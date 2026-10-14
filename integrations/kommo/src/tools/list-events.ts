@@ -26,7 +26,12 @@ export let listEventsTool = SlateTool.create(spec, {
         .enum(['lead', 'contact', 'company'])
         .optional()
         .describe('Filter by entity type'),
-      entityId: z.number().optional().describe('Filter by specific entity ID'),
+      entityId: z
+        .number()
+        .optional()
+        .describe(
+          'Filter by specific entity ID; entityType is required when using this filter'
+        ),
       eventTypes: z
         .array(z.string())
         .optional()

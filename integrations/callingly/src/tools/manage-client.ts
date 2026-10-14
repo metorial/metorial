@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let manageClient = SlateTool.create(spec, {
 - **activate** — Activate a client account.
 - **deactivate** — Deactivate a client account.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -67,9 +67,9 @@ export let manageClient = SlateTool.create(spec, {
       let clients = clientsArray.map((c: any) => ({
         clientId: String(c.id),
         name: c.name ?? `${c.fname ?? ''} ${c.lname ?? ''}`.trim(),
-        email: c.email,
-        billedUsers: c.billed_users,
-        billedNumbers: c.billed_numbers
+        email: c.email ?? undefined,
+        billedUsers: c.billed_users ?? undefined,
+        billedNumbers: c.billed_numbers ?? undefined
       }));
 
       return {
@@ -79,6 +79,18 @@ export let manageClient = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      if (
+        !ctx.input.firstName?.trim() ||
+        !ctx.input.lastName?.trim() ||
+        !ctx.input.company?.trim() ||
+        !ctx.input.email?.trim() ||
+        !ctx.input.phoneNumber?.trim() ||
+        !ctx.input.password
+      ) {
+        throw createApiServiceError(
+          'Provide firstName, lastName, company, email, phoneNumber, and password when creating a client.'
+        );
+      }
       let result = await client.createClient({
         firstName: ctx.input.firstName!,
         lastName: ctx.input.lastName!,
@@ -97,6 +109,9 @@ export let manageClient = SlateTool.create(spec, {
       };
     }
 
+    if (!ctx.input.clientId?.trim()) {
+      throw createApiServiceError(`Provide clientId for the ${ctx.input.action} action.`);
+    }
     if (ctx.input.action === 'delete') {
       await client.deleteClient(ctx.input.clientId!);
       return {

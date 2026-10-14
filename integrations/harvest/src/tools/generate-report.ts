@@ -1,18 +1,20 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateReport = SlateTool.create(spec, {
   name: 'Generate Report',
   key: 'generate_report',
-  description: `Generate various Harvest reports: time tracked by project, expenses by project, uninvoiced time and expenses, or project budget consumption. Requires a date range for time, expense, and uninvoiced reports.`,
+  description: `Generate various Harvest reports: time tracked by project, expenses by project, uninvoiced time and expenses, or project budget consumption. Requires a date range for time, expense, and uninvoiced reports. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       reportType: z
         .enum(['time', 'expenses', 'uninvoiced', 'project_budget'])
         .describe('Type of report to generate'),
@@ -40,7 +42,7 @@ export let generateReport = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.reportType === 'project_budget') {
@@ -61,7 +63,7 @@ export let generateReport = SlateTool.create(spec, {
     }
 
     if (!ctx.input.from || !ctx.input.to) {
-      throw new Error(
+      throw createApiServiceError(
         'from and to dates are required for time, expenses, and uninvoiced reports'
       );
     }

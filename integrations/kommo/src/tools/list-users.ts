@@ -17,7 +17,7 @@ let userOutputSchema = z.object({
 export let listUsersTool = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List account users or get a specific user by ID. Returns user details including name, email, role, and admin status. Use this to find user IDs for assigning leads, contacts, or tasks.`,
+  description: `List account users or get a specific user by ID. Returns user details including name, email, role, and admin status. Requires an administrator account. Use this to find user IDs for assigning leads, contacts, or tasks.`,
   tags: { readOnly: true }
 })
   .input(
@@ -48,10 +48,10 @@ export let listUsersTool = SlateTool.create(spec, {
         name: user.name,
         email: user.email,
         lang: user.lang,
-        isAdmin: user.is_admin,
-        isActive: user.is_active,
-        roleId: user.role_id,
-        groupId: user.group_id
+        isAdmin: user.rights?.is_admin,
+        isActive: user.rights?.is_active,
+        roleId: user.rights?.role_id ?? undefined,
+        groupId: user.rights?.group_id ?? undefined
       };
       return {
         output: { users: [mapped] },
@@ -66,10 +66,10 @@ export let listUsersTool = SlateTool.create(spec, {
       name: u.name,
       email: u.email,
       lang: u.lang,
-      isAdmin: u.is_admin,
-      isActive: u.is_active,
-      roleId: u.role_id,
-      groupId: u.group_id
+      isAdmin: u.rights?.is_admin,
+      isActive: u.rights?.is_active,
+      roleId: u.rights?.role_id ?? undefined,
+      groupId: u.rights?.group_id ?? undefined
     }));
 
     return {

@@ -1,107 +1,85 @@
-# Slates Specification for Dailybot
-
-## Overview
-
-DailyBot is a team productivity platform that automates async check-ins (stand-ups), forms, peer recognition (kudos), and messaging across chat platforms like Slack, Microsoft Teams, Google Chat, and Discord. It provides a public API to programmatically manage these features and integrates with project management tools for activity tracking.
+# DailyBot Integration Specification
 
 ## Authentication
 
-DailyBot uses **API Key-based authentication**.
+Connect with an API key from DailyBot Organization Settings → Integrations.
+Requests use `X-API-KEY` against `https://api.dailybot.com/v1/`. The API key
+inherits its owner's organization and permissions and requires a paid plan.
+`get_current_user` confirms the current user or agent identity;
+`get_organization` confirms organization scope. Email visibility depends on
+permissions and the `includeEmail` option.
 
-The V1 API uses HTTP headers and unique API keys to authenticate requests.
+## Tools
 
-**Obtaining an API Key:**
+The integration exposes 23 tools:
 
-- You require the Org Administrator role.
-- Navigate to Organization Settings, click "Integrations", go to the Integrations page, and click "Generate API Key".
-- You can create as many API Keys as you need and revoke them at any moment.
+- Check-ins: `list_checkins`, `get_checkin`, `create_checkin`, `update_checkin`,
+  `delete_checkin`, `get_checkin_responses`, and `send_checkin_reminders`.
+- Forms: `list_forms`, `get_form`, and `get_form_responses`.
+- Templates: `list_templates` and `get_template`.
+- Users: `get_current_user`, `list_users`, `get_user`, and `update_user`.
+- Teams: `list_teams`, `get_team_members`, and `manage_team_members`.
+- Messaging: `send_message` and `send_email`.
+- Recognition and organization: `give_kudos` and `get_organization`.
 
-**Using the API Key:**
-The API key must be sent as an `X-API-KEY` HTTP header with each request. The base URL is `https://api.dailybot.com/v1/`.
+## Pagination and discovery
 
-**Key Context:**
-An API Key includes both the organization and the key owner as context, meaning actions that require permissions or privacy checks will consider the actual permissions of the key owner.
+User, team, template, and check-in lists accept `page` and `pageSize`. Form
+lists and form responses accept `limit` and `offset`. List results include
+`count`, `next`, and `previous` when returned by DailyBot. Check-in responses
+also accept the documented page parameters; the existing `limit` and `offset`
+inputs remain available for compatibility.
 
-**Exchange Tokens (Advanced):**
-DailyBot supports an Exchange Token mechanism to make API calls on behalf of other users in the organization. This feature is disabled by default and must be requested via the support team.
+Use list tools to find resource UUIDs before invoking detail or mutation tools.
+User listings can search by name, email, or external ID and request email
+addresses. Check-in lists can search by name or filter by team/user. Templates
+can render special variables in the context of a check-in.
 
-## Features
+## Forms
 
-### Check-in Management
+`get_form` returns questions, workflow configuration, anonymity, and the full
+provider object. `get_form_responses` retains original answer values and
+response metadata. It returns the caller's own responses by default. `all`
+or filtering another submitter requires `VIEW_REPORTS` permission. Responses
+can be filtered by date, content search, and workflow state, and ordered by
+creation time. The provider rejects a workflow-state filter on a form without
+a workflow.
 
-Create, update, delete, and list check-ins (async stand-ups and recurring surveys). Check-ins are based on templates and can be configured with scheduling frequency, days of the week, custom trigger times, reminder settings, anonymity, privacy levels, and reporting channels. You can also retrieve check-in responses filtered by date range, and send manual reminders to participants who haven't responded.
+## Messaging
 
-- Check-ins can be set as trigger-based (manual only) or automatic with configurable recurring schedules.
-- Up to 3 reminders can be configured per check-in with smart or fixed frequency modes.
-- Responses include blocker indicators and completion status.
+`send_message` requires at least one user, team, or channel. Channels can carry
+`thread` and `channelType`. Each button keeps the existing `label`, `value`, and
+optional `type` inputs, with optional `url` for link buttons and `callbackUrl`
+for interactive buttons. The default type is `interactive`. Reusing
+`botMessageId` within 72 hours requests an edit of the original message.
 
-### Forms
+## Compatibility and limits
 
-List all forms visible to the API key owner. Forms support anonymous response collection, privacy settings, shortcuts, and date-bounded availability.
+Existing public tool keys, fields, types, optionality, template enums, and raw
+provider output fields remain available. No file-producing tool is exposed.
+There are no registered triggers or normalized chat adapters.
 
-- Forms are read-only via the API (listing only); form creation is managed through the web interface.
+Current official documentation uses `/checkins/create/`, `/config/`, and
+`/archive/` for check-in authoring, with inline questions, participants, and a
+nested schedule. Existing template-based authoring, update, delete, and reminder
+tools retain their legacy paths and payloads because a documented equivalence
+or removal notice was not found. Current email documentation names `to`,
+`subject`, `body_html`, and `body_text` but does not define recipient identifier
+semantics; the existing UUID-based email payload is retained. The current team
+member reference omits the add-member request body. The supplemental user-update
+reference documents first/last names, timezone, and metadata, while the existing
+full-name, occupation, schedule, time-off, active-status, and bot-enabled update
+fields remain undocumented there. Those legacy write fields require provider
+verification before claiming current support.
 
-### Templates
+## Official references
 
-Retrieve templates for check-ins and forms, including their question definitions, logic flow, and intro/outro messages. Templates can be filtered by type (check-ins or forms) and whether they are system defaults.
-
-### User Management
-
-List, view, and update users in the organization. Configurable fields include full name, occupation, timezone, work days, work start time, time-off dates, active status, and bot enablement.
-
-### Team Management
-
-List teams, view team details, list team members, add users to teams, and remove users from teams. Teams can be marked as default across the organization.
-
-### Messaging
-
-Send messages to specific users, teams, or channels via the connected chat platform. Messages can include text, images, and interactive buttons. A separate endpoint allows sending emails to users.
-
-- Group conversation creation is only supported in Slack, not other chat platforms.
-
-### Kudos (Peer Recognition)
-
-Give kudos to users on behalf of the API key owner or on behalf of DailyBot. Kudos can be associated with company values, sent anonymously, and directed to multiple receivers.
-
-### Organization Info
-
-Retrieve organization-level information including name, connected chat platform, supported domains, and platform configuration.
-
-### Activity Ingestion
-
-Add any user activity to DailyBot so it shows up in check-in reports or user activity feeds. Such activity can happen in any external context or app. This is done by posting to a unique Activity Hook URL.
-
-## Events
-
-DailyBot can deliver data to your application via WebHooks based on your organization's activity. Webhooks can be created via the web interface or the API. When creating a webhook, you must specify the endpoint URL, subscribe to event types, and optionally subscribe to specific objects (e.g., a particular check-in or form).
-
-Webhook requests can be authenticated via a Bearer token (sent in an `X-BEARER` header), HTTPS Basic Authentication, or OAuth 2.0.
-
-### Check-in Response Events
-
-Triggered when a check-in response is completed, updated, or deleted by a team member. Privacy rules apply: anonymous responses will not include user information, and events are only sent if the subscriber has read permissions on the check-in.
-
-- Events: `followups.response.completed`, `followups.response.updated`, `followups.response.deleted`
-
-### Form Response Events
-
-Triggered when a form response is created, updated, or deleted. Same privacy rules as check-in events apply.
-
-- Events: `forms.response.created`, `forms.response.updated`, `forms.response.deleted`
-
-### Kudos Events
-
-Triggered when kudos are given to a user in the organization. The payload includes giver, receivers, content, and the related company value. Anonymous kudos will mask the giver's identity.
-
-- Event: `kudos.posted`
-
-### Organization Events
-
-Triggered when user or team membership changes occur:
-
-- User activated: triggered when an administrator changes a user's status to active.
-- User deactivated: triggered when an administrator changes a user's status to inactive.
-- Team user added: triggered when a user is added to a team by an org or team administrator.
-- Team user removed: triggered when a user is removed from a team by an org or team administrator.
-
-- Events: `organization.user_activated`, `organization.user_deactivated`, `organization.team_user_added`, `organization.team_user_removed`
+- [Authentication](https://www.dailybot.com/developers/authentication/)
+- [Users](https://www.dailybot.com/developers/api/users/)
+- [Organization](https://www.dailybot.com/developers/api/organization/)
+- [Teams](https://www.dailybot.com/developers/api/teams/)
+- [Check-ins](https://www.dailybot.com/developers/api/check-ins/)
+- [Forms](https://www.dailybot.com/developers/api/forms/)
+- [Templates](https://www.dailybot.com/developers/api/templates/)
+- [Messaging](https://www.dailybot.com/developers/api/messaging/)
+- [Kudos](https://www.dailybot.com/developers/api/kudos/)

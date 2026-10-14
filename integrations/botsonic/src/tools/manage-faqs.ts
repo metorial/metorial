@@ -1,18 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { botIdSchema, pageSchema, sizeSchema, workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createFaq = SlateTool.create(spec, {
   name: 'Create FAQ',
   key: 'create_faq',
   description: `Create a new FAQ entry for a Botsonic bot. FAQs allow the bot to give precise, predetermined answers to known common questions rather than generating responses from training data.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       question: z.string().describe('The FAQ question'),
       answer: z.string().describe('The answer to the FAQ question')
     })
@@ -28,7 +34,12 @@ export let createFaq = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.createFaq({
       question: ctx.input.question,
@@ -53,17 +64,22 @@ export let listFaqs = SlateTool.create(spec, {
   name: 'List FAQs',
   key: 'list_faqs',
   description: `Retrieve all FAQ entries associated with a bot. Supports searching, sorting, and pagination.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       searchQuery: z.string().optional().describe('Search for FAQs matching this query'),
       sortBy: z.string().optional().describe('Field to sort by (e.g. created_at, question)'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      page: z.number().optional().describe('Page number (starts at 1)'),
-      size: z.number().optional().describe('Number of results per page (1-100, default 50)')
+      page: pageSchema,
+      size: sizeSchema
     })
   )
   .output(
@@ -82,13 +98,18 @@ export let listFaqs = SlateTool.create(spec, {
           })
         )
         .describe('List of FAQ entries'),
-      total: z.number().describe('Total number of FAQs'),
-      page: z.number().describe('Current page number'),
-      pages: z.number().describe('Total number of pages')
+      total: z.number().optional().describe('Total number of FAQs'),
+      page: z.number().optional().describe('Current page number'),
+      pages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.listFaqs({
       searchQuery: ctx.input.searchQuery,
@@ -112,11 +133,11 @@ export let listFaqs = SlateTool.create(spec, {
     return {
       output: {
         faqs,
-        total: result.total,
-        page: result.page,
-        pages: result.pages
+        total: result.total ?? undefined,
+        page: result.page ?? undefined,
+        pages: result.pages ?? undefined
       },
-      message: `Found **${result.total}** FAQs (page ${result.page}/${result.pages}).`
+      message: `Returned **${faqs.length}** FAQs${result.total == null ? '' : ` of ${result.total} total`}.`
     };
   })
   .build();
@@ -125,12 +146,17 @@ export let deleteFaq = SlateTool.create(spec, {
   name: 'Delete FAQ',
   key: 'delete_faq',
   description: `Delete an FAQ entry from a bot. To update an FAQ, delete the existing one and create a new one with the updated content.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       faqId: z.string().describe('The unique identifier of the FAQ to delete')
     })
   )
@@ -141,7 +167,12 @@ export let deleteFaq = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     await client.deleteFaq(ctx.input.faqId);
 

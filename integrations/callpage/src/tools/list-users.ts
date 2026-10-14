@@ -19,7 +19,15 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      users: z.array(z.any()).describe('List of user objects')
+      users: z.array(z.any()).describe('List of user objects'),
+      pagination: z
+        .object({
+          totalCount: z.number(),
+          limit: z.number(),
+          offset: z.number()
+        })
+        .optional()
+        .describe('Total matching records and the current page limit and offset')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +39,14 @@ export let listUsers = SlateTool.create(spec, {
     });
 
     return {
-      output: { users: result.users },
+      output: {
+        users: result.users,
+        pagination: {
+          totalCount: result.meta.count,
+          limit: result.meta.limit,
+          offset: result.meta.offset
+        }
+      },
       message: `Retrieved **${result.users.length}** users.`
     };
   })

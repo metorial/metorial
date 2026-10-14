@@ -24,7 +24,7 @@ Each API key can optionally be linked to a `callbackURL`, `returnURL`, and `webh
 
 ### Document Upload & Management
 
-Upload PDF or Word documents to the OKSign platform for signing. Word documents are automatically converted to PDF upon upload. You can check if a document exists, retrieve it, or remove it from the platform. Documents are automatically removed once all signatures are collected, or can be manually removed. Maximum file size is 10 MB.
+Upload PDF or Word documents to the OKSign platform for signing. Word documents are automatically converted to PDF upon upload. You can check if a document exists, retrieve it, or remove it from the platform. Documents remain available until explicitly removed. The download_document tool prepares source or signed PDFs for download. Maximum file size is 10 MB.
 
 ### Form Descriptor & Field Configuration
 
@@ -36,7 +36,7 @@ Collect signatures from one or more signers using five signing options per signa
 
 ### Notifications (Email & SMS)
 
-Send email and/or SMS notifications to signers informing them that a document is ready for signing. Notifications support configurable subject, body (HTML for email), language (nl, fr, en, da, de, pl, es, it, pt), reminders (interval in days), and repeat count. Notifications can be resent at any time. Email attachments of various types (PDF, Word, Excel, images, etc.) can be included with notification emails.
+Send email and/or SMS notifications to signers informing them that a document is ready for signing. Notifications support configurable subject, body (HTML for email), language (nl, fr, en, da, de, pl, es, it, pt), reminders (interval in days), and repeat count. Email and SMS reminder repeat counts are whole numbers from 0 to 3; reminder intervals are whole numbers from 0 to 10 days. Notifications can be resent at any time. Email attachments of various types (PDF, Word, Excel, images, etc.) can be included with notification emails.
 
 ### Briefcase (Document Bundling)
 
@@ -52,11 +52,11 @@ Embed the OKSign document editor in your own application, allowing users to inte
 
 ### Document Metadata & Audit Trail
 
-Retrieve metadata from signed documents including signature details (who signed, when, authentication method, signer identity), field values, and document status. An Audit Trail report (PDF) provides certified proof of all actions performed on a document — access, review, and signatures — with timestamps and document hash verification. Audit trails are available for up to 18 months after upload.
+Retrieve metadata from signed documents including signature details (who signed, when, authentication method, signer identity), field values, and document status. An Audit Trail report (PDF) provides certified proof of all actions performed on a document — access, review, and signatures — with timestamps and document hash verification. Audit trails are available for documents uploaded after 2023-10-02, for up to 18 months after upload. Source document IDs can also be used before signing. The audit report is downloadable, and the legacy base64 output remains for compatibility.
 
 ### Contacts Management
 
-Manage a contacts list within your OKSign account. Contacts can be added, updated, retrieved, and removed. Each contact has a name, email, optional mobile number, role/capacity, and group assignment. The contact list can be fully replaced or incrementally updated. Contacts are uniquely identified by the combination of email and name.
+Manage a contacts list within your OKSign account. Contacts can be added, updated, retrieved, and removed. Each contact has a name, email, optional mobile number, role/capacity, and group assignment. Contacts are uniquely identified by the combination of email and name.
 
 ### Account Information
 
@@ -82,5 +82,5 @@ When an email or SMS notification fails to deliver (e.g., bounce, blocked, inval
 
 OKSign also provides two purpose-built polling endpoints as alternatives to the callback and webhook URLs:
 
-- **Documents.signed polling**: Retrieve a list of documents signed within a specified time window.
+- **Documents.signed polling**: The list_signed_documents tool retrieves signing events within an ISO-8601 time window. Events include source and signed document IDs and may represent partially signed documents.
 - **Webhooks.retrieve polling**: Retrieve notification delivery errors within a specified time window.

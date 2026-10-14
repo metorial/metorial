@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,10 +39,11 @@ Use **action** to specify the operation.`,
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required when creating a field');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required when creating a field');
       let result = await client.createField({
         name: ctx.input.name,
-        type: ctx.input.fieldType,
+        type: ctx.input.fieldType || 'string',
         public_name: ctx.input.publicName
       });
       return {
@@ -52,7 +53,10 @@ Use **action** to specify the operation.`,
     }
 
     if (action === 'update') {
-      if (!ctx.input.fieldId) throw new Error('fieldId is required when updating a field');
+      if (!ctx.input.fieldId)
+        throw createApiServiceError('fieldId is required when updating a field');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required when updating a field');
       await client.updateField({
         id: ctx.input.fieldId,
         name: ctx.input.name,
@@ -65,7 +69,8 @@ Use **action** to specify the operation.`,
     }
 
     if (action === 'delete') {
-      if (!ctx.input.fieldId) throw new Error('fieldId is required when deleting a field');
+      if (!ctx.input.fieldId)
+        throw createApiServiceError('fieldId is required when deleting a field');
       await client.deleteField(ctx.input.fieldId);
       return {
         output: { fieldId: ctx.input.fieldId, success: true },
@@ -73,6 +78,6 @@ Use **action** to specify the operation.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

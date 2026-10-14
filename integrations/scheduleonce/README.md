@@ -1,6 +1,8 @@
-# Scheduleonce
+# ScheduleOnce
 
-Retrieve and manage bookings, booking calendars, booking pages, event types, users, and teams for automated appointment scheduling. Filter bookings by status, time range, and other parameters. Access detailed booking data including guest information, form submissions, virtual conferencing details, and cancel/reschedule history. Manage webhook subscriptions to receive real-time notifications for booking lifecycle events such as scheduled, rescheduled, canceled, completed, and no-show.
+Retrieve bookings, booking calendars, Classic booking pages, event types, users, and teams. Filter bookings by status, time range, owner, or scheduling resource. Access guest information, form submissions, conferencing details, and cancellation or rescheduling information. Identify the connected OnceHub account, cancel a booking, and find available calendar time slots and meeting locations.
+
+List results include the returned page count, whether more records are available, and a next cursor. Use the next cursor as the next request's `cursor`. Booking details preserve related resource IDs when expanded objects are requested.
 
 ## License
 

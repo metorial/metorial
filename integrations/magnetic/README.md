@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Magnetic
 
-Manage contacts, companies, opportunities, tasks, time tracking, and invoicing for professional services firms. Create and find contacts with detailed profiles and activity logs. Create opportunities/jobs in the CRM pipeline with owners, amounts, and due dates. Create and search tasks linked to projects, assign owners, set priorities, and add comments. Log time against tasks for billable hour tracking. Retrieve users and notifications. Export and import financial data including invoices, expenses, customers, and purchase orders.
+Create contacts and contact activity records, discover existing contacts and companies, and create opportunities or jobs. Create and search tasks, assign owners, and log additional time against tasks. Retrieve the connected user's profile, account users, and notifications.
 
 ## License
 

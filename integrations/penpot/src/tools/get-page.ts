@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPageTool = SlateTool.create(spec, {
@@ -31,7 +31,7 @@ export let getPageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let page = await client.getPage(ctx.input.fileId, ctx.input.pageId);
 
     let objectCount = page.objects ? Object.keys(page.objects).length : 0;

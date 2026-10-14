@@ -13,7 +13,7 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to retrieve contacts from'),
+      listId: z.string().describe('List ID. Call list_lists to discover available lists.'),
       filter: z
         .string()
         .optional()

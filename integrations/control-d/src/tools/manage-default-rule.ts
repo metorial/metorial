@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { actionDescription, createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -43,8 +43,8 @@ export let manageDefaultRule = SlateTool.create(spec, {
     let { operation, profileId, action, enabled, via } = ctx.input;
 
     if (operation === 'update') {
-      if (action === undefined) throw new Error('action is required for update');
-      if (enabled === undefined) throw new Error('enabled is required for update');
+      if (action === undefined) throw createApiServiceError('action is required for update');
+      if (enabled === undefined) throw createApiServiceError('enabled is required for update');
 
       let rule = await client.modifyDefaultRule(profileId, {
         action,

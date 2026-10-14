@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DocuGenerateClient } from '../lib/client';
+import { DocuGenerateClient, formatValidTags } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
@@ -18,8 +18,12 @@ export let listTemplates = SlateTool.create(spec, {
       templates: z.array(
         z.object({
           templateId: z.string().describe('Unique template ID'),
-          created: z.number().describe('Creation timestamp (Unix epoch)'),
-          updated: z.number().describe('Last update timestamp (Unix epoch)'),
+          created: z
+            .number()
+            .describe('Creation timestamp in milliseconds since the Unix epoch'),
+          updated: z
+            .number()
+            .describe('Last update timestamp in milliseconds since the Unix epoch'),
           name: z.string().describe('Template name'),
           pageCount: z.number().describe('Number of pages in the template'),
           delimiters: z
@@ -28,11 +32,21 @@ export let listTemplates = SlateTool.create(spec, {
               right: z.string()
             })
             .describe('Tag delimiters used in the template'),
-          validTags: z.array(z.string()).describe('Detected valid merge tags'),
+          validTags: z
+            .array(z.string())
+            .describe(
+              'Detected valid merge tags. Structured list or table tags are represented as JSON strings.'
+            ),
           invalidTags: z.array(z.string()).describe('Detected invalid/unclosed merge tags'),
           filename: z.string().describe('Original uploaded filename'),
           format: z.string().describe('Template file format'),
           region: z.string().describe('Processing region'),
+          folder: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Folder names from root to leaf. Empty when the template has no folder.'
+            ),
           templateUri: z.string().describe('URL to download the template file'),
           previewUri: z.string().describe('URL to preview the template'),
           imageUri: z.string().describe('URL to the template thumbnail image'),
@@ -57,11 +71,12 @@ export let listTemplates = SlateTool.create(spec, {
       name: t.name,
       pageCount: t.page_count,
       delimiters: t.delimiters,
-      validTags: t.tags.valid,
+      validTags: formatValidTags(t.tags.valid),
       invalidTags: t.tags.invalid,
       filename: t.filename,
       format: t.format,
       region: t.region,
+      folder: t.folder,
       templateUri: t.template_uri,
       previewUri: t.preview_uri,
       imageUri: t.image_uri,

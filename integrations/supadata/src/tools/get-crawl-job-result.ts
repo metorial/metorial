@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,36 +20,77 @@ export let getCrawlJobResult = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      jobId: z.string().describe('Job ID returned from the crawl request')
+      jobId: z.string().describe('Job ID returned from the crawl request'),
+      skip: z
+        .number()
+        .optional()
+        .describe(
+          'Number of pages to skip. Use the skip value in a previous result next URL to retrieve more pages.'
+        )
     })
   )
   .output(
     z.object({
-      status: z.string().describe('Job status (e.g. "processing", "completed", "failed")'),
+      status: z
+        .string()
+        .describe('Job status (e.g. "scraping", "completed", "failed", "cancelled")'),
       pages: z
         .array(crawledPageSchema)
         .optional()
         .describe('Array of crawled pages with their content'),
-      totalPages: z.number().optional().describe('Total number of pages crawled')
+      totalPages: z
+        .number()
+        .optional()
+        .describe(
+          'Total number of pages crawled when reported, otherwise the number in this response'
+        ),
+      next: z
+        .string()
+        .optional()
+        .describe(
+          'URL for the next result page; its skip parameter can be used in another call'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.skip !== undefined &&
+      (!Number.isInteger(ctx.input.skip) || ctx.input.skip < 0)
+    ) {
+      throw createApiServiceError('Crawl skip must be a non-negative whole number.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getCrawlStatus(ctx.input.jobId);
+    let result = await client.getCrawlStatus(ctx.input.jobId, ctx.input.skip);
 
-    let pages = result.pages ?? result.data ?? [];
+    let pages = (result.pages ?? result.data ?? []).map(
+      (page: {
+        url: string;
+        content?: string;
+        name?: string;
+        description?: string;
+        pageName?: string;
+        pageDescription?: string;
+      }) => ({
+        url: page.url,
+        content: page.content,
+        pageName: page.pageName ?? page.name,
+        pageDescription: page.pageDescription ?? page.description
+      })
+    );
 
     return {
       output: {
         status: result.status,
-        pages: pages,
-        totalPages: pages.length ?? result.totalPages
+        pages,
+        totalPages: result.totalPages ?? pages.length,
+        next: result.next ?? undefined
       },
       message:
         result.status === 'completed'
           ? `Crawl completed — **${pages.length}** pages extracted.`
-          : `Crawl status: **${result.status}**. ${result.status === 'processing' ? 'Try again shortly.' : ''}`
+          : `Crawl status: **${result.status}**. ${['scraping', 'processing'].includes(result.status) ? 'Try again shortly.' : ''}`
     };
   })
   .build();

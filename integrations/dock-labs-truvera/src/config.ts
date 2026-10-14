@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['production', 'testnet'])
       .default('production')
       .describe(
-        'API environment. Production uses api.dock.io, testnet uses api-testnet.dock.io'
+        'API environment. Production uses api.truvera.io, testnet uses api-testnet.truvera.io'
       )
   })
 );

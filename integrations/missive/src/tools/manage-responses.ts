@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -82,9 +82,9 @@ export let manageResponses = SlateTool.create(spec, {
       let responses = (data.responses || []).map((r: any) => ({
         responseId: r.id,
         title: r.title,
-        subject: r.subject,
+        subject: r.subject ?? undefined,
         body: r.body,
-        externalId: r.external_id
+        externalId: r.external_id ?? undefined
       }));
 
       return {
@@ -94,18 +94,20 @@ export let manageResponses = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.responseId) throw new Error('responseId is required');
+      if (!ctx.input.responseId) throw createApiServiceError('responseId is required');
       let data = await client.getResponse(ctx.input.responseId);
-      let r = data.responses;
+      let r = Array.isArray(data.responses) ? data.responses[0] : data.responses;
+      if (!r?.id)
+        throw createApiServiceError('Missive did not return the requested response.');
       return {
         output: {
           responses: [
             {
               responseId: r.id,
               title: r.title,
-              subject: r.subject,
+              subject: r.subject ?? undefined,
               body: r.body,
-              externalId: r.external_id
+              externalId: r.external_id ?? undefined
             }
           ]
         },
@@ -114,7 +116,8 @@ export let manageResponses = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.responseId) throw new Error('responseId is required for delete');
+      if (!ctx.input.responseId)
+        throw createApiServiceError('responseId is required for delete');
       await client.deleteResponses([ctx.input.responseId]);
       return {
         output: { responses: [] },
@@ -122,17 +125,29 @@ export let manageResponses = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.externalId && !ctx.input.externalSource) {
+      throw createApiServiceError('externalSource is required when externalId is provided.');
+    }
+    if (
+      ctx.input.action === 'create' &&
+      Boolean(ctx.input.organizationId) === Boolean(ctx.input.userId)
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one of organizationId or userId when creating a response.'
+      );
+    }
     let fields: Record<string, any> = {};
-    if (ctx.input.title) fields.title = ctx.input.title;
-    if (ctx.input.subject) fields.subject = ctx.input.subject;
-    if (ctx.input.body) fields.body = ctx.input.body;
+    if (ctx.input.title !== undefined) fields.title = ctx.input.title;
+    if (ctx.input.subject !== undefined) fields.subject = ctx.input.subject;
+    if (ctx.input.body !== undefined) fields.body = ctx.input.body;
     if (ctx.input.shareWithTeam) fields.share_with_team = ctx.input.shareWithTeam;
     if (ctx.input.sharedLabelIds) fields.shared_labels = ctx.input.sharedLabelIds;
     if (ctx.input.toFields) fields.to_fields = ctx.input.toFields;
     if (ctx.input.ccFields) fields.cc_fields = ctx.input.ccFields;
     if (ctx.input.bccFields) fields.bcc_fields = ctx.input.bccFields;
-    if (ctx.input.externalId) fields.external_id = ctx.input.externalId;
-    if (ctx.input.externalSource) fields.external_source = ctx.input.externalSource;
+    if (ctx.input.externalId !== undefined) fields.external_id = ctx.input.externalId;
+    if (ctx.input.externalSource !== undefined)
+      fields.external_source = ctx.input.externalSource;
 
     if (ctx.input.action === 'create') {
       if (ctx.input.organizationId) fields.organization = ctx.input.organizationId;
@@ -144,9 +159,9 @@ export let manageResponses = SlateTool.create(spec, {
           responses: responses.map((r: any) => ({
             responseId: r.id,
             title: r.title,
-            subject: r.subject,
+            subject: r.subject ?? undefined,
             body: r.body,
-            externalId: r.external_id
+            externalId: r.external_id ?? undefined
           }))
         },
         message: `Created response **${ctx.input.title}**.`
@@ -154,7 +169,8 @@ export let manageResponses = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.responseId) throw new Error('responseId is required for update');
+    if (!ctx.input.responseId)
+      throw createApiServiceError('responseId is required for update');
     let data = await client.updateResponses([ctx.input.responseId], fields);
     let responses = Array.isArray(data.responses) ? data.responses : [data.responses];
     return {
@@ -162,9 +178,9 @@ export let manageResponses = SlateTool.create(spec, {
         responses: responses.map((r: any) => ({
           responseId: r.id,
           title: r.title,
-          subject: r.subject,
+          subject: r.subject ?? undefined,
           body: r.body,
-          externalId: r.external_id
+          externalId: r.external_id ?? undefined
         }))
       },
       message: `Updated response **${ctx.input.responseId}**.`

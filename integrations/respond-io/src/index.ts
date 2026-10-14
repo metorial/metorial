@@ -6,6 +6,8 @@ import {
   createContact,
   deleteContact,
   getContact,
+  getMessage,
+  listContactChannels,
   listContacts,
   listCustomFields,
   listMessages,
@@ -23,6 +25,8 @@ export let provider = Slate.create({
   tools: [
     createContact,
     getContact,
+    getMessage,
+    listContactChannels,
     updateContact,
     deleteContact,
     listContacts,

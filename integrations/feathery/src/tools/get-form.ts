@@ -41,7 +41,11 @@ export let getForm = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let form = await client.getForm(ctx.input.formId);
@@ -50,10 +54,10 @@ export let getForm = SlateTool.create(spec, {
       output: {
         formId: form.id || form.form_id,
         formName: form.name || form.form_name,
-        enabled: form.enabled,
+        enabled: form.active ?? form.enabled,
         steps: form.steps,
         navigationRules: form.navigation_rules,
-        logicRules: form.logic_rules,
+        logicRules: form.rules ?? form.logic_rules,
         integrations: form.integrations,
         translations: form.translations,
         tags: form.tags

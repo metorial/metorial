@@ -4,6 +4,7 @@ export * from './delete-training-data';
 export * from './generate-response';
 export * from './get-bot';
 export * from './list-bots';
+export * from './list-starter-presets';
 export * from './list-training-data';
 export * from './manage-conversations';
 export * from './manage-faqs';

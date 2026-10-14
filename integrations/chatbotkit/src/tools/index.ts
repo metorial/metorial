@@ -1,5 +1,7 @@
 export * from './conversation-feedback';
+export * from './get-task';
 export * from './list-messages';
+export * from './list-models';
 export * from './list-resources';
 export * from './manage-bot';
 export * from './manage-contact';

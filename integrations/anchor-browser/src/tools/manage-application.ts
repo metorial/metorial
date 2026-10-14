@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,7 +32,7 @@ export let manageApplication = SlateTool.create(spec, {
         .object({
           applicationId: z.string(),
           name: z.string(),
-          url: z.string(),
+          url: z.string().optional(),
           description: z.string().optional(),
           identityCount: z.number().optional(),
           authMethods: z.array(z.string()).optional(),
@@ -46,7 +46,7 @@ export let manageApplication = SlateTool.create(spec, {
           z.object({
             applicationId: z.string(),
             name: z.string(),
-            url: z.string(),
+            url: z.string().optional(),
             description: z.string().optional(),
             identityCount: z.number().optional(),
             createdAt: z.string().optional()
@@ -61,7 +61,7 @@ export let manageApplication = SlateTool.create(spec, {
     let input = ctx.input;
 
     if (input.action === 'create') {
-      if (!input.source) throw new Error('source URL is required for create.');
+      if (!input.source) throw createApiServiceError('source URL is required for create.');
       let result = await client.createApplication({
         source: input.source,
         name: input.name,
@@ -72,9 +72,9 @@ export let manageApplication = SlateTool.create(spec, {
           application: {
             applicationId: result.id,
             name: result.name,
-            url: result.url,
-            description: result.description,
-            createdAt: result.created_at
+            url: result.url ?? undefined,
+            description: result.description ?? undefined,
+            createdAt: result.created_at ?? undefined
           }
         },
         message: `Application **${result.name ?? result.id}** created.`
@@ -88,10 +88,10 @@ export let manageApplication = SlateTool.create(spec, {
           applications: (result.applications ?? []).map(a => ({
             applicationId: a.id,
             name: a.name,
-            url: a.url,
-            description: a.description,
-            identityCount: a.identity_count,
-            createdAt: a.created_at
+            url: a.url ?? undefined,
+            description: a.description ?? undefined,
+            identityCount: a.identity_count ?? undefined,
+            createdAt: a.created_at ?? undefined
           }))
         },
         message: `Found **${(result.applications ?? []).length}** applications.`
@@ -99,20 +99,21 @@ export let manageApplication = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.applicationId) throw new Error('applicationId is required for get.');
+      if (!input.applicationId)
+        throw createApiServiceError('applicationId is required for get.');
       let result = await client.getApplication(input.applicationId);
       return {
         output: {
           application: {
             applicationId: result.id,
             name: result.name,
-            url: result.url,
-            description: result.description,
-            identityCount: result.identity_count,
-            authMethods: result.auth_methods,
-            allowedDomains: result.allowed_domains,
-            createdAt: result.created_at,
-            updatedAt: result.updated_at
+            url: result.url ?? undefined,
+            description: result.description ?? undefined,
+            identityCount: result.identity_count ?? undefined,
+            authMethods: result.auth_methods ?? undefined,
+            allowedDomains: result.allowed_domains ?? undefined,
+            createdAt: result.created_at ?? undefined,
+            updatedAt: result.updated_at ?? undefined
           }
         },
         message: `Application **${result.name ?? result.id}** retrieved.`
@@ -120,7 +121,8 @@ export let manageApplication = SlateTool.create(spec, {
     }
 
     if (input.action === 'update') {
-      if (!input.applicationId) throw new Error('applicationId is required for update.');
+      if (!input.applicationId)
+        throw createApiServiceError('applicationId is required for update.');
       let result = await client.updateApplication(input.applicationId, {
         allowedDomains: input.allowedDomains
       });
@@ -130,7 +132,7 @@ export let manageApplication = SlateTool.create(spec, {
             applicationId: result.id ?? input.applicationId,
             name: result.name ?? '',
             url: result.url ?? '',
-            description: result.description,
+            description: result.description ?? undefined,
             allowedDomains: result.allowed_domains ?? input.allowedDomains
           }
         },
@@ -139,7 +141,8 @@ export let manageApplication = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.applicationId) throw new Error('applicationId is required for delete.');
+      if (!input.applicationId)
+        throw createApiServiceError('applicationId is required for delete.');
       await client.deleteApplication(input.applicationId);
       return {
         output: { deleted: true },
@@ -147,6 +150,6 @@ export let manageApplication = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

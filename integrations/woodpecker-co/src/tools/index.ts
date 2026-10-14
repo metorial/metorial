@@ -18,3 +18,4 @@ export * from './reply-to-message';
 export * from './search-prospects';
 export * from './update-campaign';
 export * from './update-prospect-status';
+export * from './who-am-i';

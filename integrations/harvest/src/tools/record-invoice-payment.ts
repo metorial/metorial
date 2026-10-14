@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let recordInvoicePayment = SlateTool.create(spec, {
   name: 'Record Invoice Payment',
   key: 'record_invoice_payment',
-  description: `Record a payment against an invoice in Harvest. Optionally specify the payment date and add notes.`,
+  description: `Record a payment against an invoice in Harvest. Optionally specify the payment date and add notes. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let recordInvoicePayment = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       invoiceId: z.number().describe('ID of the invoice to record payment for'),
       amount: z.number().describe('Payment amount'),
       paidAt: z.string().optional().describe('Payment timestamp (ISO 8601)'),
@@ -33,8 +35,12 @@ export let recordInvoicePayment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
+
+    if (ctx.input.paidAt !== undefined && ctx.input.paidDate !== undefined) {
+      throw createApiServiceError('Provide either paidAt or paidDate, not both.');
+    }
 
     let payment = await client.createInvoicePayment(ctx.input.invoiceId, {
       amount: ctx.input.amount,

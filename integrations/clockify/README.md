@@ -1,6 +1,8 @@
 # Clockify
 
-Track work hours, manage projects, and generate reports. Create, update, and delete time entries with support for timers, manual entry, billable status, and tags. Manage projects, tasks, clients, and tags within workspaces. Handle invoicing including creating invoices, importing time entries and expenses, recording payments, and changing invoice status. Track expenses with file attachments and category management. Manage time off policies, submit and approve PTO requests, and update balances. Create and publish scheduled assignments with recurring intervals. Submit and manage approval workflows for time entries and expenses. Generate detailed, summary, weekly, attendance, and expense reports with export to PDF, CSV, and XLSX. Configure custom fields, manage user groups and roles, and access audit logs for workspace activity tracking.
+Track work hours, start and stop timers, and manage projects, tasks, clients, tags, and user groups. Discover accessible workspaces, inspect the authenticated user, and retrieve individual projects and time entries. Generate paginated detailed reports and grouped summary reports. Manage invoices, submit or review time off requests, and create expenses with receipt files.
+
+Choose the workspace's data region when connecting with an API key. Call `get_workspaces`, then pass a returned `workspaceId` to workspace tools. Existing connections with a stored workspace ID can continue omitting that input. Features and permissions depend on the Clockify workspace plan and the authenticated user's role.
 
 ## License
 

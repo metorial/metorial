@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrerenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -69,8 +69,8 @@ export let manageSitemaps = SlateTool.create(spec, {
         break;
       }
       case 'create': {
-        if (!ctx.input.sitemapUrl) {
-          throw new Error('sitemapUrl is required for the create action.');
+        if (!ctx.input.sitemapUrl?.trim()) {
+          throw createApiServiceError('sitemapUrl is required for the create action.');
         }
         result = await client.createSitemapV3({
           url: ctx.input.sitemapUrl,
@@ -81,8 +81,11 @@ export let manageSitemaps = SlateTool.create(spec, {
         break;
       }
       case 'update': {
-        if (!ctx.input.sitemapId) {
-          throw new Error('sitemapId is required for the update action.');
+        if (!ctx.input.sitemapId?.trim()) {
+          throw createApiServiceError('sitemapId is required for the update action.');
+        }
+        if (ctx.input.revisitInterval === undefined && ctx.input.adaptiveType === undefined) {
+          throw createApiServiceError('Provide revisitInterval or adaptiveType for update.');
         }
         result = await client.updateSitemap(ctx.input.sitemapId, {
           revisitInterval: ctx.input.revisitInterval,
@@ -92,16 +95,16 @@ export let manageSitemaps = SlateTool.create(spec, {
         break;
       }
       case 'delete': {
-        if (!ctx.input.sitemapId) {
-          throw new Error('sitemapId is required for the delete action.');
+        if (!ctx.input.sitemapId?.trim()) {
+          throw createApiServiceError('sitemapId is required for the delete action.');
         }
         result = await client.deleteSitemap(ctx.input.sitemapId);
         actionDescription = `Deleted sitemap **${ctx.input.sitemapId}**`;
         break;
       }
       case 'crawl': {
-        if (!ctx.input.sitemapId) {
-          throw new Error('sitemapId is required for the crawl action.');
+        if (!ctx.input.sitemapId?.trim()) {
+          throw createApiServiceError('sitemapId is required for the crawl action.');
         }
         result = await client.triggerSitemapCrawl(ctx.input.sitemapId);
         actionDescription = `Triggered crawl for sitemap **${ctx.input.sitemapId}**`;

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,9 @@ export let auth = SlateAuth.create()
         .describe('Your Crustdata API token. Obtain this by signing up at crustdata.com.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim()) {
+        throw createApiServiceError('Provide a non-empty Crustdata API token.');
+      }
       return {
         output: {
           token: ctx.input.apiToken

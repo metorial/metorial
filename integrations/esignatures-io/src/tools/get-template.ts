@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getTemplate = SlateTool.create(spec, {
   name: 'Get Template',
   key: 'get_template',
-  description: `Retrieves the full details of a template including its title, placeholder field keys, signer field IDs, document elements, and creation date.`,
+  description: `Retrieves the full details of a template including its title, placeholder field keys, signer field IDs, and creation date. Use get_document_content to read its Markdown body.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -43,7 +43,7 @@ export let getTemplate = SlateTool.create(spec, {
 
     let result = await client.queryTemplate(ctx.input.templateId);
 
-    let template = result?.data || result;
+    let template = result.data;
 
     let output = {
       templateId: template?.templateId || ctx.input.templateId,

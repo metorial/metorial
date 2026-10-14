@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MgmtClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,21 +46,26 @@ export let manageContentModel = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
     switch (ctx.input.operation) {
       case 'get': {
         let identifier = ctx.input.modelId ?? ctx.input.referenceName;
-        if (!identifier) throw new Error('modelId or referenceName is required for get');
+        if (!identifier)
+          throw createApiServiceError('modelId or referenceName is required for get');
         let model = await client.getModel(identifier);
         return {
-          output: { model, success: true },
-          message: `Retrieved content model **${ctx.input.referenceName || ctx.input.modelId}**`
+          output: { model: model ?? undefined, success: Boolean(model) },
+          message: model
+            ? `Retrieved content model **${ctx.input.referenceName || ctx.input.modelId}**`
+            : 'No content model matched the requested identifier.'
         };
       }
       case 'save': {
-        if (!ctx.input.modelData) throw new Error('modelData is required for save');
+        if (!ctx.input.modelData)
+          throw createApiServiceError('modelData is required for save');
         let result = await client.saveModel(ctx.input.modelData);
         return {
           output: { model: result, success: true },
@@ -68,7 +73,7 @@ export let manageContentModel = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.modelId) throw new Error('modelId is required for delete');
+        if (!ctx.input.modelId) throw createApiServiceError('modelId is required for delete');
         await client.deleteModel(ctx.input.modelId);
         return {
           output: { success: true },

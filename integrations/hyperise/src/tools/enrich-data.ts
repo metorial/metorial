@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let enrichData = SlateTool.create(spec, {
   name: 'Enrich Contact Data',
   key: 'enrich_data',
-  description: `Enrich a contact's data from an email address. Returns person details (name, profile image, job title) and company details (business name, logo, website, address) sourced from 200+ public and private data sources. Optionally provide an image template hash for fallback data.`,
+  description: `Enrich a contact's data from an email address. Returns person details (name, profile image, job title) and company details (business name, logo, website, address) sourced from 200+ public and private data sources. Provide an image template hash for fallback data; Hyperise documents the template hash as required.`,
   instructions: [
-    'Provide just the email address to get enriched person and company data.',
-    'The optional imageTemplateHash provides fallback data if enrichment fails.'
+    'Provide the email address and imageTemplateHash from list_image_templates.',
+    'Hyperise documents imageTemplateHash as required; it supplies fallback data when enrichment is unavailable.'
   ],
   tags: {
     readOnly: true
@@ -21,7 +21,9 @@ export let enrichData = SlateTool.create(spec, {
       imageTemplateHash: z
         .string()
         .optional()
-        .describe('Image template hash for fallback data resolution')
+        .describe(
+          'Image template hash for fallback data resolution; documented as required by Hyperise. Call list_image_templates to discover hashes.'
+        )
     })
   )
   .output(

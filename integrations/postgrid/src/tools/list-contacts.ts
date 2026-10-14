@@ -51,7 +51,7 @@ export let listContacts = SlateTool.create(spec, {
       city: c.city,
       provinceOrState: c.provinceOrState,
       postalOrZip: c.postalOrZip,
-      country: c.country,
+      country: c.countryCode ?? c.country,
       addressStatus: c.addressStatus
     }));
 

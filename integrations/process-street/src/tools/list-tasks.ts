@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let taskSchema = z.object({
@@ -25,6 +26,7 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       workflowRunId: z
         .string()
         .optional()
@@ -43,6 +45,7 @@ export let listTasks = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       tasks: z.array(taskSchema).describe('List of tasks')
     })
   )
@@ -51,11 +54,15 @@ export let listTasks = SlateTool.create(spec, {
 
     let data: any;
     if (ctx.input.workflowRunId) {
-      data = await client.listWorkflowRunTasks(ctx.input.workflowRunId);
+      data = await client.listWorkflowRunTasks(ctx.input.workflowRunId, ctx.input.cursor);
     } else if (ctx.input.assigneeEmail) {
-      data = await client.listTasksByAssignee(ctx.input.assigneeEmail, ctx.input.workflowId);
+      data = await client.listTasksByAssignee(
+        ctx.input.assigneeEmail,
+        ctx.input.workflowId,
+        ctx.input.cursor
+      );
     } else {
-      throw new Error('Either workflowRunId or assigneeEmail must be provided');
+      throw createApiServiceError('Either workflowRunId or assigneeEmail must be provided');
     }
 
     let tasks = (data.tasks || []).map((t: any) => ({
@@ -71,7 +78,7 @@ export let listTasks = SlateTool.create(spec, {
     }));
 
     return {
-      output: { tasks },
+      output: { tasks, nextCursor: getNextCursor(data) },
       message: `Found **${tasks.length}** task(s).`
     };
   })

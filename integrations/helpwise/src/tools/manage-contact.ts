@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageContact = SlateTool.create(spec, {
     let { action, contactId, name, email, phone, company } = ctx.input;
 
     if (action === 'get') {
-      if (!contactId) throw new Error('contactId is required for get action');
+      if (!contactId) throw createApiServiceError('contactId is required for get action');
       let contact = await client.getContact(contactId);
       return {
         output: { contact, success: true },
@@ -59,7 +59,7 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!contactId) throw new Error('contactId is required for update action');
+      if (!contactId) throw createApiServiceError('contactId is required for update action');
       let data: Record<string, any> = {};
       if (name !== undefined) data.name = name;
       if (email !== undefined) data.email = email;
@@ -73,7 +73,7 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!contactId) throw new Error('contactId is required for delete action');
+      if (!contactId) throw createApiServiceError('contactId is required for delete action');
       await client.deleteContact(contactId);
       return {
         output: { success: true },
@@ -81,6 +81,6 @@ export let manageContact = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,16 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Enter the Geokeo API key from the dashboard API tab.', {
+          reason: 'geokeo_missing_api_key'
+        });
+      }
+
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

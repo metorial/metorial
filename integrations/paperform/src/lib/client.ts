@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.paperform.co/v1';
 
@@ -42,11 +47,11 @@ export interface Form {
 
 export interface FormField {
   key: string;
-  title: string | null;
-  description: string | null;
-  required: boolean | null;
-  custom_key: string | null;
-  placeholder: string | null;
+  title?: string | null;
+  description?: string | null;
+  required?: boolean | null;
+  custom_key?: string | null;
+  placeholder?: string | null;
   type: string;
   [key: string]: unknown;
 }
@@ -76,13 +81,13 @@ export interface PartialSubmission {
 
 export interface Product {
   SKU: string;
-  name: string;
-  price: number;
-  quantity: number;
-  minimum: number;
-  maximum: number;
-  discountable: boolean;
-  images: Array<{ url: string; width: number; height: number }>;
+  name: string | null;
+  price: number | null;
+  quantity: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  discountable: boolean | null;
+  images: Array<{ url: string; width: number; height?: number }>;
   sold?: number;
 }
 
@@ -168,15 +173,18 @@ export interface PapersignWebhook {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Paperform',
+          reason: 'paperform_api_error'
+        })
     });
   }
 
@@ -188,12 +196,12 @@ export class Client {
     let response = await this.axios.get('/forms', {
       params: this.buildPaginationParams(params)
     });
-    return response.data;
+    return this.readList(response.data, 'forms');
   }
 
   async getForm(slugOrId: string): Promise<Form> {
     let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}`);
-    return response.data;
+    return this.readItem(response.data, 'form');
   }
 
   async updateForm(
@@ -215,7 +223,7 @@ export class Client {
       space_id: data.spaceId,
       translation_id: data.translationId
     });
-    return response.data;
+    return this.readItem(response.data, 'form');
   }
 
   // ---- Form Fields ----
@@ -224,17 +232,16 @@ export class Client {
     slugOrId: string,
     params?: PaginationParams & { search?: string }
   ): Promise<PaginatedResponse<FormField>> {
-    let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/fields`, {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
+    this.validatePagination(params);
+    let fields = await this.getFormFieldCollection(slugOrId, params?.search);
+    return this.paginateCollection(fields, params);
   }
 
   async getFormField(slugOrId: string, fieldKey: string): Promise<FormField> {
     let response = await this.axios.get(
       `/forms/${encodeURIComponent(slugOrId)}/fields/${encodeURIComponent(fieldKey)}`
     );
-    return response.data;
+    return this.readItem(response.data, 'field');
   }
 
   async updateFormField(
@@ -258,12 +265,12 @@ export class Client {
     let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/submissions`, {
       params: this.buildPaginationParams(params)
     });
-    return response.data;
+    return this.readList(response.data, 'submissions');
   }
 
   async getSubmission(submissionId: string): Promise<Submission> {
     let response = await this.axios.get(`/submissions/${encodeURIComponent(submissionId)}`);
-    return response.data;
+    return this.readItem(response.data, 'submission');
   }
 
   async deleteSubmission(submissionId: string): Promise<void> {
@@ -282,14 +289,14 @@ export class Client {
         params: this.buildPaginationParams(params)
       }
     );
-    return response.data;
+    return this.readList(response.data, 'partial-submissions');
   }
 
   async getPartialSubmission(submissionId: string): Promise<PartialSubmission> {
     let response = await this.axios.get(
       `/partial-submissions/${encodeURIComponent(submissionId)}`
     );
-    return response.data;
+    return this.readItem(response.data, 'partial-submission');
   }
 
   async deletePartialSubmission(submissionId: string): Promise<void> {
@@ -302,16 +309,21 @@ export class Client {
     slugOrId: string,
     params?: PaginationParams & { search?: string }
   ): Promise<PaginatedResponse<Product>> {
+    this.validatePagination(params);
     let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/products`, {
-      params: this.buildPaginationParams(params)
+      params: { search: params?.search }
     });
-    return response.data;
+    return this.paginateCollection(
+      this.readCollection<Product>(response.data, 'products'),
+      params
+    );
   }
 
   async createProduct(
     slugOrId: string,
     data: {
       SKU: string;
+      productFieldKey?: string;
       name: string;
       price: number;
       quantity?: number;
@@ -321,18 +333,40 @@ export class Client {
       images?: Array<{ url: string; width: number; height: number }>;
     }
   ): Promise<Product> {
-    let response = await this.axios.post(
-      `/forms/${encodeURIComponent(slugOrId)}/products`,
-      data
-    );
-    return response.data;
+    let { productFieldKey, ...product } = data;
+    if (!productFieldKey) {
+      let fields = await this.getFormFieldCollection(slugOrId);
+      let productFields = fields.filter(field => field.type === 'products');
+      if (productFields.length !== 1) {
+        throw createApiServiceError(
+          'Provide productFieldKey from list_form_fields to select a product field on this form.'
+        );
+      }
+      productFieldKey = productFields[0]!.key;
+    }
+    let response = await this.axios.post(`/forms/${encodeURIComponent(slugOrId)}/products`, {
+      ...product,
+      product_field_key: productFieldKey
+    });
+    return this.readItem(response.data, 'product');
   }
 
   async getProduct(slugOrId: string, sku: string): Promise<Product> {
     let response = await this.axios.get(
       `/forms/${encodeURIComponent(slugOrId)}/products/${encodeURIComponent(sku)}`
     );
-    return response.data;
+    let results = this.readResults(response.data);
+    let product = isApiErrorRecord(results.product)
+      ? results.product
+      : Array.isArray(results.products)
+        ? results.products.find(item => isApiErrorRecord(item) && item.SKU === sku)
+        : undefined;
+    if (!isApiErrorRecord(product)) {
+      throw createApiServiceError('Paperform did not return the requested product.', {
+        reason: 'paperform_invalid_response'
+      });
+    }
+    return product as unknown as Product;
   }
 
   async updateProduct(
@@ -352,7 +386,7 @@ export class Client {
       `/forms/${encodeURIComponent(slugOrId)}/products/${encodeURIComponent(sku)}`,
       data
     );
-    return response.data;
+    return this.readItem(response.data, 'product');
   }
 
   async deleteProduct(slugOrId: string, sku: string): Promise<void> {
@@ -361,24 +395,18 @@ export class Client {
     );
   }
 
-  async updateProductQuantity(
-    slugOrId: string,
-    sku: string,
-    quantity: number
-  ): Promise<Product> {
-    let response = await this.axios.put(
+  async updateProductQuantity(slugOrId: string, sku: string, quantity: number): Promise<void> {
+    await this.axios.put(
       `/forms/${encodeURIComponent(slugOrId)}/products/${encodeURIComponent(sku)}/quantity`,
       { quantity }
     );
-    return response.data;
   }
 
-  async updateProductSold(slugOrId: string, sku: string, sold: number): Promise<Product> {
-    let response = await this.axios.put(
+  async updateProductSold(slugOrId: string, sku: string, sold: number): Promise<void> {
+    await this.axios.put(
       `/forms/${encodeURIComponent(slugOrId)}/products/${encodeURIComponent(sku)}/sold`,
       { sold }
     );
-    return response.data;
   }
 
   // ---- Coupons ----
@@ -387,10 +415,12 @@ export class Client {
     slugOrId: string,
     params?: PaginationParams
   ): Promise<PaginatedResponse<Coupon>> {
-    let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/coupons`, {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
+    this.validatePagination(params);
+    let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/coupons`);
+    return this.paginateCollection(
+      this.readCollection<Coupon>(response.data, 'coupons'),
+      params
+    );
   }
 
   async createCoupon(
@@ -408,7 +438,7 @@ export class Client {
       `/forms/${encodeURIComponent(slugOrId)}/coupons`,
       data
     );
-    return response.data;
+    return this.readItem(response.data, 'coupon');
   }
 
   async getCoupon(slugOrId: string, code: string): Promise<Coupon> {
@@ -433,7 +463,7 @@ export class Client {
       `/forms/${encodeURIComponent(slugOrId)}/coupons/${encodeURIComponent(code)}`,
       data
     );
-    return response.data;
+    return this.readItem(response.data, 'coupon');
   }
 
   async deleteCoupon(slugOrId: string, code: string): Promise<void> {
@@ -448,12 +478,12 @@ export class Client {
     let response = await this.axios.get('/spaces', {
       params: this.buildPaginationParams(params)
     });
-    return response.data;
+    return this.readList(response.data, 'spaces');
   }
 
   async createSpace(data: { name: string }): Promise<Space> {
     let response = await this.axios.post('/spaces', data);
-    return response.data;
+    return this.readItem(response.data, 'space');
   }
 
   async getSpace(spaceId: string): Promise<Space> {
@@ -470,10 +500,9 @@ export class Client {
     spaceId: string,
     params?: PaginationParams
   ): Promise<PaginatedResponse<Form>> {
-    let response = await this.axios.get(`/spaces/${encodeURIComponent(spaceId)}/forms`, {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
+    this.validatePagination(params);
+    let response = await this.axios.get(`/spaces/${encodeURIComponent(spaceId)}/forms`);
+    return this.paginateCollection(this.readCollection<Form>(response.data, 'forms'), params);
   }
 
   // ---- Translations ----
@@ -573,16 +602,19 @@ export class Client {
     if (params?.folderId) queryParams.folder_id = params.folderId;
     if (params?.search) queryParams.search = params.search;
     if (params?.spaceId) queryParams.space_id = params.spaceId;
-    if (params?.status) queryParams.status = params.status;
+    if (params?.status)
+      queryParams.status = params.status.map(status =>
+        status === 'in_progress' ? 'inProgress' : status
+      );
     let response = await this.axios.get('/papersign/documents', { params: queryParams });
-    return response.data;
+    return this.readList(response.data, 'documents');
   }
 
   async getPapersignDocument(documentId: string): Promise<PapersignDocument> {
     let response = await this.axios.get(
       `/papersign/documents/${encodeURIComponent(documentId)}`
     );
-    return response.data;
+    return this.readItem(response.data, 'document');
   }
 
   async sendPapersignDocument(
@@ -644,7 +676,7 @@ export class Client {
       `/papersign/documents/${encodeURIComponent(documentId)}/send`,
       body
     );
-    return response.data;
+    return this.readItem(response.data, 'document');
   }
 
   async copyPapersignDocument(
@@ -665,7 +697,7 @@ export class Client {
         folder_id: data.folderId
       }
     );
-    return response.data;
+    return this.readItem(response.data, 'document');
   }
 
   async movePapersignDocument(
@@ -686,21 +718,21 @@ export class Client {
         folder_id: data.folderId
       }
     );
-    return response.data;
+    return this.readItem(response.data, 'document');
   }
 
   async cancelPapersignDocument(documentId: string): Promise<PapersignDocument> {
-    let response = await this.axios.post(
+    let response = await this.axios.put(
       `/papersign/documents/${encodeURIComponent(documentId)}/cancel`
     );
-    return response.data;
+    return this.readItem(response.data, 'document');
   }
 
   // ---- Papersign Folders ----
 
   async listPapersignFolders(): Promise<PaginatedResponse<PapersignFolder>> {
     let response = await this.axios.get('/papersign/folders');
-    return response.data;
+    return this.readList(response.data, 'folders');
   }
 
   async createPapersignFolder(data: {
@@ -713,14 +745,14 @@ export class Client {
       space_id: data.spaceId,
       parent_id: data.parentId
     });
-    return response.data;
+    return this.readItem(response.data, 'folder');
   }
 
   // ---- Papersign Spaces ----
 
   async listPapersignSpaces(): Promise<PaginatedResponse<PapersignSpace>> {
     let response = await this.axios.get('/papersign/spaces');
-    return response.data;
+    return this.readList(response.data, 'spaces');
   }
 
   // ---- Papersign Webhooks ----
@@ -782,11 +814,103 @@ export class Client {
 
   // ---- Helpers ----
 
+  private readResults(data: unknown): Record<string, unknown> {
+    if (!isApiErrorRecord(data) || !isApiErrorRecord(data.results)) {
+      throw createApiServiceError('Paperform returned an invalid response envelope.', {
+        reason: 'paperform_invalid_response'
+      });
+    }
+    return data.results;
+  }
+
+  private readItem<T>(data: unknown, key: string): T {
+    let value = this.readResults(data)[key];
+    if (!isApiErrorRecord(value)) {
+      throw createApiServiceError(`Paperform did not return the expected ${key}.`, {
+        reason: 'paperform_invalid_response'
+      });
+    }
+    return value as T;
+  }
+
+  private readCollection<T>(data: unknown, key: string): T[] {
+    let results = this.readResults(data)[key];
+    if (!Array.isArray(results)) {
+      throw createApiServiceError(`Paperform returned an invalid ${key} collection.`, {
+        reason: 'paperform_invalid_response'
+      });
+    }
+    return results as T[];
+  }
+
+  private paginateCollection<T>(
+    results: T[],
+    params?: PaginationParams
+  ): PaginatedResponse<T> {
+    let skip = params?.skip ?? 0;
+    let limit = params?.limit ?? 20;
+    let page = results.slice(skip, skip + limit);
+    return {
+      results: page,
+      total: results.length,
+      has_more: skip + page.length < results.length,
+      limit,
+      skip
+    };
+  }
+
+  private async getFormFieldCollection(
+    slugOrId: string,
+    search?: string
+  ): Promise<FormField[]> {
+    let response = await this.axios.get(`/forms/${encodeURIComponent(slugOrId)}/fields`, {
+      params: { search }
+    });
+    return this.readCollection(response.data, 'fields');
+  }
+
+  private readList<T>(data: unknown, key: string): PaginatedResponse<T> {
+    let results = this.readResults(data)[key];
+    if (
+      !Array.isArray(results) ||
+      !isApiErrorRecord(data) ||
+      typeof data.total !== 'number' ||
+      typeof data.has_more !== 'boolean' ||
+      typeof data.limit !== 'number' ||
+      typeof data.skip !== 'number'
+    ) {
+      throw createApiServiceError(`Paperform returned an invalid ${key} page.`, {
+        reason: 'paperform_invalid_response'
+      });
+    }
+    return {
+      results: results as T[],
+      total: data.total,
+      has_more: data.has_more,
+      limit: data.limit,
+      skip: data.skip
+    };
+  }
+
+  private validatePagination(params?: PaginationParams): void {
+    if (!params) return;
+    if (
+      params.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 100.');
+    }
+    if (params.skip !== undefined && (!Number.isInteger(params.skip) || params.skip < 0)) {
+      throw createApiServiceError('skip must be a non-negative whole number.');
+    }
+  }
+
   private buildPaginationParams(
     params?: PaginationParams & { search?: string }
   ): Record<string, unknown> {
     let query: Record<string, unknown> = {};
     if (!params) return query;
+    this.validatePagination(params);
     if (params.skip !== undefined) query.skip = params.skip;
     if (params.limit !== undefined) query.limit = params.limit;
     if (params.sort !== undefined) query.sort = params.sort;

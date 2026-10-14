@@ -1,9 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
 
-let dnsRecordSchema = z
+export let dnsRecordSchema = z
   .object({
     recordId: z.number().optional().describe('Unique ID of the DNS record'),
     type: z
@@ -84,6 +84,15 @@ export let manageDnsZone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.dnsZoneId === undefined ||
+        ctx.input.dnsZoneId <= 0 ||
+        !Number.isInteger(ctx.input.dnsZoneId))
+    )
+      throw createApiServiceError('A positive dnsZoneId is required for this action.');
+    if (ctx.input.action === 'create' && !ctx.input.domain?.trim())
+      throw createApiServiceError('A domain is required to create a DNS zone.');
     let client = new CoreClient({ token: ctx.auth.token });
 
     switch (ctx.input.action) {

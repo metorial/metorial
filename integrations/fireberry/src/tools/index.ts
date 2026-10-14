@@ -1,5 +1,6 @@
 export * from './create-record';
 export * from './delete-record';
+export * from './get-field-metadata';
 export * from './get-picklist-values';
 export * from './get-record';
 export * from './get-related-records';
@@ -7,4 +8,5 @@ export * from './list-object-fields';
 export * from './list-objects';
 export * from './list-records';
 export * from './query-records';
+export * from './query-records-v3';
 export * from './update-record';

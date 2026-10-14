@@ -18,6 +18,7 @@ export let listFields = SlateTool.create(spec, {
       fields: z
         .array(
           z.object({
+            fieldId: z.number().describe('ID used by update_field and delete_field'),
             fieldLabel: z.string().describe('Display label of the custom field'),
             fieldMergeTag: z
               .string()
@@ -33,6 +34,7 @@ export let listFields = SlateTool.create(spec, {
     let fields = await client.getFields();
 
     let mappedFields = (Array.isArray(fields) ? fields : []).map(f => ({
+      fieldId: f.id,
       fieldLabel: f.fieldLabel,
       fieldMergeTag: f.fieldMergeTag
     }));

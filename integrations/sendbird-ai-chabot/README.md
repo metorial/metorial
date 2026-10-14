@@ -1,6 +1,10 @@
-# Sendbird Ai Chatbot
+# Sendbird AI Chatbot
 
-Create, configure, and manage AI-powered chatbots within Sendbird applications. Define bot personas with system prompts, configure LLM parameters (model, temperature, max tokens), and manage knowledge base sources (PDFs, text files, URLs). Generate AI chatbot replies from conversation history, send streaming messages for real-time progressive responses, and control typing indicators. Set up function calling for third-party API integrations (e.g., appointment scheduling, order tracking). Configure welcome messages and suggested replies.
+Create, update, list, retrieve, and delete Sendbird bots. Discover a bot's joined group channels, send text messages, retrieve messages by ID, and start or stop typing indicators.
+
+Authenticate with a Sendbird application API token and Application ID from Dashboard > Settings > Application > General. Existing connections with the Application ID in configuration remain supported.
+
+AI configuration and the existing non-streaming AI-reply tool depend on compatible AI chatbot feature access. Knowledge sources, functions, welcome messages, and suggested replies are managed in the provider dashboard; this integration does not expose those operations. Delight AI in-app channels use a different API hostname and are outside this integration's current scope.
 
 ## License
 

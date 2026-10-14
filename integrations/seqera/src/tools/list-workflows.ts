@@ -1,23 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
   name: 'List Workflow Runs',
   key: 'list_workflows',
-  description: `List workflow runs (pipeline executions) in a workspace. Returns run status, duration, metadata, and basic execution details. Supports search, pagination, and sorting.`,
+  description: `List workflow runs (pipeline executions) in a workspace. Returns run status, duration, metadata, and basic execution details. Supports search and pagination.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       search: z.string().optional().describe('Search filter for run name or project'),
       max: z.number().optional().describe('Maximum number of results (default 50)'),
       offset: z.number().optional().describe('Offset for pagination'),
-      sortBy: z.string().optional().describe('Field to sort by, e.g. "start", "status"'),
-      sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction')
+      sortBy: z
+        .string()
+        .optional()
+        .describe('Legacy sort field; omit because workflow listing does not support sorting'),
+      sortDirection: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe(
+          'Legacy sort direction; omit because workflow listing does not support sorting'
+        )
     })
   )
   .output(
@@ -49,8 +59,8 @@ export let listWorkflows = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listWorkflows({
@@ -63,18 +73,18 @@ export let listWorkflows = SlateTool.create(spec, {
     });
 
     let workflows = result.workflows.map(w => ({
-      workflowId: w.id,
-      runName: w.runName,
-      status: w.status,
-      projectName: w.projectName,
-      repository: w.repository,
-      revision: w.revision,
-      userName: w.userName,
-      start: w.start,
-      complete: w.complete,
-      duration: w.duration,
-      exitStatus: w.exitStatus,
-      errorMessage: w.errorMessage
+      workflowId: w.id ?? undefined,
+      runName: w.runName ?? undefined,
+      status: w.status ?? undefined,
+      projectName: w.projectName ?? undefined,
+      repository: w.repository ?? undefined,
+      revision: w.revision ?? undefined,
+      userName: w.userName ?? undefined,
+      start: w.start ?? undefined,
+      complete: w.complete ?? undefined,
+      duration: w.duration ?? undefined,
+      exitStatus: w.exitStatus ?? undefined,
+      errorMessage: w.errorMessage ?? undefined
     }));
 
     return {

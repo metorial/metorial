@@ -1,17 +1,29 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://api.dnsfilter.com/v1';
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) throw createApiServiceError('Provide a DNSFilter API key.');
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: token,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'DNSFilter',
+          reason: 'dnsfilter_api_error'
+        })
     });
   }
 
@@ -28,24 +40,30 @@ export class Client {
   }
 
   async createOrganization(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/organizations', { data: params });
+    let res = await this.axios.post('/organizations', { organization: params });
     return res.data?.data ?? res.data;
   }
 
   async updateOrganization(organizationId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/organizations/${organizationId}`, { data: params });
+    let res = await this.axios.patch(`/organizations/${organizationId}`, {
+      organization: params
+    });
     return res.data?.data ?? res.data;
   }
 
   // ── Policies ──
 
   async listPolicies(organizationIds?: string[]): Promise<any[]> {
-    let params: Record<string, any> = {};
-    if (organizationIds?.length) {
-      params.organization_ids = organizationIds.join(',');
-    }
-    let res = await this.axios.get('/policies', { params });
-    return res.data?.data ?? res.data ?? [];
+    let organizations = organizationIds?.length ? [...new Set(organizationIds)] : [undefined];
+    let policies = await Promise.all(
+      organizations.map(async organizationId => {
+        let res = await this.axios.get('/policies', {
+          params: pickDefined({ organization_id: organizationId })
+        });
+        return res.data?.data ?? res.data ?? [];
+      })
+    );
+    return policies.flat();
   }
 
   async getPolicy(policyId: string): Promise<any> {
@@ -54,12 +72,12 @@ export class Client {
   }
 
   async createPolicy(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/policies', { data: params });
+    let res = await this.axios.post('/policies', { policy: params });
     return res.data?.data ?? res.data;
   }
 
   async updatePolicy(policyId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/policies/${policyId}`, { data: params });
+    let res = await this.axios.patch(`/policies/${policyId}`, { policy: params });
     return res.data?.data ?? res.data;
   }
 
@@ -75,7 +93,7 @@ export class Client {
   }
 
   async createScheduledPolicy(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/scheduled_policies', { data: params });
+    let res = await this.axios.post('/scheduled_policies', params);
     return res.data?.data ?? res.data;
   }
 
@@ -83,9 +101,7 @@ export class Client {
     scheduledPolicyId: string,
     params: Record<string, any>
   ): Promise<any> {
-    let res = await this.axios.patch(`/scheduled_policies/${scheduledPolicyId}`, {
-      data: params
-    });
+    let res = await this.axios.patch(`/scheduled_policies/${scheduledPolicyId}`, params);
     return res.data?.data ?? res.data;
   }
 
@@ -99,6 +115,11 @@ export class Client {
     let url = '/networks';
     let queryParams: Record<string, any> = {};
     if (params?.msp) {
+      if (!params.organizationId) {
+        throw createApiServiceError(
+          'organizationId is required when msp is true. Call list_organizations to discover organization IDs.'
+        );
+      }
       url = '/networks/msp';
       if (params.organizationId) {
         queryParams.organization_id = params.organizationId;
@@ -114,12 +135,12 @@ export class Client {
   }
 
   async createNetwork(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/networks', { data: params });
+    let res = await this.axios.post('/networks', { network: params });
     return res.data?.data ?? res.data;
   }
 
   async updateNetwork(networkId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/networks/${networkId}`, { data: params });
+    let res = await this.axios.patch(`/networks/${networkId}`, { network: params });
     return res.data?.data ?? res.data;
   }
 
@@ -149,12 +170,12 @@ export class Client {
   }
 
   async createIpAddress(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/ip_addresses', { data: params });
+    let res = await this.axios.post('/ip_addresses', { ip_address: params });
     return res.data?.data ?? res.data;
   }
 
   async updateIpAddress(ipAddressId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/ip_addresses/${ipAddressId}`, { data: params });
+    let res = await this.axios.patch(`/ip_addresses/${ipAddressId}`, { ip_address: params });
     return res.data?.data ?? res.data;
   }
 
@@ -162,8 +183,13 @@ export class Client {
     await this.axios.delete(`/ip_addresses/${ipAddressId}`);
   }
 
-  async verifyIpAddress(): Promise<any> {
-    let res = await this.axios.get('/ip_addresses/verify');
+  async verifyIpAddress(params: Record<string, any>): Promise<any> {
+    let res = await this.axios.get('/ip_addresses/verify', { data: { ip_address: params } });
+    return res.data;
+  }
+
+  async getCurrentUser(): Promise<any> {
+    let res = await this.axios.get('/current_user');
     return res.data?.data ?? res.data;
   }
 
@@ -175,22 +201,24 @@ export class Client {
   // ── Roaming Clients ──
 
   async listRoamingClients(params?: { page?: number; perPage?: number }): Promise<any> {
-    let res = await this.axios.get('/roaming_clients', { params });
+    let res = await this.axios.get('/user_agents', {
+      params: pickDefined({ 'page[number]': params?.page, 'page[size]': params?.perPage })
+    });
     return res.data;
   }
 
   async getRoamingClient(clientId: string): Promise<any> {
-    let res = await this.axios.get(`/roaming_clients/${clientId}`);
+    let res = await this.axios.get(`/user_agents/${clientId}`);
     return res.data?.data ?? res.data;
   }
 
   async updateRoamingClient(clientId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/roaming_clients/${clientId}`, { data: params });
+    let res = await this.axios.patch(`/user_agents/${clientId}`, { user_agent: params });
     return res.data?.data ?? res.data;
   }
 
   async deleteRoamingClient(clientId: string): Promise<void> {
-    await this.axios.delete(`/roaming_clients/${clientId}`);
+    await this.axios.delete(`/user_agents/${clientId}`);
   }
 
   // ── Agent Local Users ──
@@ -218,12 +246,12 @@ export class Client {
 
   async listOrganizationUsers(organizationId: string): Promise<any[]> {
     let res = await this.axios.get(`/organizations/${organizationId}/users`);
-    return res.data?.data ?? res.data ?? [];
+    return res.data?.users ?? res.data?.data ?? res.data ?? [];
   }
 
   async getOrganizationUser(organizationId: string, userId: string): Promise<any> {
     let res = await this.axios.get(`/organizations/${organizationId}/users/${userId}`);
-    return res.data?.data ?? res.data;
+    return res.data?.user ?? res.data?.data ?? res.data;
   }
 
   async addOrganizationUser(
@@ -231,9 +259,9 @@ export class Client {
     params: Record<string, any>
   ): Promise<any> {
     let res = await this.axios.post(`/organizations/${organizationId}/users`, {
-      data: params
+      user: params
     });
-    return res.data?.data ?? res.data;
+    return res.data?.user ?? res.data?.data ?? res.data;
   }
 
   async updateOrganizationUser(
@@ -242,9 +270,9 @@ export class Client {
     params: Record<string, any>
   ): Promise<any> {
     let res = await this.axios.patch(`/organizations/${organizationId}/users/${userId}`, {
-      data: params
+      user: params
     });
-    return res.data?.data ?? res.data;
+    return res.data?.user ?? res.data?.data ?? res.data;
   }
 
   async removeOrganizationUser(organizationId: string, userId: string): Promise<void> {
@@ -278,7 +306,12 @@ export class Client {
   }
 
   async addCollectionUser(collectionId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post(`/collections/${collectionId}/users`, { data: params });
+    let { user_id, ...attributes } = params;
+    let res = await this.axios.post(`/collections/${collectionId}/users`, {
+      collection_id: collectionId,
+      id: user_id,
+      ...attributes
+    });
     return res.data?.data ?? res.data;
   }
 
@@ -299,12 +332,12 @@ export class Client {
   }
 
   async createBlockPage(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/block_pages', { data: params });
+    let res = await this.axios.post('/block_pages', params);
     return res.data?.data ?? res.data;
   }
 
   async updateBlockPage(blockPageId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/block_pages/${blockPageId}`, { data: params });
+    let res = await this.axios.patch(`/block_pages/${blockPageId}`, params);
     return res.data?.data ?? res.data;
   }
 
@@ -332,7 +365,15 @@ export class Client {
   }
 
   async suggestDomainThreat(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/domains/suggest_threat', params);
+    let res = await this.axios.post('/domains/suggest_threat', null, {
+      params: pickDefined({
+        fqdn: params.domain,
+        notes: params.threat_type
+          ? `${params.notes} (Threat type: ${params.threat_type})`
+          : params.notes,
+        categories: params.category_ids?.join(',')
+      })
+    });
     return res.data?.data ?? res.data;
   }
 
@@ -361,12 +402,14 @@ export class Client {
   }
 
   async createMacAddress(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/mac_addresses', { data: params });
+    let res = await this.axios.post('/mac_addresses', { mac_address: params });
     return res.data?.data ?? res.data;
   }
 
   async updateMacAddress(macAddressId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/mac_addresses/${macAddressId}`, { data: params });
+    let res = await this.axios.patch(`/mac_addresses/${macAddressId}`, {
+      mac_address: params
+    });
     return res.data?.data ?? res.data;
   }
 
@@ -377,12 +420,12 @@ export class Client {
   // ── Traffic & Reports ──
 
   async getTrafficReport(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.get('/traffic', { params });
+    let res = await this.axios.get('/traffic_reports/total_requests', { params });
     return res.data?.data ?? res.data;
   }
 
   async getQueryLog(params: Record<string, any>): Promise<any> {
-    let res = await this.axios.get('/traffic/query_log', { params });
+    let res = await this.axios.get('/traffic_reports/query_logs', { params });
     return res.data?.data ?? res.data;
   }
 
@@ -420,7 +463,9 @@ export class Client {
   }
 
   async createNetworkSubnet(networkId: string, params: Record<string, any>): Promise<any> {
-    let res = await this.axios.post(`/networks/${networkId}/subnets`, { data: params });
+    let res = await this.axios.post(`/networks/${networkId}/subnets`, {
+      network_subnet: params
+    });
     return res.data?.data ?? res.data;
   }
 
@@ -430,7 +475,7 @@ export class Client {
     params: Record<string, any>
   ): Promise<any> {
     let res = await this.axios.patch(`/networks/${networkId}/subnets/${subnetId}`, {
-      data: params
+      network_subnet: params
     });
     return res.data?.data ?? res.data;
   }
@@ -452,7 +497,7 @@ export class Client {
     params: Record<string, any>
   ): Promise<any> {
     let res = await this.axios.patch(`/networks/${networkId}/lan_ips/${lanIpId}`, {
-      data: params
+      network_lan_ip: params
     });
     return res.data?.data ?? res.data;
   }

@@ -1,4 +1,4 @@
-# Slates Specification for AbuseIPDB
+# AbuseIPDB Integration Specification
 
 ## Overview
 
@@ -49,11 +49,13 @@ Submit reports of malicious IP addresses with one or more abuse categories (e.g.
 
 ### Bulk Reporting
 
-Upload a CSV file containing multiple IP abuse reports in a single request. The response indicates how many reports were saved and lists any invalid entries with error details.
+Upload CSV data with the required IP, Categories, ReportDate, and Comment columns. The response indicates how many reports were saved and lists any invalid entries with error details. Quote category lists and comments when they contain commas. Files must stay under 8 MB and at most 10,000 lines including headings; report dates must be no older than two months.
 
 ### Blacklist Retrieval
 
 Download a list of the most reported IP addresses, ordered by abuse confidence score. Can be retrieved in JSON or plaintext format for direct firewall import.
+
+Use `get_blacklist` for structured reputation data or `export_blacklist` for a downloadable plaintext IP list.
 
 - `confidenceMinimum` parameter allows filtering by minimum abuse score (paid feature).
 - Can be filtered by country (include or exclude specific countries) and by IP version (IPv4 or IPv6).

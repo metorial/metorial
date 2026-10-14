@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { IgnisignClient } from '../lib/client';
+import { getApiKeyScope, IgnisignClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getApplicationContext = SlateTool.create(spec, {
@@ -24,15 +24,19 @@ export let getApplicationContext = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     let result = await client.getApplicationContext();
 
     return {
       output: {
-        appId: result.appId || ctx.config.appId,
+        appId:
+          result.appId ??
+          ctx.auth.appId ??
+          ctx.config.appId ??
+          getApiKeyScope(ctx.auth.token)?.appId,
         appName: result.appName || result.name,
         status: result.status,
         appType: result.appType,

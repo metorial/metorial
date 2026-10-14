@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, contactOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -45,21 +45,7 @@ export let getContact = SlateTool.create(spec, {
     let contact = result?.data || result;
 
     return {
-      output: {
-        contactId: String(contact.id || ''),
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        email: contact.email,
-        phone: contact.phone,
-        language: contact.language,
-        countryCode: contact.countryCode,
-        profilePictureUrl: contact.profilePictureUrl,
-        tags: contact.tags,
-        assignee: contact.assignee,
-        customFields: contact.custom_fields || contact.customFields,
-        status: contact.status,
-        createdAt: contact.createdAt
-      },
+      output: contactOutput(contact),
       message: `Retrieved contact **${contact.firstName || ''} ${contact.lastName || ''}** (ID: ${contact.id}).`
     };
   })

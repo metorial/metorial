@@ -47,11 +47,11 @@ export let createIdea = SlateTool.create(spec, {
     return {
       output: {
         ideaId: result.id,
-        stormId: result.storm?.id,
-        stormTitle: result.storm?.title,
-        type: result.type,
-        color: result.color,
-        text: result.data?.text
+        stormId: result.storm?.id ?? undefined,
+        stormTitle: result.storm?.title ?? undefined,
+        type: result.type ?? undefined,
+        color: result.color ?? undefined,
+        text: result.data?.text ?? undefined
       },
       message: `Created **${ctx.input.type}** idea in Storm ${ctx.input.stormId}.`
     };

@@ -29,10 +29,10 @@ export let stopTestRun = SlateTool.create(spec, {
 
     return {
       output: {
-        testRunId: result.testRunId,
+        testRunId: result.id,
         status: result.status
       },
-      message: `Test run **${result.testRunId}** stopped. Status: **${result.status}**.`
+      message: `Test run **${result.id}** stopped. Status: **${result.status}**.`
     };
   })
   .build();

@@ -6,9 +6,11 @@ import {
   createJobMessageTool,
   createJobTool,
   getCompanySettingsTool,
+  getContactJobsTool,
   getContactTool,
   getEstimatesTool,
   getInvoicesTool,
+  getJobCustomFieldsTool,
   getJobFinancialsTool,
   getJobTool,
   getLeadHistoryTool,
@@ -22,7 +24,8 @@ import {
   managePaymentsTool,
   searchContactsTool,
   searchJobsTool,
-  uploadJobFileTool
+  uploadJobFileTool,
+  whoAmITool
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -35,6 +38,7 @@ export let provider = Slate.create({
     manageJobInsuranceTool,
     listContactsTool,
     getContactTool,
+    getContactJobsTool,
     createContactTool,
     searchContactsTool,
     createContactLogTool,
@@ -48,7 +52,9 @@ export let provider = Slate.create({
     getSupplementsTool,
     getUsersTool,
     getCompanySettingsTool,
-    getLeadHistoryTool
+    getLeadHistoryTool,
+    getJobCustomFieldsTool,
+    whoAmITool
   ],
   triggers: []
 });

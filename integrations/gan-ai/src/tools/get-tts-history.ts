@@ -32,7 +32,7 @@ export let getTtsHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.getTtsHistory({
       skip: ctx.input.skip,
       limit: ctx.input.limit

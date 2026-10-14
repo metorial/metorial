@@ -31,7 +31,7 @@ export let updateClient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;

@@ -5,13 +5,15 @@ import {
   deleteCampaign,
   getCampaign,
   getCampaignReport,
+  getContactList,
   listCampaigns,
   listContactLists,
   listContacts,
   manageContact,
   manageContactList,
   sendCampaign,
-  updateCampaign
+  updateCampaign,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -26,7 +28,9 @@ export let provider = Slate.create({
     listContactLists,
     manageContactList,
     listContacts,
-    manageContact
+    manageContact,
+    getContactList,
+    whoAmI
   ],
   triggers: []
 });

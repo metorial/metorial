@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,8 +54,8 @@ export let manageContact = SlateTool.create(spec, {
       return {
         output: {
           contactId: result.id || result._id,
-          name: result.name,
-          channel: result.channel,
+          name: result.name ?? undefined,
+          channel: result.channel ?? undefined,
           success: true
         },
         message: `Created contact **${result.name || ''}** on ${result.channel || 'unknown channel'}.`
@@ -63,13 +63,13 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!contactId) throw new Error('contactId is required for update');
+      if (!contactId) throw createApiServiceError('contactId is required for update');
       let result = await client.updateContact(contactId, fields);
       return {
         output: {
           contactId: result.id || result._id || contactId,
-          name: result.name,
-          channel: result.channel,
+          name: result.name ?? undefined,
+          channel: result.channel ?? undefined,
           success: true
         },
         message: `Updated contact **${contactId}**.`
@@ -77,7 +77,7 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!contactId) throw new Error('contactId is required for delete');
+      if (!contactId) throw createApiServiceError('contactId is required for delete');
       await client.deleteContact(contactId);
       return {
         output: {
@@ -88,6 +88,6 @@ export let manageContact = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

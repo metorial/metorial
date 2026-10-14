@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/todoist.svg" height="20"> Todoist
 
-Create, read, update, delete, complete, and reopen tasks with due dates, priorities, labels, recurring schedules, and natural language parsing. Organize tasks into projects and sections, manage sub-tasks, and assign tasks to collaborators. Create and manage projects with nesting, archiving, sharing, and multiple view styles. Add comments with file attachments and emoji reactions to tasks and projects. Create saved filters using query language, set reminders (relative, absolute, or location-based), and manage personal and shared labels. Collaborate via shared projects and workspaces with granular role-based access. Track productivity stats, karma scores, and streaks. View activity logs of all changes. Upload files, retrieve backups, and generate email-to-task addresses.
+Create, find, update, move, complete, and reopen Todoist tasks. Organize projects, sections, labels, comments, and saved filters; discover collaborators, retrieve completed-task history, and inspect account identity and productivity statistics. OAuth and personal API tokens are supported.
 
 ## Tools
 
@@ -19,6 +19,14 @@ Permanently delete a task from Todoist. This action cannot be undone.
 ### Get Collaborators
 
 List all collaborators in a shared project. Returns their names, emails, and IDs for use when assigning tasks.
+
+### Get Current User
+
+Retrieve the connected user's ID, full name, email, timezone, and Inbox project ID.
+
+### Get Completed Tasks
+
+Retrieve one page of completed tasks within a date range of at most three months. Continue with the returned cursor and unchanged filters.
 
 ### Get Productivity Stats
 

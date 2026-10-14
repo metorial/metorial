@@ -1,4 +1,4 @@
-# Slates Specification for Bookingmood
+# Bookingmood API Specification
 
 ## Overview
 

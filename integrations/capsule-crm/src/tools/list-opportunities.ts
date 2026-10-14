@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,8 +37,19 @@ export let listOpportunities = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 date to filter opportunities modified after this date'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page, 1-100 (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page, 1-100 (default: 50)'),
       embed: z
         .array(z.enum(['tags', 'fields', 'party', 'milestone', 'missingImportantFields']))
         .optional()
@@ -51,6 +62,11 @@ export let listOpportunities = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.partyId !== undefined && ctx.input.since !== undefined) {
+      throw createApiServiceError(
+        'Use partyId or since separately; Capsule does not support since on the party-specific endpoint.'
+      );
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     let result: any;
@@ -71,13 +87,13 @@ export let listOpportunities = SlateTool.create(spec, {
 
     let opportunities = (result.opportunities || []).map((o: any) => ({
       opportunityId: o.id,
-      name: o.name,
-      description: o.description,
-      createdAt: o.createdAt,
-      updatedAt: o.updatedAt,
-      closedOn: o.closedOn,
-      expectedCloseOn: o.expectedCloseOn,
-      probability: o.probability,
+      name: o.name ?? undefined,
+      description: o.description ?? undefined,
+      createdAt: o.createdAt ?? undefined,
+      updatedAt: o.updatedAt ?? undefined,
+      closedOn: o.closedOn ?? undefined,
+      expectedCloseOn: o.expectedCloseOn ?? undefined,
+      probability: o.probability ?? undefined,
       value: o.value,
       milestone: o.milestone,
       party: o.party,

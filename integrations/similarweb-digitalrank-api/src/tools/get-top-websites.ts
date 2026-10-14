@@ -21,7 +21,7 @@ export let getTopWebsites = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Number of top websites to return. Default is 10, maximum is 5,000.')
+        .describe('Whole number of top websites to return, from 1 to 5,000. Default is 10.')
     })
   )
   .output(

@@ -1,5 +1,7 @@
 export * from './analyze-sentiment';
+export * from './classify-text';
 export * from './detect-spam';
+export * from './extract-entities';
 export * from './extract-keywords';
 export * from './generate-blog-post';
 export * from './generate-headline';

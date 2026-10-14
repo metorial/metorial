@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,6 +33,12 @@ export let manageEnvironment = SlateTool.create(spec, {
         .array(z.any())
         .optional()
         .describe('Array of environment objects (for list action)'),
+      job: z
+        .any()
+        .optional()
+        .describe(
+          'Asynchronous job object, when the operation is queued. Use get_job_result with its id.'
+        ),
       environment: z.any().optional().describe('Single environment object')
     })
   )
@@ -53,42 +59,56 @@ export let manageEnvironment = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!environmentId) throw new Error('environmentId is required for get action');
+      if (!environmentId)
+        throw createApiServiceError('environmentId is required for get action');
       let environment = await client.getEnvironment(environmentId);
       return {
-        output: { environment },
+        output: { environment, ...(environment?.type === 'job' ? { job: environment } : {}) },
         message: `Retrieved environment **${environmentId}**.`
       };
     }
 
     if (action === 'fork') {
-      if (!environmentId) throw new Error('environmentId is required for fork action');
-      if (!newEnvironmentId) throw new Error('newEnvironmentId is required for fork action');
+      if (!environmentId)
+        throw createApiServiceError('environmentId is required for fork action');
+      if (!newEnvironmentId)
+        throw createApiServiceError('newEnvironmentId is required for fork action');
       let environment = await client.forkEnvironment(environmentId, newEnvironmentId);
       return {
-        output: { environment },
-        message: `Forked environment **${environmentId}** into **${newEnvironmentId}**.`
+        output: { environment, ...(environment?.type === 'job' ? { job: environment } : {}) },
+        message:
+          environment?.type === 'job'
+            ? `Queued operation as job **${environment.id}**. Use get_job_result to check completion.`
+            : `Forked environment **${environmentId}** into **${newEnvironmentId}**.`
       };
     }
 
     if (action === 'promote') {
-      if (!environmentId) throw new Error('environmentId is required for promote action');
+      if (!environmentId)
+        throw createApiServiceError('environmentId is required for promote action');
       let environment = await client.promoteEnvironment(environmentId);
       return {
-        output: { environment },
-        message: `Promoted environment **${environmentId}** to primary.`
+        output: { environment, ...(environment?.type === 'job' ? { job: environment } : {}) },
+        message:
+          environment?.type === 'job'
+            ? `Queued operation as job **${environment.id}**. Use get_job_result to check completion.`
+            : `Promoted environment **${environmentId}** to primary.`
       };
     }
 
     if (action === 'delete') {
-      if (!environmentId) throw new Error('environmentId is required for delete action');
+      if (!environmentId)
+        throw createApiServiceError('environmentId is required for delete action');
       let environment = await client.deleteEnvironment(environmentId);
       return {
-        output: { environment },
-        message: `Deleted environment **${environmentId}**.`
+        output: { environment, ...(environment?.type === 'job' ? { job: environment } : {}) },
+        message:
+          environment?.type === 'job'
+            ? `Queued operation as job **${environment.id}**. Use get_job_result to check completion.`
+            : `Deleted environment **${environmentId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

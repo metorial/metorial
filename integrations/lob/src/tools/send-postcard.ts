@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addMailPiecePreview } from '../lib/mail-piece-preview';
 import { spec } from '../spec';
 
 let inlineAddressSchema = z
@@ -130,6 +131,7 @@ export let sendPostcard = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       useType: ctx.input.useType
     });
+    await addMailPiecePreview(ctx, result, 'postcard');
     return {
       output: {
         postcardId: result.id,
@@ -185,6 +187,7 @@ export let getPostcard = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getPostcard(ctx.input.postcardId);
+    await addMailPiecePreview(ctx, result, 'postcard');
     return {
       output: {
         postcardId: result.id,
@@ -220,6 +223,14 @@ export let listPostcards = SlateTool.create(spec, {
         .optional()
         .describe('Number of postcards to return (max 100, default 10)'),
       offset: z.number().optional().describe('Number of postcards to skip for pagination'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor from previousUrl; cannot be combined with after'),
+      after: z
+        .string()
+        .optional()
+        .describe('Next-page cursor from nextUrl; cannot be combined with before'),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -239,13 +250,25 @@ export let listPostcards = SlateTool.create(spec, {
           })
         )
         .describe('List of postcards'),
-      totalCount: z.number().describe('Total number of postcards')
+      totalCount: z.number().describe('Total number of postcards'),
+      nextUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Next-page URL; pass its after query value to after'),
+      previousUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Previous-page URL; pass its before query value to before')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listPostcards({
       limit: ctx.input.limit,
+      before: ctx.input.before,
+      after: ctx.input.after,
       offset: ctx.input.offset,
       metadata: ctx.input.metadata
     });
@@ -259,7 +282,9 @@ export let listPostcards = SlateTool.create(spec, {
     return {
       output: {
         postcards,
-        totalCount: result.total_count ?? result.count ?? postcards.length
+        totalCount: result.total_count ?? result.count ?? postcards.length,
+        nextUrl: result.next_url ?? null,
+        previousUrl: result.previous_url ?? null
       },
       message: `Found **${postcards.length}** postcards`
     };
@@ -291,8 +316,11 @@ export let cancelPostcard = SlateTool.create(spec, {
     return {
       output: {
         postcardId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Canceled postcard **${ctx.input.postcardId}**`
+      message:
+        result.deleted === true
+          ? `Canceled postcard **${ctx.input.postcardId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

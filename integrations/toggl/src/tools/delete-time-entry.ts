@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteTimeEntry = SlateTool.create(spec, {
@@ -13,10 +14,7 @@ export let deleteTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       timeEntryId: z.string().describe('ID of the time entry to delete')
     })
   )
@@ -26,8 +24,8 @@ export let deleteTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
 
     await client.deleteTimeEntry(wsId, ctx.input.timeEntryId);
 

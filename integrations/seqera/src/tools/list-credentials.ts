@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCredentials = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listCredentials = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       platformId: z
         .string()
         .optional()
@@ -41,8 +43,8 @@ export let listCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let creds = await client.listCredentials({
@@ -50,13 +52,13 @@ export let listCredentials = SlateTool.create(spec, {
     });
 
     let credentials = creds.map(c => ({
-      credentialsId: c.id,
-      name: c.name,
-      description: c.description,
-      provider: c.provider,
-      dateCreated: c.dateCreated,
-      lastUpdated: c.lastUpdated,
-      lastUsed: c.lastUsed
+      credentialsId: c.id ?? undefined,
+      name: c.name ?? undefined,
+      description: c.description ?? undefined,
+      provider: c.provider ?? undefined,
+      dateCreated: c.dateCreated ?? undefined,
+      lastUpdated: c.lastUpdated ?? undefined,
+      lastUsed: c.lastUsed ?? undefined
     }));
 
     return {

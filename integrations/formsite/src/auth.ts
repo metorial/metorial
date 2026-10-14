@@ -15,7 +15,7 @@ export let auth = SlateAuth.create()
       apiToken: z
         .string()
         .describe(
-          'Formsite API access token. Found on Form Settings → Integrations → Formsite API page. Requires Pro 1 account or above.'
+          'Formsite API access token. Found on Form Settings → Integrations → Formsite API page. Requires a Professional level account.'
         )
     }),
     getOutput: async ctx => {

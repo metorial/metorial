@@ -1,10 +1,8 @@
-Note: The webhook search results are for Campaign Monitor and ActiveCampaign, not Campayn. There's no evidence that Campayn itself supports webhooks.
-
-# Slates Specification for Campayn
+# Campayn Integration Specification
 
 ## Overview
 
-Campayn is an email marketing platform based in Toronto, Canada, that enables users to create, send, and track email newsletters and marketing campaigns. It provides programmatic access to manage contacts, lists, and email campaigns through its REST API.
+Campayn is an email marketing platform. This integration manages contacts and subscribers, and retrieves contact lists, email campaign information, reports, and web sign-up forms through its REST API.
 
 ## Authentication
 
@@ -20,7 +18,7 @@ The base URL for all API requests is `https://campayn.com/api/v1/`.
 
 ### List Management
 
-Manage contact/subscriber lists. You can retrieve all lists, view list details, and access the contacts belonging to a specific list. Lists also support unsubscribing contacts by email address.
+Retrieve contact/subscriber lists with names, tags, and contact counts, and access the contacts belonging to a specific list. Lists also support unsubscribing contacts by email address or contact ID. Use `list_lists` to discover list IDs.
 
 ### Contact Management
 
@@ -28,7 +26,7 @@ Retrieve contacts associated with a specific list, with optional keyword filteri
 
 ### Email/Campaign Management
 
-Retrieve all email messages visible to the authenticated user, and retrieve details of a specific message by its ID.
+Retrieve all email messages visible to the authenticated user with `list_emails`, or retrieve one campaign's status and reporting information with `get_email`. The single-email lookup uses the documented `GET /emails.json` collection and matches its ID; it does not use an undocumented single-email endpoint.
 
 ### Reports
 
@@ -38,6 +36,13 @@ Retrieve report URLs and metadata for sent and scheduled emails, optionally filt
 
 Retrieve all webforms for a specific contact list. Retrieve details of a specific webform by ID, including form details like title, type, HTML, and signup count.
 
-## Events
+## API References
 
-The provider does not support events. Campayn's API does not offer webhooks or any built-in event subscription mechanism. Third-party platforms like Pipedream implement polling-based triggers (e.g., checking for new contacts or new emails) but these are not native to the Campayn API.
+- [Official API documentation and authentication](https://github.com/nebojsac/Campayn-API)
+- [Contacts](https://github.com/nebojsac/Campayn-API/blob/master/endpoints/contacts.md)
+- [Lists and unsubscribing](https://github.com/nebojsac/Campayn-API/blob/master/endpoints/lists.md)
+- [Emails](https://github.com/nebojsac/Campayn-API/blob/master/endpoints/emails.md)
+- [Calendar reports](https://github.com/nebojsac/Campayn-API/blob/master/endpoints/reports.md)
+- [Web forms](https://github.com/nebojsac/Campayn-API/blob/master/endpoints/forms.md)
+
+The documented API does not include a current-user endpoint or pagination parameters for these collections. The integration does not expose account signup, which requires separate provider authorization.

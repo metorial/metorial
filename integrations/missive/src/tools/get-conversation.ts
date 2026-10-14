@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -98,12 +98,14 @@ Returns full conversation details plus optionally the latest messages, comments,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.getConversation(ctx.input.conversationId);
-    let c = data.conversations || data;
+    let c = Array.isArray(data.conversations) ? data.conversations[0] : data.conversations;
+    if (!c?.id)
+      throw createApiServiceError('Missive did not return the requested conversation.');
 
     let result: any = {
       conversationId: c.id,
-      subject: c.subject,
-      assignees: c.assignees?.map((a: any) => ({ userId: a.id, name: a.name })),
+      subject: c.subject ?? undefined,
+      assignees: c.assignees?.map((a: any) => ({ userId: a.id, name: a.name ?? undefined })),
       teamId: c.team?.id,
       organizationId: c.organization?.id,
       sharedLabelIds: c.shared_labels?.map((l: any) => l.id),
@@ -117,13 +119,19 @@ Returns full conversation details plus optionally the latest messages, comments,
       let msgData = await client.listConversationMessages(ctx.input.conversationId);
       result.messages = (msgData.messages || []).map((m: any) => ({
         messageId: m.id,
-        subject: m.subject,
-        preview: m.preview,
-        body: m.body,
+        subject: m.subject ?? undefined,
+        preview: m.preview ?? undefined,
+        body: m.body ?? undefined,
         fromField: m.from_field
-          ? { address: m.from_field.address, name: m.from_field.name }
+          ? {
+              address: m.from_field.address ?? undefined,
+              name: m.from_field.name ?? undefined
+            }
           : undefined,
-        toFields: m.to_fields?.map((f: any) => ({ address: f.address, name: f.name })),
+        toFields: m.to_fields?.map((f: any) => ({
+          address: f.address ?? undefined,
+          name: f.name ?? undefined
+        })),
         deliveredAt: m.delivered_at
       }));
     }
@@ -132,7 +140,7 @@ Returns full conversation details plus optionally the latest messages, comments,
       let commentData = await client.listConversationComments(ctx.input.conversationId);
       result.comments = (commentData.comments || []).map((cm: any) => ({
         commentId: cm.id,
-        body: cm.body,
+        body: cm.body ?? undefined,
         authorName: cm.author?.name,
         createdAt: cm.created_at
       }));
@@ -142,8 +150,8 @@ Returns full conversation details plus optionally the latest messages, comments,
       let postData = await client.listConversationPosts(ctx.input.conversationId);
       result.posts = (postData.posts || []).map((p: any) => ({
         postId: p.id,
-        markdown: p.markdown,
-        text: p.text,
+        markdown: p.markdown ?? undefined,
+        text: p.text ?? undefined,
         createdAt: p.created_at
       }));
     }

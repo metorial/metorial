@@ -35,6 +35,19 @@ export let listTasks = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Maximum number of tasks to return (default 100, max 1000)'),
+      pageSize: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Tasks per page (maximum 1000)'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Token returned by the previous list_tasks call; repeat the same optional fields'
+        ),
       fields: z
         .array(z.string())
         .optional()
@@ -77,7 +90,8 @@ export let listTasks = SlateTool.create(spec, {
             .optional()
         })
       ),
-      count: z.number()
+      count: z.number(),
+      nextPageToken: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -95,6 +109,8 @@ export let listTasks = SlateTool.create(spec, {
       responsibles: ctx.input.responsibles,
       customStatuses: ctx.input.customStatuses,
       limit: ctx.input.limit,
+      pageSize: ctx.input.pageSize,
+      nextPageToken: ctx.input.nextPageToken,
       fields: ctx.input.fields,
       updatedDate: ctx.input.updatedAfter ? { start: ctx.input.updatedAfter } : undefined,
       createdDate: ctx.input.createdAfter ? { start: ctx.input.createdAfter } : undefined
@@ -128,7 +144,7 @@ export let listTasks = SlateTool.create(spec, {
     }));
 
     return {
-      output: { tasks, count: tasks.length },
+      output: { tasks, count: tasks.length, nextPageToken: result.nextPageToken },
       message: `Found **${tasks.length}** task(s).`
     };
   })

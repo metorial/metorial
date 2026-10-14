@@ -1,4 +1,4 @@
-# Slates Specification for Parseur
+# Parseur API Specification
 
 ## Overview
 
@@ -30,9 +30,36 @@ Mailboxes are the core organizational unit in Parseur. Each mailbox is configure
 
 Processing is asynchronous — a successful upload confirms receipt, not that parsing is finished. You can upload binary documents (PDFs, images, etc.) or email/text content. Documents can also be sent by forwarding emails to a mailbox's dedicated email address. After upload, you can list, retrieve, reprocess, skip, copy, or delete documents. Documents go through various statuses: INCOMING (received), ANALYZING (being analyzed), PROGRESS (being processed by AI), PARSEDOK (processed and data available), and others like QUOTAEXC (insufficient credits) or SKIPPED.
 
+Use `upload_file` with a mailbox ID from `list_mailboxes`, the original file name,
+and base64-encoded bytes. The response includes the upload's `DocumentID` metadata
+value as `documentReference`; this differs from the numeric document ID returned
+by `list_documents`. Use `upload_document` for email/text submissions, including
+subject, sender, and HTML or plain text content. Mailbox addresses use the
+`in.parseur.com` domain, as returned by `get_mailbox` and `create_mailbox`.
+
+Use `copy_mailbox` to submit an asynchronous mailbox copy request. The API returns
+a status notification rather than the new mailbox's ID. Call `list_mailboxes`
+after a few minutes to find the new copy.
+
 ### Data Retrieval
 
 Parsed data can be retrieved via the API in JSON, CSV, or XLS formats. You can list and search documents within a mailbox with sorting and date filtering options (with optional timezone specification). The API also supports custom downloads that can be created, updated, and deleted per mailbox.
+
+The document API returns parsed data as a JSON string. `get_document` and
+`list_documents` decode it into the `parsedResult` object; absent results are
+returned as null. Date filters use `YYYY-MM-DD`. The tools preserve `created`
+as the received timestamp and `modified` as the processed timestamp, falling
+back to the received timestamp while processing is pending. MIME type is null
+when the document API does not supply it.
+
+## API References
+
+- [Authentication](https://developer.parseur.com/authentication)
+- [OpenAPI contract](https://api.parseur.com/openapi.json)
+- [Upload emails and documents](https://developer.parseur.com/upload-emails-and-documents-guide)
+- [Get a document](https://developer.parseur.com/get-a-document-19984379e0)
+- [Copy a mailbox](https://developer.parseur.com/copy-a-mailbox-19932200e0)
+- [Parser schema](https://developer.parseur.com/parser-8574587d0)
 
 ### Template Management
 

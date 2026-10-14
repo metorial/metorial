@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -77,7 +77,7 @@ export let manageDatasetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for get');
+      if (!ctx.input.datasetId) throw createApiServiceError('datasetId is required for get');
       let d = await client.getDataset(ctx.input.datasetId);
       return {
         output: { dataset: mapDataset(d) },
@@ -97,7 +97,8 @@ export let manageDatasetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for update');
+      if (!ctx.input.datasetId)
+        throw createApiServiceError('datasetId is required for update');
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
       if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
@@ -109,7 +110,8 @@ export let manageDatasetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for delete');
+      if (!ctx.input.datasetId)
+        throw createApiServiceError('datasetId is required for delete');
       await client.deleteDataset(ctx.input.datasetId);
       return {
         output: { deleted: true },
@@ -117,5 +119,5 @@ export let manageDatasetsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

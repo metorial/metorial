@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseRecords, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 let pendingPayoutSchema = z.object({
@@ -69,7 +69,7 @@ export let getPayouts = SlateTool.create(spec, {
 
     if (ctx.input.view === 'types') {
       let result = await client.listPayouts(ctx.input.payoutId);
-      let payouts = (result.payouts as Record<string, unknown>[]) || [];
+      let payouts = getResponseRecords(result.payouts, 'payout types');
       return {
         output: {
           payoutTypes: payouts,
@@ -85,7 +85,7 @@ export let getPayouts = SlateTool.create(spec, {
         recipientId: ctx.input.recipientId,
         includeIneligible: ctx.input.includeIneligible
       });
-      let pending = ((result.payoutsPending as Record<string, unknown>[]) || []).map(p => ({
+      let pending = getResponseRecords(result.payoutsPending, 'pending payouts').map(p => ({
         payoutId: p.payoutId as string | undefined,
         description: p.Description as string | undefined,
         rewardCount: p.rewardCount as number | undefined,
@@ -112,7 +112,7 @@ export let getPayouts = SlateTool.create(spec, {
       recipientId: ctx.input.recipientId,
       transactionId: ctx.input.transactionId
     });
-    let transactions = (result.payoutTransactions as Record<string, unknown>[]) || [];
+    let transactions = getResponseRecords(result.payoutTransactions, 'payout transactions');
     return {
       output: {
         transactions,

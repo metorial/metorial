@@ -1,3 +1,34 @@
+# CertCentral implementation refresh (2026-10-13)
+
+The current integration uses the CertCentral Services API. Its verified request contracts are:
+
+- US base URL: `https://www.digicert.com/services/v2`; Europe base URL: `https://certcentral.digicert.eu/services/v2`. Requests authenticate with `X-DC-DEVKEY`.
+- Order and request list status filters use the literal `filters[status]` query key. Order product and common-name filters use `filters[product_name_id]` and `filters[common_name]`.
+- OV/EV TLS orders use `order_validity` for coverage and `certificate.cert_validity` for an initial certificate duration. Existing validity arguments remain available; first-certificate duration can be specified with `certificate.validityDays`. Public TLS certificate and multi-year plan limits depend on the account and product.
+- Domain creation requires `validations`. Domain submission uses `POST /domain/{domain_id}/validation` with `validations` and optional `dcv_method`. The tool defaults unspecified validation types to OV.
+- Organization creation requires address and primary-contact details. EV, code signing, and EV code signing validation submissions require `verified_users`; the tool accepts existing user IDs.
+- User info supports `GET /user/me`. Order validation uses `GET /order/certificate/{order_id}/validation`; organization checks are omitted for DV orders and domain IDs may be omitted for DV orders.
+- Certificate files use `GET /certificate/{certificate_id}/download/format/{format_type}`. The legacy `pem` choice is sent as the documented `pem_nointermediate` format. Existing `der` input remains available for compatibility, but it is absent from the current glossary and its provider support was not verified.
+
+Official references:
+
+- [Services API](https://dev.digicert.com/certcentral-apis/services-api.html)
+- [Authentication](https://dev.digicert.com/certcentral-apis/authentication.html)
+- [List orders](https://dev.digicert.com/certcentral-apis/services-api/orders/list-orders.html)
+- [List requests](https://dev.digicert.com/certcentral-apis/services-api/requests/list-requests.html)
+- [Order OV/EV SSL](https://dev.digicert.com/certcentral-apis/services-api/orders/order-ov-ev-ssl.html)
+- [Add domain](https://dev.digicert.com/certcentral-apis/services-api/domains/add-domain.html)
+- [Submit domain for validation](https://dev.digicert.com/certcentral-apis/services-api/domains/submit-for-validation.html)
+- [Create organization](https://dev.digicert.com/certcentral-apis/services-api/organizations/create-organization.html)
+- [Submit organization for validation](https://dev.digicert.com/certcentral-apis/services-api/organizations/submit-for-validation.html)
+- [User info](https://dev.digicert.com/certcentral-apis/services-api/users/user-info.html)
+- [Order validation status](https://dev.digicert.com/certcentral-apis/services-api/orders/validation-status.html)
+- [Certificate download formats](https://dev.digicert.com/certcentral-apis/services-api/certificates/download-certificate-by-format.html)
+- [Glossary](https://dev.digicert.com/certcentral-apis/services-api/glossary.html)
+- [Errors](https://dev.digicert.com/certcentral-apis/services-api/errors.html)
+
+The older research below surveys additional DigiCert APIs. It does not establish that those capabilities are implemented by this package, and older examples may have different validity limits. No authenticated provider operations were run during this refresh.
+
 # DigiCert CertCentral Services API v2 - Comprehensive Research
 
 ## Table of Contents

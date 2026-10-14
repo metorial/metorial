@@ -13,7 +13,13 @@ export let getReports = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       reportType: z
         .enum(['intelligence', 'traffic', 'queries', 'conversations', 'analysis', 'leads'])
         .describe('Type of report to retrieve')

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,6 +63,9 @@ Returns the email address along with validity status, SMTP check results, and ca
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.fullName.trim() || !ctx.input.company.trim()) {
+      throw createApiServiceError('Provide a fullName and company name or domain.');
+    }
     let client = new Client(ctx.auth.token);
 
     let stepValue = ctx.input.resultType === 'domain_only' ? 2 : 3;

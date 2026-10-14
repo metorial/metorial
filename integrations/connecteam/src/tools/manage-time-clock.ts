@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,8 +48,8 @@ export let manageTimeClock = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action, timeClockId } = ctx.input;
@@ -63,15 +63,20 @@ export let manageTimeClock = SlateTool.create(spec, {
     }
 
     if (!timeClockId) {
-      throw new Error('timeClockId is required for this action.');
+      throw createApiServiceError('timeClockId is required for this action.');
+    }
+    if (
+      (action === 'get_time_activities' || action === 'get_timesheet_totals') &&
+      (!ctx.input.startDate || !ctx.input.endDate)
+    ) {
+      throw createApiServiceError('startDate and endDate are required for this action.');
     }
 
     if (action === 'get_time_activities') {
       let result = await client.getTimeActivities(timeClockId, {
-        startDate: ctx.input.startDate,
-        endDate: ctx.input.endDate,
-        limit: ctx.input.limit,
-        offset: ctx.input.offset
+        startDate: ctx.input.startDate!,
+        endDate: ctx.input.endDate!,
+        userIds: ctx.input.userIds
       });
       return {
         output: { result },
@@ -81,11 +86,9 @@ export let manageTimeClock = SlateTool.create(spec, {
 
     if (action === 'get_timesheet_totals') {
       let result = await client.getTimesheetTotals(timeClockId, {
-        startDate: ctx.input.startDate,
-        endDate: ctx.input.endDate,
-        userIds: ctx.input.userIds,
-        limit: ctx.input.limit,
-        offset: ctx.input.offset
+        startDate: ctx.input.startDate!,
+        endDate: ctx.input.endDate!,
+        userIds: ctx.input.userIds
       });
       return {
         output: { result },
@@ -94,7 +97,7 @@ export let manageTimeClock = SlateTool.create(spec, {
     }
 
     if (action === 'clock_in') {
-      if (!ctx.input.userId) throw new Error('userId is required for clock_in.');
+      if (!ctx.input.userId) throw createApiServiceError('userId is required for clock_in.');
       let body: any = { userId: ctx.input.userId };
       if (ctx.input.jobId) body.jobId = ctx.input.jobId;
       let result = await client.clockIn(timeClockId, body);
@@ -105,7 +108,7 @@ export let manageTimeClock = SlateTool.create(spec, {
     }
 
     if (action === 'clock_out') {
-      if (!ctx.input.userId) throw new Error('userId is required for clock_out.');
+      if (!ctx.input.userId) throw createApiServiceError('userId is required for clock_out.');
       let result = await client.clockOut(timeClockId, { userId: ctx.input.userId });
       return {
         output: { result },
@@ -113,6 +116,6 @@ export let manageTimeClock = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,38 +38,41 @@ When creating, **name** is required.`,
     let { action, eventId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (!ctx.input.name?.trim()) {
+        throw createApiServiceError('name is required for create.');
+      }
       let result = await client.createEvent(fields);
       return {
         output: {
           eventId: result._id,
-          name: result.name,
-          eventCode: result.eventCode,
-          backgroundColor: result.backgroundColor,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          name: result.name ?? undefined,
+          eventCode: result.eventCode ?? undefined,
+          backgroundColor: result.backgroundColor ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created event **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
     if (action === 'update') {
-      if (!eventId) throw new Error('eventId is required for update');
+      if (!eventId) throw createApiServiceError('eventId is required for update');
       let existing = await client.getEvent(eventId);
-      let result = await client.updateEvent(eventId, { ...existing, ...fields });
+      let result = await client.updateEvent(eventId, { ...existing, ...pickDefined(fields) });
       return {
         output: {
           eventId: result._id,
-          name: result.name,
-          eventCode: result.eventCode,
-          backgroundColor: result.backgroundColor,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          name: result.name ?? undefined,
+          eventCode: result.eventCode ?? undefined,
+          backgroundColor: result.backgroundColor ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Updated event **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
-    if (!eventId) throw new Error('eventId is required for delete');
+    if (!eventId) throw createApiServiceError('eventId is required for delete');
     await client.deleteEvent(eventId);
     return {
       output: { eventId },

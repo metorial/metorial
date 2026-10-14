@@ -1,11 +1,36 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  pickDefined
+} from 'slates';
 
-let controlApi = createAxios({
-  baseURL: 'https://control.msg91.com/api/v5'
+let controlApi = createAuthenticatedAxios({
+  baseURL: 'https://control.msg91.com/api/v5',
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'MSG91', reason: 'msg91_api_error' })
 });
 
-let otpApi = createAxios({
-  baseURL: 'https://api.msg91.com/api/v5'
+controlApi.interceptors.response.use(response => {
+  let data = response.data;
+  if (
+    data &&
+    typeof data === 'object' &&
+    (data.type === 'error' ||
+      ['error', 'fail', 'failed'].includes(data.status) ||
+      data.hasError === true)
+  ) {
+    throw createApiServiceError(
+      `MSG91 API request failed: ${extractApiErrorMessage({ response })}`,
+      {
+        reason: 'msg91_api_error',
+        upstreamStatus: response.status,
+        upstreamCode: data.code === undefined ? undefined : String(data.code)
+      }
+    );
+  }
+  return response;
 });
 
 export class Msg91Client {
@@ -96,6 +121,7 @@ export class Msg91Client {
     otpExpiry?: number;
     sender?: string;
     email?: string;
+    variables?: Record<string, string>;
   }) {
     let queryParams: Record<string, any> = {
       mobile: params.mobile
@@ -107,7 +133,7 @@ export class Msg91Client {
     if (params.sender) queryParams.sender = params.sender;
     if (params.email) queryParams.email = params.email;
 
-    let res = await otpApi.post('/otp', null, {
+    let res = await controlApi.post('/otp', params.variables ?? {}, {
       headers: this.headers(),
       params: queryParams
     });
@@ -115,7 +141,7 @@ export class Msg91Client {
   }
 
   async verifyOtp(params: { mobile: string; otp: string }) {
-    let res = await otpApi.get('/otp/verify', {
+    let res = await controlApi.get('/otp/verify', {
       headers: this.headers(),
       params: {
         mobile: params.mobile,
@@ -127,11 +153,12 @@ export class Msg91Client {
 
   async resendOtp(params: { mobile: string; retryType?: 'text' | 'voice' }) {
     let queryParams: Record<string, any> = {
-      mobile: params.mobile
+      mobile: params.mobile,
+      authkey: this.authkey,
+      retrytype: params.retryType ?? 'voice'
     };
-    if (params.retryType) queryParams.retrytype = params.retryType;
 
-    let res = await otpApi.post('/otp/retry', null, {
+    let res = await controlApi.get('/otp/retry', {
       headers: this.headers(),
       params: queryParams
     });
@@ -168,8 +195,26 @@ export class Msg91Client {
     return res.data;
   }
 
-  async getEmailTemplates() {
-    let res = await controlApi.get('/email/templates', { headers: this.headers() });
+  async getEmailTemplates(
+    params: {
+      page?: number;
+      pageSize?: number;
+      keyword?: string;
+      statusId?: number;
+      includeVersions?: boolean;
+    } = {}
+  ) {
+    let res = await controlApi.get('/email/templates', {
+      headers: this.headers(),
+      params: pickDefined({
+        page: params.page,
+        per_page: params.pageSize,
+        keyword: params.keyword,
+        search_in: params.keyword ? 'name' : undefined,
+        status_id: params.statusId,
+        with: params.includeVersions ? 'versions' : undefined
+      })
+    });
     return res.data;
   }
 
@@ -210,6 +255,7 @@ export class Msg91Client {
     recipients: Array<{
       to: string[];
       components?: Record<string, string>;
+      componentDetails?: Record<string, { type: string; value: string; subtype?: string }>;
     }>;
   }) {
     let body = {
@@ -227,25 +273,59 @@ export class Msg91Client {
           namespace: params.namespace,
           to_and_components: params.recipients.map(r => ({
             to: r.to,
-            components: r.components
+            components: {
+              ...Object.fromEntries(
+                Object.entries(r.components ?? {}).map(([key, value]) => [
+                  key,
+                  {
+                    type: 'text',
+                    value,
+                    ...(key.startsWith('button_') ? { subtype: 'url' } : {})
+                  }
+                ])
+              ),
+              ...r.componentDetails
+            }
           }))
         }
       }
     };
 
-    let res = await otpApi.post('/whatsapp/whatsapp-outbound-message/bulk/', body, {
+    let res = await controlApi.post('/whatsapp/whatsapp-outbound-message/bulk/', body, {
       headers: this.headers()
     });
     return res.data;
   }
 
-  async getWhatsAppTemplates() {
-    let res = await controlApi.get('/whatsapp/templates', { headers: this.headers() });
+  async getWhatsAppTemplates(params: {
+    integratedNumber: string;
+    templateName?: string;
+    templateStatus?: string;
+    languageCode?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    let res = await controlApi.get(
+      `/whatsapp/get-template-client/${encodeURIComponent(params.integratedNumber)}`,
+      {
+        headers: this.headers(),
+        params: pickDefined({
+          template_name: params.templateName,
+          template_status: params.templateStatus,
+          template_language: params.languageCode,
+          pagination: true,
+          page_num: params.page ?? 1,
+          page_size: params.pageSize ?? 25
+        })
+      }
+    );
     return res.data;
   }
 
   async getWhatsAppNumbers() {
-    let res = await controlApi.get('/whatsapp/number', { headers: this.headers() });
+    let res = await controlApi.get('/whatsapp/whatsapp-activation/', {
+      headers: this.headers()
+    });
     return res.data;
   }
 

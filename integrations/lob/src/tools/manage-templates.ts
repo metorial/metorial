@@ -105,19 +105,39 @@ export let listTemplates = SlateTool.create(spec, {
         .optional()
         .describe('Number of templates to return (max 100, default 10)'),
       offset: z.number().optional().describe('Number of templates to skip'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor from previousUrl; cannot be combined with after'),
+      after: z
+        .string()
+        .optional()
+        .describe('Next-page cursor from nextUrl; cannot be combined with before'),
       metadata: z.record(z.string(), z.string()).optional().describe('Filter by metadata')
     })
   )
   .output(
     z.object({
       templates: z.array(templateOutputSchema).describe('List of templates'),
-      totalCount: z.number().describe('Total count')
+      totalCount: z.number().describe('Total count'),
+      nextUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Next-page URL; pass its after query value to after'),
+      previousUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Previous-page URL; pass its before query value to before')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listTemplates({
       limit: ctx.input.limit,
+      before: ctx.input.before,
+      after: ctx.input.after,
       offset: ctx.input.offset,
       metadata: ctx.input.metadata
     });
@@ -125,7 +145,9 @@ export let listTemplates = SlateTool.create(spec, {
     return {
       output: {
         templates,
-        totalCount: result.total_count ?? result.count ?? templates.length
+        totalCount: result.total_count ?? result.count ?? templates.length,
+        nextUrl: result.next_url ?? null,
+        previousUrl: result.previous_url ?? null
       },
       message: `Found **${templates.length}** templates`
     };
@@ -189,9 +211,12 @@ export let deleteTemplate = SlateTool.create(spec, {
     return {
       output: {
         templateId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted template **${ctx.input.templateId}**`
+      message:
+        result.deleted === true
+          ? `Deleted template **${ctx.input.templateId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });
 

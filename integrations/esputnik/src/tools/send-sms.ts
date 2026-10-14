@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getMessageResults } from '../lib/client';
+import { messageResultSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let sendSms = SlateTool.create(spec, {
@@ -36,28 +37,62 @@ If the phone number does not match an existing contact, a new contact will be cr
   )
   .output(
     z.object({
-      sent: z.boolean().describe('Whether the SMS was sent successfully')
+      sent: z.boolean().describe('Whether the SMS was accepted for sending'),
+      requestId: z.string().optional().describe('Use get_message_status to check delivery'),
+      results: z.array(messageResultSchema).optional().describe('Provider queue results')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let payload: Record<string, any> = {
-      phoneNumber: ctx.input.phoneNumber
-    };
-
-    if (ctx.input.text) payload.text = ctx.input.text;
-    if (ctx.input.from) payload.from = ctx.input.from;
-    if (ctx.input.templateId) payload.templateId = ctx.input.templateId;
-    if (ctx.input.contactId) payload.contactId = ctx.input.contactId;
-    if (ctx.input.externalCustomerId)
-      payload.externalCustomerId = ctx.input.externalCustomerId;
-
-    await client.sendSms(payload);
+    if (ctx.input.templateId === undefined && (!ctx.input.text || !ctx.input.from)) {
+      throw createApiServiceError(
+        'text and from are required when templateId is not provided.'
+      );
+    }
+    let response: Awaited<ReturnType<Client['sendSms']>>;
+    if (ctx.input.templateId !== undefined) {
+      response = await client.smartSend(ctx.input.templateId, [
+        {
+          locator: ctx.input.phoneNumber,
+          contactId: ctx.input.contactId,
+          externalCustomerId: ctx.input.externalCustomerId,
+          email: false,
+          fromName: ctx.input.from
+        }
+      ]);
+    } else {
+      if (ctx.input.contactId !== undefined) {
+        await client.updateContact(ctx.input.contactId, {
+          externalCustomerId: ctx.input.externalCustomerId,
+          channels: [{ type: 'sms', value: ctx.input.phoneNumber }]
+        });
+      } else if (ctx.input.externalCustomerId) {
+        await client.addOrUpdateContact({
+          externalCustomerId: ctx.input.externalCustomerId,
+          channels: [{ type: 'sms', value: ctx.input.phoneNumber }]
+        });
+      }
+      response = await client.sendSms({
+        phoneNumbers: [ctx.input.phoneNumber],
+        text: ctx.input.text,
+        from: ctx.input.from
+      });
+    }
+    let results = getMessageResults(response);
+    if (!results.length)
+      throw createApiServiceError(
+        'eSputnik returned no SMS queue result. Check the account before retrying.'
+      );
+    let rejected = results.find(result => result.status === 'ERROR');
+    if (rejected)
+      throw createApiServiceError(
+        `eSputnik rejected the SMS: ${rejected.message || rejected.status}`
+      );
 
     return {
-      output: { sent: true },
-      message: `SMS sent to **${ctx.input.phoneNumber}**.`
+      output: { sent: true, requestId: results[0]?.requestId, results },
+      message: `SMS accepted for sending to **${ctx.input.phoneNumber}**.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,7 @@ export let manageTagsTool = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!entityType || !entityId)
-        throw new Error('entityType and entityId are required for get.');
+        throw createApiServiceError('entityType and entityId are required for get.');
       let tags = await client.getTags(entityType, entityId);
       return {
         output: { tags },
@@ -66,8 +66,8 @@ export let manageTagsTool = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!entityType || !entityId)
-        throw new Error('entityType and entityId are required for update.');
-      if (!tagSlugs) throw new Error('tagSlugs is required for update.');
+        throw createApiServiceError('entityType and entityId are required for update.');
+      if (!tagSlugs) throw createApiServiceError('tagSlugs is required for update.');
       let formattedTags = tagSlugs.map(slug => ({ slug }));
       await client.updateTags(entityType, entityId, formattedTags);
       return {
@@ -76,7 +76,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       };
     }
 
-    if (!tagSlug) throw new Error('tagSlug is required for search.');
+    if (!tagSlug) throw createApiServiceError('tagSlug is required for search.');
     let result = await client.getEntitiesByTag(
       tagSlug,
       entityType ? { entityType } : undefined

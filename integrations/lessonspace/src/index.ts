@@ -1,6 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteSessionRecordings,
+  deleteSpaceRecordings,
+  getFileUrl,
   getRecording,
   getSession,
   getTranscript,
@@ -22,7 +25,10 @@ export let provider = Slate.create({
     getTranscript,
     listSpaces,
     listUsers,
-    removeUser
+    removeUser,
+    deleteSessionRecordings,
+    deleteSpaceRecordings,
+    getFileUrl
   ],
   triggers: []
 });

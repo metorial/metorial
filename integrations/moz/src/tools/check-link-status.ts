@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MozClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,10 +53,19 @@ export let checkLinkStatusTool = SlateTool.create(spec, {
       sourceScope: ctx.input.sourceScope
     });
 
-    let existsArray = response.exists || [];
+    let existsArray = response.exists;
+    if (
+      !Array.isArray(existsArray) ||
+      existsArray.length !== ctx.input.sources.length ||
+      existsArray.some(value => typeof value !== 'boolean')
+    ) {
+      throw createApiServiceError(
+        'Moz returned incomplete link status data. Retry the request.'
+      );
+    }
     let results = ctx.input.sources.map((source, i) => ({
       source,
-      linksToTarget: existsArray[i] ?? false
+      linksToTarget: existsArray[i]
     }));
 
     let linkingCount = results.filter(r => r.linksToTarget).length;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,22 +42,32 @@ export let listCampaigns = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listCampaigns(ctx.input.page);
+    let stats = await client.getCampaignStatsBatch(result.data.map(campaign => campaign.id));
+    let statsById = new Map(stats.map(item => [item.id, item]));
 
     return {
       output: {
-        campaigns: result.data.map(c => ({
-          campaignId: c.id,
-          title: c.title,
-          subject: c.subject,
-          fromName: c.from_name,
-          fromEmail: c.from_email,
-          scheduledAt: c.scheduled_at,
-          sentAt: c.sent_at,
-          sentCount: c.sent_count,
-          uniqueOpenCount: c.unique_open_count,
-          uniqueClickCount: c.unique_click_count,
-          createdAt: c.created_at
-        })),
+        campaigns: result.data.map(c => {
+          let campaignStats = statsById.get(c.id);
+          if (!campaignStats) {
+            throw createApiServiceError(`Statistics for campaign ${c.id} were not returned.`, {
+              reason: 'missing_campaign_statistics'
+            });
+          }
+          return {
+            campaignId: c.id,
+            title: c.title,
+            subject: c.subject,
+            fromName: c.from_name,
+            fromEmail: c.from_email,
+            scheduledAt: c.scheduled_at,
+            sentAt: c.sent_at,
+            sentCount: campaignStats.sent_count,
+            uniqueOpenCount: campaignStats.unique_open_count,
+            uniqueClickCount: campaignStats.unique_click_count,
+            createdAt: c.created_at
+          };
+        }),
         currentPage: result.current_page,
         lastPage: result.last_page,
         total: result.total

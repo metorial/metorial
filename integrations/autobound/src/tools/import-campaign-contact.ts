@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AutoboundClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,12 +11,15 @@ export let importCampaignContact = SlateTool.create(spec, {
 Use this to programmatically add contacts to your AI-powered outreach campaigns.`,
   instructions: [
     'The campaignId is obtained from AI Studio: Actions > Add Contacts > Monitor from API request.',
-    'contactEmail is required. Additional fields like contactName, contactJobTitle, and contactCompanyName help improve content personalization.'
+    'contactEmail is required. Additional fields like contactName, contactJobTitle, and contactCompanyName help improve content personalization.',
+    'Configure the imported field mappings in the AI Studio campaign. Fields are not mapped automatically.',
+    'Use additionalFields to pass custom campaign inputs. Named contact fields take precedence when the same key is supplied.'
   ],
   tags: {
     destructive: false
   }
 })
+  .authMethods(['api_key'])
   .input(
     z.object({
       campaignId: z.string().describe('AI Studio campaign ID to import the contact into'),
@@ -24,7 +27,11 @@ Use this to programmatically add contacts to your AI-powered outreach campaigns.
       contactName: z.string().optional().describe('Prospect full name'),
       contactJobTitle: z.string().optional().describe('Prospect job title'),
       contactCompanyName: z.string().optional().describe('Prospect company name'),
-      contactCompanySize: z.number().optional().describe('Prospect company employee count')
+      contactCompanySize: z.number().optional().describe('Prospect company employee count'),
+      additionalFields: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Custom key-value inputs configured in the campaign field mappings')
     })
   )
   .output(
@@ -45,12 +52,15 @@ Use this to programmatically add contacts to your AI-powered outreach campaigns.
     );
 
     let result = await client.importCampaignContact({
+      ...ctx.input.additionalFields,
       campaignId: ctx.input.campaignId,
       contactEmail: ctx.input.contactEmail,
-      contactName: ctx.input.contactName,
-      contactJobTitle: ctx.input.contactJobTitle,
-      contactCompanyName: ctx.input.contactCompanyName,
-      contactCompanySize: ctx.input.contactCompanySize
+      ...pickDefined({
+        contactName: ctx.input.contactName,
+        contactJobTitle: ctx.input.contactJobTitle,
+        contactCompanyName: ctx.input.contactCompanyName,
+        contactCompanySize: ctx.input.contactCompanySize
+      })
     });
 
     return {

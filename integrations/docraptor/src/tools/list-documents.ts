@@ -14,8 +14,22 @@ export let listDocuments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination. Defaults to 1.'),
-      perPage: z.number().optional().describe('Number of documents per page. Defaults to 100.')
+      page: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'Must be a positive whole number.'
+        )
+        .optional()
+        .describe('Page number for pagination. Defaults to 1.'),
+      perPage: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'Must be a positive whole number.'
+        )
+        .optional()
+        .describe('Number of documents per page. Defaults to 100.')
     })
   )
   .output(

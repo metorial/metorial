@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface CreateDocumentParams {
   name?: string;
@@ -65,6 +71,7 @@ export interface AsyncStatusResponse {
   numberOfPages?: number;
   message?: string;
   validationErrors?: string;
+  downloadId?: string;
 }
 
 export interface HostedDocumentResponse {
@@ -84,6 +91,24 @@ let buildDocumentBody = (
     callbackUrl?: string;
   }
 ) => {
+  let hasContent = Boolean(params.documentContent?.trim());
+  let hasUrl = Boolean(params.documentUrl?.trim());
+  if (hasContent === hasUrl) {
+    throw createApiServiceError(
+      'Provide either documentContent or documentUrl, but not both.'
+    );
+  }
+  if (params.documentContent !== undefined && !hasContent) {
+    throw createApiServiceError('documentContent must not be blank.');
+  }
+  if (params.documentUrl !== undefined) validateHttpUrl(params.documentUrl, 'documentUrl');
+  if (params.callbackUrl !== undefined) validateHttpUrl(params.callbackUrl, 'callbackUrl');
+  if (params.hostedExpiresAt !== undefined && !isIsoDateTime(params.hostedExpiresAt)) {
+    throw createApiServiceError(
+      'hostedExpiresAt must be an ISO 8601 datetime including seconds.'
+    );
+  }
+
   let body: Record<string, unknown> = {
     type: params.documentType,
     test: params.test ?? false
@@ -111,151 +136,241 @@ let buildDocumentBody = (
 
   if (params.princeOptions) {
     let po = params.princeOptions;
-    if (po.media) body['prince_options[media]'] = po.media;
-    if (po.baseurl) body['prince_options[baseurl]'] = po.baseurl;
-    if (po.input) body['prince_options[input]'] = po.input;
-    if (po.javascript !== undefined) body['prince_options[javascript]'] = po.javascript;
-    if (po.maxPasses !== undefined) body['prince_options[max_passes]'] = po.maxPasses;
-    if (po.encrypt !== undefined) body['prince_options[encrypt]'] = po.encrypt;
-    if (po.keyBits !== undefined) body['prince_options[key_bits]'] = po.keyBits;
-    if (po.userPassword) body['prince_options[user_password]'] = po.userPassword;
-    if (po.ownerPassword) body['prince_options[owner_password]'] = po.ownerPassword;
-    if (po.disallowPrint !== undefined)
-      body['prince_options[disallow_print]'] = po.disallowPrint;
-    if (po.disallowCopy !== undefined) body['prince_options[disallow_copy]'] = po.disallowCopy;
-    if (po.disallowAnnotate !== undefined)
-      body['prince_options[disallow_annotate]'] = po.disallowAnnotate;
-    if (po.disallowModify !== undefined)
-      body['prince_options[disallow_modify]'] = po.disallowModify;
-    if (po.allowCopyForAccessibility !== undefined)
-      body['prince_options[allow_copy_for_accessibility]'] = po.allowCopyForAccessibility;
-    if (po.allowAssembly !== undefined)
-      body['prince_options[allow_assembly]'] = po.allowAssembly;
-    if (po.noXinclude !== undefined) body['prince_options[no_xinclude]'] = po.noXinclude;
-    if (po.noNetwork !== undefined) body['prince_options[no_network]'] = po.noNetwork;
-    if (po.noParallelDownloads !== undefined)
-      body['prince_options[no_parallel_downloads]'] = po.noParallelDownloads;
-    if (po.httpUser) body['prince_options[http_user]'] = po.httpUser;
-    if (po.httpPassword) body['prince_options[http_password]'] = po.httpPassword;
-    if (po.httpProxy) body['prince_options[http_proxy]'] = po.httpProxy;
-    if (po.httpTimeout !== undefined) body['prince_options[http_timeout]'] = po.httpTimeout;
-    if (po.insecure !== undefined) body['prince_options[insecure]'] = po.insecure;
-    if (po.noAuthorStyle !== undefined)
-      body['prince_options[no_author_style]'] = po.noAuthorStyle;
-    if (po.noDefaultStyle !== undefined)
-      body['prince_options[no_default_style]'] = po.noDefaultStyle;
-    if (po.noEmbedFonts !== undefined)
-      body['prince_options[no_embed_fonts]'] = po.noEmbedFonts;
-    if (po.noSubsetFonts !== undefined)
-      body['prince_options[no_subset_fonts]'] = po.noSubsetFonts;
-    if (po.noCompress !== undefined) body['prince_options[no_compress]'] = po.noCompress;
-    if (po.cssDpi !== undefined) body['prince_options[css_dpi]'] = po.cssDpi;
-    if (po.profile) body['prince_options[profile]'] = po.profile;
-    if (po.pdfTitle) body['prince_options[pdf_title]'] = po.pdfTitle;
+    body.prince_options = pickDefined({
+      media: po.media,
+      baseurl: po.baseurl,
+      input: po.input,
+      javascript: po.javascript,
+      max_passes: po.maxPasses,
+      encrypt: po.encrypt,
+      key_bits: po.keyBits,
+      user_password: po.userPassword,
+      owner_password: po.ownerPassword,
+      disallow_print: po.disallowPrint,
+      disallow_copy: po.disallowCopy,
+      disallow_annotate: po.disallowAnnotate,
+      disallow_modify: po.disallowModify,
+      allow_copy_for_accessibility: po.allowCopyForAccessibility,
+      allow_assembly: po.allowAssembly,
+      no_xinclude: po.noXinclude,
+      no_network: po.noNetwork,
+      no_parallel_downloads: po.noParallelDownloads,
+      http_user: po.httpUser,
+      http_password: po.httpPassword,
+      http_proxy: po.httpProxy,
+      http_timeout: po.httpTimeout,
+      insecure: po.insecure,
+      no_author_style: po.noAuthorStyle,
+      no_default_style: po.noDefaultStyle,
+      no_embed_fonts: po.noEmbedFonts,
+      no_subset_fonts: po.noSubsetFonts,
+      no_compress: po.noCompress,
+      css_dpi: po.cssDpi,
+      profile: po.profile,
+      pdf_title: po.pdfTitle
+    });
   }
 
   return body;
 };
 
+let validateHttpUrl = (value: string, field: string) => {
+  try {
+    let url = new URL(value);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return;
+  } catch {}
+  throw createApiServiceError(`${field} must be a valid HTTP or HTTPS URL.`);
+};
+
+let isIsoDateTime = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/.test(value)) {
+    return false;
+  }
+  return Number.isFinite(
+    Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`)
+  );
+};
+
+let requiredString = (value: unknown, field: string): string => {
+  if (
+    (typeof value === 'string' && value.trim()) ||
+    (typeof value === 'number' && Number.isFinite(value))
+  ) {
+    return String(value);
+  }
+  throw createApiServiceError(
+    `DocRaptor returned an invalid ${field}. Please retry the request.`
+  );
+};
+
+let optionalString = (value: unknown) => (typeof value === 'string' ? value : undefined);
+let optionalNumber = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+let requiredRecord = (value: unknown) => {
+  if (!isApiErrorRecord(value)) {
+    throw createApiServiceError(
+      'DocRaptor returned an invalid response. Please retry the request.'
+    );
+  }
+  return value;
+};
+
+export let getDocumentMimeType = (type: CreateDocumentParams['documentType']) =>
+  type === 'pdf'
+    ? 'application/pdf'
+    : type === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/vnd.ms-excel';
+
 export class Client {
   private apiKey: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A DocRaptor API key is required. Reconnect with a valid API key.'
+      );
+    }
     this.apiKey = config.token;
   }
 
-  private getAxios() {
-    let encoded = Buffer.from(`${this.apiKey}:`).toString('base64');
-    return createAxios({
+  private getAxios(authenticated = true) {
+    return createAuthenticatedAxios({
       baseURL: 'https://api.docraptor.com',
-      headers: {
-        Authorization: `Basic ${encoded}`,
-        'Content-Type': 'application/json'
-      }
+      ...(authenticated ? { auth: { username: this.apiKey, password: '' } } : {}),
+      timeout: 70000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'DocRaptor',
+          reason: 'docraptor_api_error'
+        })
     });
   }
 
   async createDocument(
     params: CreateDocumentParams
-  ): Promise<{ content: string; contentLength: number }> {
+  ): Promise<{ content: Response; contentLength: number }> {
     let http = this.getAxios();
-    let body = buildDocumentBody(params);
-
-    let response = await http.post('/docs', body, {
+    let response = await http.post<ArrayBuffer>('/docs', buildDocumentBody(params), {
       responseType: 'arraybuffer'
     });
-
-    let buffer = Buffer.from(response.data as ArrayBuffer);
-    let base64Content = buffer.toString('base64');
-
+    let buffer = new Uint8Array(response.data);
+    if (!buffer.byteLength) {
+      throw createApiServiceError(
+        'DocRaptor returned an empty document. Please retry the request.'
+      );
+    }
     return {
-      content: base64Content,
-      contentLength: buffer.length
+      content: new Response(buffer, {
+        headers: { 'Content-Type': getDocumentMimeType(params.documentType) }
+      }),
+      contentLength: buffer.byteLength
     };
   }
 
   async createAsyncDocument(params: AsyncDocumentParams): Promise<{ statusId: string }> {
     let http = this.getAxios();
-    let body = buildDocumentBody({ ...params, async: true });
+    let response = await http.post<unknown>(
+      '/docs',
+      buildDocumentBody({ ...params, async: true })
+    );
+    let data = requiredRecord(response.data);
+    return { statusId: requiredString(data.status_id, 'status ID') };
+  }
 
-    let response = await http.post<{ status_id: string }>('/docs', body);
-
-    return {
-      statusId: String(response.data.status_id)
-    };
+  async createHostedAsyncDocument(
+    params: AsyncDocumentParams & HostedDocumentParams
+  ): Promise<{ statusId: string }> {
+    let http = this.getAxios();
+    let response = await http.post<unknown>(
+      '/docs',
+      buildDocumentBody({ ...params, async: true, hosted: true })
+    );
+    let data = requiredRecord(response.data);
+    return { statusId: requiredString(data.status_id, 'status ID') };
   }
 
   async getAsyncStatus(statusId: string): Promise<AsyncStatusResponse> {
+    if (!statusId.trim()) throw createApiServiceError('statusId must not be blank.');
     let http = this.getAxios();
-    let response = await http.get<Record<string, unknown>>(`/status/${statusId}.json`);
-
-    let data = response.data;
+    let response = await http.get<unknown>(`/status/${encodeURIComponent(statusId)}.json`);
+    let data = requiredRecord(response.data);
+    let status = data.status;
+    if (
+      status !== 'queued' &&
+      status !== 'working' &&
+      status !== 'completed' &&
+      status !== 'failed' &&
+      status !== 'killed'
+    ) {
+      throw createApiServiceError(
+        'DocRaptor returned an unknown document status. Please retry the request.'
+      );
+    }
+    let downloadUrl = optionalString(data.download_url);
+    if (downloadUrl !== undefined) validateHttpUrl(downloadUrl, 'download URL');
+    if (status === 'completed' && !downloadUrl) {
+      throw createApiServiceError(
+        'DocRaptor marked the document completed without a download URL. Please retry the status check.'
+      );
+    }
     return {
-      status: data.status as AsyncStatusResponse['status'],
-      downloadUrl: data.download_url as string | undefined,
-      numberOfPages: data.number_of_pages as number | undefined,
-      message: data.message as string | undefined,
-      validationErrors: data.validation_errors as string | undefined
+      status,
+      downloadUrl,
+      downloadId:
+        data.download_id === null || data.download_id === undefined
+          ? undefined
+          : requiredString(data.download_id, 'download ID'),
+      numberOfPages: optionalNumber(data.number_of_pages),
+      message: optionalString(data.message),
+      validationErrors: optionalString(data.validation_errors)
     };
   }
 
   async createHostedDocument(params: HostedDocumentParams): Promise<HostedDocumentResponse> {
     let http = this.getAxios();
-    let body = buildDocumentBody({
-      ...params,
-      hosted: true,
-      hostedDownloadLimit: params.hostedDownloadLimit,
-      hostedExpiresAt: params.hostedExpiresAt
-    });
-
-    let response = await http.post<Record<string, unknown>>('/docs', body);
-
-    let data = response.data;
+    let response = await http.post<unknown>(
+      '/docs',
+      buildDocumentBody({ ...params, hosted: true })
+    );
+    let data = requiredRecord(response.data);
+    let downloadUrl = requiredString(data.download_url, 'download URL');
+    validateHttpUrl(downloadUrl, 'download URL');
     return {
-      downloadId: data.download_id as string,
-      downloadUrl: data.download_url as string,
-      numberOfPages: data.number_of_pages as number | undefined
+      downloadId: requiredString(data.download_id, 'download ID'),
+      downloadUrl,
+      numberOfPages: optionalNumber(data.number_of_pages)
     };
   }
 
   async expireHostedDocument(downloadId: string): Promise<void> {
+    if (!downloadId.trim()) throw createApiServiceError('downloadId must not be blank.');
     let http = this.getAxios();
-    await http.patch(`/expire/${downloadId}.json`);
+    await http.patch(`/expire/${encodeURIComponent(downloadId)}.json`);
   }
 
   async listDocuments(page?: number, perPage?: number): Promise<DocumentListItem[]> {
     let http = this.getAxios();
-    let params: Record<string, unknown> = {};
-    if (page !== undefined) params.page = page;
-    if (perPage !== undefined) params.per_page = perPage;
-
-    let response = await http.get<DocumentListItem[]>('/docs.json', { params });
+    let response = await http.get<unknown>('/docs.json', {
+      params: pickDefined({ page, per_page: perPage })
+    });
+    if (!Array.isArray(response.data) || !response.data.every(isApiErrorRecord)) {
+      throw createApiServiceError(
+        'DocRaptor returned an invalid document list. Please retry the request.'
+      );
+    }
     return response.data;
   }
 
   async listIps(): Promise<string[]> {
-    let http = this.getAxios();
-    let response = await http.get<string[]>('https://docraptor.com/ips.json');
+    let http = this.getAxios(false);
+    let response = await http.get<unknown>('https://docraptor.com/ips.json');
+    if (!Array.isArray(response.data) || !response.data.every(ip => typeof ip === 'string')) {
+      throw createApiServiceError(
+        'DocRaptor returned an invalid IP address list. Please retry the request.'
+      );
+    }
     return response.data;
   }
 }

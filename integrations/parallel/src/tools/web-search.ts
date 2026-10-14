@@ -42,11 +42,11 @@ At least one of \`objective\` or \`searchQueries\` must be provided.`,
           maxCharsPerResult: z
             .number()
             .optional()
-            .describe('Maximum characters per result excerpt (min 1000)'),
+            .describe('Maximum characters per result excerpt'),
           maxCharsTotal: z
             .number()
             .optional()
-            .describe('Maximum total characters across all excerpts (min 1000)')
+            .describe('Maximum total characters across all excerpts')
         })
         .optional()
         .describe('Control excerpt length in results'),

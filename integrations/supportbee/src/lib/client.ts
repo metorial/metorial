@@ -1,31 +1,45 @@
-import { createAxios } from 'slates';
-import type { Comment, Email, Label, Reply, Snippet, Team, Ticket, User } from './types';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import type {
+  AuditEntry,
+  Comment,
+  Email,
+  Label,
+  Reply,
+  Snippet,
+  Team,
+  Ticket,
+  User
+} from './types';
 
 export class Client {
-  private token: string;
-  private baseUrl: string;
   private http;
 
   constructor(config: { token: string; companySubdomain: string }) {
-    this.token = config.token;
-    this.baseUrl = `https://${config.companySubdomain}.supportbee.com`;
-    this.http = createAxios({
-      baseURL: this.baseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
-    });
-  }
-
-  private params(extra: Record<string, any> = {}): Record<string, any> {
-    let result: Record<string, any> = { auth_token: this.token };
-    for (let [key, value] of Object.entries(extra)) {
-      if (value !== undefined && value !== null) {
-        result[key] = value;
-      }
+    if (!config.token.trim()) {
+      throw createApiServiceError('A SupportBee API token is required.');
     }
-    return result;
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(config.companySubdomain)) {
+      throw createApiServiceError(
+        'Enter only your SupportBee company subdomain, such as "example" from example.supportbee.com.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: `https://${config.companySubdomain}.supportbee.com`,
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: {
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SupportBee',
+          reason: 'supportbee_api_error'
+        })
+    });
   }
 
   // ─── Tickets ────────────────────────────────────────────
@@ -38,6 +52,7 @@ export class Client {
       spam?: boolean;
       trash?: boolean;
       replies?: boolean;
+      maxReplies?: number;
       assignedUser?: string;
       assignedTeam?: string;
       starred?: boolean;
@@ -45,23 +60,37 @@ export class Client {
       since?: string;
       until?: string;
       sortBy?: string;
+      requesterEmails?: string[];
     } = {}
   ): Promise<{ tickets: Ticket[]; total: number; totalPages: number; currentPage: number }> {
+    this.validatePagination(options);
+    if (
+      options.maxReplies !== undefined &&
+      (!Number.isInteger(options.maxReplies) ||
+        options.maxReplies < 0 ||
+        options.replies === false)
+    ) {
+      throw createApiServiceError(
+        'maxReplies must be a non-negative whole number and cannot be used with replies set to false.'
+      );
+    }
     let response = await this.http.get('/tickets', {
-      params: this.params({
+      params: pickDefined({
         per_page: options.perPage,
         page: options.page,
         archived: options.archived,
         spam: options.spam,
         trash: options.trash,
         replies: options.replies,
+        max_replies: options.maxReplies,
         assigned_user: options.assignedUser,
         assigned_team: options.assignedTeam,
         starred: options.starred,
         label: options.label,
         since: options.since,
         until: options.until,
-        sort_by: options.sortBy
+        sort_by: options.sortBy,
+        requester_emails: options.requesterEmails?.join(',')
       })
     });
     let data = response.data;
@@ -75,7 +104,7 @@ export class Client {
 
   async getTicket(ticketId: number): Promise<Ticket> {
     let response = await this.http.get(`/tickets/${ticketId}`, {
-      params: this.params()
+      params: {}
     });
     return mapTicket(response.data.ticket);
   }
@@ -85,13 +114,19 @@ export class Client {
     options: {
       perPage?: number;
       page?: number;
+      spam?: boolean;
+      trash?: boolean;
     } = {}
   ): Promise<{ tickets: Ticket[]; total: number }> {
+    this.validatePagination(options);
+    if (!query.trim()) throw createApiServiceError('Provide a non-empty ticket search query.');
     let response = await this.http.get('/tickets/search', {
-      params: this.params({
+      params: pickDefined({
         query,
         per_page: options.perPage,
-        page: options.page
+        page: options.page,
+        spam: options.spam,
+        trash: options.trash
       })
     });
     let data = response.data;
@@ -104,17 +139,41 @@ export class Client {
   async createTicket(ticket: {
     subject: string;
     requesterEmail: string;
+    requesterName?: string;
     contentText?: string;
     contentHtml?: string;
     attachmentIds?: number[];
     cc?: string[];
     bcc?: string[];
     notify?: boolean;
+    forwardingAddressId?: number;
   }): Promise<Ticket> {
+    if (!ticket.subject.trim() || !ticket.requesterEmail.trim()) {
+      throw createApiServiceError('Provide a ticket subject and requester email.');
+    }
+    if (
+      !ticket.contentText?.trim() &&
+      !ticket.contentHtml?.trim() &&
+      !ticket.attachmentIds?.length
+    ) {
+      throw createApiServiceError(
+        'Provide ticket content or at least one uploaded attachment ID.'
+      );
+    }
+    if (
+      ticket.forwardingAddressId !== undefined &&
+      (!Number.isInteger(ticket.forwardingAddressId) || ticket.forwardingAddressId < 1)
+    ) {
+      throw createApiServiceError(
+        'forwardingAddressId must be a positive whole number from list_emails.'
+      );
+    }
     let body: any = {
       ticket: {
         subject: ticket.subject,
         requester_email: ticket.requesterEmail,
+        requester_name: ticket.requesterName,
+        forwarding_address_id: ticket.forwardingAddressId,
         content: {
           text: ticket.contentText,
           html: ticket.contentHtml,
@@ -124,12 +183,12 @@ export class Client {
     };
     if (ticket.cc) body.ticket.cc = ticket.cc;
     if (ticket.bcc) body.ticket.bcc = ticket.bcc;
-    if (ticket.notify !== undefined) body.ticket.notify = ticket.notify;
+    if (ticket.notify !== undefined) body.ticket.notify_requester = ticket.notify;
 
     let response = await this.http.post('/tickets', body, {
-      params: this.params()
+      params: {}
     });
-    return mapTicket(response.data.ticket);
+    return mapTicket(response.data.ticket ?? response.data);
   }
 
   async archiveTicket(ticketId: number): Promise<void> {
@@ -137,14 +196,14 @@ export class Client {
       `/tickets/${ticketId}/archive`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async unarchiveTicket(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/archive`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -153,14 +212,14 @@ export class Client {
       `/tickets/${ticketId}/trash`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async untrashTicket(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/trash`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -169,14 +228,14 @@ export class Client {
       `/tickets/${ticketId}/spam`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async unmarkSpam(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/spam`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -185,14 +244,14 @@ export class Client {
       `/tickets/${ticketId}/answered`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async markUnanswered(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/answered`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -201,20 +260,20 @@ export class Client {
       `/tickets/${ticketId}/star`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async unstarTicket(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/star`, {
-      params: this.params()
+      params: {}
     });
   }
 
   async deleteTicket(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -222,14 +281,14 @@ export class Client {
 
   async listReplies(ticketId: number): Promise<Reply[]> {
     let response = await this.http.get(`/tickets/${ticketId}/replies`, {
-      params: this.params()
+      params: {}
     });
     return (response.data.replies || []).map(mapReply);
   }
 
   async getReply(ticketId: number, replyId: number): Promise<Reply> {
     let response = await this.http.get(`/tickets/${ticketId}/replies/${replyId}`, {
-      params: this.params()
+      params: {}
     });
     return mapReply(response.data.reply);
   }
@@ -246,6 +305,15 @@ export class Client {
       onBehalfOfEmail?: string;
     }
   ): Promise<Reply> {
+    if (
+      !reply.contentText?.trim() &&
+      !reply.contentHtml?.trim() &&
+      !reply.attachmentIds?.length
+    ) {
+      throw createApiServiceError(
+        'Provide reply content or at least one uploaded attachment ID.'
+      );
+    }
     let body: any = {
       reply: {
         content: {
@@ -264,7 +332,7 @@ export class Client {
     }
 
     let response = await this.http.post(`/tickets/${ticketId}/replies`, body, {
-      params: this.params()
+      params: {}
     });
     return mapReply(response.data.reply);
   }
@@ -273,7 +341,7 @@ export class Client {
 
   async listComments(ticketId: number): Promise<Comment[]> {
     let response = await this.http.get(`/tickets/${ticketId}/comments`, {
-      params: this.params()
+      params: {}
     });
     return (response.data.comments || []).map(mapComment);
   }
@@ -286,6 +354,15 @@ export class Client {
       attachmentIds?: number[];
     }
   ): Promise<Comment> {
+    if (
+      !comment.contentText?.trim() &&
+      !comment.contentHtml?.trim() &&
+      !comment.attachmentIds?.length
+    ) {
+      throw createApiServiceError(
+        'Provide comment content or at least one uploaded attachment ID.'
+      );
+    }
     let body = {
       comment: {
         content: {
@@ -296,7 +373,7 @@ export class Client {
       }
     };
     let response = await this.http.post(`/tickets/${ticketId}/comments`, body, {
-      params: this.params()
+      params: {}
     });
     return mapComment(response.data.comment);
   }
@@ -309,13 +386,13 @@ export class Client {
       {
         user_assignment: { user_id: userId }
       },
-      { params: this.params() }
+      { params: {} }
     );
   }
 
   async unassignUser(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/user_assignment`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -325,13 +402,13 @@ export class Client {
       {
         team_assignment: { team_id: teamId }
       },
-      { params: this.params() }
+      { params: {} }
     );
   }
 
   async unassignTeam(ticketId: number): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/team_assignment`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -339,7 +416,7 @@ export class Client {
 
   async listLabels(): Promise<Label[]> {
     let response = await this.http.get('/labels', {
-      params: this.params()
+      params: {}
     });
     return (response.data.labels || []).map(mapLabel);
   }
@@ -349,14 +426,14 @@ export class Client {
       `/tickets/${ticketId}/labels/${encodeURIComponent(labelName)}`,
       {},
       {
-        params: this.params()
+        params: {}
       }
     );
   }
 
   async removeLabel(ticketId: number, labelName: string): Promise<void> {
     await this.http.delete(`/tickets/${ticketId}/labels/${encodeURIComponent(labelName)}`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -366,7 +443,7 @@ export class Client {
     options: { withInvited?: boolean; withRoles?: string; type?: string } = {}
   ): Promise<User[]> {
     let response = await this.http.get('/users', {
-      params: this.params({
+      params: pickDefined({
         with_invited: options.withInvited,
         with_roles: options.withRoles,
         type: options.type
@@ -377,16 +454,42 @@ export class Client {
 
   async getUser(userId: number, options: { maxTickets?: number } = {}): Promise<User> {
     let response = await this.http.get(`/users/${userId}`, {
-      params: this.params({ max_tickets: options.maxTickets })
+      params: pickDefined({ max_tickets: options.maxTickets })
     });
     return mapUser(response.data.user);
+  }
+
+  async getTicketAudit(ticketId: number): Promise<AuditEntry[]> {
+    let response = await this.http.get(`/tickets/${ticketId}/audit`);
+    if (!Array.isArray(response.data?.audit)) {
+      throw createApiServiceError('SupportBee returned an unexpected ticket audit response.');
+    }
+    return response.data.audit.map((entry: any) => {
+      if (!entry || typeof entry.action !== 'string') {
+        throw createApiServiceError(
+          'SupportBee returned a ticket audit entry without an action.'
+        );
+      }
+      return {
+        action: entry.action,
+        actor: entry.actor
+          ? {
+              name: entry.actor.name ?? undefined,
+              imageUrl: entry.actor.profile_picture_url ?? undefined
+            }
+          : undefined,
+        url: entry.url ?? undefined,
+        severity: entry.severity ?? undefined,
+        happenedAt: entry.happened_at ?? undefined
+      };
+    });
   }
 
   // ─── Teams ──────────────────────────────────────────────
 
   async listTeams(options: { withUsers?: boolean } = {}): Promise<Team[]> {
     let response = await this.http.get('/teams', {
-      params: this.params({
+      params: pickDefined({
         with_users: options.withUsers
       })
     });
@@ -397,7 +500,7 @@ export class Client {
 
   async listSnippets(): Promise<Snippet[]> {
     let response = await this.http.get('/snippets', {
-      params: this.params()
+      params: {}
     });
     return (response.data.snippets || []).map(mapSnippet);
   }
@@ -419,7 +522,7 @@ export class Client {
       }
     };
     let response = await this.http.post('/snippets', body, {
-      params: this.params()
+      params: {}
     });
     return mapSnippet(response.data.snippet);
   }
@@ -442,14 +545,14 @@ export class Client {
       if (snippet.contentHtml !== undefined) body.snippet.content.html = snippet.contentHtml;
     }
     let response = await this.http.put(`/snippets/${snippetId}`, body, {
-      params: this.params()
+      params: {}
     });
     return mapSnippet(response.data.snippet);
   }
 
   async deleteSnippet(snippetId: number): Promise<void> {
     await this.http.delete(`/snippets/${snippetId}`, {
-      params: this.params()
+      params: {}
     });
   }
 
@@ -457,18 +560,23 @@ export class Client {
 
   async listEmails(): Promise<Email[]> {
     let response = await this.http.get('/emails', {
-      params: this.params()
+      params: {}
     });
-    return (response.data.emails || []).map(mapEmail);
+    let emails = response.data?.forwarding_addresses ?? response.data?.emails;
+    if (!Array.isArray(emails)) {
+      throw createApiServiceError(
+        'SupportBee returned an unexpected forwarding address response.'
+      );
+    }
+    return emails.map(mapEmail);
   }
 
   async createEmail(email: string, name?: string): Promise<Email> {
-    let body: any = { email: { email } };
-    if (name) body.email.name = name;
+    let body = { forwarding_address: pickDefined({ email, name }) };
     let response = await this.http.post('/emails', body, {
-      params: this.params()
+      params: {}
     });
-    return mapEmail(response.data.email);
+    return mapEmail(response.data.forwarding_address ?? response.data.email);
   }
 
   // ─── Reports ────────────────────────────────────────────
@@ -477,7 +585,7 @@ export class Client {
     options: { user?: string; team?: string; label?: string; since?: string } = {}
   ): Promise<any> {
     let response = await this.http.get('/reports/avg_first_response_time', {
-      params: this.params({
+      params: pickDefined({
         user: options.user,
         team: options.team,
         label: options.label,
@@ -491,7 +599,7 @@ export class Client {
     options: { user?: string; team?: string; label?: string; since?: string } = {}
   ): Promise<any> {
     let response = await this.http.get('/reports/tickets_count', {
-      params: this.params({
+      params: pickDefined({
         user: options.user,
         team: options.team,
         label: options.label,
@@ -505,7 +613,7 @@ export class Client {
     options: { user?: string; team?: string; label?: string; since?: string } = {}
   ): Promise<any> {
     let response = await this.http.get('/reports/replies_count', {
-      params: this.params({
+      params: pickDefined({
         user: options.user,
         team: options.team,
         label: options.label,
@@ -514,93 +622,100 @@ export class Client {
     });
     return response.data;
   }
+
+  private validatePagination(options: { perPage?: number; page?: number }) {
+    if (
+      options.perPage !== undefined &&
+      (!Number.isInteger(options.perPage) || options.perPage < 1 || options.perPage >= 100)
+    ) {
+      throw createApiServiceError('perPage must be a whole number between 1 and 99.');
+    }
+    if (options.page !== undefined && (!Number.isInteger(options.page) || options.page < 1)) {
+      throw createApiServiceError('page must be a positive whole number.');
+    }
+  }
 }
 
 // ─── Mappers ────────────────────────────────────────────
 
 function mapTicket(raw: any): Ticket {
+  if (!raw || typeof raw.id !== 'number') {
+    throw createApiServiceError('SupportBee returned a ticket without a numeric ID.');
+  }
+  let userAssignee = raw.current_user_assignee ?? raw.current_user_asignee;
+  let teamAssignee = raw.current_team_assignee ?? raw.current_team_asignee;
   return {
     ticketId: raw.id,
     subject: raw.subject || '',
-    repliesCount: raw.replies_count,
-    commentsCount: raw.comments_count,
-    archived: raw.archived,
-    spam: raw.spam,
-    trash: raw.trash,
-    starred: raw.starred,
-    unanswered: raw.unanswered,
-    createdAt: raw.created_at,
-    lastActivityAt: raw.last_activity_at,
+    repliesCount: raw.replies_count ?? undefined,
+    commentsCount: raw.comments_count ?? undefined,
+    archived: raw.archived ?? undefined,
+    spam: raw.spam ?? undefined,
+    trash: raw.trash ?? undefined,
+    starred: raw.starred ?? undefined,
+    unanswered: raw.unanswered ?? undefined,
+    createdAt: raw.created_at ?? undefined,
+    lastActivityAt: raw.last_activity_at ?? undefined,
     requester: raw.requester
       ? {
-          userId: raw.requester.id,
-          email: raw.requester.email,
-          name: raw.requester.name
+          userId: raw.requester.id ?? undefined,
+          email: raw.requester.email ?? undefined,
+          name: raw.requester.name ?? undefined
         }
       : undefined,
-    currentUserAssignee: raw.current_user_assignee
-      ? mapUser(raw.current_user_assignee)
-      : undefined,
-    currentTeamAssignee: raw.current_team_assignee
+    currentUserAssignee: userAssignee ? mapUser(userAssignee) : undefined,
+    currentTeamAssignee: teamAssignee
       ? {
-          teamId: raw.current_team_assignee.id || raw.current_team_assignee.team?.id,
-          name: raw.current_team_assignee.name || raw.current_team_assignee.team?.name
+          teamId: teamAssignee.id ?? teamAssignee.team?.id,
+          name: teamAssignee.name ?? teamAssignee.team?.name ?? undefined
         }
       : undefined,
     labels: raw.labels ? raw.labels.map(mapLabel) : undefined,
-    content: raw.content
-      ? {
-          text: raw.content.text || raw.content.body,
-          html: raw.content.html,
-          attachments: raw.content.attachments
-        }
-      : undefined
+    content: mapContent(raw.content)
   };
 }
 
 function mapReply(raw: any): Reply {
+  if (!raw || typeof raw.id !== 'number') {
+    throw createApiServiceError('SupportBee returned a reply without a numeric ID.');
+  }
   return {
     replyId: raw.id,
-    createdAt: raw.created_at,
-    summary: raw.summary,
-    cc: raw.cc,
-    bcc: raw.bcc,
+    createdAt: raw.created_at ?? undefined,
+    summary: raw.summary ?? undefined,
+    cc: raw.cc ?? undefined,
+    bcc: raw.bcc ?? undefined,
     replier: raw.replier ? mapUser(raw.replier) : undefined,
-    content: raw.content
-      ? {
-          text: raw.content.text || raw.content.body,
-          html: raw.content.html,
-          attachments: raw.content.attachments
-        }
-      : undefined
+    content: mapContent(raw.content)
   };
 }
 
 function mapComment(raw: any): Comment {
+  if (!raw || typeof raw.id !== 'number') {
+    throw createApiServiceError('SupportBee returned a comment without a numeric ID.');
+  }
   return {
     commentId: raw.id,
-    createdAt: raw.created_at,
+    createdAt: raw.created_at ?? undefined,
     commenter: raw.commenter ? mapUser(raw.commenter) : undefined,
-    content: raw.content
-      ? {
-          text: raw.content.text,
-          html: raw.content.html,
-          attachments: raw.content.attachments
-        }
-      : undefined
+    content: mapContent(raw.content)
   };
 }
 
 function mapUser(raw: any): User {
+  if (!raw || typeof raw.id !== 'number') {
+    throw createApiServiceError('SupportBee returned a user without a numeric ID.');
+  }
+  let picture = Array.isArray(raw.picture) ? raw.picture[0] : raw.picture;
   return {
     userId: raw.id,
     email: raw.email || '',
-    firstName: raw.first_name,
-    lastName: raw.last_name,
-    name: raw.name,
-    role: raw.role,
-    agent: raw.agent,
-    imageUrl: raw.picture?.thumb64 || raw.picture?.thumb128
+    firstName: raw.first_name ?? undefined,
+    lastName: raw.last_name ?? undefined,
+    name: raw.name ?? undefined,
+    role: raw.role ?? undefined,
+    agent: raw.agent ?? undefined,
+    imageUrl: picture?.thumb64 ?? picture?.thumb128 ?? picture?.thum128 ?? undefined
   };
 }
 
@@ -613,8 +728,8 @@ function mapTeam(raw: any): Team {
 
 function mapLabel(raw: any): Label {
   return {
-    name: raw.name || raw.label || '',
-    color: raw.color
+    name: typeof raw === 'string' ? raw : raw.name || raw.label || '',
+    color: raw.color ?? undefined
   };
 }
 
@@ -622,23 +737,39 @@ function mapSnippet(raw: any): Snippet {
   return {
     snippetId: raw.id,
     name: raw.name || '',
-    tags: raw.tags,
-    createdAt: raw.created_at,
+    tags: raw.tags ?? undefined,
+    createdAt: raw.created_at ?? undefined,
     content: raw.content
       ? {
-          text: raw.content.text,
-          html: raw.content.html
+          text: raw.content.text ?? undefined,
+          html: raw.content.html ?? undefined
         }
       : undefined
   };
 }
 
 function mapEmail(raw: any): Email {
+  if (!raw || typeof raw.id !== 'number') {
+    throw createApiServiceError(
+      'SupportBee returned a forwarding address without a numeric ID.'
+    );
+  }
   return {
     emailId: raw.id,
-    email: raw.email || '',
-    name: raw.name,
-    isDefault: raw.is_default,
-    createdAt: raw.created_at
+    email: raw.from ?? raw.email ?? '',
+    name: raw.name ?? undefined,
+    forwardingTo: raw.forward_to ?? undefined,
+    isDefault: raw.is_default ?? undefined,
+    createdAt: raw.created_at ?? undefined
   };
+}
+
+function mapContent(raw: any) {
+  return raw
+    ? {
+        text: raw.text ?? raw.body ?? undefined,
+        html: raw.html ?? undefined,
+        attachments: raw.attachments ?? undefined
+      }
+    : undefined;
 }

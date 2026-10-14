@@ -48,8 +48,7 @@ export let createBriefcase = SlateTool.create(spec, {
 
     return {
       output: {
-        briefcaseId:
-          typeof result === 'string' ? result : result?.docid || JSON.stringify(result),
+        briefcaseId: result.docid,
         briefcaseDetails: result
       },
       message: `Briefcase created with **${ctx.input.documentIds.length}** document(s).`

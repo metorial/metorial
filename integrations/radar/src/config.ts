@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['test', 'live'])
       .default('live')
       .describe(
-        'Radar environment to use. Test keys work with the test environment, live keys with the live environment.'
+        'Legacy environment preference. Radar uses the test or live environment associated with your API key.'
       )
   })
 );

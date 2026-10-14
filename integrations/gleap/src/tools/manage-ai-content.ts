@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageAiContent = SlateTool.create(spec, {
   key: 'manage_ai_content',
   description: `Create, update, retrieve, or delete AI content that powers Gleap's AI assistant (Kai). AI content is used for automated customer support responses.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -21,7 +21,9 @@ export let manageAiContent = SlateTool.create(spec, {
       contentData: z
         .record(z.string(), z.any())
         .optional()
-        .describe('AI content data (required for create and update)')
+        .describe(
+          'AI content data: create requires title, content, contentId and type; update requires title, content and type'
+        )
     })
   )
   .output(
@@ -33,12 +35,13 @@ export let manageAiContent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.contentData) {
-        throw new Error('contentData is required when creating AI content');
+        throw createApiServiceError('contentData is required when creating AI content');
       }
       let content = await client.createAiContent(ctx.input.contentData);
       return {
@@ -49,7 +52,7 @@ export let manageAiContent = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.contentId) {
-        throw new Error('contentId is required when getting AI content');
+        throw createApiServiceError('contentId is required when getting AI content');
       }
       let content = await client.getAiContent(ctx.input.contentId);
       return {
@@ -60,7 +63,7 @@ export let manageAiContent = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.contentId) {
-        throw new Error('contentId is required when updating AI content');
+        throw createApiServiceError('contentId is required when updating AI content');
       }
       let content = await client.updateAiContent(
         ctx.input.contentId,
@@ -74,7 +77,7 @@ export let manageAiContent = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.contentId) {
-        throw new Error('contentId is required when deleting AI content');
+        throw createApiServiceError('contentId is required when deleting AI content');
       }
       await client.deleteAiContent(ctx.input.contentId);
       return {
@@ -83,6 +86,6 @@ export let manageAiContent = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

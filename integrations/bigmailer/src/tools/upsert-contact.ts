@@ -8,8 +8,8 @@ export let upsertContact = SlateTool.create(spec, {
   key: 'upsert_contact',
   description: `Create or update a contact by email address. If the email does not exist, a new contact is created. If the email exists, the existing contact is updated. Supports email validation and custom field values.`,
   instructions: [
-    'Set validate to true to check email deliverability before creating/updating the contact.',
-    'Field values support string, date (YYYY-MM-DD), and integer types.'
+    'Set validate to true to check email deliverability before creating/updating the contact. Purchased validation credits are required.',
+    'Field values support exactly one string, date (YYYY-MM-DD), or integer value per field.'
   ]
 })
   .input(
@@ -19,7 +19,7 @@ export let upsertContact = SlateTool.create(spec, {
       fieldValues: z
         .array(
           z.object({
-            name: z.string().describe('Field name'),
+            name: z.string().describe('Existing field merge tag name from list_fields'),
             stringValue: z.string().optional().describe('String value'),
             dateValue: z.string().optional().describe('Date value (YYYY-MM-DD)'),
             integerValue: z.number().optional().describe('Integer value')
@@ -44,7 +44,7 @@ export let upsertContact = SlateTool.create(spec, {
       fieldValues: z
         .array(
           z.object({
-            name: z.string().describe('Field name'),
+            name: z.string().describe('Existing field merge tag name from list_fields'),
             stringValue: z.string().optional().describe('String field value'),
             dateValue: z.string().optional().describe('Date field value'),
             integerValue: z.number().optional().describe('Integer field value')

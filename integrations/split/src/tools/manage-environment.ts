@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,9 @@ export let manageEnvironment = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       action: z.enum(['create', 'delete']).describe('Action to perform.'),
       environmentName: z.string().describe('Name of the environment to create or delete.'),
       production: z
@@ -34,10 +36,12 @@ export let manageEnvironment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'create') {
       let env = await client.createEnvironment(wsId, {

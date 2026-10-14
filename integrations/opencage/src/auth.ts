@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Your OpenCage geocoding API key (30-character alphanumeric string)')
+        .trim()
+        .min(1)
+        .describe('Your OpenCage geocoding API key (32-character alphanumeric string)')
     }),
     getOutput: async ctx => {
       return {

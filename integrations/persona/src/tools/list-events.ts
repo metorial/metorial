@@ -60,8 +60,8 @@ Events are retained for up to 90 days.`,
       let payloadData = payload?.data || {};
       return {
         eventId: item.id,
-        eventType: n.name || n['event-type'] || n.event_type,
-        createdAt: n['created-at'] || n.created_at,
+        eventType: (n.name || n['event-type']) ?? n.event_type ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
         resourceType: payloadData.type,
         resourceId: payloadData.id,
         attributes: n
@@ -120,8 +120,8 @@ export let getEvent = SlateTool.create(spec, {
     return {
       output: {
         eventId: result.data?.id,
-        eventType: n.name || n['event-type'] || n.event_type,
-        createdAt: n['created-at'] || n.created_at,
+        eventType: (n.name || n['event-type']) ?? n.event_type ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
         resourceType: payloadData.type,
         resourceId: payloadData.id,
         attributes: n,

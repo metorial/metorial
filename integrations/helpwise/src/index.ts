@@ -1,8 +1,10 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  closeConversations,
   deleteConversation,
   getConversation,
+  getCurrentUser,
   listContacts,
   listConversations,
   listMailboxes,
@@ -10,6 +12,7 @@ import {
   listTeams,
   listUsers,
   manageContact,
+  manageConversationTags,
   manageMailbox,
   manageNote,
   manageTag,
@@ -21,6 +24,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    closeConversations,
+    manageConversationTags,
     listMailboxes,
     manageMailbox,
     listConversations,

@@ -1,64 +1,42 @@
-Let me get more details on the full documentation, especially around the phone info endpoint and the caller picture endpoint.# Slates Specification for Callerapi
+# CallerAPI capability reference
 
-## Overview
-
-CallerAPI is a phone number intelligence and caller identification API. It provides real-time phone number lookup, spam/fraud detection, carrier validation (HLR), porting history, online presence checks, and caller ID data aggregated from multiple sources (Truecaller, Hiya, CallApp, etc.). It serves carriers, VoIP providers, dialers, and enterprises for fraud prevention and phone number validation.
+CallerAPI provides phone intelligence, spam reputation, carrier information, portability checks, online presence, and carrier identity matching.
 
 ## Authentication
 
-CallerAPI uses API key authentication. Include your API key in the header of each request using the `X-Auth` header:
+Use an API key from the CallerAPI dashboard in the `X-Auth` request header. Current documented endpoints use `https://api.callerapi.com`. Account identity and credit balances come from `GET /api/me`.
 
-```
-X-Auth: YOUR_API_KEY
-```
+## Tools and provider operations
 
-The API key is obtained from the CallerAPI dashboard. No OAuth or other authentication methods are supported. All requests are simple GET requests authenticated via this header.
+| Tool key | Provider operation | Result |
+| --- | --- | --- |
+| `get_account_info` | `GET /api/me` | Email and account credit balances. |
+| `lookup_phone_number` | `GET /api/lookup/{phone}` with the optional `hlr` query parameter | Carrier details, spam scores, complaints, and the original provider response. |
+| `check_ported_status` | `GET /api/ported/{phone}` | Ported flag, date, date precision, and status. |
+| `get_porting_history` | `GET /api/porting-history/{phone}` | Porting action, network identifier, line type, and timestamp. |
+| `check_online_presence` | `GET /api/online-presence/{phone}` | Platform presence statuses, including Facebook, Bukalapak, and Flipkart. |
+| `verify_identity` | `POST /api/kyc/{phone}` | Identity match scores and the original provider response. |
+| `get_caller_id` | Existing `GET https://callerapi.com/api/phone/info/{phone}` | Caller identification from the existing provider sources. |
+| `get_caller_picture` | Existing `GET https://callerapi.com/api/phone/pic/{phone}` | Original `pictureBase64` plus a downloadable file when the response contains a base64 image. |
+| `assess_port_fraud_risk` | Existing `GET https://callerapi.com/api/port-fraud/{phone}` | Port fraud risk and the original provider response. |
 
-## Features
+Phone number inputs retain E.164 strings, including the leading plus sign. KYC requires a name with first and last names; middle name, date of birth, address, and email are optional. Date of birth components are strings. KYC scores are strings: -1 indicates unavailable carrier data, 0 indicates no match, and 100 indicates an exact match. The provider charges credits for KYC and some other intelligence operations.
 
-### Phone Number Lookup
+Porting events map the documented `action`, `tmtnetwork`, `i_type`, and `ts` fields into the existing public fields. The numeric network identifier is represented as text in the existing `networkId` field. Existing numeric status fields are retained; `responseStatus` exposes string statuses where the current schema uses them.
 
-Retrieve comprehensive information about a phone number by aggregating data from multiple caller ID providers (Truecaller, Hiya, CallApp, ViewCaller, EyeCon). Returns entity type, spam reputation, complaint history, business info (name, category, industry, location), and carrier info (carrier name, network type, country, porting status, timezone).
+Presence values are 1 for active, 0 for inactive, -1 for unknown, and -2 for a platform error. The older reference documents numeric status 4 as a partial reply; partial replies remain usable and do not turn uncertain platform checks into absence claims.
 
-- Phone numbers should be in E.164 format.
-- An optional `hlr=true` parameter can be included to add HLR (Home Location Register) data, which adds 1–3 seconds to response time at no additional cost.
+## Compatibility and verification limits
 
-### Caller ID Information
+The current reference does not list the existing caller ID, caller picture, or port-fraud endpoints. Their original hosts and paths are retained. This omission does not establish that the endpoints were removed; their availability and response details require verification with an authorized account. The integration registers no triggers. Other provider products, including voice streaming and report webhooks, are outside this tool refresh.
 
-Retrieve detailed caller identification data from multiple third-party providers for a given phone number. Returns name, addresses, websites, social media profiles, business categories, ratings, opening hours, and spam scores from each source.
+## Official documentation
 
-- Phone numbers should be in E.164 format.
-
-### Caller Picture Retrieval
-
-Retrieve the profile picture associated with a phone number. The phone number should be in E.164 format. The response is a base64-encoded image.
-
-### Spam and Fraud Detection
-
-The spam score (0–100) is calculated from recent complaints, call patterns, and carrier reports. Scores above 30 indicate potential delivery issues. Detailed complaint history is provided when available. Complaints include creation date, violation date, consumer state, subject, and whether it was a robocall.
-
-### Ported Number Check
-
-Check whether a phone number has been ported to a different carrier. Returns the current porting status of a given number.
-
-### Porting History
-
-Retrieve the complete history of porting events for a number, including action type, network identifiers, line type, and timestamps of each porting event.
-
-### Port-Out Fraud Assessment
-
-Assess the risk of port-out fraud for a number based on recent porting activity.
-
-### Online Presence Check
-
-Check if a number is linked to various online platforms and services, including WhatsApp, Telegram, Amazon, Google, Office 365, Instagram, LinkedIn, Twitter, Skype, and Viber.
-
-- Platform availability may vary by country. Some platforms are only available in specific regions.
-
-### Account Information
-
-Retrieve information about the authenticated user, including email, credits spent, monthly credit allowance, and remaining credits.
-
-## Events
-
-The provider does not support events. CallerAPI is a request-response API for phone number lookups and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+- [Quickstart and API host](https://docs.callerapi.com/)
+- [Account balances](https://docs.callerapi.com/balance-and-email-20033243e0)
+- [Spam score and HLR](https://docs.callerapi.com/spam-score-hlr-19887237e0)
+- [Carrier response schema](https://docs.callerapi.com/carrier-info-8537080d0)
+- [Ported status](https://docs.callerapi.com/ported-date-20034060e0)
+- [Porting history](https://docs.callerapi.com/porting-history-20035134e0)
+- [Online presence](https://docs.callerapi.com/online-presence-20039197e0)
+- [KYC identity matching](https://docs.callerapi.com/kyc-user-identity-19887238e0)

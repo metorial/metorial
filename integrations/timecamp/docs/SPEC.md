@@ -1,75 +1,61 @@
-# Slates Specification for TimeCamp
-
-## Overview
-
-TimeCamp is a time tracking software that allows teams and individuals to track time spent on tasks and projects. It provides features for timesheets, attendance tracking, invoicing, billing rates, budgeting, productivity analysis, and reporting across web, desktop, and mobile platforms.
+# TimeCamp API integration
 
 ## Authentication
 
-TimeCamp uses **API Key** authentication.
+Get an API token from [Profile Settings](https://app.timecamp.com/app#/settings/users/me).
+Requests use `Authorization: Bearer <token>` and the documented production base
+URL `https://app.timecamp.com/third_party/api`. The token inherits the user's
+permissions. Request limits depend on the account subscription and exceeding
+those limits returns HTTP 429.
 
-To obtain your API token, log in to your TimeCamp account and click on your avatar in the upper-right corner. Select "Profile Settings" and find your API token at the bottom of the page. The token is also available at: `https://app.timecamp.com/app#/settings/users/me`.
+`get_current_user` returns the user's ID, profile, root group ID, and permissions.
+`list_users` and `list_groups` provide account resource discovery.
 
-The API token is passed via the `Authorization` HTTP header in requests to the base URL `https://www.timecamp.com/third_party/api/`. For example:
+## Time tracking
 
-```
-Authorization: <your_api_token>
-```
+Time entries use the current v3 list, create, update, and delete routes. The
+provider documents November 1, 2026 as the end of support for the corresponding
+v1 routes. Existing public tool fields remain available, including
+comma-separated task/user filters and the `me` user filter.
 
-The API is available to all subscription plans and is free of charge.
+Create an entry with a duration or a start/end datetime pair. Datetime pairs
+must be on the same date; split entries spanning midnight. If `date` is
+omitted, the start datetime's date is used, or the current UTC date for a
+duration-only entry. A missing entry deletion returns `deleted: false`.
 
-There is no OAuth2 flow or scopes. The token provides access scoped to the authenticated user's account and permissions.
+`manage_timer` uses v3 status, start, and stop routes and returns the associated
+time entry ID when available. Nullable task and timer metadata are omitted.
 
-## Features
+## Projects and tags
 
-### Time Tracking & Time Entries
+Projects are top-level tasks. `list_tasks` supports active, archived, and all
+status filters. Creation handles the provider's dictionary response keyed by
+task ID. Existing legacy task tag and billing fields remain supported by the
+public task tools; the provider marks some of them deprecated in its reference.
+The existing task deletion route is also deprecated, while its recommended
+replacement queues asynchronous deletion.
 
-Manage time entries including creating, updating, and retrieving logged time. Time entries can be retrieved, created, and updated. Entries can be filtered by date range and include details such as duration, associated task, and user. Time entries can be marked as billable or non-billable.
+Call `list_tag_lists` to discover tag list IDs. `manage_tag` requires a
+`tagListId` when creating a tag, and an existing `tagId` when renaming one.
+`list_tags` can query a specific list or collect tags across visible tag lists.
 
-### Projects & Tasks
+## Attendance
 
-Manage projects, tasks, and time entries. Projects are top-level entities, and tasks are organized hierarchically beneath them as a tree structure. You can create, update, delete, and list projects and tasks. Tags can be assigned to tasks for better classification of tracked time, with optional automatic tag assignment.
+`get_attendance` accepts `date` for a single day, or `from` and `to` for a date
+range. These map to the documented `from`, `to`, and `users` query parameters.
+Attendance and other account features remain subject to provider permissions
+and subscription availability.
 
-### Timer
+## Existing client and invoice routes
 
-Control the real-time timer — check its status, start, and stop it programmatically. Useful for live time tracking integrations.
+The pre-existing client and invoice tool keys and routes are retained. The
+current official OpenAPI reference does not describe `/clients` or `/invoices`;
+their provider payloads and availability could not be confirmed in this refresh.
+Their HTTP failures use the same structured API error handling as documented
+routes, and creation does not claim success without a returned resource ID.
 
-### Users & Groups
+## Sources
 
-Manage users and recreate company structure with user groups. One user can belong to multiple groups and have different roles in each. Retrieve user information and manage team membership.
-
-### Attendance & Away Time
-
-The attendance module registers the total number of work hours per day, as well as exact start and end hours of a working day. Retrieve attendance data and away time records for users, useful for payroll and workforce management.
-
-### Clients
-
-Manage client records that can be associated with projects and invoices. Clients can be listed, created, and updated.
-
-### Invoicing
-
-Create invoices using the invoicing feature and billable time, then send them to clients as a link or PDF. Invoices can be created from tracked time entries or from blank templates. Supports custom billing rates, taxes, and currency settings.
-
-### Billing Rates
-
-Set billing rates with options for international currency, rate value history, and billing types (revenue or cost). Specific billing rates can be set for users, groups, and projects.
-
-### Tags & Geofencing
-
-The API exposes resources for tags, geofencing, and billing rates. Tags allow categorizing time entries; geofencing supports location-based tracking for field workers.
-
-### Computer Activities
-
-Retrieve data about computer activity tracking, including application usage and window titles. This is collected by the desktop application and can be queried by date.
-
-### Timesheet Approvals
-
-Timesheet approvals are available as an API resource. Supports workflows for reviewing and approving employee timesheets.
-
-### Budgeting
-
-Keep an eye on the profitability of projects on an ongoing basis using budgeting. Budgets can be assigned to projects and tracked against actual time spent.
-
-## Events
-
-The provider does not support webhooks or native event subscriptions. Webhook support has been requested as a feature on TimeCamp's feedback board, indicating it is not natively available. Third-party platforms like Zapier and Pipedream use polling mechanisms to detect new tasks and time entries, but TimeCamp itself does not offer a built-in webhook or event subscription system.
+- [Official API reference](https://developer.timecamp.com/)
+- [Official OpenAPI specification](https://developer.timecamp.com/reference/dist/api-prod.yaml)
+- [API token and request limits](https://help.timecamp.com/help/api)

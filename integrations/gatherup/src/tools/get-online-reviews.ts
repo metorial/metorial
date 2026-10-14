@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getOnlineReviews = SlateTool.create(spec, {
@@ -79,8 +79,8 @@ export let getOnlineReviews = SlateTool.create(spec, {
     return {
       output: {
         reviews,
-        page: data.page ?? 1,
-        pages: data.pages ?? 1,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1,
         totalCount: count
       } as any,
       message: `Found **${count}** online review(s) (page ${data.page ?? 1} of ${data.pages ?? 1}).`

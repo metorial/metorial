@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Basin
 
-Manage no-code form backends, submissions, and spam filtering. Create, read, update, and delete form endpoints with unique submission URLs. Retrieve and filter form submissions by date range, spam status, and other criteria. Configure spam protection with CAPTCHA, honeypots, and AI-powered detection. Handle file uploads up to 100MB per file. Manage domains, projects, and organize forms. Set up webhook integrations to forward submission data to external services via HTTP POST with JSON, form-encoded, or custom template payloads. Tag and score submissions using AI-powered Lead Agent. Configure email notifications and autoresponse emails for form submitters.
+Manage Basin form endpoints, submissions, projects, domains, and outbound webhooks. Create and update form configuration, moderate submissions, inspect webhook delivery failures, and re-queue webhook deliveries. Requires a Basin Account API Key and a plan with REST API access. Form Studio field editing and Lead Agent rules remain in the Basin dashboard. This integration does not expose email template management.
 
 ## License
 

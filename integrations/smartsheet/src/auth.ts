@@ -1,8 +1,20 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.smartsheet.com/2.0'
+let api = createAuthenticatedAxios({
+  baseURL: 'https://api.smartsheet.com/2.0',
+  contentType: false,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Smartsheet',
+      reason: 'smartsheet_auth_error'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -48,18 +60,6 @@ export let auth = SlateAuth.create()
         scope: 'READ_SIGHTS'
       },
       {
-        title: 'Create Dashboards',
-        description: 'Create new dashboards',
-        scope: 'CREATE_SIGHTS'
-      },
-      { title: 'Delete Dashboards', description: 'Delete dashboards', scope: 'DELETE_SIGHTS' },
-      { title: 'Share Dashboards', description: 'Share dashboards', scope: 'SHARE_SIGHTS' },
-      {
-        title: 'Admin Dashboards',
-        description: 'Modify dashboard structure',
-        scope: 'ADMIN_SIGHTS'
-      },
-      {
         title: 'Read Users',
         description: 'Retrieve users and groups for the organization account',
         scope: 'READ_USERS'
@@ -68,13 +68,6 @@ export let auth = SlateAuth.create()
         title: 'Admin Users',
         description: 'Add and remove users; create groups and manage seat types',
         scope: 'ADMIN_USERS'
-      },
-      { title: 'Read Contacts', description: 'Retrieve contacts', scope: 'READ_CONTACTS' },
-      { title: 'Read Events', description: 'Retrieve events', scope: 'READ_EVENTS' },
-      {
-        title: 'Admin Webhooks',
-        description: 'Create, delete, and update webhooks; get all webhooks',
-        scope: 'ADMIN_WEBHOOKS'
       },
       {
         title: 'Admin Workspaces',
@@ -113,26 +106,29 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Smartsheet',
+          operation: 'token exchange'
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'Smartsheet refresh token is missing. Reconnect the account.'
+        );
+      }
       let response = await api.post(
         '/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || '',
+          refresh_token: ctx.output.refreshToken,
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret
         }).toString(),
@@ -143,17 +139,13 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Smartsheet',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     },
 

@@ -38,7 +38,9 @@ export let sendSmsTool = SlateTool.create(spec, {
   instructions: [
     'Phone numbers should be in E.164 format (e.g., +61411111111 for Australia)',
     'Alphanumeric sender IDs are limited to 11 characters with no spaces',
-    'Schedule timestamps must be Unix timestamps in the future'
+    'Schedule timestamps must be Unix timestamps in the future',
+    'URL messaging may require account approval for new customers',
+    'Queued messages are not proof of delivery; use get_sms_receipts to check delivery status'
   ],
   tags: {
     destructive: false,
@@ -74,22 +76,20 @@ export let sendSmsTool = SlateTool.create(spec, {
       from: msg.from || '',
       body: msg.body || '',
       status: msg.status || '',
-      schedule: msg.schedule || undefined,
+      schedule: msg.schedule ? Number(msg.schedule) : undefined,
       customString: msg.custom_string || undefined
     }));
 
-    let totalPrice = sentMessages.reduce(
-      (sum: number, msg: any) => sum + (Number.parseFloat(msg.message_price) || 0),
-      0
-    );
+    let totalPrice = Number(result.data?.total_price ?? 0);
+    let queuedCount = Number(result.data?.queued_count ?? 0);
 
     return {
       output: {
         totalPrice,
-        queuedCount: mappedMessages.length,
+        queuedCount,
         messages: mappedMessages
       },
-      message: `Sent **${mappedMessages.length}** SMS message(s). Total cost: **$${totalPrice.toFixed(4)}**`
+      message: `Queued **${queuedCount}** SMS message(s). Total cost: **$${totalPrice.toFixed(4)}**`
     };
   })
   .build();

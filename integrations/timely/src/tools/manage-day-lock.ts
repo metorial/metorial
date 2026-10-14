@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDayLock = SlateTool.create(spec, {
   name: 'Manage Day Lock',
   key: 'manage_day_lock',
-  description: `Lock or unlock specific dates for specific users in Timely. Locking prevents accidental changes or unauthorized edits to time records for those days.`,
+  description: `Call list_accounts to choose a workspace when needed. Lock or unlock specific dates for specific users in Timely. Locking prevents accidental changes or unauthorized edits to time records for those days.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       action: z.enum(['lock', 'unlock']).describe('Whether to lock or unlock the days'),
       userIds: z.array(z.number()).describe('User IDs to lock/unlock days for'),
       dates: z.array(z.string()).describe('Dates to lock/unlock (YYYY-MM-DD format)')
@@ -25,10 +27,7 @@ export let manageDayLock = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     if (ctx.input.action === 'lock') {
       await client.lockDays(ctx.input.userIds, ctx.input.dates);

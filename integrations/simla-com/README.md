@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Simla.com
 
-Manage customers, orders, and product catalogs for eCommerce CRM. Create, edit, retrieve, and merge customer profiles (individual and corporate) with segmentation, notes, and file attachments. Create, edit, upload, and combine orders with line items, delivery info, discounts, payments, and custom fields. Retrieve product listings with SKUs, inventory, and product groups. Calculate delivery costs, manage delivery orders, and generate shipping documents. Integrate telephony with call event notifications. Track incremental change history for orders and customers to sync with external systems. Manage custom fields, dictionaries, reference data (statuses, payment types, delivery types, stores), and integration modules.
+Manage individual customers, orders, customer notes, payments, and tasks for eCommerce CRM. Search product catalogs and product groups, discover managers and customer segments, and retrieve configured reference data. Create and edit custom fields and dictionaries, and inspect the connected API key's permissions and accessible stores.
 
 ## License
 

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getRequestStatus = SlateTool.create(spec, {
   name: 'Get Request Status',
   key: 'get_request_status',
-  description: `Retrieves the status and results of a previous scraping request by its request ID. Supports all service types: smartscraper, searchscraper, markdownify, scrape, crawl, sitemap, and agentic-scrapper.`,
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Retrieves the status and results of a previous scraping request by its request ID. Supports all service types: smartscraper, searchscraper, markdownify, scrape, crawl, sitemap, and agentic-scrapper.`,
   instructions: [
     'Use the requestId returned from any scraping tool to check its status or retrieve results.'
   ],
@@ -50,9 +50,9 @@ export let getRequestStatus = SlateTool.create(spec, {
 
     return {
       output: {
-        requestId: response.request_id || response.scrape_request_id,
+        requestId: response.request_id ?? response.scrape_request_id,
         status: response.status,
-        result: response.result || response.llm_result || response.html || response.urls,
+        result: response.result ?? response.llm_result ?? response.html ?? response.urls,
         error: response.error
       },
       message: `Request **${ctx.input.requestId}** (${ctx.input.service}): Status **${response.status}**.`

@@ -2,7 +2,8 @@ import {
   buildApiServiceError,
   createApiServiceError,
   createAuthenticatedAxios,
-  isApiErrorRecord
+  isApiErrorRecord,
+  pickDefined
 } from 'slates';
 
 export interface SearchQuery {
@@ -75,9 +76,7 @@ export class Client {
   }
 
   async updateContact(contactId: string, data: Record<string, unknown>) {
-    let response = await this.axios.put(`/contact/v4/${encodeURIComponent(contactId)}`, data);
-    this.checkResponse(response.data);
-    return response.data;
+    return this.updateRecord('contact', contactId, data, ['lastName', 'owner']);
   }
 
   async deleteContact(contactId: string) {
@@ -105,9 +104,7 @@ export class Client {
   }
 
   async updateCompany(companyId: string, data: Record<string, unknown>) {
-    let response = await this.axios.put(`/company/v4/${encodeURIComponent(companyId)}`, data);
-    this.checkResponse(response.data);
-    return response.data;
+    return this.updateRecord('company', companyId, data, ['name', 'owner']);
   }
 
   async deleteCompany(companyId: string) {
@@ -118,6 +115,60 @@ export class Client {
 
   async searchCompanies(params: SearchParams) {
     return this.searchRecords('company', 5, params);
+  }
+
+  async resolveContactCompany(input: { company?: string; companyId?: number }) {
+    if (input.companyId !== undefined && input.company !== undefined) {
+      throw createApiServiceError('Provide either companyId or company, not both.', {
+        reason: 'salesmate_conflicting_company'
+      });
+    }
+    if (input.companyId !== undefined) return input.companyId;
+    if (input.company === undefined || input.company === '') return input.company;
+    if (/^[1-9]\d*$/.test(input.company)) return input.company;
+    let result = await this.searchCompanies({
+      fields: ['id', 'name'],
+      rows: 2,
+      query: {
+        group: {
+          operator: 'AND',
+          rules: [
+            {
+              moduleName: 'Company',
+              field: { fieldName: 'name', type: 'Text' },
+              condition: 'EQUALS',
+              data: input.company
+            }
+          ]
+        }
+      }
+    });
+    let data: unknown = result?.Data;
+    if (!isApiErrorRecord(data) || !Array.isArray(data.data)) {
+      throw createApiServiceError(
+        'Salesmate returned an unexpected company search response.',
+        {
+          reason: 'salesmate_invalid_response'
+        }
+      );
+    }
+    if (data.data.length !== 1 || Number(data.totalRows) > 1) {
+      throw createApiServiceError(
+        'The company name did not identify exactly one company. Call search_companies and provide companyId for the company to link.',
+        { reason: 'salesmate_company_not_unique' }
+      );
+    }
+    let company: unknown = data.data[0];
+    let id = isApiErrorRecord(company) ? company.id : undefined;
+    if (
+      (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) ||
+      (typeof id === 'string' && /^[1-9]\d*$/.test(id))
+    ) {
+      return id;
+    }
+    throw createApiServiceError('Salesmate did not return a valid company ID.', {
+      reason: 'salesmate_invalid_response'
+    });
   }
 
   // --- Deals ---
@@ -135,9 +186,14 @@ export class Client {
   }
 
   async updateDeal(dealId: string, data: Record<string, unknown>) {
-    let response = await this.axios.put(`/deal/v4/${encodeURIComponent(dealId)}`, data);
-    this.checkResponse(response.data);
-    return response.data;
+    return this.updateRecord('deal', dealId, data, [
+      'title',
+      'owner',
+      'primaryContact',
+      'pipeline',
+      'status',
+      'stage'
+    ]);
   }
 
   async deleteDeal(dealId: string) {
@@ -165,12 +221,7 @@ export class Client {
   }
 
   async updateActivity(activityId: string, data: Record<string, unknown>) {
-    let response = await this.axios.put(
-      `/activity/v4/${encodeURIComponent(activityId)}`,
-      data
-    );
-    this.checkResponse(response.data);
-    return response.data;
+    return this.updateRecord('activity', activityId, data, ['title', 'owner', 'type']);
   }
 
   async deleteActivity(activityId: string) {
@@ -189,6 +240,15 @@ export class Client {
 
   async createProduct(data: Record<string, unknown>) {
     let response = await this.productAxios.post('/v1/products', data);
+    this.checkResponse(response.data);
+    return response.data;
+  }
+
+  async createProductVariant(productId: string, data: Record<string, unknown>) {
+    let response = await this.productAxios.post(
+      `/v1/products/${encodeURIComponent(productId)}/variations`,
+      pickDefined(data)
+    );
     this.checkResponse(response.data);
     return response.data;
   }
@@ -220,6 +280,8 @@ export class Client {
 
   async searchProducts(params: SearchParams) {
     let { pageNo = 1, rows = 25, sortBy, sortOrder, ...body } = params;
+    this.validatePagination(pageNo, rows);
+    body.fields = [...new Set(['id', ...body.fields])];
     let response = await this.productAxios.post('/v3/products/search', body, {
       params: { from: (pageNo - 1) * rows, rows, sortBy, sortOrder }
     });
@@ -335,20 +397,7 @@ export class Client {
 
   private async searchRecords(resource: string, moduleId: number, params: SearchParams) {
     let { pageNo = 1, rows = 25, fields, query, sortBy, sortOrder } = params;
-    if (
-      !Number.isInteger(pageNo) ||
-      pageNo < 1 ||
-      !Number.isInteger(rows) ||
-      rows < 1 ||
-      rows > 250
-    ) {
-      throw createApiServiceError(
-        'Page must be a positive integer and page size must be between 1 and 250.',
-        {
-          reason: 'salesmate_invalid_pagination'
-        }
-      );
-    }
+    this.validatePagination(pageNo, rows);
     let qualify = (field: string) =>
       field.startsWith(`${resource}.`) ? field : `${resource}.${field}`;
     let filterQuery = {
@@ -371,7 +420,7 @@ export class Client {
     let response = await this.axios.post(
       `/${resource}/v4/search`,
       {
-        displayingFields: fields.map(qualify),
+        displayingFields: [...new Set([`${resource}.id`, ...fields.map(qualify)])],
         filterQuery,
         sort: { fieldName: sortBy ? qualify(sortBy) : '', order: sortOrder ?? '' },
         moduleId,
@@ -386,6 +435,59 @@ export class Client {
         }
       }
     );
+    this.checkResponse(response.data);
+    return response.data;
+  }
+
+  private validatePagination(pageNo: number, rows: number) {
+    if (
+      !Number.isSafeInteger(pageNo) ||
+      pageNo < 1 ||
+      !Number.isInteger(rows) ||
+      rows < 1 ||
+      rows > 250 ||
+      !Number.isSafeInteger((pageNo - 1) * rows)
+    ) {
+      throw createApiServiceError(
+        'Page must be a positive integer and page size must be between 1 and 250.',
+        { reason: 'salesmate_invalid_pagination' }
+      );
+    }
+  }
+
+  private async updateRecord(
+    resource: string,
+    recordId: string,
+    data: Record<string, unknown>,
+    requiredFields: string[]
+  ) {
+    let payload = pickDefined(data);
+    let missingFields = requiredFields.filter(field => payload[field] === undefined);
+    let path = `/${resource}/v4/${encodeURIComponent(recordId)}`;
+    if (missingFields.length > 0) {
+      let current = await this.axios.get(path);
+      this.checkResponse(current.data);
+      let record: unknown = current.data?.Data;
+      if (!isApiErrorRecord(record)) {
+        throw createApiServiceError('Salesmate returned an unexpected record response.', {
+          reason: 'salesmate_invalid_response'
+        });
+      }
+      for (let field of missingFields) {
+        let value = record[field];
+        if ((field === 'owner' || field === 'primaryContact') && isApiErrorRecord(value)) {
+          value = value.id;
+        }
+        if (value === undefined || value === null || value === '') {
+          throw createApiServiceError(
+            `Salesmate did not return the required ${field} field. Provide ${field} explicitly when updating the record.`,
+            { reason: 'salesmate_missing_update_field' }
+          );
+        }
+        payload[field] = value;
+      }
+    }
+    let response = await this.axios.put(path, payload);
     this.checkResponse(response.data);
     return response.data;
   }

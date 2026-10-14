@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushV4Client } from '../lib/v4-client';
 import { spec } from '../spec';
@@ -70,7 +70,8 @@ Requires OAuth 2.0 authentication and a Semrush Local Pro or Business plan. Does
       }
 
       case 'get': {
-        if (!ctx.input.locationId) throw new Error('locationId is required for get action.');
+        if (!ctx.input.locationId)
+          throw createApiServiceError('locationId is required for get action.');
         let location = await client.getLocation(ctx.input.locationId);
         return {
           output: { location },
@@ -80,7 +81,7 @@ Requires OAuth 2.0 authentication and a Semrush Local Pro or Business plan. Does
 
       case 'create': {
         if (!ctx.input.businessName)
-          throw new Error('businessName is required for create action.');
+          throw createApiServiceError('businessName is required for create action.');
         let location = await client.createLocation({
           name: ctx.input.businessName,
           address: ctx.input.address,
@@ -100,7 +101,7 @@ Requires OAuth 2.0 authentication and a Semrush Local Pro or Business plan. Does
 
       case 'update': {
         if (!ctx.input.locationId)
-          throw new Error('locationId is required for update action.');
+          throw createApiServiceError('locationId is required for update action.');
         let updateData: Record<string, unknown> = {};
         if (ctx.input.businessName !== undefined) updateData.name = ctx.input.businessName;
         if (ctx.input.address !== undefined) updateData.address = ctx.input.address;
@@ -121,7 +122,7 @@ Requires OAuth 2.0 authentication and a Semrush Local Pro or Business plan. Does
 
       case 'delete': {
         if (!ctx.input.locationId)
-          throw new Error('locationId is required for delete action.');
+          throw createApiServiceError('locationId is required for delete action.');
         await client.deleteLocation(ctx.input.locationId);
         return {
           output: { deleted: true },
@@ -130,7 +131,7 @@ Requires OAuth 2.0 authentication and a Semrush Local Pro or Business plan. Does
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

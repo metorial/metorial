@@ -59,11 +59,11 @@ export let getAccountActivity = SlateTool.create(spec, {
     });
 
     let result = response?.result;
-    let data = result?.data ?? [];
+    let data = Array.isArray(result?.data) ? result.data : [];
 
     let unlockedReports = data.map((item: any) => ({
       username: item.username,
-      influencerId: item.id,
+      influencerId: item.id === undefined || item.id === null ? undefined : String(item.id),
       platform: item.type,
       timeAdded: item.time_add,
       timePaid: item.time_pay,

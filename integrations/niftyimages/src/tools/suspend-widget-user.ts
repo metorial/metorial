@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,12 @@ Use this for managing ESP integrations where you need to control access to the e
         .string()
         .optional()
         .describe('The widget key (required when source is "widget").'),
+      pluginKey: z
+        .string()
+        .optional()
+        .describe(
+          'The Bee Plugin key from your integration configuration (required when source is bee_plugin).'
+        ),
       userId: z.string().describe('The user identifier to suspend.')
     })
   )
@@ -36,7 +42,7 @@ Use this for managing ESP integrations where you need to control access to the e
 
     if (ctx.input.source === 'widget') {
       if (!ctx.input.widgetKey) {
-        throw new Error('Widget key is required when suspending a widget user.');
+        throw createApiServiceError('Widget key is required when suspending a widget user.');
       }
       let result = await client.suspendWidgetUser(ctx.input.widgetKey, ctx.input.userId);
       return {
@@ -45,7 +51,12 @@ Use this for managing ESP integrations where you need to control access to the e
       };
     }
 
-    let result = await client.suspendBeePluginUser(ctx.input.userId);
+    if (!ctx.input.pluginKey) {
+      throw createApiServiceError(
+        'Provide pluginKey from your Bee Plugin integration configuration.'
+      );
+    }
+    let result = await client.suspendBeePluginUser(ctx.input.pluginKey, ctx.input.userId);
     return {
       output: { success: true, result },
       message: `Successfully suspended Bee Plugin user **${ctx.input.userId}**.`

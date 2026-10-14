@@ -35,7 +35,7 @@ export let getUserThreads = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
     let result = await client.getUserThreads(ctx.input.userId);
     let threadList = Array.isArray(result) ? result : result.threads || [];
-    let threads = threadList.map((t: any) => ({
+    let threads = threadList.map(t => ({
       threadId: t.thread_id,
       userId: t.user_id,
       uuid: t.uuid,

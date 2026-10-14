@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteProject = SlateTool.create(spec, {
@@ -14,12 +15,12 @@ export let deleteProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to delete')
+      projectId: projectIdSchema
     })
   )
   .output(
     z.object({
-      projectId: z.string().describe('ID of the deleted project'),
+      projectId: projectIdSchema,
       deleted: z.boolean().describe('Whether the project was successfully deleted')
     })
   )

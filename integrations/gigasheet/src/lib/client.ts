@@ -1,15 +1,19 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class GigasheetClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) throw createApiServiceError('A Gigasheet API key is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.gigasheet.com',
-      headers: {
-        'X-GIGASHEET-TOKEN': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-GIGASHEET-TOKEN', value: config.token },
+      timeout: 60_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Gigasheet',
+          reason: 'gigasheet_api_error'
+        })
     });
   }
 
@@ -48,7 +52,7 @@ export class GigasheetClient {
   }
 
   async searchLibrary(query: string): Promise<unknown[]> {
-    let response = await this.axios.post('/library/search', { query });
+    let response = await this.axios.post('/library/search', { searchTerm: query });
     return response.data;
   }
 
@@ -81,11 +85,24 @@ export class GigasheetClient {
     parentHandle?: string;
     columns?: string[];
   }): Promise<Record<string, unknown>> {
+    if (params.columns?.length) {
+      return this.uploadDirect({
+        name: params.name.endsWith('.csv') ? params.name : `${params.name}.csv`,
+        parentHandle: params.parentHandle,
+        data: `${params.columns.map(column => `"${column.replaceAll('"', '""')}"`).join(',')}\n`
+      });
+    }
     let response = await this.axios.post('/files/blank', {
-      name: params.name,
-      parent_handle: params.parentHandle,
-      columns: params.columns
+      filename: params.name,
+      folderHandle: params.parentHandle
     });
+    if (response.data?.Success === false) {
+      throw createApiServiceError(
+        typeof response.data.Message === 'string'
+          ? response.data.Message
+          : 'Gigasheet could not create the blank file.'
+      );
+    }
     return response.data;
   }
 
@@ -95,7 +112,7 @@ export class GigasheetClient {
   }): Promise<Record<string, unknown>> {
     let response = await this.axios.post('/files/directory', {
       name: params.name,
-      parent_handle: params.parentHandle
+      parentDirectory: params.parentHandle
     });
     return response.data;
   }
@@ -108,7 +125,7 @@ export class GigasheetClient {
     let response = await this.axios.post('/upload/url', {
       url: params.url,
       name: params.name,
-      parent_handle: params.parentHandle
+      folderHandle: params.parentHandle
     });
     return response.data;
   }
@@ -165,13 +182,27 @@ export class GigasheetClient {
       aggregations?: Record<string, unknown>;
     }
   ): Promise<Record<string, unknown>> {
+    if (
+      params.aggregations &&
+      Object.values(params.aggregations).some(value => typeof value !== 'string')
+    ) {
+      throw createApiServiceError(
+        'aggregations must map each column ID to an aggregation function name, such as sum or count.'
+      );
+    }
     let response = await this.axios.post(`/file/${handle}/filter`, {
       filterModel: params.filterModel,
       sortModel: params.sortModel,
       startRow: params.startRow,
       endRow: params.endRow,
-      groupColumns: params.groupColumns,
-      aggregations: params.aggregations
+      rowGroupCols: params.groupColumns?.map(id => ({ id, field: id })),
+      valueCols:
+        params.aggregations &&
+        Object.entries(params.aggregations).map(([id, aggFunc]) => ({
+          id,
+          field: id,
+          aggFunc
+        }))
     });
     return response.data;
   }
@@ -507,19 +538,26 @@ export class GigasheetClient {
       format?: string;
     }
   ): Promise<Record<string, unknown>> {
+    if (params?.format && !['csv', 'zip', 'gzip'].includes(params.format.toLowerCase())) {
+      throw createApiServiceError('Exports contain CSV data. Use format csv, zip, or gzip.');
+    }
     let response = await this.axios.post(`/dataset/${handle}/export`, {
-      filterModel: params?.filterModel,
-      groupColumns: params?.groupColumns,
-      format: params?.format
+      gridState: {
+        filterModel: params?.filterModel ?? {},
+        rowGroupCols: params?.groupColumns?.map(id => ({ id, field: id }))
+      },
+      compressionType: params?.format?.toLowerCase() === 'gzip' ? 'gzip' : 'zip'
     });
     return response.data;
   }
 
   async downloadExport(
-    handle: string,
+    _handle: string,
     exportHandle: string
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/dataset/${handle}/download/${exportHandle}`);
+    let response = await this.axios.get(
+      `/dataset/${encodeURIComponent(exportHandle)}/download-export`
+    );
     return response.data;
   }
 
@@ -528,8 +566,8 @@ export class GigasheetClient {
     return response.data;
   }
 
-  async listExports(): Promise<unknown[]> {
-    let response = await this.axios.get('/library/exports');
+  async listExports(params: { page?: number; pageSize?: number } = {}): Promise<unknown[]> {
+    let response = await this.axios.get('/library/exports', { params });
     return response.data;
   }
 
@@ -935,11 +973,16 @@ export class GigasheetClient {
     parentHandle?: string;
     format?: string;
   }): Promise<Record<string, unknown>> {
+    let contents = Buffer.from(params.data, 'utf8');
+    if (contents.byteLength > 128 * 1024 * 1024) {
+      throw createApiServiceError(
+        'Raw uploads must be at most 128 MB. Upload from a URL for larger files.'
+      );
+    }
     let response = await this.axios.post('/upload/direct', {
-      data: params.data,
-      name: params.name,
-      parent_handle: params.parentHandle,
-      format: params.format
+      contents: Array.from(contents),
+      name: params.name ?? `upload.${params.format ?? 'csv'}`,
+      parentDirectory: params.parentHandle
     });
     return response.data;
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,6 +24,12 @@ export let manageUpload = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      job: z
+        .any()
+        .optional()
+        .describe(
+          'Asynchronous job object, when the operation is queued. Use get_job_result with its id.'
+        ),
       upload: z.any().describe('The upload object')
     })
   )
@@ -38,7 +44,7 @@ export let manageUpload = SlateTool.create(spec, {
     if (action === 'get') {
       let upload = await client.getUpload(uploadId);
       return {
-        output: { upload },
+        output: { upload, ...(upload?.type === 'job' ? { job: upload } : {}) },
         message: `Retrieved upload **${upload.filename || upload.id}**.`
       };
     }
@@ -54,19 +60,25 @@ export let manageUpload = SlateTool.create(spec, {
 
       let upload = await client.updateUpload(uploadId, attributes);
       return {
-        output: { upload },
-        message: `Updated upload **${upload.filename || upload.id}**.`
+        output: { upload, ...(upload?.type === 'job' ? { job: upload } : {}) },
+        message:
+          upload?.type === 'job'
+            ? `Queued operation as job **${upload.id}**. Use get_job_result to check completion.`
+            : `Updated upload **${upload.filename || upload.id}**.`
       };
     }
 
     if (action === 'delete') {
       let upload = await client.deleteUpload(uploadId);
       return {
-        output: { upload },
-        message: `Deleted upload with ID **${uploadId}**.`
+        output: { upload, ...(upload?.type === 'job' ? { job: upload } : {}) },
+        message:
+          upload?.type === 'job'
+            ? `Queued operation as job **${upload.id}**. Use get_job_result to check completion.`
+            : `Deleted upload with ID **${uploadId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

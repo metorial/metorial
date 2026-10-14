@@ -12,6 +12,7 @@ export let createEstimate = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       clientId: z.string().describe('ID of the client for the estimate'),

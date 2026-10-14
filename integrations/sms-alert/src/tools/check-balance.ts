@@ -20,7 +20,7 @@ export let checkBalance = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
     ctx.info('Checking credit balance');
     let result = await client.getCreditBalance();
@@ -28,9 +28,9 @@ export let checkBalance = SlateTool.create(spec, {
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        description: result.description ?? result
       },
-      message: `Credit balance retrieved: ${JSON.stringify(result.description || result)}`
+      message: `Credit balance retrieved: ${JSON.stringify(result.description ?? result)}`
     };
   })
   .build();

@@ -1,10 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { messageResultSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
   contactId: z.number().optional().describe('eSputnik internal contact ID'),
+  externalCustomerId: z
+    .string()
+    .optional()
+    .describe('External customer ID as an alternative to contactId or locator'),
   locator: z
     .string()
     .optional()
@@ -52,19 +57,52 @@ Dynamic content can be injected via Velocity template parameters per recipient u
   .output(
     z.object({
       status: z.string().describe('Status of the send request'),
-      requestId: z.string().optional().describe('Request ID for tracking delivery status')
+      requestId: z
+        .string()
+        .optional()
+        .describe('First request ID for tracking delivery status'),
+      requestIds: z
+        .array(z.string())
+        .optional()
+        .describe('All queued request IDs for get_message_status'),
+      results: z
+        .array(messageResultSchema)
+        .optional()
+        .describe('Queue outcome for each recipient')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.recipients.some(
+        recipient =>
+          recipient.contactId === undefined &&
+          !recipient.locator &&
+          !recipient.externalCustomerId
+      )
+    ) {
+      throw createApiServiceError(
+        'Each recipient must provide contactId, externalCustomerId, or locator.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.smartSend(ctx.input.messageId, ctx.input.recipients);
+    if (!result.results.length)
+      throw createApiServiceError(
+        'eSputnik returned no message queue result. Check the account before retrying.'
+      );
+    let requestIds = result.results.flatMap(recipient =>
+      recipient.requestId ? [recipient.requestId] : []
+    );
+    let failed = result.results.filter(recipient => recipient.status === 'ERROR').length;
 
     return {
       output: {
-        status: result.status || 'OK',
-        requestId: result.requestId
+        status: failed ? 'ERROR' : 'OK',
+        requestId: requestIds[0],
+        requestIds,
+        results: result.results
       },
-      message: `Prepared message **${ctx.input.messageId}** sent to **${ctx.input.recipients.length}** recipient(s). Request ID: ${result.requestId || 'N/A'}.`
+      message: `Prepared message **${ctx.input.messageId}**: **${requestIds.length}** recipient(s) queued, **${failed}** rejected. Use get_message_status with the queued request IDs to check delivery.`
     };
   })
   .build();

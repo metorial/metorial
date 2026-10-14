@@ -36,12 +36,12 @@ export let getQueryLog = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let params: Record<string, any> = {};
 
-    if (ctx.input.startDate) params.start = ctx.input.startDate;
-    if (ctx.input.endDate) params.end = ctx.input.endDate;
-    if (ctx.input.domain) params.domain = ctx.input.domain;
-    if (ctx.input.siteId) params.site_id = ctx.input.siteId;
+    if (ctx.input.startDate) params.from = ctx.input.startDate;
+    if (ctx.input.endDate) params.to = ctx.input.endDate;
+    if (ctx.input.domain) params.fqdn = ctx.input.domain;
+    if (ctx.input.siteId) params.network_id = ctx.input.siteId;
     if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
-    if (ctx.input.roamingClientId) params.roaming_client_id = ctx.input.roamingClientId;
+    if (ctx.input.roamingClientId) params.agent_id = ctx.input.roamingClientId;
     if (ctx.input.result) params.result = ctx.input.result;
     if (ctx.input.filters) Object.assign(params, ctx.input.filters);
 

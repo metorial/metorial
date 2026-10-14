@@ -31,6 +31,10 @@ export let generateEmbedding = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       embeddings: z
         .array(z.array(z.number()))
         .describe('Vector embeddings as nested arrays of floats'),
@@ -56,6 +60,7 @@ export let generateEmbedding = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         embeddings: result.embeddings,
         chunks: result.chunks
       },

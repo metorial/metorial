@@ -1,33 +1,33 @@
-# Slates Specification for Leadfeeder
+# Leadfeeder API Specification
 
 ## Overview
 
-Leadfeeder (now part of Dealfront) is a B2B website visitor identification tool that tracks which companies visit your website and how they interact with your content. It provides company-level data including industry, employee count, location, and visit behavior to support B2B sales pipelines. It also offers an IP-Enrich API for resolving IP addresses to company information.
+Leadfeeder is a B2B website visitor identification tool that tracks which companies visit your website and how they interact with your content. It provides company-level data including industry, employee count, location, and visit behavior to support B2B sales pipelines. It also offers an IP-Enrich API for resolving IP addresses to company information.
 
 ## Authentication
 
 Leadfeeder provides two separate APIs, each with its own authentication method:
 
-### Leadfeeder API (main API)
+### Leadfeeder legacy API (main API)
 
-- **Method:** API Token (Bearer-style token in header)
+- **Method:** Existing legacy API token in the Authorization header
 - **Base URL:** `https://api.leadfeeder.com`
 - The API expects a token to be included in all requests via the `Authorization` header in the format: `Authorization: Token token=yourapitoken`.
-- Your API key is available in Personal settings under API tokens, or generated at `https://app.leadfeeder.com/l/settings/personal/api-tokens`.
-- A working Leadfeeder Trial or Premium account is required.
+- Existing legacy API tokens remain supported; new legacy tokens are no longer issued. Newly issued keys for the current `/v1` API use a different authentication header and do not work with these tools.
+- Some endpoints require an eligible Leadfeeder subscription and account access.
 
-### IP-Enrich API
+### Legacy IP-Enrich API
 
 - **Method:** API Key in header
 - **Base URL:** `https://api.lf-discover.com`
 - Authentication is via the `X-API-KEY` header.
-- This is a separate API key from the main Leadfeeder API token.
+- This is a separate existing legacy API key from the main token. New legacy IP-Enrich keys are no longer issued.
 
 ## Features
 
 ### Account Management
 
-Retrieve the list of Leadfeeder accounts accessible by the authenticated user. Each account represents a tracked website and includes details such as subscription type, timezone, and website tracking status (whether the tracker is installed and reporting correctly).
+Use `get_accounts` to discover accessible account IDs and `get_account` to retrieve a specific tracked website account. Each account represents a tracked website and includes details such as subscription type, timezone, and website tracking status (whether the tracker is installed and reporting correctly).
 
 ### Lead Retrieval
 
@@ -39,15 +39,15 @@ Access identified companies (leads) that have visited your website within a spec
 
 ### Custom Feeds
 
-Retrieve user-defined custom feeds (filtered views of leads). Custom feeds define criteria such as page URL filters, country codes, industry codes, assignee status, and pageview thresholds. Built-in feeds include "All leads", "New leads", "Top leads", and "Followed companies".
+Use `get_custom_feeds` to retrieve available custom feeds and `get_custom_feed` to inspect a selected feed (filtered view of leads). Custom feeds define criteria such as page URL filters, country codes, industry codes, assignee status, and pageview thresholds. Built-in feeds include "All leads", "New leads", "Top leads", and "Followed companies".
 
 ### Visit Tracking
 
-Access detailed visit data for a specific lead or across all leads within a date range. Visit data includes traffic source, medium, campaign, referring URL, landing page, full page-by-page visit route (with time on each page), visit duration, keyword data, device type, and identified visitor information (email, name) when available. Also includes Google Analytics client IDs and Adobe cookie data if applicable.
+Access detailed visit data for a specific lead or across all leads within a date range. Visit data includes traffic source, medium, campaign, referring URL, landing page, full page-by-page visit route (with time on each page), visit duration, keyword data, device type, and identified visitor information (email, name) when available. Also includes Google Analytics client IDs.
 
 ### Feed Export
 
-Request bulk exports of lead data for a given account and feed over a date range. Exports are asynchronous: you submit an export request, poll for status, and download the resulting report once processed. The report includes lead details, visit statistics, quality scores, and keywords.
+Request bulk exports of lead data for a given account and feed over a date range. Exports are asynchronous: you submit an export request, poll for status, and download the resulting report once processed. The report includes lead details, visit statistics, quality scores, and keywords. `get_export_status` supplies a downloadable JSON report when processed, and `download_export` retrieves a completed export without starting a new one. The original provider download URL remains in the output. Completed download URLs do not require authentication; the provider does not document their expiration.
 
 ### Website Tracking Script
 
@@ -57,6 +57,12 @@ Retrieve the JavaScript tracking script for a given account, which needs to be i
 
 The IP-Enrich API allows you to uncover company information related to an IPv4 or IPv6 address. Returned data includes company name, domain, industry, employee range, revenue, social profiles, business IDs, location, and a confidence score.
 
-## Events
+## Response compatibility
 
-The provider does not support webhooks or event subscriptions through its API. There is no native webhook or push-based event mechanism documented in the Leadfeeder API.
+Industry objects are returned as industry name strings. Numeric CRM and visitor IDs are returned as strings. IP-Enrich revenue and employee counts are converted from provider numeric strings to the existing numeric output fields. `employeeRangeBounds` preserves nullable and open-ended employee bounds; the original `employeesRange` remains nullable and only contains a range when both bounds are numeric.
+
+## Official documentation
+
+- [Legacy Leadfeeder API](https://docs.leadfeeder.com/api/)
+- [Legacy IP-Enrich API](https://docs.leadfeeder.com/connectors/ip-enrich-api/)
+- [Current API credential format](https://help.leadfeeder.com/en/articles/14625032-how-to-create-and-use-your-leadfeeder-api-keys)

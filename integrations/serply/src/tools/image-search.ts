@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeImageResult, searchResultArray } from '../lib/responses';
 import { spec } from '../spec';
 
 let imageResultSchema = z.object({
@@ -83,7 +84,9 @@ export let imageSearch = SlateTool.create(spec, {
       deviceType: ctx.input.deviceType
     });
 
-    let results = data.results || [];
+    let results = searchResultArray(data.image_results ?? data.results).map(
+      normalizeImageResult
+    );
 
     return {
       output: {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapeDoClient } from '../lib/client';
+import { ScrapeDoClient, validateWholeNumber } from '../lib/client';
 import { spec } from '../spec';
 
 export let googleSearch = SlateTool.create(spec, {
@@ -20,6 +20,10 @@ export let googleSearch = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('The search query string'),
+      googleDomain: z
+        .string()
+        .optional()
+        .describe('Regional Google domain, such as google.com or google.de'),
       device: z.enum(['desktop', 'mobile']).optional().describe('Device type for SERP layout'),
       gl: z
         .string()
@@ -67,8 +71,11 @@ export let googleSearch = SlateTool.create(spec, {
     let client = new ScrapeDoClient(ctx.auth.token);
     let input = ctx.input;
 
+    validateWholeNumber('start', input.start, 0);
+    validateWholeNumber('num', input.num, 1);
     let results = await client.googleSearch({
       query: input.query,
+      googleDomain: input.googleDomain,
       device: input.device,
       gl: input.gl,
       hl: input.hl,
@@ -86,8 +93,15 @@ export let googleSearch = SlateTool.create(spec, {
 
     let resultSummary = '';
     if (results && typeof results === 'object') {
-      let organicResults = results.organicResults as unknown[] | undefined;
-      let ads = results.ads as unknown[] | undefined;
+      let organicResults = Array.isArray(results.organic_results)
+        ? results.organic_results
+        : Array.isArray(results.organicResults)
+          ? results.organicResults
+          : [];
+      let ads = [
+        ...(Array.isArray(results.top_ads) ? results.top_ads : []),
+        ...(Array.isArray(results.bottom_ads) ? results.bottom_ads : [])
+      ];
       resultSummary = `${organicResults?.length || 0} organic results`;
       if (ads && ads.length > 0) {
         resultSummary += `, ${ads.length} ads`;

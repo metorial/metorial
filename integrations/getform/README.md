@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Getform
 
-Collect, store, and manage form submissions via a headless form backend API. Submit form data with structured blocks or standard form-encoded data, upload files up to 25MB, and retrieve or search submissions with filtering and pagination. Configure spam protection with reCAPTCHA, hCaptcha, or honeypot fields. Set up webhooks to forward new submissions to external endpoints. Restrict submissions to authorized domains and organize forms into collaborative workspaces. Integrates with Zapier, Make, Slack, and Discord for notifications and automation.
+Submit structured form data and retrieve or search submissions from Getform, now Forminit. Supports sender and tracking properties, field blocks, multi-choice select and checkbox values, pagination, timezone formatting, and optional file metadata. Use a Forminit API key with the default v2 connection, or select v1 for legacy token-authenticated retrieval. Protected form submission requires a Forminit API key.
+
+Retrieved submissions expose the provider's identifier as `id`. The legacy numeric `submissionId` is returned only when the provider supplies a numeric identifier. File uploads and form administration are not exposed by these tools.
+
+Official API references: [submit form](https://forminit.com/docs/submit-form-api/), [list submissions](https://forminit.com/docs/list-submissions-api/), and [form blocks](https://forminit.com/docs/form-blocks/).
 
 ## License
 

@@ -22,6 +22,11 @@ export let startProjectTracking = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      started: z.boolean().describe('Whether DeskTime confirmed that tracking started'),
+      requestTime: z
+        .union([z.string(), z.number()])
+        .optional()
+        .describe('DeskTime request timestamp'),
       rawResponse: z.any().describe('API response from DeskTime')
     })
   )
@@ -34,6 +39,12 @@ export let startProjectTracking = SlateTool.create(spec, {
 
     return {
       output: {
+        started: true,
+        requestTime:
+          typeof response.__request_time === 'string' ||
+          typeof response.__request_time === 'number'
+            ? response.__request_time
+            : undefined,
         rawResponse: response
       },
       message: `Started tracking time for project **${ctx.input.projectName}**${taskLabel}.`

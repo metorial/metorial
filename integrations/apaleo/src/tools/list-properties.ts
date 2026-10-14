@@ -6,17 +6,26 @@ import { spec } from '../spec';
 export let listProperties = SlateTool.create(spec, {
   name: 'List Properties',
   key: 'list_properties',
-  description: `List all properties (hotels/apartments) in the account. Returns each property's ID, name, location, and status. Use this to discover available properties before querying other resources.`,
+  description: `List a page of properties (hotels/apartments) in the account. Returns each property's ID, name, location, and status. Use this to discover available properties before querying other resources.`,
   tags: { readOnly: true, destructive: false }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      pageNumber: z.number().optional().describe('Page number, starting at 1.'),
+      pageSize: z.number().optional().describe('Results per page, up to 500.')
+    })
+  )
   .output(
     z.object({
       properties: z
         .array(
           z
             .object({
-              propertyId: z.string().describe('Property ID'),
+              propertyId: z
+                .string()
+                .describe(
+                  'Property ID. Call list_properties to discover available properties.'
+                ),
               name: z.string().optional().describe('Property name'),
               description: z.string().optional().describe('Property description'),
               companyName: z.string().optional(),
@@ -42,27 +51,28 @@ export let listProperties = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ApaleoClient(ctx.auth.token);
-    let result = await client.listProperties();
+    let result = await client.listProperties(ctx.input);
 
     let properties = (result.properties || []).map((p: any) => ({
-      propertyId: p.id,
-      name: p.name,
-      description: p.description,
-      companyName: p.companyName,
-      commercialRegisterEntry: p.commercialRegisterEntry,
-      taxId: p.taxId,
-      location: p.location
-        ? {
-            addressLine1: p.location.addressLine1,
-            postalCode: p.location.postalCode,
-            city: p.location.city,
-            countryCode: p.location.countryCode
-          }
-        : undefined,
-      timeZone: p.timeZone,
-      currencyCode: p.currencyCode,
-      status: p.status,
-      created: p.created
+      propertyId: p.id ?? undefined,
+      name: p.name ?? undefined,
+      description: p.description ?? undefined,
+      companyName: p.companyName ?? undefined,
+      commercialRegisterEntry: p.commercialRegisterEntry ?? undefined,
+      taxId: p.taxId ?? undefined,
+      location:
+        (p.location ?? undefined)
+          ? {
+              addressLine1: p.location.addressLine1 ?? undefined,
+              postalCode: p.location.postalCode ?? undefined,
+              city: p.location.city ?? undefined,
+              countryCode: p.location.countryCode ?? undefined
+            }
+          : undefined,
+      timeZone: p.timeZone ?? undefined,
+      currencyCode: p.currencyCode ?? undefined,
+      status: p.status ?? undefined,
+      created: p.created ?? undefined
     }));
 
     return {

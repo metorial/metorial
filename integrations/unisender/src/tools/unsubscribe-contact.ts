@@ -20,7 +20,9 @@ export let unsubscribeContact = SlateTool.create(spec, {
       contactType: z
         .enum(['email', 'phone'])
         .optional()
-        .describe('Type of contact identifier'),
+        .describe(
+          'Type of contact identifier. When omitted, inferred from the email address or phone number.'
+        ),
       listIds: z
         .array(z.number())
         .optional()
@@ -40,7 +42,8 @@ export let unsubscribeContact = SlateTool.create(spec, {
 
     let params = {
       contact: ctx.input.contact,
-      contact_type: ctx.input.contactType,
+      contact_type:
+        ctx.input.contactType ?? (ctx.input.contact.includes('@') ? 'email' : 'phone'),
       list_ids: ctx.input.listIds ? ctx.input.listIds.join(',') : undefined
     };
 

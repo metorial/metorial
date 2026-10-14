@@ -65,7 +65,7 @@ export let listReservations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      propertyId: z.string().optional().describe('Filter by property ID'),
+      propertyId: z.string().optional().describe('Filter by property ID from list_properties'),
       status: z
         .enum(['Confirmed', 'InHouse', 'CheckedOut', 'Canceled', 'NoShow'])
         .optional()
@@ -87,7 +87,7 @@ export let listReservations = SlateTool.create(spec, {
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (default 100, max 1000)')
+        .describe('Number of results per page (default 500, max 500)')
     })
   )
   .output(
@@ -111,37 +111,43 @@ export let listReservations = SlateTool.create(spec, {
     });
 
     let reservations = (result.reservations || []).map((r: any) => ({
-      reservationId: r.id,
-      bookingId: r.bookingId,
-      status: r.status,
-      arrival: r.arrival,
-      departure: r.departure,
-      adults: r.adults,
-      childrenAges: r.childrenAges,
-      primaryGuest: r.primaryGuest
-        ? {
-            firstName: r.primaryGuest.firstName,
-            lastName: r.primaryGuest.lastName,
-            email: r.primaryGuest.email
-          }
+      reservationId: r.id ?? undefined,
+      bookingId: r.bookingId ?? undefined,
+      status: r.status ?? undefined,
+      arrival: r.arrival ?? undefined,
+      departure: r.departure ?? undefined,
+      adults: r.adults ?? undefined,
+      childrenAges: r.childrenAges ?? undefined,
+      primaryGuest:
+        (r.primaryGuest ?? undefined)
+          ? {
+              firstName: r.primaryGuest.firstName ?? undefined,
+              lastName: r.primaryGuest.lastName ?? undefined,
+              email: r.primaryGuest.email ?? undefined
+            }
+          : undefined,
+      property: r.property
+        ? { propertyId: r.property.id ?? undefined, name: r.property.name ?? undefined }
         : undefined,
-      property: r.property ? { propertyId: r.property.id, name: r.property.name } : undefined,
-      unitGroup: r.unitGroup
-        ? { unitGroupId: r.unitGroup.id, name: r.unitGroup.name }
+      unitGroup:
+        (r.unitGroup ?? undefined)
+          ? { unitGroupId: r.unitGroup.id ?? undefined, name: r.unitGroup.name ?? undefined }
+          : undefined,
+      unit: r.unit
+        ? { unitId: r.unit.id ?? undefined, name: r.unit.name ?? undefined }
         : undefined,
-      unit: r.unit ? { unitId: r.unit.id, name: r.unit.name } : undefined,
-      totalGrossAmount: r.totalGrossAmount,
-      channelCode: r.channelCode,
-      created: r.created,
-      modified: r.modified
+      totalGrossAmount: r.totalGrossAmount ?? undefined,
+      channelCode: r.channelCode ?? undefined,
+      created: r.created ?? undefined,
+      modified: r.modified ?? undefined
     }));
 
     return {
       output: {
         reservations,
-        count: result.count || reservations.length
+        count: result.count ?? reservations.length
       },
-      message: `Found **${result.count || reservations.length}** reservations${ctx.input.status ? ` with status **${ctx.input.status}**` : ''}.`
+      message: `Found **${result.count ?? reservations.length}** reservations${ctx.input.status ? ` with status **${ctx.input.status}**` : ''}.`
     };
   })
   .build();

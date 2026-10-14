@@ -26,8 +26,19 @@ export let listTags = SlateTool.create(spec, {
       name: z.string().optional().describe('Filter tags by name'),
       taskId: z.string().optional().describe('Get tags assigned to a specific task'),
       sortBy: z.string().optional().describe('Sort fields, e.g. "name" or "-name"'),
-      limit: z.number().optional().describe('Maximum number of tags to return'),
-      offset: z.number().optional().describe('Number of tags to skip')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(1)
+        .max(10000)
+        .optional()
+        .describe('Maximum number of tags to return'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(0)
+        .optional()
+        .describe('Number of tags to skip')
     })
   )
   .output(
@@ -42,8 +53,8 @@ export let listTags = SlateTool.create(spec, {
     if (ctx.input.name) params.name = ctx.input.name;
     if (ctx.input.taskId) params.task_id = ctx.input.taskId;
     if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     let tags = await client.listTags(params);
 

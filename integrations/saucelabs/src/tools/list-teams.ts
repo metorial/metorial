@@ -33,15 +33,15 @@ export let listTeams = SlateTool.create(spec, {
     let client = createClient(ctx);
     let result = await client.listTeams({ name: ctx.input.name });
 
-    let teamsRaw = result.teams ?? [];
+    let teamsRaw = result.results ?? result.teams ?? [];
     let teams = teamsRaw.map((t: any) => ({
       teamId: t.id,
-      name: t.name,
-      description: t.description,
-      orgId: t.org_uuid,
-      userCount: t.user_count,
+      name: t.name ?? undefined,
+      description: t.description ?? undefined,
+      orgId: t.org_uuid ?? undefined,
+      userCount: t.user_count ?? undefined,
       virtualMachines: t.settings?.virtual_machines,
-      createdAt: t.created_at
+      createdAt: t.created_at ?? undefined
     }));
 
     return {

@@ -1,6 +1,6 @@
-# Mailer Send
+# MailerSend
 
-Send transactional emails and SMS messages. Manage email templates, sending domains, and sender identities. Verify email addresses individually or in bulk. Configure inbound email and SMS routing. Track email delivery activity and analytics including opens, clicks, bounces, and spam complaints. Manage recipient suppression lists, API tokens, SMTP users, and team member access. Schedule emails for future delivery and send bulk email batches. Monitor DMARC reports for sending domains.
+Send and schedule transactional emails and send SMS messages. Manage sending domains, DNS records, sender identities, templates, recipients, and suppression lists. Verify individual email addresses and create, find, process, and inspect bulk verification lists. Retrieve email delivery activity with event filters and pagination.
 
 ## License
 

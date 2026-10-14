@@ -27,7 +27,7 @@ export let summarize = SlateTool.create(spec, {
       withCitations: z
         .boolean()
         .optional()
-        .describe('Whether to include citations in the response (default false)')
+        .describe('Whether to include citations in the response (default true)')
     })
   )
   .output(

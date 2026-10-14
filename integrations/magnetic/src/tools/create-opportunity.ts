@@ -19,9 +19,19 @@ export let createOpportunity = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Description or extra details about the opportunity'),
-      ownerId: z.string().describe('User ID of the opportunity owner'),
-      contactId: z.string().optional().describe('ID of the associated contact'),
-      companyId: z.string().optional().describe('ID of the associated company'),
+      ownerId: z
+        .string()
+        .describe('User ID of the opportunity owner. Call list_users to discover user IDs.'),
+      contactId: z
+        .string()
+        .optional()
+        .describe('ID of the associated contact. Call list_contacts to discover contact IDs.'),
+      companyId: z
+        .string()
+        .optional()
+        .describe(
+          'ID of the associated company. Call list_companies to discover company IDs.'
+        ),
       amount: z.number().optional().describe('Monetary amount/value of the opportunity'),
       dueDate: z.string().optional().describe('Due date in ISO 8601 format'),
       tags: z.string().optional().describe('Comma-separated tags for the opportunity'),

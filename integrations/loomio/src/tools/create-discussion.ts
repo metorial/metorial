@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groupIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createDiscussion = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ export let createDiscussion = SlateTool.create(spec, {
         .enum(['md', 'html'])
         .default('md')
         .describe('Format of the description content'),
-      groupId: z.number().optional().describe('ID of the group to create the discussion in'),
+      groupId: groupIdSchema.optional(),
       recipientUserIds: z
         .array(z.number())
         .optional()
@@ -35,7 +36,11 @@ export let createDiscussion = SlateTool.create(spec, {
       recipientAudience: z
         .string()
         .optional()
-        .describe('Set to "group" to notify the entire group')
+        .describe('Set to "group" to notify the entire group'),
+      recipientMessage: z
+        .string()
+        .optional()
+        .describe('Message to include in invitation emails')
     })
   )
   .output(
@@ -51,17 +56,16 @@ export let createDiscussion = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.createDiscussion({
+    let discussion = await client.createDiscussion({
       title: ctx.input.title,
       description: ctx.input.description,
       descriptionFormat: ctx.input.descriptionFormat,
       groupId: ctx.input.groupId,
       recipientUserIds: ctx.input.recipientUserIds,
       recipientEmails: ctx.input.recipientEmails,
-      recipientAudience: ctx.input.recipientAudience
+      recipientAudience: ctx.input.recipientAudience,
+      recipientMessage: ctx.input.recipientMessage
     });
-
-    let discussion = result.discussions?.[0] || result;
 
     return {
       output: {

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { asOptionalString, createClient, isEnabled } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDocuments = SlateTool.create(spec, {
   name: 'List Documents',
   key: 'list_documents',
-  description: `List documents filtered by status type. Supports pagination and filtering by categories like all documents, action required, waiting for others, completed, drafts, or cancelled.`,
+  description: `List documents filtered by status type. Supports pagination and filtering by categories like all documents, action required, waiting for others, completed, drafts, or cancelled. Call list_businesses to discover the businessId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let listDocuments = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       type: z
         .enum([
           'all',
@@ -25,9 +27,17 @@ export let listDocuments = SlateTool.create(spec, {
         ])
         .default('all')
         .describe('Filter documents by status type'),
-      page: z.number().optional().describe('Page number for pagination'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(1)
+        .optional()
+        .describe('Page number for pagination, starting at 1'),
       limit: z
         .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(1)
+        .max(500)
         .optional()
         .describe('Maximum number of documents to return (default 500)')
     })
@@ -52,17 +62,17 @@ export let listDocuments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
     let docs = await client.listDocuments(ctx.input.type, ctx.input.page, ctx.input.limit);
 
     let documents = (Array.isArray(docs) ? docs : []).map((doc: any) => ({
       documentHash: doc.document_hash,
       title: doc.title || undefined,
-      isDraft: doc.is_draft === 1 || doc.is_draft === true,
-      isCompleted: doc.is_completed === 1 || doc.is_completed === true,
-      isCancelled: doc.is_cancelled === 1 || doc.is_cancelled === true,
-      isExpired: doc.is_expired === 1 || doc.is_expired === true,
-      createdAt: doc.created ?? undefined,
+      isDraft: isEnabled(doc.is_draft),
+      isCompleted: isEnabled(doc.is_completed),
+      isCancelled: isEnabled(doc.is_cancelled),
+      isExpired: isEnabled(doc.is_expired),
+      createdAt: asOptionalString(doc.created),
       signerCount: (doc.signers || []).length
     }));
 

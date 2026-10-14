@@ -10,8 +10,11 @@ import {
   getTestimonial,
   listCampaigns,
   listContacts,
+  listTags,
   listTestimonials,
   listWidgets,
+  searchContacts,
+  searchTestimonials,
   updateContact,
   updateTestimonial
 } from './tools';
@@ -30,7 +33,10 @@ export let provider = Slate.create({
     deleteTestimonial,
     listCampaigns,
     listWidgets,
-    createSuperLink
+    createSuperLink,
+    listTags,
+    searchContacts,
+    searchTestimonials
   ],
   triggers: []
 });

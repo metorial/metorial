@@ -1,7 +1,10 @@
 export { changeUnitState } from './change-unit-state';
 export { createBooking } from './create-booking';
+export { getBooking } from './get-booking';
+export { getCurrentAccount } from './get-current-account';
 export { getReservation } from './get-reservation';
 export { listBlocks } from './list-blocks';
+export { listBookings } from './list-bookings';
 export { listFolios } from './list-folios';
 export { listProperties } from './list-properties';
 export { listRatePlans } from './list-rate-plans';

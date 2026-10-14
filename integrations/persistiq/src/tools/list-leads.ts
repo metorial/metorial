@@ -5,7 +5,7 @@ import { spec } from '../spec';
 
 let leadSchema = z.object({
   leadId: z.string().describe('Unique identifier for the lead'),
-  ownerId: z.string().optional().describe('ID of the user who owns this lead'),
+  ownerId: z.string().optional().nullable().describe('ID of the user who owns this lead'),
   creatorId: z.string().optional().nullable().describe('ID of the user who created this lead'),
   status: z
     .string()
@@ -40,20 +40,41 @@ export let listLeads = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 0)')
+      page: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Page must be a safe whole number')
+        .optional()
+        .describe('Page number for pagination'),
+      email: z.string().optional().describe('Filter by lead email address'),
+      status: z.string().optional().describe('Filter by status name from list_lead_statuses'),
+      statusId: z.string().optional().describe('Filter by status ID from list_lead_statuses'),
+      updatedAfter: z
+        .string()
+        .optional()
+        .describe('Filter leads updated after this ISO 8601 timestamp'),
+      createdAfter: z
+        .string()
+        .optional()
+        .describe('Filter leads created after this ISO 8601 timestamp')
     })
   )
   .output(
     z.object({
       leads: z.array(leadSchema).describe('List of leads'),
-      hasMore: z.boolean().describe('Whether there are more pages of results')
+      hasMore: z.boolean().describe('Whether there are more pages of results'),
+      nextPage: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Provider continuation value for the next page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listLeads({ page: ctx.input.page });
+    let result = await client.listLeads(ctx.input);
 
-    let leads = (result.leads || []).map((lead: any) => ({
+    let leads = (result.leads || []).map(lead => ({
       leadId: lead.id,
       ownerId: lead.owner_id,
       creatorId: lead.creator_id,
@@ -72,10 +93,10 @@ export let listLeads = SlateTool.create(spec, {
       industry: lead.data?.industry
     }));
 
-    let hasMore = !!result.next_page;
+    let hasMore = result.has_more ?? !!result.next_page;
 
     return {
-      output: { leads, hasMore },
+      output: { leads, hasMore, nextPage: result.next_page },
       message: `Retrieved **${leads.length}** leads${hasMore ? ' (more pages available)' : ''}.`
     };
   })

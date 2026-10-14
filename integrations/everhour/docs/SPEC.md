@@ -1,6 +1,6 @@
-Now let me check the Everhour API documentation more closely and look for webhook details:Now I have comprehensive data from the official API documentation. Let me compile the specification.
+This reference summarizes the provider API. The registered tools cover the capabilities listed in the package README; other API capabilities below are not necessarily available as tools. Source: https://everhour.docs.apiary.io/ (official API Blueprint: https://jsapi.apiary.io/apis/everhour.source).
 
-# Slates Specification for Everhour
+# Everhour API Reference
 
 ## Overview
 
@@ -73,7 +73,7 @@ Manage team assignments for resource planning. Create, update, and delete projec
 
 ### Time Off Management
 
-Create and manage time-off requests with configurable types (e.g., sick leave, vacation). Supports full-day, half-day, and quarter-day periods. Time-off requests go through a pending/approved workflow. Manage time-off allocations per user with accrual frequencies and carryover balances.
+Create and manage time-off requests with configurable types (e.g., sick leave, vacation). Supports full-day, half-of-day, quarter-of-day, and half-and-quarter-of-day periods. Time-off requests go through a pending/approved workflow. Manage time-off allocations per user with accrual frequencies and carryover balances.
 
 ### Users
 

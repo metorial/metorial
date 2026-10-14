@@ -1,8 +1,11 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createTemplate,
   deleteDocument,
   deleteTemplate,
+  downloadDocument,
+  downloadTemplate,
   generateDocument,
   getDocument,
   getTemplate,
@@ -14,7 +17,10 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    createTemplate,
     generateDocument,
+    downloadDocument,
+    downloadTemplate,
     listTemplates,
     getTemplate,
     updateTemplate,

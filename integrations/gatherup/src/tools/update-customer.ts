@@ -37,7 +37,7 @@ export let updateCustomer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let data = await client.updateCustomer({
+    await client.updateCustomer({
       customerId: ctx.input.customerId,
       customerEmail: ctx.input.email,
       customerFirstName: ctx.input.firstName,
@@ -48,12 +48,6 @@ export let updateCustomer = SlateTool.create(spec, {
       customerJobId: ctx.input.jobId,
       customerTags: ctx.input.tags
     });
-
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to update customer: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
 
     return {
       output: { success: true },

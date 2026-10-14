@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let taskOutputSchema = z.object({
@@ -11,7 +12,7 @@ let taskOutputSchema = z.object({
   active: z.boolean().describe('Whether the task is active'),
   estimatedSeconds: z.number().nullable().describe('Estimated duration in seconds'),
   trackedSeconds: z.number().nullable().describe('Tracked time in seconds'),
-  userId: z.number().nullable().describe('Assigned user ID')
+  userId: z.number().nullable().describe('Creator user ID')
 });
 
 export let manageTask = SlateTool.create(spec, {
@@ -25,10 +26,7 @@ To **create**: provide a projectId and name. To **update**: provide a projectId,
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       projectId: z.string().describe('Project ID the task belongs to'),
       taskId: z
         .string()
@@ -38,7 +36,10 @@ To **create**: provide a projectId and name. To **update**: provide a projectId,
       name: z.string().optional().describe('Task name (required for create)'),
       active: z.boolean().optional().describe('Whether the task is active'),
       estimatedSeconds: z.number().optional().describe('Estimated duration in seconds'),
-      userId: z.number().optional().describe('User ID to assign the task to')
+      userId: z
+        .number()
+        .optional()
+        .describe('Creator user ID. Defaults to the authenticated user.')
     })
   )
   .output(
@@ -48,8 +49,12 @@ To **create**: provide a projectId and name. To **update**: provide a projectId,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
+
+    if (ctx.input.delete && !ctx.input.taskId) {
+      throw createApiServiceError('taskId is required when deleting.');
+    }
 
     if (ctx.input.delete && ctx.input.taskId) {
       await client.deleteTask(wsId, ctx.input.projectId, ctx.input.taskId);
@@ -68,7 +73,8 @@ To **create**: provide a projectId and name. To **update**: provide a projectId,
         userId: ctx.input.userId
       });
     } else {
-      if (!ctx.input.name) throw new Error('Task name is required when creating a new task.');
+      if (!ctx.input.name)
+        throw createApiServiceError('Task name is required when creating a new task.');
       result = await client.createTask(wsId, ctx.input.projectId, {
         name: ctx.input.name,
         active: ctx.input.active,
@@ -84,7 +90,7 @@ To **create**: provide a projectId and name. To **update**: provide a projectId,
       workspaceId: result.workspace_id ?? result.wid,
       active: result.active ?? true,
       estimatedSeconds: result.estimated_seconds ?? null,
-      trackedSeconds: result.tracked_seconds ?? null,
+      trackedSeconds: result.tracked_seconds == null ? null : result.tracked_seconds / 1000,
       userId: result.user_id ?? null
     };
 

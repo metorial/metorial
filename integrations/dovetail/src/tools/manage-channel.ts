@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -64,7 +64,7 @@ export let manageChannel = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title || !ctx.input.contentType) {
-        throw new Error('title and contentType are required for create action');
+        throw createApiServiceError('title and contentType are required for create action');
       }
       let channel = await client.createChannel({
         title: ctx.input.title,
@@ -87,12 +87,12 @@ export let manageChannel = SlateTool.create(spec, {
     }
 
     if (!ctx.input.channelId) {
-      throw new Error('channelId is required for update and delete actions');
+      throw createApiServiceError('channelId is required for update and delete actions');
     }
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.title) {
-        throw new Error('title is required for update action');
+        throw createApiServiceError('title is required for update action');
       }
       let channel = await client.updateChannel(ctx.input.channelId, {
         title: ctx.input.title,

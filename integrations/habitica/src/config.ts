@@ -1,12 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    xClient: z
-      .string()
-      .describe(
-        'x-client header value in the format "CreatorUserID-AppName" to identify your tool to Habitica servers'
-      )
-  })
-);
+// Preserve legacy saved fields without exposing them in the new configuration form.
+export let config = SlateConfig.create(z.object({}).passthrough());

@@ -24,9 +24,11 @@ let signerSchema = z.object({
     .optional()
     .describe('How to deliver the signature request'),
   signedDocumentDeliveryMethod: z
-    .enum(['email', 'no_delivery'])
+    .enum(['email', 'no_delivery', 'sms', ''])
     .optional()
-    .describe('How to deliver the final signed document'),
+    .describe(
+      'Final document delivery: email, sms, or an empty string; no_delivery is also accepted'
+    ),
   multiFactorAuthentications: z
     .array(z.enum(['sms_verification_code', 'email_verification_code', 'photo_id']))
     .optional()
@@ -172,11 +174,11 @@ export let createContract = SlateTool.create(spec, {
 
     let result = await client.createContract(ctx.input);
 
-    let contract = result?.data?.contract || result?.contract || result;
+    let contract = result.data.contract;
 
-    let signers = (contract?.signers || []).map((s: any) => ({
+    let signers = contract.signers.map(s => ({
       signerId: s.id,
-      name: s.name,
+      name: s.name ?? '',
       email: s.email,
       mobile: s.mobile,
       companyName: s.companyName,
@@ -191,7 +193,7 @@ export let createContract = SlateTool.create(spec, {
       signers
     };
 
-    let signerNames = signers.map((s: any) => s.name).join(', ');
+    let signerNames = signers.map(s => s.name).join(', ');
 
     return {
       output,

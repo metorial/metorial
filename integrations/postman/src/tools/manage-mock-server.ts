@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -96,7 +96,7 @@ export let manageMockServerTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!mockId) throw new Error('mockId is required for get.');
+      if (!mockId) throw createApiServiceError('mockId is required for get.');
       let mock = await client.getMock(mockId);
       return {
         output: { mock: mapMock(mock) },
@@ -105,7 +105,7 @@ export let manageMockServerTool = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!collectionUid) throw new Error('collectionUid is required for create.');
+      if (!collectionUid) throw createApiServiceError('collectionUid is required for create.');
       let mock = await client.createMock(
         {
           name,
@@ -122,7 +122,7 @@ export let manageMockServerTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!mockId) throw new Error('mockId is required for update.');
+      if (!mockId) throw createApiServiceError('mockId is required for update.');
       let mock = await client.updateMock(mockId, {
         name,
         environment: environmentUid,
@@ -134,7 +134,7 @@ export let manageMockServerTool = SlateTool.create(spec, {
       };
     }
 
-    if (!mockId) throw new Error('mockId is required for delete.');
+    if (!mockId) throw createApiServiceError('mockId is required for delete.');
     let mock = await client.deleteMock(mockId);
     return {
       output: { mock: { mockId: mock.id, uid: mock.uid } },

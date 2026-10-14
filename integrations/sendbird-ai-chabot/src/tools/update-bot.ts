@@ -17,7 +17,11 @@ let aiConfigSchema = z
       .max(2)
       .optional()
       .describe('Controls randomness of responses (0-2)'),
-    maxTokens: z.number().optional().describe('Maximum number of tokens in the response'),
+    maxTokens: z
+      .number()
+      .refine(value => Number.isSafeInteger(value) && value > 0, 'Use a positive whole number')
+      .optional()
+      .describe('Maximum number of tokens in the response'),
     topP: z.number().min(0).max(1).optional().describe('Nucleus sampling parameter (0-1)'),
     presencePenalty: z
       .number()
@@ -46,16 +50,17 @@ export let updateBot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the bot to update'),
-      botNickname: z.string().optional().describe('New display nickname'),
-      botProfileUrl: z.string().optional().describe('New profile image URL'),
-      botCallbackUrl: z.string().optional().describe('New callback URL'),
-      botType: z.string().optional().describe('New bot type/category'),
+      botUserId: z.string().min(1).max(80).describe('User ID of the bot to update'),
+      botNickname: z.string().min(1).max(80).optional().describe('New display nickname'),
+      botProfileUrl: z.string().max(2048).optional().describe('New profile image URL'),
+      botCallbackUrl: z.string().max(1024).optional().describe('New callback URL'),
+      botType: z.string().max(128).optional().describe('New bot type/category'),
       isPrivacyMode: z.boolean().optional().describe('Enable or disable privacy mode'),
       enableMarkAsRead: z.boolean().optional().describe('Enable or disable auto mark-as-read'),
       showMember: z.boolean().optional().describe('Show member info in callbacks'),
       channelInvitationPreference: z
         .number()
+        .refine(value => value === 0 || value === 1, 'Use 0 or 1')
         .optional()
         .describe('Channel invitation preference'),
       ai: aiConfigSchema
@@ -63,10 +68,10 @@ export let updateBot = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      botUserId: z.string().describe('User ID of the updated bot'),
-      botNickname: z.string().describe('Display nickname of the bot'),
-      botProfileUrl: z.string().optional().describe('Profile image URL'),
-      botType: z.string().optional().describe('Category of the bot'),
+      botUserId: z.string().min(1).max(80).describe('User ID of the updated bot'),
+      botNickname: z.string().min(1).max(80).describe('Display nickname of the bot'),
+      botProfileUrl: z.string().max(2048).optional().describe('Profile image URL'),
+      botType: z.string().max(128).optional().describe('Category of the bot'),
       botCallbackUrl: z.string().optional().describe('Callback URL'),
       isPrivacyMode: z.boolean().optional().describe('Whether privacy mode is enabled'),
       enableMarkAsRead: z.boolean().optional().describe('Whether auto mark-as-read is enabled')
@@ -75,7 +80,7 @@ export let updateBot = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let { botUserId, ...updateParams } = ctx.input;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -85,11 +85,13 @@ Choose the desired operation and provide the PDF file content along with operati
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded output PDF content'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
     let operationLabel = ctx.input.operation.replace(/_/g, ' ');
 
@@ -106,7 +108,7 @@ Choose the desired operation and provide the PDF file content along with operati
           fileContent: ctx.input.fileContent,
           text: ctx.input.watermarkText,
           watermarkPosition: ctx.input.watermarkPosition || 'Diagonal',
-          opacity: ctx.input.watermarkOpacity || 0.5
+          opacity: ctx.input.watermarkOpacity ?? 0.5
         });
         break;
 
@@ -115,7 +117,7 @@ Choose the desired operation and provide the PDF file content along with operati
           fileContent: ctx.input.fileContent,
           watermarkFileContent: ctx.input.watermarkImageContent,
           watermarkPosition: ctx.input.watermarkPosition || 'Diagonal',
-          opacity: ctx.input.watermarkOpacity || 0.5
+          opacity: ctx.input.watermarkOpacity ?? 0.5
         });
         break;
 
@@ -157,24 +159,27 @@ Choose the desired operation and provide the PDF file content along with operati
         break;
 
       case 'rotate_pages':
+        if (![90, 180, 270, 360].includes(ctx.input.rotationAngle ?? 90)) {
+          throw createApiServiceError('rotationAngle must be 90, 180, 270, or 360 degrees.');
+        }
         result = await client.rotatePdfPages({
           fileContent: ctx.input.fileContent,
-          pages: ctx.input.pages,
-          rotationAngle: ctx.input.rotationAngle || 90
+          pageNumbers: ctx.input.pages,
+          pdfPageRotation: `Degrees${ctx.input.rotationAngle ?? 90}`
         });
         break;
 
       case 'extract_pages':
         result = await client.extractPdfPages({
           fileContent: ctx.input.fileContent,
-          pages: ctx.input.pages
+          pageNumbers: ctx.input.pages
         });
         break;
 
       case 'delete_pages':
         result = await client.deletePdfPages({
           fileContent: ctx.input.fileContent,
-          pages: ctx.input.pages
+          pageNumbers: ctx.input.pages
         });
         break;
 
@@ -205,9 +210,13 @@ Choose the desired operation and provide the PDF file content along with operati
       output: {
         fileName: result.Filename || '',
         fileContent: result.FileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully performed **${operationLabel}** on PDF. Output: **${result.Filename || 'output.pdf'}**`
+      message: client.message(
+        `Successfully performed **${operationLabel}** on PDF. Output: **${result.Filename || 'output.pdf'}**`
+      )
     };
   })
   .build();

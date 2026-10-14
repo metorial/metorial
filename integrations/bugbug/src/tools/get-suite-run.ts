@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, durationMilliseconds } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSuiteRun = SlateTool.create(spec, {
@@ -19,7 +19,7 @@ export let getSuiteRun = SlateTool.create(spec, {
   .output(
     z.object({
       suiteRunId: z.string().describe('Unique identifier of the suite run'),
-      suiteId: z.string().describe('ID of the suite that was run'),
+      suiteId: z.string().nullable().describe('ID of the suite that was run'),
       suiteName: z.string().describe('Name of the suite that was run'),
       status: z.string().describe('Current status (e.g. passed, failed, running, queued)'),
       started: z.string().nullable().describe('ISO timestamp when the run started'),
@@ -40,17 +40,17 @@ export let getSuiteRun = SlateTool.create(spec, {
       output: {
         suiteRunId: run.id,
         suiteId: run.suiteId,
-        suiteName: run.suiteName,
+        suiteName: run.name,
         status: run.status,
         started: run.started,
-        finished: run.finished,
-        duration: run.duration,
-        runProfileName: run.runProfileName,
-        testRunsCount: run.testRunsCount,
-        passedTestRunsCount: run.passedTestRunsCount,
-        failedTestRunsCount: run.failedTestRunsCount
+        finished: run.ended,
+        duration: durationMilliseconds(run),
+        runProfileName: run.profileName,
+        testRunsCount: run.testRuns.length,
+        passedTestRunsCount: run.testRuns.filter(test => test.status === 'passed').length,
+        failedTestRunsCount: run.testRuns.filter(test => test.status === 'failed').length
       },
-      message: `Suite run for **${run.suiteName}**: status **${run.status}**. ${run.passedTestRunsCount}/${run.testRunsCount} passed, ${run.failedTestRunsCount} failed.`
+      message: `Suite run for **${run.name}**: status **${run.status}**. ${run.testRuns.filter(test => test.status === 'passed').length}/${run.testRuns.length} passed, ${run.testRuns.filter(test => test.status === 'failed').length} failed.`
     };
   })
   .build();

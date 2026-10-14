@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let captureScreenshot = SlateTool.create(spec, {
   name: 'Capture Screenshot',
   key: 'capture_screenshot',
-  description: `Capture a screenshot of a web page or HTML content. Supports full-page capture, custom image formats, device emulation, and proxy settings. Returns the screenshot data.`
+  description: `Capture a screenshot of a web page or HTML content. Supports full-page capture, PNG/JPEG image formats, and navigation options. Prepares a downloadable screenshot.`
 })
   .input(
     z.object({
@@ -55,6 +55,9 @@ export let captureScreenshot = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((!ctx.input.url && !ctx.input.html) || (ctx.input.url && ctx.input.html)) {
+      throw createApiServiceError('Provide exactly one of url or html.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.captureScreenshot({
@@ -72,9 +75,16 @@ export let captureScreenshot = SlateTool.create(spec, {
       }
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(result.content)),
+      mimeType: ctx.input.imageType === 'jpeg' ? 'image/jpeg' : 'image/png',
+      filename: ctx.input.imageType === 'jpeg' ? 'screenshot.jpeg' : 'screenshot.png'
+    });
+
     return {
       output: {
-        screenshotData: result
+        screenshotData: result.legacyData
       },
       message: `Captured screenshot of ${ctx.input.url ? `**${ctx.input.url}**` : 'provided HTML content'}.`
     };

@@ -1,18 +1,14 @@
 {
   "name": "@metorial/waboxapp",
-  "description": "Send WhatsApp messages, images, links, and files programmatically through a linked WhatsApp account. Track message delivery and read status via acknowledgement events. Check linked account status including connectivity and device information.",
+  "description": "Submit WhatsApp messages, images, links, and files through a linked account with a unique tracking ID. Check linked account details and device information.",
   "categories": ["email-and-messaging"],
   "skills": [
     "send text messages",
     "send images with captions",
     "send link previews",
     "send media files",
-    "track message delivery status",
-    "receive inbound messages",
-    "receive media content",
-    "check account status",
-    "handle group messages",
-    "monitor read receipts"
+    "include message tracking IDs",
+    "check account status"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/waboxapp.png"
 }

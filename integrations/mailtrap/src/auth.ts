@@ -1,8 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 
-let apiAxios = createAxios({
-  baseURL: 'https://mailtrap.io'
+let apiAxios = createAuthenticatedAxios({
+  baseURL: 'https://mailtrap.io',
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Mailtrap', reason: 'mailtrap_api_error' })
 });
 
 export let auth = SlateAuth.create()

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  analyzeImageForensics,
   compareTexts,
   detectAiImage,
   detectAiText,
@@ -15,7 +16,8 @@ export let provider = Slate.create({
     detectAiImage.build(),
     detectPlagiarism.build(),
     factCheck.build(),
-    compareTexts.build()
+    compareTexts.build(),
+    analyzeImageForensics.build()
   ],
   triggers: []
 });

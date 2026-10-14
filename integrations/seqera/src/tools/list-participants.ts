@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listParticipants = SlateTool.create(spec, {
@@ -11,7 +12,22 @@ export let listParticipants = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      workspaceId: workspaceIdSchema,
+      orgId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Organization ID from list_organizations. Omit to discover the organization containing the workspace.'
+        ),
+      max: z.number().int().min(1).max(100).optional().describe('Page size, up to 100'),
+      offset: z.number().int().min(0).optional().describe('Number of participants to skip'),
+      search: z.string().optional().describe('Search participants by name or email')
+    })
+  )
   .output(
     z.object({
       participants: z
@@ -31,28 +47,33 @@ export let listParticipants = SlateTool.create(spec, {
             teamName: z.string().optional().describe('Team name if this is a team participant')
           })
         )
-        .describe('List of workspace participants')
+        .describe('List of workspace participants'),
+      totalSize: z.number().optional().describe('Total matching participants')
     })
   )
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
-    let participants = await client.listParticipants();
+    let { participants, totalSize } = await client.listParticipants(
+      ctx.input.orgId,
+      ctx.input
+    );
 
     return {
       output: {
+        totalSize,
         participants: participants.map(p => ({
-          participantId: p.participantId,
-          userName: p.userName,
-          email: p.email,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          role: p.role,
-          teamName: p.teamName
+          participantId: p.participantId ?? undefined,
+          userName: p.userName ?? undefined,
+          email: p.email ?? undefined,
+          firstName: p.firstName ?? undefined,
+          lastName: p.lastName ?? undefined,
+          role: p.role ?? undefined,
+          teamName: p.teamName ?? undefined
         }))
       },
       message: `Found **${participants.length}** workspace participants.`

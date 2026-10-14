@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -59,21 +59,21 @@ export let manageAccounts = SlateTool.create(spec, {
       return {
         output: {
           accountId: result.id,
-          name: result.name,
-          emailAddress: result.emailAddress,
-          phoneNumber: result.phoneNumber,
-          website: result.website,
-          type: result.type,
-          industry: result.industry,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          emailAddress: result.emailAddress ?? undefined,
+          phoneNumber: result.phoneNumber ?? undefined,
+          website: result.website ?? undefined,
+          type: result.type ?? undefined,
+          industry: result.industry ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Account **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!accountId) throw new Error('accountId is required for update');
+      if (!accountId) throw createApiServiceError('accountId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -82,21 +82,21 @@ export let manageAccounts = SlateTool.create(spec, {
       return {
         output: {
           accountId: result.id,
-          name: result.name,
-          emailAddress: result.emailAddress,
-          phoneNumber: result.phoneNumber,
-          website: result.website,
-          type: result.type,
-          industry: result.industry,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          emailAddress: result.emailAddress ?? undefined,
+          phoneNumber: result.phoneNumber ?? undefined,
+          website: result.website ?? undefined,
+          type: result.type ?? undefined,
+          industry: result.industry ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Account **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!accountId) throw new Error('accountId is required for delete');
+      if (!accountId) throw createApiServiceError('accountId is required for delete');
       await client.deleteRecord('Account', accountId);
       return {
         output: {
@@ -106,6 +106,6 @@ export let manageAccounts = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

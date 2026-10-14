@@ -1,11 +1,14 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  addTaskTimeTracking,
   createComment,
   createDoc,
   createTask,
   deleteDoc,
   deleteTask,
+  getCurrentUser,
+  getDoc,
   getTask,
   getWorkspaceConfig,
   listComments,
@@ -28,7 +31,10 @@ export let provider = Slate.create({
     updateDoc,
     listDocs,
     deleteDoc,
-    getWorkspaceConfig
+    getWorkspaceConfig,
+    getDoc,
+    getCurrentUser,
+    addTaskTimeTracking
   ],
   triggers: []
 });

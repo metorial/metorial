@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,8 +43,9 @@ export let manageDataset = SlateTool.create(spec, {
     let { action, datasetId, reportId, name, description, dataSource } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a dataset');
-      if (!reportId) throw new Error('reportId is required when creating a dataset');
+      if (!name) throw createApiServiceError('Name is required when creating a dataset');
+      if (!reportId)
+        throw createApiServiceError('reportId is required when creating a dataset');
 
       let result = await client.addDataset({ name, reportId, description, dataSource });
       let created = result.data || result;
@@ -61,7 +62,8 @@ export let manageDataset = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!datasetId) throw new Error('datasetId is required when updating a dataset');
+      if (!datasetId)
+        throw createApiServiceError('datasetId is required when updating a dataset');
 
       let updateData: any = {};
       if (name !== undefined) updateData.name = name;
@@ -83,7 +85,8 @@ export let manageDataset = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!datasetId) throw new Error('datasetId is required when deleting a dataset');
+      if (!datasetId)
+        throw createApiServiceError('datasetId is required when deleting a dataset');
 
       let result = await client.deleteDataset(datasetId);
 
@@ -97,6 +100,6 @@ export let manageDataset = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

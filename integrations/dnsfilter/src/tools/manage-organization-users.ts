@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,7 +21,7 @@ export let manageOrganizationUsers = SlateTool.create(spec, {
       role: z
         .string()
         .optional()
-        .describe('User role, e.g. "admin" or "read_only" (for add/update)'),
+        .describe('User role, e.g. "administrator" or "read_only" (for add/update)'),
       attributes: z
         .record(z.string(), z.any())
         .optional()
@@ -53,7 +53,8 @@ export let manageOrganizationUsers = SlateTool.create(spec, {
     if (action === 'add') {
       let params: Record<string, any> = {};
       if (ctx.input.email) params.email = ctx.input.email;
-      if (ctx.input.role) params.role = ctx.input.role;
+      if (ctx.input.role)
+        params.role = ctx.input.role === 'admin' ? 'administrator' : ctx.input.role;
       if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
       let user = await client.addOrganizationUser(organizationId, params);
       return {
@@ -63,9 +64,10 @@ export let manageOrganizationUsers = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!userId) throw new Error('userId is required for update');
+      if (!userId) throw createApiServiceError('userId is required for update');
       let params: Record<string, any> = {};
-      if (ctx.input.role) params.role = ctx.input.role;
+      if (ctx.input.role)
+        params.role = ctx.input.role === 'admin' ? 'administrator' : ctx.input.role;
       if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
       let user = await client.updateOrganizationUser(organizationId, userId, params);
       return {
@@ -74,7 +76,7 @@ export let manageOrganizationUsers = SlateTool.create(spec, {
       };
     }
 
-    if (!userId) throw new Error('userId is required for remove');
+    if (!userId) throw createApiServiceError('userId is required for remove');
     await client.removeOrganizationUser(organizationId, userId);
     return {
       output: { removed: true },

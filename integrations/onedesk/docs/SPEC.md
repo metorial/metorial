@@ -1,63 +1,27 @@
-Let me check the actual API documentation for OneDesk and look for webhook support.Now let me look at the two APIs OneDesk has - the older v2.0 token-based one and the newer public API with API keys.Based on my research, I now have enough information to write the specification. OneDesk has two API versions: the older v2.0 (token-based auth) and the newer Public REST API (API key-based). OneDesk does not appear to natively support webhooks; the Zapier/Pipedream triggers are polling-based.
+# OneDesk integration
 
-# Slates Specification for Onedesk
-
-## Overview
-
-OneDesk is a combined help desk and project management platform. Its functionality includes accessing organizations and their information, working with feedback, requirements, tasks, issues, projects, worklogs, and more. The newer API also supports invoicing and quoting features, allowing creation and management of quotes and invoices.
+Create, retrieve, update, and search work items; create and search projects; post messages to existing conversations; create internal users; retrieve organization settings and type labels; discover users and teams; and retrieve a project by external ID.
 
 ## Authentication
 
-OneDesk supports two authentication methods:
+The recommended connection uses a Public API key sent in the `OD-Public-API-Key` header to `https://app.onedesk.com/rest/public/`. OneDesk's [developer reference](https://onedesk.com/dev/) and [OpenAPI definition](https://onedesk.com/public-api/onedesk-public-api.json) document this API.
 
-### 1. API Key Authentication (Public REST API — Recommended)
+The email/password connection remains available for existing legacy workflows. It exchanges credentials for a token and sends the token in request bodies to the existing v2.0 endpoints. Current official legacy documentation was not established during this refresh; these routes are retained for compatibility. New project lookup and user/team discovery, and work-item operations by external ID, require an API key connection.
 
-The newer Public REST API uses API key authentication. The API key is used to authorize API calls. To create an API key you need to be the account owner, then go to Admin > Integrations > API to generate one. You can create as many keys as you'd like but each requires a user license.
+## Identifiers and types
 
-The API key must be added as a header parameter titled `OD-Public-API-Key`.
+Organization type endpoints return human-readable `label` values. Use these labels as item, project, and user type names. Teams use external IDs discoverable with `search_teams`. `create_user` creates internal users, rather than customers.
 
-- **Base URL:** `https://app.onedesk.com/rest/public/`
-- **Header:** `OD-Public-API-Key: <your_api_key>`
+Create operations return external IDs with API key connections. Pass a created work item's ID to `get_item.externalId` or `update_item.externalId`; `itemId` refers to OneDesk's numeric internal ID. Pass a project external ID to `get_project`.
 
-The Public REST API is available on the Enterprise Plan.
+## Search
 
-### 2. Token-Based Authentication (Legacy REST API v2.0)
+Detailed filter requests use a whole-number `limit` from 1 to 50 and a non-negative whole-number `offset`. The existing `filters.value` remains a string; an optional `typedValue` supports boolean, number, string-array, or null values. `isCustomField` routes conditions to the custom-field filter list. Unsupported filters reported by OneDesk cause a clear failure instead of returning misleading results. Item searches discover type labels when `itemTypes` is omitted.
 
-The older API uses email/password login to obtain an authentication token. You send a POST request to `https://app.onedesk.com/rest/2.0/login/loginUser` with your email and password. The response returns an `authenticationToken` which is then passed in subsequent request bodies.
+## Messages
 
-- **Base URL:** `https://app.onedesk.com/rest/2.0/`
-- The `authenticationToken` is included in the JSON body of each API request, not as a header.
+Messages are posted to an existing conversation external ID. Their visibility follows the conversation; this tool does not create or change conversation visibility.
 
-## Features
+## Verification scope
 
-### Work Item Management (Tickets & Tasks)
-
-Create, read, update, and search for work items including tickets, tasks, and other configurable item types. Items can be looked up by internal ID or external ID. The API is organized based on different work objects such as timesheets, tickets, etc. Items support custom fields, status lifecycle management, priorities, and assignments.
-
-### Project & Space Management
-
-Create and manage projects (called "spaces" in the older API) and portfolios. Projects can be organized hierarchically with parent containers. Search supports filtering by properties using operations like EQ, NOT_EMPTY, and filtering on both standard and custom fields.
-
-### Organization & Customer Management
-
-Retrieve organization profile and policy information. Create and manage users and customers. The API allows creating users or customers programmatically.
-
-### Timesheets & Work Logging
-
-Create and manage timesheets to track time spent on tasks and tickets. Timesheets can be pushed to external accounting tools.
-
-### Invoicing & Quoting
-
-The API supports invoicing and quoting features, allowing creation and update of quotes and invoices via the API.
-
-### Messaging & Conversations
-
-Create messages or comments on work items. This includes both internal comments and public-facing customer communications.
-
-### Search & Filtering
-
-Search across work items, projects, and other entities using filter-based queries. Filters support property-based conditions including comparisons on standard fields and custom fields.
-
-## Events
-
-The provider does not support webhooks or a native event subscription mechanism through its API. Third-party platforms like Zapier and Pipedream offer polling-based triggers for OneDesk (e.g., new item created, item updated, project created), but these are not built-in webhook or push event features of the OneDesk API itself.
+This refresh checks requests and result handling against the published API definition and verifies the local build. It does not establish live account acceptance or legacy token lifetime behavior.

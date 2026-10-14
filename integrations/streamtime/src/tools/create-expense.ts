@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,21 @@ export let createExpense = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('ID of the job item (line item) this expense is for'),
-      amount: z.number().optional().describe('Expense amount'),
+      itemName: z.string().optional().describe('Expense item name'),
+      costRate: z
+        .number()
+        .optional()
+        .describe('Cost per unit in expense currency. Alternative to amount.'),
+      sellRate: z.number().optional().describe('Sell price per unit in expense currency'),
+      quantity: z
+        .number()
+        .optional()
+        .describe('Expense quantity. amount is a total cost and uses quantity 1.'),
+      itemPricingMethodId: z.number().optional().describe('Expense pricing method ID'),
+      amount: z
+        .number()
+        .optional()
+        .describe('Total expense cost. Sent as costRate with quantity 1.'),
       description: z.string().optional().describe('Description of the expense'),
       date: z.string().optional().describe('Date of the expense (YYYY-MM-DD)'),
       supplierContactId: z.number().optional().describe('ID of the supplier contact')
@@ -37,7 +51,25 @@ export let createExpense = SlateTool.create(spec, {
     let body: Record<string, any> = {};
     if (ctx.input.jobId !== undefined) body.jobId = ctx.input.jobId;
     if (ctx.input.jobItemId !== undefined) body.jobItemId = ctx.input.jobItemId;
-    if (ctx.input.amount !== undefined) body.amount = ctx.input.amount;
+    if (
+      ctx.input.amount !== undefined &&
+      (ctx.input.costRate !== undefined ||
+        (ctx.input.quantity !== undefined && ctx.input.quantity !== 1))
+    ) {
+      throw createApiServiceError(
+        'Provide amount for a total cost at quantity 1, or costRate and quantity for unit pricing.'
+      );
+    }
+    if (ctx.input.amount !== undefined) {
+      body.costRate = ctx.input.amount;
+      body.quantity = 1;
+    }
+    if (ctx.input.costRate !== undefined) body.costRate = ctx.input.costRate;
+    if (ctx.input.sellRate !== undefined) body.sellRate = ctx.input.sellRate;
+    if (ctx.input.quantity !== undefined) body.quantity = ctx.input.quantity;
+    if (ctx.input.itemName !== undefined) body.itemName = ctx.input.itemName;
+    if (ctx.input.itemPricingMethodId !== undefined)
+      body.itemPricingMethodId = ctx.input.itemPricingMethodId;
     if (ctx.input.description !== undefined) body.description = ctx.input.description;
     if (ctx.input.date !== undefined) body.date = ctx.input.date;
     if (ctx.input.supplierContactId !== undefined)

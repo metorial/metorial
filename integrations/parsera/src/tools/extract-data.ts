@@ -1,25 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attributeSchema, cookieSchema, validateExtraction } from '../lib/schemas';
 import { spec } from '../spec';
-
-let attributeSchema = z.object({
-  name: z.string().describe('Name of the data field to extract'),
-  description: z
-    .string()
-    .describe('Natural-language description of what this field should contain'),
-  type: z
-    .enum(['string', 'integer', 'number', 'bool', 'list'])
-    .optional()
-    .describe('Expected output type for this field')
-});
-
-let cookieSchema = z.object({
-  name: z.string().describe('Cookie name'),
-  value: z.string().describe('Cookie value'),
-  domain: z.string().optional().describe('Cookie domain'),
-  path: z.string().optional().describe('Cookie path')
-});
 
 export let extractDataTool = SlateTool.create(spec, {
   name: 'Extract Data from URL',
@@ -69,6 +52,7 @@ Supports **precision mode** for extracting data hidden in HTML tags and **proxy 
     })
   )
   .handleInvocation(async ctx => {
+    validateExtraction(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let results = await client.extract({
@@ -80,10 +64,10 @@ Supports **precision mode** for extracting data hidden in HTML tags and **proxy 
       cookies: ctx.input.cookies
     });
 
-    let count = Array.isArray(results) ? results.length : 0;
+    let count = results.length;
 
     return {
-      output: { results: Array.isArray(results) ? results : [] },
+      output: { results },
       message: `Extracted **${count}** record(s) from ${ctx.input.url}`
     };
   })

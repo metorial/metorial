@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateIssue = SlateTool.create(spec, {
@@ -13,14 +14,14 @@ export let updateIssue = SlateTool.create(spec, {
       issueId: z.string().describe('ID of the issue to update'),
       title: z.string().optional().describe('New title'),
       description: z.string().optional().describe('New description'),
-      status: z.string().optional().describe('New status'),
+      status: z.string().optional().describe('New status ID or name: open or resolved'),
       priority: z
         .string()
         .optional()
         .describe('New priority (e.g., "NONE", "LOW", "MEDIUM", "HIGH")'),
       dueAt: z.string().optional().describe('New due date in ISO 8601 format'),
       categoryId: z.string().optional().describe('New category ID'),
-      siteId: z.string().optional().describe('New site ID'),
+      siteId: siteIdSchema.optional(),
       addCollaboratorIds: z
         .array(z.string())
         .optional()
@@ -41,6 +42,16 @@ export let updateIssue = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { issueId } = ctx.input;
     let updatedFields: string[] = [];
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) =>
+          key !== 'issueId' &&
+          value !== undefined &&
+          (!Array.isArray(value) || value.length > 0)
+      )
+    ) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
 
     if (ctx.input.title !== undefined) {
       await client.updateIssueTitle(issueId, ctx.input.title);

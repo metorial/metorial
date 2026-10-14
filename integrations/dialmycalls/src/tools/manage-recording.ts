@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { Recording } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageRecording = SlateTool.create(spec, {
@@ -85,7 +86,8 @@ Supports three creation methods:
     } = ctx.input;
 
     if (action === 'delete') {
-      if (!recordingId) throw new Error('recordingId is required for delete action');
+      if (!recordingId)
+        throw createApiServiceError('recordingId is required for delete action');
       await client.deleteRecording(recordingId);
       return {
         output: { recordingId },
@@ -94,9 +96,13 @@ Supports three creation methods:
     }
 
     if (action === 'update') {
-      if (!recordingId) throw new Error('recordingId is required for update action');
-      if (!name) throw new Error('name is required for update action');
+      if (!recordingId)
+        throw createApiServiceError('recordingId is required for update action');
+      if (!name) throw createApiServiceError('name is required for update action');
       let result = await client.updateRecording(recordingId, { name });
+      if (result.url && result.processed !== false) {
+        await ctx.addAttachment({ type: 'url', url: result.url });
+      }
       return {
         output: {
           recordingId: result.id,
@@ -113,20 +119,20 @@ Supports three creation methods:
     }
 
     // create
-    if (!name) throw new Error('name is required for create action');
-    if (!method) throw new Error('method is required for create action');
+    if (!name) throw createApiServiceError('name is required for create action');
+    if (!method) throw createApiServiceError('method is required for create action');
 
-    let result: any;
+    let result: Recording;
     if (method === 'tts') {
-      if (!text) throw new Error('text is required for tts method');
-      if (!gender) throw new Error('gender is required for tts method');
-      if (!language) throw new Error('language is required for tts method');
+      if (!text) throw createApiServiceError('text is required for tts method');
+      if (!gender) throw createApiServiceError('gender is required for tts method');
+      if (!language) throw createApiServiceError('language is required for tts method');
       result = await client.createRecordingTts({ name, text, gender, language });
     } else if (method === 'url') {
-      if (!fileUrl) throw new Error('fileUrl is required for url method');
+      if (!fileUrl) throw createApiServiceError('fileUrl is required for url method');
       result = await client.createRecordingByUrl({ name, url: fileUrl });
     } else {
-      if (!phone) throw new Error('phone is required for phone method');
+      if (!phone) throw createApiServiceError('phone is required for phone method');
       result = await client.createRecordingByPhone({
         name,
         phone,
@@ -134,6 +140,10 @@ Supports three creation methods:
         extension,
         whitelabel
       });
+    }
+
+    if (result.url && result.processed !== false) {
+      await ctx.addAttachment({ type: 'url', url: result.url });
     }
 
     return {

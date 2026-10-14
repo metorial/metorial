@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapMember } from '../lib/member';
 import { spec } from '../spec';
 
 export let getTeamMembers = SlateTool.create(spec, {
@@ -32,19 +33,16 @@ export let getTeamMembers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getUsers();
-    let items = Array.isArray(result) ? result : result.results || [];
+    let items = Array.isArray(result) ? result : result?.results;
+    if (!Array.isArray(items)) {
+      throw createApiServiceError('Route4Me returned an invalid team member list.', {
+        reason: 'invalid_member_response'
+      });
+    }
 
     return {
       output: {
-        members: items.map((m: any) => ({
-          memberId: m.member_id,
-          memberEmail: m.member_email,
-          memberFirstName: m.member_first_name,
-          memberLastName: m.member_last_name,
-          memberPhone: m.member_phone,
-          memberType: m.member_type,
-          readOnly: m.readonly_user
-        }))
+        members: items.map(mapMember)
       },
       message: `Retrieved ${items.length} team member(s).`
     };
@@ -87,17 +85,17 @@ Supported member types: "PRIMARY_ACCOUNT" (owner), "SUB_ACCOUNT_ADMIN", "SUB_ACC
       member_last_name: ctx.input.memberLastName,
       member_type: ctx.input.memberType,
       member_password: ctx.input.memberPassword,
-      readonly_user: ctx.input.readOnly || false
+      READONLY_USER: ctx.input.readOnly ?? false
     };
 
-    let result = await client.createMember(body);
+    let result = mapMember(await client.createMember(body));
 
     return {
       output: {
-        memberId: result.member_id,
-        memberEmail: result.member_email
+        memberId: result.memberId,
+        memberEmail: result.memberEmail
       },
-      message: `Created team member **${result.member_id}** (${ctx.input.memberEmail}).`
+      message: `Created team member **${result.memberId}** (${ctx.input.memberEmail}).`
     };
   })
   .build();
@@ -132,12 +130,20 @@ export let updateTeamMember = SlateTool.create(spec, {
     let body: Record<string, any> = {
       member_id: ctx.input.memberId
     };
-    if (ctx.input.memberEmail) body.member_email = ctx.input.memberEmail;
-    if (ctx.input.memberFirstName) body.member_first_name = ctx.input.memberFirstName;
-    if (ctx.input.memberLastName) body.member_last_name = ctx.input.memberLastName;
-    if (ctx.input.memberPhone) body.member_phone = ctx.input.memberPhone;
-    if (ctx.input.memberType) body.member_type = ctx.input.memberType;
-    if (ctx.input.readOnly !== undefined) body.readonly_user = ctx.input.readOnly;
+    if (ctx.input.memberEmail !== undefined) body.member_email = ctx.input.memberEmail;
+    if (ctx.input.memberFirstName !== undefined)
+      body.member_first_name = ctx.input.memberFirstName;
+    if (ctx.input.memberLastName !== undefined)
+      body.member_last_name = ctx.input.memberLastName;
+    if (ctx.input.memberPhone !== undefined) body.member_phone = ctx.input.memberPhone;
+    if (ctx.input.memberType !== undefined) body.member_type = ctx.input.memberType;
+    if (ctx.input.readOnly !== undefined) body.READONLY_USER = ctx.input.readOnly;
+
+    if (Object.keys(body).length === 1) {
+      throw createApiServiceError('Provide at least one member property to update.', {
+        reason: 'invalid_member_update'
+      });
+    }
 
     await client.updateMember(body);
 

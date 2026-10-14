@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -70,17 +70,90 @@ Supports converting any common document format to PDF, converting between Office
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded output file content'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
+    let type = ctx.input.conversionType;
+    if (type.startsWith('html_to_')) {
+      if (!ctx.input.htmlContent?.trim() && !ctx.input.fileContent?.trim()) {
+        throw createApiServiceError('Provide htmlContent or a base64 HTML fileContent.');
+      }
+      if (ctx.input.htmlContent && ctx.input.fileContent) {
+        throw createApiServiceError('Provide only one of htmlContent and fileContent.');
+      }
+    } else if (type === 'json_to_excel') {
+      if (!ctx.input.jsonContent?.trim()) {
+        throw createApiServiceError('jsonContent is required for JSON to Excel conversion.');
+      }
+      try {
+        JSON.parse(ctx.input.jsonContent);
+      } catch {
+        throw createApiServiceError('jsonContent must contain valid JSON.');
+      }
+    } else if (type === 'text_to_pdf') {
+      if (ctx.input.textContent === undefined && !ctx.input.fileContent?.trim()) {
+        throw createApiServiceError('Provide textContent or a base64 text fileContent.');
+      }
+    } else if (!ctx.input.fileContent?.trim()) {
+      throw createApiServiceError('fileContent is required for this conversion.');
+    }
+    if (
+      ['file_to_pdf', 'convert_word', 'convert_excel', 'convert_powerpoint'].includes(type) &&
+      !ctx.input.fileName?.trim()
+    ) {
+      throw createApiServiceError(
+        'fileName with its extension is required for this conversion.'
+      );
+    }
+    let formats: Record<string, string[]> = {
+      convert_word: [
+        'PDF',
+        'DOCX',
+        'DOC',
+        'DOTX',
+        'RTF',
+        'HTML',
+        'TXT',
+        'PNG',
+        'TIFF',
+        'DOCM'
+      ],
+      convert_excel: [
+        'PDF',
+        'HTML',
+        'CSV',
+        'TXT',
+        'XLSX',
+        'XLS',
+        'XLTX',
+        'PNG',
+        'TIFF',
+        'XLSB',
+        'XLSM'
+      ],
+      convert_powerpoint: ['PDF', 'HTML', 'POTX', 'PPTX', 'TXT', 'PNG', 'TIFF'],
+      pdf_to_images: ['JPG', 'PNG']
+    };
+    let format = ctx.input.outputFormat ?? (type === 'pdf_to_images' ? 'PNG' : 'PDF');
+    if (formats[type] && !formats[type].includes(format)) {
+      throw createApiServiceError(`outputFormat must be one of: ${formats[type].join(', ')}.`);
+    }
+    let htmlIsUrl = /^https?:\/\//i.test(ctx.input.htmlContent ?? '');
+    let htmlBody = ctx.input.fileContent
+      ? { fileContent: ctx.input.fileContent }
+      : htmlIsUrl
+        ? { Url: ctx.input.htmlContent }
+        : { htmlData: ctx.input.htmlContent };
 
     switch (ctx.input.conversionType) {
       case 'file_to_pdf':
         result = await client.convertFileToPdf({
-          fileName: ctx.input.fileName,
+          FileName: ctx.input.fileName,
           fileContent: ctx.input.fileContent,
           outputFilename: ctx.input.outputFilename || 'output',
           pdfaCompliance: ctx.input.pdfaCompliance || false,
@@ -90,49 +163,53 @@ Supports converting any common document format to PDF, converting between Office
 
       case 'html_to_pdf':
         result = await client.convertHtmlToPdf({
-          htmlContent: ctx.input.htmlContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          ...htmlBody
         });
         break;
 
       case 'html_to_word':
         result = await client.convertHtmlToWord({
-          htmlContent: ctx.input.htmlContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          FileName: ctx.input.fileName || 'input.html',
+          outputFilename: ctx.input.outputFilename || 'output.docx',
+          FinalOperation: true,
+          ...(htmlIsUrl ? { htmlUrl: ctx.input.htmlContent } : htmlBody)
         });
         break;
 
       case 'html_to_image':
         result = await client.convertHtmlToImage({
-          htmlContent: ctx.input.htmlContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          ...htmlBody
         });
         break;
 
       case 'pdf_to_word':
         result = await client.convertPdfToWord({
           fileContent: ctx.input.fileContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          fileName: ctx.input.fileName || 'input.pdf',
+          outputFilename: ctx.input.outputFilename || 'output.docx',
+          finalOperation: true
         });
         break;
 
       case 'pdf_to_excel':
         result = await client.convertPdfToExcel({
-          fileContent: ctx.input.fileContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          fileContent: ctx.input.fileContent
         });
         break;
 
       case 'pdf_to_images':
         result = await client.convertPdfToImages({
-          fileContent: ctx.input.fileContent
+          fileContent: ctx.input.fileContent,
+          imageFormat: format,
+          filenamePrefix: ctx.input.outputFilename
         });
         break;
 
       case 'pdf_to_pdfa':
         result = await client.convertPdfToPdfa({
           fileContent: ctx.input.fileContent,
-          outputFilename: ctx.input.outputFilename || 'output',
+          FileName: ctx.input.fileName || 'input.pdf',
+          FinalOperation: true,
           pdfaComplianceLevel: ctx.input.pdfaComplianceLevel || 'PDF_A_2A'
         });
         break;
@@ -143,9 +220,9 @@ Supports converting any common document format to PDF, converting between Office
             fileName: ctx.input.fileName,
             fileContent: ctx.input.fileContent,
             outputFilename: ctx.input.outputFilename || 'output',
-            outputFormat: ctx.input.outputFormat || 'PDF'
+            outputFormat: format
           },
-          ctx.input.outputFormat || 'PDF'
+          format
         );
         break;
 
@@ -155,9 +232,9 @@ Supports converting any common document format to PDF, converting between Office
             fileName: ctx.input.fileName,
             fileContent: ctx.input.fileContent,
             outputFilename: ctx.input.outputFilename || 'output',
-            outputFormat: ctx.input.outputFormat || 'PDF'
+            outputFormat: format
           },
-          ctx.input.outputFormat || 'PDF'
+          format
         );
         break;
 
@@ -167,9 +244,9 @@ Supports converting any common document format to PDF, converting between Office
             fileName: ctx.input.fileName,
             fileContent: ctx.input.fileContent,
             outputFilename: ctx.input.outputFilename || 'output',
-            outputFormat: ctx.input.outputFormat || 'PDF'
+            outputFormat: format
           },
-          ctx.input.outputFormat || 'PDF'
+          format
         );
         break;
 
@@ -182,19 +259,26 @@ Supports converting any common document format to PDF, converting between Office
 
       case 'text_to_pdf':
         result = await client.convertTextToPdf({
-          text: ctx.input.textContent,
-          outputFilename: ctx.input.outputFilename || 'output'
+          FileName: ctx.input.fileName || 'input.txt',
+          textData: ctx.input.textContent,
+          fileContent: ctx.input.fileContent,
+          outputFilename: ctx.input.outputFilename || 'output.pdf',
+          FinalOperation: true
         });
         break;
     }
 
     return {
       output: {
-        fileName: result.Filename || result.filename || '',
+        fileName: result.Filename || result.filename || ctx.input.outputFilename || '',
         fileContent: result.FileContent || result.fileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully converted document using **${ctx.input.conversionType}**. Output file: **${result.Filename || result.filename || 'output'}**`
+      message: client.message(
+        `Successfully converted document using **${ctx.input.conversionType}**. Output file: **${result.Filename || result.filename || 'output'}**`
+      )
     };
   })
   .build();

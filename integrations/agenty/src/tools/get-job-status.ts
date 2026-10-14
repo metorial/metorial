@@ -55,7 +55,7 @@ export let getJobStatus = SlateTool.create(spec, {
 
     return {
       output: {
-        jobId: j.job_id,
+        jobId: String(j.job_id),
         agentId: j.agent_id,
         status: j.status,
         pagesCredit: j.pages_credit,

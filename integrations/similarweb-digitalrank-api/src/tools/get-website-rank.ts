@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, normalizeDomain } from '../lib/client';
 import { spec } from '../spec';
 
 export let getWebsiteRank = SlateTool.create(spec, {
@@ -9,18 +9,18 @@ export let getWebsiteRank = SlateTool.create(spec, {
   description: `Retrieve ranking data for a website domain. Supports three ranking types:
 - **Global Rank**: SimilarWeb's monthly worldwide rank for a domain.
 - **Country Rank**: Monthly rank within a specific country (requires a 2-letter ISO country code).
-- **Category Rank**: The domain's industry category and its rank within that category.
+- **Category Rank**: The domain's industry category and its worldwide rank within that category for the previous month.
 
-Omit start and end dates to retrieve the most recent 28-day ranking data.`,
+For global and country ranks, omit both dates to retrieve the most recent 28-day ranking data.`,
   instructions: [
     'Provide the domain without "www." prefix (e.g., "google.com" not "www.google.com").',
     'Use "country" rank type with a valid 2-letter ISO country code (e.g., "us", "gb", "de").',
     'Date parameters use YYYY-MM format and only apply to global and country rank types.'
   ],
   constraints: [
-    'Each request costs 1 data credit (category rank costs 2 credits).',
+    'Pricing depends on the subscription: global and country rank use 1 hit per request or 1 credit per result; category rank uses 1 hit per request or 2 credits per result.',
     'Country rank does not support a worldwide filter — a specific country code is required.',
-    'Free tier is limited to 100 data credits per month.'
+    'Available countries and historical data depend on the subscription. Call get_capabilities to check access.'
   ],
   tags: {
     destructive: false,
@@ -100,7 +100,8 @@ Omit start and end dates to retrieve the most recent 28-day ranking data.`,
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let { domain, rankType } = ctx.input;
+    let { rankType } = ctx.input;
+    let domain = normalizeDomain(ctx.input.domain);
 
     if (rankType === 'global') {
       let result = await client.getGlobalRank({
@@ -133,7 +134,7 @@ Omit start and end dates to retrieve the most recent 28-day ranking data.`,
 
     if (rankType === 'country') {
       if (!ctx.input.countryCode) {
-        throw new Error('countryCode is required when rankType is "country".');
+        throw createApiServiceError('countryCode is required when rankType is "country".');
       }
 
       let result = await client.getCountryRank({
@@ -165,7 +166,6 @@ Omit start and end dates to retrieve the most recent 28-day ranking data.`,
       };
     }
 
-    // category
     let result = await client.getCategoryRank({ domain });
 
     return {

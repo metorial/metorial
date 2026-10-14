@@ -38,6 +38,12 @@ For YouTube-specific detailed metadata, use the "Get YouTube Video" tool instead
   )
   .output(
     z.object({
+      id: z.string().optional().describe('Provider media ID'),
+      url: z.string().optional().describe('Canonical URL of the media'),
+      media: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Media details, including carousel items when present'),
       platform: z
         .string()
         .optional()
@@ -65,16 +71,36 @@ For YouTube-specific detailed metadata, use the "Get YouTube Video" tool instead
 
     let result = await client.getMetadata({ url: ctx.input.url });
 
+    let author = result.author;
+    let stats = result.statistics ?? result.stats;
+
     return {
       output: {
+        id: result.id,
+        url: result.url,
+        media: result.media ?? undefined,
         platform: result.platform,
         contentType: result.type ?? result.contentType,
-        title: result.title,
-        description: result.description,
-        author: result.author,
-        stats: result.statistics ?? result.stats,
-        duration: result.duration,
-        thumbnail: result.thumbnail,
+        title: result.title ?? undefined,
+        description: result.description ?? undefined,
+        author: author
+          ? {
+              username: author.username ?? undefined,
+              name: author.name ?? author.displayName ?? undefined,
+              avatar: author.avatar ?? author.avatarUrl ?? undefined,
+              verified: author.verified ?? undefined
+            }
+          : undefined,
+        stats: stats
+          ? {
+              views: stats.views ?? undefined,
+              likes: stats.likes ?? undefined,
+              comments: stats.comments ?? undefined,
+              shares: stats.shares ?? undefined
+            }
+          : undefined,
+        duration: result.duration ?? result.media?.duration ?? undefined,
+        thumbnail: result.thumbnail ?? result.media?.thumbnailUrl ?? undefined,
         tags: result.tags,
         createdAt: result.createdAt ?? result.publishedAt,
         additionalData: result.additionalData ?? result.extra

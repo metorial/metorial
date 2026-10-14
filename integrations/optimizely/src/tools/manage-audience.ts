@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExperimentationClient } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,7 @@ Audiences define targeting criteria that can be applied to experiments to contro
     switch (ctx.input.action) {
       case 'list': {
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for listing audiences');
+          throw createApiServiceError('projectId is required for listing audiences');
         let audiences = await client.listAudiences(ctx.input.projectId, {
           page: ctx.input.page,
           per_page: ctx.input.perPage
@@ -51,7 +51,7 @@ Audiences define targeting criteria that can be applied to experiments to contro
         };
       }
       case 'get': {
-        if (!ctx.input.audienceId) throw new Error('audienceId is required');
+        if (!ctx.input.audienceId) throw createApiServiceError('audienceId is required');
         let audience = await client.getAudience(ctx.input.audienceId);
         return {
           output: { audience },
@@ -59,8 +59,8 @@ Audiences define targeting criteria that can be applied to experiments to contro
         };
       }
       case 'create': {
-        if (!ctx.input.projectId) throw new Error('projectId is required');
-        if (!ctx.input.name) throw new Error('name is required');
+        if (!ctx.input.projectId) throw createApiServiceError('projectId is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
         let audience = await client.createAudience({
           project_id: ctx.input.projectId,
           name: ctx.input.name,
@@ -73,7 +73,7 @@ Audiences define targeting criteria that can be applied to experiments to contro
         };
       }
       case 'update': {
-        if (!ctx.input.audienceId) throw new Error('audienceId is required');
+        if (!ctx.input.audienceId) throw createApiServiceError('audienceId is required');
         let audience = await client.updateAudience(ctx.input.audienceId, {
           name: ctx.input.name,
           description: ctx.input.description,

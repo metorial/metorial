@@ -30,7 +30,11 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 300)'),
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of results (max 1500)'),
       offset: z
         .number()
         .optional()
@@ -40,15 +44,22 @@ export let listProjects = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Sort field with + (asc) or - (desc) prefix, e.g. "+name" or "-created"'),
-      fields: z.string().optional().describe('Comma-separated list of fields to return')
+      fields: z.string().optional().describe('Comma-separated list of fields to return'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
     z.object({
       projects: z.array(projectSchema),
-      itemCount: z.number().describe('Total number of items matching the query'),
+      itemCount: z.number().describe('Number of items in this response page'),
       limit: z.number().describe('Applied limit'),
-      offset: z.number().describe('Applied offset')
+      offset: z.number().describe('Applied offset'),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -58,7 +69,8 @@ export let listProjects = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      cursor: ctx.input.cursor
     });
 
     let projects = result.data.map((p: any) => ({
@@ -67,15 +79,15 @@ export let listProjects = SlateTool.create(spec, {
       number: p.number,
       status: p.status,
       projectType: p.project_type,
-      location: p.location,
+      location: p.location ?? undefined,
       inDate: p.equipment_period_from || p.in,
       outDate: p.equipment_period_to || p.out,
-      planPeriodFrom: p.planperiod_start,
-      planPeriodTo: p.planperiod_end,
-      contact: p.contact,
+      planPeriodFrom: p.planperiod_start ?? undefined,
+      planPeriodTo: p.planperiod_end ?? undefined,
+      contact: p.contact ?? p.customer ?? undefined,
       memo: p.memo,
-      createdAt: p.created,
-      updatedAt: p.modified
+      createdAt: p.created ?? undefined,
+      updatedAt: p.modified ?? undefined
     }));
 
     return {
@@ -83,7 +95,8 @@ export let listProjects = SlateTool.create(spec, {
         projects,
         itemCount: result.itemCount,
         limit: result.limit,
-        offset: result.offset
+        offset: result.offset,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** projects. Returned ${projects.length} projects (offset: ${result.offset}).`
     };

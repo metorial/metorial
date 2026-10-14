@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let gatewayResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   carrierName: z.string().optional().describe('Name of the carrier'),
   isWireless: z.string().optional().describe('Whether the number is wireless ("y" or "n")'),
@@ -18,6 +19,7 @@ let gatewayResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   carrierName: raw.carrier_name,
   isWireless: raw.wless,

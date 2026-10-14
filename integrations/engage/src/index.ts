@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createOrUpdateUser,
+  deleteDeviceToken,
   deleteUser,
+  deleteUserAttribute,
   getUser,
   listLists,
   listUsers,
@@ -22,6 +24,8 @@ export let provider = Slate.create({
     getUser,
     listUsers,
     deleteUser,
+    deleteUserAttribute,
+    deleteDeviceToken,
     mergeUsers,
     trackEvent,
     manageList,

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteNewsletterList,
   executeApiFunction,
   executeSqlQuery,
   getFailedEmails,
@@ -18,7 +19,8 @@ export let provider = Slate.create({
     manageDirectories,
     sendEmail,
     manageNewsletterContacts,
-    getFailedEmails
+    getFailedEmails,
+    deleteNewsletterList
   ],
   triggers: []
 });

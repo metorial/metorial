@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SmsAlertClient } from '../lib/client';
+import { SmsAlertClient, type SmsAlertResponse } from '../lib/client';
+import { limitSchema, orderSchema, pageSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTemplates = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageTemplates = SlateTool.create(spec, {
   key: 'manage_templates',
   description: `List, create, edit, or delete reusable SMS templates. Templates store pre-defined message content for use in SMS campaigns.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -17,6 +18,9 @@ export let manageTemplates = SlateTool.create(spec, {
       action: z
         .enum(['list', 'create', 'edit', 'delete'])
         .describe('Action to perform on templates.'),
+      page: pageSchema,
+      limit: limitSchema,
+      order: orderSchema,
       templateId: z
         .string()
         .optional()
@@ -40,25 +44,25 @@ export let manageTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
-    let result: any;
+    let result: SmsAlertResponse;
 
     if (ctx.input.action === 'list') {
       ctx.info('Listing templates');
-      result = await client.listTemplates();
+      result = await client.listTemplates(ctx.input);
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Retrieved SMS templates`
       };
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.templateName) throw new Error('Template name is required.');
-      if (!ctx.input.templateBody) throw new Error('Template body is required.');
+      if (!ctx.input.templateName) throw createApiServiceError('Template name is required.');
+      if (!ctx.input.templateBody) throw createApiServiceError('Template body is required.');
 
       ctx.info(`Creating template: ${ctx.input.templateName}`);
       result = await client.createTemplate({
@@ -68,14 +72,18 @@ export let manageTemplates = SlateTool.create(spec, {
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Template **${ctx.input.templateName}** created`
       };
     }
 
     if (ctx.input.action === 'edit') {
-      if (!ctx.input.templateId) throw new Error('Template ID is required to edit.');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('Template ID is required to edit.');
+
+      if (!ctx.input.templateName && !ctx.input.templateBody)
+        throw createApiServiceError('Provide templateName or templateBody to update.');
 
       ctx.info(`Editing template: ${ctx.input.templateId}`);
       result = await client.editTemplate({
@@ -86,26 +94,27 @@ export let manageTemplates = SlateTool.create(spec, {
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Template **${ctx.input.templateId}** updated`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.templateId) throw new Error('Template ID is required to delete.');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('Template ID is required to delete.');
 
       ctx.info(`Deleting template: ${ctx.input.templateId}`);
       result = await client.deleteTemplate({ templateId: ctx.input.templateId });
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Template **${ctx.input.templateId}** deleted`
       };
     }
 
-    throw new Error(`Invalid action: ${ctx.input.action}`);
+    throw createApiServiceError(`Invalid action: ${ctx.input.action}`);
   })
   .build();

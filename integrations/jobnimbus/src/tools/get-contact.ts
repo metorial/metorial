@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ownerIds } from '../lib/records';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -59,36 +60,36 @@ export let getContact = SlateTool.create(spec, {
 
     let output = {
       contactId: c.jnid,
-      firstName: c.first_name,
-      lastName: c.last_name,
-      displayName: c.display_name,
-      company: c.company,
-      email: c.email,
-      homePhone: c.home_phone,
-      mobilePhone: c.mobile_phone,
-      workPhone: c.work_phone,
-      faxNumber: c.fax_number,
-      website: c.website,
-      addressLine1: c.address_line1,
-      addressLine2: c.address_line2,
-      city: c.city,
-      state: c.state_text,
-      zip: c.zip,
-      country: c.country_name,
-      description: c.description,
-      statusName: c.status_name,
-      recordTypeName: c.record_type_name,
-      sourceName: c.source_name,
-      tags: c.tags,
-      owners: c.owners,
-      salesRep: c.sales_rep,
-      salesRepName: c.sales_rep_name,
-      number: c.number,
-      dateCreated: c.date_created,
-      dateUpdated: c.date_updated,
-      dateStart: c.date_start,
-      dateEnd: c.date_end,
-      createdByName: c.created_by_name
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      displayName: c.display_name ?? undefined,
+      company: c.company ?? undefined,
+      email: c.email ?? undefined,
+      homePhone: c.home_phone ?? undefined,
+      mobilePhone: c.mobile_phone ?? undefined,
+      workPhone: c.work_phone ?? undefined,
+      faxNumber: c.fax_number ?? undefined,
+      website: c.website ?? undefined,
+      addressLine1: c.address_line1 ?? undefined,
+      addressLine2: c.address_line2 ?? undefined,
+      city: c.city ?? undefined,
+      state: c.state_text ?? undefined,
+      zip: c.zip ?? undefined,
+      country: c.country_name ?? undefined,
+      description: c.description ?? undefined,
+      statusName: c.status_name ?? undefined,
+      recordTypeName: c.record_type_name ?? undefined,
+      sourceName: c.source_name ?? undefined,
+      tags: c.tags ?? undefined,
+      owners: ownerIds(c.owners),
+      salesRep: c.sales_rep ?? undefined,
+      salesRepName: c.sales_rep_name ?? undefined,
+      number: c.number ?? undefined,
+      dateCreated: c.date_created ?? undefined,
+      dateUpdated: c.date_updated ?? undefined,
+      dateStart: c.date_start ?? undefined,
+      dateEnd: c.date_end ?? undefined,
+      createdByName: c.created_by_name ?? undefined
     };
 
     return {

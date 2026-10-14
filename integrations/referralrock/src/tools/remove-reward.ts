@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseRecords, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let removeReward = SlateTool.create(spec, {
@@ -31,11 +31,13 @@ export let removeReward = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.rewardIds.length === 0)
+      throw createApiServiceError('Provide at least one reward ID to remove.');
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
     let result = await client.removeRewards(ctx.input.rewardIds);
 
-    let results = ((result as unknown as Record<string, unknown>[]) || []).map(r => {
+    let results = getResponseRecords(result, 'reward removal').map(r => {
       let info = (r.resultInfo || {}) as Record<string, unknown>;
       return {
         rewardId: (r.rewardId || '') as string,
@@ -46,7 +48,7 @@ export let removeReward = SlateTool.create(spec, {
 
     return {
       output: { results },
-      message: `Removed **${ctx.input.rewardIds.length}** reward(s).`
+      message: `Received **${results.length}** reward removal result(s).`
     };
   })
   .build();

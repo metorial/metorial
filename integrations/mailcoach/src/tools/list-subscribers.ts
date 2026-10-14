@@ -38,6 +38,7 @@ export let listSubscribers = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Search term to filter by email, first name, last name, or tags'),
+      email: z.string().optional().describe('Filter by an exact email address'),
       status: z
         .enum(['subscribed', 'unconfirmed', 'unsubscribed'])
         .optional()
@@ -59,6 +60,7 @@ export let listSubscribers = SlateTool.create(spec, {
 
     let result = await client.listSubscribers(ctx.input.emailListUuid, {
       search: ctx.input.search,
+      email: ctx.input.email,
       status: ctx.input.status,
       page: ctx.input.page
     });
@@ -69,9 +71,17 @@ export let listSubscribers = SlateTool.create(spec, {
       email: sub.email,
       firstName: sub.first_name ?? null,
       lastName: sub.last_name ?? null,
-      status: sub.status ?? 'subscribed',
+      status:
+        sub.status ??
+        (sub.unsubscribed_at
+          ? 'unsubscribed'
+          : sub.subscribed_at
+            ? 'subscribed'
+            : 'unconfirmed'),
       tags: sub.tags ?? [],
-      extraAttributes: sub.extra_attributes ?? null,
+      extraAttributes: Array.isArray(sub.extra_attributes)
+        ? null
+        : (sub.extra_attributes ?? null),
       subscribedAt: sub.subscribed_at ?? null,
       unsubscribedAt: sub.unsubscribed_at ?? null,
       createdAt: sub.created_at,

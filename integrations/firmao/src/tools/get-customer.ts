@@ -65,23 +65,39 @@ export let getCustomer = SlateTool.create(spec, {
       output: {
         customerId: c.id,
         name: c.name,
-        label: c.label,
-        customerType: c.customerType,
-        nipNumber: c.nipNumber,
-        bankAccountNumber: c.bankAccountNumber,
-        emails: c.emails,
-        phones: c.phones,
-        website: c.website,
-        description: c.description,
-        ownership: c.ownership,
-        employeesNumber: c.employeesNumber,
-        industry: c.industry?.key ?? c.industry,
-        officeAddress: c.officeAddress,
-        correspondenceAddress: c.correspondenceAddress,
-        tags: c.tags?.map((t: any) => t.name ?? t),
-        customFields: c.customFields,
-        creationDate: c.creationDate,
-        lastModificationDate: c.lastModificationDate
+        label: c.label ?? undefined,
+        customerType: c.customerType ?? undefined,
+        nipNumber: c.nipNumber ?? undefined,
+        bankAccountNumber: c.bankAccountNumber ?? undefined,
+        emails: c.emails ?? undefined,
+        phones: c.phones ?? undefined,
+        website: c.website ?? undefined,
+        description: c.description ?? undefined,
+        ownership: c.ownership ?? undefined,
+        employeesNumber: c.employeesNumber ?? undefined,
+        industry: (typeof c.industry === 'object' ? c.industry?.key : c.industry) ?? undefined,
+        officeAddress: c.officeAddress
+          ? {
+              street: c.officeAddress.street ?? undefined,
+              city: c.officeAddress.city ?? undefined,
+              postCode: c.officeAddress.postCode ?? undefined,
+              country: c.officeAddress.country ?? undefined
+            }
+          : undefined,
+        correspondenceAddress: c.correspondenceAddress
+          ? {
+              street: c.correspondenceAddress.street ?? undefined,
+              city: c.correspondenceAddress.city ?? undefined,
+              postCode: c.correspondenceAddress.postCode ?? undefined,
+              country: c.correspondenceAddress.country ?? undefined
+            }
+          : undefined,
+        tags: c.tags
+          ?.map((t: any) => (typeof t === 'string' ? t : (t.name ?? t.label)))
+          .filter((tag: unknown) => typeof tag === 'string'),
+        customFields: c.customFields ?? undefined,
+        creationDate: c.creationDate ?? undefined,
+        lastModificationDate: c.lastModificationDate ?? c.lastUpdateDate ?? undefined
       },
       message: `Retrieved customer **${c.name}** (ID: ${c.id}).`
     };

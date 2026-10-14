@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DromoClient } from '../lib/client';
+import { createDownloadAttachment } from '../lib/files';
 import { spec } from '../spec';
 
 export let getHeadlessImport = SlateTool.create(spec, {
@@ -40,7 +41,15 @@ export let getHeadlessImport = SlateTool.create(spec, {
       downloadUrl: z
         .string()
         .optional()
-        .describe('Pre-signed URL to download the processed data (when status is SUCCESSFUL)')
+        .describe('Pre-signed URL to download the processed data (when status is SUCCESSFUL)'),
+      resultMetadata: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Result metadata returned after processing'),
+      importErrors: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Processing errors returned by Dromo')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,24 +58,25 @@ export let getHeadlessImport = SlateTool.create(spec, {
 
     let downloadUrl: string | undefined;
     if (imp.status === 'SUCCESSFUL') {
-      try {
-        let urlResponse = await client.getHeadlessImportDownloadUrl(ctx.input.importId);
-        downloadUrl = urlResponse.url;
-      } catch {
-        // Download URL may not be available yet
-      }
+      let urlResponse = await client.getHeadlessImportDownloadUrl(ctx.input.importId);
+      downloadUrl = urlResponse.url;
+      await ctx.addAttachment(
+        createDownloadAttachment(downloadUrl, 'headless', ctx.input.importId)
+      );
     }
 
     return {
       output: {
         importId: imp.id,
         schemaId: imp.schema_id,
-        originalFilename: imp.original_filename,
+        originalFilename: imp.original_filename ?? '',
         status: imp.status,
         createdDate: imp.created_date,
         numDataRows: imp.num_data_rows,
-        reviewUrl: imp.review_url,
-        downloadUrl
+        reviewUrl: imp.review_url ?? undefined,
+        downloadUrl,
+        resultMetadata: imp.result_metadata ?? undefined,
+        importErrors: imp.import_errors ?? undefined
       },
       message: `Headless import **${imp.id}** — status: **${imp.status}**${imp.num_data_rows != null ? `, ${imp.num_data_rows} rows` : ''}.`
     };

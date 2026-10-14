@@ -1,6 +1,10 @@
 # Chatbotkit
 
-Build, manage, and deploy AI chatbots and conversational agents. Create and configure bots with custom backstories, AI models (OpenAI, Anthropic, etc.), datasets, and skillsets. Manage conversations with streaming responses, function calling, and context-aware memory. Import knowledge from web pages, PDFs, DOCX, and Notion into datasets. Define skillsets with custom abilities for actions like web fetching and email sending. Track and manage contacts with personalized experiences and scheduled actions. Deploy bots to Slack, Discord, WhatsApp, Microsoft Teams, Google Chat, Twilio SMS, and web widgets. Organize resources into spaces and blueprints for team collaboration. Extract structured data from conversations using custom schemas. Manage files, secrets, audit logs, and content moderation settings. Support multi-tenancy via the Partner API with sub-account creation and impersonation.
+Build and manage ChatBotKit bots, conversations, datasets, skillsets, contacts, memories and spaces. Send messages and obtain AI responses, search knowledge records and memories, and inspect conversation history. Discover available models and inspect background task status. Manage deployment channels with their channel-specific configuration and use cursor pagination to browse resources.
+
+Use `list_models` to find model IDs and token limits. Use `list_resources` with `resourceType: "tasks"`, then `get_task`, to inspect background work. For deployment-channel operations, supply `type` to `manage_integration` or `integrationType` when listing integrations, such as `widget`, `slack`, `discord`, `sitemap` or `notion`. The contact `ensure` action requires a stable `fingerprint`.
+
+This integration uses a ChatBotKit API secret key. Optional `runAsUserId` selects a child user for accounts authorized to use impersonation.
 
 ## License
 

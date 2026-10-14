@@ -46,11 +46,17 @@ export let listDeals = SlateTool.create(spec, {
       stageId: ctx.input.stageId
     });
 
-    let items = Array.isArray(result) ? result : result?.results || result?.data || [];
+    let items = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.results)
+        ? result.results
+        : Array.isArray(result?.data)
+          ? result.data
+          : [];
     let deals = items.map((d: any) => ({
       dealId: d.id ? String(d.id) : undefined,
-      name: d.name,
-      value: d.value,
+      name: d.name ?? undefined,
+      value: d.value ?? undefined,
       stageId: d.stage_id ? String(d.stage_id) : d.stage ? String(d.stage) : undefined,
       ownerId: d.owner_id ? String(d.owner_id) : d.owner ? String(d.owner) : undefined
     }));

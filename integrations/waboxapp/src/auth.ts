@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -23,6 +23,14 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('A Waboxapp API token is required.');
+      }
+      if (!/^\d+$/.test(ctx.input.phoneNumber)) {
+        throw createApiServiceError(
+          'The linked account phone number must include the country code and contain digits only, without a + prefix.'
+        );
+      }
       return {
         output: {
           token: ctx.input.token,

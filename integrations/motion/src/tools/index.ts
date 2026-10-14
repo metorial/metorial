@@ -3,6 +3,7 @@ export * from './create-recurring-task';
 export * from './create-task';
 export * from './delete-recurring-task';
 export * from './delete-task';
+export * from './get-current-user';
 export * from './get-project';
 export * from './get-task';
 export * from './list-projects';

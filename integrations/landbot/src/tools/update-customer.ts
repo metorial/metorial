@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlatformClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,9 @@ export let updateCustomerTool = SlateTool.create(spec, {
       fields: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Key-value pairs of customer fields to update'),
+        .describe(
+          'Customer field names and values to create or update individually. Names use lowercase letters, digits, and underscores; values cannot be null.'
+        ),
       botId: z.number().optional().describe('Bot ID to assign the customer to'),
       blockId: z
         .string()
@@ -43,6 +45,9 @@ export let updateCustomerTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.blockId !== undefined && ctx.input.botId === undefined) {
+      throw createApiServiceError('Provide botId when specifying blockId.');
+    }
     let client = new PlatformClient(ctx.auth.token);
 
     let fieldsUpdated = false;

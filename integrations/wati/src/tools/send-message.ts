@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,6 +52,12 @@ Messages can only be sent within a 24-hour window after a user's last interactio
       apiEndpoint: ctx.config.apiEndpoint
     });
 
+    if (ctx.input.fileUrl && ctx.input.messageText) {
+      throw createApiServiceError('Provide either messageText or fileUrl for one message.');
+    }
+    if (ctx.input.fileCaption && !ctx.input.fileUrl) {
+      throw createApiServiceError('fileCaption requires fileUrl.');
+    }
     let result: any;
 
     if (ctx.input.fileUrl) {
@@ -63,19 +69,25 @@ Messages can only be sent within a 24-hour window after a user's last interactio
     } else if (ctx.input.messageText) {
       result = await client.sendTextMessage(ctx.input.target, ctx.input.messageText);
     } else {
-      throw new Error('Either messageText or fileUrl must be provided.');
+      throw createApiServiceError('Either messageText or fileUrl must be provided.');
     }
 
+    let message = result?.message;
+    if (!message || typeof message !== 'object') {
+      throw createApiServiceError(
+        'Wati returned no message receipt. Verify the conversation before sending again.'
+      );
+    }
     return {
       output: {
-        messageId: result?.id,
-        conversationId: result?.conversation_id,
-        created: result?.created,
-        status: result?.status
+        messageId: message.id ?? undefined,
+        conversationId: message.conversation_id ?? undefined,
+        created: message.created ?? undefined,
+        status: message.status ?? undefined
       },
       message: ctx.input.fileUrl
-        ? `File message sent to **${ctx.input.target}**.`
-        : `Text message sent to **${ctx.input.target}**.`
+        ? `File message accepted for **${ctx.input.target}**.`
+        : `Text message accepted for **${ctx.input.target}**.`
     };
   })
   .build();

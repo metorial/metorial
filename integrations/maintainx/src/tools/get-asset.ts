@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getAsset = SlateTool.create(spec, {
   name: 'Get Asset',
   key: 'get_asset',
-  description: `Retrieves detailed information about a specific asset by ID, including its name, description, serial number, manufacturer, model, location, status, and custom fields.`,
+  description: `Retrieves detailed information about a specific asset by ID, including its name, description, serial number, manufacturer, model, location, status, and custom fields. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let getAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       assetId: z.number().describe('ID of the asset to retrieve')
     })
   )
@@ -34,30 +36,27 @@ export let getAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.getAsset(ctx.input.assetId);
     let asset = result.asset ?? result;
 
     return {
       output: {
-        assetId: asset.id,
-        name: asset.name,
-        description: asset.description,
-        barcode: asset.barcode,
-        serialNumber: asset.serialNumber,
-        manufacturer: asset.manufacturer,
-        model: asset.model,
-        locationId: asset.locationId,
-        parentId: asset.parentId,
-        status: asset.status,
-        createdAt: asset.createdAt,
-        updatedAt: asset.updatedAt
+        assetId: asset.id ?? undefined,
+        name: asset.name ?? undefined,
+        description: asset.description ?? undefined,
+        barcode: asset.barcode ?? undefined,
+        serialNumber: asset.serialNumber ?? undefined,
+        manufacturer: asset.manufacturer ?? undefined,
+        model: asset.model ?? undefined,
+        locationId: asset.locationId ?? undefined,
+        parentId: asset.parentId ?? undefined,
+        status: asset.status?.status ?? undefined,
+        createdAt: asset.createdAt ?? undefined,
+        updatedAt: asset.updatedAt ?? undefined
       },
-      message: `Asset **#${asset.id}**: "${asset.name}"${asset.status ? ` — status: **${asset.status}**` : ''}.`
+      message: `Asset **#${asset.id}**: "${asset.name}"${asset.status?.status ? ` — status: **${asset.status.status}**` : ''}.`
     };
   })
   .build();

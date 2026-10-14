@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     organizationId: z
       .string()
+      .optional()
       .describe(
-        'The Organization ID. Found in Elorus under Settings > Organization > Organization ID.'
+        'Default organization ID for existing connections. Can be supplied on each tool. Found in Elorus under Settings > Organization > Organization ID.'
       )
   })
 );

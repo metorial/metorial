@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,7 +29,14 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let axios = createAxios();
+      let axios = createAuthenticatedAxios({
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'SendFox',
+            reason: 'sendfox_oauth_error',
+            operation: 'token exchange'
+          })
+      });
       let response = await axios.post('https://sendfox.com/oauth/token', {
         grant_type: 'authorization_code',
         client_id: ctx.clientId,
@@ -49,15 +57,7 @@ export let auth = SlateAuth.create()
       input: Record<string, never>;
       scopes: string[];
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.sendfox.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/me');
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
@@ -88,15 +88,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.sendfox.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/me');
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {

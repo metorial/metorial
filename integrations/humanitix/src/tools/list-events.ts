@@ -1,11 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { overrideLocationSchema, sinceSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
   eventId: z.string().describe('Unique identifier for the event'),
   name: z.string().optional().describe('Name of the event'),
+  url: z.string().optional().describe('Public event URL'),
+  dates: z
+    .array(z.any())
+    .optional()
+    .describe('Event date entries including IDs for eventDateId filters'),
   slug: z.string().optional().describe('URL slug for the event'),
   description: z.string().optional().describe('Description of the event'),
   startDate: z.string().optional().describe('Start date of the event'),
@@ -38,7 +44,13 @@ export let listEvents = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      pageSize: z.number().optional().describe('Number of events per page (max 100)')
+      pageSize: z.number().optional().describe('Number of events per page (max 100)'),
+      inFutureOnly: z
+        .boolean()
+        .optional()
+        .describe('Return only events whose end date is in the future.'),
+      since: sinceSchema,
+      overrideLocation: overrideLocationSchema
     })
   )
   .output(
@@ -54,12 +66,17 @@ export let listEvents = SlateTool.create(spec, {
 
     let response = await client.getEvents({
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      inFutureOnly: ctx.input.inFutureOnly,
+      since: ctx.input.since,
+      overrideLocation: ctx.input.overrideLocation
     });
 
     let events = (response.events || []).map((event: any) => ({
       eventId: event._id,
       name: event.name,
+      url: event.url,
+      dates: event.dates,
       slug: event.slug,
       description: event.description,
       startDate: event.startDate,
@@ -78,14 +95,16 @@ export let listEvents = SlateTool.create(spec, {
       updatedAt: event.updatedAt
     }));
 
+    let totalResults = response.total ?? response.totalResults;
+
     return {
       output: {
         events,
-        totalResults: response.totalResults,
+        totalResults,
         page: response.page,
         pageSize: response.pageSize
       },
-      message: `Found **${events.length}** events${response.totalResults ? ` out of ${response.totalResults} total` : ''}.`
+      message: `Found **${events.length}** events${totalResults !== undefined ? ` out of ${totalResults} total` : ''}.`
     };
   })
   .build();

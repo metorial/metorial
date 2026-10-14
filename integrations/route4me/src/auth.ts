@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { mapMember } from './lib/member';
 
 export let auth = SlateAuth.create()
   .output(
@@ -16,7 +18,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your Route4Me API key. Found under Security > API Key or Account Settings > Integrations > API Key.'
+          'Your Route4Me API key. Found under Settings > Organization Settings > Integrations > API Key.'
         )
     }),
 
@@ -29,25 +31,15 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.route4me.com'
-      });
-
-      let response = await http.get('/api.v4/user.php', {
-        params: {
-          api_key: ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let user = mapMember(await client.getUser());
 
       return {
         profile: {
-          id: user.member_id?.toString(),
-          email: user.member_email,
+          id: user.memberId.toString(),
+          email: user.memberEmail,
           name:
-            [user.member_first_name, user.member_last_name].filter(Boolean).join(' ') ||
-            undefined
+            [user.memberFirstName, user.memberLastName].filter(Boolean).join(' ') || undefined
         }
       };
     }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { taskState } from '../lib/task-values';
 import { spec } from '../spec';
 
 export let listActions = SlateTool.create(spec, {
@@ -13,8 +14,16 @@ export let listActions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      status: z.array(z.string()).optional().describe('Filter by action status values'),
-      priority: z.array(z.string()).optional().describe('Filter by priority levels'),
+      status: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Filter by action status IDs or names: to do, in progress, complete, or cannot do'
+        ),
+      priority: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by priority IDs or names: none, low, medium, high'),
       assigneeIds: z.array(z.string()).optional().describe('Filter by assigned user IDs'),
       searchValue: z.string().optional().describe('Search text to filter actions'),
       pageSize: z.number().optional().describe('Number of results per page (max 100)'),
@@ -52,16 +61,19 @@ export let listActions = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let actions = result.actions.map((a: any) => ({
-      actionId: a.task_id || a.id,
-      title: a.title,
-      description: a.description,
-      status: a.status?.key || a.status_id || a.status,
-      priority: a.priority?.key || a.priority_id || a.priority,
-      dueAt: a.due_at,
-      createdAt: a.created_at,
-      inspectionId: a.inspection?.inspection_id || a.inspection_id
-    }));
+    let actions = result.actions.map((action: any) => {
+      let a = action.task ?? action;
+      return {
+        actionId: a.task_id || a.id,
+        title: a.title ?? undefined,
+        description: a.description ?? undefined,
+        status: taskState(a.status) ?? a.status_id ?? undefined,
+        priority: taskState(a.priority) ?? a.priority_id ?? undefined,
+        dueAt: a.due_at ?? undefined,
+        createdAt: a.created_at ?? undefined,
+        inspectionId: a.inspection?.inspection_id ?? a.inspection_id ?? undefined
+      };
+    });
 
     return {
       output: { actions, nextPageToken: result.nextPageToken },

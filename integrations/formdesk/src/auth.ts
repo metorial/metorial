@@ -1,4 +1,9 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -25,8 +30,14 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let http = createAxios({
-        baseURL: `https://www.formdesk.com/api/rest/v1/${ctx.input.domain}`,
+      let http = createAuthenticatedAxios({
+        baseURL: `https://www.formdesk.com/api/rest/v1/${encodeURIComponent(ctx.input.domain)}`,
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Formdesk',
+            reason: 'formdesk_auth_error',
+            detailKeys: ['reason', 'description', 'message', 'code']
+          }),
         headers: {
           Authorization: `Bearer ${ctx.input.token}`
         }
@@ -34,8 +45,13 @@ export let auth = SlateAuth.create()
 
       let response = await http.get('/connect');
       let data = response.data;
-      let host = data.host || 'www.formdesk.com';
-      let domain = data.domain || ctx.input.domain;
+      let host = data?.host;
+      if (typeof host !== 'string' || !/^(?:[a-z\d-]+\.)*formdesk\.com$/i.test(host)) {
+        throw createApiServiceError(
+          'Formdesk did not return a valid account host. Check the API key and account folder.'
+        );
+      }
+      let domain = ctx.input.domain;
 
       return {
         output: {

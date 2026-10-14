@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TapfiliateClient } from '../lib/client';
 import { spec } from '../spec';
@@ -83,22 +83,36 @@ export let createConversion = SlateTool.create(spec, {
   )
   .output(conversionSchema)
   .handleInvocation(async ctx => {
+    if (
+      !(
+        ctx.input.referralCode ||
+        ctx.input.coupon ||
+        ctx.input.clickId ||
+        ctx.input.customerId ||
+        ctx.input.trackingId ||
+        (ctx.input.assetId && ctx.input.sourceId)
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide at least one attribution method: referralCode, coupon, clickId, trackingId, customerId, or both assetId and sourceId.'
+      );
+    }
     let client = new TapfiliateClient({ token: ctx.auth.token });
     let result = await client.createConversion(ctx.input);
 
     return {
       output: {
         conversionId: result.id,
-        externalId: result.external_id,
-        amount: result.amount,
-        currency: result.currency,
+        externalId: result.external_id ?? undefined,
+        amount: result.amount ?? undefined,
+        currency: result.currency ?? undefined,
         click: result.click,
         commissions: result.commissions,
         affiliate: result.affiliate,
         program: result.program,
         customer: result.customer,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Created conversion **#${result.id}**${result.amount ? ` for ${result.amount} ${result.currency || ''}` : ''}.`
     };
@@ -127,16 +141,16 @@ export let getConversion = SlateTool.create(spec, {
     return {
       output: {
         conversionId: result.id,
-        externalId: result.external_id,
-        amount: result.amount,
-        currency: result.currency,
+        externalId: result.external_id ?? undefined,
+        amount: result.amount ?? undefined,
+        currency: result.currency ?? undefined,
         click: result.click,
         commissions: result.commissions,
         affiliate: result.affiliate,
         program: result.program,
         customer: result.customer,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Retrieved conversion **#${result.id}**${result.amount ? ` (${result.amount} ${result.currency || ''})` : ''}.`
     };
@@ -174,16 +188,16 @@ export let listConversions = SlateTool.create(spec, {
 
     let conversions = results.map((r: any) => ({
       conversionId: r.id,
-      externalId: r.external_id,
-      amount: r.amount,
-      currency: r.currency,
+      externalId: r.external_id ?? undefined,
+      amount: r.amount ?? undefined,
+      currency: r.currency ?? undefined,
       click: r.click,
       commissions: r.commissions,
       affiliate: r.affiliate,
       program: r.program,
       customer: r.customer,
       metaData: r.meta_data,
-      createdAt: r.created_at
+      createdAt: r.created_at ?? undefined
     }));
 
     return {
@@ -225,16 +239,16 @@ export let updateConversion = SlateTool.create(spec, {
     return {
       output: {
         conversionId: result.id,
-        externalId: result.external_id,
-        amount: result.amount,
-        currency: result.currency,
+        externalId: result.external_id ?? undefined,
+        amount: result.amount ?? undefined,
+        currency: result.currency ?? undefined,
         click: result.click,
         commissions: result.commissions,
         affiliate: result.affiliate,
         program: result.program,
         customer: result.customer,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Updated conversion **#${result.id}**.`
     };

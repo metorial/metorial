@@ -1,4 +1,4 @@
-Now let me get more details on the Live Feed API and the financial API:# Slates Specification for BuiltWith
+# BuiltWith API Specification
 
 ## Overview
 
@@ -47,6 +47,14 @@ Resolves company names to their associated domain names. You can specify how man
 ### Keywords
 
 Allows you to get access to keywords connected to websites. Supports multi-domain lookups (up to 16 domains at once).
+
+### Keyword Search
+
+Search websites containing an alphabetical keyword of at least four letters. Supports page sizes from 16 to 1000 and a string cursor for subsequent pages. The cursor value `END` marks the end of the result set.
+
+### Technology Changes
+
+Retrieve recent technology additions and removals for a domain with optional date or natural-language window filtering. Results include technology names, categories, change dates, and business context.
 
 ### Trust & Fraud Detection
 

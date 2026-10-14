@@ -7,6 +7,7 @@ import {
   deleteCampaign,
   deleteSubscriber,
   findSubscriber,
+  getCampaignDeliveryStatus,
   listCampaigns,
   listCustomFields,
   listSubcategories,
@@ -21,6 +22,7 @@ export let provider = Slate.create({
   tools: [
     addUpdateSubscriber,
     findSubscriber,
+    getCampaignDeliveryStatus,
     deactivateSubscriber,
     activateSubscriber,
     deleteSubscriber,

@@ -22,7 +22,7 @@ export let fetchPage = SlateTool.create(spec, {
 
 Use this for fetching server-rendered HTML or any HTTP resource. For JavaScript-rendered pages, use the **Render Page** tool instead.`,
   instructions: [
-    'The response body is returned base64-encoded. Decode it to get the actual content.',
+    'The response body is available as a downloadable file and retained as base64 for existing workflows.',
     'You cannot set the Cookie header via customHttpRequestHeaders — use requestCookies instead.',
     'httpRequestBody (base64) and httpRequestText (UTF-8 string) are mutually exclusive.'
   ],
@@ -104,7 +104,7 @@ Use this for fetching server-rendered HTML or any HTTP resource. For JavaScript-
     let response = await client.extract({
       url: ctx.input.url,
       httpResponseBody: true,
-      httpResponseHeaders: ctx.input.includeResponseHeaders || undefined,
+      httpResponseHeaders: true,
       httpRequestMethod: ctx.input.httpRequestMethod,
       httpRequestText: ctx.input.httpRequestText,
       httpRequestBody: ctx.input.httpRequestBody,
@@ -118,12 +118,28 @@ Use this for fetching server-rendered HTML or any HTTP resource. For JavaScript-
       session: ctx.input.sessionId ? { id: ctx.input.sessionId } : undefined
     });
 
+    if (response.httpResponseBody !== undefined) {
+      let mimeType =
+        response.httpResponseHeaders?.find(
+          header => header.name.toLowerCase() === 'content-type'
+        )?.value ?? 'application/octet-stream';
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Buffer.from(response.httpResponseBody, 'base64'), {
+          headers: { 'content-type': mimeType }
+        }),
+        filename: 'response.bin'
+      });
+    }
+
     return {
       output: {
         url: response.url,
         statusCode: response.statusCode,
         httpResponseBody: response.httpResponseBody,
-        httpResponseHeaders: response.httpResponseHeaders,
+        httpResponseHeaders: ctx.input.includeResponseHeaders
+          ? response.httpResponseHeaders
+          : undefined,
         responseCookies: response.responseCookies
       },
       message: `Fetched **${response.url}** — HTTP ${response.statusCode ?? 'unknown'}`

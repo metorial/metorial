@@ -253,7 +253,7 @@ export interface FormTemplate {
 
 export interface Invoice {
   id: string;
-  invoiceNumber: string;
+  invoiceNumber: number;
   status: string;
   currency: string;
   totalInCents: number;

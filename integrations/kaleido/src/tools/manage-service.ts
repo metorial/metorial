@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId, environmentId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageService = SlateTool.create(spec, {
@@ -15,8 +16,8 @@ Each service is bound to a membership and runs alongside the blockchain nodes.`,
   .input(
     z.object({
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Action to perform'),
-      consortiumId: z.string().describe('Consortium ID'),
-      environmentId: z.string().describe('Environment ID'),
+      consortiumId,
+      environmentId,
       serviceId: z.string().optional().describe('Service ID (required for get, delete)'),
       name: z.string().optional().describe('Service name (required for create)'),
       serviceType: z
@@ -71,11 +72,11 @@ Each service is bound to a membership and runs alongside the blockchain nodes.`,
       let mapped = services.map((s: any) => ({
         serviceId: s._id,
         name: s.name,
-        serviceType: s.service || undefined,
-        membershipId: s.membership_id || undefined,
-        state: s.state || undefined,
-        size: s.size || undefined,
-        urls: s.urls || undefined
+        serviceType: s.service ?? undefined,
+        membershipId: s.membership_id ?? undefined,
+        state: s.state ?? undefined,
+        size: s.size ?? undefined,
+        urls: s.urls ?? undefined
       }));
 
       return {
@@ -85,9 +86,12 @@ Each service is bound to a membership and runs alongside the blockchain nodes.`,
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required');
-      if (!ctx.input.serviceType) throw new Error('Service type is required');
-      if (!ctx.input.membershipId) throw new Error('Membership ID is required');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required', { reason: 'invalid_input' });
+      if (!ctx.input.serviceType)
+        throw createApiServiceError('Service type is required', { reason: 'invalid_input' });
+      if (!ctx.input.membershipId)
+        throw createApiServiceError('Membership ID is required', { reason: 'invalid_input' });
 
       let result = await client.createService(
         ctx.input.consortiumId,
@@ -103,17 +107,18 @@ Each service is bound to a membership and runs alongside the blockchain nodes.`,
       return {
         output: {
           serviceId: result._id,
-          name: result.name,
-          serviceType: result.service,
-          membershipId: result.membership_id,
-          state: result.state,
+          name: result.name ?? undefined,
+          serviceType: result.service ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          state: result.state ?? undefined,
           urls: result.urls
         },
         message: `Created service **${result.name}** (\`${result._id}\`) of type ${result.service}.`
       };
     }
 
-    if (!ctx.input.serviceId) throw new Error('Service ID is required');
+    if (!ctx.input.serviceId)
+      throw createApiServiceError('Service ID is required', { reason: 'invalid_input' });
 
     if (ctx.input.action === 'get') {
       let result = await client.getService(
@@ -124,10 +129,10 @@ Each service is bound to a membership and runs alongside the blockchain nodes.`,
       return {
         output: {
           serviceId: result._id,
-          name: result.name,
-          serviceType: result.service,
-          membershipId: result.membership_id,
-          state: result.state,
+          name: result.name ?? undefined,
+          serviceType: result.service ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          state: result.state ?? undefined,
           urls: result.urls
         },
         message: `Service **${result.name}** — type: ${result.service || 'unknown'}, state: ${result.state || 'unknown'}.`

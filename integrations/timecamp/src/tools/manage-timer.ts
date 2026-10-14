@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type TimerResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTimer = SlateTool.create(spec, {
@@ -36,12 +36,19 @@ export let manageTimer = SlateTool.create(spec, {
       userId: z.string().optional().describe('User ID'),
       startedAt: z.string().optional().describe('Timer start timestamp'),
       elapsed: z.number().optional().describe('Elapsed seconds'),
-      taskName: z.string().optional().describe('Name of the tracked task')
+      taskName: z.string().optional().describe('Name of the tracked task'),
+      entryId: z.string().optional().describe('Time entry ID created or updated by the timer')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    if (ctx.input.action !== 'start' && ctx.input.taskId !== undefined) {
+      throw createApiServiceError('taskId is only used with the start action.');
+    }
+    if (ctx.input.action !== 'stop' && ctx.input.timerId !== undefined) {
+      throw createApiServiceError('timerId is only used with the stop action.');
+    }
+    let result: TimerResponse;
 
     if (ctx.input.action === 'status') {
       result = await client.getTimerStatus();
@@ -51,20 +58,22 @@ export let manageTimer = SlateTool.create(spec, {
       result = await client.stopTimer(ctx.input.timerId);
     }
 
+    if (!result?.timer) {
+      throw createApiServiceError('TimeCamp returned an invalid timer response.');
+    }
     let isRunning =
-      result?.isTimerRunning === true ||
-      result?.isTimerRunning === 1 ||
-      result?.isTimerRunning === '1';
+      ctx.input.action === 'start' ? result.timer.id != null : result.timer.isRunning === true;
 
     return {
       output: {
         isRunning,
-        timerId: result?.timer_id ? String(result.timer_id) : undefined,
-        taskId: result?.task_id ? String(result.task_id) : undefined,
-        userId: result?.user_id ? String(result.user_id) : undefined,
-        startedAt: result?.started_at || undefined,
-        elapsed: result?.elapsed !== undefined ? Number(result.elapsed) : undefined,
-        taskName: result?.name || undefined
+        timerId: result.timer.id == null ? undefined : String(result.timer.id),
+        taskId: result.task?.id == null ? undefined : String(result.task.id),
+        userId: result.timer.userId == null ? undefined : String(result.timer.userId),
+        startedAt: result.timer.startedAt ?? undefined,
+        elapsed: result.timer.elapsed ?? undefined,
+        taskName: result.task?.name ?? undefined,
+        entryId: result.entry?.id == null ? undefined : String(result.entry.id)
       },
       message:
         ctx.input.action === 'start'

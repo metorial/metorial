@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -104,7 +104,7 @@ export let manageUploadsTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.uploadId) throw new Error('uploadId is required for get');
+      if (!ctx.input.uploadId) throw createApiServiceError('uploadId is required for get');
       let u = await client.getUpload(ctx.input.uploadId);
       return {
         output: { upload: mapUpload(u) },
@@ -130,8 +130,9 @@ export let manageUploadsTool = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for create');
-      if (!ctx.input.url) throw new Error('url is required for create');
+      if (!ctx.input.tilesetId)
+        throw createApiServiceError('tilesetId is required for create');
+      if (!ctx.input.url) throw createApiServiceError('url is required for create');
       let u = await client.createUpload({
         tileset: ctx.input.tilesetId,
         url: ctx.input.url,
@@ -144,7 +145,7 @@ export let manageUploadsTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.uploadId) throw new Error('uploadId is required for delete');
+      if (!ctx.input.uploadId) throw createApiServiceError('uploadId is required for delete');
       await client.deleteUpload(ctx.input.uploadId);
       return {
         output: { deleted: true },
@@ -152,5 +153,5 @@ export let manageUploadsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

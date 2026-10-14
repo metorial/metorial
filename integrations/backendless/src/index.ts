@@ -5,9 +5,11 @@ import {
   deleteFile,
   deleteObject,
   findUsers,
+  getTableSchema,
   listFiles,
   manageCache,
   manageCounter,
+  manageRelations,
   publishMessage,
   queryObjects,
   registerUser,
@@ -28,7 +30,9 @@ export let provider = Slate.create({
     publishMessage,
     sendEmail,
     manageCounter,
-    manageCache
+    manageCache,
+    getTableSchema,
+    manageRelations
   ],
   triggers: []
 });

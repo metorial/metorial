@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createVendor = SlateTool.create(spec, {
   name: 'Create Vendor',
   key: 'create_vendor',
-  description: `Creates a new vendor in MaintainX. Vendors supply parts and services and can be linked to purchase orders and assets.`,
+  description: `Creates a new vendor in MaintainX. Vendors supply parts and services and can be linked to purchase orders and assets. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,11 +15,18 @@ export let createVendor = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       name: z.string().describe('Vendor name'),
       email: z.string().optional().describe('Contact email address'),
       phone: z.string().optional().describe('Contact phone number'),
-      address: z.string().optional().describe('Vendor address'),
-      website: z.string().optional().describe('Vendor website URL')
+      address: z
+        .string()
+        .optional()
+        .describe('Unsupported by the current MaintainX vendor API; omit this field'),
+      website: z
+        .string()
+        .optional()
+        .describe('Unsupported by the current MaintainX vendor API; omit this field')
     })
   )
   .output(
@@ -28,10 +36,7 @@ export let createVendor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createVendor({
       name: ctx.input.name,

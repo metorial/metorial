@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
   findLayerById,
@@ -6,9 +6,9 @@ import {
   findLayersByName,
   flattenLayers,
   type SketchLayer,
-  type SketchLayerClass,
-  type SketchPage
+  type SketchLayerClass
 } from '../lib/client';
+import { parseSketchPages } from '../lib/schemas';
 import { spec } from '../spec';
 
 let layerClassEnum = z.enum([
@@ -90,7 +90,7 @@ export let inspectLayersTool = SlateTool.create(spec, {
 
 Use this to drill into specific layers or find all layers of a certain type across pages.`,
   instructions: [
-    'Provide exactly one of: objectId, layerName, or layerClass to search by.',
+    'Provide one of objectId, layerName, or layerClass to search by, or omit all three to list every child layer.',
     'If searching by layerName, all layers with that exact name will be returned.'
   ],
   tags: {
@@ -151,24 +151,28 @@ Use this to drill into specific layers or find all layers of a certain type acro
     })
   )
   .handleInvocation(async ctx => {
-    let pages = ctx.input.pages as SketchPage[];
+    let pages = parseSketchPages(ctx.input.pages);
     let { objectId, layerName, layerClass, includeRawJson } = ctx.input;
+
+    if ([objectId, layerName, layerClass].filter(value => value !== undefined).length > 1) {
+      throw createApiServiceError('Provide only one of objectId, layerName, or layerClass.');
+    }
 
     let matched: LayerSummary[] = [];
     let rawMatched: Record<string, unknown>[] = [];
 
-    if (objectId) {
+    if (objectId !== undefined) {
       for (let page of pages) {
-        let found = findLayerById(page.layers ?? [], objectId);
+        let found = findLayerById([page], objectId);
         if (found) {
           matched.push(toSummary(found));
           if (includeRawJson) rawMatched.push(found as Record<string, unknown>);
           break;
         }
       }
-    } else if (layerName) {
+    } else if (layerName !== undefined) {
       for (let page of pages) {
-        let found = findLayersByName(page.layers ?? [], layerName);
+        let found = findLayersByName([page], layerName);
         for (let layer of found) {
           matched.push(toSummary(layer));
           if (includeRawJson) rawMatched.push(layer as Record<string, unknown>);
@@ -176,7 +180,7 @@ Use this to drill into specific layers or find all layers of a certain type acro
       }
     } else if (layerClass) {
       for (let page of pages) {
-        let found = findLayersByClass(page.layers ?? [], layerClass as SketchLayerClass);
+        let found = findLayersByClass([page], layerClass as SketchLayerClass);
         for (let layer of found) {
           matched.push(toSummary(layer));
           if (includeRawJson) rawMatched.push(layer as Record<string, unknown>);
@@ -192,13 +196,14 @@ Use this to drill into specific layers or find all layers of a certain type acro
       }
     }
 
-    let searchDesc = objectId
-      ? `object ID "${objectId}"`
-      : layerName
-        ? `name "${layerName}"`
-        : layerClass
-          ? `class "${layerClass}"`
-          : 'all layers';
+    let searchDesc =
+      objectId !== undefined
+        ? `object ID "${objectId}"`
+        : layerName !== undefined
+          ? `name "${layerName}"`
+          : layerClass
+            ? `class "${layerClass}"`
+            : 'all layers';
 
     return {
       output: {

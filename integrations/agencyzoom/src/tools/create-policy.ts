@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createPolicy = SlateTool.create(spec, {
   name: 'Create Policy',
   key: 'create_policy',
-  description: `Create a new insurance policy in AgencyZoom. Associate it with a customer, set carrier and product line details, premium amounts, effective/expiry dates, and assign agents or CSRs.`,
+  description: `Create a new insurance policy in AgencyZoom. Associate it with a customer, set carrier and product line details, premium amounts, effective/expiry dates, and assign agents or CSRs. AgencyZoom requires soldDate, agentId, premium, items, leadSourceId, locationId, effectiveDate, expiryDate, and an additional X-Api-Token connection credential.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -19,6 +19,16 @@ export let createPolicy = SlateTool.create(spec, {
       productLine: z
         .string()
         .describe('Product line name or ID (e.g. "Auto", "Home", "Life")'),
+      soldDate: z
+        .string()
+        .optional()
+        .describe('Sold date (YYYY-MM-DD). Required by AgencyZoom.'),
+      leadSourceId: z
+        .string()
+        .optional()
+        .describe(
+          'Lead source ID. Required by AgencyZoom; discover with list_reference_data.'
+        ),
       premium: z.number().optional().describe('Policy premium amount in cents'),
       items: z.number().optional().describe('Number of items or units covered by the policy'),
       effectiveDate: z
@@ -42,17 +52,15 @@ export let createPolicy = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {
       customerId: ctx.input.customerId,
       carrier: ctx.input.carrier,
       productLine: ctx.input.productLine
     };
+    if (ctx.input.soldDate !== undefined) data.soldDate = ctx.input.soldDate;
+    if (ctx.input.leadSourceId !== undefined) data.leadSourceId = ctx.input.leadSourceId;
     if (ctx.input.premium !== undefined) data.premium = ctx.input.premium;
     if (ctx.input.items !== undefined) data.items = ctx.input.items;
     if (ctx.input.effectiveDate !== undefined) data.effectiveDate = ctx.input.effectiveDate;

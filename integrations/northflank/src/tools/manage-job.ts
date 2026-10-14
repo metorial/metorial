@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageJob = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let manageJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       action: z.enum(['get', 'run', 'list_runs']).describe('Operation to perform'),
       projectId: z.string().describe('Project ID the job belongs to'),
       jobId: z.string().describe('Job ID'),
@@ -51,7 +53,9 @@ export let manageJob = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let { action, projectId, jobId } = ctx.input;
@@ -91,7 +95,7 @@ export let manageJob = SlateTool.create(spec, {
       let runs = (result.data?.runs || []).map((r: any) => ({
         runId: r.id,
         status: r.status,
-        createdAt: r.createdAt
+        createdAt: r.startedAt
       }));
       return {
         output: {
@@ -103,6 +107,6 @@ export let manageJob = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

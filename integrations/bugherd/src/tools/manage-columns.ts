@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let columnSchema = z.object({
@@ -13,19 +14,19 @@ let columnSchema = z.object({
 export let listColumns = SlateTool.create(spec, {
   name: 'List Columns',
   key: 'list_columns',
-  description: `List all custom Kanban board columns for a BugHerd project. Returns the column names and positions that extend the default workflow (backlog, todo, doing, done, closed).`,
+  description: `List built-in and custom Kanban board columns for a BugHerd project, including their IDs, names, and positions.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.number().describe('Project ID to list columns for')
+      projectId: positiveIntegerSchema.describe('Project ID to list columns for')
     })
   )
   .output(
     z.object({
-      columns: z.array(columnSchema).describe('Custom columns on the project board')
+      columns: z.array(columnSchema).describe('Columns on the project board')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,12 +37,12 @@ export let listColumns = SlateTool.create(spec, {
       columnId: c.id,
       name: c.name,
       position: c.position,
-      sortorder: c.sortorder
+      sortorder: c.sortorder ?? null
     }));
 
     return {
       output: { columns },
-      message: `Found **${columns.length}** custom column(s) in project ${ctx.input.projectId}.`
+      message: `Found **${columns.length}** column(s) in project ${ctx.input.projectId}.`
     };
   })
   .build();

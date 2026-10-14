@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createCredentialTemplate,
   createVerificationRequest,
+  getCredentialTemplate,
   getIssuanceSession,
+  getPresentationTemplate,
   getVerificationSession,
   issueCredential,
   listCredentialTemplates,
@@ -22,6 +24,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listCredentialTemplates,
+    getCredentialTemplate,
     createCredentialTemplate,
     issueCredential,
     getIssuanceSession,
@@ -30,6 +33,7 @@ export let provider = Slate.create({
     revokeCredentials,
     managePresentationTemplate,
     listPresentationTemplates,
+    getPresentationTemplate,
     manageDidcommConnection,
     listDidcommConnections,
     manageTrustedEntity,

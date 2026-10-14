@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ParseSettings {
   abuse?: boolean;
@@ -86,11 +86,13 @@ export interface CompareEntitiesResponse {
 }
 
 export interface LanguageInfo {
-  id: string;
+  id?: string;
+  isoCode?: string;
   name: string;
   englishName: string;
   nativeEncoding?: string;
   preferredFont?: string;
+  fontFace?: string;
   latin?: boolean;
   rightToLeft?: boolean;
 }
@@ -184,11 +186,15 @@ export class Client {
   private http;
 
   constructor(token: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.tisane.ai',
-      headers: {
-        'Ocp-Apim-Subscription-Key': token
-      }
+      authHeader: { name: 'Ocp-Apim-Subscription-Key', value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Tisane',
+          operation: 'request',
+          reason: 'tisane_api_error'
+        })
     });
   }
 
@@ -254,17 +260,17 @@ export class Client {
     content: string,
     settings: Record<string, any> = {}
   ): Promise<string> {
-    let response = await this.http.post('/transform', {
-      from,
-      to,
-      content,
-      settings
-    });
+    let response = await this.http.post<string>(
+      '/transform',
+      { from, to, content, settings },
+      { responseType: 'text' }
+    );
     return response.data;
   }
 
   async cleanUpText(content: string): Promise<string> {
-    let response = await this.http.post('/helper/extract_text', content, {
+    let response = await this.http.post<string>('/helper/extract_text', content, {
+      responseType: 'text',
       headers: {
         'Content-Type': 'text/plain'
       }
@@ -273,7 +279,7 @@ export class Client {
   }
 
   async listLanguages(): Promise<LanguageInfo[]> {
-    let response = await this.http.get('/languages');
+    let response = await this.http.get<LanguageInfo[]>('/languages');
     return response.data;
   }
 

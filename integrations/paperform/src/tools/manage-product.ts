@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Product } from '../lib/client';
 import { spec } from '../spec';
 
 let productImageSchema = z.object({
@@ -9,15 +9,17 @@ let productImageSchema = z.object({
   height: z.number().describe('Image height in pixels')
 });
 
-let productOutputSchema = z.object({
+export let productOutputSchema = z.object({
   sku: z.string().describe('Product SKU'),
-  name: z.string().describe('Product name'),
-  price: z.number().describe('Product price'),
-  quantity: z.number().describe('Available quantity'),
-  minimum: z.number().describe('Minimum selection quantity'),
-  maximum: z.number().describe('Maximum selection quantity'),
-  discountable: z.boolean().describe('Whether discounts apply'),
-  images: z.array(productImageSchema).describe('Product images')
+  name: z.string().nullable().describe('Product name'),
+  price: z.number().nullable().describe('Product price'),
+  quantity: z.number().nullable().describe('Available quantity'),
+  minimum: z.number().nullable().describe('Minimum selection quantity'),
+  maximum: z.number().nullable().describe('Maximum selection quantity'),
+  discountable: z.boolean().nullable().describe('Whether discounts apply'),
+  images: z
+    .array(productImageSchema.extend({ height: z.number().optional() }))
+    .describe('Product images')
 });
 
 export let listProducts = SlateTool.create(spec, {
@@ -57,13 +59,13 @@ export let listProducts = SlateTool.create(spec, {
 
     let products = result.results.map(p => ({
       sku: p.SKU,
-      name: p.name,
-      price: p.price,
-      quantity: p.quantity,
-      minimum: p.minimum,
-      maximum: p.maximum,
-      discountable: p.discountable,
-      images: p.images
+      name: p.name ?? null,
+      price: p.price ?? null,
+      quantity: p.quantity ?? null,
+      minimum: p.minimum ?? null,
+      maximum: p.maximum ?? null,
+      discountable: p.discountable ?? null,
+      images: p.images ?? []
     }));
 
     return {
@@ -86,6 +88,12 @@ export let createProduct = SlateTool.create(spec, {
     z.object({
       formSlugOrId: z.string().describe('The form slug, custom slug, or unique ID'),
       sku: z.string().describe('Unique product identifier (SKU)'),
+      productFieldKey: z
+        .string()
+        .optional()
+        .describe(
+          'Product field key from list_form_fields. Omit only when the form has exactly one product field.'
+        ),
       name: z.string().describe('Product name'),
       price: z.number().describe('Product price'),
       quantity: z.number().optional().describe('Available quantity'),
@@ -101,6 +109,7 @@ export let createProduct = SlateTool.create(spec, {
 
     let p = await client.createProduct(ctx.input.formSlugOrId, {
       SKU: ctx.input.sku,
+      productFieldKey: ctx.input.productFieldKey,
       name: ctx.input.name,
       price: ctx.input.price,
       quantity: ctx.input.quantity,
@@ -113,13 +122,13 @@ export let createProduct = SlateTool.create(spec, {
     return {
       output: {
         sku: p.SKU,
-        name: p.name,
-        price: p.price,
-        quantity: p.quantity,
-        minimum: p.minimum,
-        maximum: p.maximum,
-        discountable: p.discountable,
-        images: p.images
+        name: p.name ?? null,
+        price: p.price ?? null,
+        quantity: p.quantity ?? null,
+        minimum: p.minimum ?? null,
+        maximum: p.maximum ?? null,
+        discountable: p.discountable ?? null,
+        images: p.images ?? []
       },
       message: `Created product **${p.name}** (SKU: ${p.SKU}) at price ${p.price}.`
     };
@@ -161,7 +170,7 @@ export let updateProduct = SlateTool.create(spec, {
       ctx.input.discountable !== undefined ||
       ctx.input.images !== undefined;
 
-    let p: any;
+    let p: Product | undefined;
     if (hasMainUpdate) {
       p = await client.updateProduct(ctx.input.formSlugOrId, ctx.input.sku, {
         name: ctx.input.name,
@@ -174,7 +183,7 @@ export let updateProduct = SlateTool.create(spec, {
     }
 
     if (ctx.input.quantity !== undefined) {
-      p = await client.updateProductQuantity(
+      await client.updateProductQuantity(
         ctx.input.formSlugOrId,
         ctx.input.sku,
         ctx.input.quantity
@@ -182,27 +191,23 @@ export let updateProduct = SlateTool.create(spec, {
     }
 
     if (ctx.input.sold !== undefined) {
-      p = await client.updateProductSold(
-        ctx.input.formSlugOrId,
-        ctx.input.sku,
-        ctx.input.sold
-      );
+      await client.updateProductSold(ctx.input.formSlugOrId, ctx.input.sku, ctx.input.sold);
     }
 
-    if (!p) {
+    if (!p || ctx.input.quantity !== undefined || ctx.input.sold !== undefined) {
       p = await client.getProduct(ctx.input.formSlugOrId, ctx.input.sku);
     }
 
     return {
       output: {
         sku: p.SKU,
-        name: p.name,
-        price: p.price,
-        quantity: p.quantity,
-        minimum: p.minimum,
-        maximum: p.maximum,
-        discountable: p.discountable,
-        images: p.images
+        name: p.name ?? null,
+        price: p.price ?? null,
+        quantity: p.quantity ?? null,
+        minimum: p.minimum ?? null,
+        maximum: p.maximum ?? null,
+        discountable: p.discountable ?? null,
+        images: p.images ?? []
       },
       message: `Updated product **${p.name}** (SKU: ${p.SKU}).`
     };

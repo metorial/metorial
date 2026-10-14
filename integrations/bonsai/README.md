@@ -1,6 +1,8 @@
 # Bonsai
 
-Manage freelance and agency business operations including clients, proposals, contracts, invoices, projects, and deals. Create and update client records with contact details and notes. Send proposals and track when they are viewed or accepted. Generate contracts with e-signatures and monitor signing activity. Create and send invoices with automated payment reminders, track payment status, and support recurring invoices. Manage projects and tasks with assignees, due dates, priorities, and time tracking. Track deals through pipeline stages. Collect form responses and schedule events.
+Create and list clients, projects, deals, and tasks in Bonsai. Read task details, discover team members and task board columns, and apply saved task templates.
+
+Task operations and team/status discovery use the [Bonsai public API](https://docs.hellobonsai.com/api). Generate an access token in Settings → Integrations → API. Client, project, deal, and task-template tools retain the existing connector routes; their endpoint contracts are not published in the public API reference and may require a legacy Zapier key. See [API coverage and limitations](docs/SPEC.md).
 
 ## License
 

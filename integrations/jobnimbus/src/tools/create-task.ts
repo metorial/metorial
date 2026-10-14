@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,9 +16,17 @@ export let createTask = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Contact or job ID to associate this task with'),
-      recordTypeName: z.string().optional().describe('Record type name'),
+      recordTypeName: z
+        .string()
+        .optional()
+        .describe(
+          'Required task type name. Call get_account_settings to discover task types.'
+        ),
       priority: z.number().optional().describe('Task priority (numeric value)'),
-      dateStart: z.number().optional().describe('Start date as Unix timestamp'),
+      dateStart: z
+        .number()
+        .optional()
+        .describe('Required start date as Unix timestamp in seconds'),
       dateEnd: z.number().optional().describe('Due date as Unix timestamp'),
       owners: z.array(z.string()).optional().describe('Assignee user IDs'),
       tags: z.array(z.string()).optional().describe('Tags to assign')
@@ -32,6 +40,11 @@ export let createTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.dateStart === undefined || !ctx.input.recordTypeName?.trim()) {
+      throw createApiServiceError(
+        'Provide dateStart and recordTypeName. Call get_account_settings to discover task types.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let data: Record<string, any> = {
@@ -39,12 +52,12 @@ export let createTask = SlateTool.create(spec, {
     };
 
     if (ctx.input.description) data.description = ctx.input.description;
-    if (ctx.input.parentRecordId) data.primary = ctx.input.parentRecordId;
+    if (ctx.input.parentRecordId) data.related = [{ id: ctx.input.parentRecordId }];
     if (ctx.input.recordTypeName) data.record_type_name = ctx.input.recordTypeName;
     if (ctx.input.priority !== undefined) data.priority = ctx.input.priority;
-    if (ctx.input.dateStart) data.date_start = ctx.input.dateStart;
-    if (ctx.input.dateEnd) data.date_end = ctx.input.dateEnd;
-    if (ctx.input.owners) data.owners = ctx.input.owners;
+    if (ctx.input.dateStart !== undefined) data.date_start = ctx.input.dateStart;
+    if (ctx.input.dateEnd !== undefined) data.date_end = ctx.input.dateEnd;
+    if (ctx.input.owners) data.owners = ctx.input.owners.map(id => ({ id }));
     if (ctx.input.tags) data.tags = ctx.input.tags;
 
     let result = await client.createTask(data);

@@ -1,17 +1,12 @@
 {
   "name": "@metorial/productboard",
-  "description": "Manage product roadmaps, feedback, and feature prioritization. Create, read, update, and delete features, notes (feedback), releases, objectives, key results, and initiatives. Organize product hierarchy including products, components, and features with custom fields. Collect and manage user feedback and notes from any source. Plan delivery timelines with releases and release groups. Align product work with strategic goals through objectives and initiatives. Manage companies and users associated with feedback. Integrate with external tools via plugin integrations for two-way sync workflows.",
+  "description": "Read current Productboard entity records, discover workspace entity types and field configurations, and inspect the connected OAuth user. Entity reads use API v2; OAuth identity requires an OAuth connection. Retained legacy API v1 tools are unavailable after the announced July 8, 2026 sunset. See https://developer.productboard.com/v1.0.0/changelog/2026-04-09.",
   "categories": ["apis-and-http-requests", "task-and-project-management"],
   "skills": [
-    "manage features and subfeatures",
-    "collect and organize feedback",
-    "plan product releases",
-    "manage objectives and key results",
-    "create and manage initiatives",
-    "configure custom fields",
-    "manage companies and users",
-    "integrate external tools via plugins",
-    "manage product hierarchy"
+    "discover available entity types and field configurations",
+    "read and filter current entity records",
+    "paginate entity records",
+    "inspect the connected OAuth user and workspace"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/productboard.jpg"
 }

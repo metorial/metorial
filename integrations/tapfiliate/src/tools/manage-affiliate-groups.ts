@@ -30,8 +30,8 @@ export let listAffiliateGroups = SlateTool.create(spec, {
 
     let groups = results.map((r: any) => ({
       groupId: r.id,
-      title: r.title,
-      currency: r.currency
+      title: r.title ?? undefined,
+      currency: r.currency ?? undefined
     }));
 
     return {
@@ -64,8 +64,8 @@ export let createAffiliateGroup = SlateTool.create(spec, {
     return {
       output: {
         groupId: result.id,
-        title: result.title,
-        currency: result.currency
+        title: result.title ?? undefined,
+        currency: result.currency ?? undefined
       },
       message: `Created affiliate group **${result.title}** (\`${result.id}\`).`
     };
@@ -97,8 +97,8 @@ export let updateAffiliateGroup = SlateTool.create(spec, {
     return {
       output: {
         groupId: result.id,
-        title: result.title,
-        currency: result.currency
+        title: result.title ?? undefined,
+        currency: result.currency ?? undefined
       },
       message: `Updated affiliate group \`${ctx.input.groupId}\`.`
     };

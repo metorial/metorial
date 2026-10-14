@@ -6,14 +6,16 @@ import { spec } from '../spec';
 export let findEmail = SlateTool.create(spec, {
   name: 'Find Email',
   key: 'find_email',
-  description: `Discover valid, verified business email addresses by person name and company domain. Generates potential email addresses and verifies them in real time.
+  description: `Find candidate business email addresses by person name and company domain. Generates potential email addresses and checks them in real time.
 
 Provide a first name, last name, and domain for best accuracy. If only a domain is provided, functional emails like "contact@" or "support@" will be returned. Each result includes a confidence score.`,
   instructions: [
     'Provide at least a domain to search. For better accuracy, include both first name and last name.',
     'Results are returned with a confidence score indicating reliability.'
   ],
-  constraints: ['Only charges for email addresses returned with medium confidence or higher.'],
+  constraints: [
+    'A search with a name costs five credits; a domain-only search costs ten. Inspect confidence and verification result before using a candidate.'
+  ],
   tags: {
     readOnly: true,
     destructive: false
@@ -32,7 +34,13 @@ Provide a first name, last name, and domain for best accuracy. If only a domain 
         .array(
           z.object({
             email: z.string().describe('The discovered email address'),
-            confidence: z.string().describe('Confidence score of the result')
+            confidence: z.string().describe('Confidence score of the result'),
+            result: z
+              .string()
+              .optional()
+              .describe(
+                'Deliverability status of this candidate, when returned by the provider'
+              )
           })
         )
         .describe('List of discovered email addresses with confidence scores'),

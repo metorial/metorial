@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,8 +46,9 @@ export let forkCollectionTool = SlateTool.create(spec, {
     let { action, collectionId } = ctx.input;
 
     if (action === 'fork') {
-      if (!ctx.input.label) throw new Error('label is required for forking.');
-      if (!ctx.input.workspaceId) throw new Error('workspaceId is required for forking.');
+      if (!ctx.input.label) throw createApiServiceError('label is required for forking.');
+      if (!ctx.input.workspaceId)
+        throw createApiServiceError('workspaceId is required for forking.');
       let result = await client.forkCollection(
         collectionId,
         ctx.input.label,
@@ -66,7 +67,7 @@ export let forkCollectionTool = SlateTool.create(spec, {
 
     if (action === 'merge') {
       if (!ctx.input.sourceUid || !ctx.input.destinationUid) {
-        throw new Error('sourceUid and destinationUid are required for merge.');
+        throw createApiServiceError('sourceUid and destinationUid are required for merge.');
       }
       let result = await client.mergeCollectionFork(
         ctx.input.sourceUid,

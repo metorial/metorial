@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ReportData } from '../lib/client';
 import { pageOutputSchema, reportOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
@@ -28,11 +28,19 @@ export let getPage = SlateTool.create(spec, {
         ),
       reportsPageSize: z
         .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be safe whole numbers')
+        .min(1)
+        .max(500)
         .optional()
         .describe(
           'Number of reports to return when includeReports is true (1-500, default 50)'
         ),
-      reportsPageNumber: z.number().optional().describe('Page number for reports pagination')
+      reportsPageNumber: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be safe whole numbers')
+        .min(1)
+        .optional()
+        .describe('Page number for reports pagination')
     })
   )
   .output(
@@ -44,7 +52,19 @@ export let getPage = SlateTool.create(spec, {
       reports: z
         .array(reportOutputSchema)
         .optional()
-        .describe('Historical reports for this page, if requested')
+        .describe('Historical reports for this page, if requested'),
+      reportsCurrentPage: z
+        .number()
+        .optional()
+        .describe('Current report-history page, when requested'),
+      hasNextReportsPage: z
+        .boolean()
+        .optional()
+        .describe('Whether more historical reports are available'),
+      hasPrevReportsPage: z
+        .boolean()
+        .optional()
+        .describe('Whether earlier report-history pages are available')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,24 +72,24 @@ export let getPage = SlateTool.create(spec, {
 
     let page = await client.getPage(ctx.input.pageId);
 
-    let latestReport: any;
+    let latestReport: ReportData | undefined;
     if (ctx.input.includeLatestReport) {
-      try {
-        latestReport = await client.getPageLatestReport(ctx.input.pageId);
-      } catch (e) {
-        ctx.warn(
-          `Could not fetch latest report: ${e instanceof Error ? e.message : String(e)}`
-        );
-      }
+      latestReport = await client.getPageLatestReport(ctx.input.pageId);
     }
 
-    let reports: any;
+    let reports: ReportData[] | undefined;
+    let reportsCurrentPage: number | undefined;
+    let hasNextReportsPage: boolean | undefined;
+    let hasPrevReportsPage: boolean | undefined;
     if (ctx.input.includeReports) {
       let result = await client.listPageReports(ctx.input.pageId, {
         pageSize: ctx.input.reportsPageSize,
         pageNumber: ctx.input.reportsPageNumber
       });
       reports = result.items;
+      reportsCurrentPage = result.currentPage;
+      hasNextReportsPage = !!result.nextPage;
+      hasPrevReportsPage = !!result.prevPage;
     }
 
     let msg = `Page **${page.url}** — ${page.reportCount} report(s), monitored: ${page.monitored}`;
@@ -81,7 +101,14 @@ export let getPage = SlateTool.create(spec, {
     }
 
     return {
-      output: { page, latestReport, reports },
+      output: {
+        page,
+        latestReport,
+        reports,
+        reportsCurrentPage,
+        hasNextReportsPage,
+        hasPrevReportsPage
+      },
       message: msg
     };
   })

@@ -58,7 +58,7 @@ export let listCampaigns = SlateTool.create(spec, {
           subject: c.subject,
           title: c.title,
           status: c.status,
-          contentType: c.content_type,
+          contentType: c.content_type ?? c.editor ?? 'UNKNOWN',
           createdAt: c.created,
           modifiedAt: c.modified
         })),

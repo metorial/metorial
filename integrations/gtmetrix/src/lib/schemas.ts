@@ -4,8 +4,11 @@ export let reportOutputSchema = z.object({
   reportId: z.string().describe('Unique identifier of the report'),
   url: z.string().describe('The tested URL'),
   pageId: z.string().describe('Associated page ID'),
-  testId: z.string().describe('Test ID that generated this report'),
-  source: z.string().describe('Source of the test (e.g. "api", "ondemand", "monitor")'),
+  testId: z
+    .string()
+    .optional()
+    .describe('Test ID that generated this report, if still retained'),
+  source: z.string().describe('Source of the test (e.g. "api", "on-demand", "monitored")'),
   browser: z.string().describe('Browser ID used for the test'),
   location: z.string().describe('Location ID used for the test'),
   created: z.number().describe('Unix timestamp when the report was created'),
@@ -50,7 +53,7 @@ export let reportOutputSchema = z.object({
 
   resourceLinks: z
     .record(z.string(), z.string())
-    .describe('Links to report resources (HAR, screenshot, video, PDF, etc.)'),
+    .describe('Available report resource URLs. These API URLs require authentication.'),
   reportUrl: z.string().optional().describe('Public URL of the GTmetrix report')
 });
 

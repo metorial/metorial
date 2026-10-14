@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,6 +34,9 @@ export let getDesignTokens = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.styleguideId)) {
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
     let tokens: any;
 
@@ -42,7 +45,7 @@ export let getDesignTokens = SlateTool.create(spec, {
     } else if (ctx.input.styleguideId) {
       tokens = await client.getStyleguideDesignTokens(ctx.input.styleguideId);
     } else {
-      throw new Error('Either projectId or styleguideId must be provided');
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
     }
 
     return {

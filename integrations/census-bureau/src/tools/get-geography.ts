@@ -58,19 +58,19 @@ Use this to understand how to construct the \`forGeography\` and \`inGeography\`
       vintage: ctx.input.vintage
     });
 
-    let geographies = geoData.map((geo: any) => ({
+    let geographies = geoData.map(geo => ({
       name: geo.name || '',
       geoLevelDisplay: geo.geoLevelDisplay || undefined,
       referenceDate: geo.referenceDate || undefined,
-      requires: geo.requires
-        ? geo.requires.map((r: any) => (typeof r === 'string' ? r : r.toString()))
-        : undefined,
+      requires: geo.requires,
       wildcards: geo.wildcard
         ? Array.isArray(geo.wildcard)
           ? geo.wildcard
           : [geo.wildcard]
         : undefined,
-      optionalWithWCFor: geo.optionalWithWCFor || undefined
+      optionalWithWCFor: Array.isArray(geo.optionalWithWCFor)
+        ? geo.optionalWithWCFor.join(', ')
+        : geo.optionalWithWCFor || undefined
     }));
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,15 +57,18 @@ Uses posts under the hood, which leave a visible trace in the conversation histo
     let actions: string[] = [];
 
     if (ctx.input.mergeTargetConversationId) {
-      await client.mergeConversations(
+      let data = await client.mergeConversations(
         ctx.input.conversationId,
         ctx.input.mergeTargetConversationId,
         ctx.input.mergeSubject
       );
+      let mergedId = data.conversations?.[0]?.id;
+      if (!mergedId)
+        throw createApiServiceError('Missive did not return the merged conversation ID.');
       actions.push('merged');
       return {
         output: {
-          conversationId: ctx.input.mergeTargetConversationId,
+          conversationId: mergedId,
           merged: true
         },
         message: `Merged conversation **${ctx.input.conversationId}** into **${ctx.input.mergeTargetConversationId}**.`
@@ -74,7 +77,11 @@ Uses posts under the hood, which leave a visible trace in the conversation histo
 
     let post: Record<string, any> = {
       conversation: ctx.input.conversationId,
-      text: ''
+      text: 'Conversation updated via API.',
+      notification: {
+        title: 'Conversation updated',
+        body: 'Conversation state updated via API.'
+      }
     };
 
     if (ctx.input.close !== undefined) {

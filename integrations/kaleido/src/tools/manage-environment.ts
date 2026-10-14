@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId, environmentId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageEnvironment = SlateTool.create(spec, {
@@ -17,7 +18,7 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete'])
         .describe('Action to perform'),
-      consortiumId: z.string().describe('Consortium ID'),
+      consortiumId,
       environmentId: z
         .string()
         .optional()
@@ -25,11 +26,11 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       name: z.string().optional().describe('Environment name (required for create)'),
       description: z.string().optional().describe('Environment description'),
       provider: z
-        .enum(['geth', 'quorum', 'besu', 'corda', 'fabric'])
+        .enum(['geth', 'quorum', 'besu', 'corda', 'fabric', 'pantheon'])
         .optional()
         .describe('Blockchain protocol (required for create)'),
       consensusType: z
-        .enum(['poa', 'raft', 'ibft'])
+        .enum(['poa', 'raft', 'ibft', 'single-notary'])
         .optional()
         .describe('Consensus algorithm (required for create)'),
       blockPeriod: z.number().optional().describe('Block period in seconds'),
@@ -41,7 +42,7 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       environments: z
         .array(
           z.object({
-            environmentId: z.string().describe('Environment ID'),
+            environmentId,
             name: z.string().describe('Environment name'),
             description: z.string().optional().describe('Environment description'),
             provider: z.string().optional().describe('Blockchain protocol'),
@@ -66,7 +67,11 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       consensusType: z.string().optional().describe('Consensus algorithm'),
       state: z.string().optional().describe('Current state'),
       chainId: z.number().optional().describe('Chain ID'),
-      deleted: z.boolean().optional().describe('Whether the environment was deleted')
+      deleted: z.boolean().optional().describe('Whether the environment was deleted'),
+      deletionRequested: z
+        .boolean()
+        .optional()
+        .describe('Whether Kaleido accepted the deletion request')
     })
   )
   .handleInvocation(async ctx => {
@@ -80,15 +85,15 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       let mapped = environments.map((e: any) => ({
         environmentId: e._id,
         name: e.name,
-        description: e.description || undefined,
-        provider: e.provider || undefined,
-        consensusType: e.consensus_type || undefined,
-        state: e.state || undefined,
-        releaseId: e.release_id || undefined,
-        chainId: e.chain_id || undefined,
-        blockPeriod: e.block_period || undefined,
-        nodeCount: e.node_list?.length || undefined,
-        createdAt: e.created_at || undefined
+        description: e.description ?? undefined,
+        provider: e.provider ?? undefined,
+        consensusType: e.consensus_type ?? undefined,
+        state: e.state ?? undefined,
+        releaseId: e.release_id ?? undefined,
+        chainId: e.chain_id ?? undefined,
+        blockPeriod: e.block_period ?? undefined,
+        nodeCount: e.node_list?.length ?? undefined,
+        createdAt: e.created_at ?? undefined
       }));
 
       return {
@@ -98,14 +103,27 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required');
-      if (!ctx.input.provider) throw new Error('Provider is required');
-      if (!ctx.input.consensusType) throw new Error('Consensus type is required');
+      for (let [field, value] of Object.entries({
+        blockPeriod: ctx.input.blockPeriod,
+        chainId: ctx.input.chainId
+      })) {
+        if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+          throw createApiServiceError(`${field} must be a nonnegative whole number.`, {
+            reason: 'invalid_input'
+          });
+        }
+      }
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required', { reason: 'invalid_input' });
+      if (!ctx.input.provider)
+        throw createApiServiceError('Provider is required', { reason: 'invalid_input' });
+      if (!ctx.input.consensusType)
+        throw createApiServiceError('Consensus type is required', { reason: 'invalid_input' });
 
       let result = await client.createEnvironment(ctx.input.consortiumId, {
         name: ctx.input.name,
         description: ctx.input.description,
-        provider: ctx.input.provider,
+        provider: ctx.input.provider === 'besu' ? 'pantheon' : ctx.input.provider,
         consensus_type: ctx.input.consensusType,
         block_period: ctx.input.blockPeriod,
         chain_id: ctx.input.chainId
@@ -114,18 +132,19 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       return {
         output: {
           environmentId: result._id,
-          name: result.name,
-          description: result.description,
-          provider: result.provider,
-          consensusType: result.consensus_type,
-          state: result.state,
-          chainId: result.chain_id
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          provider: result.provider ?? undefined,
+          consensusType: result.consensus_type ?? undefined,
+          state: result.state ?? undefined,
+          chainId: result.chain_id ?? undefined
         },
         message: `Created environment **${result.name}** (\`${result._id}\`) with ${result.provider}/${result.consensus_type}.`
       };
     }
 
-    if (!ctx.input.environmentId) throw new Error('Environment ID is required');
+    if (!ctx.input.environmentId)
+      throw createApiServiceError('Environment ID is required', { reason: 'invalid_input' });
 
     if (ctx.input.action === 'get') {
       let result = await client.getEnvironment(
@@ -135,12 +154,12 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       return {
         output: {
           environmentId: result._id,
-          name: result.name,
-          description: result.description,
-          provider: result.provider,
-          consensusType: result.consensus_type,
-          state: result.state,
-          chainId: result.chain_id
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          provider: result.provider ?? undefined,
+          consensusType: result.consensus_type ?? undefined,
+          state: result.state ?? undefined,
+          chainId: result.chain_id ?? undefined
         },
         message: `Environment **${result.name}** — ${result.provider}/${result.consensus_type}, state: ${result.state || 'unknown'}.`
       };
@@ -160,25 +179,30 @@ Configure the blockchain protocol (Geth, Quorum, Besu, Corda, Fabric) and consen
       return {
         output: {
           environmentId: result._id,
-          name: result.name,
-          description: result.description,
-          provider: result.provider,
-          consensusType: result.consensus_type,
-          state: result.state,
-          chainId: result.chain_id
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          provider: result.provider ?? undefined,
+          consensusType: result.consensus_type ?? undefined,
+          state: result.state ?? undefined,
+          chainId: result.chain_id ?? undefined
         },
         message: `Updated environment **${result.name}**.`
       };
     }
 
     // delete
-    await client.deleteEnvironment(ctx.input.consortiumId, ctx.input.environmentId);
+    let result = await client.deleteEnvironment(
+      ctx.input.consortiumId,
+      ctx.input.environmentId
+    );
     return {
       output: {
         environmentId: ctx.input.environmentId,
-        deleted: true
+        deleted: result?.state === 'deleted',
+        deletionRequested: true,
+        state: result?.state ?? undefined
       },
-      message: `Deleted environment \`${ctx.input.environmentId}\`.`
+      message: `Kaleido accepted the deletion request for environment \`${ctx.input.environmentId}\`.`
     };
   })
   .build();

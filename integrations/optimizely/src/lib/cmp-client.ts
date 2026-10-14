@@ -1,10 +1,24 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+import { optimizelyErrorMapping } from './api-errors';
+
+let pagination = (page?: number, limit?: number) => {
+  if (page !== undefined && (!Number.isInteger(page) || page < 1))
+    throw createApiServiceError('page must be a positive whole number.');
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100))
+    throw createApiServiceError('limit must be a whole number between 1 and 100.');
+  return {
+    offset: page === undefined ? undefined : (page - 1) * (limit ?? 10),
+    page_size: limit
+  };
+};
 
 export class CmpClient {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(token: string) {
     this.axios = createAxios({
+      errorMapping: optimizelyErrorMapping,
+      timeout: 30000,
       baseURL: 'https://api.cmp.optimizely.com',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -13,23 +27,33 @@ export class CmpClient {
     });
   }
 
+  async getCurrentUser() {
+    let response = await this.axios.get(
+      'https://accounts.cmp.optimizely.com/o/oauth2/v1/userinfo'
+    );
+    return response.data;
+  }
+
   // Tasks
   async listTasks(params?: { page?: number; limit?: number; status?: string }) {
-    let response = await this.axios.get('/v3/tasks', { params });
+    let response = await this.axios.get('/v3/tasks', {
+      params: { ...pagination(params?.page, params?.limit), status: params?.status }
+    });
     return response.data;
   }
 
   async getTask(taskId: string) {
-    let response = await this.axios.get(`/v3/tasks/${taskId}`);
+    let response = await this.axios.get(`/v3/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
   async createTask(data: {
-    name: string;
+    title: string;
     description?: string;
     campaign_id?: string;
     assignee_id?: string;
-    due_date?: string;
+    due_at?: string;
+    owner_id?: string;
     workflow_id?: string;
     custom_fields?: Record<string, any>;
   }) {
@@ -38,39 +62,44 @@ export class CmpClient {
   }
 
   async updateTask(taskId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/v3/tasks/${taskId}`, data);
+    let response = await this.axios.patch(`/v3/tasks/${encodeURIComponent(taskId)}`, data);
     return response.data;
   }
 
   async deleteTask(taskId: string) {
-    let response = await this.axios.delete(`/v3/tasks/${taskId}`);
+    let response = await this.axios.delete(`/v3/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
   // Task Comments
   async listTaskComments(taskId: string) {
-    let response = await this.axios.get(`/v3/tasks/${taskId}/comments`);
+    let response = await this.axios.get(`/v3/tasks/${encodeURIComponent(taskId)}/comments`);
     return response.data;
   }
 
-  async createTaskComment(taskId: string, data: { body: string }) {
-    let response = await this.axios.post(`/v3/tasks/${taskId}/comments`, data);
+  async createTaskComment(taskId: string, data: { value: string }) {
+    let response = await this.axios.post(
+      `/v3/tasks/${encodeURIComponent(taskId)}/comments`,
+      data
+    );
     return response.data;
   }
 
   // Campaigns
   async listCampaigns(params?: { page?: number; limit?: number }) {
-    let response = await this.axios.get('/v3/campaigns', { params });
+    let response = await this.axios.get('/v3/campaigns', {
+      params: pagination(params?.page, params?.limit)
+    });
     return response.data;
   }
 
   async getCampaign(campaignId: string) {
-    let response = await this.axios.get(`/v3/campaigns/${campaignId}`);
+    let response = await this.axios.get(`/v3/campaigns/${encodeURIComponent(campaignId)}`);
     return response.data;
   }
 
   async createCampaign(data: {
-    name: string;
+    title: string;
     description?: string;
     start_date?: string;
     end_date?: string;
@@ -81,8 +110,36 @@ export class CmpClient {
   }
 
   async updateCampaign(campaignId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/v3/campaigns/${campaignId}`, data);
-    return response.data;
+    let response = await this.axios.patch(
+      `/v3/campaigns/${encodeURIComponent(campaignId)}`,
+      data
+    );
+    return response.status === 204 ? this.getCampaign(campaignId) : response.data;
+  }
+
+  private assetPath(
+    assetId: string,
+    assetType?: string,
+    action: 'get' | 'update' | 'delete' = 'get'
+  ) {
+    let paths: Record<string, string> = {
+      image: 'images',
+      video: 'videos',
+      article: 'articles',
+      raw_file: 'raw-files',
+      structured_content: 'structured-contents'
+    };
+    if (assetType && !paths[assetType])
+      throw createApiServiceError(
+        'assetType must be image, video, article, raw_file, or structured_content.'
+      );
+    let documentedType =
+      assetType &&
+      !(assetType === 'article' && action !== 'get') &&
+      !(assetType === 'structured_content' && action === 'delete')
+        ? assetType
+        : undefined;
+    return `/v3/${documentedType ? paths[documentedType] : 'assets'}/${encodeURIComponent(assetId)}`;
   }
 
   // Assets / Library
@@ -92,33 +149,47 @@ export class CmpClient {
     folder_id?: string;
     type?: string;
   }) {
-    let response = await this.axios.get('/v3/assets', { params });
+    let response = await this.axios.get('/v3/assets', {
+      params: {
+        ...pagination(params?.page, params?.limit),
+        folder_id: params?.folder_id,
+        type: params?.type
+      }
+    });
     return response.data;
   }
 
-  async getAsset(assetId: string) {
-    let response = await this.axios.get(`/v3/assets/${assetId}`);
+  async getAsset(assetId: string, assetType?: string) {
+    let response = await this.axios.get(this.assetPath(assetId, assetType));
     return response.data;
   }
 
-  async updateAsset(assetId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/v3/assets/${assetId}`, data);
+  async updateAsset(assetId: string, data: Record<string, any>, assetType?: string) {
+    let payload = this.assetPath(assetId, assetType, 'update').startsWith('/v3/assets/')
+      ? data
+      : { ...data, title: data.name, name: undefined };
+    let response = await this.axios.patch(
+      this.assetPath(assetId, assetType, 'update'),
+      payload
+    );
     return response.data;
   }
 
-  async deleteAsset(assetId: string) {
-    let response = await this.axios.delete(`/v3/assets/${assetId}`);
+  async deleteAsset(assetId: string, assetType?: string) {
+    let response = await this.axios.delete(this.assetPath(assetId, assetType, 'delete'));
     return response.data;
   }
 
   // Folders
   async listFolders(params?: { parent_id?: string }) {
-    let response = await this.axios.get('/v3/folders', { params });
+    let response = await this.axios.get('/v3/folders', {
+      params: { parent_folder_id: params?.parent_id }
+    });
     return response.data;
   }
 
   async getFolder(folderId: string) {
-    let response = await this.axios.get(`/v3/folders/${folderId}`);
+    let response = await this.axios.get(`/v3/folders/${encodeURIComponent(folderId)}`);
     return response.data;
   }
 
@@ -135,7 +206,9 @@ export class CmpClient {
   }
 
   async getWorkRequest(workRequestId: string) {
-    let response = await this.axios.get(`/v3/work-requests/${workRequestId}`);
+    let response = await this.axios.get(
+      `/v3/work-requests/${encodeURIComponent(workRequestId)}`
+    );
     return response.data;
   }
 
@@ -143,7 +216,8 @@ export class CmpClient {
     title: string;
     description?: string;
     assignee_id?: string;
-    due_date?: string;
+    due_at?: string;
+    owner_id?: string;
     custom_fields?: Record<string, any>;
   }) {
     let response = await this.axios.post('/v3/work-requests', data);
@@ -157,7 +231,7 @@ export class CmpClient {
   }
 
   async getUser(userId: string) {
-    let response = await this.axios.get(`/v3/users/${userId}`);
+    let response = await this.axios.get(`/v3/users/${encodeURIComponent(userId)}`);
     return response.data;
   }
 
@@ -173,7 +247,9 @@ export class CmpClient {
   }
 
   async getContentType(contentTypeId: string) {
-    let response = await this.axios.get(`/v3/content-types/${contentTypeId}`);
+    let response = await this.axios.get(
+      `/v3/content-types/${encodeURIComponent(contentTypeId)}`
+    );
     return response.data;
   }
 
@@ -189,7 +265,7 @@ export class CmpClient {
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await this.axios.delete(`/v3/webhooks/${webhookId}`);
+    let response = await this.axios.delete(`/v3/webhooks/${encodeURIComponent(webhookId)}`);
     return response.data;
   }
 }

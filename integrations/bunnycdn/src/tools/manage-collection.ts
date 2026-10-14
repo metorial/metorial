@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,8 +51,17 @@ export let manageCollection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!Number.isInteger(ctx.input.libraryId) || ctx.input.libraryId <= 0)
+      throw createApiServiceError('libraryId must be a positive integer.');
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      !ctx.input.collectionId?.trim()
+    )
+      throw createApiServiceError('collectionId is required for this action.');
+    if (['create', 'update'].includes(ctx.input.action) && !ctx.input.name?.trim())
+      throw createApiServiceError('A name is required for this collection action.');
     if (!ctx.auth.streamToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Stream Library API Key is required for collection operations. Please configure it in the authentication settings.'
       );
     }

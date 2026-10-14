@@ -13,7 +13,12 @@ export let getAttendance = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      date: z.string().optional().describe('Date to filter (YYYY-MM-DD)'),
+      date: z
+        .string()
+        .optional()
+        .describe('Single date (YYYY-MM-DD). Use this or both from and to.'),
+      from: z.string().optional().describe('Start date (YYYY-MM-DD) for a date range.'),
+      to: z.string().optional().describe('End date (YYYY-MM-DD) for a date range.'),
       userId: z.number().optional().describe('User ID to filter by')
     })
   )
@@ -27,7 +32,9 @@ export let getAttendance = SlateTool.create(spec, {
 
     let records = await client.getAttendance({
       date: ctx.input.date,
-      userId: ctx.input.userId
+      userId: ctx.input.userId,
+      from: ctx.input.from,
+      to: ctx.input.to
     });
 
     let recordList = Array.isArray(records) ? records : records ? [records] : [];

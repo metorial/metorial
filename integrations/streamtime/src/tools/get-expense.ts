@@ -49,20 +49,13 @@ export let getExpense = SlateTool.create(spec, {
     };
 
     if (ctx.input.includePurchaseOrder) {
-      try {
-        output.purchaseOrder = await client.getExpensePurchaseOrder(ctx.input.expenseId);
-      } catch {
-        output.purchaseOrder = undefined;
-      }
+      output.purchaseOrder =
+        (await client.getExpensePurchaseOrder(ctx.input.expenseId)) ?? undefined;
     }
     if (ctx.input.includePurchaseOrderLineItems) {
-      try {
-        output.purchaseOrderLineItems = await client.listExpensePurchaseOrderLineItems(
-          ctx.input.expenseId
-        );
-      } catch {
-        output.purchaseOrderLineItems = undefined;
-      }
+      output.purchaseOrderLineItems = await client.listExpensePurchaseOrderLineItems(
+        ctx.input.expenseId
+      );
     }
 
     return {

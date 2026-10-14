@@ -1,4 +1,4 @@
-# Slates Specification for Cabinpanda
+# CabinPanda Integration Specification
 
 ## Overview
 

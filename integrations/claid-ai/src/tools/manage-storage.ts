@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
     if (action === 'list') {
       ctx.info('Listing storage connectors');
       let result = await client.listStorages();
-      let storages = (result.data || []).map((s: any) => ({
+      let storages = (result.data || []).map(s => ({
         storageId: s.id,
         name: s.name,
         storageType: s.type,
@@ -87,7 +87,8 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
     }
 
     if (action === 'get') {
-      if (!ctx.input.storageId) throw new Error('storageId is required for get action');
+      if (ctx.input.storageId === undefined)
+        throw createApiServiceError('storageId is required for get action');
       ctx.info(`Getting storage connector ${ctx.input.storageId}`);
       let result = await client.getStorage(ctx.input.storageId);
       let s = result.data;
@@ -109,15 +110,25 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.storageType) throw new Error('storageType is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+      if (!ctx.input.storageType)
+        throw createApiServiceError('storageType is required for create action');
 
+      if (ctx.input.name.length > 50) {
+        throw createApiServiceError('Storage name must contain at most 50 characters.');
+      }
       let parameters: Record<string, unknown> = {};
 
       if (ctx.input.storageType === 'web_folder') {
-        if (!ctx.input.baseUrl) throw new Error('baseUrl is required for web_folder storage');
+        if (!ctx.input.baseUrl)
+          throw createApiServiceError('baseUrl is required for web_folder storage');
         parameters.base_url = ctx.input.baseUrl;
       } else {
+        if (!ctx.input.bucket || !ctx.input.accessKey || !ctx.input.secretAccessKey) {
+          throw createApiServiceError(
+            'bucket, accessKey, and secretAccessKey are required to create S3 or GCS storage.'
+          );
+        }
         if (ctx.input.bucket) parameters.bucket = ctx.input.bucket;
         if (ctx.input.path) parameters.path = ctx.input.path;
         if (ctx.input.accessKey && ctx.input.secretAccessKey) {
@@ -153,10 +164,16 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
     }
 
     if (action === 'update') {
-      if (!ctx.input.storageId) throw new Error('storageId is required for update action');
+      if (ctx.input.storageId === undefined)
+        throw createApiServiceError('storageId is required for update action');
 
       let updateParams: Record<string, unknown> = {};
-      if (ctx.input.name) updateParams.name = ctx.input.name;
+      if (ctx.input.name !== undefined) {
+        if (!ctx.input.name || ctx.input.name.length > 50) {
+          throw createApiServiceError('Storage name must contain 1–50 characters.');
+        }
+        updateParams.name = ctx.input.name;
+      }
       if (ctx.input.storageType) updateParams.type = ctx.input.storageType;
 
       let parameters: Record<string, unknown> = {};
@@ -165,7 +182,7 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
         parameters.bucket = ctx.input.bucket;
         hasParams = true;
       }
-      if (ctx.input.path) {
+      if (ctx.input.path !== undefined) {
         parameters.path = ctx.input.path;
         hasParams = true;
       }
@@ -173,14 +190,22 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
         parameters.base_url = ctx.input.baseUrl;
         hasParams = true;
       }
-      if (ctx.input.accessKey && ctx.input.secretAccessKey) {
+      if (ctx.input.accessKey !== undefined || ctx.input.secretAccessKey !== undefined) {
+        if (ctx.input.accessKey === '' || ctx.input.secretAccessKey === '') {
+          throw createApiServiceError('Storage credential values must not be empty.');
+        }
         parameters.credentials = {
-          access_key: ctx.input.accessKey,
-          secret_access_key: ctx.input.secretAccessKey
+          ...(ctx.input.accessKey !== undefined ? { access_key: ctx.input.accessKey } : {}),
+          ...(ctx.input.secretAccessKey !== undefined
+            ? { secret_access_key: ctx.input.secretAccessKey }
+            : {})
         };
         hasParams = true;
       }
       if (hasParams) updateParams.parameters = parameters;
+      if (!Object.keys(updateParams).length) {
+        throw createApiServiceError('Provide a storage name, type, or parameter to update.');
+      }
 
       ctx.info(`Updating storage connector ${ctx.input.storageId}`);
       let result = await client.updateStorage(ctx.input.storageId, updateParams);
@@ -203,7 +228,8 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
     }
 
     if (action === 'delete') {
-      if (!ctx.input.storageId) throw new Error('storageId is required for delete action');
+      if (ctx.input.storageId === undefined)
+        throw createApiServiceError('storageId is required for delete action');
 
       ctx.info(`Deleting storage connector ${ctx.input.storageId}`);
       await client.deleteStorage(ctx.input.storageId);
@@ -214,6 +240,6 @@ Use the appropriate **action** to list, create, get, update, or delete storage c
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

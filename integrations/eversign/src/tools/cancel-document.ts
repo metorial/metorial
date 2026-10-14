@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let cancelDocument = SlateTool.create(spec, {
   name: 'Cancel Document',
   key: 'cancel_document',
-  description: `Cancel an active document, preventing any further signing. Also supports trashing or permanently deleting documents that are in draft or cancelled state.`,
+  description: `Cancel an active document, move a document to trash, or permanently delete a cancelled or trashed document. Call list_businesses to discover the businessId.`,
   instructions: [
     'Use action "cancel" to cancel active documents.',
     'Use action "trash" to move documents to the trash.',
-    'Use action "delete" to permanently delete documents (must be in draft or cancelled state).'
+    'Cancel pending documents before deleting them. Trash completed or draft documents before deleting them.'
   ],
   tags: {
     destructive: true,
@@ -19,6 +20,7 @@ export let cancelDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       documentHash: z.string().describe('Unique hash identifier of the document'),
       action: z
         .enum(['cancel', 'trash', 'delete'])
@@ -33,7 +35,7 @@ export let cancelDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
 
     if (ctx.input.action === 'cancel') {
       await client.cancelDocument(ctx.input.documentHash);

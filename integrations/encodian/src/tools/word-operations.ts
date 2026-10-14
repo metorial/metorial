@@ -62,11 +62,13 @@ export let wordOperations = SlateTool.create(spec, {
       fileName: z.string().optional().describe('Output filename'),
       fileContent: z.string().optional().describe('Base64-encoded output file'),
       text: z.string().optional().describe('Extracted text (for extract_text operation)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
 
     switch (ctx.input.operation) {
@@ -80,9 +82,13 @@ export let wordOperations = SlateTool.create(spec, {
           output: {
             fileName: result.Filename,
             fileContent: result.FileContent,
+            operationStatus: client.operationStatus,
+            statusUrl: client.statusUrl,
             operationId: result.OperationId
           },
-          message: `Merged **${ctx.input.documents?.length || 0} documents** into **${result.Filename}**`
+          message: client.message(
+            `Merged **${ctx.input.documents?.length || 0} documents** into **${result.Filename}**`
+          )
         };
 
       case 'search_replace':
@@ -102,9 +108,11 @@ export let wordOperations = SlateTool.create(spec, {
         return {
           output: {
             text: result.text || result.Text || '',
+            operationStatus: client.operationStatus,
+            statusUrl: client.statusUrl,
             operationId: result.OperationId || ''
           },
-          message: `Successfully extracted text from Word document.`
+          message: client.message(`Successfully extracted text from Word document.`)
         };
 
       case 'add_text_watermark':
@@ -151,9 +159,13 @@ export let wordOperations = SlateTool.create(spec, {
       output: {
         fileName: result.Filename || '',
         fileContent: result.FileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}** on Word document.`
+      message: client.message(
+        `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}** on Word document.`
+      )
     };
   })
   .build();

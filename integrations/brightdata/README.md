@@ -1,6 +1,6 @@
 # Bright Data
 
-Scrape websites, bypass anti-bot protections, and extract structured data at scale. Unlock blocked web pages with automatic CAPTCHA solving and proxy rotation. Query search engines (Google, Bing, Yandex, DuckDuckGo) for SERP data with localization and device emulation. Run 120+ pre-built scrapers for popular platforms like Amazon, LinkedIn, and Airbnb. Crawl millions of pages simultaneously. Automate headless browsers via Puppeteer, Playwright, or Selenium with built-in anti-detection. Access pre-collected datasets from 100+ domains. Manage proxy networks across 195 countries with residential, datacenter, ISP, and mobile IPs. Configure zones and manage account settings.
+Unlock web pages, query search engines, and collect structured data with Bright Data's pre-built scrapers. Discover scraper IDs and input schemas, run synchronous or asynchronous collections, inspect job logs, and download completed snapshots. View account information and manage proxy or scraping zones.
 
 ## License
 

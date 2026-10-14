@@ -34,7 +34,7 @@ export let listProducts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
 
     let result = await client.listProducts({
       page: ctx.input.page,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -71,15 +71,15 @@ export let manageVideo = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Video GUID. Required for get, update, delete, and reencode.'),
-      title: z.string().optional().describe('Video title (create/update)'),
+      title: z.string().optional().describe('Video title (create/update/fetch)'),
       collectionId: z
         .string()
         .optional()
-        .describe('Collection ID to organize the video (create/update)'),
+        .describe('Collection ID to organize the video (create/update/fetch)'),
       thumbnailTime: z
         .number()
         .optional()
-        .describe('Timestamp in seconds for thumbnail generation (create)'),
+        .describe('Timestamp in seconds for thumbnail generation (create/fetch)'),
       fetchUrl: z.string().optional().describe('URL to fetch the video from (fetch action)'),
       fetchHeaders: z
         .record(z.string(), z.string())
@@ -133,8 +133,19 @@ export let manageVideo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!Number.isInteger(ctx.input.libraryId) || ctx.input.libraryId <= 0)
+      throw createApiServiceError('libraryId must be a positive integer.');
+    if (
+      ['get', 'update', 'delete', 'reencode'].includes(ctx.input.action) &&
+      !ctx.input.videoId?.trim()
+    )
+      throw createApiServiceError('videoId is required for this action.');
+    if (ctx.input.action === 'create' && !ctx.input.title?.trim())
+      throw createApiServiceError('A title is required to create a video.');
+    if (ctx.input.action === 'fetch' && !ctx.input.fetchUrl?.trim())
+      throw createApiServiceError('fetchUrl is required to import a video.');
     if (!ctx.auth.streamToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Stream Library API Key is required for video operations. Please configure it in the authentication settings.'
       );
     }
@@ -202,10 +213,14 @@ export let manageVideo = SlateTool.create(spec, {
       case 'fetch': {
         let data: any = { url: ctx.input.fetchUrl! };
         if (ctx.input.fetchHeaders) data.headers = ctx.input.fetchHeaders;
+        if (ctx.input.title !== undefined) data.title = ctx.input.title;
 
-        let result = await client.fetchVideo(ctx.input.libraryId, data);
+        let result = await client.fetchVideo(ctx.input.libraryId, data, {
+          collectionId: ctx.input.collectionId,
+          thumbnailTime: ctx.input.thumbnailTime
+        });
         return {
-          output: { success: true, video: result },
+          output: { success: result.success ?? true },
           message: `Started fetching video from **${ctx.input.fetchUrl}**. The video will be processed asynchronously.`
         };
       }

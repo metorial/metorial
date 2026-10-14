@@ -17,8 +17,11 @@ export let manageTeamMembership = SlateTool.create(spec, {
       action: z
         .enum(['add', 'remove'])
         .describe('Whether to add or remove the player from the team'),
-      teamId: z.string().describe('ID of the team'),
-      playerId: z.string().optional().describe('Pointagram player ID'),
+      teamId: z.string().describe('Team ID. Call list_teams to discover team IDs.'),
+      playerId: z
+        .string()
+        .optional()
+        .describe('Pointagram player ID. Call list_players to discover player IDs.'),
       playerName: z.string().optional().describe('Name of the player'),
       playerEmail: z.string().optional().describe('Email of the player'),
       playerExternalId: z.string().optional().describe('External ID of the player')

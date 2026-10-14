@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getProjectInfo = SlateTool.create(spec, {
@@ -24,20 +24,17 @@ export let getProjectInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let info = await client.getProjectInfo();
 
     return {
       output: {
-        projectId: info.project_id || ctx.config.projectId,
+        projectId: info.project_id || client.projectId,
         projectName: info.name,
         eventCollections: info.events,
         projectDetails: info
       },
-      message: `Project **${info.name || ctx.config.projectId}** has **${info.events?.length ?? 0}** event collection(s).`
+      message: `Project **${info.name || client.projectId}** has **${info.events?.length ?? 0}** event collection(s).`
     };
   });

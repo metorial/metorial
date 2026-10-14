@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTask = SlateTool.create(spec, {
   name: 'Manage Task',
   key: 'manage_task',
-  description: `Create, update, or delete a task type in Harvest. Tasks are reusable categories that can be assigned to projects. They can have default hourly rates and billable settings.`,
+  description: `Create, update, or delete a task type in Harvest. Tasks are reusable categories that can be assigned to projects. They can have default hourly rates and billable settings. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   constraints: ['Tasks cannot be deleted if they have associated time entries.'],
   tags: {
     destructive: true,
@@ -15,6 +16,7 @@ export let manageTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       taskId: z.number().optional().describe('Task ID (required for update/delete)'),
       name: z.string().optional().describe('Task name (required for create)'),
@@ -38,11 +40,11 @@ export let manageTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.taskId) throw new Error('taskId is required for delete');
+      if (!ctx.input.taskId) throw createApiServiceError('taskId is required for delete');
       await client.deleteTask(ctx.input.taskId);
       return {
         output: { taskId: ctx.input.taskId, deleted: true },
@@ -51,7 +53,7 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let t = await client.createTask({
         name: ctx.input.name,
         billableByDefault: ctx.input.billableByDefault,
@@ -73,7 +75,7 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.taskId) throw new Error('taskId is required for update');
+    if (!ctx.input.taskId) throw createApiServiceError('taskId is required for update');
     let t = await client.updateTask(ctx.input.taskId, {
       name: ctx.input.name,
       billableByDefault: ctx.input.billableByDefault,

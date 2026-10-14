@@ -1,15 +1,94 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export type LeadTransaction = {
+  resourceId: string;
+  cell: string;
+  campaignId?: string;
+  sendId?: string;
+  clickId?: string;
+  status?: 'completed' | 'pending' | 'rejected';
+};
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Dripcel API key is required. Reconnect with a valid key.'
+      );
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.dripcel.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+      timeout: 30000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Dripcel',
+          reason: 'dripcel_api_error',
+          nestedKeys: ['error', 'errors', 'issues'],
+          extractResponse: (failure, helpers) => {
+            let response = helpers.getResponse(failure);
+            if (!helpers.isRecord(failure) || !helpers.isRecord(failure.data)) {
+              return response;
+            }
+            let normalized = failure.data;
+            let upstream = helpers.isRecord(normalized.upstream)
+              ? normalized.upstream
+              : undefined;
+            let baggage = helpers.isRecord(normalized.baggage)
+              ? normalized.baggage
+              : undefined;
+            let status = upstream?.status ?? normalized.status ?? response?.status;
+            return {
+              ...response,
+              status:
+                typeof status === 'number' || typeof status === 'string' ? status : undefined,
+              data: baggage?.response ?? response?.data
+            };
+          },
+          extractUpstreamCode: (failure, response, helpers) => {
+            if (helpers.isRecord(response?.data) && helpers.isRecord(response.data.error)) {
+              let code = response.data.error.code;
+              if (typeof code === 'string') return code;
+            }
+            if (helpers.isRecord(failure) && helpers.isRecord(failure.data)) {
+              let upstream = failure.data.upstream;
+              if (helpers.isRecord(upstream) && typeof upstream.code === 'string') {
+                return upstream.code;
+              }
+            }
+            return undefined;
+          }
+        })
+    });
+
+    this.axios.interceptors.response.use(response => {
+      if (!isApiErrorRecord(response.data) || typeof response.data.ok !== 'boolean') {
+        throw createApiServiceError('Dripcel returned an invalid response. Try again later.');
       }
+      if (!response.data.ok) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data: response.data } },
+          {
+            providerLabel: 'Dripcel',
+            reason: 'dripcel_api_error',
+            nestedKeys: ['error', 'errors', 'issues'],
+            extractUpstreamCode: () =>
+              isApiErrorRecord(response.data.error) &&
+              typeof response.data.error.code === 'string'
+                ? response.data.error.code
+                : undefined
+          }
+        );
+      }
+      return response;
     });
   }
 
@@ -29,6 +108,16 @@ export class Client {
     projection?: Record<string, number>;
     options?: { skip?: number; limit?: number };
   }) {
+    if (
+      !params.find?.cell?.length &&
+      !params.find?.tag_ids?.$in?.length &&
+      !params.find?.tag_ids?.$all?.length &&
+      !params.find?.updatedAt?.$gte &&
+      !params.find?.updatedAt?.$lte
+    ) {
+      throw createApiServiceError('Provide at least one contact search filter.');
+    }
+    this.validatePagination(params.options);
     let res = await this.axios.post('/contacts/search', params);
     return res.data;
   }
@@ -179,9 +268,20 @@ export class Client {
     return res.data;
   }
 
+  async getCampaignsV2(campaignId?: string) {
+    let path = campaignId
+      ? `/campaigns/v2/${encodeURIComponent(campaignId)}`
+      : '/campaigns/v2';
+    let res = await this.axios.get(path);
+    return res.data;
+  }
+
   // ── Deliveries ────────────────────────────────────────────
 
   async getDeliveries(params: { cell?: string; customerId?: string }) {
+    if (!params.cell && !params.customerId) {
+      throw createApiServiceError('Provide cell or customerId to look up deliveries.');
+    }
     let queryParams: Record<string, string> = {};
     if (params.cell) queryParams.cell = params.cell;
     if (params.customerId) queryParams.customerId = params.customerId;
@@ -205,6 +305,7 @@ export class Client {
     };
     options?: { skip?: number; limit?: number };
   }) {
+    this.validatePagination(params.options);
     let body: Record<string, any> = {};
     if (params.find) {
       body.find = {};
@@ -301,6 +402,19 @@ export class Client {
 
   // ── Exchange Transactions ─────────────────────────────────
 
+  async createTransactions(leads: LeadTransaction[]) {
+    let body = leads.map(lead => ({
+      resource_id: lead.resourceId,
+      cell: lead.cell,
+      ...(lead.campaignId !== undefined ? { campaign_id: lead.campaignId } : {}),
+      ...(lead.sendId !== undefined ? { send_id: lead.sendId } : {}),
+      ...(lead.clickId !== undefined ? { click_id: lead.clickId } : {}),
+      ...(lead.status !== undefined ? { status: lead.status } : {})
+    }));
+    let res = await this.axios.post('/exchange/buyer/transaction', body);
+    return res.data;
+  }
+
   async updateTransactionStatus(transactionId: string, status: 'completed' | 'rejected') {
     let res = await this.axios.put(
       `/exchange/buyer/transaction/${encodeURIComponent(transactionId)}/status`,
@@ -329,5 +443,13 @@ export class Client {
   async getBalance() {
     let res = await this.axios.get('/balance');
     return res.data;
+  }
+
+  private validatePagination(options?: { skip?: number; limit?: number }) {
+    for (let [field, value] of Object.entries(options ?? {})) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+        throw createApiServiceError(`${field} must be a non-negative whole number.`);
+      }
+    }
   }
 }

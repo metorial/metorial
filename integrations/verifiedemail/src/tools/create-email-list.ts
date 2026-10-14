@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { emailListSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createEmailList = SlateTool.create(spec, {
@@ -21,21 +22,13 @@ Use this to prepare a batch of emails for bulk verification.`,
   .input(
     z.object({
       name: z.string().describe('A descriptive name for the email list'),
-      emails: z.array(z.string()).describe('Array of email addresses to add to the list')
+      emails: z
+        .array(z.string())
+        .min(1)
+        .describe('Array of email addresses to add to the list')
     })
   )
-  .output(
-    z.object({
-      listId: z.string().describe('Unique identifier of the created list'),
-      name: z.string().describe('Name of the email list'),
-      emailCount: z.number().describe('Total number of email addresses in the list'),
-      verifiedCount: z.number().describe('Number of verified email addresses'),
-      unverifiedCount: z.number().describe('Number of unverified email addresses'),
-      status: z.string().describe('Current status of the list'),
-      createdAt: z.string().describe('When the list was created'),
-      updatedAt: z.string().describe('When the list was last updated')
-    })
-  )
+  .output(emailListSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -46,7 +39,7 @@ Use this to prepare a batch of emails for bulk verification.`,
 
     return {
       output: list,
-      message: `Created email list **"${list.name}"** with **${list.emailCount}** email(s). List ID: \`${list.listId}\`. Status: **${list.status}**.`
+      message: `Created email list **"${list.name}"** for verification. List ID: \`${list.listId}\`. Status: **${list.status}**.`
     };
   })
   .build();

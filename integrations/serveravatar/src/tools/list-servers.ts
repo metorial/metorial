@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listServers = SlateTool.create(spec, {
   name: 'List Servers',
   key: 'list_servers',
   description: `List all servers within an organization, with pagination support. Returns server details including IP, OS, web server type, database type, and health status.
-Optionally retrieve a single server's full details by providing a serverId.`,
+Optionally retrieve a single server's full details by providing a serverId.
+${organizationScopeGuidance}`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,7 +17,7 @@ Optionally retrieve a single server's full details by providing a serverId.`,
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z
         .string()
         .optional()
@@ -36,7 +38,8 @@ Optionally retrieve a single server's full details by providing a serverId.`,
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     if (ctx.input.serverId) {
       let server = await client.getServer(orgId, ctx.input.serverId);

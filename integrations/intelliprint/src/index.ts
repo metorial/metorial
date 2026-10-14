@@ -3,12 +3,15 @@ import { spec } from './spec';
 import {
   addRecipient,
   cancelPrintJob,
+  createBackground,
   createMailingList,
   createPrintJob,
   deleteBackground,
   deleteMailingList,
   deleteRecipient,
+  downloadLetterPreview,
   getBackground,
+  getFileUrl,
   getMailingList,
   getPrintJob,
   getRecipient,
@@ -16,6 +19,7 @@ import {
   listMailingLists,
   listPrintJobs,
   listRecipients,
+  updateBackground,
   updateMailingList,
   updatePrintJob,
   updateRecipient
@@ -23,6 +27,10 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    createBackground,
+    updateBackground,
+    downloadLetterPreview,
+    getFileUrl,
     createPrintJob,
     getPrintJob,
     listPrintJobs,

@@ -49,9 +49,17 @@ export let verifyEmail = SlateTool.create(spec, {
       score: z.number().describe('Deliverability score from 0 (worst) to 100 (best)'),
       domain: z.string().describe('The domain part of the email address'),
       user: z.string().describe('The user (local) part of the email address'),
+      birthYear: z
+        .number()
+        .int()
+        .nullable()
+        .describe('Possible birth year inferred from the email address, or null when unknown'),
       acceptAll: z
         .boolean()
-        .describe('Whether the mail server accepts all addresses regardless of validity'),
+        .nullable()
+        .describe(
+          'Whether the mail server accepts all addresses regardless of validity; null when not checked'
+        ),
       disposable: z
         .boolean()
         .describe('Whether the email is hosted on a disposable/temporary email service'),

@@ -32,11 +32,11 @@ export let listDocuments = SlateTool.create(spec, {
       receivedAfter: z
         .string()
         .optional()
-        .describe('Filter documents received after this date (ISO 8601)'),
+        .describe('Filter documents received after this date (YYYY-MM-DD)'),
       receivedBefore: z
         .string()
         .optional()
-        .describe('Filter documents received before this date (ISO 8601)'),
+        .describe('Filter documents received before this date (YYYY-MM-DD)'),
       timezone: z
         .string()
         .optional()
@@ -57,7 +57,9 @@ export let listDocuments = SlateTool.create(spec, {
           fileName: z.string().describe('Original file name'),
           contentType: z.string().nullable().describe('MIME content type'),
           created: z.string().describe('Upload timestamp (ISO 8601)'),
-          modified: z.string().describe('Last modification timestamp (ISO 8601)'),
+          modified: z
+            .string()
+            .describe('Processing timestamp, or upload timestamp while processing is pending'),
           creditUsage: z.number().describe('Credits consumed by this document'),
           parsedResult: z
             .record(z.string(), z.any())

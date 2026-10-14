@@ -1,6 +1,4 @@
-Now I have enough information. Let me also check the API base URL and confirm filtering capabilities.
-
-# Slates Specification for Mopinion
+# Mopinion Specification
 
 ## Overview
 
@@ -14,7 +12,7 @@ Credentials can be created via the Mopinion Suite at Integrations » Feedback AP
 
 The authentication flow works as follows:
 
-1. **Obtain credentials**: You need a **public key** and a **private key** (also referred to as a signature token) from your Mopinion account.
+1. **Obtain credentials**: You need a **public key** and a **private key** from your Mopinion account.
 2. **Get a signature token**: A signature token is retrieved from the API for a specific private_key and public_key. When instantiating, a signature token is retrieved from the API and stored using your private_key and public_key.
 3. **Sign each request**: In each request, an HMAC signature will be created using SHA256-hashing, and encrypted with your signature_token. This HMAC signature is encoded together with the public_key. After this encryption, the token is set into the headers under the `X-Auth-Token` key.
 
@@ -43,17 +41,23 @@ Reports contain metadata such as name, description, language, creation date, and
 
 ### Datasets
 
-Datasets belong to reports and include properties like name, description, and data source. You can retrieve, add, update, and delete datasets. Datasets represent the structured collections of feedback data within a report.
+Datasets belong to reports and include properties like name, description, and data source. Retrieve a report with `list_reports` to discover its datasets, then use `get_dataset` for details. The integration also retains legacy dataset management actions. Datasets represent the structured collections of feedback data within a report.
 
 ### Feedback Retrieval
 
 Retrieve feedback data from reports or datasets. Feedback can be filtered using various criteria:
 
-- Filters include date, rating (numeric), NPS (Net Promoter Score, 0-10), CES (Customer Effort Score, 1-5), CES inverse, GCR (Goal Completion Rate with options: no, partly, yes), and tags.
+- Filters include date, rating (numeric), NPS (Net Promoter Score, 0-10), CES (Customer Effort Score, 1-5), CES inverse, GCR (Goal Completion Rate with options: no, partly, yes), and tags. Prefix a filter value with `!`, `<`, `<<`, `>`, or `>>` to apply a comparison, for example `filterNps: ">8"`.
+- Pagination supports up to 1000 feedback entries per request.
+- Use `feedbackId` to retrieve one feedback entry or a comma-separated selection within a report or dataset.
 
 ### Fields
 
 Retrieve the field definitions (questions and metadata fields) configured for a given report or dataset. This is useful for understanding the structure of collected feedback data.
+
+## API Compatibility
+
+Read operations use the documented stable v2.5 API. Existing management actions retain their legacy v2.0 API requests; the current public reference does not list their write routes.
 
 ## Events
 

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { scrapeOptionsSchema, sessionOptionsSchema } from '../lib/schemas';
+import { getScreenshotFile } from '../lib/screenshot';
 import { spec } from '../spec';
 
 export let crawlWebsite = SlateTool.create(spec, {
@@ -91,10 +92,16 @@ Starts the crawl job, waits for completion, and returns all crawled page content
     ctx.progress('Waiting for crawl job to complete...');
     let result = await client.pollForCompletion(
       () => client.getCrawlJobStatus(jobId),
-      () => client.getCrawlJobResult(jobId)
+      () => client.getCrawlJobResult(jobId),
+      { jobId }
     );
 
     let pages = result.data as Record<string, unknown>[] | undefined;
+    for (let page of pages ?? []) {
+      if (typeof page.screenshot === 'string' && page.screenshot) {
+        await ctx.addAttachment(getScreenshotFile(page.screenshot));
+      }
+    }
 
     return {
       output: {
@@ -110,7 +117,7 @@ Starts the crawl job, waits for completion, and returns all crawled page content
           html: p.html as string | undefined,
           links: p.links as string[] | undefined
         })),
-        error: result.error as string | undefined
+        error: typeof result.error === 'string' ? result.error : undefined
       },
       message: `Crawl completed for **${ctx.input.url}**. **${result.totalCrawledPages ?? pages?.length ?? 0}** pages crawled.`
     };

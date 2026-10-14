@@ -8,9 +8,11 @@ import {
   getAccountMedia,
   getBrandMentions,
   getInfluencerReport,
+  getKeywordPosts,
   getMetricsHistory,
   getMyNetwork,
   getReportConnections,
+  getTaxonomy,
   manageLists,
   searchInfluencers
 } from './tools';
@@ -29,7 +31,9 @@ export let provider = Slate.create({
     getMetricsHistory,
     getMyNetwork,
     getAccountActivity,
-    getReportConnections
+    getReportConnections,
+    getTaxonomy,
+    getKeywordPosts
   ],
   triggers: []
 });

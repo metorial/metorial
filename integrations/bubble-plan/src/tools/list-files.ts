@@ -43,7 +43,7 @@ export let listFiles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
 
     let result = await client.getFiles({

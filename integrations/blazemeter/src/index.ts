@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCurrentUser,
   getTest,
   getTestResults,
   listTests,
@@ -20,6 +21,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listTests,
     getTest,
     manageTest,

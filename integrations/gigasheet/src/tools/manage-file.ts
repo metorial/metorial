@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,14 +46,14 @@ export let manageFile = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'rename':
         if (!ctx.input.sheetHandle || !ctx.input.newName) {
-          throw new Error('sheetHandle and newName are required for rename');
+          throw createApiServiceError('sheetHandle and newName are required for rename');
         }
         result = await client.renameFile(ctx.input.sheetHandle, ctx.input.newName);
         break;
 
       case 'copy':
         if (!ctx.input.sheetHandle) {
-          throw new Error('sheetHandle is required for copy');
+          throw createApiServiceError('sheetHandle is required for copy');
         }
         result = await client.copyFile(ctx.input.sheetHandle, {
           name: ctx.input.newName,
@@ -63,21 +63,25 @@ export let manageFile = SlateTool.create(spec, {
 
       case 'move':
         if (!ctx.input.sheetHandle || !ctx.input.targetFolderHandle) {
-          throw new Error('sheetHandle and targetFolderHandle are required for move');
+          throw createApiServiceError(
+            'sheetHandle and targetFolderHandle are required for move'
+          );
         }
         result = await client.moveFile(ctx.input.sheetHandle, ctx.input.targetFolderHandle);
         break;
 
       case 'delete':
         if (!ctx.input.sheetHandle) {
-          throw new Error('sheetHandle is required for delete');
+          throw createApiServiceError('sheetHandle is required for delete');
         }
         await client.deleteFile(ctx.input.sheetHandle);
         break;
 
       case 'combine':
         if (!ctx.input.combineHandles || ctx.input.combineHandles.length < 2) {
-          throw new Error('combineHandles with at least 2 handles is required for combine');
+          throw createApiServiceError(
+            'combineHandles with at least 2 handles is required for combine'
+          );
         }
         result = await client.combineFiles(ctx.input.combineHandles, {
           name: ctx.input.newName,

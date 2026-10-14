@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageDocument = SlateTool.create(spec, {
   name: 'Manage Document',
   key: 'manage_document',
-  description: `Perform management actions on an existing document: revoke (cancel) a document in progress, send a reminder to pending signers, or permanently delete a document. Specify exactly one action to perform.`,
+  description: `Revoke a document in progress, send a reminder to pending signers, or delete a document. Delete moves the document to Trash unless deletePermanently is true. Specify exactly one action to perform.`,
   instructions: [
     'Only one action (revoke, remind, or delete) can be performed per invocation.',
     'Revoking requires a message explaining the reason.',
@@ -30,6 +30,12 @@ export let manageDocument = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Custom message to include with the reminder'),
+      deletePermanently: z
+        .boolean()
+        .optional()
+        .describe(
+          'Permanently delete instead of moving to Trash; used only with action delete'
+        ),
       onBehalfOf: z
         .string()
         .optional()
@@ -45,7 +51,7 @@ export let manageDocument = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 
@@ -53,13 +59,13 @@ export let manageDocument = SlateTool.create(spec, {
 
     if (action === 'revoke') {
       if (!revokeMessage) {
-        throw new Error('revokeMessage is required when action is "revoke"');
+        throw createApiServiceError('revokeMessage is required when action is "revoke".');
       }
       await client.revokeDocument(documentId, revokeMessage, onBehalfOf);
     } else if (action === 'remind') {
       await client.remindDocument(documentId, reminderMessage, onBehalfOf);
     } else if (action === 'delete') {
-      await client.deleteDocument(documentId);
+      await client.deleteDocument(documentId, ctx.input.deletePermanently);
     }
 
     let actionLabels: Record<string, string> = {

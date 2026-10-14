@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { taskState } from '../lib/task-values';
 import { spec } from '../spec';
 
 export let listIssues = SlateTool.create(spec, {
@@ -13,8 +14,14 @@ export let listIssues = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      status: z.array(z.string()).optional().describe('Filter by issue status values'),
-      priority: z.array(z.string()).optional().describe('Filter by priority levels'),
+      status: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by issue status IDs or names: open or resolved'),
+      priority: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by priority IDs or names: none, low, medium, high'),
       categoryIds: z.array(z.string()).optional().describe('Filter by issue category IDs'),
       siteIds: z.array(z.string()).optional().describe('Filter by site IDs'),
       pageSize: z.number().optional().describe('Number of results per page'),
@@ -54,18 +61,21 @@ export let listIssues = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let issues = result.issues.map((i: any) => ({
-      issueId: i.id || i.incident_id,
-      title: i.title,
-      description: i.description,
-      status: i.status,
-      priority: i.priority,
-      categoryId: i.category_id || i.category?.id,
-      siteId: i.site_id || i.site?.id,
-      dueAt: i.due_at,
-      occurredAt: i.occurred_at,
-      createdAt: i.created_at
-    }));
+    let issues = result.issues.map((issue: any) => {
+      let i = issue.task ?? issue;
+      return {
+        issueId: i.task_id || i.id || issue.incident_id,
+        title: i.title ?? undefined,
+        description: i.description ?? undefined,
+        status: taskState(i.status) ?? i.status_id ?? undefined,
+        priority: taskState(i.priority) ?? i.priority_id ?? undefined,
+        categoryId: issue.category_id ?? issue.category?.id ?? undefined,
+        siteId: i.site_id ?? i.site?.site_id ?? i.site?.id ?? undefined,
+        dueAt: i.due_at ?? undefined,
+        occurredAt: i.occurred_at ?? undefined,
+        createdAt: i.created_at ?? undefined
+      };
+    });
 
     return {
       output: { issues, nextPageToken: result.nextPageToken },

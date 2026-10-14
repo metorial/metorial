@@ -49,7 +49,8 @@ export let autosuggestPlaces = SlateTool.create(spec, {
   description: `Get real-time place and address suggestions as the user types. Returns a mix of places, addresses, and query completions optimized for search-as-you-type UIs.
 Supports both the autosuggest endpoint (places + query suggestions) and the autocomplete endpoint (address completion only).`,
   instructions: [
-    'Either "at" or "inArea" is required to scope the suggestions geographically.',
+    'Autosuggest requires "at" or an "inArea" circle/bounding box. Autocomplete can also use a country filter alone.',
+    'Do not combine "at" with an "inArea" circle or bounding box.',
     'Set mode to "autocomplete" for address-only completions, or "autosuggest" (default) for places + query suggestions.'
   ],
   tags: {

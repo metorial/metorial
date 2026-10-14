@@ -1,17 +1,53 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  collectApiErrorDetails,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.referralrock.com';
 
 export class ReferralRockClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'Referral Rock API credentials are missing. Reconnect with your API keys.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Basic ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      authHeader: { value: `Basic ${config.token}` },
+      errorMapping: {
+        mapAxiosError: error => {
+          let details: string[] = [];
+          collectApiErrorDetails(error.response?.data, details, {
+            detailKeys: [
+              'message',
+              'Message',
+              'ExceptionMessage',
+              'error',
+              'error_description'
+            ],
+            nestedKeys: ['resultInfo', 'errors']
+          });
+          let data = error.response?.data;
+          if (isApiErrorRecord(data) && isApiErrorRecord(data.ModelState)) {
+            for (let value of Object.values(data.ModelState)) {
+              collectApiErrorDetails(value, details);
+            }
+          }
+          return details.length > 0 ? { message: details.join(' - ') } : undefined;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Referral Rock',
+          reason: 'referralrock_api_error'
+        })
     });
   }
 
@@ -22,6 +58,7 @@ export class ReferralRockClient {
     offset?: number;
     count?: number;
   }): Promise<Record<string, unknown>> {
+    validatePagination(params);
     let response = await this.axios.get('/api/programs', { params });
     return response.data;
   }
@@ -45,12 +82,18 @@ export class ReferralRockClient {
     offset?: number;
     count?: number;
   }): Promise<Record<string, unknown>> {
+    validatePagination(params);
     let response = await this.axios.get('/api/members', { params });
     return response.data;
   }
 
-  async createMember(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/api/members', body);
+  async createMember(
+    body: Record<string, unknown>,
+    shouldSendEmail?: boolean
+  ): Promise<Record<string, unknown>> {
+    let response = await this.axios.post('/api/members', body, {
+      params: { shouldSendEmail }
+    });
     return response.data;
   }
 
@@ -64,9 +107,9 @@ export class ReferralRockClient {
     return response.data;
   }
 
-  async getMemberStats(memberId: string): Promise<Record<string, unknown>> {
+  async getMemberStats(query: string, timePeriod: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/api/memberstats/getsingle', {
-      params: { memberId }
+      params: { query, timePeriod }
     });
     return response.data;
   }
@@ -84,6 +127,7 @@ export class ReferralRockClient {
     offset?: number;
     count?: number;
   }): Promise<Record<string, unknown>> {
+    validatePagination(params);
     let response = await this.axios.get('/api/referrals', { params });
     return response.data;
   }
@@ -91,7 +135,7 @@ export class ReferralRockClient {
   async getReferral(params: {
     referralId?: string;
     email?: string;
-    externalIdentifier?: string;
+    externalId?: string;
   }): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/api/referral/single', { params });
     return response.data;
@@ -135,11 +179,36 @@ export class ReferralRockClient {
     programId?: string;
     memberId?: string;
     referralId?: string;
+    query?: string;
+    status?: string;
+    sort?: string;
+    dateFrom?: string;
+    dateTo?: string;
     offset?: number;
     count?: number;
   }): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/api/rewards', { params });
-    return response.data;
+    validatePagination(params);
+    let { referralId, ...queryParams } = params ?? {};
+    let response = await this.axios.get('/api/rewards', {
+      params: referralId ? { ...queryParams, offset: 0, count: 2_147_483_647 } : queryParams
+    });
+    if (!referralId) return response.data;
+
+    // The rewards endpoint has no referralId query parameter; filter before pagination.
+    let data = response.data as Record<string, unknown>;
+    let rewards = getResponseRecords(data.rewards, 'reward list').filter(
+      reward => reward.referralId === referralId
+    );
+    let offset = params?.offset ?? 0;
+    return {
+      ...data,
+      rewards: rewards.slice(
+        offset,
+        params?.count === undefined ? undefined : offset + params.count
+      ),
+      offset,
+      total: rewards.length
+    };
   }
 
   async createRewards(rewards: Record<string, unknown>[]): Promise<Record<string, unknown>> {
@@ -183,7 +252,7 @@ export class ReferralRockClient {
   // ── Payouts ──
 
   async listPayouts(payoutId?: string): Promise<Record<string, unknown>> {
-    let url = payoutId ? `/api/payouts/${payoutId}` : '/api/payouts';
+    let url = payoutId ? `/api/payouts/${encodeURIComponent(payoutId)}` : '/api/payouts';
     let response = await this.axios.get(url);
     return response.data;
   }
@@ -271,6 +340,13 @@ export class ReferralRockClient {
     return response.data;
   }
 
+  async submitCustomerFeed(
+    customers: Record<string, unknown>[]
+  ): Promise<Record<string, unknown>[]> {
+    let response = await this.axios.post('/api/customerfeeds', customers);
+    return getResponseRecords(response.data, 'customer feed outcomes');
+  }
+
   // ── Member Access URLs ──
 
   async getMemberAccessUrls(body: {
@@ -300,3 +376,49 @@ export class ReferralRockClient {
     });
   }
 }
+
+let validatePagination = (params?: { offset?: number; count?: number }) => {
+  for (let key of ['offset', 'count'] as const) {
+    let value = params?.[key];
+    if (
+      value !== undefined &&
+      (!Number.isInteger(value) || value < 0 || value > 2_147_483_647)
+    ) {
+      throw createApiServiceError(`${key} must be a whole number between 0 and 2147483647.`);
+    }
+  }
+};
+
+export let getResponseRecords = (value: unknown, label: string): Record<string, unknown>[] => {
+  if (!Array.isArray(value) || !value.every(isApiErrorRecord)) {
+    throw createApiServiceError(`Referral Rock returned an invalid ${label} response.`, {
+      reason: 'referralrock_invalid_response'
+    });
+  }
+  return value;
+};
+
+export let getFirstResult = (value: unknown): Record<string, unknown> => {
+  let first = Array.isArray(value) ? value[0] : value;
+  if (!isApiErrorRecord(first)) {
+    throw createApiServiceError('Referral Rock did not return an operation result.', {
+      reason: 'referralrock_invalid_response'
+    });
+  }
+  return first;
+};
+
+export let getResponseEntity = (result: Record<string, unknown>, key: string) => {
+  let entity = result[key];
+  if (!isApiErrorRecord(entity) || typeof entity.id !== 'string' || !entity.id) {
+    let info = isApiErrorRecord(result.resultInfo) ? result.resultInfo : {};
+    let message = info.Message ?? result.message;
+    throw createApiServiceError(
+      typeof message === 'string' && message.trim()
+        ? `Referral Rock: ${message}`
+        : `Referral Rock did not return the ${key} for this operation.`,
+      { reason: 'referralrock_operation_failed' }
+    );
+  }
+  return entity;
+};

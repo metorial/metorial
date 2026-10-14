@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEmailValidationResult } from '../lib/results';
 import { spec } from '../spec';
 
 let emailResultSchema = z.object({
+  validationId: z.string().describe('Unique identifier for this email validation result'),
   email: z.string().describe('The validated email address'),
   score: z.number().describe('Validity score from 0 to 100'),
   result: z
@@ -12,14 +14,23 @@ let emailResultSchema = z.object({
   reason: z.string().describe('Specific reason for the result'),
   isFormatValid: z.boolean().describe('Whether the email format is valid'),
   isDomainValid: z.boolean().describe('Whether the domain is valid'),
-  isMxValid: z.boolean().describe('Whether MX records exist and are valid'),
+  isMxValid: z
+    .boolean()
+    .describe(
+      'True if MX records were checked and are valid. Check isMxChecked before treating false as invalid.'
+    ),
+  isMxChecked: z
+    .boolean()
+    .describe('Whether the provider checked MX records; false when its MX result is null'),
   isNotBlocklisted: z.boolean().describe('Whether the email is not on any blocklist'),
   isNotCatchAll: z.boolean().describe('Whether the domain is not a catch-all'),
   isNotGeneric: z.boolean().describe('Whether the email is not a generic/role-based address'),
   isFreeProvider: z.boolean().describe('Whether the email uses a free provider'),
-  mxRecord: z.string().describe('Mail exchanger record for the domain'),
-  domain: z.string().describe('Domain part of the email'),
-  username: z.string().describe('Local part of the email')
+  mxRecord: z
+    .string()
+    .describe('Mail exchanger record for the domain, or empty if unavailable'),
+  domain: z.string().describe('Domain part of the email, or empty if unavailable'),
+  username: z.string().describe('Local part of the email, or empty if unavailable')
 });
 
 export let getBulkValidationResults = SlateTool.create(spec, {
@@ -53,30 +64,17 @@ export let getBulkValidationResults = SlateTool.create(spec, {
         .describe('Timestamp when the batch finished, or null if still processing'),
       results: z
         .array(emailResultSchema)
-        .describe('Validation results for each email in the batch (empty if not yet finished)')
+        .describe(
+          'Validation results currently available; processing jobs may include partial results'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let response = await client.getBatchStatus(ctx.input.batchId);
 
-    let isFinished = response.finished_at !== null;
-    let results = (response.emails || []).map(e => ({
-      email: e.email,
-      score: e.score,
-      result: e.result,
-      reason: e.reason,
-      isFormatValid: e.isv_format,
-      isDomainValid: e.isv_domain,
-      isMxValid: e.isv_mx,
-      isNotBlocklisted: e.isv_noblock,
-      isNotCatchAll: e.isv_nocatchall,
-      isNotGeneric: e.isv_nogeneric,
-      isFreeProvider: e.is_free,
-      mxRecord: e.mx_record,
-      domain: e.domain,
-      username: e.username
-    }));
+    let isFinished = typeof response.finished_at === 'string';
+    let results = (response.emails ?? []).map(mapEmailValidationResult);
 
     let deliverable = results.filter(r => r.result === 'deliverable').length;
     let undeliverable = results.filter(r => r.result === 'undeliverable').length;
@@ -92,7 +90,7 @@ export let getBulkValidationResults = SlateTool.create(spec, {
         createdAt: response.created_at,
         size: response.size,
         isFinished,
-        finishedAt: response.finished_at,
+        finishedAt: response.finished_at ?? null,
         results
       },
       message

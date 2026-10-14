@@ -66,7 +66,7 @@ export let listInvoices = SlateTool.create(spec, {
 
     let invoices = result.items.map(inv => ({
       invoiceId: inv.id,
-      invoiceNumber: inv.invoiceNumber,
+      invoiceNumber: String(inv.invoiceNumber),
       status: inv.status,
       currency: inv.currency,
       totalInCents: inv.totalInCents,

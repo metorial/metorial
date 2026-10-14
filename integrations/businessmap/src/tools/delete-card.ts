@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteCardTool = SlateTool.create(spec, {
   name: 'Delete Card',
   key: 'delete_card',
-  description: `Permanently delete a card from Kanbanize. This action is **irreversible**. Consider using archive or discard instead if you may need the card later.`,
+  description: `Permanently delete a card from Businessmap. This action is **irreversible**. Consider using archive or discard instead if you may need the card later.`,
   tags: {
     destructive: true
   }
@@ -23,10 +23,7 @@ export let deleteCardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     await client.deleteCard(ctx.input.cardId);
 

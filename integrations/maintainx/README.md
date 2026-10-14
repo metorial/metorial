@@ -1,6 +1,10 @@
-# <img src="logo.svg" height="20"> Maintainx
+# <img src="logo.svg" height="20"> MaintainX
 
-Create, update, and track work orders for reactive and preventive maintenance. Manage assets, locations, parts inventory, meters, and readings. Create and process purchase orders, manage vendors, and organize users into teams. Send messages in work order conversations, create work requests, assign categories and priorities, and export maintenance data as CSV for reporting. Supports custom fields, asset hierarchies, QR/barcode tracking, and low-stock alerts for parts inventory.
+Create, update, and track work orders and work requests. Manage assets, locations, and parts; record meter readings; create purchase orders and vendors. Discover organizations, users, teams, categories, and conversations, and send conversation messages.
+
+Use a MaintainX REST API key. A key scoped to one organization is resolved during connection setup. For multi-organization keys, call `list_organizations` and pass the chosen `organizationId` to subsequent tools. Existing connections can continue to use their saved organization setting.
+
+Costs are expressed in cents. The optional work-order type filter applies to each returned page, so keep following `nextCursor` even when a page has no matches. Non-OPEN status on creation, or status combined with other updates, requires a separate status request; a failure can leave the created or updated work order in place.
 
 ## License
 

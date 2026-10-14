@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let workflowSchema = z.object({
@@ -19,26 +20,26 @@ export let listWorkflows = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       name: z.string().optional().describe('Filter workflows by name')
     })
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       workflows: z.array(workflowSchema).describe('List of workflows')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.listWorkflows(
-      ctx.input.name ? { name: ctx.input.name } : undefined
-    );
+    let data = await client.listWorkflows({ name: ctx.input.name, cursor: ctx.input.cursor });
     let workflows = (data.workflows || []).map((w: any) => ({
       workflowId: w.id,
       name: w.name,
       description: w.description
     }));
     return {
-      output: { workflows },
+      output: { workflows, nextCursor: getNextCursor(data) },
       message: `Found **${workflows.length}** workflow(s).`
     };
   })

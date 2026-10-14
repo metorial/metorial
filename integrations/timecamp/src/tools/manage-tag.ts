@@ -1,18 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, timeCampCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTag = SlateTool.create(spec, {
   name: 'Create or Update Tag',
   key: 'manage_tag',
   description: `Create a new tag or update an existing tag in TimeCamp. Tags are used to categorize time entries and tasks.`,
-  instructions: ['Omit tagId to create a new tag.', 'Provide tagId to rename an existing tag.']
+  instructions: [
+    'Omit tagId and provide tagListId from list_tag_lists to create a new tag.',
+    'Provide tagId to rename an existing tag.'
+  ]
 })
   .input(
     z.object({
       tagId: z.number().optional().describe('Tag ID to update. Omit to create a new tag.'),
-      name: z.string().describe('Tag name')
+      name: z.string().describe('Tag name'),
+      tagListId: z
+        .number()
+        .optional()
+        .describe(
+          'Required when creating a tag. Call list_tag_lists to discover tag list IDs.'
+        )
     })
   )
   .output(
@@ -32,8 +41,8 @@ export let manageTag = SlateTool.create(spec, {
         message: `Updated tag **${ctx.input.tagId}** to "${ctx.input.name}".`
       };
     } else {
-      let result = await client.createTag(ctx.input.name);
-      let tagId = String(result?.tag_id || result?.id || '');
+      let result = await client.createTag(ctx.input.name, ctx.input.tagListId);
+      let tagId = timeCampCreatedId(result, ['tag_id', 'id'], 'tag');
       return {
         output: {
           tagId

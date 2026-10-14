@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Eversign
 
-Create, send, sign, and manage legally binding electronic signature documents. Send documents to signers with configurable signing order, create reusable templates, and generate documents from templates. Support embedded signing and document preparation within your own application via iFrame. Upload files, download completed PDFs with audit trails, and bulk send documents from CSV data. Manage signers by sending reminders, reassigning signing responsibility, and authenticating via SMS. Track document lifecycle events through webhooks including creation, viewing, signing, completion, decline, and expiration. Operate in sandbox mode for testing.
+Send and manage electronic signature documents with Eversign, now Xodo Sign. Create documents from files or existing templates, configure signing order and embedded signing, send reminders, reassign signers, and download original or final PDFs. Prepare bulk CSV structures, create and discover bulk jobs, and retrieve document audit history. Sandbox mode supports testing.
+
+Use `list_businesses` to discover a business ID, then pass `businessId` to document, template, and bulk tools. API keys and OAuth are supported; OAuth can access documents created through the connected app. Existing OAuth connections created before version 0.3.0 need to reconnect to enable the corrected Bearer authentication.
 
 ## License
 

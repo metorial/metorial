@@ -19,7 +19,11 @@ export let shareBoard = SlateTool.create(spec, {
   .input(
     z.object({
       boardId: z.string().describe('ID of the board to share'),
-      emails: z.array(z.string()).describe('Email addresses of users to invite'),
+      emails: z
+        .array(z.string().email())
+        .min(1)
+        .max(20)
+        .describe('Email addresses of 1 to 20 users to invite'),
       role: z
         .enum(['viewer', 'commenter', 'editor'])
         .optional()
@@ -59,8 +63,13 @@ export let getBoardMembers = SlateTool.create(spec, {
   .input(
     z.object({
       boardId: z.string().describe('ID of the board'),
-      limit: z.number().optional().describe('Maximum number of members to return'),
-      offset: z.string().optional().describe('Pagination offset')
+      limit: z
+        .number()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Maximum number of members to return, from 1 to 50'),
+      offset: z.string().regex(/^\d+$/).optional().describe('Zero-based pagination offset')
     })
   )
   .output(
@@ -74,7 +83,8 @@ export let getBoardMembers = SlateTool.create(spec, {
           })
         )
         .describe('List of board members'),
-      total: z.number().optional().describe('Total number of members')
+      total: z.number().optional().describe('Total number of members'),
+      offset: z.string().optional().describe('Offset for the next page, if available')
     })
   )
   .handleInvocation(async ctx => {
@@ -86,14 +96,18 @@ export let getBoardMembers = SlateTool.create(spec, {
 
     let members = (result.data || []).map((member: any) => ({
       memberId: member.id?.toString(),
-      name: member.name,
-      role: member.role
+      name: member.name ?? undefined,
+      role: member.role ?? undefined
     }));
+
+    let nextOffset = Number(result.offset ?? ctx.input.offset ?? 0) + members.length;
 
     return {
       output: {
         members,
-        total: result.total
+        total: result.total ?? undefined,
+        offset:
+          members.length > 0 && nextOffset < result.total ? String(nextOffset) : undefined
       },
       message: `Found **${members.length}** member(s) on board ${ctx.input.boardId}.`
     };
@@ -131,7 +145,7 @@ export let updateBoardMember = SlateTool.create(spec, {
     return {
       output: {
         memberId: member.id?.toString(),
-        role: member.role
+        role: member.role ?? undefined
       },
       message: `Updated member ${ctx.input.memberId} role to **${ctx.input.role}** on board ${ctx.input.boardId}.`
     };

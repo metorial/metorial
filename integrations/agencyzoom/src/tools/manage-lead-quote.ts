@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,11 +46,7 @@ export let manageLeadQuote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
@@ -70,7 +66,7 @@ export let manageLeadQuote = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.quoteId) {
-          throw new Error('quoteId is required for "update" action');
+          throw createApiServiceError('quoteId is required for "update" action');
         }
 
         let data: Record<string, unknown> = {};
@@ -89,7 +85,7 @@ export let manageLeadQuote = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.quoteId) {
-          throw new Error('quoteId is required for "delete" action');
+          throw createApiServiceError('quoteId is required for "delete" action');
         }
 
         await client.deleteLeadQuote(ctx.input.leadId, ctx.input.quoteId);

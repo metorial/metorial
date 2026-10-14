@@ -6,19 +6,23 @@ import { spec } from '../spec';
 export let generateAiReply = SlateTool.create(spec, {
   name: 'Generate AI Reply',
   key: 'generate_ai_reply',
-  description: `Generates an AI chatbot reply based on a conversation history. Provide an array of messages with roles ("user" or "assistant") and the bot will generate a contextual response using its configured AI backend.`,
+  description: `Generates a non-streaming reply through the existing Sendbird AI chatbot replies API. Availability depends on the application's AI chatbot feature access. Provide conversation history with "user" or "assistant" roles.`,
   instructions: [
     'Messages should alternate between "user" and "assistant" roles for best results.',
     'The last message should typically be from the "user" role.'
   ],
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the AI chatbot to generate the reply'),
+      botUserId: z
+        .string()
+        .min(1)
+        .max(80)
+        .describe('User ID of the AI chatbot to generate the reply'),
       messages: z
         .array(
           z.object({
@@ -31,7 +35,7 @@ export let generateAiReply = SlateTool.create(spec, {
       useStreamingResponse: z
         .boolean()
         .optional()
-        .describe('Whether to use streaming response mode')
+        .describe('Set false or omit. Streaming replies cannot be returned by this tool.')
     })
   )
   .output(
@@ -49,7 +53,7 @@ export let generateAiReply = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let result = await client.generateAiReply(
@@ -58,9 +62,9 @@ export let generateAiReply = SlateTool.create(spec, {
       ctx.input.useStreamingResponse
     );
 
-    let replies = (result.reply_messages || []).map((r: Record<string, unknown>) => ({
-      role: r.role as string | undefined,
-      content: (r.content ?? r.message) as string | undefined
+    let replies = result.reply_messages.map(r => ({
+      role: r.role,
+      content: r.content ?? r.message
     }));
 
     return {

@@ -1,13 +1,14 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let authAxios = createAxios({
-  baseURL: 'https://ticktick.com/oauth'
-});
-
-let apiAxios = createAxios({
-  baseURL: 'https://api.ticktick.com/open/v1'
-});
+let authAxios = createAxios({ baseURL: 'https://ticktick.com/oauth' });
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,7 +22,6 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
     scopes: [
       {
         title: 'Read Tasks',
@@ -30,11 +30,10 @@ export let auth = SlateAuth.create()
       },
       {
         title: 'Write Tasks',
-        description: 'Full access to create, update, and delete tasks and projects',
+        description: 'Create, update, complete, move, and delete tasks and projects',
         scope: 'tasks:write'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
@@ -43,97 +42,86 @@ export let auth = SlateAuth.create()
         scope: ctx.scopes.join(' '),
         state: ctx.state
       });
-
-      return {
-        url: `https://ticktick.com/oauth/authorize?${params.toString()}`
-      };
+      return { url: `https://ticktick.com/oauth/authorize?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
-      let response = await authAxios.post(
-        '/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let response = await authAxios.post(
+          '/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            scope: ctx.scopes.join(' ')
+          }).toString(),
+          {
+            auth: { username: ctx.clientId, password: ctx.clientSecret },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
           }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        );
+        return {
+          output: normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'TickTick',
+            operation: 'token exchange'
+          })
+        };
+      } catch (error) {
+        throw buildApiServiceError(error, {
+          providerLabel: 'TickTick',
+          operation: 'token exchange',
+          reason: 'ticktick_oauth_error'
+        });
       }
-
-      let response = await authAxios.post(
-        '/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
-      };
     },
-
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'TickTick did not provide a refresh token. Reconnect your account to authorize access again.',
+          { reason: 'missing_refresh_token' }
+        );
+      }
+      // Preserve refresh support for connections that already hold a refresh token.
+      // The current Open API reference only documents the authorization-code grant.
+      try {
+        let response = await authAxios.post(
+          '/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken
+          }).toString(),
+          {
+            auth: { username: ctx.clientId, password: ctx.clientSecret },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          }
+        );
+        return {
+          output: normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'TickTick',
+            operation: 'token refresh',
+            previousRefreshToken: ctx.output.refreshToken
+          })
+        };
+      } catch (error) {
+        throw buildApiServiceError(error, {
+          providerLabel: 'TickTick',
+          operation: 'token refresh',
+          reason: 'ticktick_oauth_error'
+        });
+      }
+    },
     getProfile: async (ctx: {
       output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
     }) => {
-      let response = await apiAxios.get('/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
-
+      let user = await new Client({ token: ctx.output.token }).getUserProfile();
       return {
         profile: {
           id: user.id,
           name: user.name ?? user.username,
-          email: user.email
+          email: user.email ?? undefined
         }
       };
     }

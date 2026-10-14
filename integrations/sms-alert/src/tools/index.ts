@@ -1,4 +1,5 @@
 export * from './check-balance';
+export * from './get-current-user';
 export * from './get-delivery-status';
 export * from './get-sms-report';
 export * from './list-sender-ids';

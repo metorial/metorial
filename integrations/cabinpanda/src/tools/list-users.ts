@@ -31,11 +31,11 @@ export let listUsers = SlateTool.create(spec, {
     let client = new CabinPandaClient({ token: ctx.auth.token });
     let users = await client.listUsers();
 
-    let mappedUsers = (Array.isArray(users) ? users : []).map((user: any) => ({
+    let mappedUsers = users.map((user: any) => ({
       userId: user?.id?.toString(),
-      name: user?.name,
-      email: user?.email,
-      role: user?.role,
+      name: user?.name ?? undefined,
+      email: user?.email ?? undefined,
+      role: user?.role ?? undefined,
       raw: user
     }));
 

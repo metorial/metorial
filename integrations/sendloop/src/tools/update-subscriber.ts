@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,11 +35,11 @@ export let updateSubscriber = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     if (!ctx.input.subscriberId && !ctx.input.emailAddress) {
-      throw new Error('Either subscriberId or emailAddress must be provided');
+      throw createApiServiceError('Either subscriberId or emailAddress must be provided');
     }
 
     await client.updateSubscriber(ctx.input.listId, {

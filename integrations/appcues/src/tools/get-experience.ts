@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
+import { mapExperience } from '../lib/experience';
 import { spec } from '../spec';
 
 export let getExperience = SlateTool.create(spec, {
@@ -14,7 +15,17 @@ export let getExperience = SlateTool.create(spec, {
   .input(
     z.object({
       experienceType: z
-        .enum(['flow', 'pin', 'banner', 'launchpad', 'checklist', 'mobile', 'nps', 'embed'])
+        .enum([
+          'flow',
+          'flow_v2',
+          'pin',
+          'banner',
+          'launchpad',
+          'checklist',
+          'mobile',
+          'nps',
+          'embed'
+        ])
         .describe('The type of experience to retrieve'),
       experienceId: z.string().describe('The ID of the experience')
     })
@@ -41,6 +52,7 @@ export let getExperience = SlateTool.create(spec, {
 
     let fetchMap: Record<string, (id: string) => Promise<any>> = {
       flow: id => client.getFlow(id),
+      flow_v2: id => client.getFlowV2(id),
       pin: id => client.getPin(id),
       banner: id => client.getBanner(id),
       launchpad: id => client.getLaunchpad(id),
@@ -52,27 +64,16 @@ export let getExperience = SlateTool.create(spec, {
 
     let fetchFn = fetchMap[ctx.input.experienceType];
     if (!fetchFn) {
-      throw new Error(`Unsupported experience type: ${ctx.input.experienceType}`);
+      throw createApiServiceError(`Unsupported experience type: ${ctx.input.experienceType}`);
     }
     let item = await fetchFn(ctx.input.experienceId);
 
     return {
       output: {
-        experienceId: item.id || item.ID || ctx.input.experienceId,
-        name: item.name || item.Name || '',
-        published: item.published ?? item.Published ?? false,
-        experienceType: ctx.input.experienceType,
-        createdAt: item.created_at || item.createdAt || undefined,
-        updatedAt: item.updated_at || item.updatedAt || undefined,
-        frequency: item.frequency || undefined,
-        tags: item.tags
-          ? Array.isArray(item.tags)
-            ? item.tags.map((t: any) => t.name || t)
-            : undefined
-          : undefined,
+        ...mapExperience(item, ctx.input.experienceType, ctx.input.experienceId),
         raw: item
       },
-      message: `Retrieved **${ctx.input.experienceType}** experience: **${item.name || item.Name || ctx.input.experienceId}** (${item.published ? 'published' : 'unpublished'}).`
+      message: `Retrieved **${ctx.input.experienceType}** experience: **${item.name || item.Name || item.internal_name || item.title || ctx.input.experienceId}** (${item.published ? 'published' : 'unpublished'}).`
     };
   })
   .build();

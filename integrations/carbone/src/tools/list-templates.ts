@@ -34,7 +34,9 @@ export let listTemplates = SlateTool.create(spec, {
       origin: z
         .number()
         .optional()
-        .describe('Filter by upload origin: 0 for API uploads, 1 for Studio uploads.'),
+        .describe(
+          'Filter by upload origin: 0 API, 1 Studio, 2 Salesforce, 3 Odoo, 4 HubSpot.'
+        ),
       includeVersions: z
         .boolean()
         .optional()
@@ -46,7 +48,9 @@ export let listTemplates = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of templates to return (default: 100).'),
+        .describe(
+          'Maximum number of templates to return, a whole number from 1 to 100 (default: 100).'
+        ),
       cursor: z.string().optional().describe('Pagination cursor from a previous response.')
     })
   )

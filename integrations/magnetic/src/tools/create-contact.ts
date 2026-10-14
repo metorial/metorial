@@ -23,7 +23,7 @@ export let createContact = SlateTool.create(spec, {
       companyId: z
         .string()
         .optional()
-        .describe('ID of an existing company to associate with this contact'),
+        .describe('ID of an existing company. Call list_companies to discover company IDs.'),
       companyName: z
         .string()
         .optional()

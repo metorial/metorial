@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { exportResponse, mapFields } from '../lib/mappers';
+import type { DovetailExport } from '../lib/types';
 import { spec } from '../spec';
 
 export let getNote = SlateTool.create(spec, {
   name: 'Get Note',
   key: 'get_note',
-  description: `Retrieve a specific research note with its full content, fields, and metadata. Optionally export the note as HTML or Markdown.`,
+  description: `Retrieve research note metadata and custom fields. Optionally prepare its full content as a downloadable HTML or Markdown file.`,
   tags: {
     readOnly: true
   }
@@ -24,13 +26,14 @@ export let getNote = SlateTool.create(spec, {
     z.object({
       noteId: z.string(),
       title: z.string(),
+      fileIds: z.array(z.string()).optional().describe('Associated file IDs for get_file.'),
       content: z.string().optional(),
       previewText: z.string().nullable().optional(),
       projectId: z.string().nullable().optional(),
       projectTitle: z.string().nullable().optional(),
       authors: z.array(z.string()).optional(),
       createdAt: z.string(),
-      updatedAt: z.string(),
+      updatedAt: z.string().optional(),
       fields: z
         .array(
           z.object({
@@ -47,23 +50,29 @@ export let getNote = SlateTool.create(spec, {
 
     let note = await client.getNote(ctx.input.noteId);
 
-    let exportedContent: any;
+    let exportedContent: DovetailExport | undefined;
     if (ctx.input.exportFormat) {
       exportedContent = await client.exportNote(ctx.input.noteId, ctx.input.exportFormat);
+      await ctx.addAttachment({
+        type: 'content',
+        content: exportResponse(exportedContent, ctx.input.exportFormat),
+        filename: `dovetail-note-${encodeURIComponent(note.id)}.${ctx.input.exportFormat === 'html' ? 'html' : 'md'}`
+      });
     }
 
     return {
       output: {
         noteId: note.id,
         title: note.title,
+        fileIds: note.files?.map(file => file.id),
         content: note.content,
         previewText: note.preview_text ?? null,
-        projectId: note.project_id ?? null,
-        projectTitle: note.project_title ?? null,
+        projectId: note.project?.id ?? note.project_id ?? null,
+        projectTitle: note.project?.title ?? note.project_title ?? null,
         authors: note.authors,
         createdAt: note.created_at,
         updatedAt: note.updated_at,
-        fields: note.fields,
+        fields: mapFields(note.fields),
         exportedContent
       },
       message: `Retrieved note **${note.title}**${ctx.input.exportFormat ? ` (exported as ${ctx.input.exportFormat})` : ''}.`

@@ -1,12 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateWorkOrder = SlateTool.create(spec, {
   name: 'Update Work Order',
   key: 'update_work_order',
-  description: `Updates an existing work order in MaintainX. Can modify title, description, priority, status, assignees, asset, location, categories, and due date. Only provided fields will be updated.`,
+  description: `Updates an existing work order in MaintainX. Can modify title, description, priority, status, assignees, asset, location, categories, and due date. Only provided fields will be updated. For multi-organization keys, call list_organizations and pass organizationId.`,
+  instructions: [
+    'Status is applied after any other fields. If its request fails, those fields may already be saved; use the workOrderId in the error with get_work_order, then retry only update_work_order with that ID and status if needed.'
+  ],
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +18,7 @@ export let updateWorkOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       workOrderId: z.number().describe('ID of the work order to update'),
       title: z.string().optional().describe('New title'),
       description: z.string().optional().describe('New description'),
@@ -24,7 +29,9 @@ export let updateWorkOrder = SlateTool.create(spec, {
       status: z
         .enum(['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'DONE'])
         .optional()
-        .describe('New status'),
+        .describe(
+          'New status, applied after other fields through a separate request. If it fails, the earlier field update already succeeded; retrieve the work order and retry only status'
+        ),
       assignees: z
         .array(z.number())
         .optional()
@@ -48,10 +55,7 @@ export let updateWorkOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let updateData: Record<string, any> = {};
     if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
@@ -72,9 +76,9 @@ export let updateWorkOrder = SlateTool.create(spec, {
     return {
       output: {
         workOrderId: wo.id ?? ctx.input.workOrderId,
-        title: wo.title,
-        status: wo.status,
-        priority: wo.priority
+        title: wo.title ?? undefined,
+        status: wo.status ?? undefined,
+        priority: wo.priority ?? undefined
       },
       message: `Updated work order **#${ctx.input.workOrderId}**${ctx.input.status ? ` — status set to **${ctx.input.status}**` : ''}.`
     };

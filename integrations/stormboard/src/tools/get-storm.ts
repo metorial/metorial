@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getStorm = SlateTool.create(spec, {
   name: 'Get Storm Details',
   key: 'get_storm',
-  description: `Retrieve detailed information about a specific Storm including its template, sections, and metadata.`,
+  description: `Retrieve a Storm's ID, key, title, goals, and last activity timestamp. Use get_storm_template to retrieve its template and sections.`,
   tags: {
     readOnly: true
   }
@@ -32,10 +32,10 @@ export let getStorm = SlateTool.create(spec, {
     return {
       output: {
         stormId: storm.id,
-        key: storm.key,
+        key: storm.key ?? undefined,
         title: storm.title,
-        goals: storm.goals,
-        lastActivity: storm.lastactivity
+        goals: storm.goals ?? undefined,
+        lastActivity: storm.lastactivity ?? undefined
       },
       message: `Retrieved Storm **"${storm.title}"** (ID: ${storm.id}).`
     };

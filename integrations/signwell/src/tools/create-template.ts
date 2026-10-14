@@ -20,7 +20,7 @@ let fieldSchema = z.object({
   required: z.boolean().optional().describe('Whether the field is required'),
   x: z.number().describe('X coordinate position on the page'),
   y: z.number().describe('Y coordinate position on the page'),
-  page: z.number().describe('Page number (0-indexed)'),
+  page: z.number().describe('Page number within the corresponding file, starting at 1'),
   placeholderId: z.string().describe('ID of the placeholder this field is assigned to'),
   apiId: z.string().optional().describe('Custom API identifier for the field'),
   width: z.number().optional().describe('Width of the field'),
@@ -39,7 +39,7 @@ export let createTemplate = SlateTool.create(spec, {
     'Provide at least one placeholder recipient and at least one file.',
     'Fields reference placeholders by their ID.'
   ],
-  constraints: ['Rate limited to 30 template creation requests per minute.'],
+  constraints: ['Subject to the account API rate limits.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -70,7 +70,9 @@ export let createTemplate = SlateTool.create(spec, {
       fields: z
         .array(z.array(fieldSchema))
         .optional()
-        .describe('Signing fields grouped by page')
+        .describe(
+          'One field array for each file, in file order; use an empty array for files without fields'
+        )
     })
   )
   .output(
@@ -100,13 +102,15 @@ export let createTemplate = SlateTool.create(spec, {
 
     let output = {
       templateId: result.id,
-      name: result.name,
-      isDraft: result.is_draft,
-      placeholders: result.placeholders?.map((p: any) => ({
-        placeholderId: p.id,
-        name: p.name
+      name: result.name ?? undefined,
+      isDraft:
+        result.is_draft ??
+        (result.status ? result.status.toLowerCase() === 'draft' : undefined),
+      placeholders: result.placeholders?.map(p => ({
+        placeholderId: p.id ?? undefined,
+        name: p.name ?? undefined
       })),
-      createdAt: result.created_at
+      createdAt: result.created_at ?? undefined
     };
 
     return {

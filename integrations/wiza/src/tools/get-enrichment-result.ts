@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -100,7 +100,11 @@ Use the revealId from the **Enrich Contact** tool to check progress and retrieve
       certifications: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
-        .describe('Certifications from LinkedIn.')
+        .describe('Certifications from LinkedIn.'),
+      apiCreditsUsed: z
+        .number()
+        .optional()
+        .describe('Total API credits charged for this enrichment.')
     })
   )
   .handleInvocation(async ctx => {
@@ -122,50 +126,57 @@ Use the revealId from the **Enrich Contact** tool to check progress and retrieve
       emailStatus: e.email_status
     }));
 
-    let phones = d.phones?.map(p => ({
-      phoneNumber: p.phone_number,
-      phoneType: p.phone_type
-    }));
+    let phones = d.phones?.map(p => {
+      let phoneNumber = p.number ?? p.phone_number;
+      if (!phoneNumber) {
+        throw createApiServiceError('Wiza returned a phone entry without a number.');
+      }
+      return {
+        phoneNumber,
+        phoneType: p.type ?? p.phone_type ?? 'unknown'
+      };
+    });
 
     let output = {
       revealId: d.id,
       status: d.status,
       isComplete: d.is_complete,
-      failError: d.fail_error,
-      name: d.name,
-      title: d.title,
-      headline: d.headline,
-      bio: d.bio,
-      location: d.location,
-      linkedinProfileUrl: d.linkedin_profile_url,
-      enrichmentLevel: d.enrichment_level,
-      primaryEmail: d.email,
-      primaryEmailType: d.email_type,
-      primaryEmailStatus: d.email_status,
+      failError: d.fail_error ?? undefined,
+      name: d.name ?? undefined,
+      title: d.title ?? undefined,
+      headline: d.headline ?? undefined,
+      bio: d.bio ?? undefined,
+      location: d.location ?? undefined,
+      linkedinProfileUrl: d.linkedin_profile_url ?? undefined,
+      enrichmentLevel: d.enrichment_level ?? undefined,
+      primaryEmail: d.email ?? undefined,
+      primaryEmailType: d.email_type ?? undefined,
+      primaryEmailStatus: d.email_status ?? undefined,
       emails,
-      primaryPhone: d.mobile_phone || d.phone_number,
+      primaryPhone: d.mobile_phone || d.phone_number || undefined,
       phones,
-      companyName: d.company,
-      companyDomain: d.company_domain,
-      companyLinkedin: d.company_linkedin,
-      companyIndustry: d.company_industry,
-      companySubindustry: d.company_subindustry,
-      companySize: d.company_size,
-      companySizeRange: d.company_size_range,
-      companyType: d.company_type,
-      companyLocation: d.company_location,
-      companyFounded: d.company_founded,
-      companyRevenue: d.company_revenue,
-      companyFunding: d.company_funding,
-      isPremium: d.is_premium,
-      isOpenToWork: d.is_open_to_work,
-      tenureAtCompany: d.tenure_at_company,
-      tenureAtRole: d.tenure_at_role,
-      skills: d.skills,
-      languages: d.languages,
-      workHistory: d.work_history,
-      education: d.education,
-      certifications: d.certifications
+      companyName: d.company ?? undefined,
+      companyDomain: d.company_domain ?? undefined,
+      companyLinkedin: d.company_linkedin ?? undefined,
+      companyIndustry: d.company_industry ?? undefined,
+      companySubindustry: d.company_subindustry ?? undefined,
+      companySize: d.company_size ?? undefined,
+      companySizeRange: d.company_size_range ?? undefined,
+      companyType: d.company_type ?? undefined,
+      companyLocation: d.company_location ?? undefined,
+      companyFounded: d.company_founded ?? undefined,
+      companyRevenue: d.company_revenue == null ? undefined : String(d.company_revenue),
+      companyFunding: d.company_funding == null ? undefined : String(d.company_funding),
+      isPremium: d.is_premium ?? undefined,
+      isOpenToWork: d.is_open_to_work ?? undefined,
+      tenureAtCompany: d.tenure_at_company ?? undefined,
+      tenureAtRole: d.tenure_at_role ?? undefined,
+      skills: d.skills ?? undefined,
+      languages: d.languages ?? undefined,
+      workHistory: d.work_history ?? undefined,
+      education: d.education ?? undefined,
+      certifications: d.certifications ?? undefined,
+      apiCreditsUsed: d.credits?.api_credits?.total
     };
 
     if (d.status === 'failed') {

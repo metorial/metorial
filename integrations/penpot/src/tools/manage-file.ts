@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageFileTool = SlateTool.create(spec, {
@@ -34,13 +34,13 @@ export let manageFileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { action, projectId, fileId, name, isShared } = ctx.input;
 
     switch (action) {
       case 'create': {
         if (!projectId || !name)
-          throw new Error('projectId and name are required for create action');
+          throw createApiServiceError('projectId and name are required for create action');
         let file = await client.createFile(projectId, name, isShared);
         return {
           output: {
@@ -54,7 +54,7 @@ export let manageFileTool = SlateTool.create(spec, {
       }
       case 'rename': {
         if (!fileId || !name)
-          throw new Error('fileId and name are required for rename action');
+          throw createApiServiceError('fileId and name are required for rename action');
         let file = await client.renameFile(fileId, name);
         return {
           output: { fileId: file.id, name: file.name },
@@ -62,7 +62,7 @@ export let manageFileTool = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!fileId) throw new Error('fileId is required for delete action');
+        if (!fileId) throw createApiServiceError('fileId is required for delete action');
         await client.deleteFile(fileId);
         return {
           output: { fileId },
@@ -71,7 +71,9 @@ export let manageFileTool = SlateTool.create(spec, {
       }
       case 'set_shared': {
         if (!fileId || isShared === undefined)
-          throw new Error('fileId and isShared are required for set_shared action');
+          throw createApiServiceError(
+            'fileId and isShared are required for set_shared action'
+          );
         let result = await client.setFileShared(fileId, isShared);
         return {
           output: {

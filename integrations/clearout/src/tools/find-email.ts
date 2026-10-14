@@ -30,7 +30,13 @@ Use this for sales prospecting, lead enrichment, or finding contact information 
       timeout: z
         .number()
         .optional()
-        .describe('Maximum time in milliseconds for the search (e.g., 30000 for 30 seconds)')
+        .describe('Maximum time in milliseconds for the search, up to 180000 (default 30000)'),
+      queue: z
+        .boolean()
+        .optional()
+        .describe(
+          'Continue discovery in the background after timeout (default true). Use get_finder_result with the returned queue ID.'
+        )
     })
   )
   .output(
@@ -59,7 +65,8 @@ Use this for sales prospecting, lead enrichment, or finding contact information 
     let result = await client.findEmail({
       name: ctx.input.name,
       domain: ctx.input.domain,
-      timeout: ctx.input.timeout
+      timeout: ctx.input.timeout,
+      queue: ctx.input.queue
     });
 
     let data = (result.data ?? result) as Record<string, unknown>;
@@ -88,8 +95,9 @@ Use this for sales prospecting, lead enrichment, or finding contact information 
     let emailList = emails.map(e => e.emailAddress).join(', ');
     return {
       output,
-      message:
-        emails.length > 0
+      message: output.queueId
+        ? `Email discovery is queued. Use get_finder_result with queue ID **${output.queueId}**.`
+        : emails.length > 0
           ? `Found **${emails.length}** email(s) for **${ctx.input.name}** at **${ctx.input.domain}**: ${emailList} (confidence: ${output.confidenceScore ?? 'N/A'})`
           : `No email addresses found for **${ctx.input.name}** at **${ctx.input.domain}**.`
     };

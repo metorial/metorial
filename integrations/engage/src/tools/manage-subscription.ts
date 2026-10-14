@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,6 +9,7 @@ export let manageSubscription = SlateTool.create(spec, {
   description: `Manages a user's subscription to an Engage list. Can subscribe a new user, update subscription status (subscribe/unsubscribe), or remove a user entirely from a list. You can also add or remove a user from multiple lists at once using the bulk action.`,
   instructions: [
     'Use "subscribe" to add a new subscriber to a list. Provide user details if the user does not exist yet.',
+    'Subscribe may send an opt-in confirmation email; acceptance does not confirm the subscription.',
     'Use "update_status" to subscribe or unsubscribe an existing user. Unsubscribing preserves the user in the list but stops engagements.',
     'Use "remove" to completely remove a user from a list.',
     'Use "add_to_lists" or "remove_from_lists" to manage a user\'s membership in multiple lists at once.'
@@ -65,7 +66,12 @@ export let manageSubscription = SlateTool.create(spec, {
     let { action, listId, uid, subscribed, listIds } = ctx.input;
 
     if (action === 'subscribe') {
-      if (!listId) throw new Error('listId is required for subscribe action');
+      if (!listId) throw createApiServiceError('listId is required for subscribe action');
+      if (!ctx.input.subscriberEmail && !ctx.input.subscriberPhone) {
+        throw createApiServiceError(
+          'Provide subscriberEmail or subscriberPhone to subscribe.'
+        );
+      }
       let result = await client.subscribeToList(listId, {
         first_name: ctx.input.subscriberFirstName,
         last_name: ctx.input.subscriberLastName,
@@ -73,16 +79,16 @@ export let manageSubscription = SlateTool.create(spec, {
         number: ctx.input.subscriberPhone
       });
       return {
-        output: { uid: result.uid, subscribed: true },
-        message: `Subscribed user **${result.uid}** to list **${listId}**.`
+        output: { uid: result.uid, status: 'ok' },
+        message: `Requested subscription for user **${result.uid}** to list **${listId}**. Confirmation may be required.`
       };
     }
 
     if (action === 'update_status') {
-      if (!listId) throw new Error('listId is required for update_status action');
-      if (!uid) throw new Error('uid is required for update_status action');
+      if (!listId) throw createApiServiceError('listId is required for update_status action');
+      if (!uid) throw createApiServiceError('uid is required for update_status action');
       if (subscribed === undefined)
-        throw new Error('subscribed is required for update_status action');
+        throw createApiServiceError('subscribed is required for update_status action');
       let result = await client.updateSubscription(listId, uid, subscribed);
       return {
         output: { uid, subscribed: result.subscribed },
@@ -93,8 +99,8 @@ export let manageSubscription = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!listId) throw new Error('listId is required for remove action');
-      if (!uid) throw new Error('uid is required for remove action');
+      if (!listId) throw createApiServiceError('listId is required for remove action');
+      if (!uid) throw createApiServiceError('uid is required for remove action');
       let result = await client.removeSubscriber(listId, uid);
       return {
         output: { uid, status: result.status },
@@ -103,9 +109,9 @@ export let manageSubscription = SlateTool.create(spec, {
     }
 
     if (action === 'add_to_lists') {
-      if (!uid) throw new Error('uid is required for add_to_lists action');
+      if (!uid) throw createApiServiceError('uid is required for add_to_lists action');
       if (!listIds || listIds.length === 0)
-        throw new Error('listIds is required for add_to_lists action');
+        throw createApiServiceError('listIds is required for add_to_lists action');
       await client.addUserToLists(uid, listIds);
       return {
         output: { uid, status: 'ok' },
@@ -114,9 +120,9 @@ export let manageSubscription = SlateTool.create(spec, {
     }
 
     // remove_from_lists
-    if (!uid) throw new Error('uid is required for remove_from_lists action');
+    if (!uid) throw createApiServiceError('uid is required for remove_from_lists action');
     if (!listIds || listIds.length === 0)
-      throw new Error('listIds is required for remove_from_lists action');
+      throw createApiServiceError('listIds is required for remove_from_lists action');
     await client.removeUserFromLists(uid, listIds);
     return {
       output: { uid, status: 'ok' },

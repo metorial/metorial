@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -70,6 +70,16 @@ export let createJobTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.inputLocation === 'remote_url' && typeof ctx.input.input !== 'string') {
+      throw createApiServiceError('For remote_url input, supply the URL of the email file.');
+    }
+    if (ctx.input.inputLocation === 'supplied' && !Array.isArray(ctx.input.input)) {
+      throw createApiServiceError('For supplied input, supply an array of email records.');
+    }
+    if (Array.isArray(ctx.input.input) && ctx.input.input.length === 0) {
+      throw createApiServiceError('Supply at least one email record to create a job.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createJob({

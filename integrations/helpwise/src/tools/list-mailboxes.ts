@@ -13,8 +13,18 @@ export let listMailboxes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of mailboxes to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Maximum number of mailboxes to return'),
+      page: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Page number for pagination')
     })
   )
   .output(
@@ -30,7 +40,9 @@ export let listMailboxes = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let mailboxes = Array.isArray(result) ? result : (result.mailboxes ?? result.data ?? []);
+    let mailboxes = Array.isArray(result)
+      ? result
+      : (result.mailboxes ?? result.data?.mailboxes ?? result.data ?? []);
 
     return {
       output: { mailboxes },

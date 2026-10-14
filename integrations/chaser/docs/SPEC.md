@@ -1,4 +1,4 @@
-The search for Chaser webhooks returned results for unrelated services (Chaster, Chargebee, etc.), not for ChaserHQ. Let me check the API docs more carefully for webhook support.# Slates Specification for Chaser
+# Chaser API Specification
 
 ## Overview
 
@@ -32,7 +32,7 @@ Manage multiple contact persons per customer. Each contact person has their own 
 
 ### Invoice Management
 
-The API allows you to interact with information relating to the organisations' invoices. Create, retrieve, and update invoices with details including invoice number, status (DRAFT, SUBMITTED, AUTHORISED, PAID, VOIDED, DELETED), currency, amounts (due, paid, total, subtotal), dates (issued, due, fully paid), and customer association. A valid customer ID is required to create an invoice, therefore the customer must be created before adding the invoice. You can also upload invoice PDFs to attach them to invoices. Invoices support filtering by many fields including status, amounts, and dates.
+The API allows you to interact with information relating to the organisations' invoices. Create, retrieve, and update invoices with details including invoice number, status (DRAFT, SUBMITTED, AUTHORISED, PAID, VOIDED, DELETED), currency, amounts (due, paid, total, subtotal), dates (issued, due, fully paid), and customer association. A valid customer ID is required to create an invoice, therefore the customer must be created before adding the invoice. You can provide an invoice PDF source URL for Chaser to fetch, and track the expected payment date. Invoices support filtering by many fields including status, amounts, and dates.
 
 ### Credit Note Management
 
@@ -50,6 +50,16 @@ Retrieve details about the connected organisation(s) including name, legal name,
 
 Trigger a manual synchronisation of the organisation data. You can optionally specify post-sync tasks to execute, such as calculating next chases, updating invoice instalments, calculating contact balances, verifying contact credit limits, calculating task reminders, and calculating total revenue.
 
+## Payment Reminder Controls
+
+Pause or resume chasing for a single invoice, all invoices of a customer, or the connected organisation. The returned chasing status records whether reminders are enabled for the chosen resource.
+
+## Documentation
+
+- [Current API reference](https://openapi.chaserhq.com/docs/)
+- [OpenAPI definition](https://openapi.chaserhq.com/docs/json)
+- [API connection and data requirements](https://help.chaserhq.com/chaserapi)
+
 ## Events
 
-The provider does not support events. The Chaser API does not offer webhooks or any built-in event subscription mechanism. Data synchronization is achieved by pushing data into Chaser via the API and triggering syncs manually via the sync endpoint.
+No event subscriptions are implemented. Push updated records into Chaser and request organisation synchronisation when required.

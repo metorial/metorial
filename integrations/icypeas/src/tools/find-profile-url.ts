@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let findProfileUrl = SlateTool.create(spec, {
   name: 'Find Profile URL',
   key: 'find_profile_url',
-  description: `Find a LinkedIn profile URL for a person or a company. For people, provide name and optionally company/job title. For companies, provide the company name or domain.`,
+  description: `Find a LinkedIn profile URL for a person or a company. For people, provide first and last names plus a company/domain or job title. For companies, provide the company name or domain.`,
   instructions: [
     'For best results with person searches, provide only essential information (name + company).',
     'Set targetType to "person" or "company" to specify what you are looking for.'
@@ -39,7 +39,10 @@ export let findProfileUrl = SlateTool.create(spec, {
 
     let result: any;
     if (ctx.input.targetType === 'company') {
-      result = await client.findCompanyUrl(ctx.input.companyOrDomain || '');
+      if (!ctx.input.companyOrDomain?.trim()) {
+        throw createApiServiceError('Provide a company name or domain for a company search.');
+      }
+      result = await client.findCompanyUrl(ctx.input.companyOrDomain);
     } else {
       result = await client.findPersonUrl({
         firstname: ctx.input.firstname,
@@ -49,7 +52,8 @@ export let findProfileUrl = SlateTool.create(spec, {
       });
     }
 
-    let profileUrl = result?.url || result?.profileUrl || result?.linkedinUrl;
+    let profileUrl =
+      result?.result || result?.url || result?.profileUrl || result?.linkedinUrl;
 
     return {
       output: {

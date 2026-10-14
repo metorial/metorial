@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  getBase64ByteLength,
+  requestAxiosData
+} from 'slates';
 
 let BASE_URL = 'https://oksign.be/services/rest/v1';
 let BASE_URL_V2 = 'https://oksign.be/services/rest/v2';
@@ -6,6 +13,7 @@ let BASE_URL_V2 = 'https://oksign.be/services/rest/v2';
 export interface OkSignResponse<T = string> {
   status: 'OK' | 'FAILED';
   reason: T;
+  docid?: string;
 }
 
 export interface DocumentExistsInfo {
@@ -28,11 +36,11 @@ export interface SignerInfo {
 }
 
 export interface SigningOptions {
-  eid?: boolean;
-  pen?: boolean;
-  tan?: boolean;
-  itsme?: boolean;
-  smartid?: boolean;
+  eid?: boolean | Record<string, never>;
+  pen?: boolean | Record<string, never>;
+  tan?: boolean | Record<string, never>;
+  itsme?: boolean | Record<string, never>;
+  smartid?: boolean | Record<string, never>;
 }
 
 export interface FormField {
@@ -93,6 +101,7 @@ export interface NotificationPayload {
   notifications: {
     smtp?: SmtpNotification;
     sms?: SmsNotification;
+    workflow?: Array<{ id: string; sequence: number }>;
   };
   signersinfo?: SignerInfo[];
   workflow?: Array<{ id: string; sequence: number }>;
@@ -100,28 +109,29 @@ export interface NotificationPayload {
 
 export interface MetadataFieldInfo {
   name: string;
-  value: string;
+  value?: string;
+  metadata?: { value?: string | MetadataSignerInfo };
   inputtype: string;
-  signerid: string;
+  signerid?: string;
 }
 
 export interface MetadataSignerInfo {
-  signedby: string;
-  actingas: string;
-  authMethod: string;
-  isodate: string;
-  serialnumber: string;
-  provider: string;
+  signedby?: string;
+  actingas?: string;
+  authMethod?: string;
+  isodate?: string;
+  serialnumber?: string;
+  provider?: string;
   signerid: string;
 }
 
 export interface DocumentMetadata {
   filename: string;
-  size: number;
+  size: number | string;
   nbrOfSigaturesRequired: number;
   nbrOfSigaturesValid: number;
   fields: MetadataFieldInfo[];
-  signersinfo: MetadataSignerInfo[];
+  signersinfo: SignerInfo[];
 }
 
 export interface Contact {
@@ -174,468 +184,479 @@ export class Client {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token || /[\r\n]/.test(config.token)) {
+      throw createApiServiceError(
+        'OKSign authorization is missing or invalid. Reconnect your account.'
+      );
+    }
     this.token = config.token;
   }
 
-  private getAxios() {
-    return createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        'x-oksign-authorization': this.token,
-        accept: 'application/json; charset=utf-8'
-      }
+  private getAxios(baseURL = BASE_URL) {
+    return createAuthenticatedAxios({
+      baseURL,
+      authHeader: { name: 'x-oksign-authorization', value: this.token },
+      contentType: 'application/json; charset=utf-8',
+      headers: { accept: 'application/json; charset=utf-8' },
+      timeout: 120000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'OKSign',
+          reason: 'upstream_request_failed'
+        })
     });
   }
 
-  private getAxiosV2() {
-    return createAxios({
-      baseURL: BASE_URL_V2,
-      headers: {
-        'x-oksign-authorization': this.token,
-        accept: 'application/json; charset=utf-8'
-      }
-    });
+  private async request<T>(
+    operation: string,
+    request: Parameters<typeof requestAxiosData<OkSignResponse<T>>>[1]
+  ) {
+    let response = await requestAxiosData(operation, request, (error, operation) =>
+      buildApiServiceError(error, {
+        providerLabel: 'OKSign',
+        reason: 'upstream_request_failed',
+        operation
+      })
+    );
+    if (!response || response.status !== 'OK') {
+      throw createApiServiceError(
+        `OKSign ${operation} failed: ${extractApiErrorMessage(
+          { response: { data: response } },
+          {
+            detailKeys: ['reason', 'message'],
+            nestedKeys: ['reason'],
+            fallbackMessage: 'Invalid API response'
+          }
+        )}`,
+        { reason: 'upstream_request_failed', upstreamCode: response?.status }
+      );
+    }
+    return response;
   }
 
-  // ========== Document Management ==========
+  private async requestList<T>(
+    operation: string,
+    request: Parameters<typeof requestAxiosData<OkSignResponse<T[]>>>[1]
+  ) {
+    let response = await this.request<T[]>(operation, request);
+    if (!Array.isArray(response.reason)) {
+      throw createApiServiceError(`OKSign ${operation} returned an invalid list.`);
+    }
+    return response.reason;
+  }
+
+  private decodeUpload(fileContent: string, filename: string) {
+    let normalized = fileContent.replace(/\s/g, '');
+    if (
+      !normalized ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) ||
+      normalized.length % 4 === 1
+    ) {
+      throw createApiServiceError('Provide valid base64-encoded file content.');
+    }
+    let bytes = Buffer.from(normalized, 'base64');
+    if (
+      bytes.toString('base64').replace(/=+$/, '') !== normalized.replace(/=+$/, '') ||
+      !bytes.length ||
+      getBase64ByteLength(normalized) > 10 * 1024 * 1024
+    ) {
+      throw createApiServiceError('Provide a valid, non-empty file no larger than 10 MB.');
+    }
+    if (!filename || /[^\x20-\x7E]/.test(filename)) {
+      throw createApiServiceError(
+        'Use a non-empty filename containing only printable US-ASCII characters.'
+      );
+    }
+    return bytes;
+  }
 
   async uploadDocument(
     fileContent: string,
     filename: string,
     contentType: string
   ): Promise<string> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>('/document/upload', fileContent, {
-      headers: {
-        'x-oksign-filename': filename,
-        'content-type': contentType
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Document upload failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+    let bytes = this.decodeUpload(fileContent, filename);
+    return (
+      await this.request<string>('document upload', () =>
+        this.getAxios().post('/document/upload', bytes, {
+          headers: {
+            'x-oksign-filename': filename,
+            'content-type': contentType
+          }
+        })
+      )
+    ).reason;
   }
 
   async documentExists(docId: string): Promise<DocumentExistsInfo> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<DocumentExistsInfo>>('/document/exists', {
-      headers: {
-        'x-oksign-docid': docId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Document exists check failed: ${response.data.reason}`);
+    let response = (
+      await this.request<DocumentExistsInfo>('document existence check', () =>
+        this.getAxios().get('/document/exists', { headers: { 'x-oksign-docid': docId } })
+      )
+    ).reason;
+    if (
+      !response ||
+      typeof response.filename !== 'string' ||
+      typeof response.template !== 'boolean'
+    ) {
+      throw createApiServiceError('OKSign returned invalid document details.');
     }
-    return response.data.reason;
+    return response;
   }
 
   async removeDocument(docId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/document/remove', {
-      headers: {
-        'x-oksign-docid': docId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Document removal failed: ${response.data.reason}`);
-    }
+    await this.request('document removal', () =>
+      this.getAxios().delete('/document/remove', {
+        headers: { 'x-oksign-docid': docId }
+      })
+    );
   }
-
-  // ========== Form Descriptor ==========
 
   async uploadFormDescriptor(
     docId: string,
     formDescriptor: FormDescriptor
   ): Promise<SignerUrl[]> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse<SignerUrl[]>>(
-      '/formdesc/upload',
-      formDescriptor,
-      {
-        headers: {
-          'x-oksign-docid': docId,
-          'content-type': 'application/json; charset=utf-8'
-        }
-      }
+    return await this.requestList<SignerUrl>('form configuration', () =>
+      this.getAxios().post('/formdesc/upload', formDescriptor, {
+        headers: { 'x-oksign-docid': docId }
+      })
     );
-    if (response.data.status !== 'OK') {
-      throw new Error(
-        `Form descriptor upload failed: ${JSON.stringify(response.data.reason)}`
-      );
-    }
-    return response.data.reason;
   }
 
-  async retrieveFormDescriptor(docId: string): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/formdesc/retrieve', {
-      headers: {
-        'x-oksign-docid': docId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Form descriptor retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveFormDescriptor(docId: string): Promise<unknown> {
+    return (
+      await this.request<unknown>('form retrieval', () =>
+        this.getAxios().get('/formdesc/retrieve', { headers: { 'x-oksign-docid': docId } })
+      )
+    ).reason;
   }
-
-  // ========== Notifications ==========
 
   async uploadNotifications(docId: string, payload: NotificationPayload): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>('/notifications/upload', payload, {
-      headers: {
-        'x-oksign-docid': docId,
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Notification upload failed: ${response.data.reason}`);
-    }
+    await this.request('notification upload', () =>
+      this.getAxios().post('/notifications/upload', payload, {
+        headers: { 'x-oksign-docid': docId }
+      })
+    );
   }
 
-  // ========== Briefcase ==========
-
-  async createBriefcase(config: BriefcaseConfig): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse<any>>('/briefcase/create', config, {
-      headers: {
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Briefcase creation failed: ${JSON.stringify(response.data.reason)}`);
+  async createBriefcase(config: BriefcaseConfig) {
+    if (!config.documents.length)
+      throw createApiServiceError('Include at least one document in the briefcase.');
+    let response = await this.request<SignerUrl[]>('briefcase creation', () =>
+      this.getAxios().post('/briefcase/create', {
+        list: config.documents.map(document => document.docid),
+        packagename: config.packagename,
+        callbackurl: config.callbackURL,
+        returnurl: config.returnURL,
+        webhookurl: config.webhookURL
+      })
+    );
+    if (typeof response.docid !== 'string' || !response.docid) {
+      throw createApiServiceError('OKSign did not return a briefcase ID.');
     }
-    return response.data.reason;
+    return { docid: response.docid, signerurls: response.reason };
   }
 
-  async retrieveBriefcase(briefcaseId: string): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/briefcase/retrieve', {
-      headers: {
-        'x-oksign-docid': briefcaseId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Briefcase retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveBriefcase(briefcaseId: string): Promise<unknown> {
+    return (
+      await this.request<unknown>('briefcase retrieval', () =>
+        this.getAxios().get('/briefcase/retrieve', {
+          headers: { 'x-oksign-docid': briefcaseId }
+        })
+      )
+    ).reason;
   }
 
   async removeBriefcase(briefcaseId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/briefcase/remove', {
-      headers: {
-        'x-oksign-docid': briefcaseId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Briefcase removal failed: ${response.data.reason}`);
-    }
+    await this.request('briefcase removal', () =>
+      this.getAxios().delete('/briefcase/remove', {
+        headers: { 'x-oksign-docid': briefcaseId }
+      })
+    );
   }
 
-  // ========== SignExpress ==========
-
-  async createSignExpress(config: SignExpressConfig): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse<any>>('/signexpress/create', config, {
-      headers: {
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`SignExpress creation failed: ${JSON.stringify(response.data.reason)}`);
+  async createSignExpress(config: SignExpressConfig): Promise<unknown> {
+    if (!config.documents.length)
+      throw createApiServiceError('Include at least one document in the signing session.');
+    let validityperiod = config.validity === undefined ? undefined : config.validity * 86400;
+    if (
+      validityperiod !== undefined &&
+      (!Number.isSafeInteger(validityperiod) || validityperiod <= 0)
+    ) {
+      throw createApiServiceError(
+        'validityDays must produce a positive whole number of seconds.'
+      );
     }
-    return response.data.reason;
+    return (
+      await this.request<unknown>('SignExpress creation', () =>
+        this.getAxios().post('/signexpress/create', {
+          list: config.documents.map(document => document.docid),
+          signerinfo: { id: config.signerid },
+          validityperiod,
+          callbackurl: config.callbackURL,
+          returnurl: config.returnURL
+        })
+      )
+    ).reason;
   }
 
-  async retrieveSignExpress(tokenId: string): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/signexpress/retrieve', {
-      headers: {
-        'x-oksign-docid': tokenId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`SignExpress retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveSignExpress(tokenId: string): Promise<unknown> {
+    return (
+      await this.request<unknown>('SignExpress retrieval', () =>
+        this.getAxios().get('/signexpress/retrieve', {
+          headers: { 'x-oksign-token': tokenId }
+        })
+      )
+    ).reason;
   }
 
   async removeSignExpress(tokenId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/signexpress/remove', {
-      headers: {
-        'x-oksign-docid': tokenId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`SignExpress removal failed: ${response.data.reason}`);
-    }
+    await this.request('SignExpress removal', () =>
+      this.getAxios().delete('/signexpress/remove', {
+        headers: { 'x-oksign-token': tokenId }
+      })
+    );
   }
 
-  // ========== EditorExpress ==========
-
-  async createEditorExpress(config: EditorExpressConfig): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse<any>>('/editorexpress/create', config, {
-      headers: {
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(
-        `EditorExpress creation failed: ${JSON.stringify(response.data.reason)}`
-      );
-    }
-    return response.data.reason;
+  async createEditorExpress(config: EditorExpressConfig): Promise<unknown> {
+    return (
+      await this.request<unknown>('EditorExpress creation', () =>
+        this.getAxios().post('/editorexpress/create', {
+          list: [config.docid],
+          showAnonymousSigners: config.showAnonymousSigners,
+          showMeSigner: config.showMeSigner,
+          showTeammembers: config.showTeammembers,
+          showSigningOptions:
+            config.showSigningOptions === undefined
+              ? undefined
+              : {
+                  eid: config.showSigningOptions,
+                  itsme: config.showSigningOptions,
+                  smartid: config.showSigningOptions ? {} : false,
+                  pen: config.showSigningOptions,
+                  tan: config.showSigningOptions
+                }
+        })
+      )
+    ).reason;
   }
 
-  async retrieveEditorExpress(tokenId: string): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/editorexpress/retrieve', {
-      headers: {
-        'x-oksign-docid': tokenId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`EditorExpress retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveEditorExpress(tokenId: string): Promise<unknown> {
+    return (
+      await this.request<unknown>('EditorExpress retrieval', () =>
+        this.getAxios().get('/editorexpress/retrieve', {
+          headers: { 'x-oksign-token': tokenId }
+        })
+      )
+    ).reason;
   }
 
   async removeEditorExpress(tokenId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/editorexpress/remove', {
-      headers: {
-        'x-oksign-docid': tokenId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`EditorExpress removal failed: ${response.data.reason}`);
-    }
+    await this.request('EditorExpress removal', () =>
+      this.getAxios().delete('/editorexpress/remove', {
+        headers: { 'x-oksign-token': tokenId }
+      })
+    );
   }
-
-  // ========== Metadata ==========
 
   async retrieveMetadata(signedDocId: string): Promise<DocumentMetadata> {
-    let http = this.getAxiosV2();
-    let response = await http.get<OkSignResponse<DocumentMetadata>>('/metadata/retrieve', {
-      headers: {
-        'x-oksign-docid': signedDocId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Metadata retrieval failed: ${JSON.stringify(response.data.reason)}`);
+    let metadata = (
+      await this.request<DocumentMetadata>('metadata retrieval', () =>
+        this.getAxios(BASE_URL_V2).get('/metadata/retrieve', {
+          headers: { 'x-oksign-docid': signedDocId }
+        })
+      )
+    ).reason;
+    if (
+      !metadata ||
+      typeof metadata.filename !== 'string' ||
+      (typeof metadata.size !== 'string' && typeof metadata.size !== 'number') ||
+      typeof metadata.nbrOfSigaturesRequired !== 'number' ||
+      typeof metadata.nbrOfSigaturesValid !== 'number' ||
+      (metadata.fields !== undefined && !Array.isArray(metadata.fields))
+    ) {
+      throw createApiServiceError('OKSign returned invalid document metadata.');
     }
-    return response.data.reason;
+    return metadata;
   }
 
-  // ========== Audit Trail ==========
-
   async retrieveAuditTrail(signedDocId: string): Promise<string> {
-    let http = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        'x-oksign-authorization': this.token,
-        accept: 'application/pdf'
-      },
-      responseType: 'arraybuffer'
-    });
-    let response = await http.get('/audittrail/retrieve', {
-      headers: {
-        'x-oksign-docid': signedDocId
-      }
-    });
-    // Returns PDF binary - we'll return base64 encoded
-
-    let buffer = Buffer.from(response.data as ArrayBuffer);
+    let bytes = await requestAxiosData(
+      'audit trail retrieval',
+      () =>
+        this.getAxios().get<ArrayBuffer>('/audittrail/retrieve', {
+          responseType: 'arraybuffer',
+          headers: {
+            'x-oksign-docid': signedDocId,
+            'x-oksign-format': 'pdf',
+            accept: 'application/pdf'
+          }
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'OKSign',
+          reason: 'upstream_request_failed',
+          operation
+        })
+    );
+    let buffer = Buffer.from(bytes);
+    if (buffer.subarray(0, 5).toString() !== '%PDF-') {
+      throw createApiServiceError('OKSign did not return a PDF audit trail report.');
+    }
     return buffer.toString('base64');
   }
 
-  // ========== Contacts ==========
-
   async uploadContacts(contacts: Contact[]): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>('/contacts/upload', contacts, {
-      headers: {
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Contacts upload failed: ${response.data.reason}`);
-    }
+    if (!contacts.length) throw createApiServiceError('Provide at least one contact.');
+    await this.request('contacts upload', () =>
+      this.getAxios().post('/contacts/upload', contacts)
+    );
   }
 
-  async retrieveContacts(): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/contacts/retrieve');
-    if (response.data.status !== 'OK') {
-      throw new Error(`Contacts retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveContacts(): Promise<Contact[]> {
+    return await this.requestList<Contact>('contacts retrieval', () =>
+      this.getAxios().get('/contacts/retrieve')
+    );
   }
 
-  async removeContact(contactId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/contacts/remove', {
-      headers: {
-        'x-oksign-docid': contactId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Contact removal failed: ${response.data.reason}`);
-    }
+  async removeContact(name: string, email: string): Promise<number | undefined> {
+    return (
+      await this.request<number | undefined>('contact removal', () =>
+        this.getAxios().post('/contacts/remove', [{ name, email }])
+      )
+    ).reason;
   }
 
-  // ========== Account ==========
-
-  async retrieveUsers(): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/users/retrieve');
-    if (response.data.status !== 'OK') {
-      throw new Error(`Users retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveUsers(): Promise<UserInfo[]> {
+    return await this.requestList<UserInfo>('users retrieval', () =>
+      this.getAxios().get('/users/retrieve')
+    );
   }
 
-  async retrieveCredits(): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/credits/retrieve');
-    if (response.data.status !== 'OK') {
-      throw new Error(`Credits retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveCredits(): Promise<unknown> {
+    let response = await requestAxiosData(
+      'credits retrieval',
+      () =>
+        this.getAxios().get<OkSignResponse<unknown> & { quantity?: number }>(
+          '/credits/retrieve'
+        ),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'OKSign',
+          reason: 'upstream_request_failed',
+          operation
+        })
+    );
+    // The reference shows a bare credits object as well as the standard result envelope.
+    if (response?.status === 'OK') return response.reason;
+    if (response?.status === undefined && typeof response?.quantity === 'number')
+      return response;
+    throw createApiServiceError(
+      `OKSign credits retrieval failed: ${extractApiErrorMessage(
+        { response: { data: response } },
+        { detailKeys: ['reason'], nestedKeys: ['reason'] }
+      )}`
+    );
   }
 
-  async retrieveEmailTemplates(): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/emailtemplates/retrieve');
-    if (response.data.status !== 'OK') {
-      throw new Error(`Email templates retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveEmailTemplates(): Promise<unknown> {
+    return (
+      await this.request<unknown>('email templates retrieval', () =>
+        this.getAxios().get('/email-templates/retrieve')
+      )
+    ).reason;
   }
 
-  async retrieveLinkedList(docId: string): Promise<any> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any>>('/linkedlist/retrieve', {
-      headers: {
-        'x-oksign-docid': docId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Linked list retrieval failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+  async retrieveLinkedList(docId: string): Promise<unknown> {
+    return (
+      await this.request<unknown>('linked documents retrieval', () =>
+        this.getAxios().get('/linkedlist/retrieve', { headers: { 'x-oksign-docid': docId } })
+      )
+    ).reason;
   }
-
-  // ========== Signer ID ==========
 
   async calculateSignerId(name: string, email: string): Promise<string> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>(
-      '/signerid/calculate',
-      { name, email },
-      {
-        headers: {
-          'content-type': 'application/json; charset=utf-8'
-        }
-      }
-    );
-    if (response.data.status !== 'OK') {
-      throw new Error(`Signer ID calculation failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+    return (
+      await this.request<string>('signer ID calculation', () =>
+        this.getAxios().post('/signerid/calculate', { name, email })
+      )
+    ).reason;
   }
-
-  // ========== Org Token Info ==========
 
   async updateOrgTokenInfo(config: {
     callbackURL?: string;
     returnURL?: string;
     webhookURL?: string;
   }): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>('/orgtokeninfo/update', config, {
-      headers: {
-        'content-type': 'application/json; charset=utf-8'
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Org token info update failed: ${response.data.reason}`);
+    if (
+      config.callbackURL === undefined ||
+      config.returnURL === undefined ||
+      config.webhookURL === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide callbackUrl, returnUrl, and webhookUrl. Use an empty string to clear a URL. OKSign replaces all three values together.'
+      );
     }
+    await this.request('token configuration update', () =>
+      this.getAxios().post('/orgtokeninfo/update', {
+        callbackurl: config.callbackURL,
+        returnurl: config.returnURL,
+        webhookurl: config.webhookURL
+      })
+    );
   }
-
-  // ========== Email Attachments ==========
 
   async uploadEmailAttachment(
     fileContent: string,
     filename: string,
     contentType: string
   ): Promise<string> {
-    let http = this.getAxios();
-    let response = await http.post<OkSignResponse>('/emailattachment/upload', fileContent, {
-      headers: {
-        'x-oksign-filename': filename,
-        'content-type': contentType
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Email attachment upload failed: ${response.data.reason}`);
-    }
-    return response.data.reason;
+    let bytes = this.decodeUpload(fileContent, filename);
+    return (
+      await this.request<string>('email attachment upload', () =>
+        this.getAxios().post('/emailattachment/upload', bytes, {
+          headers: {
+            'x-oksign-filename': filename,
+            'content-type': contentType
+          }
+        })
+      )
+    ).reason;
   }
 
   async removeEmailAttachment(attachmentId: string): Promise<void> {
-    let http = this.getAxios();
-    let response = await http.delete<OkSignResponse>('/emailattachment/remove', {
-      headers: {
-        'x-oksign-docid': attachmentId
-      }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(`Email attachment removal failed: ${response.data.reason}`);
-    }
+    await this.request('email attachment removal', () =>
+      this.getAxios().delete('/emailattachment/remove', {
+        headers: { 'x-oksign-docid': attachmentId }
+      })
+    );
   }
-
-  // ========== Polling ==========
 
   async getSignedDocuments(from: string, to: string): Promise<SignedDocument[]> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<SignedDocument[]>>('/documents/signed', {
-      params: { from, to }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(
-        `Signed documents retrieval failed: ${JSON.stringify(response.data.reason)}`
-      );
-    }
-    return response.data.reason || [];
+    return await this.requestList<SignedDocument>('signed documents retrieval', () =>
+      this.getAxios().get('/documents/signed', {
+        headers: {
+          'x-oksign-starttime': from,
+          'x-oksign-endtime': to
+        }
+      })
+    );
   }
 
-  async getActiveDocuments(): Promise<any[]> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any[]>>('/documents/active');
-    if (response.data.status !== 'OK') {
-      throw new Error(
-        `Active documents retrieval failed: ${JSON.stringify(response.data.reason)}`
-      );
-    }
-    return response.data.reason || [];
+  async getActiveDocuments(): Promise<unknown[]> {
+    return await this.requestList<unknown>('active documents retrieval', () =>
+      this.getAxios().get('/documents/active')
+    );
   }
 
-  async getWebhookErrors(from: string, to: string): Promise<any[]> {
-    let http = this.getAxios();
-    let response = await http.get<OkSignResponse<any[]>>('/webhooks/retrieve', {
-      params: { from, to }
-    });
-    if (response.data.status !== 'OK') {
-      throw new Error(
-        `Webhook errors retrieval failed: ${JSON.stringify(response.data.reason)}`
-      );
-    }
-    return response.data.reason || [];
+  async getWebhookErrors(from: string, to: string): Promise<unknown[]> {
+    return await this.requestList<unknown>('notification errors retrieval', () =>
+      this.getAxios().get('/webhooks/retrieve', {
+        headers: {
+          'x-oksign-starttime': from,
+          'x-oksign-endtime': to
+        }
+      })
+    );
   }
 }

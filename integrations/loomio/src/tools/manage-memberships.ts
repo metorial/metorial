@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groupIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageMemberships = SlateTool.create(spec, {
@@ -20,7 +21,7 @@ export let manageMemberships = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.number().describe('ID of the group to manage memberships for'),
+      groupId: groupIdSchema,
       emails: z.array(z.string()).describe('List of email addresses to invite to the group'),
       removeAbsent: z
         .boolean()
@@ -56,8 +57,8 @@ export let manageMemberships = SlateTool.create(spec, {
       removeAbsent: ctx.input.removeAbsent
     });
 
-    let added = result.added || [];
-    let removed = result.removed || [];
+    let added = result.added_emails;
+    let removed = result.removed_emails;
 
     return {
       output: { added, removed },

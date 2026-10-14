@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,6 +46,12 @@ When only a prompt is provided, the AI auto-generates a schema which is returned
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.prompt?.trim() && !ctx.input.schema) {
+      throw createApiServiceError(
+        'Provide a prompt or JSON Schema describing what to extract.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createExtraction({

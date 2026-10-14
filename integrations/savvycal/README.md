@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/savvycal.png" height="20"> Savvycal
 
-Create, manage, and cancel scheduled events via shareable scheduling links. List and create scheduling links with configurable durations, custom fields, and availability settings. Manage automated workflows with actions and rules attached to scheduling links. Register and manage webhooks for real-time notifications on event lifecycle changes, attendee updates, meeting poll responses, and workflow triggers. Retrieve user information and supported time zones. Supports paid event checkout tracking, meeting polls, and custom event metadata.
+Discover available booking slots, create and cancel events, and manage scheduling links in SavvyCal. Retrieve event details, custom fields, workflow listings, the current user, and supported time zones.
 
 ## Tools
 
@@ -23,6 +23,10 @@ Retrieve information about the currently authenticated SavvyCal user. Returns pr
 ### List Events
 
 List scheduled events from SavvyCal. Supports filtering by event state and pagination via cursor-based navigation. Returns event details including attendees, conferencing info, and metadata.
+
+### List Available Link Slots
+
+List available start and end times, meeting durations, and availability ranks for a scheduling link. Use these slots when creating an event.
 
 ### List Scheduling Links
 

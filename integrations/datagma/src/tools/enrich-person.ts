@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseDatagmaNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let enrichPerson = SlateTool.create(spec, {
@@ -14,11 +15,11 @@ Optionally retrieve expanded person details (education, experience history), com
     'Set personFull to true for expanded education and experience details.',
     'Set companyPremium to true for detailed LinkedIn company data.',
     'Set companyFull to true for financial and Crunchbase company data.',
-    'Set phoneFull to true to also search for mobile phone numbers (costs 30 credits).'
+    'Set phoneFull to true to also search for mobile phone numbers. Additional credits apply.'
   ],
   constraints: [
     'Rate limited to 10 requests per second.',
-    'Each enrichment costs 1 credit. Phone search adds 30 credits.'
+    'Successful person enrichment costs 2 credits. Phone searches consume additional credits.'
   ],
   tags: {
     destructive: false,
@@ -79,7 +80,7 @@ Optionally retrieve expanded person details (education, experience history), com
         .boolean()
         .optional()
         .default(false)
-        .describe('Also search for mobile phone numbers (costs 30 additional credits)'),
+        .describe('Also search for mobile phone numbers; additional credits apply'),
       deepTraffic: z
         .boolean()
         .optional()
@@ -100,19 +101,32 @@ Optionally retrieve expanded person details (education, experience history), com
         .optional()
         .describe('Company data including name, industry, size, locations'),
       phone: z.array(z.any()).optional().describe('Phone numbers found for the person'),
+      phoneDetails: z
+        .any()
+        .optional()
+        .describe('Phone result grouped by work phones and mobiles'),
       email: z.string().optional().describe('Email address with verification status'),
+      emailDetails: z.any().optional().describe('Email address and its verification status'),
       emailV2: z.any().optional().describe('Enhanced email validation data'),
       creditBurn: z.number().optional().describe('Number of credits consumed by this request')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.linkedinUrl?.trim() &&
+      !ctx.input.email?.trim() &&
+      !(ctx.input.fullName?.trim() && ctx.input.companyName?.trim())
+    ) {
+      throw createApiServiceError(
+        'Provide linkedinUrl, email, or both fullName and companyName.'
+      );
+    }
     let client = new Client(ctx.auth.token);
 
     let data = ctx.input.linkedinUrl || ctx.input.email || ctx.input.companyName;
 
     let result = await client.enrichFull({
       data,
-      firstName: ctx.input.fullName ? undefined : undefined,
       fullName: ctx.input.fullName,
       companyKeyword: ctx.input.companyKeyword,
       countryCode: ctx.input.countryCode,
@@ -125,19 +139,34 @@ Optionally retrieve expanded person details (education, experience history), com
     });
 
     let personName =
-      result?.person?.name || result?.person?.fullName || ctx.input.fullName || 'Unknown';
-    let companyName = result?.company?.name || ctx.input.companyName || '';
+      result?.person?.basic?.name ||
+      result?.person?.data?.name ||
+      result?.person?.name ||
+      result?.person?.fullName ||
+      ctx.input.fullName ||
+      'Unknown';
+    let companyName =
+      result?.company?.basic?.name || result?.company?.name || ctx.input.companyName || '';
+    let phone = Array.isArray(result?.phone)
+      ? result.phone
+      : result?.phone
+        ? [...(result.phone.workPhones ?? []), ...(result.phone.mobiles ?? [])]
+        : undefined;
+    let email = typeof result?.email === 'string' ? result.email : result?.email?.email;
+    let creditBurn = parseDatagmaNumber(result?.creditBurn, 'creditBurn');
 
     return {
       output: {
         person: result?.person,
         company: result?.company,
-        phone: result?.phone,
-        email: result?.email,
+        phone,
+        phoneDetails: result?.phone,
+        email,
+        emailDetails: result?.email,
         emailV2: result?.emailV2,
-        creditBurn: result?.creditBurn
+        creditBurn
       },
-      message: `Enriched person **${personName}**${companyName ? ` at **${companyName}**` : ''}. Credits used: ${result?.creditBurn ?? 'N/A'}.`
+      message: `Enriched person **${personName}**${companyName ? ` at **${companyName}**` : ''}. Credits used: ${creditBurn ?? 'N/A'}.`
     };
   })
   .build();

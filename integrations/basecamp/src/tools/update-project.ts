@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProjectTool = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update a Basecamp project's name or description. You can also trash a project to mark it for deletion (auto-deleted after 30 days).`,
+  description: `Call list_accounts to discover the accountId for this operation. Update a Basecamp project's name or description. You can also trash a project to mark it for deletion (auto-deleted after 30 days).`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project to update'),
       name: z.string().optional().describe('New name for the project'),
       description: z
@@ -36,7 +38,8 @@ export let updateProjectTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     if (ctx.input.trash) {

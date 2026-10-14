@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface StartBuildParams {
   appId: string;
@@ -113,26 +113,74 @@ export interface AddVariablesParams {
   variables: VariableGroupVariable[];
 }
 
+export interface CacheDeletionResponse {
+  caches: string[];
+  message?: string;
+}
+
+export interface CurrentUserResponse {
+  id: string;
+  avatar_url: string | null;
+  permissions: Record<string, string[]>;
+}
+
+export interface VariableGroupsResponse {
+  data: Array<{ id: string; name: string }>;
+  page_size: number;
+  current_page: number;
+  total_pages: number;
+}
+
+export let getArtifactDownloadUrl = (artifactUrl: string): URL => {
+  let url: URL;
+  try {
+    url = new URL(artifactUrl);
+  } catch {
+    throw createApiServiceError('Provide the authenticated artifact URL from get_build.');
+  }
+  if (
+    url.origin !== 'https://api.codemagic.io' ||
+    !url.pathname.startsWith('/artifacts/') ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('/public-url') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw createApiServiceError(
+      'Provide an authenticated https://api.codemagic.io/artifacts/ URL from get_build.'
+    );
+  }
+  return url;
+};
+
 export class CodemagicClient {
-  private api: ReturnType<typeof createAxios>;
-  private apiV3: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
+  private apiV3: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Codemagic API token is required. Reconnect your account.'
+      );
+    }
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Codemagic',
+        reason: 'codemagic_api_error'
+      });
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.codemagic.io',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': config.token
-      }
+      authHeader: { name: 'x-auth-token', value: config.token },
+      errorAdapter
     });
 
-    this.apiV3 = createAxios({
+    this.apiV3 = createAuthenticatedAxios({
       baseURL: 'https://codemagic.io/api/v3',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'x-auth-token': config.token
-      }
+      authHeader: { name: 'x-auth-token', value: config.token },
+      headers: { Accept: 'application/json' },
+      errorAdapter
     });
   }
 
@@ -144,7 +192,7 @@ export class CodemagicClient {
   }
 
   async getApplication(appId: string): Promise<ApplicationResponse> {
-    let response = await this.api.get(`/apps/${appId}`);
+    let response = await this.api.get(`/apps/${encodeURIComponent(appId)}`);
     return response.data.application;
   }
 
@@ -169,6 +217,15 @@ export class CodemagicClient {
   // --- Builds ---
 
   async startBuild(params: StartBuildParams): Promise<{ buildId: string }> {
+    if (
+      (params.branch !== undefined && !params.branch.trim()) ||
+      (params.tag !== undefined && !params.tag.trim()) ||
+      (params.branch !== undefined) === (params.tag !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one non-empty branch or tag to start a build.'
+      );
+    }
     let body: Record<string, unknown> = {
       appId: params.appId,
       workflowId: params.workflowId
@@ -202,12 +259,12 @@ export class CodemagicClient {
   }
 
   async getBuild(buildId: string): Promise<BuildResponse> {
-    let response = await this.api.get(`/builds/${buildId}`);
+    let response = await this.api.get(`/builds/${encodeURIComponent(buildId)}`);
     return response.data.build;
   }
 
   async cancelBuild(buildId: string): Promise<{ status: string }> {
-    let response = await this.api.post(`/builds/${buildId}/cancel`);
+    let response = await this.api.post(`/builds/${encodeURIComponent(buildId)}/cancel`);
     return { status: response.status === 208 ? 'already_finished' : 'cancelled' };
   }
 
@@ -217,37 +274,68 @@ export class CodemagicClient {
     artifactUrl: string,
     expiresAt?: number
   ): Promise<{ url: string; expiresAt: string }> {
-    let securePath = artifactUrl.replace('https://api.codemagic.io/artifacts/', '');
+    let url = getArtifactDownloadUrl(artifactUrl);
+    if (
+      expiresAt !== undefined &&
+      (!Number.isInteger(expiresAt) || expiresAt <= Date.now() / 1000)
+    ) {
+      throw createApiServiceError('expiresAt must be a future UNIX timestamp in seconds.');
+    }
     let body: Record<string, unknown> = {};
-    if (expiresAt) body.expiresAt = expiresAt;
-    let response = await this.api.post(`/artifacts/${securePath}/public-url`, body);
+    if (expiresAt !== undefined) body.expiresAt = expiresAt;
+    let response = await this.api.post(`${url.pathname}/public-url`, body);
     return response.data;
   }
 
   // --- Caches ---
 
   async listCaches(appId: string): Promise<CacheResponse[]> {
-    let response = await this.api.get(`/apps/${appId}/caches`);
+    let response = await this.api.get<{ caches: CacheResponse[] }>(
+      `/apps/${encodeURIComponent(appId)}/caches`
+    );
+    return response.data.caches;
+  }
+
+  async deleteAllCaches(appId: string): Promise<CacheDeletionResponse> {
+    let response = await this.api.delete<CacheDeletionResponse>(
+      `/apps/${encodeURIComponent(appId)}/caches`
+    );
     return response.data;
   }
 
-  async deleteAllCaches(appId: string): Promise<void> {
-    await this.api.delete(`/apps/${appId}/caches`);
-  }
-
-  async deleteCache(appId: string, cacheId: string): Promise<void> {
-    await this.api.delete(`/apps/${appId}/caches/${cacheId}`);
+  async deleteCache(appId: string, cacheId: string): Promise<CacheDeletionResponse> {
+    let response = await this.api.delete<CacheDeletionResponse>(
+      `/apps/${encodeURIComponent(appId)}/caches/${encodeURIComponent(cacheId)}`
+    );
+    return response.data;
   }
 
   // --- Environment Variables (v3 API) ---
 
   async addVariablesToGroup(params: AddVariablesParams): Promise<unknown> {
     let response = await this.apiV3.post(
-      `/variable-groups/${params.variableGroupId}/variables`,
+      `/variable-groups/${encodeURIComponent(params.variableGroupId)}/variables`,
       {
         secure: params.secure ?? false,
         variables: params.variables
       }
+    );
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<CurrentUserResponse> {
+    let response = await this.apiV3.get<{ data: CurrentUserResponse }>('/user');
+    return response.data.data;
+  }
+
+  async listVariableGroups(
+    appId: string,
+    page?: number,
+    pageSize?: number
+  ): Promise<VariableGroupsResponse> {
+    let response = await this.apiV3.get<VariableGroupsResponse>(
+      `/apps/${encodeURIComponent(appId)}/variable-groups`,
+      { params: { page, page_size: pageSize } }
     );
     return response.data;
   }

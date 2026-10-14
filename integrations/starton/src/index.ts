@@ -2,10 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deploySmartContract,
+  getBalance,
   getTransactions,
   importSmartContract,
   interactSmartContract,
   listIpfsPins,
+  listKms,
+  listNetworks,
   listSmartContracts,
   listTemplates,
   manageWallets,
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     manageWallets,
     manageWatchers,
     getTransactions,
-    listTemplates
+    listTemplates,
+    listNetworks,
+    listKms,
+    getBalance
   ],
   triggers: []
 });

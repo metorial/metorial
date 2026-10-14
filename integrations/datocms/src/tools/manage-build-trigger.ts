@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,13 @@ export let manageBuildTrigger = SlateTool.create(spec, {
         .optional()
         .describe('Adapter-specific settings (e.g. trigger_url for custom adapter)'),
       frontendUrl: z.string().optional().describe('Public URL of the deployed site'),
-      enabled: z.boolean().optional().describe('Whether the trigger is active')
+      enabled: z.boolean().optional().describe('Whether the trigger is active'),
+      autotriggerOnScheduledPublications: z
+        .boolean()
+        .optional()
+        .describe(
+          'Automatically deploy on scheduled publications or unpublishings (defaults to false for create)'
+        )
     })
   )
   .output(
@@ -45,8 +51,16 @@ export let manageBuildTrigger = SlateTool.create(spec, {
       environment: ctx.config.environment
     });
 
-    let { action, buildTriggerId, name, adapter, adapterSettings, frontendUrl, enabled } =
-      ctx.input;
+    let {
+      action,
+      buildTriggerId,
+      name,
+      adapter,
+      adapterSettings,
+      frontendUrl,
+      enabled,
+      autotriggerOnScheduledPublications
+    } = ctx.input;
 
     if (action === 'list') {
       let buildTriggers = await client.listBuildTriggers();
@@ -57,7 +71,8 @@ export let manageBuildTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!buildTriggerId) throw new Error('buildTriggerId is required for get action');
+      if (!buildTriggerId)
+        throw createApiServiceError('buildTriggerId is required for get action');
       let buildTrigger = await client.getBuildTrigger(buildTriggerId);
       return {
         output: { buildTrigger },
@@ -66,12 +81,21 @@ export let manageBuildTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      let attributes: Record<string, any> = {};
+      if (!name) throw createApiServiceError('name is required for create action');
+      if (!adapter) throw createApiServiceError('adapter is required for create action');
+      if (!adapterSettings)
+        throw createApiServiceError('adapterSettings is required for create action');
+      let attributes: Record<string, any> = {
+        frontend_url: frontendUrl ?? null,
+        autotrigger_on_scheduled_publications: autotriggerOnScheduledPublications ?? false
+      };
       if (name) attributes.name = name;
       if (adapter) attributes.adapter = adapter;
       if (adapterSettings) attributes.adapter_settings = adapterSettings;
       if (frontendUrl) attributes.frontend_url = frontendUrl;
       if (enabled !== undefined) attributes.enabled = enabled;
+      if (autotriggerOnScheduledPublications !== undefined)
+        attributes.autotrigger_on_scheduled_publications = autotriggerOnScheduledPublications;
       let buildTrigger = await client.createBuildTrigger(attributes);
       return {
         output: { buildTrigger },
@@ -80,13 +104,16 @@ export let manageBuildTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!buildTriggerId) throw new Error('buildTriggerId is required for update action');
+      if (!buildTriggerId)
+        throw createApiServiceError('buildTriggerId is required for update action');
       let attributes: Record<string, any> = {};
       if (name) attributes.name = name;
       if (adapter) attributes.adapter = adapter;
       if (adapterSettings) attributes.adapter_settings = adapterSettings;
       if (frontendUrl) attributes.frontend_url = frontendUrl;
       if (enabled !== undefined) attributes.enabled = enabled;
+      if (autotriggerOnScheduledPublications !== undefined)
+        attributes.autotrigger_on_scheduled_publications = autotriggerOnScheduledPublications;
       let buildTrigger = await client.updateBuildTrigger(buildTriggerId, attributes);
       return {
         output: { buildTrigger },
@@ -95,7 +122,8 @@ export let manageBuildTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'trigger') {
-      if (!buildTriggerId) throw new Error('buildTriggerId is required for trigger action');
+      if (!buildTriggerId)
+        throw createApiServiceError('buildTriggerId is required for trigger action');
       let buildTrigger = await client.triggerBuild(buildTriggerId);
       return {
         output: { buildTrigger },
@@ -104,7 +132,8 @@ export let manageBuildTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!buildTriggerId) throw new Error('buildTriggerId is required for delete action');
+      if (!buildTriggerId)
+        throw createApiServiceError('buildTriggerId is required for delete action');
       let buildTrigger = await client.deleteBuildTrigger(buildTriggerId);
       return {
         output: { buildTrigger },
@@ -112,6 +141,6 @@ export let manageBuildTrigger = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

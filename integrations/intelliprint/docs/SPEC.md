@@ -1,4 +1,4 @@
-Let me get more details on the webhooks and additional features from the docs.# Slates Specification for Intelliprint
+# Intelliprint Specification
 
 ## Overview
 
@@ -43,7 +43,7 @@ Three ways to provide content for a print job:
 
 ### Bulk Mail
 
-Large documents can be split into individual letters automatically, or batch mailings can be sent with a single API call. Document splitting is configured via options like `split_by_content` with a splitting keyword.
+Large documents can be split into individual letters automatically, or batch mailings can be sent with a single API call. Document splitting uses `splitting.method`, with `phrase` for `split_on_phrase` or `pages` for `split_on_pages`.
 
 ### Postage Services
 
@@ -75,15 +75,28 @@ Print jobs can be cancelled before they enter production.
 
 ### Reusable Backgrounds
 
-Background images or letterheads can be applied to print jobs.
+Create reusable PDF, RTF, or Word backgrounds with `create_background`, rename them with `update_background`, and apply their IDs to print jobs. `get_background` also provides a downloadable PDF preview. Intelliprint prevents deleting backgrounds used in the previous 90 days.
 
 ### Extra Documents
 
-Additional documents can be attached to print jobs, with options to apply backgrounds to those documents as well.
+Intelliprint supports extra documents through its API; this integration does not currently expose that upload workflow.
 
 ### Content Manipulation
 
 Options are available to adjust page positioning (horizontal/vertical offsets in mm) and to remove letters containing a specific phrase.
+
+## PDF Previews
+
+Use `get_print_job` to find individual mail item IDs, then `download_letter_preview` to download a selected PDF. Intelliprint returns signed preview URLs that expire after one hour. A fresh resource retrieval is used to obtain the current URL before download; previews remain unavailable once Intelliprint deletes their underlying PDF.
+
+## API Reference
+
+- [Connection and authentication](https://www.intelliprint.net/reference)
+- [Create a print job](https://www.intelliprint.net/reference/prints/create)
+- [Create a background](https://www.intelliprint.net/reference/backgrounds/create)
+- [Update a background](https://www.intelliprint.net/reference/backgrounds/update)
+- [Retrieve a print job](https://www.intelliprint.net/reference/prints/retrieve)
+- [Errors](https://www.intelliprint.net/docs/errors)
 
 ## Events
 

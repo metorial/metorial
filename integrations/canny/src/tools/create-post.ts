@@ -22,7 +22,7 @@ export let createPostTool = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe('Custom field key-value pairs'),
-      eta: z.string().optional().describe('Estimated completion date (ISO 8601)'),
+      eta: z.string().optional().describe('Estimated completion date (MM/YYYY)'),
       etaPublic: z.boolean().optional().describe('Whether to show ETA publicly'),
       imageURLs: z.array(z.string()).optional().describe('Array of image URLs to attach'),
       ownerId: z.string().optional().describe('Canny user ID of the post owner/assignee'),
@@ -44,7 +44,7 @@ export let createPostTool = SlateTool.create(spec, {
       authorID: ctx.input.authorId,
       boardID: ctx.input.boardId,
       title: ctx.input.title,
-      details: ctx.input.details,
+      details: ctx.input.details ?? '',
       categoryID: ctx.input.categoryId,
       customFields: ctx.input.customFields,
       eta: ctx.input.eta,

@@ -44,11 +44,13 @@ export let barcodeCreate = SlateTool.create(spec, {
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded barcode/QR code image'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
 
     if (ctx.input.type === 'barcode') {
@@ -87,9 +89,13 @@ export let barcodeCreate = SlateTool.create(spec, {
       output: {
         fileName: result.Filename || '',
         fileContent: result.FileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully created **${ctx.input.type === 'barcode' ? ctx.input.barcodeType || 'Code128' : 'QR code'}** image.`
+      message: client.message(
+        `Successfully created **${ctx.input.type === 'barcode' ? ctx.input.barcodeType || 'Code128' : 'QR code'}** image.`
+      )
     };
   })
   .build();

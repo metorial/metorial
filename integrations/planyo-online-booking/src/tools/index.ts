@@ -18,3 +18,5 @@ export { modifyReservation } from './modify-reservation';
 export { modifyUser } from './modify-user';
 export { recordPayment } from './record-payment';
 export { reservationAction } from './reservation-action';
+export { searchReservations } from './search-reservations';
+export { searchResources } from './search-resources';

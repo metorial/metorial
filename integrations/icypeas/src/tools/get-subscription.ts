@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,6 +16,8 @@ export let getSubscription = SlateTool.create(spec, {
     z.object({
       email: z
         .string()
+        .trim()
+        .email()
         .optional()
         .describe(
           'Account email address. If not provided, uses the email from authentication settings.'
@@ -36,7 +38,7 @@ export let getSubscription = SlateTool.create(spec, {
 
     let email = ctx.input.email || ctx.auth.accountEmail;
     if (!email) {
-      throw new Error(
+      throw createApiServiceError(
         'Account email is required. Provide it as input or configure it in authentication settings.'
       );
     }
@@ -46,7 +48,13 @@ export let getSubscription = SlateTool.create(spec, {
     return {
       output: {
         success: result?.success ?? true,
-        subscription: result?.subscription,
+        subscription: result?.subscription ?? {
+          plan: result?.plan,
+          status: result?.status,
+          currency: result?.currency,
+          priceId: result?.priceId,
+          quotas: result?.quotas
+        },
         credits: result?.credits,
         userId: result?.userId || result?._id,
         raw: result

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapPerson, personSchema } from '../lib/profiles';
 import { spec } from '../spec';
 
 let filterSchema = z.object({
@@ -16,57 +17,6 @@ let rangeFilterSchema = z.object({
   min: z.number().optional().describe('Minimum value (inclusive)'),
   max: z.number().optional().describe('Maximum value (inclusive)'),
   exclude: z.boolean().optional().describe('If true, excludes this range')
-});
-
-let employmentSchema = z.object({
-  title: z.string().optional(),
-  companyName: z.string().optional(),
-  companyDomain: z.string().optional(),
-  companyId: z.string().optional(),
-  companyIndustry: z.string().optional(),
-  companyHeadcount: z.number().optional(),
-  companyType: z.string().optional(),
-  isCurrent: z.boolean().optional(),
-  startAt: z.string().optional(),
-  endAt: z.string().optional()
-});
-
-let personSchema = z.object({
-  personId: z.string().optional(),
-  fullName: z.string().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  location: z
-    .object({
-      country: z.string().optional(),
-      countryCode: z.string().optional(),
-      city: z.string().optional(),
-      region: z.string().optional()
-    })
-    .optional(),
-  linkedinUrl: z.string().optional(),
-  skills: z.array(z.string()).optional(),
-  languages: z
-    .array(
-      z.object({
-        language: z.string().optional(),
-        code: z.string().optional(),
-        proficiency: z.string().optional()
-      })
-    )
-    .optional(),
-  educations: z
-    .array(
-      z.object({
-        schoolName: z.string().optional(),
-        degree: z.string().optional(),
-        startAt: z.string().optional(),
-        endAt: z.string().optional()
-      })
-    )
-    .optional(),
-  currentEmployment: employmentSchema.optional(),
-  allEmployment: z.array(employmentSchema).optional()
 });
 
 export let searchPeople = SlateTool.create(spec, {
@@ -92,8 +42,20 @@ Costs 0.25 credits per person returned.`,
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of results to skip (max 10,000)'),
-      limit: z.number().optional().describe('Results per page (default 10, max 100)'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(0)
+        .max(10000)
+        .optional()
+        .describe('Number of results to skip (max 10,000)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (default 10, max 100)'),
       searchAfter: z
         .string()
         .optional()
@@ -206,14 +168,16 @@ Costs 0.25 credits per person returned.`,
       limit: ctx.input.limit,
       search_after: ctx.input.searchAfter,
       person_names: toApiFilter(ctx.input.personNames),
-      person_linkedin_urls: toApiFilter(ctx.input.personLinkedinUrls),
+      person_professional_network_urls: toApiFilter(ctx.input.personLinkedinUrls),
       person_locations: toApiFilter(ctx.input.personLocations),
       person_skills: toApiFilter(ctx.input.personSkills),
       person_universities: toApiFilter(ctx.input.personUniversities),
       person_ids: toApiFilter(ctx.input.personIds),
       current_company_names: toApiFilter(ctx.input.currentCompanyNames),
       current_company_domains: toApiFilter(ctx.input.currentCompanyDomains),
-      current_company_linkedin_urls: toApiFilter(ctx.input.currentCompanyLinkedinUrls),
+      current_company_professional_network_urls: toApiFilter(
+        ctx.input.currentCompanyLinkedinUrls
+      ),
       current_company_specialties: toApiFilter(ctx.input.currentCompanySpecialties),
       current_company_industries: toApiFilter(ctx.input.currentCompanyIndustries),
       current_company_types: toApiFilter(ctx.input.currentCompanyTypes),
@@ -232,53 +196,7 @@ Costs 0.25 credits per person returned.`,
       current_position_years_in: ctx.input.currentPositionYearsIn
     });
 
-    let mapEmployment = (emp: any) => {
-      if (!emp) return undefined;
-      return {
-        title: emp.title,
-        companyName: emp.company?.name,
-        companyDomain: emp.company?.domain,
-        companyId: emp.company?.id,
-        companyIndustry: emp.company?.industry?.main_industry,
-        companyHeadcount: emp.company?.headcount,
-        companyType: emp.company?.company_type,
-        isCurrent: emp.is_current,
-        startAt: emp.start_at,
-        endAt: emp.end_at
-      };
-    };
-
-    let people = (result.people ?? []).map((person: any) => ({
-      personId: person.id,
-      fullName: person.full_name,
-      firstName: person.first_name,
-      lastName: person.last_name,
-      location: person.location
-        ? {
-            country: person.location.country,
-            countryCode: person.location.country_code,
-            city: person.location.city,
-            region: person.location.region
-          }
-        : undefined,
-      linkedinUrl: person.social_profiles?.linkedin?.url,
-      skills: person.skills,
-      languages: person.languages?.map((l: any) => ({
-        language: l.language,
-        code: l.code,
-        proficiency: l.proficiency
-      })),
-      educations: person.educations?.map((e: any) => ({
-        schoolName: e.school_name,
-        degree: e.degree,
-        startAt: e.start_at,
-        endAt: e.end_at
-      })),
-      currentEmployment: person.employment?.current
-        ? mapEmployment(person.employment.current)
-        : undefined,
-      allEmployment: person.employment?.all?.map(mapEmployment)
-    }));
+    let people = (result.people ?? []).map(mapPerson);
 
     return {
       output: {

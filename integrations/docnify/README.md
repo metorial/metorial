@@ -1,6 +1,6 @@
 # Docnify
 
-Create, send, and manage electronic document signatures. Create documents from templates, add recipients, and send documents for signing. Monitor document lifecycle events including creation, individual recipient signatures, and full completion when all recipients have signed.
+Create, send, and manage electronic document signatures. Create documents from templates, add recipients, and send documents for signing. Retrieve document details and list documents to inspect signing progress.
 
 ## License
 

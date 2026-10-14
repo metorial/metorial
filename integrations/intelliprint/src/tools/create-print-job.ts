@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
@@ -19,7 +19,7 @@ export let createPrintJob = SlateTool.create(spec, {
   description: `Create a new print job to send physical letters or postcards via Royal Mail. Supports multiple content strategies: provide HTML/text content, reference a pre-designed template, or supply a file URL. Recipients can be specified inline or via a mailing list. Jobs can be created as drafts for review or confirmed immediately for printing.`,
   instructions: [
     'Set confirmed to true to immediately submit for printing, or leave as false to create a draft you can review and confirm later.',
-    'For postcards, provide frontImageUrl and backImageUrl instead of content or template.',
+    'Postcards accept a two-page fileUrl or both frontImageUrl and backImageUrl. Choose one content source.',
     'Use testmode for testing without incurring costs or sending actual mail.'
   ],
   constraints: [
@@ -97,6 +97,44 @@ export let createPrintJob = SlateTool.create(spec, {
   )
   .output(printJobSchema)
   .handleInvocation(async ctx => {
+    if (!!ctx.input.frontImageUrl !== !!ctx.input.backImageUrl) {
+      throw createApiServiceError(
+        'Provide both frontImageUrl and backImageUrl for postcards.'
+      );
+    }
+    if (ctx.input.frontImageUrl && ctx.input.type !== 'postcard') {
+      throw createApiServiceError('Front and back images require type postcard.');
+    }
+    for (let [field, value] of Object.entries({
+      content: ctx.input.content,
+      templateId: ctx.input.templateId,
+      fileUrl: ctx.input.fileUrl,
+      frontImageUrl: ctx.input.frontImageUrl,
+      backImageUrl: ctx.input.backImageUrl
+    })) {
+      if (value !== undefined && !value.trim()) {
+        throw createApiServiceError(`Provide a non-empty ${field}, or omit it.`);
+      }
+    }
+    let contentSources = [
+      ctx.input.content,
+      ctx.input.templateId,
+      ctx.input.fileUrl,
+      ctx.input.frontImageUrl
+    ].filter(value => value !== undefined).length;
+    if (contentSources !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one content source: content, templateId, fileUrl, or both postcard images.'
+      );
+    }
+    if (
+      ctx.input.printing?.doubleSided === 'mixed' &&
+      !ctx.input.printing.doubleSidedSpecificPages?.length
+    ) {
+      throw createApiServiceError(
+        'Mixed double-sided printing requires doubleSidedSpecificPages.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {
@@ -124,8 +162,8 @@ export let createPrintJob = SlateTool.create(spec, {
     // Postcard images
     if (ctx.input.frontImageUrl && ctx.input.backImageUrl) {
       params.file = {
-        front: { url: ctx.input.frontImageUrl },
-        back: { url: ctx.input.backImageUrl }
+        front_image: { url: ctx.input.frontImageUrl },
+        back_image: { url: ctx.input.backImageUrl }
       };
     }
 
@@ -147,6 +185,7 @@ export let createPrintJob = SlateTool.create(spec, {
     if (ctx.input.printing) {
       params.printing = {
         double_sided: ctx.input.printing.doubleSided,
+        double_sided_specific_pages: ctx.input.printing.doubleSidedSpecificPages,
         premium_quality: ctx.input.printing.premiumQuality,
         black_and_white: ctx.input.printing.blackAndWhite,
         matt_finish: ctx.input.printing.mattFinish
@@ -180,7 +219,7 @@ export let createPrintJob = SlateTool.create(spec, {
 
     // Remove letters
     if (ctx.input.removeLettersContaining) {
-      params.remove_letters = { containing: ctx.input.removeLettersContaining };
+      params.remove_letters = { with_phrase: ctx.input.removeLettersContaining };
     }
 
     let result = await client.createPrintJob(params);

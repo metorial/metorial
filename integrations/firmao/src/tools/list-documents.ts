@@ -49,9 +49,9 @@ export let listDocuments = SlateTool.create(spec, {
     let documents = result.data.map((d: any) => ({
       documentId: d.id,
       name: d.name,
-      description: d.description,
-      size: d.size,
-      creationDate: d.creationDate
+      description: d.description ?? undefined,
+      size: d.fileSize ?? d.size ?? undefined,
+      creationDate: d.creationDate ?? undefined
     }));
 
     return {

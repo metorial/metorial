@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
 - **pause**: Pause a running scraper.
 - **resume**: Resume a paused scraper.
 - **download**: Download scraped data.
-- **split**: Split a scraper into multiple parts.
+- **split**: Detach contacts already extracted from a segmented scraper. The provider determines the split; parts is retained for compatibility.
 - **start_enrichment**: Start email/phone enrichment on scraped data.`,
   tags: {
     destructive: false
@@ -45,7 +45,24 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
         .optional()
         .describe('LinkedIn Sales Navigator search URL (required for create)'),
       linkedInAuthId: z.string().optional().describe('LinkedIn auth config ID (for create)'),
-      parts: z.number().optional().describe('Number of parts to split into (for split)')
+      parts: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy input retained for compatibility; the provider determines the split'
+        ),
+      format: z
+        .number()
+        .int()
+        .min(1)
+        .max(3)
+        .optional()
+        .default(3)
+        .describe('Download format: 1 with emails, 2 without emails, 3 all contacts'),
+      country: z
+        .string()
+        .optional()
+        .describe('ISO country code required for start_enrichment, for example US or FR')
     })
   )
   .output(
@@ -61,7 +78,7 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new EmeliaClient(ctx.auth.token);
-    let { action, scraperId, name, url, linkedInAuthId, parts } = ctx.input;
+    let { action, scraperId, name, url, linkedInAuthId } = ctx.input;
 
     if (action === 'list') {
       let scrapers = await client.listLinkedInScrapers();
@@ -73,8 +90,8 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required');
-      if (!url) throw new Error('Sales Navigator search URL is required');
+      if (!name) throw createApiServiceError('Name is required');
+      if (!url) throw createApiServiceError('Sales Navigator search URL is required');
       let scraper = await client.createLinkedInScraper({ name, url, linkedInAuthId });
       return {
         output: { scraper, success: true },
@@ -82,7 +99,7 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
       };
     }
 
-    if (!scraperId) throw new Error('Scraper ID is required for this action');
+    if (!scraperId) throw createApiServiceError('Scraper ID is required for this action');
 
     if (action === 'delete') {
       await client.deleteLinkedInScraper(scraperId);
@@ -93,7 +110,7 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
     }
 
     if (action === 'rename') {
-      if (!name) throw new Error('New name is required');
+      if (!name) throw createApiServiceError('New name is required');
       await client.renameLinkedInScraper(scraperId, name);
       return {
         output: { success: true },
@@ -118,30 +135,40 @@ export let manageLinkedInScraper = SlateTool.create(spec, {
     }
 
     if (action === 'download') {
-      let downloadData = await client.downloadScraperData(scraperId);
+      let result = await client.downloadScraperData(scraperId, ctx.input.format);
+      if (typeof result?.data !== 'string')
+        throw createApiServiceError('Emelia did not return CSV content.');
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(result.data, {
+          headers: { 'content-type': 'text/csv; charset=utf-8' }
+        }),
+        filename: `scraper-${scraperId.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`
+      });
       return {
-        output: { downloadData, success: true },
+        output: { downloadData: result, success: true },
         message: `Downloaded data from scraper **${scraperId}**.`
       };
     }
 
     if (action === 'split') {
-      if (!parts) throw new Error('Number of parts is required');
-      await client.splitLinkedInScraper(scraperId, { parts });
+      await client.splitLinkedInScraper(scraperId);
       return {
         output: { success: true },
-        message: `Split scraper **${scraperId}** into **${parts}** parts.`
+        message: `Detached the collected contacts from scraper **${scraperId}**.`
       };
     }
 
     if (action === 'start_enrichment') {
-      await client.startScraperEnrichment(scraperId);
+      if (!ctx.input.country)
+        throw createApiServiceError('Country code is required to enrich scraper contacts.');
+      await client.startScraperEnrichment(scraperId, ctx.input.country);
       return {
         output: { success: true },
         message: `Started enrichment for scraper **${scraperId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

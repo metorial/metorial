@@ -36,10 +36,10 @@ export let getIntegration = SlateTool.create(spec, {
     return {
       output: {
         integrationId: integ?.id?.toString(),
-        name: integ?.name,
-        type: integ?.type,
-        formId: integ?.form_id?.toString() ?? integ?.form_key,
-        status: integ?.status,
+        name: integ?.name ?? undefined,
+        type: integ?.type ?? undefined,
+        formId: integ?.form_id?.toString() ?? integ?.form_key?.toString(),
+        status: integ?.status ?? undefined,
         raw: integ
       },
       message: `Retrieved integration **${integ?.name ?? ctx.input.integrationId}**.`

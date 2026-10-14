@@ -165,7 +165,7 @@ export let searchNearbyUsersTool = SlateTool.create(spec, {
   name: 'Search Nearby Users',
   key: 'search_nearby_users',
   description: `Search for users near a specific location, sorted by distance. Useful for finding users in proximity to a given point.`,
-  constraints: ['Rate limited to 100 requests per second.'],
+  constraints: ['Default rate limit is 10 requests per second.'],
   tags: {
     readOnly: true
   }

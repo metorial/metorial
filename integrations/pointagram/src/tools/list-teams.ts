@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PointagramClient } from '../lib/client';
+import { getPointagramList, PointagramClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTeams = SlateTool.create(spec, {
@@ -25,7 +25,7 @@ export let listTeams = SlateTool.create(spec, {
     });
 
     let result = await client.listTeams();
-    let teams = Array.isArray(result) ? result : (result?.teams ?? [result]);
+    let teams = getPointagramList(result, 'teams');
 
     return {
       output: { teams },

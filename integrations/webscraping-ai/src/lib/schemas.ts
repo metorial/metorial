@@ -12,16 +12,18 @@ export let scrapingOptionsSchema = {
   timeout: z
     .number()
     .optional()
-    .describe('Total request timeout in milliseconds (1-30000). Defaults to 10000.'),
+    .describe(
+      'Total request timeout in milliseconds. Defaults to 10000; values above 25000 are capped by the API.'
+    ),
   waitFor: z
     .string()
     .optional()
     .describe('CSS selector to wait for before returning the page content.'),
   proxy: z
-    .enum(['datacenter', 'residential'])
+    .enum(['datacenter', 'residential', 'stealth', 'auto'])
     .optional()
     .describe(
-      'Proxy type. Datacenter is faster (1 credit), residential handles anti-bot sites (5 credits). Defaults to datacenter.'
+      'Proxy type. Residential and stealth handle stronger anti-bot protection at higher credit costs. Auto escalates through available tiers and cannot be combined with customProxy. Defaults to datacenter.'
     ),
   country: z
     .string()
@@ -48,7 +50,9 @@ export let scrapingOptionsSchema = {
   customProxy: z
     .string()
     .optional()
-    .describe('Custom proxy URL in format http://user:pass@host:port.'),
+    .describe(
+      'Custom proxy URL in format http://user:pass@host:port. Cannot be combined with proxy=auto.'
+    ),
   errorOn404: z
     .boolean()
     .optional()

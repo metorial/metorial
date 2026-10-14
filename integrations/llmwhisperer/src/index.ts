@@ -2,8 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   extractDocument,
+  getExtractionDetails,
   getExtractionStatus,
   getHighlights,
+  getTagUsage,
   getUsageInfo,
   manageWebhook,
   retrieveExtraction
@@ -16,6 +18,8 @@ export let provider = Slate.create({
     retrieveExtraction,
     getHighlights,
     getUsageInfo,
+    getExtractionDetails,
+    getTagUsage,
     manageWebhook
   ],
   triggers: []

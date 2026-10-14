@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,7 +55,7 @@ export let manageBlockPage = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!blockPageId) throw new Error('blockPageId is required for get');
+      if (!blockPageId) throw createApiServiceError('blockPageId is required for get');
       let blockPage = await client.getBlockPage(blockPageId);
       return {
         output: { blockPage },
@@ -64,7 +64,7 @@ export let manageBlockPage = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!blockPageId) throw new Error('blockPageId is required for delete');
+      if (!blockPageId) throw createApiServiceError('blockPageId is required for delete');
       await client.deleteBlockPage(blockPageId);
       return {
         output: { deleted: true },
@@ -84,7 +84,7 @@ export let manageBlockPage = SlateTool.create(spec, {
       };
     }
 
-    if (!blockPageId) throw new Error('blockPageId is required for update');
+    if (!blockPageId) throw createApiServiceError('blockPageId is required for update');
     let blockPage = await client.updateBlockPage(blockPageId, params);
     return {
       output: { blockPage },

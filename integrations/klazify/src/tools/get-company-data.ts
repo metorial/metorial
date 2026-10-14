@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCompanyData = SlateTool.create(spec, {
@@ -18,7 +19,10 @@ export let getCompanyData = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL, domain, or email address to look up company data for')
+      url: z
+        .string()
+        .describe('The URL, domain, or email address to look up company data for'),
+      refresh: refreshSchema
     })
   )
   .output(
@@ -31,7 +35,19 @@ export let getCompanyData = SlateTool.create(spec, {
         .string()
         .nullable()
         .describe('Estimated number of employees (e.g., "100K+")'),
-      revenue: z.number().nullable().describe('Estimated annual revenue'),
+      revenue: z
+        .number()
+        .nullable()
+        .describe(
+          'Numeric revenue when supplied by the provider; otherwise null. See revenueRange for textual estimates.'
+        ),
+      revenueRange: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Exact estimated annual revenue range supplied by the provider, such as "$1M-$10M"'
+        ),
       raised: z.string().nullable().describe('Total funding raised'),
       tags: z.array(z.string()).nullable().describe('Industry classification tags'),
       tech: z.array(z.string()).nullable().describe('Technology stack identifiers')
@@ -39,7 +55,7 @@ export let getCompanyData = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.companyData(ctx.input.url);
+    let result = await client.companyData(ctx.input.url, ctx.input.refresh);
 
     let company = result.objects?.company ?? {};
 
@@ -49,7 +65,8 @@ export let getCompanyData = SlateTool.create(spec, {
       stateCode: company.stateCode ?? null,
       countryCode: company.countryCode ?? null,
       employeesRange: company.employeesRange ?? null,
-      revenue: company.revenue ?? null,
+      revenue: typeof company.revenue === 'number' ? company.revenue : null,
+      revenueRange: typeof company.revenue === 'string' ? company.revenue : null,
       raised: company.raised ?? null,
       tags: company.tags ?? null,
       tech: company.tech ?? null

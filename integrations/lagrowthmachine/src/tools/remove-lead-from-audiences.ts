@@ -19,7 +19,14 @@ export let removeLeadFromAudiences = SlateTool.create(spec, {
           'Audience name(s) to remove the lead from, or "all" to remove from all audiences'
         ),
       email: z.string().optional().describe('Email address of the lead'),
-      leadId: z.string().optional().describe('La Growth Machine lead ID'),
+      proEmail: z.string().optional().describe('Professional email address of the lead'),
+      persoEmail: z.string().optional().describe('Personal email address of the lead'),
+      leadId: z
+        .string()
+        .optional()
+        .describe(
+          'La Growth Machine lead ID. The lead is looked up first to resolve an identifier supported by audience removal.'
+        ),
       linkedinUrl: z.string().optional().describe('LinkedIn profile URL'),
       twitter: z.string().optional().describe('Twitter/X handle'),
       crmId: z.string().optional().describe('CRM identifier'),
@@ -46,6 +53,8 @@ export let removeLeadFromAudiences = SlateTool.create(spec, {
     let result = await client.removeLeadFromAudiences({
       audience: ctx.input.audience,
       email: ctx.input.email,
+      proEmail: ctx.input.proEmail,
+      persoEmail: ctx.input.persoEmail,
       leadId: ctx.input.leadId,
       linkedinUrl: ctx.input.linkedinUrl,
       twitter: ctx.input.twitter,
@@ -62,7 +71,7 @@ export let removeLeadFromAudiences = SlateTool.create(spec, {
 
     return {
       output: { result },
-      message: `Lead removed from audience(s): **${audienceDisplay}**.`
+      message: `Audience removal request completed for **${audienceDisplay}**. Leads absent from an audience are ignored.`
     };
   })
   .build();

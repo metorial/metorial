@@ -89,7 +89,17 @@ export let geocodeResultSchema = z.object({
   confidence: z.number().describe('Confidence score from 0 (lowest) to 10 (highest)'),
   components: z
     .record(z.string(), z.union([z.string(), z.number()]))
-    .describe('Address components (country, city, road, etc.)'),
+    .describe(
+      'Address components (country, city, road, etc.); list values are comma-separated'
+    ),
+  iso3166SubdivisionCodes: z
+    .array(z.string())
+    .optional()
+    .describe('ISO 3166-2 subdivision codes, ordered from least to most specific'),
+  distanceFromQueryMeters: z
+    .number()
+    .optional()
+    .describe('Distance in meters from reverse-geocoding query coordinates to the result'),
   bounds: z
     .object({
       northeast: z.object({ lat: z.number(), lng: z.number() }),

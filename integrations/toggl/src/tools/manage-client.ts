@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let clientOutputSchema = z.object({
@@ -23,10 +24,7 @@ To **create**: provide a name. To **update**: provide a clientId and fields to c
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       clientId: z
         .string()
         .optional()
@@ -45,8 +43,12 @@ To **create**: provide a name. To **update**: provide a clientId and fields to c
     })
   )
   .handleInvocation(async ctx => {
-    let togglClient = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let togglClient = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await togglClient.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
+
+    if (ctx.input.delete && !ctx.input.clientId) {
+      throw createApiServiceError('clientId is required when deleting.');
+    }
 
     if (ctx.input.delete && ctx.input.clientId) {
       await togglClient.deleteClient(wsId, ctx.input.clientId);
@@ -64,7 +66,7 @@ To **create**: provide a name. To **update**: provide a clientId and fields to c
       });
     } else {
       if (!ctx.input.name)
-        throw new Error('Client name is required when creating a new client.');
+        throw createApiServiceError('Client name is required when creating a new client.');
       result = await togglClient.createClient(wsId, {
         name: ctx.input.name,
         notes: ctx.input.notes

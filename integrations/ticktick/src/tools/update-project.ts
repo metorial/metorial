@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { mapProject, projectOutputSchema } from '../lib/schemas';
+import { mapProject, projectIdSchema, projectOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ export let updateProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to update'),
+      projectId: projectIdSchema,
       name: z.string().optional().describe('New project name'),
       color: z.string().optional().describe('New hex color code, e.g. "#F18181"'),
       viewMode: z.enum(['list', 'kanban', 'timeline']).optional().describe('New view mode'),

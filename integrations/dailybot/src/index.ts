@@ -5,6 +5,9 @@ import {
   deleteCheckin,
   getCheckin,
   getCheckinResponses,
+  getCurrentUser,
+  getForm,
+  getFormResponses,
   getOrganization,
   getTeamMembers,
   getTemplate,
@@ -44,7 +47,10 @@ export let provider = Slate.create({
     sendMessage,
     sendEmail,
     giveKudos,
-    getOrganization
+    getOrganization,
+    getCurrentUser,
+    getForm,
+    getFormResponses
   ],
   triggers: []
 });

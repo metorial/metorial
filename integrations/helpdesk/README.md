@@ -1,6 +1,12 @@
 # <img src="logo.jpeg" height="20"> Helpdesk
 
-Manage customer support tickets including creating, updating, assigning, and filtering tickets by status, priority, tags, teams, and custom fields. Add public or private messages and attachments to ticket conversations. Import historical tickets from other systems. Manage agents with roles, team membership, and autoassignment settings. Organize agents into teams with configurable email templates and reply addresses. Create automation rules with triggers and actions to automatically process tickets. Define reusable macros and canned response templates. Configure custom email domains and mailboxes for inbound routing. Create saved ticket filter views. Access reports on ticket volume, ratings, response times, and resolution times. Query audit logs of system changes. Manage webhooks for ticket lifecycle events including creation, updates, status changes, assignment changes, new messages, and tag changes.
+Manage HelpDesk support tickets, assign teams and agents, update ticket status and priority, manage tags and followers, merge and unmerge tickets, send public replies and private notes, request customer ratings, manage automation rules and reusable responses, query reports and audit logs, and discover the connected license and saved ticket views.
+
+## Ticket API notes
+
+Ticket creation requires the `message` field for the first plain-text message. Priority labels remain `low`, `medium`, `high`, and `urgent`; requests translate them to the numeric values used by HelpDesk. Tags use tag IDs and custom field maps use their API keys. `list_tickets` returns an opaque pagination cursor; keep the same filters and sort order when using it.
+
+See the [official HelpDesk API reference](https://api.helpdesk.com/docs).
 
 ## License
 

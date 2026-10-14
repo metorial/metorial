@@ -41,6 +41,9 @@ export let listRecordings = SlateTool.create(spec, {
 
     if (ctx.input.recordingId) {
       let rec = await client.getRecording(ctx.input.recordingId);
+      if (rec.url && rec.processed !== false) {
+        await ctx.addAttachment({ type: 'url', url: rec.url });
+      }
       return {
         output: {
           recordings: [

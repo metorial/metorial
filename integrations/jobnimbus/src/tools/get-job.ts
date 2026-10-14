@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ownerIds, recordId, recordName } from '../lib/records';
 import { spec } from '../spec';
 
 export let getJob = SlateTool.create(spec, {
@@ -51,29 +52,29 @@ export let getJob = SlateTool.create(spec, {
     return {
       output: {
         jobId: j.jnid,
-        name: j.name,
-        description: j.description,
-        number: j.number,
-        statusName: j.status_name,
-        recordTypeName: j.record_type_name,
-        addressLine1: j.address_line1,
-        addressLine2: j.address_line2,
-        city: j.city,
-        state: j.state_text,
-        zip: j.zip,
-        country: j.country_name,
-        primaryContactId: j.primary,
-        primaryContactName: j.primary_name,
-        sourceName: j.source_name,
-        tags: j.tags,
-        owners: j.owners,
-        salesRep: j.sales_rep,
-        salesRepName: j.sales_rep_name,
-        dateCreated: j.date_created,
-        dateUpdated: j.date_updated,
-        dateStart: j.date_start,
-        dateEnd: j.date_end,
-        createdByName: j.created_by_name
+        name: j.name ?? undefined,
+        description: j.description ?? undefined,
+        number: j.number ?? undefined,
+        statusName: j.status_name ?? undefined,
+        recordTypeName: j.record_type_name ?? undefined,
+        addressLine1: j.address_line1 ?? undefined,
+        addressLine2: j.address_line2 ?? undefined,
+        city: j.city ?? undefined,
+        state: j.state_text ?? undefined,
+        zip: j.zip ?? undefined,
+        country: j.country_name ?? undefined,
+        primaryContactId: recordId(j.primary),
+        primaryContactName: recordName(j.primary) ?? j.primary_name ?? undefined,
+        sourceName: j.source_name ?? undefined,
+        tags: j.tags ?? undefined,
+        owners: ownerIds(j.owners),
+        salesRep: j.sales_rep ?? undefined,
+        salesRepName: j.sales_rep_name ?? undefined,
+        dateCreated: j.date_created ?? undefined,
+        dateUpdated: j.date_updated ?? undefined,
+        dateStart: j.date_start ?? undefined,
+        dateEnd: j.date_end ?? undefined,
+        createdByName: j.created_by_name ?? undefined
       },
       message: `Retrieved job **${j.name || j.jnid}** (${j.status_name || 'no status'}).`
     };

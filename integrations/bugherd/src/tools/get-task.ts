@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
+import type { BugherdTask } from '../lib/types';
 import { spec } from '../spec';
 
 let userRefSchema = z
@@ -21,9 +23,8 @@ export let getTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      taskId: z.number().describe('Global task ID'),
-      projectId: z
-        .number()
+      taskId: positiveIntegerSchema.describe('Global task ID'),
+      projectId: positiveIntegerSchema
         .optional()
         .describe('Project ID (optional, enables project-scoped lookup)')
     })
@@ -58,7 +59,7 @@ export let getTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BugherdClient(ctx.auth.token);
 
-    let task: any;
+    let task: BugherdTask;
     if (ctx.input.projectId) {
       task = await client.getTask(ctx.input.projectId, ctx.input.taskId);
     } else {
@@ -73,21 +74,21 @@ export let getTask = SlateTool.create(spec, {
         taskId: task.id,
         localTaskId: task.local_task_id,
         projectId: task.project_id,
-        title: task.title,
+        title: task.title ?? null,
         description: task.description,
         status: task.status,
         priorityId: task.priority_id,
-        tagNames: task.tag_names,
-        externalId: task.external_id,
-        site: task.site,
-        pageUrl: task.url,
-        screenshotUrl: task.screenshot_url,
-        secretLink: task.secret_link,
-        adminLink: task.admin_link,
-        attachments: task.attachments,
+        tagNames: task.tag_names ?? [],
+        externalId: task.external_id ?? null,
+        site: task.site ?? null,
+        pageUrl: task.url ?? null,
+        screenshotUrl: task.screenshot_url ?? null,
+        secretLink: task.secret_link ?? null,
+        adminLink: task.admin_link ?? null,
+        attachments: task.attachments ?? [],
         assignee: mapUser(task.assigned_to),
         requester: mapUser(task.requester),
-        requesterEmail: task.requester_email,
+        requesterEmail: task.requester_email ?? null,
         createdAt: task.created_at,
         updatedAt: task.updated_at,
         closedAt: task.closed_at

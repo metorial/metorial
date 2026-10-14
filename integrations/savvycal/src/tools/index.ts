@@ -3,6 +3,7 @@ export * from './create-event';
 export * from './get-event';
 export * from './get-user';
 export * from './list-events';
+export * from './list-link-slots';
 export * from './list-links';
 export * from './list-time-zones';
 export * from './list-workflows';

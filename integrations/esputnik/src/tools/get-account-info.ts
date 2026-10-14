@@ -15,6 +15,8 @@ export let getAccountInfo = SlateTool.create(spec, {
   .output(
     z.object({
       organisationName: z.string().optional().describe('Organization name'),
+      organisationId: z.number().optional().describe('Organization ID'),
+      userEmail: z.string().optional().describe('Authenticated API user'),
       currentBalance: z.string().optional().describe('Current account balance'),
       creditLimit: z.string().optional().describe('Credit limit'),
       currency: z.string().optional().describe('Account currency'),
@@ -33,11 +35,14 @@ export let getAccountInfo = SlateTool.create(spec, {
     return {
       output: {
         organisationName: accountInfo?.organisationName || accountInfo?.name,
-        currentBalance: balance?.currentBalance,
-        creditLimit: balance?.creditLimit,
+        organisationId: accountInfo?.orgId,
+        userEmail: accountInfo?.userEmail,
+        currentBalance:
+          balance?.currentBalance == null ? undefined : String(balance.currentBalance),
+        creditLimit: balance?.creditLimit == null ? undefined : String(balance.creditLimit),
         currency: balance?.currency,
-        bonusEmails: balance?.bonusEmails,
-        bonusSms: balance?.bonusSmses
+        bonusEmails: balance?.bonusEmails == null ? undefined : String(balance.bonusEmails),
+        bonusSms: balance?.bonusSmses == null ? undefined : String(balance.bonusSmses)
       },
       message: `Account: **${accountInfo?.organisationName || accountInfo?.name || 'Unknown'}**. Balance: ${balance?.currentBalance || '0'} ${balance?.currency || ''}.`
     };

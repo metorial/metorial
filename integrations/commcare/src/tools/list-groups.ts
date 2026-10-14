@@ -58,7 +58,7 @@ export let listGroups = SlateTool.create(spec, {
       reporting: g.reporting,
       userIds: g.users,
       domain: g.domain,
-      metadata: g.metadata
+      metadata: g.metadata ?? {}
     }));
 
     return {

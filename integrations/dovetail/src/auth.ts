@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,22 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://dovetail.com/api/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await axios.get('/token/info');
-      let data = response.data?.data;
+      let data = await new Client({ token: ctx.output.token }).getTokenInfo();
 
       return {
         profile: {
-          id: data?.id,
-          subdomain: data?.subdomain
+          id: data.id,
+          subdomain: data.subdomain
         }
       };
     }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
+import { mapExperience } from '../lib/experience';
 import { spec } from '../spec';
 
 let experienceSchema = z.object({
@@ -10,7 +11,7 @@ let experienceSchema = z.object({
   experienceType: z
     .string()
     .describe(
-      'Type of experience (flow, pin, banner, launchpad, checklist, mobile, nps, embed)'
+      'Type of experience (flow, flow_v2, pin, banner, launchpad, checklist, mobile, nps, embed)'
     ),
   createdAt: z.string().optional().describe('When the experience was created'),
   updatedAt: z.string().optional().describe('When the experience was last updated'),
@@ -21,7 +22,7 @@ let experienceSchema = z.object({
 export let listExperiences = SlateTool.create(spec, {
   name: 'List Experiences',
   key: 'list_experiences',
-  description: `List all experiences in your Appcues account. Supports filtering by experience type to retrieve flows, pins, banners, launchpads, checklists, mobile experiences, NPS surveys, or embeds. Returns key metadata including publish status, name, and tags.`,
+  description: `List all experiences in your Appcues account. Supports filtering by experience type to retrieve flows (including Flow 2.0), pins, banners, launchpads, checklists, mobile experiences, NPS surveys, or embeds. Returns key metadata including publish status, name, and tags.`,
   tags: {
     readOnly: true
   }
@@ -29,7 +30,17 @@ export let listExperiences = SlateTool.create(spec, {
   .input(
     z.object({
       experienceType: z
-        .enum(['flow', 'pin', 'banner', 'launchpad', 'checklist', 'mobile', 'nps', 'embed'])
+        .enum([
+          'flow',
+          'flow_v2',
+          'pin',
+          'banner',
+          'launchpad',
+          'checklist',
+          'mobile',
+          'nps',
+          'embed'
+        ])
         .optional()
         .describe('Filter by experience type. If omitted, returns all experience types.')
     })
@@ -48,12 +59,23 @@ export let listExperiences = SlateTool.create(spec, {
 
     let types = ctx.input.experienceType
       ? [ctx.input.experienceType]
-      : ['flow', 'pin', 'banner', 'launchpad', 'checklist', 'mobile', 'nps', 'embed'];
+      : [
+          'flow',
+          'flow_v2',
+          'pin',
+          'banner',
+          'launchpad',
+          'checklist',
+          'mobile',
+          'nps',
+          'embed'
+        ];
 
     let allExperiences: z.infer<typeof experienceSchema>[] = [];
 
     let fetchMap: Record<string, () => Promise<any[]>> = {
       flow: () => client.listFlows(),
+      flow_v2: () => client.listFlowsV2(),
       pin: () => client.listPins(),
       banner: () => client.listBanners(),
       launchpad: () => client.listLaunchpads(),
@@ -64,30 +86,11 @@ export let listExperiences = SlateTool.create(spec, {
     };
 
     for (let type of types) {
-      try {
-        let fetchFn = fetchMap[type];
-        if (!fetchFn) continue;
-        let items = await fetchFn();
-        if (Array.isArray(items)) {
-          for (let item of items) {
-            allExperiences.push({
-              experienceId: item.id || item.ID || '',
-              name: item.name || item.Name || '',
-              published: item.published ?? item.Published ?? false,
-              experienceType: type,
-              createdAt: item.created_at || item.createdAt || undefined,
-              updatedAt: item.updated_at || item.updatedAt || undefined,
-              frequency: item.frequency || undefined,
-              tags: item.tags
-                ? Array.isArray(item.tags)
-                  ? item.tags.map((t: any) => t.name || t)
-                  : undefined
-                : undefined
-            });
-          }
-        }
-      } catch (e) {
-        ctx.warn(`Failed to fetch ${type} experiences: ${e}`);
+      let fetchFn = fetchMap[type];
+      if (!fetchFn) continue;
+      let items = await fetchFn();
+      if (Array.isArray(items)) {
+        allExperiences.push(...items.map(item => mapExperience(item, type)));
       }
     }
 

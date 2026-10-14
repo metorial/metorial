@@ -34,18 +34,23 @@ let userResolutionSchema = z.object({
 export let generateInsights = SlateTool.create(spec, {
   name: 'Generate Insights',
   key: 'generate_insights',
-  description: `Retrieve up to 25 ranked, personalized insights for a prospect. Insights cover both contact-level signals (job changes, LinkedIn posts, Twitter posts, podcast appearances, work milestones) and company-level signals (SEC filings, news, funding, hiring trends, tech stack, GitHub activity, earnings transcripts, and more).
+  description: `DEPRECATED — use enrich_contact or enrich_company for signal data. Autobound retires this API on October 30, 2026. The replacement returns raw signals without seller-specific ranking.
+
+Retrieve up to 25 ranked, personalized insights for a prospect. Insights cover both contact-level signals (job changes, LinkedIn posts, Twitter posts, podcast appearances, work milestones) and company-level signals (SEC filings, news, funding, hiring trends, tech stack, GitHub activity, earnings transcripts, and more).
 
 Insights are ranked by relevance to both the prospect and the seller. Provide seller information for better insight ranking.`,
   instructions: [
+    'Migrate to enrich_contact or enrich_company before October 30, 2026, using a separate Signal API key. The legacy request and result remain available until provider retirement.',
     'At least one contact identifier is required: contactEmail, contactLinkedinUrl, or contactCompanyUrl.',
     'Provide userEmail or userLinkedinUrl to improve insight ranking based on seller relevance.',
     'Use insightSubtypes to filter for specific signal types (max 10 subtypes, returns up to 2 insights per subtype).'
   ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
+  .authMethods(['api_key'])
   .input(
     z.object({
       contactEmail: z.string().optional().describe('Prospect email address'),

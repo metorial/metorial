@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,20 @@ Useful for parsing invoices, receipts, forms, tables, or any structured informat
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let fileBuffer = Buffer.from(ctx.input.fileContent, 'base64');
+    let fileContent = ctx.input.fileContent.replace(/\s/g, '');
+    if (
+      !fileContent ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(fileContent) ||
+      fileContent.length % 4 === 1
+    ) {
+      throw createApiServiceError(
+        'fileContent must be non-empty base64-encoded file content.'
+      );
+    }
+    let fileBuffer = Buffer.from(fileContent, 'base64');
+    if (fileBuffer.toString('base64').replace(/=+$/, '') !== fileContent.replace(/=+$/, '')) {
+      throw createApiServiceError('fileContent must contain valid base64-encoded bytes.');
+    }
 
     let result = await client.queryDocument(fileBuffer, ctx.input.fileName, {
       query: ctx.input.query,

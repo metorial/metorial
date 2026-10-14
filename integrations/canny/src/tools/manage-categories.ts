@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageCategoriesTool = SlateTool.create(spec, {
   key: 'manage_categories',
   description: `Create, retrieve, list, or delete categories on a board. Categories help organize posts within a board and support parent-child nesting.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -16,7 +16,10 @@ export let manageCategoriesTool = SlateTool.create(spec, {
       action: z
         .enum(['create', 'retrieve', 'list', 'delete'])
         .describe('The action to perform'),
-      boardId: z.string().optional().describe('Board ID (required for create and list)'),
+      boardId: z
+        .string()
+        .optional()
+        .describe('Board ID (required for create; optional filter for list)'),
       categoryId: z.string().optional().describe('Category ID (for retrieve or delete)'),
       name: z.string().optional().describe('Category name (for create)'),
       parentId: z.string().optional().describe('Parent category ID for nesting (for create)'),
@@ -68,22 +71,22 @@ export let manageCategoriesTool = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.boardId) throw new Error('boardId is required for create');
-        if (!ctx.input.name) throw new Error('name is required for create');
+        if (!ctx.input.boardId) throw createApiServiceError('boardId is required for create');
+        if (!ctx.input.name) throw createApiServiceError('name is required for create');
         let result = await client.createCategory({
           boardID: ctx.input.boardId,
           name: ctx.input.name,
           parentID: ctx.input.parentId,
-          subscribeAdmins: ctx.input.subscribeAdmins
+          subscribeAdmins: ctx.input.subscribeAdmins ?? false
         });
         return {
           output: {
             category: {
               categoryId: result.id,
-              name: result.name,
+              name: ctx.input.name,
               postCount: result.postCount,
-              parentId: result.parentID || null,
-              boardId: result.board?.id,
+              parentId: ctx.input.parentId ?? null,
+              boardId: ctx.input.boardId,
               url: result.url,
               created: result.created
             }
@@ -93,7 +96,8 @@ export let manageCategoriesTool = SlateTool.create(spec, {
       }
 
       case 'retrieve': {
-        if (!ctx.input.categoryId) throw new Error('categoryId is required for retrieve');
+        if (!ctx.input.categoryId)
+          throw createApiServiceError('categoryId is required for retrieve');
         let cat = await client.retrieveCategory(ctx.input.categoryId);
         return {
           output: {
@@ -112,7 +116,6 @@ export let manageCategoriesTool = SlateTool.create(spec, {
       }
 
       case 'list': {
-        if (!ctx.input.boardId) throw new Error('boardId is required for list');
         let result = await client.listCategories({
           boardID: ctx.input.boardId,
           limit: ctx.input.limit,
@@ -133,7 +136,8 @@ export let manageCategoriesTool = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.categoryId) throw new Error('categoryId is required for delete');
+        if (!ctx.input.categoryId)
+          throw createApiServiceError('categoryId is required for delete');
         await client.deleteCategory(ctx.input.categoryId);
         return {
           output: { success: true },
@@ -142,7 +146,7 @@ export let manageCategoriesTool = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

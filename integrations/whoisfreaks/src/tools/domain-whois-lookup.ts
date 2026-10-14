@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,10 +17,14 @@ export let domainWhoisLookup = SlateTool.create(spec, {
     z.object({
       domainName: z
         .string()
+        .trim()
+        .min(1)
         .optional()
         .describe('Single domain name to look up (e.g. "example.com")'),
       domainNames: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(100)
         .optional()
         .describe('Array of domain names for bulk lookup (max 100)')
     })
@@ -31,6 +35,10 @@ export let domainWhoisLookup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.domainName !== undefined && ctx.input.domainNames !== undefined) {
+      throw createApiServiceError('Provide either domainName or domainNames, not both.');
+    }
+
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (ctx.input.domainNames && ctx.input.domainNames.length > 0) {
@@ -49,6 +57,6 @@ export let domainWhoisLookup = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either domainName or domainNames must be provided.');
+    throw createApiServiceError('Either domainName or domainNames must be provided.');
   })
   .build();

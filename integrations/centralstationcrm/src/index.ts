@@ -12,15 +12,18 @@ import {
   deletePerson,
   deleteTask,
   getCompany,
+  getCurrentUser,
   getDeal,
   getPerson,
   getStats,
   linkContacts,
   listCompanies,
   listDeals,
+  listNotes,
   listPeople,
   listProjects,
   listTasks,
+  listUsers,
   manageAddresses,
   manageContactDetails,
   manageHistoricEvents,
@@ -62,7 +65,10 @@ export let provider = Slate.create({
     manageAddresses,
     manageHistoricEvents,
     linkContacts,
-    getStats
+    getStats,
+    getCurrentUser,
+    listUsers,
+    listNotes
   ],
   triggers: []
 });

@@ -1,8 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let axiosInstance = createAxios({
-  baseURL: 'https://api.serpdog.io'
+let accountProfile = z.object({
+  email: z.string(),
+  user_name: z.string().nullish(),
+  name: z.string().nullish(),
+  plan: z.string().nullish(),
+  plan_name: z.string().nullish()
 });
 
 export let auth = SlateAuth.create()
@@ -21,6 +26,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Enter your Serpdog API key.');
+      }
       return {
         output: {
           token: ctx.input.apiKey
@@ -29,19 +37,20 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await axiosInstance.get('/account_info', {
-        params: {
-          api_key: ctx.output.token
-        }
-      });
-
-      let data = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let parsed = accountProfile.safeParse(await client.getAccountInfo());
+      if (!parsed.success) {
+        throw createApiServiceError(
+          'Serpdog returned invalid account information. Reconnect with a valid API key.'
+        );
+      }
+      let data = parsed.data;
 
       return {
         profile: {
           email: data.email,
-          name: data.name || data.email,
-          plan: data.plan_name
+          name: data.user_name || data.name || data.email,
+          plan: data.plan || data.plan_name || undefined
         }
       };
     }

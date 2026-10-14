@@ -45,12 +45,22 @@ export let scrapeWeb = SlateTool.create(spec, {
         .describe('Custom HTTP headers to include in the request'),
       width: z.number().optional().describe('Viewport width in pixels (default: 1920)'),
       height: z.number().optional().describe('Viewport height in pixels (default: 1080)'),
-      isMobile: z.boolean().optional().describe('Emulate mobile viewport')
+      isMobile: z.boolean().optional().describe('Emulate mobile viewport'),
+      features: z
+        .array(z.enum(['meta', 'link']))
+        .optional()
+        .describe('Page metadata and links to extract'),
+      scale: z.number().optional().describe('Device scale factor, at least 1'),
+      sizePreset: z.string().optional().describe('Named screen size preset, such as FHD')
     })
   )
   .output(
     z.object({
       success: z.boolean().describe('Whether the scrape was successful'),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       data: z
         .array(
           z.object({
@@ -71,6 +81,7 @@ export let scrapeWeb = SlateTool.create(spec, {
         .describe('Matched selectors'),
       pagePosition: z.number().optional().describe('Current page position'),
       pagePositionLength: z.number().optional().describe('Total number of pages available'),
+      links: z.array(z.unknown()).optional().describe('Links detected on the page'),
       meta: z
         .object({
           title: z.string().optional(),
@@ -96,7 +107,10 @@ export let scrapeWeb = SlateTool.create(spec, {
       httpHeaders: ctx.input.httpHeaders,
       width: ctx.input.width,
       height: ctx.input.height,
-      isMobile: ctx.input.isMobile
+      isMobile: ctx.input.isMobile,
+      features: ctx.input.features,
+      scale: ctx.input.scale,
+      sizePreset: ctx.input.sizePreset
     });
 
     let source = ctx.input.url || 'provided HTML';
@@ -105,9 +119,11 @@ export let scrapeWeb = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         data: result.data,
         context: result.context,
         selectors: result.selectors,
+        links: result.link,
         pagePosition: result.page_position,
         pagePositionLength: result.page_position_length,
         meta: result.meta

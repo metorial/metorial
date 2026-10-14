@@ -1,80 +1,36 @@
-import { badRequestError, ServiceError } from '@lowerdeck/error';
-
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
-
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let pushMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let message = value.trim();
-  if (message && !messages.includes(message)) {
-    messages.push(message);
-  }
-};
-
-let extractDataForSEOMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let data = response?.data;
-  let messages: string[] = [];
-
-  if (isRecord(data)) {
-    pushMessage(messages, data.status_message);
-    pushMessage(messages, data.message);
-    pushMessage(messages, data.error);
-
-    let tasks = data.tasks;
-    if (Array.isArray(tasks)) {
-      for (let task of tasks) {
-        if (!isRecord(task)) continue;
-        pushMessage(messages, task.status_message);
-      }
-    }
-  } else {
-    pushMessage(messages, data);
-  }
-
-  if (messages.length > 0) {
-    return messages.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
-};
+import { buildApiServiceError, createApiServiceError } from 'slates';
 
 export let dataForSEOServiceError = (message: string) =>
-  new ServiceError(badRequestError({ message }));
+  createApiServiceError(message, { reason: 'dataforseo_validation_error' });
 
-export let dataForSEOApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
+export let dataForSEOApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'DataForSEO',
+    operation,
+    reason: 'dataforseo_api_error',
+    detailKeys: ['status_message', 'message', 'error'],
+    nestedKeys: ['tasks', 'errors'],
+    extractResponse: (error, helpers) => {
+      let response = helpers.getResponse(error);
+      if (
+        !helpers.isRecord(error) ||
+        error.name !== 'SlateError' ||
+        !helpers.isRecord(error.data)
+      ) {
+        return response;
+      }
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status = response?.status;
-  let statusLabel =
-    status !== undefined
-      ? `HTTP ${status}${response?.statusText ? ` ${response.statusText}` : ''}: `
-      : '';
-
-  let serviceError = dataForSEOServiceError(
-    `DataForSEO API ${operation} failed: ${statusLabel}${extractDataForSEOMessage(error)}`
-  );
-
-  serviceError.data.reason = 'dataforseo_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+      let baggage = helpers.isRecord(error.data.baggage) ? error.data.baggage : undefined;
+      let status = response?.status ?? error.data.upstreamStatus;
+      return {
+        ...response,
+        status: typeof status === 'number' || typeof status === 'string' ? status : undefined,
+        data: baggage?.response
+      };
+    },
+    extractUpstreamCode: (_error, response, helpers) => {
+      if (!helpers.isRecord(response?.data)) return undefined;
+      let code = response.data.status_code;
+      return typeof code === 'number' ? String(code) : undefined;
+    }
+  });

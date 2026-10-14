@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,7 @@ export let manageCollectionUsers = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!userId) throw new Error('userId is required for add');
+      if (!userId) throw createApiServiceError('userId is required for add');
       let params: Record<string, any> = { user_id: userId };
       if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
       let user = await client.addCollectionUser(collectionId, params);
@@ -55,7 +55,7 @@ export let manageCollectionUsers = SlateTool.create(spec, {
       };
     }
 
-    if (!userId) throw new Error('userId is required for remove');
+    if (!userId) throw createApiServiceError('userId is required for remove');
     await client.removeCollectionUser(collectionId, userId);
     return {
       output: { removed: true },

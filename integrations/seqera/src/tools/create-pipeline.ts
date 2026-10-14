@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createPipeline = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let createPipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name for the pipeline'),
       description: z.string().optional().describe('Pipeline description'),
       repository: z.string().describe('Nextflow pipeline repository URL'),
@@ -42,8 +44,8 @@ export let createPipeline = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let pipeline = await client.createPipeline({
@@ -63,9 +65,9 @@ export let createPipeline = SlateTool.create(spec, {
 
     return {
       output: {
-        pipelineId: pipeline.pipelineId,
-        name: pipeline.name,
-        repository: pipeline.repository
+        pipelineId: pipeline.pipelineId ?? undefined,
+        name: pipeline.name ?? undefined,
+        repository: pipeline.repository ?? undefined
       },
       message: `Pipeline **${pipeline.name || ctx.input.name}** created successfully.`
     };

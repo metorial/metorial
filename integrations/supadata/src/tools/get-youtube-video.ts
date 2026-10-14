@@ -52,7 +52,7 @@ For metadata from other platforms (TikTok, Instagram, etc.), use the "Get Media 
         commentCount: result.commentCount ?? result.comments,
         thumbnail: result.thumbnail,
         tags: result.tags,
-        publishedAt: result.publishedAt ?? result.createdAt,
+        publishedAt: result.publishedAt ?? result.uploadDate ?? result.createdAt ?? undefined,
         categoryId: result.categoryId
       },
       message: `YouTube video: **${result.title ?? 'unknown'}** — ${result.viewCount ?? result.views ?? 0} views, ${result.duration ?? 0}s duration.`

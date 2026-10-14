@@ -14,7 +14,13 @@ let linkSchema = z.object({
   redirectUrl: z.string().describe('Final redirect destination URL'),
   isImage: z.boolean().describe('Whether the link is an image source'),
   isBroken: z.boolean().describe('Whether the link returned an error status'),
-  protocol: z.string().describe('URL protocol (http, https, etc.)')
+  protocol: z.string().describe('URL protocol (http, https, etc.)'),
+  status: z
+    .string()
+    .optional()
+    .describe('Original status code or failure reason reported for the link'),
+  blacklistName: z.string().optional().describe('Name of the blacklist containing this link'),
+  blacklistUrl: z.string().optional().describe('URL of the blacklist containing this link')
 });
 
 let imageSchema = z.object({
@@ -24,7 +30,8 @@ let imageSchema = z.object({
   height: z.number().describe('Original image height in pixels'),
   renderedWidth: z.number().describe('Rendered width in pixels as specified in HTML'),
   renderedHeight: z.number().describe('Rendered height in pixels as specified in HTML'),
-  imageType: z.string().describe('Image format (png, jpg, gif, etc.)')
+  imageType: z.string().describe('Image format (png, jpg, gif, etc.)'),
+  isBackground: z.boolean().optional().describe('Whether this is a background image')
 });
 
 let summaryItemSchema = z.object({
@@ -83,6 +90,11 @@ Only works on campaigns with "completed" status.`,
       pdCdnsFound: z.number().describe('Number of poor-delivery CDNs detected'),
       pdCdnList: z.array(z.any()).describe('List of poor-delivery CDNs found'),
       domainsScanned: z.number().describe('Number of unique domains scanned'),
+      domainList: z.array(z.string()).optional().describe('Domains checked during analysis'),
+      brokenLinkList: z
+        .array(linkSchema)
+        .optional()
+        .describe('Broken links and their failure reasons'),
       imageCount: z.number().describe('Total number of images in the campaign'),
       imageList: z.array(imageSchema).describe('Inventory of all images'),
       osImageList: z.array(imageSchema).describe('Oversized images detected'),
@@ -96,6 +108,14 @@ Only works on campaigns with "completed" status.`,
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getCampaign(ctx.input.campaignId, ctx.input.minifyHtml ?? true);
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(result.campaignHtml, {
+        headers: { 'content-type': 'text/html; charset=utf-8' }
+      }),
+      filename: 'cleaned-campaign.html'
+    });
 
     let issues: string[] = [];
     if (result.spamWordsCount > 0) issues.push(`${result.spamWordsCount} spam keywords`);

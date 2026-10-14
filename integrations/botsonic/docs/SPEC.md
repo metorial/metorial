@@ -1,61 +1,32 @@
-Now let me check the authentication details more carefully and see if there are two types of tokens.Now I have a comprehensive understanding of Botsonic's API. Let me also check authentication details for the two types of tokens (API Token per bot vs. API Secret Key).I now have enough information to write the specification. There are two authentication mechanisms: a per-bot API Token (obtained from the bot's Integration page) and account-level API Secret Keys (created from the API section in account settings). The API has no webhook/event support based on my research.
+# Botsonic Integration Specification
 
-# Slates Specification for Botsonic
+## Authentication and resource selection
 
-## Overview
+Account API Secret Keys are sent as `USER-API-KEY` to bot-management endpoints under `https://api.botsonic.ai/v1/business`. Bot-scoped endpoints use a bot API token in `X-BOT-KEY`.
 
-Botsonic is a no-code AI chatbot builder by Writesonic, powered by GPT-4, that allows businesses to create custom chatbots trained on their own data. It allows businesses and websites to customize their own chatbots for customer support, shopping assistance, and educational purposes. The REST API enables programmatic bot management, response generation, training data management, and conversation retrieval.
+For an account connection, use `list_bots` to discover a bot, then pass its `botId` to a bot-scoped tool. The integration retrieves the bot token using the documented bot API key endpoint; an optional `workspaceId` selects the workspace. A Bot API Token connection directly targets the token's bot and cannot run account-wide bot management.
 
-## Authentication
+Existing stored connections without a credential-type marker retain their token: account management uses it as an account key, while bot-scoped calls without a bot ID use it as a legacy bot token. Supply a bot ID to resolve a token from an account key, or reconnect using the appropriate authentication method.
 
-Botsonic uses API token-based authentication via HTTP headers. There are two types of tokens:
+## Supported workflows
 
-### 1. Bot-Specific API Token
+- Discover, create, inspect, and delete bots. Bot creation maps the public `name` field to the provider's `bot_name` field.
+- Generate synchronous responses with optional conversation history, response format, source content, and starter-question context.
+- Upload file URLs, text, or batches of URLs; inspect training-data processing and delete entries. Upload acceptance does not imply processing completion.
+- Create, list, update, and delete starter questions; retrieve the welcome message and starter presets.
+- Create, list, and delete FAQs; inspect conversations and end chats with optional feedback.
 
-Each bot has its own API Token, obtained by navigating to the chatbot's Integration Page > REST API and copying the API Token. This token is used for bot-scoped operations such as generating responses. It is passed as a header in API requests (typically as `token` in the request header).
+Pagination totals and response message IDs are optional because the provider response schema does not require them. Page sizes and display order retain number schemas while checking whole-number values. All tools use object input schemas.
 
-**Base URL:** `https://api.botsonic.ai/v1/botsonic/`
+## Limits
 
-### 2. Account-Level API Secret Key
+API access is plan-dependent. The tools return synchronous responses; streaming is not exposed. Bot IDs supplied with a Bot API Token connection must correspond to the token's bot, particularly for file and text uploads. No event subscriptions are exposed by this integration. No suitable account-identity endpoint is present in the official API reference.
 
-From the left-hand side menu, click [API], then click [Create new Secret Key]. Access to this feature varies based on the specific plan you have chosen. Enter a name for the secret key, then click [Create Secret Key] to generate a new secret key. This key is used for account-wide business API endpoints (bot management, data management, FAQs, etc.) and is passed as a header in requests.
+## Provider references
 
-**Base URL for business endpoints:** `https://api.botsonic.ai/v1/business/`
-
-**Note:** The free and plus plans are unable to access the API. You need to upgrade to the business plan.
-
-## Features
-
-### Response Generation
-
-Send a message to a bot and receive an AI-generated response based on the bot's training data. Supports both synchronous and streaming response modes. The request involves parameters like `chat_id` and `chat_history` in the JSON payload.
-
-### Bot Management
-
-Create new bots, list all bots associated with the account, retrieve detailed information about specific bots, and delete bots. You can also retrieve a bot's API key programmatically.
-
-### Training Data Management
-
-Upload and manage the knowledge base that powers the bot's responses. Supported operations include:
-
-- File upload in PDF, DOC, and DOCX formats, URL links (including YouTube video links), or an entire website sitemap.
-- Bulk uploading URLs for training.
-- Uploading text content directly.
-- Retrieving all training data files and deleting specific data entries.
-- Checking the processing status of uploaded data.
-
-### FAQ Management
-
-Manage FAQs (frequently asked questions) associated with the bot, facilitating the creation, update, and deletion of FAQs. FAQs allow the bot to give precise answers to known common questions.
-
-### Starter Questions Management
-
-Manage starter questions — predefined questions to streamline user interactions and enhance the bot's responsiveness. You can create, update, delete, and list starter questions, as well as retrieve starter presets by bot ID.
-
-### Conversation History
-
-Access and manage chat conversations. Retrieve all conversations for a bot, get details of a specific conversation by chat ID, and end active chat sessions. Useful for reviewing interactions, analytics, and quality assurance.
-
-## Events
-
-The provider does not support events. Botsonic does not offer webhooks or event subscription mechanisms through its API.
+- [REST API guide](https://docs.botsonic.com/docs/rest-api)
+- [Account API keys](https://docs.botsonic.com/docs/your-api-keys)
+- [Bot discovery](https://docs.botsonic.com/reference/get_all_bots_v1_business_bot_all_get)
+- [Bot API token retrieval](https://docs.botsonic.com/reference/get_bot_api_key_v1_business_bot__bot_id__bot_api_key_get)
+- [Business response generation](https://docs.botsonic.com/reference/generate_sync_or_streaming_response_v1_business_botsonic_post)
+- [Starter presets](https://docs.botsonic.com/reference/get_all_starter_presets_by_bot_id_v1_business_bot_starter_presets_all_get-1)

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   AhaComment,
   AhaEpic,
@@ -13,17 +13,68 @@ import type {
   AhaUser
 } from './types';
 
+// Aha! uses nullable optional fields and rich-text objects in its record responses.
+let normalizeAhaResponse = (value: unknown): unknown => {
+  if (value === null) return undefined;
+  if (Array.isArray(value)) return value.map(normalizeAhaResponse);
+  if (typeof value !== 'object' || value === null) return value;
+  let record: Record<string, unknown> = Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => {
+      if (
+        (key === 'description' || key === 'theme') &&
+        typeof entry === 'object' &&
+        entry !== null &&
+        'body' in entry
+      ) {
+        return [key, normalizeAhaResponse(entry.body)];
+      }
+      if (key === 'pagination' && Array.isArray(entry)) {
+        return [key, normalizeAhaResponse(entry[0])];
+      }
+      return [key, normalizeAhaResponse(entry)];
+    })
+  );
+  if (record.theme !== undefined && record.description === undefined)
+    record.description = record.theme;
+  return record;
+};
+
 export class AhaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+
+  static resolveSubdomain(subdomain?: string, config?: Record<string, unknown>): string {
+    let value =
+      subdomain ?? (typeof config?.subdomain === 'string' ? config.subdomain : undefined);
+    if (!value || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(value)) {
+      throw createApiServiceError(
+        'Reconnect Aha! with your account subdomain, such as company for company.aha.io.'
+      );
+    }
+    return value;
+  }
+
+  static fromContext(ctx: {
+    auth: { token: string; subdomain?: string };
+    config?: Record<string, unknown>;
+  }): AhaClient {
+    return new AhaClient(
+      AhaClient.resolveSubdomain(ctx.auth.subdomain, ctx.config),
+      ctx.auth.token
+    );
+  }
 
   constructor(subdomain: string, token: string) {
-    this.axios = createAxios({
+    subdomain = AhaClient.resolveSubdomain(subdomain);
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${subdomain}.aha.io/api/v1`,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Aha!', reason: 'aha_api_error' })
+    });
+    this.axios.interceptors.response.use(response => {
+      response.data = normalizeAhaResponse(response.data);
+      return response;
     });
   }
 
@@ -119,7 +170,7 @@ export class AhaClient {
     };
     if (release.startDate) body.release.start_date = release.startDate;
     if (release.releaseDate) body.release.release_date = release.releaseDate;
-    if (release.description) body.release.description = release.description;
+    if (release.description) body.release.theme = release.description;
     if (release.parkingLot !== undefined) body.release.parking_lot = release.parkingLot;
 
     let response = await this.axios.post(`/products/${productId}/releases`, body);
@@ -141,7 +192,7 @@ export class AhaClient {
     if (updates.name !== undefined) body.release.name = updates.name;
     if (updates.startDate !== undefined) body.release.start_date = updates.startDate;
     if (updates.releaseDate !== undefined) body.release.release_date = updates.releaseDate;
-    if (updates.description !== undefined) body.release.description = updates.description;
+    if (updates.description !== undefined) body.release.theme = updates.description;
     if (updates.parkingLot !== undefined) body.release.parking_lot = updates.parkingLot;
 
     let response = await this.axios.put(`/releases/${releaseId}`, body);
@@ -567,9 +618,12 @@ export class AhaClient {
     if (params?.page) query.page = params.page;
     if (params?.perPage) query.per_page = params.perPage;
 
-    let response = await this.axios.get(`/${recordType}/${recordId}/comments`, {
-      params: query
-    });
+    let response = await this.axios.get(
+      `/${recordType === 'to_dos' ? 'tasks' : recordType}/${recordId}/comments`,
+      {
+        params: query
+      }
+    );
     let data = response.data as { comments: AhaComment[]; pagination: AhaPagination };
     return data;
   }
@@ -579,9 +633,12 @@ export class AhaClient {
     recordId: string,
     body: string
   ): Promise<AhaComment> {
-    let response = await this.axios.post(`/${recordType}/${recordId}/comments`, {
-      comment: { body }
-    });
+    let response = await this.axios.post(
+      `/${recordType === 'to_dos' ? 'tasks' : recordType}/${recordId}/comments`,
+      {
+        comment: { body }
+      }
+    );
     let data = response.data as { comment: AhaComment };
     return data.comment;
   }
@@ -635,11 +692,11 @@ export class AhaClient {
     if (params?.page) query.page = params.page;
     if (params?.perPage) query.per_page = params.perPage;
 
-    let response = await this.axios.get(`/${recordType}/${recordId}/to_dos`, {
+    let response = await this.axios.get(`/${recordType}/${recordId}/tasks`, {
       params: query
     });
-    let data = response.data as { to_dos: AhaTodo[]; pagination: AhaPagination };
-    return { todos: data.to_dos, pagination: data.pagination };
+    let data = response.data as { tasks: AhaTodo[]; pagination: AhaPagination };
+    return { todos: data.tasks, pagination: data.pagination };
   }
 
   async createTodo(
@@ -652,20 +709,38 @@ export class AhaClient {
       assignees?: string[];
     }
   ): Promise<AhaTodo> {
-    let body: Record<string, any> = {
-      to_do: {
-        name: todo.name
+    let taskableTypes: Record<string, string> = {
+      features: 'Feature',
+      releases: 'Release',
+      requirements: 'Requirement',
+      epics: 'Epic',
+      ideas: 'Ideas::Idea'
+    };
+    let taskableType = taskableTypes[recordType];
+    if (!taskableType)
+      throw createApiServiceError('Unsupported parent record type for a to-do.');
+    let assignedToUsers: { email: string }[] = [];
+    for (let userId of todo.assignees ?? []) {
+      let user = await this.getUser(userId);
+      if (!user.email)
+        throw createApiServiceError(
+          `Aha! user ${userId} has no email address for to-do assignment.`
+        );
+      assignedToUsers.push({ email: user.email });
+    }
+    let body = {
+      task: {
+        name: todo.name,
+        body: todo.body ?? todo.name,
+        taskable_type: taskableType,
+        taskable_id: recordId,
+        due_date: todo.dueDate,
+        ...(assignedToUsers.length ? { assigned_to_users: assignedToUsers } : {})
       }
     };
-    if (todo.body) body.to_do.body = todo.body;
-    if (todo.dueDate) body.to_do.due_date = todo.dueDate;
-    if (todo.assignees && todo.assignees.length > 0) {
-      body.to_do.assignee_ids = todo.assignees;
-    }
-
-    let response = await this.axios.post(`/${recordType}/${recordId}/to_dos`, body);
-    let data = response.data as { to_do: AhaTodo };
-    return data.to_do;
+    let response = await this.axios.post('/tasks', body);
+    let data = response.data as { task: AhaTodo };
+    return data.task;
   }
 
   async updateTodo(
@@ -677,19 +752,20 @@ export class AhaClient {
       completed?: boolean;
     }
   ): Promise<AhaTodo> {
-    let body: Record<string, any> = { to_do: {} };
-    if (updates.name !== undefined) body.to_do.name = updates.name;
-    if (updates.body !== undefined) body.to_do.body = updates.body;
-    if (updates.dueDate !== undefined) body.to_do.due_date = updates.dueDate;
-    if (updates.completed !== undefined) body.to_do.completed = updates.completed;
+    let body: Record<string, any> = { task: {} };
+    if (updates.name !== undefined) body.task.name = updates.name;
+    if (updates.body !== undefined) body.task.body = updates.body;
+    if (updates.dueDate !== undefined) body.task.due_date = updates.dueDate;
+    if (updates.completed !== undefined)
+      body.task.status = updates.completed ? 'complete' : 'pending';
 
-    let response = await this.axios.put(`/to_dos/${todoId}`, body);
-    let data = response.data as { to_do: AhaTodo };
-    return data.to_do;
+    let response = await this.axios.put(`/tasks/${todoId}`, body);
+    let data = response.data as { task: AhaTodo };
+    return data.task;
   }
 
   async deleteTodo(todoId: string): Promise<void> {
-    await this.axios.delete(`/to_dos/${todoId}`);
+    await this.axios.delete(`/tasks/${todoId}`);
   }
 
   // ─── Me (Current User) ────────────────────────────────────────

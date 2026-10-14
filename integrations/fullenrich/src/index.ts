@@ -5,6 +5,8 @@ import {
   getCreditBalance,
   getEnrichmentResult,
   getReverseEmailResult,
+  lookupCompany,
+  lookupPerson,
   reverseEmailLookup,
   searchCompanies,
   searchPeople,
@@ -19,6 +21,8 @@ export let provider = Slate.create({
     getReverseEmailResult,
     searchPeople,
     searchCompanies,
+    lookupPerson,
+    lookupCompany,
     getCreditBalance,
     verifyApiKey
   ],

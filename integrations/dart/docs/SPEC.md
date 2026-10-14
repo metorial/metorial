@@ -1,4 +1,4 @@
-# Slates Specification for Dart
+# Dart API Specification
 
 ## Overview
 
@@ -40,17 +40,19 @@ The API supports task and doc management. Documents can be used for wikis, meeti
 
 Get information about the user's space, including available assignees, dartboards, folders, statuses, tags, priorities, and sizes. This allows integrations to discover the structure and settings of a Dart workspace before performing operations.
 
-### Sprint Management
-
-Dart offers sprint planning checklists and automated task management. Sprints can be used to manage tasks on a regular cadence.
-
-### Report Generation
-
-Reports can be generated with polished summaries, including standup, changelog, and other reports based on completed work and team activity.
-
 ### Time Tracking
 
-Time tracking and other simple properties are supported and exposed through the API.
+Add time tracking entries to tasks with start and end timestamps including a timezone. Entries can be attributed to a user and can target a time tracking custom property. The updated task includes the refreshed total tracked time.
+
+### Connected Account
+
+Check the current account with `GET /me`, which returns authentication status and the authenticated user ID, name, and email.
+
+## API Sources
+
+- [Public API documentation](https://app.dartai.com/api/v0/public/docs/)
+- [Current OpenAPI schema](https://app.dartai.com/api/v0/public/schema/)
+- [OAuth integration guide](https://help.dartai.com/en/articles/12618292-dart-oauth-integration-guide)
 
 ## Events
 

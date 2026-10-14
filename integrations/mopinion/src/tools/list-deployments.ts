@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -25,7 +25,14 @@ export let listDeployments = SlateTool.create(spec, {
         .array(
           z.object({
             deploymentKey: z.string().describe('Deployment key/identifier'),
-            name: z.string().describe('Deployment name')
+            name: z.string().describe('Deployment name'),
+            domain: z.string().optional().describe('Deployment domain'),
+            type: z.string().optional().describe('Deployment type'),
+            published: z.boolean().optional().describe('Whether the deployment is published'),
+            rules: z
+              .array(z.any())
+              .optional()
+              .describe('Rules that determine when forms are displayed')
           })
         )
         .describe('List of deployments')
@@ -39,14 +46,27 @@ export let listDeployments = SlateTool.create(spec, {
 
     if (ctx.input.deploymentKey) {
       let deployment = await client.getDeployment(ctx.input.deploymentKey);
-      let deploymentData = deployment.data || deployment;
+      let data = deployment.data ?? deployment;
+      let deploymentData = Array.isArray(data.deployment)
+        ? data.deployment[0]
+        : (data.deployment ?? data);
+      if (!deploymentData) {
+        throw createApiServiceError(
+          'Mopinion returned no details for the requested deployment.'
+        );
+      }
 
       return {
         output: {
           deployments: [
             {
-              deploymentKey: deploymentData.key || ctx.input.deploymentKey,
-              name: deploymentData.name || ''
+              deploymentKey:
+                deploymentData.key || deploymentData.id || ctx.input.deploymentKey,
+              name: deploymentData.name || '',
+              domain: deploymentData.domain,
+              type: deploymentData.type,
+              published: deploymentData.published,
+              rules: deploymentData.rules
             }
           ]
         },

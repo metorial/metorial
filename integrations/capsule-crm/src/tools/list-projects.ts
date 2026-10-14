@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,8 +35,19 @@ export let listProjects = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 date to filter projects modified after this date'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page, 1-100 (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page, 1-100 (default: 50)'),
       embed: z
         .array(z.enum(['tags', 'fields', 'party', 'opportunity', 'missingImportantFields']))
         .optional()
@@ -49,6 +60,11 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.partyId !== undefined && ctx.input.since !== undefined) {
+      throw createApiServiceError(
+        'Use partyId or since separately; Capsule does not support since on the party-specific endpoint.'
+      );
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     let result: any;
@@ -69,13 +85,13 @@ export let listProjects = SlateTool.create(spec, {
 
     let projects = (result.kases || []).map((k: any) => ({
       projectId: k.id,
-      name: k.name,
-      description: k.description,
-      status: k.status,
-      createdAt: k.createdAt,
-      updatedAt: k.updatedAt,
-      closedOn: k.closedOn,
-      expectedCloseOn: k.expectedCloseOn,
+      name: k.name ?? undefined,
+      description: k.description ?? undefined,
+      status: k.status ?? undefined,
+      createdAt: k.createdAt ?? undefined,
+      updatedAt: k.updatedAt ?? undefined,
+      closedOn: k.closedOn ?? undefined,
+      expectedCloseOn: k.expectedCloseOn ?? undefined,
       party: k.party,
       owner: k.owner,
       team: k.team,

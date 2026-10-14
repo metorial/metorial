@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -42,7 +42,8 @@ export let manageIpAccess = SlateTool.create(spec, {
     let { operation, deviceId, ips } = ctx.input;
 
     if (operation === 'authorize') {
-      if (!ips || ips.length === 0) throw new Error('ips is required for authorize');
+      if (!ips || ips.length === 0)
+        throw createApiServiceError('ips is required for authorize');
       await client.authorizeIps(deviceId, ips);
       return {
         output: { ips: ips.map(ip => ({ ip })) },
@@ -51,7 +52,8 @@ export let manageIpAccess = SlateTool.create(spec, {
     }
 
     if (operation === 'deauthorize') {
-      if (!ips || ips.length === 0) throw new Error('ips is required for deauthorize');
+      if (!ips || ips.length === 0)
+        throw createApiServiceError('ips is required for deauthorize');
       await client.deauthorizeIps(deviceId, ips);
       return {
         output: { ips: ips.map(ip => ({ ip })) },

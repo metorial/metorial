@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ export let manageEmailProviders = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!providerConfig) throw new Error('Provider configuration is required');
+      if (!providerConfig) throw createApiServiceError('Provider configuration is required');
       let provider = await client.addEmailProvider(providerConfig);
       return {
         output: { provider, success: true },
@@ -66,7 +66,7 @@ export let manageEmailProviders = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!providerId) throw new Error('Provider ID is required');
+      if (!providerId) throw createApiServiceError('Provider ID is required');
       await client.deleteEmailProvider(providerId);
       return {
         output: { success: true },
@@ -75,7 +75,7 @@ export let manageEmailProviders = SlateTool.create(spec, {
     }
 
     if (action === 'enable_warmup') {
-      if (!providerId) throw new Error('Provider ID is required');
+      if (!providerId) throw createApiServiceError('Provider ID is required');
       await client.enableWarmup(providerId);
       return {
         output: { success: true },
@@ -84,7 +84,7 @@ export let manageEmailProviders = SlateTool.create(spec, {
     }
 
     if (action === 'disable_warmup') {
-      if (!providerId) throw new Error('Provider ID is required');
+      if (!providerId) throw createApiServiceError('Provider ID is required');
       await client.disableWarmup(providerId);
       return {
         output: { success: true },
@@ -101,6 +101,6 @@ export let manageEmailProviders = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

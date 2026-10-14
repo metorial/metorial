@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { TavePublicClient } from '../lib/client';
+import { contactKind, TavePublicClient, textField } from '../lib/client';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -15,18 +15,27 @@ export let createContact = SlateTool.create(spec, {
   .input(
     z.object({
       firstName: z.string().describe('First name of the contact'),
+      name: z
+        .string()
+        .optional()
+        .describe('Company or location name; required when creating those contact kinds'),
       lastName: z.string().optional().describe('Last name of the contact'),
       email: z.string().optional().describe('Email address of the contact'),
       phone: z.string().optional().describe('Phone number of the contact'),
       contactKind: z
         .string()
         .optional()
-        .describe('Kind of contact (e.g., "individual", "business")'),
-      brand: z.string().optional().describe('Brand to associate the contact with'),
+        .describe(
+          'Contact kind: person, company, or location; individual and business are also accepted'
+        ),
+      brand: z
+        .string()
+        .optional()
+        .describe('Exact brand name or ID. Call get_brands to discover brands'),
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom fields as key-value pairs')
+        .describe('Custom fields keyed by the configured field ID, exact name, or token')
     })
   )
   .output(
@@ -39,20 +48,36 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TavePublicClient(ctx.auth.token);
-
-    let data: Record<string, unknown> = {
-      first_name: ctx.input.firstName
-    };
-
-    if (ctx.input.lastName) data.last_name = ctx.input.lastName;
-    if (ctx.input.email) data.email = ctx.input.email;
-    if (ctx.input.phone) data.phone = ctx.input.phone;
-    if (ctx.input.contactKind) data.contact_kind = ctx.input.contactKind;
-    if (ctx.input.brand) data.brand = ctx.input.brand;
-
-    if (ctx.input.customFields) {
-      data.custom_fields = ctx.input.customFields;
+    let client = new TavePublicClient(ctx.auth);
+    let kind = contactKind(ctx.input.contactKind ?? 'person');
+    if (kind === 'employee')
+      throw createApiServiceError(
+        'The public contact creation API supports person, company, and location contacts.'
+      );
+    if (kind !== 'person' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Provide name when creating a company or location contact.');
+    }
+    let data: Record<string, unknown> = pickDefined({
+      kind,
+      email: ctx.input.email,
+      brandId: ctx.input.brand
+        ? await client.resolveNamedId('/brand', ctx.input.brand, 'Brand')
+        : undefined,
+      customFields: ctx.input.customFields
+        ? await client.customFields(ctx.input.customFields, 'Contact')
+        : undefined
+    });
+    if (kind === 'person') {
+      data.firstName = ctx.input.firstName;
+      if (ctx.input.lastName !== undefined) data.lastName = ctx.input.lastName;
+      if (ctx.input.phone !== undefined) data.cellPhone = { formatted: ctx.input.phone };
+    } else {
+      data.name = ctx.input.name;
+      if (kind === 'company') {
+        data.primaryContactFirstName = ctx.input.firstName;
+        if (ctx.input.lastName !== undefined) data.primaryContactLastName = ctx.input.lastName;
+      }
+      if (ctx.input.phone !== undefined) data.phone = { formatted: ctx.input.phone };
     }
 
     ctx.info({ message: 'Creating contact in Tave', firstName: ctx.input.firstName });
@@ -61,10 +86,14 @@ export let createContact = SlateTool.create(spec, {
 
     return {
       output: {
-        contactId: String(result.id ?? result.contact_id ?? ''),
-        firstName: result.first_name ?? ctx.input.firstName,
-        lastName: result.last_name ?? ctx.input.lastName,
-        email: result.email ?? ctx.input.email,
+        contactId: String(result.id),
+        firstName:
+          textField(result, 'firstName', 'primaryContactFirstName', 'first_name') ??
+          ctx.input.firstName,
+        lastName:
+          textField(result, 'lastName', 'primaryContactLastName', 'last_name') ??
+          ctx.input.lastName,
+        email: textField(result, 'email') ?? ctx.input.email,
         raw: result
       },
       message: `Successfully created contact **${ctx.input.firstName}${ctx.input.lastName ? ` ${ctx.input.lastName}` : ''}**${ctx.input.email ? ` (${ctx.input.email})` : ''}.`

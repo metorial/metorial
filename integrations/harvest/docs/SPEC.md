@@ -1,6 +1,4 @@
-Let me get the official Harvest webhook documentation and the OAuth2 token endpoint details.Now let me check for Harvest's native webhook support specifically:I notice there's no webhooks section in the official Harvest API V2 documentation. The documentation covers Clients, Company, Invoices, Estimates, Expenses, Tasks, Timesheets, Projects, Roles, Users, and Reports — but no webhooks. The earlier search results about webhooks were either from third-party platforms (Greenhouse, which is a different product) or from integration platforms suggesting workarounds. Let me confirm this isn't just missing from the index.Now I have all the information I need. The official Harvest API V2 does not support native webhooks. The rollout.com article that showed webhook code was AI-generated content and not based on actual Harvest API documentation.
-
-# Slates Specification for Harvest
+# Harvest API Specification
 
 ## Overview
 
@@ -110,3 +108,14 @@ Retrieve and update company-level settings such as timezone, currency, and time 
 ## Events
 
 The official Harvest API does not have native webhook support. The official Harvest API documentation does not mention webhooks. The provider does not support events.
+
+
+## Integration refresh (0.2.1)
+
+- `list_accounts` discovers authorized Harvest accounts without requiring a setup account ID. For one account, authentication persists the default account ID. Other tools accept an optional `accountId`; existing saved account selections remain supported.
+- `get_current_user` retrieves the authenticated account user through `/v2/users/me`.
+- `list_estimates` exposes estimate IDs and documented filters for the existing estimate workflow. It uses page-based pagination.
+- Clients, projects, tasks, and users support cursor navigation using `cursor` and `nextCursor`. Existing numeric `page` output remains compatible; `pageNumberKnown` indicates when a cursor response omitted the page number.
+- OAuth token requests use form encoding and preserve refresh tokens when no replacement is returned. New OAuth consent requests Harvest access only.
+- `send_invoice` emails when `eventType` is omitted. `send`, `close`, `draft`, and `re-open` record lifecycle events without emailing.
+- Payment date fields are mutually exclusive; new invoice/estimate line items require `kind` and `unitPrice`; new expenses require `totalCost` or `units`.

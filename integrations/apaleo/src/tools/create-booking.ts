@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApaleoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,13 @@ let reservationInputSchema = z.object({
     )
     .optional()
     .describe(
-      'Rate plan assignments per time slice. If not set, the default rate plan is used.'
+      'Rate plan assignments per time slice; required when creating the reservation. Use search_offers to choose a rate plan.'
+    ),
+  source: z
+    .string()
+    .optional()
+    .describe(
+      'Supported source required when channelCode is ChannelManager; omit for other channels.'
     ),
   companyId: z.string().optional().describe('Company profile ID for corporate bookings'),
   corporateCode: z.string().optional().describe('Corporate rate code'),
@@ -67,7 +73,7 @@ export let createBooking = SlateTool.create(spec, {
   key: 'create_booking',
   description: `Create a new booking with one or more reservations. A booking groups reservations under a single booker. Each reservation represents a separate room stay. Supports rate plan assignments, guest details, corporate codes, and pre-payments.`,
   instructions: [
-    'At minimum, each reservation needs arrival, departure, and adults count.',
+    'Each reservation needs arrival, departure, adults, and timeSlices. channelCode defaults to Direct.',
     'Use timeSlices to specify which rate plan to use for each night.',
     'If unitGroupId is not set, a room type must be determinable from the rate plan.'
   ],
@@ -85,6 +91,10 @@ export let createBooking = SlateTool.create(spec, {
         ),
       comment: z.string().optional().describe('Internal booking comment'),
       bookerComment: z.string().optional().describe('Comment from the booker'),
+      transactionReference: z
+        .string()
+        .optional()
+        .describe('Payment transaction reference to complete when creating the booking.'),
       reservations: z
         .array(reservationInputSchema)
         .min(1)
@@ -99,16 +109,74 @@ export let createBooking = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ApaleoClient(ctx.auth.token);
+    let booker = ctx.input.booker ?? ctx.input.reservations[0]?.primaryGuest;
+    if (!booker) {
+      throw createApiServiceError(
+        'Provide booker or the primaryGuest of the first reservation.'
+      );
+    }
+    for (let reservation of ctx.input.reservations) {
+      if (!reservation.timeSlices?.length) {
+        throw createApiServiceError(
+          'Every reservation requires timeSlices. Use search_offers to select a rate plan for each time slice.'
+        );
+      }
+      if (reservation.channelCode === 'ChannelManager' && !reservation.source) {
+        throw createApiServiceError('source is required when channelCode is ChannelManager.');
+      }
+      if (reservation.channelCode !== 'ChannelManager' && reservation.source !== undefined) {
+        throw createApiServiceError(
+          'source is only supported when channelCode is ChannelManager.'
+        );
+      }
+      if (reservation.unitGroupId) {
+        for (let ratePlanId of new Set(
+          reservation.timeSlices.map(slice => slice.ratePlanId)
+        )) {
+          let ratePlan = await client.getRatePlan(ratePlanId);
+          if (ratePlan.unitGroup?.id !== reservation.unitGroupId) {
+            throw createApiServiceError(
+              `Rate plan ${ratePlanId} does not belong to unitGroupId ${reservation.unitGroupId}. Choose a matching rate plan from list_rate_plans.`
+            );
+          }
+        }
+      }
+    }
 
     let result = await client.createBooking({
-      booker: ctx.input.booker,
+      booker,
       comment: ctx.input.comment,
       bookerComment: ctx.input.bookerComment,
-      reservations: ctx.input.reservations
+      transactionReference: ctx.input.transactionReference,
+      reservations: ctx.input.reservations.map(({ unitId, unitGroupId, ...reservation }) => ({
+        ...reservation,
+        channelCode: reservation.channelCode ?? 'Direct'
+      }))
     });
 
     let bookingId = result.id;
-    let reservationIds = (result.reservationIds || []) as string[];
+    let reservationIds = (result.reservationIds || []).map(
+      (reservation: string | { id: string }) =>
+        typeof reservation === 'string' ? reservation : reservation.id
+    );
+    for (let [index, reservation] of ctx.input.reservations.entries()) {
+      if (reservation.unitId) {
+        let reservationId = reservationIds[index];
+        if (!reservationId) {
+          throw createApiServiceError(
+            `Booking ${bookingId} was created, but no reservation ID was returned for room assignment. Retrieve it with get_booking before assigning the room.`
+          );
+        }
+        try {
+          await client.assignUnit(reservationId, reservation.unitId);
+        } catch (error) {
+          throw createApiServiceError(
+            `Booking ${bookingId} was created with reservation ${reservationId}, but assigning room ${reservation.unitId} failed. Retrieve the reservation and retry assign_unit with manage_reservation.`,
+            { parent: error }
+          );
+        }
+      }
+    }
 
     return {
       output: {

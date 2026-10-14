@@ -39,14 +39,12 @@ export let listSubmissions = SlateTool.create(spec, {
     let client = new CabinPandaClient({ token: ctx.auth.token });
     let submissions = await client.listSubmissions(ctx.input.formId);
 
-    let mappedSubmissions = (Array.isArray(submissions) ? submissions : []).map(
-      (sub: any) => ({
-        submissionId: sub?.id?.toString(),
-        createdAt: sub?.created_at,
-        fields: sub?.fields ?? sub?.data,
-        raw: sub
-      })
-    );
+    let mappedSubmissions = submissions.map((sub: any) => ({
+      submissionId: sub?.id?.toString(),
+      createdAt: sub?.created_at ?? undefined,
+      fields: sub?.fields ?? sub?.data,
+      raw: sub
+    }));
 
     return {
       output: { submissions: mappedSubmissions },

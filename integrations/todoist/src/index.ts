@@ -16,6 +16,8 @@ import {
   deleteTask,
   getCollaborators,
   getComments,
+  getCompletedTasks,
+  getCurrentUser,
   getFilters,
   getLabels,
   getProductivityStats,
@@ -62,6 +64,8 @@ export let provider = Slate.create({
     updateFilter,
     deleteFilter,
     getCollaborators,
+    getCompletedTasks,
+    getCurrentUser,
     getProductivityStats
   ] as any[],
   triggers: []

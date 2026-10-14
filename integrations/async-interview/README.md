@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Async Interview
 
-Manage asynchronous video interviews for hiring workflows. List and retrieve interview jobs (positions), access candidate interview responses (video, audio, or text), and invite candidates to participate in interviews. Monitor for new interview response submissions to trigger follow-up workflows such as notifying hiring managers or pushing data to an ATS. Supports AI-powered transcription of candidate responses and file attachment collection.
+Review asynchronous interview campaigns and candidate submissions. List interview jobs, retrieve interview responses with candidate details and recording links, and filter responses by a job discovered with `list_jobs`.
 
 ## License
 

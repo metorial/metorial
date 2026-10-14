@@ -52,8 +52,8 @@ export let createEntry = SlateTool.create(spec, {
     return {
       output: {
         entryId: result.id,
-        type: result.type,
-        createdAt: result.createdAt
+        type: result.type ?? undefined,
+        createdAt: result.createdAt ?? undefined
       },
       message: `Created ${result.type ?? 'note'} entry (ID: ${result.id}).`
     };

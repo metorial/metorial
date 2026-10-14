@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, subscriberDetails } from '../lib/client';
 import { spec } from '../spec';
 
 export let createSubscriber = SlateTool.create(spec, {
@@ -28,7 +28,9 @@ export let createSubscriber = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom field key-value pairs (field name as key, value as value)'),
+        .describe(
+          'Custom field key-value pairs. Call list_fields for fieldName keys, such as {$company}.'
+        ),
       triggerAutomation: z
         .boolean()
         .optional()
@@ -38,7 +40,15 @@ export let createSubscriber = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      subscriberId: z.number().describe('Unique ID of the created subscriber'),
+      subscriberId: z
+        .number()
+        .optional()
+        .describe('Legacy numeric subscriber ID, when returned by Sender'),
+      subscriberKey: z
+        .string()
+        .describe(
+          'Subscriber ID. Pass this value to get_subscriber or update_subscriber as identifier'
+        ),
       email: z.string().describe('Email address of the subscriber'),
       firstname: z.string().nullable().describe('First name'),
       lastname: z.string().nullable().describe('Last name'),
@@ -64,13 +74,7 @@ export let createSubscriber = SlateTool.create(spec, {
 
     return {
       output: {
-        subscriberId: subscriber.id,
-        email: subscriber.email,
-        firstname: subscriber.firstname,
-        lastname: subscriber.lastname,
-        phone: subscriber.phone,
-        subscriberStatus: subscriber.subscriber_status,
-        createdAt: subscriber.created
+        ...subscriberDetails(subscriber)
       },
       message: `Subscriber **${subscriber.email}** created successfully with ID \`${subscriber.id}\`.`
     };

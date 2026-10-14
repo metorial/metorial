@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'appdrag',
   name: 'AppDrag',
   description:
-    'Cloud-based web development platform with drag-and-drop website builder, cloud CMS, serverless backend (Cloud Backend powered by AWS Lambda), cloud database (MySQL-compatible), e-commerce, blogging, and newsletter tools.',
+    'Access existing AppDrag projects for SQL queries, Cloud Backend function calls, stored files, transactional email, and newsletter management. AppDrag has announced shutdown on November 1, 2026.',
   metadata: {},
   config,
   auth

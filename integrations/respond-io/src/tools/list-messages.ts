@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, messageOutput, nextCursorId } from '../lib/client';
 import { spec } from '../spec';
 
 export let listMessages = SlateTool.create(spec, {
@@ -56,22 +56,16 @@ export let listMessages = SlateTool.create(spec, {
       ctx.input.cursorId
     );
     let data = result?.data || result;
-    let messagesList = Array.isArray(data) ? data : data?.messages || data?.data || [];
+    let messagesList = Array.isArray(data)
+      ? data
+      : data?.items || data?.messages || data?.data || [];
 
-    let messages = messagesList.map((m: any) => ({
-      messageId: String(m.id || m.messageId || ''),
-      type: m.type,
-      text: m.text || m.message?.text,
-      direction: m.direction,
-      channelId: m.channelId ? String(m.channelId) : undefined,
-      createdAt: m.createdAt,
-      status: m.status
-    }));
+    let messages = messagesList.map(messageOutput);
 
     return {
       output: {
         messages,
-        nextCursorId: data?.cursorId || data?.nextCursorId
+        nextCursorId: nextCursorId(data)
       },
       message: `Retrieved **${messages.length}** message(s) for contact **${ctx.input.contactId}**.`
     };

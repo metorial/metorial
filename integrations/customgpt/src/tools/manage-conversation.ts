@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,13 @@ export let manageConversation = SlateTool.create(spec, {
       action: z
         .enum(['create', 'update', 'delete', 'export'])
         .describe('Action to perform on the conversation'),
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       sessionId: z
         .string()
         .optional()
@@ -30,7 +36,11 @@ export let manageConversation = SlateTool.create(spec, {
       name: z
         .string()
         .optional()
-        .describe('Name for the conversation (used with create and update)')
+        .describe('Name for the conversation (used with create and update)'),
+      format: z
+        .enum(['json', 'excel', 'csv', 'pdf'])
+        .optional()
+        .describe('Download format for export (default: csv)')
     })
   )
   .output(
@@ -42,7 +52,7 @@ export let manageConversation = SlateTool.create(spec, {
       exportedContent: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Exported conversation content')
+        .describe('Legacy export field; download the exported conversation file instead')
     })
   )
   .handleInvocation(async ctx => {
@@ -62,7 +72,9 @@ export let manageConversation = SlateTool.create(spec, {
     }
 
     if (!sessionId) {
-      throw new Error('sessionId is required for update, delete, and export actions');
+      throw createApiServiceError(
+        'sessionId is required for update, delete, and export actions'
+      );
     }
 
     if (action === 'update') {
@@ -86,13 +98,21 @@ export let manageConversation = SlateTool.create(spec, {
     }
 
     // export
-    let exported = await client.exportConversation(projectId, sessionId);
+    let format = ctx.input.format ?? 'csv';
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://app.customgpt.ai/api/v1/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/export`,
+      headers: {
+        Authorization: `Bearer ${ctx.auth.token}`,
+        Accept: 'application/octet-stream'
+      },
+      query: { format }
+    });
     return {
       output: {
-        sessionId,
-        exportedContent: exported
+        sessionId
       },
-      message: `Exported conversation **${sessionId}**.`
+      message: `Prepared conversation **${sessionId}** for download as ${format}.`
     };
   })
   .build();

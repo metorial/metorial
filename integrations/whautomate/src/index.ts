@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   getAppointmentSlots,
   getMessages,
+  getTag,
   listLocations,
   manageAppointment,
   manageBroadcast,
@@ -33,6 +34,7 @@ export let provider = Slate.create({
     manageContactTags,
     sendMessage,
     getMessages,
+    getTag,
     manageSegment,
     manageBroadcast,
     manageAppointment,

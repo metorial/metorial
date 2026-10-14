@@ -64,6 +64,7 @@ export let listContent = SlateTool.create(spec, {
       guid: ctx.config.guid,
       locale: ctx.input.locale || ctx.config.locale,
       region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod,
       apiType: ctx.input.apiType
     });
 

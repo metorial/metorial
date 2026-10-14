@@ -1,5 +1,6 @@
 export * from './create-constituent';
 export * from './create-gift';
+export * from './get-action';
 export * from './get-constituent';
 export * from './get-gift';
 export * from './get-giving-summary';
@@ -8,5 +9,6 @@ export * from './list-gifts';
 export * from './manage-actions';
 export * from './manage-fundraising';
 export * from './manage-lists';
+export * from './manage-opportunities';
 export * from './search-constituents';
 export * from './update-constituent';

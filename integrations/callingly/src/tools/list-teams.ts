@@ -40,11 +40,11 @@ export let listTeams = SlateTool.create(spec, {
 
     let teams = teamsArray.map((team: any) => ({
       teamId: String(team.id),
-      name: team.name,
-      callMode: team.call_mode,
-      isRecord: team.is_record,
-      language: team.language,
-      delay: team.delay
+      name: team.name ?? undefined,
+      callMode: team.call_mode ?? undefined,
+      isRecord: team.is_record == null ? undefined : !!team.is_record,
+      language: team.language ?? undefined,
+      delay: team.delay ?? undefined
     }));
 
     return {

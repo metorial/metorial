@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let includeExcludeSchema = z
   .object({
-    include: z.array(z.string()).optional().describe('Values to include'),
-    exclude: z.array(z.string()).optional().describe('Values to exclude')
+    include: z.array(z.string()).max(200).optional().describe('Values to include'),
+    exclude: z.array(z.string()).max(200).optional().describe('Values to exclude')
   })
   .optional();
 
@@ -45,7 +45,13 @@ export let searchCompanies = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Pagination token from a previous response'),
-      pageSize: z.number().optional().describe('Results per page (1-200, default: 100)')
+      pageSize: z
+        .number()
+        .min(1)
+        .max(200)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .optional()
+        .describe('Results per page (1-200, default: 100)')
     })
   )
   .output(
@@ -70,7 +76,15 @@ export let searchCompanies = SlateTool.create(spec, {
     }
 
     if (ctx.input.headcount) {
-      query.headcount = ctx.input.headcount;
+      let range = ctx.input.headcount.trim().match(/^(>=|<=|>|<)\s*(\d+)$/);
+      if (!range) {
+        throw createApiServiceError('Headcount must use a comparison such as >100 or <=500.');
+      }
+      let value = Number(range[2]);
+      if (!Number.isSafeInteger(value)) {
+        throw createApiServiceError('Headcount must be a safe nonnegative integer.');
+      }
+      query.headcount = { [range[1]!]: value };
     }
 
     if (ctx.input.countOnly) {

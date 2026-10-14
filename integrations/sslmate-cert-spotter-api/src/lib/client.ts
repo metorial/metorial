@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface IssuanceQuery {
   domain: string;
@@ -57,55 +57,77 @@ export interface MonitoredDomain {
 }
 
 export class CertSpotterClient {
-  private token: string;
-  private ctSearchApi: ReturnType<typeof createAxios>;
-  private monitoringApi: ReturnType<typeof createAxios>;
+  private ctSearchApi: ReturnType<typeof createAuthenticatedAxios>;
+  private monitoringApi: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-    this.ctSearchApi = createAxios({
+    let token = config.token.trim();
+    if (!token) {
+      throw createApiServiceError('Connect an SSLMate account with an API key.');
+    }
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Cert Spotter',
+        reason: 'cert_spotter_api_error',
+        nestedKeys: ['sub_errors'],
+        extractResponse: (failure, helpers) => {
+          let response = helpers.getResponse(failure);
+          if (
+            helpers.isRecord(failure) &&
+            failure.name === 'SlateError' &&
+            helpers.isRecord(failure.data) &&
+            helpers.isRecord(failure.data.baggage) &&
+            failure.data.baggage.response !== undefined
+          ) {
+            return { ...response, data: failure.data.baggage.response };
+          }
+          return response;
+        },
+        extractUpstreamCode: (_failure, response, helpers) =>
+          helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+            ? response.data.code
+            : undefined
+      });
+
+    this.ctSearchApi = createAuthenticatedAxios({
       baseURL: 'https://api.certspotter.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter
     });
-    this.monitoringApi = createAxios({
+    this.monitoringApi = createAuthenticatedAxios({
       baseURL: 'https://sslmate.com/api/v3/monitoring',
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter
     });
   }
 
   // --- CT Search API ---
 
   async searchIssuances(query: IssuanceQuery): Promise<Issuance[]> {
-    let params: Record<string, string> = {
-      domain: query.domain
-    };
+    if (!query.domain.trim()) {
+      throw createApiServiceError('Provide a domain name to search.');
+    }
+    let params = new URLSearchParams({ domain: query.domain });
 
     if (query.includeSubdomains) {
-      params.include_subdomains = 'true';
+      params.set('include_subdomains', 'true');
     }
     if (query.matchWildcards) {
-      params.match_wildcards = 'true';
+      params.set('match_wildcards', 'true');
     }
     if (query.after) {
-      params.after = query.after;
+      params.set('after', query.after);
     }
 
-    let expandParams = '';
-    if (query.expand && query.expand.length > 0) {
-      expandParams = query.expand.map(e => `&expand=${encodeURIComponent(e)}`).join('');
+    let expansions = new Set(query.expand ?? []);
+    if ([...expansions].some(field => field.startsWith('issuer.'))) {
+      expansions.add('issuer');
+    }
+    for (let field of expansions) {
+      params.append('expand', field);
     }
 
-    let queryString = Object.entries(params)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join('&');
-
-    let response = await this.ctSearchApi.get<Issuance[]>(
-      `/issuances?${queryString}${expandParams}`
-    );
+    let response = await this.ctSearchApi.get<Issuance[]>(`/issuances?${params}`);
     return response.data;
   }
 
@@ -118,7 +140,7 @@ export class CertSpotterClient {
 
   async getMonitoredDomain(name: string): Promise<MonitoredDomain> {
     let response = await this.monitoringApi.get<MonitoredDomain>(
-      `/monitored_domains/${encodeURIComponent(name)}`
+      this.monitoredDomainPath(name)
     );
     return response.data;
   }
@@ -128,7 +150,7 @@ export class CertSpotterClient {
     settings: { enabled?: boolean }
   ): Promise<MonitoredDomain> {
     let response = await this.monitoringApi.post<MonitoredDomain>(
-      `/monitored_domains/${encodeURIComponent(name)}`,
+      this.monitoredDomainPath(name),
       settings,
       {
         headers: {
@@ -140,7 +162,14 @@ export class CertSpotterClient {
   }
 
   async deleteMonitoredDomain(name: string): Promise<void> {
-    await this.monitoringApi.delete(`/monitored_domains/${encodeURIComponent(name)}`);
+    await this.monitoringApi.delete(this.monitoredDomainPath(name));
+  }
+
+  private monitoredDomainPath(name: string) {
+    if (!name.trim()) {
+      throw createApiServiceError('Provide a monitored domain name.');
+    }
+    return `/monitored_domains/${encodeURIComponent(name)}`;
   }
 
   // --- Authorization API ---

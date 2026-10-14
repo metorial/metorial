@@ -22,7 +22,14 @@ export let getDocumentMetadata = SlateTool.create(spec, {
   .output(
     z.object({
       filename: z.string().describe('Document filename'),
-      fileSize: z.number().describe('Document file size in bytes'),
+      fileSize: z
+        .number()
+        .optional()
+        .describe('Exact document size in bytes when returned numerically by the provider'),
+      fileSizeDisplay: z
+        .string()
+        .optional()
+        .describe('Provider formatted file size, for example 80 kB'),
       signaturesRequired: z
         .number()
         .describe('Total number of signature fields in the document'),
@@ -63,27 +70,38 @@ export let getDocumentMetadata = SlateTool.create(spec, {
 
     let isFullySigned = metadata.nbrOfSigaturesValid >= metadata.nbrOfSigaturesRequired;
 
-    let fields = (metadata.fields || []).map(f => ({
-      name: f.name,
-      value: f.value,
-      fieldType: f.inputtype,
-      signerId: f.signerid
-    }));
+    let fields = (metadata.fields || []).map(f => {
+      let value = f.metadata?.value ?? f.value;
+      return {
+        name: f.name,
+        value: typeof value === 'string' ? value : value ? JSON.stringify(value) : '',
+        fieldType: f.inputtype,
+        signerId:
+          typeof value === 'object' ? (value.signerid ?? f.signerid ?? '') : (f.signerid ?? '')
+      };
+    });
 
-    let signatures = (metadata.signersinfo || []).map(s => ({
-      signedBy: s.signedby,
-      actingAs: s.actingas,
-      authMethod: s.authMethod,
-      signedAt: s.isodate,
-      serialNumber: s.serialnumber,
-      provider: s.provider,
-      signerId: s.signerid
-    }));
+    let signatures = (metadata.fields || []).flatMap(field => {
+      let value = field.metadata?.value;
+      if (field.inputtype !== 'CanvasSIG' || typeof value !== 'object' || !value) return [];
+      return [
+        {
+          signedBy: value.signedby ?? '',
+          actingAs: value.actingas ?? '',
+          authMethod: value.authMethod ?? '',
+          signedAt: value.isodate ?? '',
+          serialNumber: value.serialnumber ?? '',
+          provider: value.provider ?? '',
+          signerId: value.signerid ?? field.signerid ?? ''
+        }
+      ];
+    });
 
     return {
       output: {
         filename: metadata.filename,
-        fileSize: metadata.size,
+        fileSize: typeof metadata.size === 'number' ? metadata.size : undefined,
+        fileSizeDisplay: typeof metadata.size === 'string' ? metadata.size : undefined,
         signaturesRequired: metadata.nbrOfSigaturesRequired,
         signaturesCompleted: metadata.nbrOfSigaturesValid,
         isFullySigned,

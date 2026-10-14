@@ -13,8 +13,8 @@ export let listIpfsPins = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().default(20).describe('Number of pins to return'),
-      page: z.number().default(0).describe('Page number for pagination')
+      limit: z.number().min(1).max(2500).default(20).describe('Number of pins to return'),
+      page: z.number().min(0).default(0).describe('Page number for pagination')
     })
   )
   .output(
@@ -24,6 +24,10 @@ export let listIpfsPins = SlateTool.create(spec, {
           z.object({
             pinId: z.string().describe('Pin identifier'),
             cid: z.string().describe('IPFS content identifier'),
+            status: z
+              .string()
+              .optional()
+              .describe('Pin status, such as queued, pinning, pinned, or failed'),
             name: z.string().optional().describe('Pin name'),
             createdAt: z.string().optional().describe('Creation timestamp')
           })
@@ -40,17 +44,18 @@ export let listIpfsPins = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         pins: items.map((p: any) => ({
           pinId: p.id || '',
           cid: p.cid || p.pinStatus?.pin?.cid || '',
-          name: p.name,
+          status: p.status ?? undefined,
+          name: p.name ?? undefined,
           createdAt: p.createdAt
         })),
-        totalCount: result.meta?.totalCount || items.length
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length
       },
       message: `Found **${items.length}** IPFS pins.`
     };

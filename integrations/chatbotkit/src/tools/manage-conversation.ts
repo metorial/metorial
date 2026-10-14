@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageConversationTool = SlateTool.create(spec, {
@@ -57,32 +58,33 @@ export let manageConversationTool = SlateTool.create(spec, {
       return {
         output: {
           conversationId: result.id,
-          botId: result.botId,
-          model: result.model,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          botId: result.botId ?? botId,
+          model: result.model ?? model,
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Conversation **${result.id}** created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!conversationId) throw new Error('conversationId is required for fetch');
+      if (!conversationId) throw createApiServiceError('conversationId is required for fetch');
       let result = await client.fetchConversation(conversationId);
       return {
         output: {
           conversationId: result.id,
-          botId: result.botId,
+          botId: result.botId ?? undefined,
           model: result.model,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Fetched conversation **${result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!conversationId) throw new Error('conversationId is required for update');
+      if (!conversationId)
+        throw createApiServiceError('conversationId is required for update');
       let updateData: Record<string, any> = {};
       if (botId !== undefined) updateData.botId = botId;
       if (backstory !== undefined) updateData.backstory = backstory;
@@ -94,17 +96,18 @@ export let manageConversationTool = SlateTool.create(spec, {
       return {
         output: {
           conversationId: result.id || conversationId,
-          botId: result.botId,
-          model: result.model,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          botId: result.botId ?? botId,
+          model: result.model ?? model,
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Conversation **${conversationId}** updated.`
       };
     }
 
     if (action === 'delete') {
-      if (!conversationId) throw new Error('conversationId is required for delete');
+      if (!conversationId)
+        throw createApiServiceError('conversationId is required for delete');
       await client.deleteConversation(conversationId);
       return {
         output: {
@@ -114,6 +117,6 @@ export let manageConversationTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

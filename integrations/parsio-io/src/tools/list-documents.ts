@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,9 +15,9 @@ export let listDocuments = SlateTool.create(spec, {
     z.object({
       mailboxId: z.string().describe('ID of the mailbox to list documents from'),
       page: z.number().optional().describe('Page number for pagination (starting from 1)'),
-      limit: z.number().optional().describe('Number of documents per page'),
-      dateFrom: z.string().optional().describe('Start date filter (ISO 8601 format)'),
-      dateTo: z.string().optional().describe('End date filter (ISO 8601 format)'),
+      limit: z.number().optional().describe('Number of documents per page (1–500)'),
+      dateFrom: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
+      dateTo: z.string().optional().describe('End date filter (YYYY-MM-DD)'),
       searchQuery: z.string().optional().describe('Search query to filter documents'),
       status: z
         .enum(['parsed', 'fail', 'skipped', 'new', 'quota', 'parsing', 'exception'])
@@ -41,6 +41,22 @@ export let listDocuments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('page must be a whole number starting at 1.', {
+        reason: 'invalid_page'
+      });
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 500)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 500.', {
+        reason: 'invalid_page_size'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listDocuments(ctx.input.mailboxId, {
       page: ctx.input.page,
@@ -52,13 +68,13 @@ export let listDocuments = SlateTool.create(spec, {
     });
 
     let docs = Array.isArray(result) ? result : result?.docs || result?.documents || [];
-    let total = result?.total;
+    let total = result?.total ?? undefined;
 
     let mapped = docs.map((doc: any) => ({
-      documentId: doc._id || doc.id,
-      name: doc.name || doc.subject,
-      status: doc.status,
-      createdAt: doc.created_at || doc.createdAt
+      documentId: doc.doc_id || doc._id || doc.id,
+      name: doc.name || doc.subject || undefined,
+      status: doc.status ?? undefined,
+      createdAt: doc.created_at || doc.createdAt || undefined
     }));
 
     return {

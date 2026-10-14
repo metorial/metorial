@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Creates a new user or customer in OneDesk.
-Users can be internal team members (agents) or external customers.
+  description: `Creates a new internal user in OneDesk.
+Use this for internal team members (agents).
 Specify the user type and optionally assign them to teams.`,
   tags: {
     destructive: false,
@@ -22,16 +22,19 @@ Specify the user type and optionally assign them to teams.`,
       type: z
         .string()
         .optional()
+        .describe('User type name. Call get_organization and use a userTypes label.'),
+      teams: z
+        .array(z.string())
+        .optional()
         .describe(
-          'User type identifier. Use "Get Organization Info" to list available user types.'
+          'Team external IDs to assign the user to. Call search_teams to discover them.'
         ),
-      teams: z.array(z.string()).optional().describe('Team IDs to assign the user to.'),
       isAdmin: z.boolean().optional().describe('Set to true to grant admin privileges.')
     })
   )
   .output(
     z.object({
-      userId: z.string().describe('ID of the newly created user.')
+      userId: z.string().describe('External ID of the newly created user.')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,8 +52,7 @@ Specify the user type and optionally assign them to teams.`,
       isAdmin: ctx.input.isAdmin
     });
 
-    let userId =
-      typeof result === 'string' ? result : result?.id || result?.externalId || String(result);
+    let userId = getCreatedId(result);
 
     return {
       output: {

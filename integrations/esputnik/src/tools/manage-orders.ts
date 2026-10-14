@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,6 +31,7 @@ let orderSchema = z.object({
   discount: z.number().optional().describe('Discount amount'),
   deliveryMethod: z.string().optional().describe('Delivery method'),
   paymentMethod: z.string().optional().describe('Payment method'),
+  marketId: z.string().optional().describe('Customer market or region identifier'),
   deliveryAddress: z.string().optional().describe('Delivery address'),
   items: z.array(orderItemSchema).optional().describe('Order line items')
 });
@@ -54,16 +55,39 @@ Only **DELIVERED** orders count toward RFM analysis and revenue reporting.`,
   )
   .output(
     z.object({
-      submitted: z.boolean().describe('Whether the orders were submitted successfully')
+      submitted: z.boolean().describe('Whether all orders were accepted successfully'),
+      failedOrders: z
+        .array(
+          z.object({
+            order: z.any().describe('Order that failed validation'),
+            error: z.string().describe('Provider validation error')
+          })
+        )
+        .optional()
+        .describe('Orders rejected by the provider')
     })
   )
   .handleInvocation(async ctx => {
+    for (let order of ctx.input.orders) {
+      if (!order.externalCustomerId && !order.email && !order.phone) {
+        throw createApiServiceError(
+          `Order ${order.externalOrderId} requires externalCustomerId, email, or phone.`
+        );
+      }
+      if (order.items?.some(item => item.externalItemId.length > 50)) {
+        throw createApiServiceError(
+          `Order ${order.externalOrderId}: each item needs an externalItemId of at most 50 characters.`
+        );
+      }
+    }
     let client = new Client({ token: ctx.auth.token });
-    await client.addOrders(ctx.input.orders);
+    let result = await client.addOrders(ctx.input.orders);
+    let failedOrders = result?.failedOrders;
+    let failedCount = failedOrders?.length ?? 0;
 
     return {
-      output: { submitted: true },
-      message: `**${ctx.input.orders.length}** order(s) submitted successfully.`
+      output: { submitted: failedCount === 0, failedOrders },
+      message: `**${ctx.input.orders.length - failedCount}** order(s) accepted, **${failedCount}** rejected.`
     };
   })
   .build();
@@ -93,7 +117,7 @@ export let deleteOrders = SlateTool.create(spec, {
 
     return {
       output: { deleted: true },
-      message: `**${ctx.input.externalOrderIds.length}** order(s) deleted successfully.`
+      message: `Deletion accepted for **${ctx.input.externalOrderIds.length}** order(s); processing is asynchronous.`
     };
   })
   .build();

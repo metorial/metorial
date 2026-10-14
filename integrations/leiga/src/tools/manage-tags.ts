@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTagsTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listTagsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID')
+      projectId: projectIdSchema
     })
   )
   .output(
@@ -41,9 +42,12 @@ export let createTagTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
-      name: z.string().describe('Tag name'),
-      color: z.string().optional().describe('Tag color (hex code, e.g. "#FF5733")')
+      projectId: projectIdSchema,
+      name: z.string().min(1).max(20).describe('Tag name, 1 to 20 characters'),
+      color: z
+        .string()
+        .optional()
+        .describe('Legacy color input. Leiga does not document tag colors; omit this field.')
     })
   )
   .output(
@@ -61,13 +65,36 @@ export let createTagTool = SlateTool.create(spec, {
       color: ctx.input.color
     });
 
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to create tag');
-    }
-
     return {
       output: { success: true, raw: response.data },
       message: `Created tag **"${ctx.input.name}"**.`
+    };
+  })
+  .build();
+
+export let updateTagTool = SlateTool.create(spec, {
+  name: 'Update Tag',
+  key: 'update_tag',
+  description: 'Rename a project tag. Call list_tags to discover tag IDs.'
+})
+  .input(
+    z.object({
+      tagId: z.number().describe('Tag ID from list_tags'),
+      name: z.string().min(1).max(20).describe('New tag name, 1 to 20 characters')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean().describe('Whether the tag was renamed'),
+      tagId: z.number()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    await client.updateTag({ tagId: ctx.input.tagId, name: ctx.input.name });
+    return {
+      output: { success: true, tagId: ctx.input.tagId },
+      message: `Renamed tag #${ctx.input.tagId} to **${ctx.input.name}**.`
     };
   })
   .build();
@@ -93,11 +120,7 @@ export let deleteTagTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteTag(ctx.input.tagId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete tag');
-    }
+    await client.deleteTag(ctx.input.tagId);
 
     return {
       output: { success: true },

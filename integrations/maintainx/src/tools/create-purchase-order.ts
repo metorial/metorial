@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createPurchaseOrder = SlateTool.create(spec, {
   name: 'Create Purchase Order',
   key: 'create_purchase_order',
-  description: `Creates a new purchase order in MaintainX. Purchase orders specify types, quantities, and prices for items to buy, typically parts from a vendor. Items can reference existing parts inventory or be custom line items.`,
+  description: `Creates a new purchase order in MaintainX. Purchase orders specify types, quantities, and prices for items to buy, typically parts from a vendor. Items can reference existing parts inventory or be custom line items. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let createPurchaseOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       title: z.string().optional().describe('Title of the purchase order'),
       description: z.string().optional().describe('Description or notes'),
       vendorId: z.number().optional().describe('Vendor ID to order from'),
@@ -25,12 +27,15 @@ export let createPurchaseOrder = SlateTool.create(spec, {
               .optional()
               .describe('Part ID from inventory (if ordering an existing part)'),
             name: z.string().optional().describe('Item name (for custom line items)'),
-            quantity: z.number().optional().describe('Quantity to order'),
-            unitCost: z.number().optional().describe('Unit cost')
+            quantity: z
+              .number()
+              .optional()
+              .describe('Quantity to order; required for every item'),
+            unitCost: z.number().optional().describe('Unit cost in cents; 120 means 1.20')
           })
         )
         .optional()
-        .describe('Line items in the purchase order')
+        .describe('Line items in the purchase order; required by MaintainX')
     })
   )
   .output(
@@ -40,10 +45,7 @@ export let createPurchaseOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createPurchaseOrder({
       title: ctx.input.title,

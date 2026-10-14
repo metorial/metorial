@@ -92,8 +92,8 @@ let sharedStyleInputSchema = z.object({
 
 let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
   let style = createStyle({
-    fillColor: input.fillColor ? hexToColor(input.fillColor) : undefined,
-    borderColor: input.borderColor ? hexToColor(input.borderColor) : undefined,
+    fillColor: input.fillColor !== undefined ? hexToColor(input.fillColor) : undefined,
+    borderColor: input.borderColor !== undefined ? hexToColor(input.borderColor) : undefined,
     borderThickness: input.borderThickness,
     opacity: input.opacity
   });
@@ -115,10 +115,10 @@ let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
     isVisible: input.isVisible
   });
 
-  if (input.layerClass === 'text' && input.textContent) {
+  if (input.layerClass === 'text') {
     layer.attributedString = {
       _class: 'attributedString',
-      string: input.textContent,
+      string: input.textContent ?? '',
       attributes: []
     };
   }
@@ -129,12 +129,12 @@ let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
 export let generateDocumentTool = SlateTool.create(spec, {
   name: 'Generate Document',
   key: 'generate_document',
-  description: `Generate a complete Sketch document structure including **document.json**, **meta.json**, and **page JSON** files. Creates valid Sketch file format data that can be assembled into a .sketch ZIP archive.
+  description: `Generate draft Sketch document structures including **document.json**, **meta.json**, and **page JSON** files. Produces draft JSON structures and downloadable JSON files. Validate and complete them against the target Sketch file-format schema before assembling a native document.
 
-Use this to programmatically create entire Sketch documents with pages, artboards, layers, color assets, and shared styles.`,
+Use this to prepare draft pages, artboards, layers, color assets, and shared styles for further completion and validation.`,
   instructions: [
-    'The output includes all the JSON structures needed for a .sketch file: document.json, meta.json, user.json, and individual page JSON files.',
-    'To assemble a valid .sketch file, place document.json, meta.json, and user.json at the root of a ZIP archive, and put each page JSON in the pages/ folder using the page object ID as the filename.'
+    'Provides draft document.json, meta.json, user.json, and page JSON as structured data and downloadable files. The generated structures omit some required native file-format fields.',
+    'Before creating a .sketch ZIP archive, validate and complete every JSON structure against the target official file-format schema. Place document.json, meta.json, and user.json at the archive root and each page at pages/{objectId}.json.'
   ]
 })
   .input(
@@ -161,20 +161,20 @@ Use this to programmatically create entire Sketch documents with pages, artboard
     z.object({
       documentJson: z
         .record(z.string(), z.unknown())
-        .describe('The document.json content for the .sketch archive root'),
+        .describe('Draft document.json data for the .sketch archive root'),
       metaJson: z
         .record(z.string(), z.unknown())
-        .describe('The meta.json content for the .sketch archive root'),
+        .describe('Draft meta.json data for the .sketch archive root'),
       userJson: z
         .record(z.string(), z.unknown())
-        .describe('The user.json content for the .sketch archive root'),
+        .describe('Draft user.json data for the .sketch archive root'),
       pages: z
         .array(
           z.object({
             filename: z
               .string()
               .describe('Filename to use in the pages/ folder (e.g. "pages/{objectId}.json")'),
-            pageJson: z.record(z.string(), z.unknown()).describe('The page JSON content')
+            pageJson: z.record(z.string(), z.unknown()).describe('Draft page JSON data')
           })
         )
         .describe('Page JSON files to place in the pages/ folder')
@@ -212,8 +212,9 @@ Use this to programmatically create entire Sketch documents with pages, artboard
       do_objectID: generateObjectId(),
       name: input.name,
       value: createStyle({
-        fillColor: input.fillColor ? hexToColor(input.fillColor) : undefined,
-        borderColor: input.borderColor ? hexToColor(input.borderColor) : undefined,
+        fillColor: input.fillColor !== undefined ? hexToColor(input.fillColor) : undefined,
+        borderColor:
+          input.borderColor !== undefined ? hexToColor(input.borderColor) : undefined,
         borderThickness: input.borderThickness,
         opacity: input.opacity
       })
@@ -243,6 +244,25 @@ Use this to programmatically create entire Sketch documents with pages, artboard
       pageJson: page as unknown as Record<string, unknown>
     }));
 
+    let files = [
+      { filename: 'document.json', data: documentJson },
+      { filename: 'meta.json', data: metaJson },
+      { filename: 'user.json', data: userJson },
+      ...pageFiles.map(file => ({
+        filename: file.filename.split('/').at(-1) ?? file.filename,
+        data: file.pageJson
+      }))
+    ];
+    for (let file of files) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(JSON.stringify(file.data, null, 2), {
+          headers: { 'content-type': 'application/json' }
+        }),
+        filename: file.filename
+      });
+    }
+
     let totalArtboards = builtPages.reduce(
       (sum, p) => sum + (p.layers?.filter(l => l._class === 'artboard').length ?? 0),
       0
@@ -255,7 +275,7 @@ Use this to programmatically create entire Sketch documents with pages, artboard
         userJson,
         pages: pageFiles
       },
-      message: `Generated Sketch document with **${builtPages.length}** page(s), **${totalArtboards}** artboard(s), **${colorAssets?.length ?? 0}** color asset(s), and **${(sharedStyles?.length ?? 0) + (sharedTextStyles?.length ?? 0)}** shared style(s).`
+      message: `Generated draft Sketch document data with **${builtPages.length}** page(s), **${totalArtboards}** artboard(s), **${colorAssets?.length ?? 0}** color asset(s), and **${(sharedStyles?.length ?? 0) + (sharedTextStyles?.length ?? 0)}** shared style(s).`
     };
   })
   .build();

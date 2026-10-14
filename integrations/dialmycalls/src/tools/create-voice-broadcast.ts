@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createVoiceBroadcast = SlateTool.create(spec, {
   name: 'Create Voice Broadcast',
   key: 'create_voice_broadcast',
-  description: `Create and send a voice call broadcast to a list of contacts. Requires a caller ID and a recording (the message to play). Supports scheduling, answering machine detection, and add-on features.`,
+  description: `Create and send a voice call broadcast to a list of contacts. Requires a caller ID and a recording (the message to play). Supports scheduling and answering machine detection.`,
   instructions: [
     'You must have a valid callerIdId and recordingId before creating a broadcast.',
     'Use sendImmediately=true to send right away, or provide sendAt for scheduling.',
@@ -67,6 +67,13 @@ export let createVoiceBroadcast = SlateTool.create(spec, {
       sendEmail,
       accessAccountId
     } = ctx.input;
+
+    if (contacts.length === 0) {
+      throw createApiServiceError('Provide at least one contact for the voice broadcast.');
+    }
+    if (machineRecordingId && useAmd !== true) {
+      throw createApiServiceError('Set useAmd=true when providing machineRecordingId.');
+    }
 
     let result = await client.createCall({
       name,

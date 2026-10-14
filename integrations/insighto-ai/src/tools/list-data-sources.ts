@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listDataSources = SlateTool.create(spec, {
@@ -50,19 +50,19 @@ export let listDataSources = SlateTool.create(spec, {
 
     if (ctx.input.datasourceId) {
       let result = await client.getDataSource(ctx.input.datasourceId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       let files: any[] | undefined;
 
       if (ctx.input.includeFiles) {
         let filesResult = await client.listDataSourceFiles(ctx.input.datasourceId);
-        files = filesResult.data || filesResult;
+        files = getListResult(filesResult).items;
       }
 
       return {
         output: {
           dataSource: {
             datasourceId: data.id,
-            name: data.name,
+            name: data.name ?? undefined,
             files
           }
         },
@@ -71,15 +71,14 @@ export let listDataSources = SlateTool.create(spec, {
     }
 
     let result = await client.listDataSources({ page: ctx.input.page, size: ctx.input.size });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         dataSources: list.map((d: any) => ({
           datasourceId: d.id,
-          name: d.name
+          name: d.name ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** data source(s).`
     };

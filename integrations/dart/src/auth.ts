@@ -1,8 +1,23 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let api = createAxios({
-  baseURL: 'https://app.dartai.com'
+type DartAuthOutput = { token: string; refreshToken?: string; expiresAt?: string };
+
+let api = createAuthenticatedAxios({
+  baseURL: 'https://app.dartai.com',
+  contentType: false,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Dart',
+      reason: 'dart_oauth_error'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -55,20 +70,23 @@ export let auth = SlateAuth.create()
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }
       );
-      let data = response.data;
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Dart',
+          operation: 'token exchange'
+        })
       };
     },
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: DartAuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw createApiServiceError(
+          'Dart did not provide a refresh token. Reconnect your account.',
+          { reason: 'missing_refresh_token' }
+        );
       }
       let response = await api.post(
         '/api/oauth/token/',
@@ -82,26 +100,20 @@ export let auth = SlateAuth.create()
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }
       );
-      let data = response.data;
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Dart',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken
+        })
       };
     },
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/api/v0/public/config', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-      let user = response.data?.user;
+    getProfile: async (ctx: { output: DartAuthOutput }) => {
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
       return {
         profile: {
-          name: user?.name,
-          email: user?.email
+          name: user.name,
+          email: user.email
         }
       };
     }
@@ -122,15 +134,12 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/api/v0/public/config', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-      let user = response.data?.user;
+    getProfile: async (ctx: { output: DartAuthOutput }) => {
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
       return {
         profile: {
-          name: user?.name,
-          email: user?.email
+          name: user.name,
+          email: user.email
         }
       };
     }

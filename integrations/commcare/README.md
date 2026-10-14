@@ -1,6 +1,10 @@
-# Comm Care
+# CommCare
 
-Manage cases, forms, and users on CommCare, a mobile data collection and case management platform for frontline workers. Create, update, close, and query cases that track longitudinal records such as patients or households. Retrieve submitted form data and attachments, and submit new forms via the OpenRosa standard. Manage mobile workers, web users, and user groups. Access application structure and lookup table reference data. Send and receive SMS messages. Integrate with FHIR services for healthcare data interoperability. Configure webhooks for form submissions, case changes, and application updates.
+Query, create, update, and close CommCare cases; retrieve submitted forms; manage mobile workers and user groups; and inspect web users, application structure, and fixture reference data.
+
+Use `get_current_user` to identify the connected web user, `list_projects` to discover accessible project spaces, and `bulk_get_cases` to retrieve case IDs or external IDs in one request. Case creation requires a case type, name, and owner ID. Case property values must be strings. `bulk_cases` creates when a case ID is omitted and updates when one is supplied; an external ID alone does not make that tool an upsert.
+
+The JSON Case API cannot reopen a closed case. API-key access and project permissions are required. The existing `send_sms` tool retains its legacy request contract; compatibility of that endpoint with the connected CommCare deployment needs verification.
 
 ## License
 

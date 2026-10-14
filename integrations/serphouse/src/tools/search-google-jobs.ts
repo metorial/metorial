@@ -43,7 +43,7 @@ export let searchGoogleJobs = SlateTool.create(spec, {
       domain: ctx.input.domain,
       lang: ctx.input.lang,
       ...(ctx.input.loc ? { loc: ctx.input.loc } : {}),
-      ...(ctx.input.locId ? { loc_id: ctx.input.locId } : {}),
+      ...(ctx.input.locId !== undefined ? { loc_id: ctx.input.locId } : {}),
       ...(ctx.input.dateRange ? { date_range: ctx.input.dateRange } : {})
     });
 

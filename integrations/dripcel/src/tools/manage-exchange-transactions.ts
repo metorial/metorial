@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -84,7 +84,9 @@ export let manageExchangeTransactions = SlateTool.create(spec, {
     // accept or reject
     let txId = ctx.input.transactionId;
     if (!txId || Array.isArray(txId)) {
-      throw new Error('A single transactionId is required for accept/reject actions');
+      throw createApiServiceError(
+        'A single transactionId is required for accept/reject actions'
+      );
     }
 
     let newStatus: 'completed' | 'rejected' =

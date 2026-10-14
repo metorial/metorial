@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, recurringIntervalNames } from '../lib/client';
 import { spec } from '../spec';
 
 let scheduleItemSchema = z.object({
@@ -64,6 +64,12 @@ export let createRecurringSchedule = SlateTool.create(spec, {
         .optional()
         .describe('Action on recurrence: 0 = Send, 1 = Draft, 2 = Autobill'),
       occurrences: z.number().optional().describe('Total occurrences (0 = unlimited)'),
+      paymentProfileId: z
+        .number()
+        .optional()
+        .describe(
+          'Required for Autobill (action 2). Use list_payment_profiles to find profiles.'
+        ),
       tax: z.number().optional().describe('First tax rate percentage'),
       tax2: z.number().optional().describe('Second tax rate percentage'),
       tax3: z.number().optional().describe('Third tax rate percentage'),
@@ -97,20 +103,23 @@ export let createRecurringSchedule = SlateTool.create(spec, {
     };
     if (ctx.input.action !== undefined) data.action = ctx.input.action;
     if (ctx.input.occurrences !== undefined) data.occurrences = ctx.input.occurrences;
+    if (ctx.input.occurrences === 0) data.unlimited = true;
+    if (ctx.input.paymentProfileId !== undefined)
+      data.payment_profile_id = ctx.input.paymentProfileId;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
-    if (ctx.input.poNumber) data.po_number = ctx.input.poNumber;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
+    if (ctx.input.poNumber !== undefined) data.po = ctx.input.poNumber;
 
     if (ctx.input.items) {
       data.recurring_schedule_items_attributes = ctx.input.items.map(item => ({
         title: item.title,
         quantity: item.quantity,
         price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        taxable: item.taxable ?? undefined,
+        taxable2: item.taxable2 ?? undefined,
+        taxable3: item.taxable3 ?? undefined
       }));
     }
 
@@ -142,6 +151,10 @@ export let updateRecurringSchedule = SlateTool.create(spec, {
       nextDate: z.string().optional().describe('Next scheduled date (YYYY-MM-DD)'),
       duePeriod: z.number().optional().describe('Days until due'),
       occurrences: z.number().optional().describe('Total occurrences (0 = unlimited)'),
+      paymentProfileId: z
+        .number()
+        .optional()
+        .describe('Payment profile for Autobill. Use list_payment_profiles to find profiles.'),
       tax: z.number().optional().describe('First tax rate percentage'),
       tax2: z.number().optional().describe('Second tax rate percentage'),
       tax3: z.number().optional().describe('Third tax rate percentage'),
@@ -175,11 +188,14 @@ export let updateRecurringSchedule = SlateTool.create(spec, {
     if (ctx.input.nextDate !== undefined) data.next_date = ctx.input.nextDate;
     if (ctx.input.duePeriod !== undefined) data.due_period = ctx.input.duePeriod;
     if (ctx.input.occurrences !== undefined) data.occurrences = ctx.input.occurrences;
+    if (ctx.input.occurrences === 0) data.unlimited = true;
+    if (ctx.input.paymentProfileId !== undefined)
+      data.payment_profile_id = ctx.input.paymentProfileId;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
-    if (ctx.input.notes !== undefined) data.notes = ctx.input.notes;
-    if (ctx.input.poNumber !== undefined) data.po_number = ctx.input.poNumber;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
+    if (ctx.input.poNumber !== undefined) data.po = ctx.input.poNumber;
 
     if (ctx.input.items) {
       data.recurring_schedule_items_attributes = ctx.input.items.map(item => {
@@ -240,13 +256,13 @@ export let getRecurringSchedules = SlateTool.create(spec, {
     }
 
     let result = await client.listRecurringSchedules({ page: ctx.input.page });
-    let schedules = (result.recurring_schedules || []).map(mapSchedule);
+    let schedules = (result.recurring_schedules || result.recurring || []).map(mapSchedule);
 
     return {
       output: {
         schedules,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${schedules.length} recurring schedule(s).`
     };
@@ -285,29 +301,32 @@ export let deleteRecurringSchedule = SlateTool.create(spec, {
 
 let mapSchedule = (s: any) => ({
   scheduleId: s.id,
-  clientId: s.client_id,
-  currencyCode: s.currency_code,
-  status: s.status,
-  action: s.action,
-  timeInterval: s.time_interval,
-  nextDate: s.next_date,
-  duePeriod: s.due_period,
-  occurrences: s.occurrences,
-  occurrencesRemaining: s.occurrences_remaining,
-  tax: s.tax,
-  tax2: s.tax2,
-  tax3: s.tax3,
-  notes: s.notes,
-  poNumber: s.po_number,
+  clientId: s.client_id ?? undefined,
+  currencyCode: s.currency_code ?? undefined,
+  status: s.status ?? undefined,
+  action: s.action ?? undefined,
+  timeInterval:
+    typeof s.time_interval === 'number'
+      ? (recurringIntervalNames[s.time_interval] ?? String(s.time_interval))
+      : (s.time_interval ?? undefined),
+  nextDate: s.next_date ?? undefined,
+  duePeriod: s.due_period ?? undefined,
+  occurrences: s.occurrences ?? undefined,
+  occurrencesRemaining: s.occurrences_remaining ?? undefined,
+  tax: s.tax ?? undefined,
+  tax2: s.tax2 ?? undefined,
+  tax3: s.tax3 ?? undefined,
+  notes: s.notes ?? s.note ?? undefined,
+  poNumber: s.po_number ?? s.po ?? undefined,
   items: s.recurring_schedule_items
     ? s.recurring_schedule_items.map((item: any) => ({
-        scheduleItemId: item.id,
+        scheduleItemId: item.id ?? undefined,
         title: item.title,
         quantity: item.quantity,
-        price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        price: typeof item.price === 'string' ? Number(item.price) : item.price,
+        taxable: item.taxable ?? item['taxable?'] ?? undefined,
+        taxable2: item.taxable2 ?? item['secondary_tax?'] ?? undefined,
+        taxable3: item.taxable3 ?? item['tertiary_tax?'] ?? undefined
       }))
     : undefined
 });

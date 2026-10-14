@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ export let manageDocumentTool = SlateTool.create(spec, {
     'To get the document secret, first query the entity selecting the document field with its nested secret: {"TypeName/Description": ["Collaboration~Documents/secret"]}.',
     'If you already have the document secret, provide it directly via documentSecret.',
     'If you provide typeName, entityId, and documentField, the tool will retrieve the secret automatically.',
-    'When writing content, specify the format matching your content (default: md for Markdown).'
+    'When writing content, specify md, html, or json to match your content. The plain-text format is read-only.'
   ],
   tags: {
     destructive: false
@@ -62,6 +62,13 @@ export let manageDocumentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action === 'write' && ctx.input.content === undefined) {
+      throw createApiServiceError('Content is required for write action.');
+    }
+    if (ctx.input.action === 'write' && ctx.input.format === 'plain-text') {
+      throw createApiServiceError('Use md, html, or json when writing a document.');
+    }
+
     let client = new Client({
       accountName: ctx.config.accountName,
       token: ctx.auth.token
@@ -72,7 +79,7 @@ export let manageDocumentTool = SlateTool.create(spec, {
     // Resolve document secret if not provided
     if (!secret) {
       if (!ctx.input.typeName || !ctx.input.entityId || !ctx.input.documentField) {
-        throw new Error(
+        throw createApiServiceError(
           'Either documentSecret or all of typeName, entityId, and documentField must be provided'
         );
       }
@@ -90,12 +97,16 @@ export let manageDocumentTool = SlateTool.create(spec, {
 
       let entity = entities[0];
       if (!entity) {
-        throw new Error(`Entity ${ctx.input.entityId} not found in ${ctx.input.typeName}`);
+        throw createApiServiceError(
+          `Entity ${ctx.input.entityId} not found in ${ctx.input.typeName}`
+        );
       }
 
       secret = entity[ctx.input.documentField]?.['Collaboration~Documents/secret'];
       if (!secret) {
-        throw new Error(`Document secret not found for field ${ctx.input.documentField}`);
+        throw createApiServiceError(
+          `Document secret not found for field ${ctx.input.documentField}`
+        );
       }
     }
 
@@ -109,10 +120,7 @@ export let manageDocumentTool = SlateTool.create(spec, {
         message: `Read document content (${ctx.input.format} format, ${doc.content.length} chars).`
       };
     } else {
-      if (!ctx.input.content) {
-        throw new Error('Content is required for write action');
-      }
-      await client.updateDocumentContent(secret, ctx.input.content, ctx.input.format);
+      await client.updateDocumentContent(secret, ctx.input.content!, ctx.input.format);
       return {
         output: {
           documentSecret: secret,

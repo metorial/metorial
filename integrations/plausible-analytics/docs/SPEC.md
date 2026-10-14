@@ -1,4 +1,4 @@
-# Slates Specification for Plausible Analytics
+# Plausible Analytics Specification
 
 ## Overview
 
@@ -11,7 +11,9 @@ Plausible Analytics uses **API key-based authentication** via Bearer Token.
 There are two types of API keys, each granting access to different APIs:
 
 1. **Stats API Key**: Provides read-only access to query analytics data (Stats API).
-2. **Sites API Key**: Provides access to manage sites, goals, custom properties, shared links, and guest access (Site Provisioning API). Only available on Enterprise plans.
+2. **Sites API Key**: Provides access to change sites, goals, custom properties, shared links, and guest access (Site Provisioning API). Write operations are available on Enterprise plans. Stats API keys also work for read-only Site Provisioning endpoints on plans that include the Stats API.
+
+Keys are scoped to the team selected when they are created. They do not inherit all sites their owner can view, including sites owned by other teams or sites where their owner is a guest.
 
 To create an API key:
 
@@ -28,7 +30,7 @@ Authorization: Bearer YOUR-KEY
 
 **Base URL**: `https://plausible.io` (for cloud-hosted). Self-hosted instances use their own base URL.
 
-**Important**: Each request also requires a `site_id` parameter, which is the domain of your website as registered in Plausible (e.g., `example.com`).
+**Site selection**: Analytics and site-specific provisioning requests use the registered website domain as `site_id` (e.g., `example.com`). Use `list_sites` to discover accessible domains and `list_teams` for team identifiers.
 
 ## Features
 
@@ -48,7 +50,9 @@ Send pageviews and custom events to Plausible programmatically via the Events AP
 - Events require a `name` (use `pageview` for page views, or any custom string for custom events) and a `url`.
 - Optional fields include `referrer`, custom properties (props), and revenue data.
 - The `User-Agent` and `X-Forwarded-For` headers are used for visitor identification and geolocation when sending from a server.
-- No API key is required for the Events API; authentication is based on the domain matching a registered site.
+- No API key is required for the Events API.
+- Set `interactive` to false for custom events that should not affect bounce detection.
+- HTTP 202 acceptance does not guarantee recording. The `dropped` output exposes the provider's bot-filtering rejection header; use the actual visitor's IP and User-Agent for server-side tracking.
 
 ### Site Management
 
@@ -56,7 +60,8 @@ Programmatically create, update, retrieve, list, and delete sites in your Plausi
 
 - Configure tracker script settings per site (e.g., outbound link tracking, file downloads, form submissions, 404 page tracking, hash-based routing, revenue tracking).
 - Change the domain name of an existing site.
-- Available only on Enterprise plans.
+- Write operations require an Enterprise Sites API key; read operations also support Stats API keys.
+- `get_tracker_installation` resolves a site's tracker ID to its documented script URL and returns the configured tracking features.
 
 ### Goal Management
 
@@ -64,6 +69,7 @@ Create, list, and delete goals (conversion tracking) for a site. Goals can be ei
 
 - Pageview goals support wildcard paths.
 - Custom event goals can be narrowed down by specific custom property values.
+- Each custom property supports one string value per goal. The existing `customProps` array input is preserved; supply a single value in each array. Multiple allowed values cannot be represented by the provider's goal API.
 - Goals can have custom display names for the dashboard.
 
 ### Custom Property Management
@@ -81,6 +87,10 @@ List, invite, and remove guest users for a site. Guests can be assigned either a
 ### Team Management
 
 List teams associated with your account and check whether API access is available for each team. Sites can be scoped by team.
+
+### Service Health
+
+Use `check_api_health` to inspect instance readiness and its returned component details when troubleshooting tracking or query failures. This check does not verify API key access.
 
 ## Events
 

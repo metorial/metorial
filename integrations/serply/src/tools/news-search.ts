@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeNewsEntry, searchResultArray } from '../lib/responses';
 import { spec } from '../spec';
 
 let newsEntrySchema = z.object({
@@ -22,10 +23,16 @@ export let newsSearch = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z
+      query: z.string().describe('News search text'),
+      countryLanguage: z
         .string()
+        .optional()
+        .describe('Google News country and language edition, for example US:en or GB:en'),
+      resolveLinks: z
+        .boolean()
+        .optional()
         .describe(
-          'News search query. Can include filters like ceid=US:en for country/language targeting.'
+          'Resolve Google News redirects to publisher URLs; increases request latency'
         ),
       num: z.number().optional().describe('Number of results to return'),
       start: z.number().optional().describe('Start offset for pagination'),
@@ -82,18 +89,20 @@ export let newsSearch = SlateTool.create(spec, {
       start: ctx.input.start,
       lr: ctx.input.language,
       hl: ctx.input.interfaceLanguage,
+      ceid: ctx.input.countryLanguage,
+      resolveLinks: ctx.input.resolveLinks,
       proxyLocation: ctx.input.proxyLocation,
       deviceType: ctx.input.deviceType
     });
 
     let feed = data.feed || {};
-    let entries = feed.entries || data.entries || [];
+    let entries = searchResultArray(data.entries ?? feed.entries).map(normalizeNewsEntry);
 
     return {
       output: {
         entries,
-        feedTitle: feed.title || null,
-        feedLanguage: feed.language || null
+        feedTitle: feed.title ?? undefined,
+        feedLanguage: feed.language ?? undefined
       },
       message: `Found **${entries.length}** news articles for "${ctx.input.query}".`
     };

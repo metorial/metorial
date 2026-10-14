@@ -1,4 +1,4 @@
-# Slates Specification for Userlist
+# Userlist Integration Specification
 
 ## Overview
 
@@ -29,7 +29,7 @@ Create, update, and delete user records in Userlist. Users are identified by a u
 
 - Users can be identified by either `identifier` or `email` (at least one is required).
 - Custom properties support strings, numbers, booleans, arrays, objects, and null values. Nested properties are supported.
-- Subscription preferences can be set per topic.
+- Subscription preferences can be set per topic; each supplied preference must include a boolean `subscribed` value.
 
 ### Company Management
 
@@ -60,7 +60,9 @@ Send one-off transactional messages (email or in-app/web) to individual users. Y
 - Messages can be sent via `email` or `web` channel.
 - When using a template, only the template identifier and recipient are required. Custom properties can be passed to personalize the template using Liquid.
 - Custom messages support HTML, plain text, or multipart body formats.
-- Optional configuration includes sender, theme, topic, reply-to address, and preheader text.
+- Optional configuration includes sender, from email address, company context, theme, topic, reply-to address, and preheader text. Set `disableTheme` to true to disable theming.
+- The tool accepts `text/html` and `text/plain` body types and maps them to the API's `html` and `text` types. For `multipart`, provide `html` and/or `text`; the API receives a content array.
+- A successful request means the message was accepted for asynchronous processing; it does not confirm delivery.
 
 ### Client-Side Tracking & In-App Messages
 

@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Endorsal
 
-Collect, manage, and display customer testimonials and reviews. Create and manage contacts for review request campaigns. Send automated review requests via email and SMS through AutoRequest campaigns. Create, retrieve, update, and delete testimonials with star ratings, tags, and customer details. Import reviews from external platforms like Google, Facebook, Yelp, and Tripadvisor. Generate pre-filled SuperLinks to reduce friction in the review process. List and monitor widget configurations for embedding social proof on websites. Track campaign delivery stats including open and click rates.
+Manage contacts and customer testimonials in Endorsal. Search contacts by customer details or custom attributes, find testimonials by rating or reviewer, and discover tags for grouped reviews. Browse AutoRequest campaigns and widget configurations, and generate pre-filled SuperLinks.
+
+API keys are specific to an Endorsal property. The list tools apply `limit` and `page` locally because the documented API returns a complete list. The current public API reference does not document the existing SuperLink endpoint; its existing behavior is retained.
 
 ## License
 

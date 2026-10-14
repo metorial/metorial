@@ -1,6 +1,12 @@
+import { createApiServiceError } from 'slates';
+
 // Helper to normalize Persona API JSON:API response data into flat objects
 export let normalizeResource = (data: any): Record<string, any> => {
-  if (!data) return {};
+  if (!data || typeof data.id !== 'string' || !data.id) {
+    throw createApiServiceError('Persona returned a resource without an ID.', {
+      reason: 'persona_invalid_response'
+    });
+  }
   let result: Record<string, any> = {
     resourceId: data.id,
     resourceType: data.type
@@ -28,7 +34,12 @@ export let normalizeListResponse = (
   nextCursor: string | undefined;
   previousCursor: string | undefined;
 } => {
-  let items = (response?.data || []).map(normalizeResource);
+  if (!Array.isArray(response?.data)) {
+    throw createApiServiceError('Persona returned an invalid resource collection.', {
+      reason: 'persona_invalid_response'
+    });
+  }
+  let items = response.data.map(normalizeResource);
   let nextCursor = response?.links?.next ? extractCursor(response.links.next) : undefined;
   let previousCursor = response?.links?.prev ? extractCursor(response.links.prev) : undefined;
   return { items, nextCursor, previousCursor };

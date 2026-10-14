@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Autobound
 
-Generate AI-powered personalized sales outreach content including emails, email sequences, call scripts, LinkedIn connection requests, and SMS messages. Enrich prospects with ranked buying signal insights covering job changes, funding, news, SEC filings, hiring trends, tech stack changes, and more. Import contacts into campaigns and access a B2B database of 270M+ contacts and 11M+ companies. Configure writing style, AI model, word count, insight filters, and sales asset references for content generation.
+Generate personalized sales emails, sequences, call scripts, LinkedIn connection requests, SMS messages, and custom content. Retrieve company and contact buying signals, discover available signal types and subtypes, inspect the authenticated Signal API account, and import contacts with custom campaign fields into AI Studio.
+
+Content tools use the Autobound Content API key. Signal tools use a separate key from [the Signal API portal](https://signalapi.autobound.ai). Choose Signal API Key for signal-only connections, or provide the optional Signal API key alongside the Content API key to use both API families.
+
+The legacy `generate_insights` tool remains available with its existing inputs and output. Autobound [announces retirement on October 30, 2026](https://autobound-api.readme.io/changelog/generate-insights-api-retires-move-to-the-signal-api); migrate to `enrich_contact` or `enrich_company` for structured signal data. These return raw signals rather than seller-ranked insight text.
 
 ## License
 

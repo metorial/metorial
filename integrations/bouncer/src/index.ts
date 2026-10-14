@@ -5,6 +5,9 @@ import {
   checkCredits,
   checkToxicity,
   createBatchVerification,
+  deleteBatchVerification,
+  deleteToxicityJob,
+  finishBatchVerification,
   getBatchResults,
   getBatchStatus,
   getToxicityResults,
@@ -20,10 +23,13 @@ export let provider = Slate.create({
     createBatchVerification,
     getBatchStatus,
     getBatchResults,
+    finishBatchVerification,
+    deleteBatchVerification,
     verifyDomain,
     checkToxicity,
     getToxicityStatus,
     getToxicityResults,
+    deleteToxicityJob,
     checkCredits
   ],
   triggers: []

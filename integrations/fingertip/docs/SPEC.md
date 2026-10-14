@@ -1,4 +1,8 @@
-Now let me get more details on the API features by looking at a few more sections:# Slates Specification for Fingertip
+# Fingertip specification
+
+## Service status
+
+The [official homepage](https://fingertip.com/) announces Fingertip's closure, dated 1 May 2026, and its transition to Linktree. The documentation below describes the retained historical API contract. Indexed endpoint documentation remains accessible in some cases, but current API availability and new API key creation have not been verified. This integration does not switch existing Fingertip credentials or resources to Linktree.
 
 ## Overview
 
@@ -8,7 +12,7 @@ Fingertip is an all-in-one business platform that lets users create websites, ma
 
 Fingertip uses **API key-based authentication** via Bearer tokens.
 
-- **Obtaining an API key:** Log in to your Fingertip account and generate a key at [fingertip.com/api-keys](https://fingertip.com/api-keys).
+- **Historical API key setup:** The [REST API guide](https://docs.fingertip.com/rest-api) directs users to [fingertip.com/api-keys](https://fingertip.com/api-keys). Availability after the closure is unverified.
 - **Base URL:** `https://api.fingertip.com/v1`
 - **Usage:** Include the API key in the `Authorization` header of every request as a Bearer token:
   ```
@@ -31,7 +35,7 @@ Fingertip uses **API key-based authentication** via Bearer tokens.
 
 ### Page Themes
 
-- Manage visual themes for pages, allowing customization of the look and feel of individual pages on a site.
+- The historical API supported page themes; theme management is not exposed by the current tools.
 
 ### Blocks
 
@@ -44,35 +48,35 @@ Fingertip uses **API key-based authentication** via Bearer tokens.
 ### Bookings & Event Types
 
 - Manage bookings (appointments/scheduling) and the event types that define bookable services.
-- Supports creating, rescheduling, and cancelling bookings.
+- Existing tools list bookings and event types and accept, decline, complete, reschedule, or cancel bookings. Creating bookings is not exposed.
 
 ### Blog Posts
 
-- Create and manage blog posts associated with a site.
+- List published blog posts and retrieve their details and HTML content.
 
 ### Forms
 
-- Manage forms and collect form submissions from site visitors.
+- List form templates and existing form submission responses.
 
 ### Invoices
 
-- Create and manage invoices for clients, supporting the billing workflow.
+- List invoices with status filters and pagination. The provider's numeric invoice number is returned as a string to preserve the existing output contract.
 
 ### Orders
 
-- Manage orders placed through a site's e-commerce functionality.
+- List orders placed through a site's e-commerce functionality.
 
 ### Site Memberships & Invitations
 
-- Manage memberships and invitations for a site, controlling who has access or roles on a given site.
+- Historical provider capabilities; membership and invitation management are not exposed by the current tools.
 
 ### Workspaces
 
-- Manage workspaces, which serve as organizational containers. Includes workspace memberships and invitations for team collaboration.
+- Discover authorized workspaces. Workspace membership and invitation management are not exposed.
 
 ### Webhooks Management
 
-- Register and manage webhook endpoints via the API to receive real-time event notifications.
+- The historical provider API supported webhook management; webhook tools are not exposed by this integration.
 
 ## Events
 

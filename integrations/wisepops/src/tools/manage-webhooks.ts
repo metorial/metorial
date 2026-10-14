@@ -54,7 +54,7 @@ export let createWebhook = SlateTool.create(spec, {
   description: `Register a new webhook to receive real-time form submission data.
 Choose an event type (email, phone, or survey) and provide a target URL. Optionally scope the webhook to a specific campaign.`,
   instructions: [
-    'The target URL must be a publicly accessible HTTPS endpoint that can receive POST requests.',
+    'The target URL must be a publicly accessible HTTP or HTTPS endpoint that can receive POST requests; HTTPS is recommended.',
     'Use "email" for sign-up block submissions, "phone" for phone block submissions, and "survey" for survey block submissions.'
   ]
 })
@@ -68,7 +68,7 @@ Choose an event type (email, phone, or survey) and provide a target URL. Optiona
         .number()
         .optional()
         .describe(
-          'Campaign ID to scope the webhook to a specific campaign. Omit to receive data from all campaigns.'
+          'Campaign ID from list_campaigns to scope the webhook to a specific campaign. Omit to receive data from all campaigns.'
         )
     })
   )

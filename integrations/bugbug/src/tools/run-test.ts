@@ -45,10 +45,10 @@ export let runTest = SlateTool.create(spec, {
 
     return {
       output: {
-        testRunId: result.testRunId,
+        testRunId: result.id,
         status: result.status
       },
-      message: `Test run started with ID **${result.testRunId}**. Status: **${result.status}**.`
+      message: `Test run started with ID **${result.id}**. Status: **${result.status}**.`
     };
   })
   .build();

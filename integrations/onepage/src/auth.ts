@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -40,22 +41,13 @@ export let auth = SlateAuth.create()
       output: { userId: string; token: string };
       input: { userId: string; apiKey: string };
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://app.onepagecrm.com/api/v3',
-        auth: {
-          username: ctx.output.userId,
-          password: ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/users/profile.json');
-      let user = response.data?.data?.user;
+      let user = await new Client(ctx.output).getCurrentUser();
 
       return {
         profile: {
-          id: user?.id || ctx.output.userId,
-          email: user?.email,
-          name: [user?.first_name, user?.last_name].filter(Boolean).join(' ') || undefined
+          id: user.userId,
+          email: user.email,
+          name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined
         }
       };
     }

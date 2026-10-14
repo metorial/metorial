@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ownerIds, recordId } from '../lib/records';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -59,7 +60,7 @@ export let listTasks = SlateTool.create(spec, {
     let mustClauses: any[] = [];
 
     if (ctx.input.parentRecordId) {
-      mustClauses.push({ term: { primary: ctx.input.parentRecordId } });
+      mustClauses.push({ term: { 'related.id': ctx.input.parentRecordId } });
     }
     if (ctx.input.isCompleted !== undefined) {
       mustClauses.push({ term: { is_completed: ctx.input.isCompleted } });
@@ -75,19 +76,19 @@ export let listTasks = SlateTool.create(spec, {
 
     let tasks = (result.results || []).map((t: any) => ({
       taskId: t.jnid,
-      title: t.title,
-      description: t.description,
-      number: t.number,
+      title: t.title ?? undefined,
+      description: t.description ?? undefined,
+      number: t.number ?? undefined,
       priority: t.priority != null ? String(t.priority) : undefined,
-      isCompleted: t.is_completed,
-      parentRecordId: t.primary,
-      owners: t.owners,
-      tags: t.tags,
-      dateStart: t.date_start,
-      dateEnd: t.date_end,
-      dateCreated: t.date_created,
-      dateUpdated: t.date_updated,
-      createdByName: t.created_by_name
+      isCompleted: t.is_completed ?? undefined,
+      parentRecordId: recordId(t.primary) ?? ownerIds(t.related)?.[0],
+      owners: ownerIds(t.owners),
+      tags: t.tags ?? undefined,
+      dateStart: t.date_start ?? undefined,
+      dateEnd: t.date_end ?? undefined,
+      dateCreated: t.date_created ?? undefined,
+      dateUpdated: t.date_updated ?? undefined,
+      createdByName: t.created_by_name ?? undefined
     }));
 
     return {

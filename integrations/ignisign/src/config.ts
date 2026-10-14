@@ -5,7 +5,10 @@ export let config = SlateConfig.create(
   z.object({
     appId: z
       .string()
-      .describe('Ignisign Application ID (e.g., appId_XXXX-XXXX-XXXX-XXXX-XXXX)'),
+      .optional()
+      .describe(
+        'Legacy application ID. Current API keys identify the application automatically.'
+      ),
     appEnv: z
       .enum(['DEVELOPMENT', 'STAGING', 'PRODUCTION'])
       .default('DEVELOPMENT')

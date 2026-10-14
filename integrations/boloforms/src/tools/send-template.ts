@@ -54,7 +54,12 @@ export let sendTemplate = SlateTool.create(spec, {
     z.object({
       message: z.string().optional().describe('Response message from the API'),
       templateId: z.string().optional().describe('ID of the template used'),
-      createdDocumentId: z.string().optional().describe('ID of the newly created document'),
+      createdDocumentId: z
+        .string()
+        .optional()
+        .describe(
+          'Respondent Mongo ObjectId; use as responseId for send_reminder or void_document with PDF_TEMPLATE'
+        ),
       createdDocumentStatus: z.string().optional().describe('Status of the created document'),
       signers: z
         .array(
@@ -79,42 +84,46 @@ export let sendTemplate = SlateTool.create(spec, {
         ? { subject: ctx.input.subject, message: ctx.input.message }
         : undefined;
 
-    let result: any;
-
-    if (ctx.input.signingType === 'PDF_TEMPLATE') {
-      result = await client.sendPdfTemplate({
-        documentId: ctx.input.documentId,
-        receiversList: ctx.input.receiversList.map(r => ({
-          name: r.name,
-          email: r.email,
-          roleTitle: r.roleTitle ?? r.name,
-          message: r.message,
-          subject: r.subject
-        })),
-        mailData,
-        customVariables: ctx.input.customVariables
-      });
-    } else {
-      result = await client.sendFormTemplate({
-        documentId: ctx.input.documentId,
-        receiversList: ctx.input.receiversList.map(r => ({
-          name: r.name,
-          email: r.email,
-          message: r.message,
-          subject: r.subject
-        })),
-        mailData,
-        customVariables: ctx.input.customVariables
-      });
-    }
+    let result =
+      ctx.input.signingType === 'PDF_TEMPLATE'
+        ? await client.sendPdfTemplate({
+            documentId: ctx.input.documentId,
+            receiversList: ctx.input.receiversList.map(r => ({
+              name: r.name,
+              email: r.email,
+              roleTitle: r.roleTitle,
+              message: r.message,
+              subject: r.subject
+            })),
+            mailData,
+            customVariables: ctx.input.customVariables
+          })
+        : await client.sendFormTemplate({
+            documentId: ctx.input.documentId,
+            receiversList: ctx.input.receiversList.map(r => ({
+              name: r.name,
+              email: r.email,
+              message: r.message,
+              subject: r.subject
+            })),
+            mailData,
+            customVariables: ctx.input.customVariables
+          });
 
     return {
       output: {
-        message: result.message,
-        templateId: result.templateId,
-        createdDocumentId: result.createdDocumentId,
-        createdDocumentStatus: result.createdDocumentStatus,
-        signers: result.signers
+        message: result.message ?? undefined,
+        templateId: result.templateId ?? undefined,
+        createdDocumentId: result.createdDocumentId ?? undefined,
+        createdDocumentStatus: result.createdDocumentStatus ?? undefined,
+        signers: result.signers?.map(signer => ({
+          signerId: signer.signerId ?? undefined,
+          email: signer.email ?? undefined,
+          name: signer.name ?? undefined,
+          status: signer.status ?? undefined,
+          roleTitle: signer.roleTitle ?? undefined,
+          sentUrl: signer.sentUrl ?? undefined
+        }))
       },
       message: `Sent **${ctx.input.signingType === 'PDF_TEMPLATE' ? 'PDF' : 'form'} template** to **${ctx.input.receiversList.length}** recipient(s).${result.createdDocumentId ? ` Created document ID: \`${result.createdDocumentId}\`` : ''}`
     };

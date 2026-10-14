@@ -122,6 +122,24 @@ export let captureScreenshot = SlateTool.create(spec, {
       proxyPool: ctx.input.proxyPool
     });
 
+    let mimeType = result.imageFormat === 'jpg' ? 'image/jpeg' : `image/${result.imageFormat}`;
+    if (result.screenshotUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.screenshotUrl,
+        query: { key: ctx.auth.token },
+        mimeType
+      });
+    } else {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Uint8Array.from(Buffer.from(result.imageBase64, 'base64')), {
+          headers: { 'Content-Type': mimeType }
+        }),
+        filename: `screenshot.${result.imageFormat}`
+      });
+    }
+
     return {
       output: result,
       message: `Captured screenshot of **${ctx.input.url}** in ${result.imageFormat} format. Stored at: ${result.screenshotUrl}`

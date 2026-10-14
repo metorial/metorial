@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getNotificationMessage } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTemplate = SlateTool.create(spec, {
@@ -70,10 +70,13 @@ export let manageTemplate = SlateTool.create(spec, {
       }
       case 'copy': {
         if (!targetMailboxId) {
-          throw new Error('targetMailboxId is required for copy action');
+          throw createApiServiceError('targetMailboxId is required for copy action');
         }
         let result = await client.copyTemplate(templateId, targetMailboxId);
-        resultMessage = result.message || `Template copied to mailbox ${targetMailboxId}`;
+        resultMessage = getNotificationMessage(
+          result,
+          `Template copy queued for mailbox ${targetMailboxId}`
+        );
         break;
       }
       case 'delete': {

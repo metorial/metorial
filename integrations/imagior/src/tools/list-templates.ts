@@ -43,18 +43,16 @@ export let listTemplates = SlateTool.create(spec, {
       order: ctx.input.order
     });
 
-    let templates = Array.isArray(result) ? result : [];
-
     return {
       output: {
-        templates: templates.map((t: any) => ({
+        templates: result.map(t => ({
           templateId: t.id,
           name: t.name,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt
         }))
       },
-      message: `Found **${templates.length}** template(s).`
+      message: `Found **${result.length}** template(s).`
     };
   })
   .build();

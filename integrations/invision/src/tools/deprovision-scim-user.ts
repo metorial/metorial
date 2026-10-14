@@ -9,18 +9,19 @@ export let deprovisionScimUser = SlateTool.create(spec, {
   description: `Deactivates or deletes a provisioned user from an InVision Enterprise account via the SCIM API.
 By default, the user is deactivated (soft removal). Set **permanentDelete** to true to permanently remove the user record.
 
-**Note:** InVision was shut down on December 31, 2024. This tool will only work if the service is still accessible.`,
+**Note:** InVision discontinued its design products on December 31, 2024. Legacy API availability is not guaranteed.`,
   constraints: ['Permanent deletion cannot be undone. Use deactivation when possible.'],
   tags: {
     destructive: true
   }
 })
+  .authMethods(['scim_bearer_token'])
   .input(
     z.object({
       scimBaseUrl: z
         .string()
         .describe('The SCIM API base URL (e.g., https://team.invisionapp.com/scim/v2)'),
-      userId: z.string().describe('The SCIM user ID of the user to deprovision'),
+      userId: z.string().min(1).describe('The SCIM user ID of the user to deprovision'),
       permanentDelete: z
         .boolean()
         .optional()
@@ -30,7 +31,7 @@ By default, the user is deactivated (soft removal). Set **permanentDelete** to t
   )
   .output(
     z.object({
-      userId: z.string().describe('SCIM user ID of the deprovisioned user'),
+      userId: z.string().min(1).describe('SCIM user ID of the deprovisioned user'),
       action: z.enum(['deactivated', 'deleted']).describe('The action that was taken')
     })
   )

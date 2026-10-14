@@ -21,10 +21,7 @@ export let archiveCardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.archive) {
       await client.archiveCard(ctx.input.cardId);

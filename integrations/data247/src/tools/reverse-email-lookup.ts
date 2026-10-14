@@ -44,7 +44,7 @@ export let reverseEmailLookup = SlateTool.create(spec, {
       business: raw.business,
       phone: raw.phone,
       phoneType: raw.phone_type,
-      phoneCarrier: raw.phone_carrier,
+      phoneCarrier: raw.phone_telco_name || raw.phone_carrier,
       address: raw.address,
       city: raw.city,
       state: raw.state,

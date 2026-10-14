@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ParseHubRun } from '../lib/client';
 import { spec } from '../spec';
 
 let runSchema = z
@@ -14,9 +14,11 @@ let runSchema = z
       .number()
       .describe('Whether extracted data is available (1 = ready, 0 = not ready)'),
     startTime: z.string().describe('When the run started'),
-    endTime: z.string().describe('When the run ended'),
+    endTime: z
+      .string()
+      .describe('When the run ended; empty while the end time is unavailable'),
     pages: z.number().describe('Number of pages scraped'),
-    md5sum: z.string().describe('MD5 checksum of the extracted data'),
+    md5sum: z.string().describe('MD5 checksum of the extracted data; empty while unavailable'),
     startUrl: z.string().describe('URL the run started scraping from'),
     startTemplate: z.string().describe('Template used as the entry point'),
     startValue: z.string().describe('Value passed to the project for parameterized scraping')
@@ -26,8 +28,14 @@ let runSchema = z
 let projectSchema = z.object({
   projectToken: z.string().describe('Unique token identifying the project'),
   title: z.string().describe('Name of the project'),
-  mainTemplate: z.string().describe('Default template used as the entry point'),
-  mainSite: z.string().describe('Default starting URL for the project'),
+  mainTemplate: z
+    .string()
+    .describe('Default entry template; empty when includeOptions is false'),
+  mainSite: z.string().describe('Default starting URL; empty when includeOptions is false'),
+  optionsJson: z
+    .string()
+    .optional()
+    .describe('Project configuration JSON, when includeOptions is true'),
   lastRun: runSchema.nullable().describe('Most recent run for this project'),
   lastReadyRun: runSchema.nullable().describe('Most recent run with data available'),
   runList: z.array(runSchema).describe('List of recent runs')
@@ -46,11 +54,13 @@ export let listProjects = SlateTool.create(spec, {
       offset: z
         .number()
         .optional()
-        .describe('Index to start listing projects from (for pagination)'),
+        .describe('Non-negative whole-number index to start listing projects from'),
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of projects to return (default 20)'),
+        .describe(
+          'Maximum number of projects to return: a whole number from 1 to 20 (default 20)'
+        ),
       includeOptions: z
         .boolean()
         .optional()
@@ -75,8 +85,9 @@ export let listProjects = SlateTool.create(spec, {
     let projects = result.projects.map(p => ({
       projectToken: p.token,
       title: p.title,
-      mainTemplate: p.main_template,
-      mainSite: p.main_site,
+      mainTemplate: p.main_template ?? '',
+      mainSite: p.main_site ?? '',
+      optionsJson: p.options_json,
       lastRun: p.last_run ? mapRun(p.last_run) : null,
       lastReadyRun: p.last_ready_run ? mapRun(p.last_ready_run) : null,
       runList: (p.run_list || []).map(mapRun)
@@ -92,15 +103,15 @@ export let listProjects = SlateTool.create(spec, {
   })
   .build();
 
-let mapRun = (r: any) => ({
+let mapRun = (r: ParseHubRun) => ({
   projectToken: r.project_token,
   runToken: r.run_token,
   status: r.status,
-  dataReady: r.data_ready,
+  dataReady: Number(Boolean(r.data_ready)),
   startTime: r.start_time,
-  endTime: r.end_time,
+  endTime: r.end_time ?? '',
   pages: r.pages,
-  md5sum: r.md5sum,
+  md5sum: r.md5sum ?? '',
   startUrl: r.start_url,
   startTemplate: r.start_template,
   startValue: r.start_value

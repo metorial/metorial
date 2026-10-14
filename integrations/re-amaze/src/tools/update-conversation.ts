@@ -1,7 +1,11 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { conversationStatusDescription, validateHoldUntil } from '../lib/conversations';
+import {
+  conversationStatusDescription,
+  validateConversationStatus,
+  validateHoldUntil
+} from '../lib/conversations';
 import { spec } from '../spec';
 
 export let updateConversation = SlateTool.create(spec, {
@@ -56,7 +60,30 @@ export let updateConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateConversationStatus(ctx.input.status);
     validateHoldUntil(ctx.input.status, ctx.input.holdUntil);
+    for (let [field, value] of Object.entries({
+      assigneeEmail: ctx.input.assigneeEmail,
+      channelSlug: ctx.input.channelSlug,
+      brandUrl: ctx.input.brandUrl
+    })) {
+      if (value !== undefined && !value.trim()) {
+        throw createApiServiceError(
+          `Provide a nonempty ${field} when updating a conversation.`
+        );
+      }
+    }
+    if (
+      ctx.input.status === undefined &&
+      ctx.input.assigneeEmail === undefined &&
+      ctx.input.tagList === undefined &&
+      ctx.input.channelSlug === undefined &&
+      ctx.input.customFields === undefined &&
+      ctx.input.holdUntil === undefined &&
+      ctx.input.brandUrl === undefined
+    ) {
+      throw createApiServiceError('Provide at least one conversation field to update.');
+    }
     if (ctx.input.brandUrl !== undefined && !ctx.input.channelSlug) {
       throw createApiServiceError(
         'Provide channelSlug for the destination email channel when moving a conversation to another brand.'

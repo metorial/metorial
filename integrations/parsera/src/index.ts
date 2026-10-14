@@ -5,8 +5,11 @@ import {
   deleteScraperTool,
   extractDataTool,
   extractMarkdownTool,
+  getScraperRunTool,
+  getScraperTool,
   listScrapersTool,
   parseContentTool,
+  runScraperAsyncTool,
   runScraperTool
 } from './tools';
 
@@ -19,7 +22,10 @@ export let provider = Slate.create({
     createScraperTool,
     runScraperTool,
     listScrapersTool,
-    deleteScraperTool
+    deleteScraperTool,
+    getScraperTool,
+    runScraperAsyncTool,
+    getScraperRunTool
   ],
   triggers: []
 });

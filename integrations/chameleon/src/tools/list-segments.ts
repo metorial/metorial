@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChameleonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -73,6 +73,9 @@ Optionally list experiences (tours, surveys, launchers) connected to a segment.`
   )
   .handleInvocation(async ctx => {
     let client = new ChameleonClient(ctx.auth.token);
+    if (ctx.input.experienceKind && !ctx.input.segmentId) {
+      throw createApiServiceError('Provide segmentId when listing related experiences.');
+    }
 
     if (ctx.input.segmentId && ctx.input.experienceKind) {
       let result = await client.getSegmentExperiences(
@@ -81,7 +84,7 @@ Optionally list experiences (tours, surveys, launchers) connected to a segment.`
       );
       return {
         output: {
-          segment: mapSegment(result),
+          segment: mapSegment(result.segment),
           experiences: result[`${ctx.input.experienceKind}s`] || [],
           cursor: result.cursor
         },

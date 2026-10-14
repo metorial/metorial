@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let dealOutputSchema = z.object({
@@ -29,13 +30,13 @@ let mapDeal = (d: any) => ({
   status: d.status,
   currency: d.currency,
   money: d.money,
-  reminderDate: d.reminder_date,
-  closedOn: d.closed_on,
+  reminderDate: d.reminder_date ?? undefined,
+  closedOn: d.closed_on ?? undefined,
   tags: d.tags,
   user: d.user,
   company: d.company,
-  dealCategory: d.deal_category,
-  info: d.info,
+  dealCategory: d.category ?? d.deal_category,
+  info: d.info ?? undefined,
   createdAt: d.created_at,
   updatedAt: d.updated_at
 });
@@ -50,6 +51,7 @@ export let listDeals = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       status: z
         .enum(['potential', 'pending', 'won', 'lost', 'dropped'])
         .optional()
@@ -75,6 +77,8 @@ export let listDeals = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.status) params.status = ctx.input.status;
     if (ctx.input.tags) params.tags = ctx.input.tags;
     if (ctx.input.companyId) params.company_id = ctx.input.companyId;

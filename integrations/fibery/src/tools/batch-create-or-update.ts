@@ -10,7 +10,8 @@ export let batchCreateOrUpdateTool = SlateTool.create(spec, {
   instructions: [
     'The conflictField must be a text, integer, or date field used to detect existing entities.',
     'Set conflictAction to "update-latest" to update matching entities or "skip-create" to skip duplicates.',
-    'Each entity in the array should contain the conflict field value and any other fields to set.'
+    'Each entity in the array should contain the conflict field value and any other fields to set.',
+    'Provide fibery/id to preserve an entity UUID; a UUID is generated for each entity that omits it.'
   ],
   constraints: ['Rate limit: 3 requests per second per token.'],
   tags: {
@@ -40,7 +41,12 @@ export let batchCreateOrUpdateTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      processedCount: z.number().describe('Number of entities processed')
+      processedCount: z.number().describe('Number of entities processed'),
+      results: z
+        .array(z.record(z.string(), z.any()))
+        .describe(
+          'Per-entity provider outcomes, including created, updated, or duplicate entity IDs'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -49,7 +55,7 @@ export let batchCreateOrUpdateTool = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    await client.batchCreateOrUpdate({
+    let results = await client.batchCreateOrUpdate({
       typeName: ctx.input.typeName,
       entities: ctx.input.entities,
       conflictField: ctx.input.conflictField,
@@ -58,7 +64,8 @@ export let batchCreateOrUpdateTool = SlateTool.create(spec, {
 
     return {
       output: {
-        processedCount: ctx.input.entities.length
+        processedCount: results.length,
+        results
       },
       message: `Batch processed **${ctx.input.entities.length}** entities of type **${ctx.input.typeName}** (conflict action: ${ctx.input.conflictAction}).`
     };

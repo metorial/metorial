@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +16,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Heyy API key. Found in Heyy Hub under Settings > Developers > API Keys.')
+        .describe('Heyy API key. Create one in your Heyy workspace under Settings > API Keys.')
     }),
 
     getOutput: async ctx => {
@@ -27,17 +28,8 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.hey-y.io/api/v2.0'
-      });
-
-      let response = await axios.get('/business', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let business = response.data?.data;
+      let client = new Client({ token: ctx.output.token });
+      let business = await client.getBusiness();
 
       return {
         profile: {

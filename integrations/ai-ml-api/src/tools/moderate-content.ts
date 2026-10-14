@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ Analyzes input for harmful content and returns a safety classification with haza
 Supports text, image URLs, and base64-encoded images.`,
   instructions: [
     'For text moderation, provide the text content directly.',
-    'For image moderation, provide the image URL in the imageUrl field.',
+    'For image moderation, provide imageUrl and use "meta-llama/Llama-Guard-3-11B-Vision-Turbo".',
     'Unsafe content will include a hazard category explaining why it was flagged.'
   ],
   tags: {
@@ -39,6 +39,9 @@ Supports text, image URLs, and base64-encoded images.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.text?.trim() && !ctx.input.imageUrl?.trim()) {
+      throw createApiServiceError('Provide text or an image URL to moderate.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -60,7 +63,10 @@ Supports text, image URLs, and base64-encoded images.`,
     let result = await client.moderateContent(ctx.input.model, [{ role: 'user', content }]);
 
     let classification = result.choices[0]?.message?.content ?? '';
-    let isSafe = classification.toLowerCase().startsWith('safe');
+    if (!classification.trim()) {
+      throw createApiServiceError('AI/ML API returned no moderation classification.');
+    }
+    let isSafe = /^safe(?:\s|$)/i.test(classification.trim());
 
     return {
       output: {

@@ -13,9 +13,22 @@ export let getMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       sessionId: z.string().describe('Session ID of the conversation'),
-      page: z.number().optional().describe('Page number (default: 1)'),
+      page: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Page number (default: 1)'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
   )

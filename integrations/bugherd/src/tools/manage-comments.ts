@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let commentSchema = z.object({
@@ -22,8 +23,8 @@ export let listComments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('Project ID'),
-      taskId: z.number().describe('Task ID to list comments for')
+      projectId: positiveIntegerSchema.describe('Project ID'),
+      taskId: positiveIntegerSchema.describe('Task ID to list comments for')
     })
   )
   .output(
@@ -37,7 +38,7 @@ export let listComments = SlateTool.create(spec, {
 
     let comments = rawComments.map(c => ({
       commentId: c.id,
-      taskId: c.task_id,
+      taskId: c.task_id ?? ctx.input.taskId,
       userId: c.user_id,
       text: c.text,
       isPrivate: c.is_private,
@@ -96,7 +97,7 @@ export let createComment = SlateTool.create(spec, {
     return {
       output: {
         commentId: comment.id,
-        taskId: comment.task_id,
+        taskId: comment.task_id ?? ctx.input.taskId,
         text: comment.text,
         isPrivate: comment.is_private,
         createdAt: comment.created_at

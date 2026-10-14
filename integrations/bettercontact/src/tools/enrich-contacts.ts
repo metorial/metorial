@@ -36,6 +36,8 @@ Returns a request ID to retrieve results later using the **Get Enrichment Result
   instructions: [
     'Either company or companyDomain must be provided for each contact.',
     'Include linkedinUrl when enriching phone numbers for better accuracy.',
+    'If both enrichment flags are false, BetterContact applies email enrichment by default.',
+    'Submissions are not idempotent. Do not resubmit a successful request; retrieve its results using requestId.',
     'Maximum 100 contacts per request.',
     'Use the returned requestId with the Get Enrichment Results tool to retrieve enriched data.'
   ],
@@ -60,6 +62,20 @@ Returns a request ID to retrieve results later using the **Get Enrichment Result
         .string()
         .optional()
         .describe('URL to receive results via webhook when enrichment completes'),
+      verifyCatchAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'Run catch-all email verification. Requires the catch-all add-on on your plan.'
+        ),
+      timeoutSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe(
+          'Maximum time in seconds for the enrichment waterfall; results found before the timeout are returned.'
+        ),
       processFlow: z
         .string()
         .optional()
@@ -83,12 +99,15 @@ Returns a request ID to retrieve results later using the **Get Enrichment Result
       enrichEmailAddress: ctx.input.enrichEmailAddress,
       enrichPhoneNumber: ctx.input.enrichPhoneNumber,
       webhook: ctx.input.webhookUrl,
-      processFlow: ctx.input.processFlow
+      processFlow: ctx.input.processFlow,
+      verifyCatchAll: ctx.input.verifyCatchAll,
+      timeoutSeconds: ctx.input.timeoutSeconds
     });
 
-    let enrichTypes: any[] = [];
+    let enrichTypes: string[] = [];
     if (ctx.input.enrichEmailAddress) enrichTypes.push('emails');
     if (ctx.input.enrichPhoneNumber) enrichTypes.push('phone numbers');
+    if (enrichTypes.length === 0) enrichTypes.push('emails');
 
     return {
       output: {

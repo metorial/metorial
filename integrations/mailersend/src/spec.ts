@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'mailersend',
   name: 'MailerSend',
   description:
-    'Transactional email and SMS messaging service with email verification, template management, analytics, and inbound routing.',
+    'Transactional email and SMS messaging service with email verification, template management, sending domains, and delivery activity.',
   metadata: {},
   config,
   auth

@@ -28,13 +28,9 @@ export let createBatchVerification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, sandbox: ctx.config.sandbox });
 
     let result = await client.createBatchVerification(ctx.input.emails, ctx.input.filename);
-
-    if (!result.success) {
-      throw new Error(result.message || 'Failed to create batch verification job.');
-    }
 
     return {
       output: {

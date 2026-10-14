@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BlazeMeterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,12 +39,13 @@ export let manageTest = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name || !ctx.input.projectId) {
-        throw new Error('name and projectId are required for creating a test');
+        throw createApiServiceError('name and projectId are required for creating a test');
       }
       let test = await client.createTest({
         name: ctx.input.name,
@@ -59,7 +60,7 @@ export let manageTest = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.testId) {
-        throw new Error('testId is required for updating a test');
+        throw createApiServiceError('testId is required for updating a test');
       }
       let test = await client.updateTest(ctx.input.testId, {
         name: ctx.input.name,
@@ -73,7 +74,7 @@ export let manageTest = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.testId) {
-        throw new Error('testId is required for deleting a test');
+        throw createApiServiceError('testId is required for deleting a test');
       }
       await client.deleteTest(ctx.input.testId);
       return {
@@ -82,6 +83,6 @@ export let manageTest = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

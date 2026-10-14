@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageFlagSet = SlateTool.create(spec, {
@@ -16,7 +17,9 @@ export let manageFlagSet = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       action: z.enum(['create', 'list', 'get', 'delete']).describe('Action to perform.'),
       flagSetName: z.string().optional().describe('Name of the flag set (for create).'),
       flagSetId: z.string().optional().describe('ID of the flag set (for get/delete).'),
@@ -57,13 +60,14 @@ export let manageFlagSet = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
-        if (!wsId) throw new Error('workspaceId is required to create a flag set.');
+        if (!wsId)
+          throw createApiServiceError('workspaceId is required to create a flag set.');
         if (!ctx.input.flagSetName)
-          throw new Error('flagSetName is required to create a flag set.');
+          throw createApiServiceError('flagSetName is required to create a flag set.');
         let fs = await client.createFlagSet({
           name: ctx.input.flagSetName,
           description: ctx.input.description,
@@ -74,7 +78,7 @@ export let manageFlagSet = SlateTool.create(spec, {
             flagSet: {
               flagSetId: fs.id,
               flagSetName: fs.name,
-              description: fs.description,
+              description: fs.description ?? undefined,
               createdAt: fs.createdAt
             }
           },
@@ -83,7 +87,8 @@ export let manageFlagSet = SlateTool.create(spec, {
       }
 
       case 'list': {
-        if (!wsId) throw new Error('workspaceId is required to list flag sets.');
+        validatePagination(undefined, ctx.input.limit, 200);
+        if (!wsId) throw createApiServiceError('workspaceId is required to list flag sets.');
         let result = await client.listFlagSets(wsId, {
           limit: ctx.input.limit,
           after: ctx.input.after
@@ -91,24 +96,25 @@ export let manageFlagSet = SlateTool.create(spec, {
         let flagSets = result.data.map(fs => ({
           flagSetId: fs.id,
           flagSetName: fs.name,
-          description: fs.description,
+          description: fs.description ?? undefined,
           createdAt: fs.createdAt
         }));
         return {
-          output: { flagSets, nextMarker: result.nextMarker },
+          output: { flagSets, nextMarker: result.nextMarker ?? undefined },
           message: `Found **${flagSets.length}** flag sets.`
         };
       }
 
       case 'get': {
-        if (!ctx.input.flagSetId) throw new Error('flagSetId is required to get a flag set.');
+        if (!ctx.input.flagSetId)
+          throw createApiServiceError('flagSetId is required to get a flag set.');
         let fs = await client.getFlagSet(ctx.input.flagSetId);
         return {
           output: {
             flagSet: {
               flagSetId: fs.id,
               flagSetName: fs.name,
-              description: fs.description,
+              description: fs.description ?? undefined,
               createdAt: fs.createdAt
             }
           },
@@ -118,7 +124,7 @@ export let manageFlagSet = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.flagSetId)
-          throw new Error('flagSetId is required to delete a flag set.');
+          throw createApiServiceError('flagSetId is required to delete a flag set.');
         await client.deleteFlagSet(ctx.input.flagSetId);
         return {
           output: { deleted: true },

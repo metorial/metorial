@@ -24,7 +24,7 @@ API keys allow other apps to access your account without giving out your passwor
 
 ### Contact Management
 
-Create, read, update, and delete contacts in the CRM. Manage contact relationships with a 360° view, import or capture contacts/leads, enrich them, and track all conversations and activities. Contacts can be segmented using filters and smart views.
+Create, read, update, and delete contacts in the CRM. Link a company by `companyId` from `search_companies`, or supply an existing company name that resolves to exactly one record. Ambiguous and missing names require an explicit ID. The existing string `company` field also accepts a numeric ID; an empty string clears the association during updates. Manage contact relationships with a 360° view, import or capture contacts/leads, enrich them, and track all conversations and activities. Contacts can be segmented using filters and smart views.
 
 ### Company Management
 
@@ -40,7 +40,7 @@ Activities can be scheduled tasks, appointments, to-do's, or meetings needed to 
 
 ### Products
 
-Create a product catalog with detailed information about each product, including quantities, discounts, and pricing. Products can be associated with deals.
+Create a product catalog with detailed information about each product, including quantities, discounts, and pricing. Products can be associated with deals. Product creation and updates expose SKU and active-for-sales state. Use `create_product_variant` to add a named variant with a sale price and currency to a parent product discovered by `search_products`.
 
 ### Tickets
 
@@ -104,6 +104,8 @@ Webhooks are configured by creating automation rules (workflows/smart flows) tha
 
 ## API Reference and Verification Limits
 
-Verified against the [official Salesmate API reference](https://apidocs.salesmate.io/) and its published request/response examples. Search tools translate page numbers to `from` offsets, use `displayingFields`, `filterQuery`, and `sort`, and return the provider `totalRows` value as `totalCount`. Deal follower IDs are sent as `userId` objects. Provider failure envelopes are surfaced as errors even when HTTP status is 200.
+Verified against the [official Salesmate API reference](https://apidocs.salesmate.io/) and its published request/response examples. Contact, company, deal, and activity updates retrieve missing required fields before submitting a PUT request; lookup owners and primary contacts are converted to their IDs. Only required fields and requested changes are submitted.
+
+Search tools translate page numbers to `from` offsets, use `displayingFields`, `filterQuery`, and `sort`, and return the provider `totalRows` value as `totalCount`. Core CRM searches and product searches always request stable record IDs and accept up to 250 records per page. Deal follower IDs are sent as `userId` objects. Provider failure envelopes are surfaced as errors even when HTTP status is 200.
 
 The current reference does not document standalone ticket CRUD routes; existing ticket tools remain unverified. Product retrieval is also not separately documented. The reference warns that v1/v3 were deprecated in 2023 while continuing to publish only those product routes, so current product API availability remains uncertain. The reference includes no module-ID response example, so discovery accepts a numeric ID or an `id`/`moduleId` field and reports unexpected responses. No authenticated provider calls or live tests were run during this refresh.

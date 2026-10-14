@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { MgmtClient } from '../lib/client';
+import { type BatchResult, MgmtClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let contentWorkflow = SlateTool.create(spec, {
@@ -28,7 +28,11 @@ export let contentWorkflow = SlateTool.create(spec, {
     z.object({
       contentIds: z.array(z.number()).describe('IDs of the items the action was applied to'),
       action: z.string().describe('The workflow action that was performed'),
-      success: z.boolean().describe('Whether the operation succeeded')
+      batchId: z
+        .number()
+        .optional()
+        .describe('Queued batch ID. Use get_batch_status if success is false.'),
+      success: z.boolean().describe('Whether the write batch completed successfully')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,39 +40,43 @@ export let contentWorkflow = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.input.locale || ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
+    if (ctx.input.contentIds.some(id => !Number.isInteger(id) || id <= 0)) {
+      throw createApiServiceError('contentIds must contain positive whole-number IDs.');
+    }
+    let result: BatchResult;
     if (ctx.input.contentIds.length === 1) {
       let contentId = ctx.input.contentIds[0]!;
-      switch (ctx.input.action) {
-        case 'publish':
-          await client.publishContentItem(contentId, ctx.input.comments);
-          break;
-        case 'unpublish':
-          await client.unpublishContentItem(contentId, ctx.input.comments);
-          break;
-        case 'request-approval':
-          await client.requestApproval(contentId, ctx.input.comments);
-          break;
-        case 'approve':
-          await client.approveContentItem(contentId, ctx.input.comments);
-          break;
-        case 'decline':
-          await client.declineContentItem(contentId, ctx.input.comments);
-          break;
-      }
+      let operations = {
+        publish: () => client.publishContentItem(contentId, ctx.input.comments),
+        unpublish: () => client.unpublishContentItem(contentId, ctx.input.comments),
+        'request-approval': () => client.requestApproval(contentId, ctx.input.comments),
+        approve: () => client.approveContentItem(contentId, ctx.input.comments),
+        decline: () => client.declineContentItem(contentId, ctx.input.comments)
+      };
+      result = await operations[ctx.input.action]();
     } else {
-      await client.batchWorkflow(ctx.input.contentIds, ctx.input.action);
+      if (ctx.input.comments) {
+        throw createApiServiceError(
+          'Agility CMS batch workflow does not accept comments. Omit comments or apply the action to one content item at a time.'
+        );
+      }
+      result = await client.batchWorkflow(ctx.input.contentIds, ctx.input.action);
     }
 
     return {
       output: {
         contentIds: ctx.input.contentIds,
         action: ctx.input.action,
-        success: true
+        batchId: result.batchId,
+        success: result.completed
       },
-      message: `Applied **${ctx.input.action}** to **${ctx.input.contentIds.length}** content item(s): ${ctx.input.contentIds.join(', ')}`
+      message: result.completed
+        ? `Applied **${ctx.input.action}** to **${ctx.input.contentIds.length}** content item(s): ${ctx.input.contentIds.join(', ')}`
+        : `Workflow is still pending in batch **#${result.batchId}**. Call get_batch_status to check completion.`
     };
   })
   .build();

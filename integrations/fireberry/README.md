@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Fireberry
 
-Manage a full CRM platform covering sales, marketing, and service. Create, read, update, and delete accounts, contacts, opportunities, orders, invoices, tickets, activities, campaigns, products, projects, contracts, and assets. Query and search records across any object type with advanced filtering. Manage custom objects and custom fields to extend the data model. Handle invoicing with multiple document types (invoices, credit invoices, receipts, drafts) and line items. Schedule and track activities including tasks, meetings, phone calls, and notes. Retrieve object metadata and field schemas. Upload files and associate them with records.
+Manage Fireberry CRM records across standard and custom objects. Create, retrieve, update, delete, and list records, and retrieve related records with pagination. Search using the existing query language or structured filters with multi-field sorting, grouping, aggregation, and up to 500 results per page. Discover available object types, fields, detailed field metadata, and picklist values before creating or updating data.
 
 ## License
 

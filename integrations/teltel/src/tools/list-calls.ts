@@ -8,6 +8,9 @@ export let listCallsTool = SlateTool.create(spec, {
   key: 'list_calls',
   description: `Retrieve call data records (CDR) from TelTel. Returns detailed information about calls including duration, time, status, and audio recording URLs.
 Use date filters to narrow down results, or filter by user to see a specific agent's calls.`,
+  constraints: [
+    'The userId filter is applied to the returned page after pagination; a page may contain fewer than limit matching calls.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -23,7 +26,12 @@ Use date filters to narrow down results, or filter by user to see a specific age
         .string()
         .optional()
         .describe('End date for filtering calls (ISO 8601 format, e.g. "2024-01-31")'),
-      userId: z.string().optional().describe('Filter calls by a specific user ID'),
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'Filter calls by caller or callee user ID from list_users; applied within the selected page'
+        ),
       limit: z.number().optional().describe('Maximum number of results to return'),
       offset: z.number().optional().describe('Offset for pagination')
     })

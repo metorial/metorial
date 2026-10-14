@@ -75,7 +75,7 @@ export let scholarSearch = SlateTool.create(spec, {
       deviceType: ctx.input.deviceType
     });
 
-    let results = data.results || [];
+    let results = data.articles ?? data.results ?? [];
 
     return {
       output: {

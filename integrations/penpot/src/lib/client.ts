@@ -1,33 +1,67 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  requestAxiosData
+} from 'slates';
+
+export let normalizeBaseUrl = (value: string): string => {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw createApiServiceError('Provide a valid Penpot instance URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw createApiServiceError(
+      'The Penpot instance URL must use HTTP or HTTPS without credentials, a query, or a fragment.'
+    );
+  }
+  return url.toString().replace(/\/+$/, '');
+};
 
 export class Client {
   private baseUrl: string;
-  private token: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { baseUrl: string; token: string }) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, '');
-    this.token = config.token;
-  }
-
-  private get axios() {
-    return createAxios({
+    this.baseUrl = normalizeBaseUrl(config.baseUrl);
+    this.axios = createAuthenticatedAxios({
       baseURL: this.baseUrl,
-      headers: {
-        Authorization: `Token ${this.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Token ${config.token}` },
+      headers: { Accept: 'application/json' }
     });
   }
 
-  private async rpc<T = any>(method: string, data?: Record<string, any>): Promise<T> {
-    let response = await this.axios.post(`/api/main/methods/${method}`, data ?? {});
-    return response.data;
+  private handleError(error: unknown, operation: string) {
+    return buildApiServiceError(error, {
+      providerLabel: 'Penpot',
+      reason: 'penpot_api_error',
+      operation,
+      detailKeys: ['hint', 'message', 'detail', 'error', 'code']
+    });
   }
 
-  private async rpcGet<T = any>(method: string, params?: Record<string, any>): Promise<T> {
-    let response = await this.axios.get(`/api/main/methods/${method}`, { params });
-    return response.data;
+  private async rpc<T = any>(method: string, data?: Record<string, unknown>): Promise<T> {
+    return requestAxiosData<T>(
+      method,
+      () => this.axios.post(`/api/main/methods/${method}`, data ?? {}),
+      (error, operation) => this.handleError(error, operation)
+    );
+  }
+
+  private async rpcGet<T = any>(method: string, params?: Record<string, unknown>): Promise<T> {
+    return requestAxiosData<T>(
+      method,
+      () => this.axios.get(`/api/main/methods/${method}`, { params }),
+      (error, operation) => this.handleError(error, operation)
+    );
   }
 
   // ─── Profile ─────────────────────────────────────────────────
@@ -62,7 +96,8 @@ export class Client {
   }
 
   async updateTeam(teamId: string, name: string): Promise<any> {
-    return this.rpc('update-team', { id: teamId, name });
+    await this.rpc('update-team', { id: teamId, name });
+    return this.getTeam({ id: teamId });
   }
 
   async deleteTeam(teamId: string): Promise<any> {
@@ -166,7 +201,8 @@ export class Client {
   async searchFiles(teamId: string, searchTerm?: string): Promise<any[]> {
     let params: Record<string, any> = { 'team-id': teamId };
     if (searchTerm) params['search-term'] = searchTerm;
-    return this.rpcGet('search-files', params);
+    let files = await this.rpc<any[] | null>('search-files', params);
+    return files ?? [];
   }
 
   async renameFile(fileId: string, name: string): Promise<any> {
@@ -346,12 +382,80 @@ export class Client {
     fileId: string,
     includeLibraries: boolean,
     embedAssets: boolean
-  ): Promise<any> {
-    return this.rpc('export-binfile', {
-      'file-id': fileId,
-      'include-libraries': includeLibraries,
-      'embed-assets': embedAssets
-    });
+  ): Promise<{ url: string; expiresAt: string; rawResponse: string }> {
+    let response = await requestAxiosData<string>(
+      'export-binfile',
+      () =>
+        this.axios.post(
+          '/api/main/methods/export-binfile',
+          {
+            'file-id': fileId,
+            'include-libraries': includeLibraries,
+            'embed-assets': embedAssets
+          },
+          { responseType: 'text', headers: { Accept: 'text/event-stream' } }
+        ),
+      (error, operation) => this.handleError(error, operation)
+    );
+    let result: unknown;
+    let completed = false;
+    for (let block of response.split(/\r?\n\r?\n/)) {
+      let lines = block.split(/\r?\n/);
+      let event = lines
+        .find(line => line.startsWith('event:'))
+        ?.slice(6)
+        .trim();
+      if (event === 'error') {
+        throw createApiServiceError(
+          'Penpot could not export this file. Check file permissions and retry.',
+          { reason: 'penpot_export_failed' }
+        );
+      }
+      if (event !== 'end') continue;
+      let data = lines
+        .filter(line => line.startsWith('data:'))
+        .map(line => line.slice(5).trimStart())
+        .join('\n');
+      try {
+        result = JSON.parse(data);
+      } catch {
+        throw createApiServiceError(
+          'Penpot returned an invalid export result. Retry the export.'
+        );
+      }
+      completed = true;
+    }
+    if (!completed) {
+      throw createApiServiceError('Penpot did not finish the export. Retry the export.');
+    }
+    // Penpot's SSE encoder uses Transit JSON-verbose; the final result is
+    // a URI tag; quoted-string responses are accepted as well.
+    for (let i = 0; i < 2; i++) {
+      if (typeof result !== 'object' || result === null || Array.isArray(result)) break;
+      let value = result as Record<string, unknown>;
+      result = value['~#uri'] ?? value["~#'"];
+    }
+    if (typeof result !== 'string') {
+      throw createApiServiceError('Penpot did not return a download URL. Retry the export.');
+    }
+    let url: URL;
+    try {
+      url = new URL(result, `${this.baseUrl}/`);
+    } catch {
+      throw createApiServiceError(
+        'Penpot returned an invalid download URL. Retry the export.'
+      );
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+      throw createApiServiceError(
+        'Penpot returned an unsupported download URL. Retry the export.'
+      );
+    }
+    return {
+      url: url.toString(),
+      expiresAt: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+      rawResponse: response
+    };
   }
 
   // ─── File Object Thumbnails ──────────────────────────────────
@@ -368,8 +472,12 @@ export class Client {
 
   async createFileSnapshot(fileId: string, label?: string): Promise<any> {
     let data: Record<string, any> = { 'file-id': fileId };
-    if (label) data.label = label;
+    if (label !== undefined) data.label = label;
     return this.rpc('create-file-snapshot', data);
+  }
+
+  async deleteFileSnapshot(snapshotId: string): Promise<any> {
+    return this.rpc('delete-file-snapshot', { id: snapshotId });
   }
 
   async restoreFileSnapshot(fileId: string, snapshotId: string): Promise<any> {

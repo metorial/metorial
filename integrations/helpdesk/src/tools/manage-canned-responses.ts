@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -97,7 +97,7 @@ export let manageCannedResponses = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.cannedResponseId) {
-        throw new Error('cannedResponseId is required for the "get" action');
+        throw createApiServiceError('cannedResponseId is required for the "get" action');
       }
       let cannedResponse = await client.getCannedResponse(ctx.input.cannedResponseId);
       return {
@@ -108,10 +108,10 @@ export let manageCannedResponses = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for the "create" action');
+        throw createApiServiceError('name is required for the "create" action');
       }
       if (!ctx.input.content) {
-        throw new Error('content is required for the "create" action');
+        throw createApiServiceError('content is required for the "create" action');
       }
       let input: Record<string, unknown> = {
         name: ctx.input.name,
@@ -129,7 +129,7 @@ export let manageCannedResponses = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.cannedResponseId) {
-        throw new Error('cannedResponseId is required for the "update" action');
+        throw createApiServiceError('cannedResponseId is required for the "update" action');
       }
       let input: Record<string, unknown> = {};
       if (ctx.input.name !== undefined) input.name = ctx.input.name;
@@ -149,7 +149,7 @@ export let manageCannedResponses = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.cannedResponseId) {
-        throw new Error('cannedResponseId is required for the "delete" action');
+        throw createApiServiceError('cannedResponseId is required for the "delete" action');
       }
       await client.deleteCannedResponse(ctx.input.cannedResponseId);
       return {
@@ -158,6 +158,6 @@ export let manageCannedResponses = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

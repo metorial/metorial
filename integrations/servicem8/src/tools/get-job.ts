@@ -44,7 +44,7 @@ export let getJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let j = await client.getJob(ctx.input.jobUuid);
 
     return {
@@ -52,7 +52,7 @@ export let getJob = SlateTool.create(spec, {
         jobUuid: j.uuid,
         generatedJobId: j.generated_job_id,
         status: j.status,
-        description: j.description,
+        description: j.job_description,
         jobAddress: j.job_address,
         billingAddress: j.billing_address,
         companyUuid: j.company_uuid,
@@ -60,7 +60,7 @@ export let getJob = SlateTool.create(spec, {
         date: j.date,
         dueDate: j.due_date,
         totalPrice: j.total_price,
-        poNumber: j.po_number,
+        poNumber: j.purchase_order_number,
         workDoneDescription: j.work_done_description,
         completionDate: j.completion_date,
         active: j.active,

@@ -14,7 +14,9 @@ export let getTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project'),
+      projectId: z
+        .string()
+        .describe('The ID of the project. Call list_projects to discover available projects.'),
       timeEntryId: z.string().describe('The ID of the time entry to retrieve'),
       fullResolutionUrl: z
         .boolean()

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageIntegrationTool = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ export let manageIntegrationTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Integration type (e.g. widget, slack, discord, whatsapp, sitemap, notion, trigger, extract, support)'
+          'Channel type used for every action (e.g. widget, slack, discord, whatsapp, sitemap, notion, trigger, extract, support)'
         ),
       botId: z.string().optional().describe('Bot ID to connect the integration to'),
       name: z.string().optional().describe('Integration name'),
@@ -56,69 +57,71 @@ export let manageIntegrationTool = SlateTool.create(spec, {
       let data: Record<string, any> = {};
       if (type) data.type = type;
       if (botId) data.botId = botId;
-      if (name) data.name = name;
-      if (description) data.description = description;
+      if (name !== undefined) data.name = name;
+      if (description !== undefined) data.description = description;
       if (settings) Object.assign(data, settings);
+      if (type !== undefined) data.type = type;
       if (meta) data.meta = meta;
       let result = await client.createIntegration(data);
       return {
         output: {
           integrationId: result.id,
-          type: result.type,
-          botId: result.botId,
-          name: result.name,
-          createdAt: result.createdAt
+          type: result.type ?? type,
+          botId: result.botId ?? botId,
+          name: result.name ?? name,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Integration **${result.name || result.id}** (${result.type || type}) created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!integrationId) throw new Error('integrationId is required for fetch');
-      let result = await client.fetchIntegration(integrationId);
+      if (!integrationId) throw createApiServiceError('integrationId is required for fetch');
+      let result = await client.fetchIntegration(integrationId, type);
       return {
         output: {
           integrationId: result.id,
-          type: result.type,
-          botId: result.botId,
+          type: result.type ?? type,
+          botId: result.botId ?? undefined,
           name: result.name,
-          createdAt: result.createdAt
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Fetched integration **${result.name || result.id}** (${result.type}).`
       };
     }
 
     if (action === 'update') {
-      if (!integrationId) throw new Error('integrationId is required for update');
+      if (!integrationId) throw createApiServiceError('integrationId is required for update');
       let data: Record<string, any> = {};
       if (type) data.type = type;
       if (botId) data.botId = botId;
-      if (name) data.name = name;
-      if (description) data.description = description;
+      if (name !== undefined) data.name = name;
+      if (description !== undefined) data.description = description;
       if (settings) Object.assign(data, settings);
+      if (type !== undefined) data.type = type;
       if (meta) data.meta = meta;
       let result = await client.updateIntegration(integrationId, data);
       return {
         output: {
           integrationId: result.id || integrationId,
-          type: result.type,
-          botId: result.botId,
-          name: result.name,
-          createdAt: result.createdAt
+          type: result.type ?? type,
+          botId: result.botId ?? botId,
+          name: result.name ?? name,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Integration **${integrationId}** updated.`
       };
     }
 
     if (action === 'delete') {
-      if (!integrationId) throw new Error('integrationId is required for delete');
-      await client.deleteIntegration(integrationId);
+      if (!integrationId) throw createApiServiceError('integrationId is required for delete');
+      await client.deleteIntegration(integrationId, type);
       return {
         output: { integrationId },
         message: `Integration **${integrationId}** deleted.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

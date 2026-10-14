@@ -2,11 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   cleanCampaign,
+  createInboxTest,
   deleteCampaign,
   getCampaign,
   getCampaignPdf,
   getCampaignStatus,
   getCredits,
+  getInboxTestResults,
   listCampaigns
 } from './tools';
 export let provider = Slate.create({
@@ -18,7 +20,9 @@ export let provider = Slate.create({
     listCampaigns,
     deleteCampaign,
     getCredits,
-    getCampaignPdf
+    getCampaignPdf,
+    createInboxTest,
+    getInboxTestResults
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-# Slates Specification for Simplero
+# Simplero Integration Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ Requests are authenticated using HTTP Basic Auth, with the API key as the userna
 
 The API key can be obtained from the Simplero Admin interface under **Settings > Integrations**.
 
-All API request URLs start with `https://simplero.com/api/v1/`. All requests must be over HTTPS.
+Existing operations use the supported `https://simplero.com/api/v1/` endpoints. Segment discovery uses `https://simplero.com/api/v2/segments` and returns pagination metadata. All requests must be over HTTPS. The provider recommends v2 for new integrations while retaining v1 for existing integrations.
 
 Additionally, a **User-Agent** header identifying your application must be included in every request, in the format: `Your App Name (email@example.com)`. Failure to include it results in a 400 error.
 
@@ -28,7 +28,7 @@ Note the colon after the API key (empty password).
 
 ### Contact Management
 
-Create, update, and look up contacts by email or internal ID. Contacts support custom fields (address, phone, etc.), tags, notes, GDPR consent tracking, and affiliate attribution. You can also update a contact's login credentials (with their consent) and retrieve course completion progress across all courses for a given contact.
+Create, update, and look up contacts by email, internal ID, or token. Contacts support custom fields (address, phone, etc.), tags, notes, GDPR consent tracking, and affiliate attribution. Retrieve course completion progress across all courses for a given contact.
 
 - Tags can be added or removed individually via dedicated endpoints.
 - Custom contact fields use an internal naming convention (`field_ID_SUBFIELD`).
@@ -38,14 +38,28 @@ Create, update, and look up contacts by email or internal ID. Contacts support c
 
 Retrieve all lists, subscribe contacts to lists (individually or in bulk up to 1,000 at a time), unsubscribe contacts, and look up subscriptions by email. Subscriptions support tracking parameters such as IP address, referrer, affiliate ref, landing page ID, and custom tags.
 
-- Bulk subscribe operations are asynchronous; a token is returned to poll for completion status.
+- Bulk subscribe operations are asynchronous; pass the returned `bulkToken` to `get_request_status` to retrieve completion status and per-subscriber results.
 
 ### Product and Purchase Management
 
 List all products, retrieve product details, and look up purchases by email, ID, or token. Purchase records include detailed billing information, payment processor details, transaction history, and participant/entrant data.
 
 - Purchases cannot be created on trial accounts.
-- A dedicated webhook endpoint (`POST https://simplero.com/webhook/products/{id}/purchase`) allows external selling systems to automatically add people to products in Simplero by providing an API key, name, and email as POST parameters.
+- `manage_product` can create free purchases on active, non-trial accounts.
+
+### Broadcasts and Segments
+
+List and retrieve broadcasts, create drafts or scheduled broadcasts, send test messages, and inspect engagement activity. Use `list_segments` to discover segment IDs for broadcast recipients. The discovery response includes `pagination.next_after` for cursor pagination; pass it as `after` on the next call.
+
+### Account Identity and Request Status
+
+`get_account_info` returns the connected account and user records. `get_request_status` reports pending, running, success, or failure status and the results of asynchronous operations.
+
+### API References
+
+- [Official v1 API documentation](https://github.com/Simplero/Simplero-API)
+- [Official v2 API reference](https://simplero.com/api/v2/docs)
+- [Official v2 OpenAPI specification](https://simplero.com/api/v2/docs/openapi.json)
 
 ### Invoice Retrieval
 

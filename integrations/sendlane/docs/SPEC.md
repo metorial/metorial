@@ -1,6 +1,4 @@
-Let me get the Stoplight API docs to understand the full set of endpoints.Now I have enough information to compile the specification. Let me synthesize what I've found.
-
-# Slates Specification for Sendlane
+# Sendlane API Specification
 
 ## Overview
 

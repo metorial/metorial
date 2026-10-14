@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let upsertCustomer = SlateTool.create(spec, {
   name: 'Create or Update Customer',
   key: 'upsert_customer',
-  description: `Create a new customer or update an existing one in Simplesat. The customer's email is used as the unique identifier — if a customer with the given email already exists, their record will be updated. Custom attribute fields that don't exist yet will be created automatically.`,
+  description: `Create a new customer or update an existing one in Simplesat. The customer's email is used as the unique identifier — if a customer with the given email already exists, their record will be updated. Supplying custom attributes replaces the existing custom attributes, so include all values you want to retain.`,
   tags: {
     destructive: false
   }
@@ -19,9 +19,7 @@ export let upsertCustomer = SlateTool.create(spec, {
       customAttributes: z
         .record(z.string(), z.string())
         .optional()
-        .describe(
-          'Custom attribute key-value pairs (new attributes are created automatically)'
-        )
+        .describe('Custom attribute key-value pairs; replaces existing custom attributes')
     })
   )
   .output(

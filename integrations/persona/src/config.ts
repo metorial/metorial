@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     environment: z
       .enum(['production', 'sandbox'])
       .default('production')
-      .describe('Persona environment to use. Determines the expected API key prefix.')
+      .describe(
+        'Environment label for this connection. Your API key selects the API environment.'
+      )
   })
 );

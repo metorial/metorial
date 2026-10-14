@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let createLead = SlateTool.create(spec, {
   name: 'Create Lead',
   key: 'create_lead',
-  description: `Create a new lead (prospect) in PersistIQ. Provide contact details like email, name, company, and other fields. Optionally assign the lead to a specific user via their creator ID. Duplicate emails are silently skipped.`,
+  description: `Create a new lead (prospect) in PersistIQ. Provide contact details like email, name, company, and other fields. Optionally select the lead creator using List Users. Duplicate handling defaults to skipping the existing prospect; select update to merge fields into an existing lead.`,
   instructions: [
     'The email field is required for creating a lead.',
-    'If a lead with the same email already exists, the new record will not be added.'
+    'Use duplicateStrategy to choose whether to skip or update an existing lead with the same email.'
   ]
 })
   .input(
@@ -28,7 +28,11 @@ export let createLead = SlateTool.create(spec, {
       creatorId: z
         .string()
         .optional()
-        .describe('ID of the user to assign as the owner of this lead'),
+        .describe('ID of the lead creator. Call list_users to find user IDs.'),
+      duplicateStrategy: z
+        .enum(['skip', 'update'])
+        .optional()
+        .describe('How to handle an existing lead with the same email (default: skip)'),
       customFields: z
         .record(z.string(), z.string())
         .optional()
@@ -68,19 +72,28 @@ export let createLead = SlateTool.create(spec, {
       }
     }
 
-    let result = await client.createLeads([leadData], ctx.input.creatorId);
+    let result = await client.createLead(
+      leadData,
+      ctx.input.creatorId,
+      ctx.input.duplicateStrategy
+    );
 
-    let lead = result.leads?.[0] || {};
+    let lead = result.lead || result.leads?.[0];
+    if (!lead?.id) {
+      throw createApiServiceError(
+        'PersistIQ did not return a lead ID. The duplicate may have been skipped; call list_leads with the email to find the existing prospect before retrying.'
+      );
+    }
 
     return {
       output: {
-        leadId: lead.id || '',
+        leadId: lead.id,
         email: lead.data?.email || ctx.input.email,
         firstName: lead.data?.first_name || ctx.input.firstName,
         lastName: lead.data?.last_name || ctx.input.lastName,
         status: lead.status
       },
-      message: `Created lead **${ctx.input.firstName || ''} ${ctx.input.lastName || ''}** (${ctx.input.email}).`
+      message: `Processed lead **${ctx.input.firstName || ''} ${ctx.input.lastName || ''}** (${ctx.input.email}).`
     };
   })
   .build();

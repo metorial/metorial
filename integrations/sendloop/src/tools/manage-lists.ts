@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,7 @@ export let manageLists = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let {
@@ -66,7 +66,7 @@ export let manageLists = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('List name is required for create action');
+      if (!name) throw createApiServiceError('List name is required for create action');
       let result = await client.createList({
         name,
         optInMode: optInMode || undefined,
@@ -87,7 +87,7 @@ export let manageLists = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!listId) throw new Error('List ID is required for update action');
+      if (!listId) throw createApiServiceError('List ID is required for update action');
       await client.updateList(listId, {
         name,
         optInMode: optInMode || undefined,
@@ -108,7 +108,7 @@ export let manageLists = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!listId) throw new Error('List ID is required for delete action');
+      if (!listId) throw createApiServiceError('List ID is required for delete action');
       await client.deleteList(listId);
 
       return {
@@ -120,6 +120,6 @@ export let manageLists = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -52,7 +52,13 @@ export let getSchedulingInfo = SlateTool.create(spec, {
       output: {
         success: result.success,
         orderScheduled: result.orderScheduled,
-        scheduleInformation: result.scheduleInformation,
+        scheduleInformation: result.scheduleInformation
+          ? {
+              ...result.scheduleInformation,
+              vehicleLabel: result.scheduleInformation.vehicleLabel ?? undefined,
+              vehicleRegistration: result.scheduleInformation.vehicleRegistration ?? undefined
+            }
+          : undefined,
         code: result.code,
         message: result.message
       },

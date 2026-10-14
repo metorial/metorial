@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -79,6 +79,25 @@ export let geocodeAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let structured = [
+      ctx.input.name,
+      ctx.input.housenumber,
+      ctx.input.street,
+      ctx.input.postcode,
+      ctx.input.city,
+      ctx.input.state,
+      ctx.input.country
+    ].some(value => value?.trim());
+    if (!ctx.input.text?.trim() && !structured) {
+      throw createApiServiceError(
+        'Provide address text or at least one structured address component.'
+      );
+    }
+    if (ctx.input.text?.trim() && structured) {
+      throw createApiServiceError(
+        'Provide either address text or structured address components, not both.'
+      );
+    }
     let client = new GeoapifyClient({ token: ctx.auth.token });
 
     let data = await client.geocodeForward({

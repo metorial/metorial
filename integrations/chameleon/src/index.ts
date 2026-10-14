@@ -19,11 +19,17 @@ import {
   searchProfiles,
   updateExperience,
   updateMicrosurvey,
-  updateTour
+  updateTour,
+  upsertCompany,
+  upsertProfile,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
+    upsertProfile,
+    upsertCompany,
     searchProfiles,
     getProfile,
     deleteProfile,

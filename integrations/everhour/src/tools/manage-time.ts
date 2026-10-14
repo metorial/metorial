@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,8 +38,19 @@ export let listTimeRecords = SlateTool.create(spec, {
         .describe('Project ID (required when scope is "project")'),
       from: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       to: z.string().optional().describe('End date (YYYY-MM-DD)'),
-      limit: z.number().optional().describe('Maximum number of records'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number within the safe integer range')
+        .min(1)
+        .max(50000)
+        .optional()
+        .describe('Maximum number of records (1-50,000)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number within the safe integer range')
+        .min(1)
+        .optional()
+        .describe('Page number for pagination, starting at 1')
     })
   )
   .output(
@@ -59,16 +70,28 @@ export let listTimeRecords = SlateTool.create(spec, {
 
     switch (ctx.input.scope) {
       case 'user':
-        records = await client.listUserTime(ctx.input.userId!, params);
+        if (ctx.input.userId === undefined) {
+          throw createApiServiceError(
+            'userId is required when scope is "user". Call list_users to find user IDs.'
+          );
+        }
+        records = await client.listUserTime(ctx.input.userId, params);
         break;
       case 'task':
-        records = await client.listTaskTime(ctx.input.taskId!, {
-          from: ctx.input.from,
-          to: ctx.input.to
-        });
+        if (!ctx.input.taskId?.trim()) {
+          throw createApiServiceError(
+            'taskId is required when scope is "task". Call list_tasks to find task IDs.'
+          );
+        }
+        records = await client.listTaskTime(ctx.input.taskId, params);
         break;
       case 'project':
-        records = await client.listProjectTime(ctx.input.projectId!, params);
+        if (!ctx.input.projectId?.trim()) {
+          throw createApiServiceError(
+            'projectId is required when scope is "project". Call list_projects to find project IDs.'
+          );
+        }
+        records = await client.listProjectTime(ctx.input.projectId, params);
         break;
       default:
         records = await client.listTeamTime(params);
@@ -79,11 +102,11 @@ export let listTimeRecords = SlateTool.create(spec, {
       timeSeconds: r.time,
       userId: r.user,
       date: r.date,
-      taskId: r.task?.id,
-      taskName: r.task?.name,
-      isLocked: r.isLocked,
-      isInvoiced: r.isInvoiced,
-      comment: r.comment
+      taskId: r.task?.id ?? undefined,
+      taskName: r.task?.name ?? undefined,
+      isLocked: r.isLocked ?? undefined,
+      isInvoiced: r.isInvoiced ?? undefined,
+      comment: r.comment ?? undefined
     }));
 
     return {
@@ -126,11 +149,11 @@ export let logTime = SlateTool.create(spec, {
         timeSeconds: result.time,
         userId: result.user,
         date: result.date,
-        taskId: result.task?.id,
-        taskName: result.task?.name,
-        isLocked: result.isLocked,
-        isInvoiced: result.isInvoiced,
-        comment: result.comment
+        taskId: result.task?.id ?? undefined,
+        taskName: result.task?.name ?? undefined,
+        isLocked: result.isLocked ?? undefined,
+        isInvoiced: result.isInvoiced ?? undefined,
+        comment: result.comment ?? undefined
       },
       message: `Logged **${Math.round(ctx.input.timeSeconds / 60)} minutes** on ${ctx.input.date}.`
     };
@@ -168,11 +191,11 @@ export let updateTimeRecord = SlateTool.create(spec, {
         timeSeconds: result.time,
         userId: result.user,
         date: result.date,
-        taskId: result.task?.id,
-        taskName: result.task?.name,
-        isLocked: result.isLocked,
-        isInvoiced: result.isInvoiced,
-        comment: result.comment
+        taskId: result.task?.id ?? undefined,
+        taskName: result.task?.name ?? undefined,
+        isLocked: result.isLocked ?? undefined,
+        isInvoiced: result.isInvoiced ?? undefined,
+        comment: result.comment ?? undefined
       },
       message: `Updated time record ${timeRecordId}.`
     };

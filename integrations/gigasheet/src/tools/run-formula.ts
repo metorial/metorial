@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,7 +46,7 @@ export let runFormula = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'run':
-        if (!ctx.input.formula) throw new Error('formula is required for run');
+        if (!ctx.input.formula) throw createApiServiceError('formula is required for run');
         result = await client.runFormula(ctx.input.sheetHandle, {
           formula: ctx.input.formula,
           newColumnName: ctx.input.newColumnName
@@ -54,17 +54,18 @@ export let runFormula = SlateTool.create(spec, {
         break;
 
       case 'validate':
-        if (!ctx.input.formula) throw new Error('formula is required for validate');
+        if (!ctx.input.formula)
+          throw createApiServiceError('formula is required for validate');
         result = await client.validateFormula(ctx.input.sheetHandle, ctx.input.formula);
         break;
 
       case 'preview':
-        if (!ctx.input.formula) throw new Error('formula is required for preview');
+        if (!ctx.input.formula) throw createApiServiceError('formula is required for preview');
         result = await client.previewFormula(ctx.input.sheetHandle, ctx.input.formula);
         break;
 
       case 'ai_build':
-        if (!ctx.input.prompt) throw new Error('prompt is required for ai_build');
+        if (!ctx.input.prompt) throw createApiServiceError('prompt is required for ai_build');
         result = await client.formulaBuilder(ctx.input.sheetHandle, ctx.input.prompt);
         break;
     }

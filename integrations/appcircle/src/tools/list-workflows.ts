@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
@@ -21,7 +21,7 @@ export let listWorkflows = SlateTool.create(spec, {
       z
         .object({
           workflowId: z.string().optional(),
-          workflowName: z.string().optional()
+          workflowName: z.string().nullish()
         })
         .passthrough()
     )
@@ -30,7 +30,7 @@ export let listWorkflows = SlateTool.create(spec, {
     let client = createClient(ctx);
     let workflows = await client.listWorkflows(ctx.input.profileId);
 
-    let items = Array.isArray(workflows) ? workflows : [];
+    let items = getAppcircleList(workflows, 'list');
 
     return {
       output: items,

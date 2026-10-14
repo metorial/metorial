@@ -1,18 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attributeSchema, validateExtraction } from '../lib/schemas';
 import { spec } from '../spec';
-
-let attributeSchema = z.object({
-  name: z.string().describe('Name of the data field to extract'),
-  description: z
-    .string()
-    .describe('Natural-language description of what this field should contain'),
-  type: z
-    .enum(['string', 'integer', 'number', 'bool', 'list'])
-    .optional()
-    .describe('Expected output type for this field')
-});
 
 export let parseContentTool = SlateTool.create(spec, {
   name: 'Parse Content',
@@ -52,6 +42,7 @@ Useful when you have pre-fetched HTML or text and want AI-powered data extractio
     })
   )
   .handleInvocation(async ctx => {
+    validateExtraction(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let results = await client.parse({
@@ -61,10 +52,10 @@ Useful when you have pre-fetched HTML or text and want AI-powered data extractio
       mode: ctx.input.mode
     });
 
-    let count = Array.isArray(results) ? results.length : 0;
+    let count = results.length;
 
     return {
-      output: { results: Array.isArray(results) ? results : [] },
+      output: { results },
       message: `Extracted **${count}** record(s) from the provided content`
     };
   })

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSprintsTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listSprintsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID to list sprints for')
+      projectId: projectIdSchema
     })
   )
   .output(
@@ -41,7 +42,7 @@ export let createSprintTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       name: z.string().describe('Sprint name'),
       goal: z.string().optional().describe('Sprint goal description'),
       startDate: z.string().optional().describe('Sprint start date (ISO 8601)'),
@@ -66,10 +67,6 @@ export let createSprintTool = SlateTool.create(spec, {
       endDate: ctx.input.endDate,
       assigneeId: ctx.input.assigneeId
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to create sprint');
-    }
 
     return {
       output: { success: true, raw: response.data },
@@ -101,7 +98,7 @@ export let updateSprintTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.updateSprint({
+    await client.updateSprint({
       sprintId: ctx.input.sprintId,
       name: ctx.input.name,
       goal: ctx.input.goal,
@@ -109,10 +106,6 @@ export let updateSprintTool = SlateTool.create(spec, {
       endDate: ctx.input.endDate,
       assigneeId: ctx.input.assigneeId
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update sprint');
-    }
 
     return {
       output: { success: true },
@@ -142,11 +135,7 @@ export let deleteSprintTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteSprint(ctx.input.sprintId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete sprint');
-    }
+    await client.deleteSprint(ctx.input.sprintId);
 
     return {
       output: { success: true },

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getKeyInfo = SlateTool.create(spec, {
   name: 'Get API Key Info',
   key: 'get_key_info',
-  description: `Retrieve details about an API key including remaining lookups, available datasets, usage limits, and daily limits. Can also check basic key availability (public info) or get detailed private information.`,
+  description: `Retrieve details about an API key including remaining lookups, available datasets, usage limits, and daily limits. Private details require the account Management Key on the connection. Set includeDetails to false for a public availability check.`,
   tags: {
     readOnly: true
   }
@@ -57,7 +57,7 @@ export let getKeyInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     if (!ctx.input.includeDetails) {
       let result = await client.getKeyAvailability(ctx.input.apiKey);
@@ -76,24 +76,30 @@ export let getKeyInfo = SlateTool.create(spec, {
     let r = result.result || {};
 
     let output = {
-      available: true,
+      available: r.available ?? undefined,
       remainingLookups: r.lookups_remaining,
       dailyLimit: r.daily_limit
         ? {
-            limit: r.daily_limit.limit,
-            consumed: r.daily_limit.consumed
+            limit: r.daily_limit.limit ?? undefined,
+            consumed: r.daily_limit.consumed ?? undefined
           }
         : undefined,
       individualLimit: r.individual_limit
         ? {
-            limit: r.individual_limit.limit,
-            consumed: r.individual_limit.consumed
+            limit: r.individual_limit.limit ?? undefined,
+            consumed: r.individual_limit.consumed ?? undefined
           }
         : undefined,
-      datasets: r.datasets,
+      datasets: Array.isArray(r.datasets)
+        ? r.datasets
+        : r.datasets
+          ? Object.entries(r.datasets)
+              .filter(([, enabled]) => enabled === true)
+              .map(([name]) => name)
+          : undefined,
       allowedUrls: r.allowed_urls,
       notifications: r.notifications,
-      enabled: r.enabled,
+      enabled: r.enabled ?? undefined,
       code: result.code
     };
 

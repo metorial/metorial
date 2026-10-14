@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let launchWorkflow = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let launchWorkflow = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       pipeline: z.string().describe('Pipeline repository URL or name'),
       computeEnvId: z.string().optional().describe('Compute environment ID'),
       workDir: z.string().optional().describe('Work directory (e.g., s3://bucket/work)'),
@@ -60,8 +62,8 @@ export let launchWorkflow = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.launchWorkflow({

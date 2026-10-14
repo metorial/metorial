@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchTimeEntries = SlateTool.create(spec, {
   name: 'Search Time Entries',
   key: 'search_time_entries',
-  description: `Search and filter timesheet entries using advanced query operators. Filter by resource, project, date ranges, and status.
+  description: `Search and filter timesheet entries using advanced query operators. Filter by resource, project, date ranges, and status. Use page and limit to retrieve additional results; the API returns 20 entries by default.
 Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gt**, **$gte** for flexible querying.`,
   constraints: ['Requires the Timesheets extension to be enabled on the account.'],
   tags: {
@@ -15,6 +15,14 @@ Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gt**, **$gte** for f
 })
   .input(
     z.object({
+      page: z.number().int().min(0).optional().describe('Page number (0-based)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Results per page, up to 1000'),
       resources: z
         .any()
         .optional()
@@ -59,19 +67,19 @@ Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gt**, **$gte** for f
     if (ctx.input.status !== undefined) filters.status = ctx.input.status;
     if (ctx.input.metadata !== undefined) filters.metadata = ctx.input.metadata;
 
-    let entries = await client.searchTimeEntries(filters);
+    let entries = await client.searchTimeEntries(filters, ctx.input.page, ctx.input.limit);
     return {
       output: {
         timeEntries: entries.map((e: any) => ({
           timeEntryId: e._id,
-          resourceId: e.resource,
-          projectId: e.project,
-          date: e.date,
-          minutes: e.minutes,
-          status: e.status,
-          note: e.note,
-          createdDate: e.createdDate,
-          updatedDate: e.updatedDate
+          resourceId: e.resource ?? undefined,
+          projectId: e.project ?? undefined,
+          date: e.date ?? undefined,
+          minutes: e.minutes ?? undefined,
+          status: e.status ?? undefined,
+          note: e.note ?? undefined,
+          createdDate: e.createdDate ?? undefined,
+          updatedDate: e.updatedDate ?? undefined
         }))
       },
       message: `Found **${entries.length}** time entries matching the search criteria.`

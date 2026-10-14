@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { parseAddressNumber } from '../lib/address-fields';
 import { AddressZenClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -35,7 +36,7 @@ export let resolveAddress = SlateTool.create(spec, {
   description: `Resolve a full address from an autocomplete suggestion ID. This is step 2 of the address autocomplete process: first use **Search Addresses** to get suggestions, then use this tool with the suggestion's address ID to retrieve complete address details.
 Returns standardized address components including street lines, city, state/county, postcode, and geographic coordinates.`,
   instructions: [
-    'Use "usa" format for US addresses and "gbr" format for UK or international addresses.',
+    'Use "usa" format for all licensed countries. The "gbr" option is retained for existing UK-format workflows.',
     'This operation consumes a lookup from your balance.'
   ],
   constraints: ['Each resolution decrements your lookup balance.'],
@@ -50,13 +51,13 @@ Returns standardized address components including street lines, city, state/coun
         .enum(['usa', 'gbr'])
         .default('usa')
         .describe(
-          'Address format: "usa" for US format (2 address lines, city, state, zip) or "gbr" for UK format (3 address lines, post town, postcode)'
+          'Address format: "usa" returns US-style fields for all licensed countries; "gbr" is the legacy UK-shaped format (3 address lines, post town, postcode)'
         )
     })
   )
   .output(addressSchema)
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     let result = await client.resolveAddress(ctx.input.addressId, ctx.input.format);
     let addr = result.result || {};
@@ -67,21 +68,21 @@ Returns standardized address components including street lines, city, state/coun
       line3: addr.line_3 || undefined,
       city: addr.city || addr.post_town || undefined,
       county: addr.county || undefined,
-      state: addr.state || undefined,
-      postcode: addr.postcode || undefined,
-      zipCode: addr.zip_code || addr.zip_plus_4_code || undefined,
+      state: addr.state_abbreviation || addr.state || undefined,
+      postcode: addr.postcode || addr.zip_code || undefined,
+      zipCode: addr.zip_plus_4_code || addr.zip_code || undefined,
       country: addr.country || undefined,
       countryIso: addr.country_iso || undefined,
-      latitude: addr.latitude !== undefined ? Number(addr.latitude) : undefined,
-      longitude: addr.longitude !== undefined ? Number(addr.longitude) : undefined,
-      udprn: addr.udprn,
-      umprn: addr.umprn,
+      latitude: parseAddressNumber(addr.latitude),
+      longitude: parseAddressNumber(addr.longitude),
+      udprn: parseAddressNumber(addr.udprn),
+      umprn: parseAddressNumber(addr.umprn),
       uprn: addr.uprn?.toString(),
       buildingName: addr.building_name || undefined,
       buildingNumber: addr.building_number || undefined,
       subBuildingName: addr.sub_building_name || undefined,
       thoroughfare: addr.thoroughfare || undefined,
-      dependentLocality: addr.dependent_locality || undefined,
+      dependentLocality: addr.dependent_locality || addr.dependant_locality || undefined,
       district: addr.district || undefined,
       ward: addr.ward || undefined,
       organisationName: addr.organisation_name || undefined

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let contactOutputSchema = z.object({
@@ -24,11 +25,11 @@ let mapContact = (c: any) => ({
   firstname: c.firstname,
   lastname: c.lastname,
   gender: c.gender,
-  title: c.title,
-  jobPosition: c.job_position,
-  email: c.email,
-  phone: c.phone,
-  mobile: c.mobile,
+  title: c.title ?? undefined,
+  jobPosition: c.job_position ?? undefined,
+  email: c.work_email ?? undefined,
+  phone: c.work_phone ?? undefined,
+  mobile: c.mobile_phone ?? undefined,
   company: c.company,
   tags: c.tags,
   createdAt: c.created_at,
@@ -45,6 +46,7 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       tags: z.string().optional().describe('Comma-separated list of tags to filter by'),
       term: z.string().optional().describe('Full-text search term'),
       phone: z.string().optional().describe('Filter by phone number')
@@ -59,6 +61,8 @@ export let listContacts = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.tags) params.tags = ctx.input.tags;
     if (ctx.input.term) params.term = ctx.input.term;
     if (ctx.input.phone) params.phone = ctx.input.phone;
@@ -132,9 +136,9 @@ export let createContact = SlateTool.create(spec, {
     if (ctx.input.firstname) data.firstname = ctx.input.firstname;
     if (ctx.input.title) data.title = ctx.input.title;
     if (ctx.input.jobPosition) data.job_position = ctx.input.jobPosition;
-    if (ctx.input.email) data.email = ctx.input.email;
-    if (ctx.input.phone) data.phone = ctx.input.phone;
-    if (ctx.input.mobile) data.mobile = ctx.input.mobile;
+    if (ctx.input.email) data.work_email = ctx.input.email;
+    if (ctx.input.phone) data.work_phone = ctx.input.phone;
+    if (ctx.input.mobile) data.mobile_phone = ctx.input.mobile;
     if (ctx.input.companyId) data.company_id = ctx.input.companyId;
     if (ctx.input.tags) data.tags = ctx.input.tags;
 
@@ -179,9 +183,9 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.gender) data.gender = ctx.input.gender;
     if (ctx.input.title !== undefined) data.title = ctx.input.title;
     if (ctx.input.jobPosition !== undefined) data.job_position = ctx.input.jobPosition;
-    if (ctx.input.email !== undefined) data.email = ctx.input.email;
-    if (ctx.input.phone !== undefined) data.phone = ctx.input.phone;
-    if (ctx.input.mobile !== undefined) data.mobile = ctx.input.mobile;
+    if (ctx.input.email !== undefined) data.work_email = ctx.input.email;
+    if (ctx.input.phone !== undefined) data.work_phone = ctx.input.phone;
+    if (ctx.input.mobile !== undefined) data.mobile_phone = ctx.input.mobile;
     if (ctx.input.tags) data.tags = ctx.input.tags;
 
     let c = await client.updateContact(ctx.input.contactId, data);

@@ -1,11 +1,87 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+
+let parseErrorData = (value: unknown): unknown => {
+  let data = value;
+  if (data instanceof ArrayBuffer) {
+    data = Buffer.from(data).toString('utf8');
+  } else if (data instanceof Uint8Array) {
+    data = Buffer.from(data).toString('utf8');
+  }
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return data;
+    }
+  }
+  if (isApiErrorRecord(data)) {
+    if (isApiErrorRecord(data.result) && isApiErrorRecord(data.result.error)) {
+      return data.result.error;
+    }
+    if (isApiErrorRecord(data.error)) return data.error;
+  }
+  return data;
+};
 
 export class Client {
   private http;
 
   constructor(private token: string) {
-    this.http = createAxios({
-      baseURL: 'https://api.scrapfly.io'
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.scrapfly.io',
+      contentType: false,
+      timeout: 155000,
+      errorMapping: {
+        extractResponseData: response => parseErrorData(response.data),
+        mapAxiosError: (error, inferred) => {
+          let data = parseErrorData(error.response?.data);
+          return {
+            ...inferred,
+            retryable:
+              isApiErrorRecord(data) && typeof data.retryable === 'boolean'
+                ? data.retryable
+                : inferred.retryable
+          };
+        }
+      },
+      errorAdapter: error => {
+        let adapted = buildApiServiceError(error, {
+          providerLabel: 'Scrapfly',
+          reason: 'scrapfly_api_error',
+          detailKeys: ['message', 'description', 'detail', 'error_description', 'code'],
+          nestedKeys: ['error', 'errors', 'result'],
+          extractUpstreamCode: (_failure, response, helpers) => {
+            let data = response?.data;
+            return helpers.isRecord(data) && typeof data.code === 'string'
+              ? data.code
+              : undefined;
+          },
+          extractResponse: (failure, helpers) => {
+            let response = helpers.getResponse(failure);
+            let data =
+              helpers.isRecord(failure) && helpers.isRecord(failure.data)
+                ? failure.data
+                : undefined;
+            let baggage = helpers.isRecord(data?.baggage) ? data.baggage : undefined;
+            let upstream = helpers.isRecord(data?.upstream) ? data.upstream : undefined;
+            let status = response?.status ?? upstream?.status ?? data?.status;
+            return {
+              ...response,
+              status:
+                typeof status === 'number' || typeof status === 'string' ? status : undefined,
+              data: response?.data ?? baggage?.response
+            };
+          }
+        });
+        if (
+          isApiErrorRecord(error) &&
+          isApiErrorRecord(error.data) &&
+          typeof error.data.retryable === 'boolean'
+        ) {
+          adapted.data.retryable = error.data.retryable;
+        }
+        return adapted;
+      }
     });
   }
 
@@ -64,26 +140,14 @@ export class Client {
       }
     }
 
-    let axiosConfig: any = { params, headers };
-
-    if (options.body) {
-      axiosConfig.data = options.body;
-    }
-
     let method = (options.method ?? 'GET').toLowerCase();
-    let response: any;
-
-    if (method === 'post' || method === 'put' || method === 'patch') {
-      response = await this.http.request({
-        method,
-        url: '/scrape',
-        params,
-        headers,
-        data: options.body
-      });
-    } else {
-      response = await this.http.get('/scrape', { params, headers });
-    }
+    let response = await this.http.request({
+      method,
+      url: '/scrape',
+      params,
+      headers,
+      data: options.body
+    });
 
     return response.data;
   }
@@ -214,26 +278,41 @@ export class Client {
   }
 
   async getCrawlStatus(crawlerUuid: string): Promise<any> {
-    let response = await this.http.get(`/crawl/${crawlerUuid}/status`, {
+    let response = await this.http.get(`/crawl/${encodeURIComponent(crawlerUuid)}/status`, {
       params: this.params()
     });
     return response.data;
   }
 
-  async getCrawlUrls(crawlerUuid: string): Promise<any> {
-    let response = await this.http.get(`/crawl/${crawlerUuid}/urls`, {
-      params: this.params()
+  async getCrawlUrls(crawlerUuid: string, status?: string): Promise<any> {
+    let response = await this.http.get(`/crawl/${encodeURIComponent(crawlerUuid)}/urls`, {
+      params: this.params(status ? { status } : {}),
+      responseType: 'text'
     });
     return response.data;
   }
 
-  async getCrawlContents(crawlerUuid: string, format?: string): Promise<any> {
+  async getCrawlContents(
+    crawlerUuid: string,
+    format?: string,
+    options: { limit?: number; offset?: number; url?: string } = {}
+  ): Promise<any> {
     let params: Record<string, any> = this.params();
-    if (format) params.format = format;
-    let response = await this.http.get(`/crawl/${crawlerUuid}/contents`, {
-      params
+    if (format) params.formats = format;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.offset !== undefined) params.offset = options.offset;
+    if (options.url !== undefined) params.url = options.url;
+    let response = await this.http.get(`/crawl/${encodeURIComponent(crawlerUuid)}/contents`, {
+      params,
+      headers: { Accept: 'application/json' }
     });
     return response.data;
+  }
+
+  async cancelCrawl(crawlerUuid: string): Promise<void> {
+    await this.http.post(`/crawl/${encodeURIComponent(crawlerUuid)}/cancel`, undefined, {
+      params: this.params()
+    });
   }
 
   // ── Account API ─────────────────────────────────────────────────────

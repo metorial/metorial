@@ -56,7 +56,9 @@ export let updateCampaign = SlateTool.create(spec, {
     if (ctx.input.listUnsubscribe !== undefined)
       settings.list_unsubscribe = ctx.input.listUnsubscribe;
     if (ctx.input.trackOpens !== undefined)
-      settings.open_disabled_list = !ctx.input.trackOpens;
+      settings.open_disabled_list = ctx.input.trackOpens
+        ? []
+        : ['google.com', 'outlook.com', 'OTHER_PROVIDER'];
 
     if (Object.keys(settings).length > 0) {
       payload.settings = settings;

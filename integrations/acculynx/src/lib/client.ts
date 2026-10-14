@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.acculynx.com/api/v2';
 let WEBHOOKS_BASE_URL = 'https://api.acculynx.com/webhooks/v2';
@@ -8,20 +8,65 @@ export class Client {
   private webhooksApi;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'AccuLynx',
+        reason: 'acculynx_api_error',
+        detailKeys: ['detail', 'title', 'message']
+      });
+    this.api = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter
     });
-    this.webhooksApi = createAxios({
+    this.webhooksApi = createAuthenticatedAxios({
       baseURL: WEBHOOKS_BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter
     });
+  }
+
+  private async resolveJobSettingId(
+    path: string,
+    value: string,
+    label: string,
+    idKey = 'id',
+    numericId = false
+  ): Promise<string | number> {
+    if (numericId && /^\d+$/.test(value)) return Number(value);
+    if (!numericId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value))
+      return value;
+
+    let index = 0;
+    while (index <= 100000) {
+      let response = await this.api.get(path, {
+        params: { pageSize: 25, recordStartIndex: index }
+      });
+      let result = response.data;
+      let items: Record<string, any>[] = Array.isArray(result)
+        ? result
+        : (result?.items ?? []);
+      let matches = items.filter(
+        item =>
+          typeof item.name === 'string' && item.name.toLowerCase() === value.toLowerCase()
+      );
+      if (matches.length === 1 && matches[0]?.[idKey] !== undefined) {
+        return matches[0][idKey];
+      }
+      if (matches.length > 1) break;
+      let nextIndex = index + items.length;
+      if (
+        items.length < 25 ||
+        (typeof result?.count === 'number' && nextIndex >= result.count)
+      ) {
+        break;
+      }
+      index = nextIndex;
+    }
+    throw createApiServiceError(
+      `The ${label} "${value}" could not be uniquely resolved. Provide its provider ID instead.`,
+      { reason: 'invalid_acculynx_reference' }
+    );
   }
 
   // --- Jobs ---
@@ -39,7 +84,14 @@ export class Client {
     assignment?: string;
     filterByDate?: string;
   }) {
-    let response = await this.api.get('/jobs', { params });
+    let { pageStartIndex, filterByDate, ...rest } = params ?? {};
+    let response = await this.api.get('/jobs', {
+      params: {
+        ...rest,
+        recordStartIndex: pageStartIndex,
+        dateFilterType: rest.dateFilterType ?? filterByDate
+      }
+    });
     return response.data;
   }
 
@@ -56,13 +108,88 @@ export class Client {
     leadSourceChild?: string;
     estimatedJobValue?: number;
     description?: string;
+    tradeTypeIds?: string[];
+    workTypeId?: number;
+    leadSourceId?: string;
+    jobCategoryId?: number;
+    priority?: 'Urgent' | 'High' | 'Normal';
   }) {
-    let response = await this.api.post('/jobs', data);
+    if (data.estimatedJobValue !== undefined || data.leadSourceChild !== undefined) {
+      throw createApiServiceError(
+        'The job creation API does not support estimatedJobValue or leadSourceChild. Omit these fields.',
+        { reason: 'unsupported_acculynx_job_fields' }
+      );
+    }
+    let tradeTypeIds = data.tradeTypeIds;
+    if (!tradeTypeIds && data.tradeType) {
+      tradeTypeIds = [
+        String(
+          await this.resolveJobSettingId(
+            '/company-settings/job-file-settings/trade-types',
+            data.tradeType,
+            'trade type',
+            'tradeId'
+          )
+        )
+      ];
+    }
+    let workTypeId = data.workTypeId;
+    if (workTypeId === undefined && data.workType) {
+      workTypeId = Number(
+        await this.resolveJobSettingId(
+          '/company-settings/job-file-settings/work-types',
+          data.workType,
+          'work type',
+          'id',
+          true
+        )
+      );
+    }
+    let leadSourceId = data.leadSourceId;
+    if (!leadSourceId && data.leadSource) {
+      leadSourceId = String(
+        await this.resolveJobSettingId(
+          '/company-settings/leads/lead-sources',
+          data.leadSource,
+          'lead source'
+        )
+      );
+    }
+    let response = await this.api.post('/jobs', {
+      contact: { id: data.contactId },
+      tradeTypes: tradeTypeIds?.map(id => ({ id })),
+      workType: workTypeId === undefined ? undefined : { id: workTypeId },
+      leadSource: leadSourceId ? { id: leadSourceId } : undefined,
+      jobCategory: data.jobCategoryId === undefined ? undefined : { id: data.jobCategoryId },
+      priority: data.priority,
+      notes: data.description
+    });
     return response.data;
   }
 
-  async searchJobs(data: { query?: string; pageSize?: number; pageStartIndex?: number }) {
-    let response = await this.api.post('/jobs/search', data);
+  async searchJobs(data: {
+    query?: string;
+    pageSize?: number;
+    pageStartIndex?: number;
+    includes?: string;
+    geoLocation?: { latitude: number; longitude: number; mapRadius?: number };
+  }) {
+    if (!data.query?.trim() && !data.geoLocation) {
+      throw createApiServiceError('Provide a non-empty query or geoLocation to search jobs.', {
+        reason: 'missing_acculynx_job_search'
+      });
+    }
+    let response = await this.api.post(
+      '/jobs/search',
+      { searchTerm: data.query, geoLocation: data.geoLocation },
+      {
+        params: {
+          pageSize: data.pageSize,
+          recordStartIndex: data.pageStartIndex,
+          includes: data.includes
+        }
+      }
+    );
     return response.data;
   }
 
@@ -168,6 +295,66 @@ export class Client {
     return response.data;
   }
 
+  private async resolveContactTypeId(value: string): Promise<string> {
+    if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)) return value;
+
+    for (let pageStartIndex = 0; pageStartIndex <= 4000; pageStartIndex++) {
+      let result = await this.getContactTypes({ pageSize: 25, pageStartIndex });
+      let items: { id: string; name?: string }[] = Array.isArray(result)
+        ? result
+        : (result?.items ?? []);
+      let matches = items.filter(
+        item => item.name?.toLowerCase() === value.trim().toLowerCase()
+      );
+      if (matches.length === 1 && matches[0]?.id) return matches[0].id;
+      if (
+        matches.length > 1 ||
+        items.length < 25 ||
+        (typeof result?.count === 'number' && (pageStartIndex + 1) * 25 >= result.count)
+      ) {
+        break;
+      }
+    }
+    throw createApiServiceError(
+      `The contact type "${value}" could not be uniquely resolved. Provide a valid contact type name or ID.`,
+      { reason: 'invalid_acculynx_contact_type' }
+    );
+  }
+
+  private async resolveContactLocationId(
+    value: string,
+    label: 'country' | 'state',
+    countryId?: number
+  ): Promise<number> {
+    let numericId = Number(value);
+    if (/^\d+$/.test(value) && Number.isSafeInteger(numericId) && numericId > 0) {
+      return numericId;
+    }
+    if (label === 'state' && countryId === undefined) {
+      throw createApiServiceError(
+        'Provide country when using a state name or abbreviation, or provide the numeric state ID.',
+        { reason: 'missing_acculynx_contact_country' }
+      );
+    }
+    let result =
+      label === 'country'
+        ? await this.getCountries()
+        : await this.getStates(String(countryId));
+    let items: { id: number; name?: string; abbreviation?: string }[] = Array.isArray(result)
+      ? result
+      : (result?.items ?? []);
+    let matches = items.filter(item =>
+      [item.name, item.abbreviation].some(
+        name => typeof name === 'string' && name.toLowerCase() === value.trim().toLowerCase()
+      )
+    );
+    if (matches.length === 1 && Number.isSafeInteger(matches[0]?.id)) return matches[0]!.id;
+    throw createApiServiceError(
+      `The ${label} "${value}" could not be uniquely resolved. Provide a valid name, abbreviation, or numeric ID.`,
+      { reason: 'invalid_acculynx_contact_location' }
+    );
+  }
+
   async createContact(data: {
     firstName?: string;
     lastName?: string;
@@ -183,17 +370,125 @@ export class Client {
     emailAddresses?: { emailAddress: string; isPrimary?: boolean }[];
     phoneNumbers?: { phoneNumber: string; type?: string; isPrimary?: boolean }[];
   }) {
-    let response = await this.api.post('/contacts', data);
+    let phoneTypes: Record<string, 'Home' | 'Mobile' | 'Work'> = {
+      home: 'Home',
+      mobile: 'Mobile',
+      work: 'Work'
+    };
+    let phoneNumbers = data.phoneNumbers?.map(phone => {
+      let type = phoneTypes[(phone.type ?? 'Home').trim().toLowerCase()];
+      if (!/^\d{10}$/.test(phone.phoneNumber) || !type) {
+        throw createApiServiceError(
+          'Each phone number must contain exactly 10 digits and use type Home, Mobile, or Work.',
+          { reason: 'invalid_acculynx_contact_phone' }
+        );
+      }
+      return { number: phone.phoneNumber, type, primary: phone.isPrimary };
+    });
+    let countryId =
+      data.address?.country === undefined
+        ? undefined
+        : await this.resolveContactLocationId(data.address.country, 'country');
+    let stateId =
+      data.address?.state === undefined
+        ? undefined
+        : await this.resolveContactLocationId(data.address.state, 'state', countryId);
+    let contactTypeId =
+      data.contactType === undefined
+        ? undefined
+        : await this.resolveContactTypeId(data.contactType);
+    let response = await this.api.post('/contacts', {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      companyName: data.companyName,
+      contactTypeIds: contactTypeId === undefined ? undefined : [contactTypeId],
+      mailingAddress: data.address
+        ? {
+            street1: data.address.street,
+            city: data.address.city,
+            zipCode: data.address.zip,
+            state: stateId === undefined ? undefined : { id: stateId },
+            country: countryId === undefined ? undefined : { id: countryId }
+          }
+        : undefined,
+      emailAddresses: data.emailAddresses?.map(email => ({
+        address: email.emailAddress,
+        primary: email.isPrimary
+      })),
+      phoneNumbers
+    });
     return response.data;
   }
 
-  async searchContacts(data: { query?: string; pageSize?: number; pageStartIndex?: number }) {
-    let response = await this.api.post('/contacts/search', data);
+  async searchContacts(data: {
+    query?: string;
+    pageSize?: number;
+    pageStartIndex?: number;
+    startDate?: string;
+    endDate?: string;
+    contactTypes?: string[];
+    sortColumn?:
+      | 'CreatedDate'
+      | 'CompanyName'
+      | 'ContactType'
+      | 'firstName'
+      | 'lastName'
+      | 'LifeTimeValue';
+    sortDirection?: 'Ascending' | 'Descending';
+  }) {
+    let startDate = data.startDate ?? '1970-01-01T00:00:00Z';
+    let endDate = data.endDate ?? new Date().toISOString();
+    if (
+      !Number.isFinite(Date.parse(startDate)) ||
+      !Number.isFinite(Date.parse(endDate)) ||
+      Date.parse(startDate) > Date.parse(endDate)
+    ) {
+      throw createApiServiceError(
+        'Provide valid startDate and endDate values in chronological order.',
+        {
+          reason: 'invalid_acculynx_contact_search_dates'
+        }
+      );
+    }
+    let response = await this.api.post(
+      '/contacts/search',
+      {
+        searchTerm: data.query,
+        contactTypes: data.contactTypes,
+        startDate,
+        endDate,
+        sort: {
+          sortColumn: data.sortColumn ?? 'CreatedDate',
+          sortDirection: data.sortDirection ?? 'Ascending'
+        }
+      },
+      { params: { pageSize: data.pageSize, pageStartIndex: data.pageStartIndex } }
+    );
     return response.data;
   }
 
-  async getContactTypes() {
-    let response = await this.api.get('/contacts/types');
+  async getContactTypes(params?: { pageSize?: number; pageStartIndex?: number }) {
+    let response = await this.api.get('/contacts/contact-types', { params });
+    return response.data;
+  }
+
+  async getContactJobs(
+    contactId: string,
+    params?: { pageSize?: number; recordStartIndex?: number }
+  ) {
+    let response = await this.api.get(`/contacts/${encodeURIComponent(contactId)}/jobs`, {
+      params
+    });
+    return response.data;
+  }
+
+  async getJobCustomFields(
+    jobId: string,
+    params?: { pageSize?: number; recordStartIndex?: number }
+  ) {
+    let response = await this.api.get(`/jobs/${encodeURIComponent(jobId)}/custom-fields`, {
+      params
+    });
     return response.data;
   }
 
@@ -215,8 +510,42 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.api.post(`/contacts/${contactId}/logs`, data);
-    return response.data;
+    let logTypes: Record<string, 'PhoneCall' | 'SMS' | 'Email'> = {
+      phonecall: 'PhoneCall',
+      sms: 'SMS',
+      email: 'Email'
+    };
+    let type = logTypes[data.type?.replace(/\s+/g, '').toLowerCase() ?? ''];
+    if (!type || !data.date) {
+      throw createApiServiceError(
+        'Provide a date and communication type PhoneCall, Phone Call, SMS, or Email to create a contact log.',
+        { reason: 'invalid_acculynx_contact_log' }
+      );
+    }
+    let dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data.date);
+    let isoTimestamp =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/i.test(
+        data.date
+      );
+    let timestamp = Date.parse(dateOnly ? `${data.date}T00:00:00Z` : data.date);
+    let calendarDate = data.date.slice(0, 10);
+    let calendarTimestamp = Date.parse(`${calendarDate}T00:00:00Z`);
+    if (
+      (!dateOnly && !isoTimestamp) ||
+      !Number.isFinite(timestamp) ||
+      !Number.isFinite(calendarTimestamp) ||
+      new Date(calendarTimestamp).toISOString().slice(0, 10) !== calendarDate ||
+      (data.description?.length ?? 0) > 1000
+    ) {
+      throw createApiServiceError(
+        'Use a valid YYYY-MM-DD date or ISO 8601 timestamp with a timezone, and a description of at most 1000 characters.',
+        { reason: 'invalid_acculynx_contact_log' }
+      );
+    }
+    let logDate = new Date(timestamp).toISOString();
+    let submittedLog = { logDate, type, description: data.description };
+    await this.api.post(`/contacts/${encodeURIComponent(contactId)}/logs`, submittedLog);
+    return { contactId, ...submittedLog, accepted: true };
   }
 
   // --- Estimates ---
@@ -303,7 +632,7 @@ export class Client {
   }
 
   async getAccountingIntegrationStatus(jobId: string) {
-    let response = await this.api.get(`/jobs/${jobId}/accounting-integrations/sync-changes`);
+    let response = await this.api.get(`/jobs/${jobId}/accounting/integration-status`);
     return response.data;
   }
 
@@ -478,7 +807,9 @@ export class Client {
       body: string;
     }
   ) {
-    let response = await this.api.post(`/jobs/${jobId}/messages`, data);
+    let response = await this.api.post(`/jobs/${jobId}/messages`, {
+      message: data.subject ? `${data.subject}\n\n${data.body}` : data.body
+    });
     return response.data;
   }
 
@@ -489,7 +820,9 @@ export class Client {
       body: string;
     }
   ) {
-    let response = await this.api.post(`/jobs/${jobId}/messages/${messageId}/replies`, data);
+    let response = await this.api.post(`/jobs/${jobId}/messages/${messageId}/replies`, {
+      message: data.body
+    });
     return response.data;
   }
 

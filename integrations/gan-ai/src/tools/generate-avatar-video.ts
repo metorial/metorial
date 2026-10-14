@@ -43,7 +43,7 @@ export let generateAvatarVideo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.createAvatarVideo({
       avatarId: ctx.input.avatarId,
       title: ctx.input.title,

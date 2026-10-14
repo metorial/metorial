@@ -70,6 +70,10 @@ export let listCalls = SlateTool.create(spec, {
       from: z.string().optional().describe('Start date filter in ISO 8601 format'),
       to: z.string().optional().describe('End date filter in ISO 8601 format'),
       source: z.string().optional().describe('Filter by integration source slug'),
+      conversationTypeUuid: z
+        .string()
+        .optional()
+        .describe('Filter by conversation type UUID, obtainable from get_call'),
       sourceIds: z
         .array(z.string())
         .optional()
@@ -99,7 +103,8 @@ export let listCalls = SlateTool.create(spec, {
       pagination: z.object({
         page: z.number().describe('Current page number'),
         items: z.number().describe('Items per page'),
-        count: z.number().describe('Total number of calls matching the filter')
+        count: z.number().describe('Total number of calls matching the filter'),
+        pages: z.number().optional().describe('Total number of pages')
       })
     })
   )

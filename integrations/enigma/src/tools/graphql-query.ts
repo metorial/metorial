@@ -6,17 +6,15 @@ import { spec } from '../spec';
 export let graphqlQuery = SlateTool.create(spec, {
   name: 'GraphQL Query',
   key: 'graphql_query',
-  description: `Execute a custom GraphQL query against Enigma's API. Enables flexible queries for businesses, brands, operating locations, legal entities, and their relationships.
+  description: `Execute a custom GraphQL operation against Enigma's API. Enables flexible queries for businesses, brands, operating locations, legal entities, and their relationships.
 
 Use this for advanced queries that combine search, filtering, and nested data retrieval in a single request. Supports the full Enigma GraphQL schema including brands, operating locations, legal entities, card transactions, industries, and more.`,
   instructions: [
     "Refer to Enigma's GraphQL schema for available types and fields.",
     'Use the search query with SearchInput to find businesses by name, entity type, and address.',
-    'Pagination uses Relay-style cursors with first/last/after/before parameters.'
-  ],
-  tags: {
-    readOnly: true
-  }
+    'Top-level search pagination uses conditions.limit and conditions.pageToken; related attribute connections use first/last/after/before.',
+    'Query operations retrieve data. Mutation operations can change saved lists and other account resources.'
+  ]
 })
   .input(
     z.object({

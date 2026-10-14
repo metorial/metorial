@@ -1,4 +1,4 @@
-Let me get more details on the specific API features available.# Slates Specification for Penpot
+# Penpot Integration Specification
 
 ## Overview
 
@@ -22,7 +22,9 @@ The token is passed via the `Authorization` header with the `Token` prefix. Exam
 Authorization: Token <your-access-token>
 ```
 
-**Base URL:**
+**Instance URL:**
+
+Set `baseUrl` alongside the personal access token during authentication. The resolved URL is saved with the connection; older stored tool configuration remains a fallback for existing connections.
 
 - For the SaaS instance: `https://design.penpot.app`
 - For self-hosted instances: your custom domain
@@ -35,7 +37,7 @@ The backend RPC API URLs are changed from `/api/rpc/command/<name>` to `/api/mai
 
 ### Profile Management
 
-Retrieve and update the current user's profile information (name, email, avatar, etc.).
+Retrieve the current user's profile information, including their name, email, language, and default team/project IDs.
 
 ### Team Management
 
@@ -53,17 +55,13 @@ Create new design files, list projects, and manage file metadata. The API suppor
 
 Files contain pages. The API allows adding, removing, and organizing pages within design files.
 
-### Shape Operations
+### File Versions
 
-Shape Operations: Create rectangles, circles, frames, paths, text, and SVG shapes. Modify Designs: Update shape properties, move objects, resize, rotate, and style. Shapes can be queried and filtered by type, area, color, font, or text content. Detailed shape properties (colors, text, fonts, effects) can be retrieved.
-
-### Component System
-
-Create and manage reusable design components. Components can be searched by name across files and libraries.
-
-### Design Tokens
-
-Export your design tokens from Penpot into ready-to-use code or parseable data files. The API provides access to design tokens, supporting design-to-code workflows.
+`list_file_snapshots` returns visible saved versions with labels and stable IDs.
+`manage_file_snapshot` saves a version, restores a selected version, or deletes
+an eligible user-created version. Restore replaces the current design contents;
+retrieve `get_file` again before submitting page edits. Penpot enforces editing
+permissions, snapshot quotas, and locking rules. Lists are limited by the server.
 
 ### Media Assets
 
@@ -75,7 +73,7 @@ Add and retrieve comments on design files, enabling collaboration and feedback w
 
 ### File Export
 
-Export design data, including the ability to export files in Penpot's native format (.penpot) for import/migration.
+Download a design file in native .penpot format, optionally including linked libraries and embedded assets. Export completion is read from the provider event stream. Temporary download URLs are renewed when needed; a renewed export represents the current file contents.
 
 ## Events
 

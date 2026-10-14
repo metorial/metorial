@@ -4,7 +4,9 @@ import {
   getAccountInfo,
   getCampaignReport,
   getCampaigns,
+  getListReport,
   getLists,
+  importSubscribers,
   manageCampaigns,
   manageCustomFields,
   manageLists,
@@ -21,6 +23,8 @@ export let provider = Slate.create({
   tools: [
     getAccountInfo,
     getLists,
+    getListReport,
+    importSubscribers,
     manageLists,
     manageCustomFields,
     subscribe,

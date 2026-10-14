@@ -6,29 +6,53 @@ import { spec } from '../spec';
 export let listVersionsTool = SlateTool.create(spec, {
   name: 'List Versions',
   key: 'list_versions',
-  description: `List all versions (releases) in a project. Returns version names, descriptions, dates, and statuses.`,
+  description: `List one page of organization versions (releases). Returns version names, owner IDs, descriptions, dates, statuses, and total count.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID')
+      projectId: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy project context, accepted for compatibility. Leiga versions are organization-wide and cannot be filtered by project.'
+        ),
+      pageNumber: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(1)
+        .describe('Page number starting at 1'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(50)
+        .describe('Versions per page')
     })
   )
   .output(
     z.object({
-      versions: z.array(z.any()).describe('List of versions/releases')
+      versions: z.array(z.any()).describe('List of versions/releases'),
+      total: z.number().optional().describe('Total matching versions')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let response = await client.listVersions(ctx.input.projectId);
+    let response = await client.listVersions(
+      ctx.input.projectId,
+      ctx.input.pageNumber,
+      ctx.input.pageSize
+    );
 
-    let versions = response.data || [];
+    let versions = response.data?.list || [];
 
     return {
-      output: { versions },
+      output: { versions, total: response.data?.total },
       message: `Found **${versions.length}** version(s).`
     };
   })
@@ -37,12 +61,23 @@ export let listVersionsTool = SlateTool.create(spec, {
 export let createVersionTool = SlateTool.create(spec, {
   name: 'Create Version',
   key: 'create_version',
-  description: `Create a new version (release) in a project. Versions help organize work into release milestones.`
+  description: `Create an organization version (release). Versions help organize work into release milestones. Leiga requires ownerId; call list_org_members to discover member IDs.`
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy project context, accepted for compatibility. Leiga versions are organization-wide.'
+        ),
       name: z.string().describe('Version name'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe(
+          'Version owner user ID. Required by Leiga; call list_org_members to discover IDs.'
+        ),
       description: z.string().optional().describe('Version description'),
       startDate: z.string().optional().describe('Start date (ISO 8601)'),
       releaseDate: z.string().optional().describe('Target release date (ISO 8601)')
@@ -60,14 +95,11 @@ export let createVersionTool = SlateTool.create(spec, {
     let response = await client.createVersion({
       projectId: ctx.input.projectId,
       name: ctx.input.name,
+      ownerId: ctx.input.ownerId,
       description: ctx.input.description,
       startDate: ctx.input.startDate,
       releaseDate: ctx.input.releaseDate
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to create version');
-    }
 
     return {
       output: { success: true, raw: response.data },
@@ -79,12 +111,18 @@ export let createVersionTool = SlateTool.create(spec, {
 export let updateVersionTool = SlateTool.create(spec, {
   name: 'Update Version',
   key: 'update_version',
-  description: `Update a version's name, description, or dates.`
+  description: `Update a version's name, owner, description, or dates. Leiga requires ownerId; call list_versions to find the current owner. The current name is retained when omitted.`
 })
   .input(
     z.object({
       versionId: z.number().describe('The version ID to update'),
       name: z.string().optional().describe('New version name'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe(
+          'Version owner ID. Required by Leiga; call list_versions for the existing ownerId or list_org_members for a new owner.'
+        ),
       description: z.string().optional().describe('New version description'),
       startDate: z.string().optional().describe('New start date (ISO 8601)'),
       releaseDate: z.string().optional().describe('New release date (ISO 8601)')
@@ -98,17 +136,14 @@ export let updateVersionTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.updateVersion({
+    await client.updateVersion({
       versionId: ctx.input.versionId,
       name: ctx.input.name,
+      ownerId: ctx.input.ownerId,
       description: ctx.input.description,
       startDate: ctx.input.startDate,
       releaseDate: ctx.input.releaseDate
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update version');
-    }
 
     return {
       output: { success: true },
@@ -120,7 +155,7 @@ export let updateVersionTool = SlateTool.create(spec, {
 export let deleteVersionTool = SlateTool.create(spec, {
   name: 'Delete Version',
   key: 'delete_version',
-  description: `Delete a version from a project.`,
+  description: `Delete an organization-wide version (release). Call list_versions to discover version IDs and confirm which organization version to remove.`,
   tags: {
     destructive: true
   }
@@ -138,11 +173,7 @@ export let deleteVersionTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteVersion(ctx.input.versionId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete version');
-    }
+    await client.deleteVersion(ctx.input.versionId);
 
     return {
       output: { success: true },
@@ -159,6 +190,12 @@ export let manageVersionLifecycleTool = SlateTool.create(spec, {
   .input(
     z.object({
       versionId: z.number().describe('The version ID'),
+      releasedDate: z
+        .string()
+        .optional()
+        .describe(
+          'Actual release date (ISO 8601) for action release. Defaults to the current time.'
+        ),
       action: z
         .enum(['release', 'cancel_release', 'archive', 'unarchive'])
         .describe('Lifecycle action to perform')
@@ -172,24 +209,19 @@ export let manageVersionLifecycleTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response: any;
     switch (ctx.input.action) {
       case 'release':
-        response = await client.releaseVersion(ctx.input.versionId);
+        await client.releaseVersion(ctx.input.versionId, ctx.input.releasedDate);
         break;
       case 'cancel_release':
-        response = await client.cancelReleaseVersion(ctx.input.versionId);
+        await client.cancelReleaseVersion(ctx.input.versionId);
         break;
       case 'archive':
-        response = await client.archiveVersion(ctx.input.versionId);
+        await client.archiveVersion(ctx.input.versionId);
         break;
       case 'unarchive':
-        response = await client.unarchiveVersion(ctx.input.versionId);
+        await client.unarchiveVersion(ctx.input.versionId);
         break;
-    }
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || `Failed to ${ctx.input.action} version`);
     }
 
     return {

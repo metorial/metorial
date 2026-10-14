@@ -6,6 +6,7 @@ import {
   controlPipelineRunTool,
   createChatbotTool,
   createKnowledgeBaseTool,
+  createPipelineTool,
   createTransformationTool,
   deleteChatbotTool,
   deleteKnowledgeBaseTool,
@@ -24,7 +25,8 @@ import {
   runChatbotTool,
   runPipelineTool,
   runTransformationTool,
-  terminateChatbotSessionTool
+  terminateChatbotSessionTool,
+  uploadChatbotFilesTool
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -35,6 +37,7 @@ export let provider = Slate.create({
     listPipelinesTool,
     getPipelineTool,
     deletePipelineTool,
+    createPipelineTool,
     createKnowledgeBaseTool,
     listKnowledgeBasesTool,
     getKnowledgeBaseTool,
@@ -48,6 +51,7 @@ export let provider = Slate.create({
     createChatbotTool,
     deleteChatbotTool,
     terminateChatbotSessionTool,
+    uploadChatbotFilesTool,
     runTransformationTool,
     listTransformationsTool,
     getTransformationTool,

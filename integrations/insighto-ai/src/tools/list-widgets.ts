@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWidgets = SlateTool.create(spec, {
@@ -44,13 +44,13 @@ export let listWidgets = SlateTool.create(spec, {
 
     if (ctx.input.widgetId) {
       let result = await client.getWidget(ctx.input.widgetId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
           widget: {
             widgetId: data.id,
-            name: data.name,
-            assistantId: data.assistant_id
+            name: data.name ?? undefined,
+            assistantId: data.assistant_id ?? undefined
           }
         },
         message: `Retrieved widget **${data.name || data.id}**.`
@@ -58,16 +58,15 @@ export let listWidgets = SlateTool.create(spec, {
     }
 
     let result = await client.listWidgets({ page: ctx.input.page, size: ctx.input.size });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         widgets: list.map((w: any) => ({
           widgetId: w.id,
-          name: w.name,
-          assistantId: w.assistant_id
+          name: w.name ?? undefined,
+          assistantId: w.assistant_id ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** widget(s).`
     };

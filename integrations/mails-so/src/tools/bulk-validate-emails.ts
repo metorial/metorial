@@ -36,7 +36,7 @@ export let bulkValidateEmails = SlateTool.create(spec, {
         batchId: response.id,
         createdAt: response.created_at,
         size: response.size,
-        isFinished: response.finished_at !== null
+        isFinished: typeof response.finished_at === 'string'
       },
       message: `Batch job **${response.id}** created with **${response.size}** emails. Poll for results using the batch ID.`
     };

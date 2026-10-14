@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let search = SlateTool.create(spec, {
   name: 'Search',
   key: 'search',
-  description: `Perform a semantic search (Magic Search) across the entire Dovetail workspace. Searches highlights, notes, insights, channels, themes, and tags simultaneously using natural language queries.`,
+  description: `Perform a full-text keyword search (Magic Search) across the entire Dovetail workspace. Searches highlights, notes, insights, channels, themes, and tags simultaneously using keyword queries.`,
   constraints: [
     'Max limit is 250 results per request.',
     'Uses offset-based pagination (not cursor-based).'
@@ -17,12 +17,18 @@ export let search = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().describe('Natural language search query'),
+      query: z.string().min(1).describe('Natural language search query'),
       offset: z
         .number()
+        .min(0)
         .optional()
         .describe('Number of results to skip (for pagination, default 0)'),
-      limit: z.number().optional().describe('Max results to return (default 50, max 250)')
+      limit: z
+        .number()
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Max results to return (default 50, max 250)')
     })
   )
   .output(
@@ -116,8 +122,8 @@ export let search = SlateTool.create(spec, {
         })),
         themes: (result.themes || []).map(t => ({
           themeId: t.id,
-          title: t.title,
-          summary: t.summary
+          title: t.title ?? '',
+          summary: t.summary ?? ''
         }))
       },
       message: `Found **${result.total}** results for "${ctx.input.query}".`

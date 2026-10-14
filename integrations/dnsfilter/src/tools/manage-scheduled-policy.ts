@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -58,7 +58,8 @@ export let manageScheduledPolicy = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!scheduledPolicyId) throw new Error('scheduledPolicyId is required for delete');
+      if (!scheduledPolicyId)
+        throw createApiServiceError('scheduledPolicyId is required for delete');
       await client.deleteScheduledPolicy(scheduledPolicyId);
       return {
         output: { deleted: true },
@@ -81,7 +82,8 @@ export let manageScheduledPolicy = SlateTool.create(spec, {
       };
     }
 
-    if (!scheduledPolicyId) throw new Error('scheduledPolicyId is required for update');
+    if (!scheduledPolicyId)
+      throw createApiServiceError('scheduledPolicyId is required for update');
     let scheduledPolicy = await client.updateScheduledPolicy(scheduledPolicyId, params);
     return {
       output: { scheduledPolicy },

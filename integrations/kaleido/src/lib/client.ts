@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let regionBaseUrls: Record<string, string> = {
   us: 'https://console.kaleido.io/api/v1',
@@ -10,18 +10,33 @@ let regionBaseUrls: Record<string, string> = {
 };
 
 export class KaleidoClient {
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; region: string }) {
-    let baseURL = regionBaseUrls[config.region] || regionBaseUrls.us;
+    let baseURL = regionBaseUrls[config.region];
+    if (!baseURL) {
+      throw createApiServiceError('Select a supported Kaleido deployment region.', {
+        reason: 'invalid_region'
+      });
+    }
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a Kaleido API key.', { reason: 'missing_auth' });
+    }
 
-    this.api = createAxios({
+    this.api = createAuthenticatedAxios({
       baseURL,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${config.token}`
-      }
+        Authorization: `Bearer ${config.token.trim()}`
+      },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Kaleido',
+          reason: 'kaleido_api_error',
+          detailKeys: ['errorMessage', 'message', 'error', 'detail', 'code']
+        })
     });
   }
 
@@ -33,7 +48,7 @@ export class KaleidoClient {
   }
 
   async getConsortium(consortiumId: string): Promise<any> {
-    let response = await this.api.get(`/consortia/${consortiumId}`);
+    let response = await this.api.get(`/consortia/${encodeURIComponent(consortiumId)}`);
     return response.data;
   }
 
@@ -50,37 +65,45 @@ export class KaleidoClient {
     consortiumId: string,
     params: { name?: string; description?: string }
   ): Promise<any> {
-    let response = await this.api.patch(`/consortia/${consortiumId}`, params);
+    let response = await this.api.patch(
+      `/consortia/${encodeURIComponent(consortiumId)}`,
+      params
+    );
     return response.data;
   }
 
   async deleteConsortium(consortiumId: string): Promise<any> {
-    let response = await this.api.delete(`/consortia/${consortiumId}`);
+    let response = await this.api.delete(`/consortia/${encodeURIComponent(consortiumId)}`);
     return response.data;
   }
 
   // --- Memberships ---
 
   async listMemberships(consortiumId: string): Promise<any[]> {
-    let response = await this.api.get(`/consortia/${consortiumId}/memberships`);
+    let response = await this.api.get(
+      `/consortia/${encodeURIComponent(consortiumId)}/memberships`
+    );
     return response.data;
   }
 
   async getMembership(consortiumId: string, membershipId: string): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/memberships/${membershipId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/memberships/${encodeURIComponent(membershipId)}`
     );
     return response.data;
   }
 
   async createMembership(consortiumId: string, params: { org_name: string }): Promise<any> {
-    let response = await this.api.post(`/consortia/${consortiumId}/memberships`, params);
+    let response = await this.api.post(
+      `/consortia/${encodeURIComponent(consortiumId)}/memberships`,
+      params
+    );
     return response.data;
   }
 
   async deleteMembership(consortiumId: string, membershipId: string): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/memberships/${membershipId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/memberships/${encodeURIComponent(membershipId)}`
     );
     return response.data;
   }
@@ -88,13 +111,15 @@ export class KaleidoClient {
   // --- Environments ---
 
   async listEnvironments(consortiumId: string): Promise<any[]> {
-    let response = await this.api.get(`/consortia/${consortiumId}/environments`);
+    let response = await this.api.get(
+      `/consortia/${encodeURIComponent(consortiumId)}/environments`
+    );
     return response.data;
   }
 
   async getEnvironment(consortiumId: string, environmentId: string): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}`
     );
     return response.data;
   }
@@ -111,7 +136,10 @@ export class KaleidoClient {
       chain_id?: number;
     }
   ): Promise<any> {
-    let response = await this.api.post(`/consortia/${consortiumId}/environments`, params);
+    let response = await this.api.post(
+      `/consortia/${encodeURIComponent(consortiumId)}/environments`,
+      params
+    );
     return response.data;
   }
 
@@ -124,7 +152,7 @@ export class KaleidoClient {
     }
   ): Promise<any> {
     let response = await this.api.patch(
-      `/consortia/${consortiumId}/environments/${environmentId}`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}`,
       params
     );
     return response.data;
@@ -132,7 +160,7 @@ export class KaleidoClient {
 
   async deleteEnvironment(consortiumId: string, environmentId: string): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}`
     );
     return response.data;
   }
@@ -141,14 +169,14 @@ export class KaleidoClient {
 
   async listNodes(consortiumId: string, environmentId: string): Promise<any[]> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes`
     );
     return response.data;
   }
 
   async getNode(consortiumId: string, environmentId: string, nodeId: string): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}`
     );
     return response.data;
   }
@@ -159,12 +187,12 @@ export class KaleidoClient {
     params: {
       name: string;
       membership_id: string;
-      role?: string;
+      init_consensus_role?: string;
       size?: string;
     }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes`,
       params
     );
     return response.data;
@@ -176,12 +204,11 @@ export class KaleidoClient {
     nodeId: string,
     params: {
       name?: string;
-      role?: string;
       size?: string;
     }
   ): Promise<any> {
     let response = await this.api.patch(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}`,
       params
     );
     return response.data;
@@ -189,7 +216,7 @@ export class KaleidoClient {
 
   async deleteNode(consortiumId: string, environmentId: string, nodeId: string): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}`
     );
     return response.data;
   }
@@ -201,7 +228,8 @@ export class KaleidoClient {
     action: string
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}/${action}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}/${encodeURIComponent(action)}`,
+      {}
     );
     return response.data;
   }
@@ -212,7 +240,7 @@ export class KaleidoClient {
     nodeId: string
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}/status`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}/status`
     );
     return response.data;
   }
@@ -220,10 +248,13 @@ export class KaleidoClient {
   async getNodeLogs(
     consortiumId: string,
     environmentId: string,
-    nodeId: string
+    nodeId: string,
+    logType: string,
+    params?: { maxlines?: number; frompos?: number }
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/nodes/${nodeId}/logs`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}/logs/${encodeURIComponent(logType)}`,
+      { params }
     );
     return response.data;
   }
@@ -232,7 +263,7 @@ export class KaleidoClient {
 
   async listServices(consortiumId: string, environmentId: string): Promise<any[]> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/services`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/services`
     );
     return response.data;
   }
@@ -243,7 +274,7 @@ export class KaleidoClient {
     serviceId: string
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/services/${serviceId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/services/${encodeURIComponent(serviceId)}`
     );
     return response.data;
   }
@@ -259,7 +290,7 @@ export class KaleidoClient {
     }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/services`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/services`,
       params
     );
     return response.data;
@@ -271,7 +302,7 @@ export class KaleidoClient {
     serviceId: string
   ): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}/services/${serviceId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/services/${encodeURIComponent(serviceId)}`
     );
     return response.data;
   }
@@ -280,7 +311,7 @@ export class KaleidoClient {
 
   async listAppCreds(consortiumId: string, environmentId: string): Promise<any[]> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/appcreds`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/appcreds`
     );
     return response.data;
   }
@@ -291,7 +322,7 @@ export class KaleidoClient {
     appCredId: string
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/appcreds/${appCredId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/appcreds/${encodeURIComponent(appCredId)}`
     );
     return response.data;
   }
@@ -305,7 +336,7 @@ export class KaleidoClient {
     }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/appcreds`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/appcreds`,
       params
     );
     return response.data;
@@ -317,46 +348,97 @@ export class KaleidoClient {
     appCredId: string
   ): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}/appcreds/${appCredId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/appcreds/${encodeURIComponent(appCredId)}`
     );
     return response.data;
   }
 
-  // --- Compiled Contracts ---
+  // Contract projects own compiled versions; promotion targets an environment.
 
-  async listCompiledContracts(consortiumId: string, environmentId: string): Promise<any[]> {
+  async listContractProjects(consortiumId: string): Promise<any[]> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/compiled_contracts`
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts`
+    );
+    return response.data;
+  }
+
+  async getContractProject(consortiumId: string, projectId: string): Promise<any> {
+    let response = await this.api.get(
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}`
+    );
+    return response.data;
+  }
+
+  async createContractProject(
+    consortiumId: string,
+    params: {
+      name: string;
+      description?: string;
+      membership_id: string;
+      type: string;
+    }
+  ): Promise<any> {
+    let response = await this.api.post(
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts`,
+      params
+    );
+    return response.data;
+  }
+
+  async updateContractProject(
+    consortiumId: string,
+    projectId: string,
+    params: {
+      name?: string;
+      description?: string;
+    }
+  ): Promise<any> {
+    let response = await this.api.patch(
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}`,
+      params
+    );
+    return response.data;
+  }
+
+  async deleteContractProject(consortiumId: string, projectId: string): Promise<any> {
+    let response = await this.api.delete(
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}`
+    );
+    return response.data;
+  }
+
+  async listCompiledContracts(consortiumId: string, projectId: string): Promise<any[]> {
+    let response = await this.api.get(
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}/compiled_contracts`
     );
     return response.data;
   }
 
   async getCompiledContract(
     consortiumId: string,
-    environmentId: string,
+    projectId: string,
     contractId: string
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/compiled_contracts/${contractId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}/compiled_contracts/${encodeURIComponent(contractId)}`
     );
     return response.data;
   }
 
   async createCompiledContract(
     consortiumId: string,
-    environmentId: string,
+    projectId: string,
     params: {
-      name: string;
-      description?: string;
-      type?: string;
-      source?: string;
-      abi?: any;
+      description: string;
+      membership_id: string;
+      contract_url?: string;
+      contract_name?: string;
+      abi?: string;
       bytecode?: string;
-      dev_docs?: string;
     }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/compiled_contracts`,
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}/compiled_contracts`,
       params
     );
     return response.data;
@@ -364,30 +446,42 @@ export class KaleidoClient {
 
   async promoteCompiledContract(
     consortiumId: string,
-    environmentId: string,
-    contractId: string
+    projectId: string,
+    contractId: string,
+    params: {
+      environment_id: string;
+      endpoint?: string;
+    }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/compiled_contracts/${contractId}/promote`
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}/compiled_contracts/${encodeURIComponent(contractId)}/promote`,
+      params
     );
     return response.data;
   }
 
   async deleteCompiledContract(
     consortiumId: string,
-    environmentId: string,
+    projectId: string,
     contractId: string
   ): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}/compiled_contracts/${contractId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/contracts/${encodeURIComponent(projectId)}/compiled_contracts/${encodeURIComponent(contractId)}`
     );
+    return response.data;
+  }
+
+  async listOrganizations(): Promise<any[]> {
+    let response = await this.api.get('/orgs');
     return response.data;
   }
 
   // --- Invitations ---
 
   async listInvitations(consortiumId: string): Promise<any[]> {
-    let response = await this.api.get(`/consortia/${consortiumId}/invitations`);
+    let response = await this.api.get(
+      `/consortia/${encodeURIComponent(consortiumId)}/invitations`
+    );
     return response.data;
   }
 
@@ -398,13 +492,16 @@ export class KaleidoClient {
       email: string;
     }
   ): Promise<any> {
-    let response = await this.api.post(`/consortia/${consortiumId}/invitations`, params);
+    let response = await this.api.post(
+      `/consortia/${encodeURIComponent(consortiumId)}/invitations`,
+      params
+    );
     return response.data;
   }
 
   async deleteInvitation(consortiumId: string, invitationId: string): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/invitations/${invitationId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/invitations/${encodeURIComponent(invitationId)}`
     );
     return response.data;
   }
@@ -416,21 +513,28 @@ export class KaleidoClient {
     limit?: number;
     skip?: number;
   }): Promise<any[]> {
-    let queryParams: Record<string, any> = {};
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.skip) queryParams.skip = params.skip;
+    let path = params?.consortiumId
+      ? `/audit/${encodeURIComponent(params.consortiumId)}`
+      : '/audit';
 
-    let path = params?.consortiumId ? `/consortia/${params.consortiumId}/audit` : '/audit';
-
-    let response = await this.api.get(path, { params: queryParams });
-    return response.data;
+    let response = await this.api.get(path);
+    if (!Array.isArray(response.data)) {
+      throw createApiServiceError('Kaleido returned an unexpected audit log response.', {
+        reason: 'invalid_response'
+      });
+    }
+    let skip = params?.skip ?? 0;
+    return response.data.slice(
+      skip,
+      params?.limit === undefined ? undefined : skip + params.limit
+    );
   }
 
   // --- Configurations ---
 
   async listConfigurations(consortiumId: string, environmentId: string): Promise<any[]> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/configurations`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/configurations`
     );
     return response.data;
   }
@@ -441,7 +545,7 @@ export class KaleidoClient {
     configId: string
   ): Promise<any> {
     let response = await this.api.get(
-      `/consortia/${consortiumId}/environments/${environmentId}/configurations/${configId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/configurations/${encodeURIComponent(configId)}`
     );
     return response.data;
   }
@@ -457,7 +561,7 @@ export class KaleidoClient {
     }
   ): Promise<any> {
     let response = await this.api.post(
-      `/consortia/${consortiumId}/environments/${environmentId}/configurations`,
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/configurations`,
       params
     );
     return response.data;
@@ -469,7 +573,7 @@ export class KaleidoClient {
     configId: string
   ): Promise<any> {
     let response = await this.api.delete(
-      `/consortia/${consortiumId}/environments/${environmentId}/configurations/${configId}`
+      `/consortia/${encodeURIComponent(consortiumId)}/environments/${encodeURIComponent(environmentId)}/configurations/${encodeURIComponent(configId)}`
     );
     return response.data;
   }

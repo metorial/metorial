@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSigningPolicies = SlateTool.create(spec, {
@@ -40,24 +40,25 @@ export let getSigningPolicies = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let policies = await client.getSigningPolicies({
       projectSlug: ctx.input.projectSlug,
       signingPolicySlug: ctx.input.signingPolicySlug
     });
 
-    let mapped = policies.map(p => ({
-      projectSlug: p.projectSlug || '',
-      signingPolicySlug: p.signingPolicySlug || '',
-      certificateThumbprint: p.certificate?.thumbprint || '',
-      certificateCommonName: p.certificate?.commonName || '',
-      rsaModulusLengthInBits: p.rsaKeyParameters?.modulusLengthInBits
-    }));
+    let mapped = policies.map(p => {
+      let certificate = p.certificateBytes
+        ? client.certificateDetails(Buffer.from(p.certificateBytes, 'base64'))
+        : undefined;
+      return {
+        projectSlug: p.projectSlug,
+        signingPolicySlug: p.signingPolicySlug,
+        certificateThumbprint: certificate?.thumbprint ?? '',
+        certificateCommonName: certificate?.commonName ?? '',
+        rsaModulusLengthInBits: p.keyType === 'Rsa' ? p.keySizeInBits : undefined
+      };
+    });
 
     return {
       output: { signingPolicies: mapped },

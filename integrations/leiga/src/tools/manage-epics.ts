@@ -1,34 +1,48 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listEpicsTool = SlateTool.create(spec, {
   name: 'List Epics',
   key: 'list_epics',
-  description: `List all epics in a project. Returns epic names, descriptions, and IDs.`,
+  description: `List one page of epics in a project. Call list_projects to discover project IDs. Returns epic names, descriptions, IDs, and total count.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID')
+      projectId: projectIdSchema,
+      pageNumber: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(1)
+        .describe('Page number starting at 1'),
+      pageSize: z.number().int().positive().optional().default(50).describe('Epics per page')
     })
   )
   .output(
     z.object({
-      epics: z.array(z.any()).describe('List of epics')
+      epics: z.array(z.any()).describe('List of epics'),
+      total: z.number().optional().describe('Total matching epics')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let response = await client.listEpics(ctx.input.projectId);
+    let response = await client.listEpics(
+      ctx.input.projectId,
+      ctx.input.pageNumber,
+      ctx.input.pageSize
+    );
 
-    let epics = response.data || [];
+    let epics = response.data?.list || [];
 
     return {
-      output: { epics },
+      output: { epics, total: response.data?.total },
       message: `Found **${epics.length}** epic(s).`
     };
   })
@@ -41,7 +55,7 @@ export let createEpicTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       name: z.string().describe('Epic name'),
       description: z.string().optional().describe('Epic description')
     })
@@ -60,10 +74,6 @@ export let createEpicTool = SlateTool.create(spec, {
       name: ctx.input.name,
       description: ctx.input.description
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to create epic');
-    }
 
     return {
       output: { success: true, raw: response.data },
@@ -92,15 +102,11 @@ export let updateEpicTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.updateEpic({
+    await client.updateEpic({
       epicId: ctx.input.epicId,
       name: ctx.input.name,
       description: ctx.input.description
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update epic');
-    }
 
     return {
       output: { success: true },
@@ -130,11 +136,7 @@ export let deleteEpicTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteEpic(ctx.input.epicId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete epic');
-    }
+    await client.deleteEpic(ctx.input.epicId);
 
     return {
       output: { success: true },

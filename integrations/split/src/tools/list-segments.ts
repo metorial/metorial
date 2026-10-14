@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listSegments = SlateTool.create(spec, {
   name: 'List Segments',
   key: 'list_segments',
-  description: `List all segments in a Split workspace. Returns segment names, descriptions, and associated traffic types.`,
+  description: `List a page of segments in a Split workspace. Returns segment names, descriptions, associated traffic types, and pagination metadata. Call list_workspaces to discover workspace IDs.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +17,11 @@ export let listSegments = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.')
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
+      offset: z.number().optional().describe('Pagination offset. Defaults to 0.'),
+      limit: z.number().optional().describe('Page size, between 1 and 50. Defaults to 20.')
     })
   )
   .output(
@@ -29,17 +34,25 @@ export let listSegments = SlateTool.create(spec, {
           trafficTypeId: z.string().optional()
         })
       ),
-      totalCount: z.number()
+      totalCount: z.number(),
+      offset: z.number().optional(),
+      limit: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.listSegments(wsId);
+    let client = new Client(ctx.auth);
+    validatePagination(ctx.input.offset, ctx.input.limit, 50);
+    let result = await client.listSegments(wsId, {
+      offset: ctx.input.offset,
+      limit: ctx.input.limit
+    });
 
     let segments = result.objects.map(s => ({
       segmentName: s.name,
@@ -49,8 +62,13 @@ export let listSegments = SlateTool.create(spec, {
     }));
 
     return {
-      output: { segments, totalCount: result.totalCount },
-      message: `Found **${result.totalCount}** segments.`
+      output: {
+        segments,
+        totalCount: result.totalCount,
+        offset: result.offset,
+        limit: result.limit
+      },
+      message: `Returned **${segments.length}** of **${result.totalCount}** segments, starting at offset ${result.offset}.`
     };
   })
   .build();

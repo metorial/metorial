@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTask = SlateTool.create(spec, {
@@ -18,8 +19,8 @@ export let createTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('Project ID to create the task in'),
-      description: z.string().describe('Task description'),
+      projectId: positiveIntegerSchema.describe('Project ID to create the task in'),
+      description: z.string().min(1).describe('Task description'),
       priority: z
         .enum(['not set', 'critical', 'important', 'normal', 'minor'])
         .optional()
@@ -30,13 +31,14 @@ export let createTask = SlateTool.create(spec, {
         .describe(
           'Task status (e.g., "backlog", "todo", "doing", "done", "closed", or a custom column name)'
         ),
-      assignedToId: z.number().optional().describe('User ID to assign the task to'),
+      assignedToId: positiveIntegerSchema.optional().describe('User ID to assign the task to'),
       assignedToEmail: z
         .string()
+        .email()
         .optional()
         .describe('Email of the assignee (must be a project member)'),
-      requesterId: z.number().optional().describe('User ID of the requester'),
-      requesterEmail: z.string().optional().describe('Email of the requester'),
+      requesterId: positiveIntegerSchema.optional().describe('User ID of the requester'),
+      requesterEmail: z.string().email().optional().describe('Email of the requester'),
       tagNames: z.array(z.string()).optional().describe('Tags to apply to the task'),
       externalId: z
         .string()

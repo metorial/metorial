@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Leiga
 
-Manage issues, sprints, epics, and releases in an AI-powered project management platform for development teams. Create, update, query, and delete work items with fields like priority, status, assignee, and custom fields. Manage subtasks, link related issues, and track story points. Create and manage sprints with goals and date ranges. Organize work into epics and versions/releases. Add comments and reactions to issues. Upload and manage file attachments. Configure project workflows, tags, and webhooks. Manage project members and roles.
+Manage issues, subtasks, issue relations, sprints, epics, organization releases, comments, and tags. Discover accessible projects, issue types and schemas, and organization and project members.
+
+Authenticate with the Client ID and Secret Key from Leiga OpenAPI settings. The enabled API modules and your account permissions determine available operations. Call `list_projects` and `list_issue_types`, then `get_issue_schema` to discover valid field codes and option IDs before creating or updating issues.
+
+`list_epics`, `list_comments`, and `list_versions` return one page plus a total count. Leiga versions are organization-wide; creating or updating a version requires `ownerId`, discoverable through `list_org_members` or the existing version's `ownerId` in `list_versions`. Deleting a subtask requires its parent `issueId`; `list_subtasks` supplies subtask IDs and completion state.
 
 ## License
 

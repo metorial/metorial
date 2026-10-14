@@ -1,4 +1,4 @@
-# Slates Specification for Mails.so
+# Mails.so Integration Specification
 
 ## Overview
 
@@ -35,6 +35,20 @@ Validate multiple email addresses in a single request by submitting a list of em
 - Each email in the result set receives the same detailed validation response as single validation.
 - Bulk validation requires a paid subscription.
 - Results must be polled using the batch job ID until the job is complete (the `finished_at` field becomes populated).
+
+### Completed Batch Export
+
+Use Export Bulk Validation Results to download a completed batch as JSON. The file contains batch metadata and all normalized email results, including validation IDs, scores, classifications, reasons, and checks. Export is unavailable while processing is incomplete.
+
+### Optional Validation Details
+
+The API can return null for unavailable username and domain details, and for MX checks that were not performed. Tools return empty text for unavailable username, domain, or MX record values. `isMxChecked` distinguishes an unchecked MX result from a checked result. `isMxValid` is true only when the provider reports a valid MX result; a false value with `isMxChecked: false` does not mean MX records are invalid.
+
+## Documented API Coverage
+
+The integration covers the documented single validation, batch creation, and batch retrieval endpoints. The public API documentation does not describe an account or current-user endpoint. Authentication uses the documented `x-mails-api-key` header.
+
+Official references: [Authentication](https://docs.mails.so/authentication/), [Single validation](https://docs.mails.so/single/), [Response fields](https://docs.mails.so/response/), and [Bulk validation](https://docs.mails.so/bulk/).
 
 ## Events
 

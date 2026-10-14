@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,10 +47,16 @@ export let manageLists = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       ctx.info('Fetching all lists');
       let result = await client.getLists();
-      let items = Array.isArray(result) ? result : result?.results || result?.data || [];
+      let items = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.results)
+          ? result.results
+          : Array.isArray(result?.data)
+            ? result.data
+            : [];
       let lists = items.map((l: any) => ({
         listId: l.id ? String(l.id) : undefined,
-        name: l.name
+        name: l.name ?? undefined
       }));
 
       return {
@@ -61,7 +67,7 @@ export let manageLists = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('List name is required when creating a new list.');
+        throw createApiServiceError('List name is required when creating a new list.');
       }
       ctx.info(`Creating list "${ctx.input.name}"`);
       let result = await client.createList(ctx.input.name);
@@ -75,7 +81,7 @@ export let manageLists = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.listId) {
-        throw new Error('List ID is required when deleting a list.');
+        throw createApiServiceError('List ID is required when deleting a list.');
       }
       ctx.info(`Deleting list ${ctx.input.listId}`);
       let result = await client.deleteList(ctx.input.listId);
@@ -86,6 +92,6 @@ export let manageLists = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

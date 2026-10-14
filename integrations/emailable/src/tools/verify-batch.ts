@@ -9,7 +9,7 @@ export let verifyBatch = SlateTool.create(spec, {
   description: `Submit a batch of email addresses for bulk verification. Returns a batch ID that can be used to check the status and retrieve results later using the **Get Batch Status** tool. Optionally provide a callback URL to receive results via HTTP POST when the batch completes.`,
   instructions: [
     'Use the Get Batch Status tool to check progress and retrieve results after submitting a batch.',
-    'For batches up to 1,000 emails, individual results are returned inline. For larger batches, a downloadable CSV file is provided.'
+    'For batches up to 1,000 emails, individual results are returned inline. For larger batches, a downloadable ZIP-compressed CSV file is provided.'
   ],
   constraints: [
     'Maximum of 50,000 emails per batch.',
@@ -36,7 +36,7 @@ export let verifyBatch = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Limit which fields are returned in results (e.g. ["email", "state", "score"])'
+          'Limit which provider fields are returned (e.g. ["email", "state", "score"]). Use snake_case field names from the Emailable API; omitted fields remain absent in batch results.'
         ),
       retries: z
         .boolean()

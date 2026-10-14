@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
     }
 
     if (!ctx.input.userId) {
-      throw new Error('userId is required when action is "add"');
+      throw createApiServiceError('userId is required when action is "add"');
     }
 
     await client.addGroupMember(ctx.input.groupId, ctx.input.userId, ctx.input.admin);

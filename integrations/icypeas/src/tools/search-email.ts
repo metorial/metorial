@@ -19,7 +19,11 @@ export let searchEmail = SlateTool.create(spec, {
     z.object({
       firstname: z.string().optional().describe('First name of the person to find'),
       lastname: z.string().optional().describe('Last name of the person to find'),
-      domainOrCompany: z.string().describe('Domain name or company name of the person')
+      domainOrCompany: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Domain name or company name of the person')
     })
   )
   .output(
@@ -36,15 +40,16 @@ export let searchEmail = SlateTool.create(spec, {
       lastname: ctx.input.lastname,
       domainOrCompany: ctx.input.domainOrCompany
     });
+    let searchId = result.item?._id || result._id || result.id;
 
     return {
       output: {
         success: result.success ?? true,
-        searchId: result._id || result.id
+        searchId
       },
       message:
         result.success !== false
-          ? `Email search submitted for **${[ctx.input.firstname, ctx.input.lastname].filter(Boolean).join(' ')}** at **${ctx.input.domainOrCompany}**. Search ID: \`${result._id || result.id}\``
+          ? `Email search submitted for **${[ctx.input.firstname, ctx.input.lastname].filter(Boolean).join(' ')}** at **${ctx.input.domainOrCompany}**. Search ID: \`${searchId}\``
           : `Email search failed: ${JSON.stringify(result)}`
     };
   })

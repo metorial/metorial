@@ -39,12 +39,12 @@ export let createAffiliateProspect = SlateTool.create(spec, {
     return {
       output: {
         prospectId: result.id,
-        firstname: result.firstname,
-        lastname: result.lastname,
-        email: result.email,
+        firstname: result.firstname ?? undefined,
+        lastname: result.lastname ?? undefined,
+        email: result.email ?? undefined,
         program: result.program,
         group: result.group,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Created prospect **${result.firstname} ${result.lastname}** (\`${result.id}\`).`
     };
@@ -77,12 +77,12 @@ export let listAffiliateProspects = SlateTool.create(spec, {
 
     let prospects = results.map((r: any) => ({
       prospectId: r.id,
-      firstname: r.firstname,
-      lastname: r.lastname,
-      email: r.email,
+      firstname: r.firstname ?? undefined,
+      lastname: r.lastname ?? undefined,
+      email: r.email ?? undefined,
       program: r.program,
       group: r.group,
-      createdAt: r.created_at
+      createdAt: r.created_at ?? undefined
     }));
 
     return {

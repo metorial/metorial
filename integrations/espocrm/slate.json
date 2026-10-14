@@ -1,18 +1,19 @@
 {
   "name": "@metorial/espocrm",
-  "description": "Manage contacts, accounts, leads, opportunities, and support cases in a self-hosted CRM. Create, read, update, and delete records across all entity types. Track sales pipelines and convert leads into contacts and opportunities. Manage meetings, calls, tasks, and calendar events linked to CRM records. Send emails, manage email templates, and run mass email campaigns. Upload file attachments, generate PDF documents from templates, and import data from CSV. Link related records together, post to activity streams, and manage custom entities and fields.",
+  "description": "Manage contacts, accounts, leads, opportunities, support cases, meetings, calls, and tasks in your EspoCRM instance. Read and manage built-in or custom entity records, convert leads, send emails, link related records, upload and download files, generate PDFs from templates, and read or post to activity streams.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage contacts and accounts",
     "track leads and opportunities",
     "manage support cases",
     "schedule meetings and calls",
-    "send and manage emails",
+    "send emails",
     "generate PDF documents",
-    "import data records",
-    "manage file attachments",
+    "manage custom records",
+    "upload and download files",
     "link related records",
-    "configure webhooks"
+    "read and post activity streams",
+    "identify the connected user"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/espocrm.svg"
 }

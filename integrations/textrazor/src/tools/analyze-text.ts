@@ -121,7 +121,7 @@ Use **classifiers** to categorize documents against built-in taxonomies (IAB, IP
   instructions: [
     'You must provide either "text" or "sourceUrl", but not both.',
     'You must specify at least one extractor. Common combinations: ["entities", "topics"] for general NLP, ["entities", "relations", "words"] for detailed linguistic analysis.',
-    'Built-in classifier IDs: "textrazor_iab_content_taxonomy_3.0", "textrazor_iab_content_taxonomy", "textrazor_newscodes", "textrazor_mediatopics", "textrazor_mediatopics_20170101".'
+    'Built-in classifier IDs: "textrazor_iab_content_taxonomy_3.0", "textrazor_iab_content_taxonomy", "textrazor_newscodes", "textrazor_mediatopics", "textrazor_mediatopics_2023Q1".'
   ],
   constraints: [
     'Text input is limited to 200KB of UTF-8 text.',
@@ -177,6 +177,20 @@ Use **classifiers** to categorize documents against built-in taxonomies (IAB, IP
         .boolean()
         .optional()
         .describe('Return the raw downloaded text in the response'),
+      cleanupUseMetadata: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use HTML titles and metadata to aid extraction (default: true; ignored in raw mode)'
+        ),
+      downloadRunJavascript: z
+        .boolean()
+        .optional()
+        .describe('Render JavaScript before analyzing a URL (slower than a normal download)'),
+      entityIncludeAddressPlaces: z
+        .boolean()
+        .optional()
+        .describe('Extract places found in postal addresses (default: false)'),
       entityDictionaries: z
         .array(z.string())
         .optional()
@@ -257,6 +271,9 @@ Use **classifiers** to categorize documents against built-in taxonomies (IAB, IP
       cleanupMode: ctx.input.cleanupMode,
       cleanupReturnCleaned: ctx.input.cleanupReturnCleaned,
       cleanupReturnRaw: ctx.input.cleanupReturnRaw,
+      cleanupUseMetadata: ctx.input.cleanupUseMetadata,
+      downloadRunJavascript: ctx.input.downloadRunJavascript,
+      entityIncludeAddressPlaces: ctx.input.entityIncludeAddressPlaces,
       entityDictionaries: ctx.input.entityDictionaries,
       entityFilterDbpediaTypes: ctx.input.entityFilterDbpediaTypes,
       entityFilterFreebaseTypes: ctx.input.entityFilterFreebaseTypes,

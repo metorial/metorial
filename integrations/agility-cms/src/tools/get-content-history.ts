@@ -37,7 +37,8 @@ export let getContentHistory = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.input.locale || ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
     let history = await client.getContentHistory(ctx.input.contentId, {
@@ -45,7 +46,7 @@ export let getContentHistory = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let comments: any[] | undefined;
+    let comments: any;
     if (ctx.input.includeComments) {
       comments = await client.getContentComments(ctx.input.contentId, {
         take: ctx.input.take,
@@ -53,8 +54,12 @@ export let getContentHistory = SlateTool.create(spec, {
       });
     }
 
-    let historyList = Array.isArray(history) ? history : [];
-    let commentList = comments ? (Array.isArray(comments) ? comments : []) : undefined;
+    let historyList = Array.isArray(history) ? history : (history?.items ?? []);
+    let commentList = comments
+      ? Array.isArray(comments)
+        ? comments
+        : (comments.items ?? [])
+      : undefined;
 
     return {
       output: { history: historyList, comments: commentList },

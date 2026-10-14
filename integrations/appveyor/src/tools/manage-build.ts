@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,13 +46,13 @@ export let manageBuild = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
       case 'rerun': {
         if (ctx.input.buildId === undefined) {
-          throw new Error('buildId is required for rerun');
+          throw createApiServiceError('buildId is required for rerun');
         }
         let build = await client.reRunBuild({
           buildId: ctx.input.buildId,
@@ -66,7 +66,7 @@ export let manageBuild = SlateTool.create(spec, {
 
       case 'cancel': {
         if (!ctx.input.accountName || !ctx.input.projectSlug || !ctx.input.buildVersion) {
-          throw new Error(
+          throw createApiServiceError(
             'accountName, projectSlug, and buildVersion are required for cancel'
           );
         }
@@ -83,7 +83,7 @@ export let manageBuild = SlateTool.create(spec, {
 
       case 'delete': {
         if (ctx.input.buildId === undefined) {
-          throw new Error('buildId is required for delete');
+          throw createApiServiceError('buildId is required for delete');
         }
         await client.deleteBuild(ctx.input.buildId);
         return {
@@ -93,7 +93,7 @@ export let manageBuild = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

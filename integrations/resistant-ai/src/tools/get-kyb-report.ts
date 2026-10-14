@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getKybReport = SlateTool.create(spec, {
   name: 'Get KYB Report',
   key: 'get_kyb_report',
-  description: `Retrieves the details and results of a previously requested Know Your Business (KYB) report. Returns the report status, business entity details, and a link to the full report when available.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Retrieves the details and results of a previously requested Know Your Business (KYB) report. Returns the report status, business entity details, and a link to the full report when available.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -52,7 +52,7 @@ export let getKybReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.getKybReport(ctx.input.reportId);
 

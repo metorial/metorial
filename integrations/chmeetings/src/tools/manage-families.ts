@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -222,7 +222,7 @@ export let manageFamilyMembers = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'add': {
         if (!ctx.input.members || ctx.input.members.length === 0) {
-          throw new Error('Members are required for the add action');
+          throw createApiServiceError('Members are required for the add action');
         }
         let result = await client.addFamilyMembers(
           ctx.input.familyId,
@@ -233,14 +233,16 @@ export let manageFamilyMembers = SlateTool.create(spec, {
       }
       case 'remove': {
         if (!ctx.input.personId) {
-          throw new Error('personId is required for the remove action');
+          throw createApiServiceError('personId is required for the remove action');
         }
         await client.removeFamilyMember(ctx.input.familyId, ctx.input.personId);
         break;
       }
       case 'updateRole': {
         if (!ctx.input.personId || !ctx.input.role) {
-          throw new Error('personId and role are required for the updateRole action');
+          throw createApiServiceError(
+            'personId and role are required for the updateRole action'
+          );
         }
         await client.updateFamilyMemberRole(
           ctx.input.familyId,
@@ -251,7 +253,9 @@ export let manageFamilyMembers = SlateTool.create(spec, {
       }
       case 'replace': {
         if (!ctx.input.members || ctx.input.members.length < 2) {
-          throw new Error('At least 2 members are required for the replace action');
+          throw createApiServiceError(
+            'At least 2 members are required for the replace action'
+          );
         }
         let result = await client.setFamilyMembers(
           ctx.input.familyId,

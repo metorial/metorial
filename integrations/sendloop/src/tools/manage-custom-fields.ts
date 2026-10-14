@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,7 +43,7 @@ export let manageCustomFields = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let { action, listId, customFieldId, fieldName, fieldType } = ctx.input;
@@ -60,7 +60,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!fieldName) throw new Error('Field name is required for create action');
+      if (!fieldName) throw createApiServiceError('Field name is required for create action');
       let result = await client.createCustomField(listId, { fieldName, fieldType });
 
       return {
@@ -73,7 +73,8 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!customFieldId) throw new Error('Custom field ID is required for delete action');
+      if (!customFieldId)
+        throw createApiServiceError('Custom field ID is required for delete action');
       await client.deleteCustomField(listId, customFieldId);
 
       return {
@@ -82,6 +83,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

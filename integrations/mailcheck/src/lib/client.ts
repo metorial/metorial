@@ -1,12 +1,12 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface VerificationResult {
   email: string;
-  trustRate: number;
-  mxExists: boolean;
-  smtpExists: boolean;
-  isNotSmtpCatchAll: boolean;
-  isNotDisposable: boolean;
+  trustRate?: number;
+  mxExists?: boolean;
+  smtpExists?: boolean;
+  isNotSmtpCatchAll?: boolean;
+  isNotDisposable?: boolean;
   gravatar?: {
     entries?: Array<{
       profileUrl?: string;
@@ -36,6 +36,10 @@ export interface OperationMetadata {
 }
 
 export interface OperationResult {
+  error?: {
+    code?: number;
+    message?: string;
+  };
   code?: number;
   message?: string;
   response?: {
@@ -45,7 +49,7 @@ export interface OperationResult {
 
 export interface Operation {
   name: string;
-  done: boolean;
+  done?: boolean;
   metadata?: OperationMetadata;
   result?: OperationResult;
 }
@@ -56,25 +60,27 @@ export interface ListOperationsResponse {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.mailcheck.co/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Mailcheck',
+          reason: 'mailcheck_api_error'
+        })
     });
   }
 
   async verifySingleEmail(email: string): Promise<VerificationResult> {
-    let response = await this.axios.post('/singleEmail:check', { email });
+    let response = await this.axios.post<VerificationResult>('/singleEmail:check', { email });
     return response.data;
   }
 
   async createBatchCheck(emails: string[]): Promise<Operation> {
-    let response = await this.axios.post('/emails:check', { emails });
+    let response = await this.axios.post<Operation>('/emails:check', { emails });
     return response.data;
   }
 
@@ -82,7 +88,7 @@ export class Client {
     pageSize?: number;
     pageToken?: string;
   }): Promise<ListOperationsResponse> {
-    let response = await this.axios.get('/emails/operations', {
+    let response = await this.axios.get<ListOperationsResponse>('/emails/operations', {
       params: {
         page_size: params?.pageSize,
         page_token: params?.pageToken
@@ -92,7 +98,9 @@ export class Client {
   }
 
   async getOperationStatus(operationName: string): Promise<Operation> {
-    let response = await this.axios.get(`/emails/${operationName}`);
+    let response = await this.axios.get<Operation>(
+      `/emails/${encodeURIComponent(operationName)}`
+    );
     return response.data;
   }
 }

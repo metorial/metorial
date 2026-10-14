@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,11 +32,8 @@ Use this to access structured data extracted from documents by entity extraction
       cursor: z
         .string()
         .optional()
-        .describe('Pagination cursor (only for instruction-based queries)'),
-      pageSize: z
-        .number()
-        .optional()
-        .describe('Page size (only for instruction-based queries)'),
+        .describe('Pagination cursor from the previous entity response'),
+      pageSize: z.number().optional().describe('Page size, a whole number from 1 to 100'),
       partition: z.string().optional().describe('Partition override')
     })
   )
@@ -52,6 +49,10 @@ Use this to access structured data extracted from documents by entity extraction
       token: ctx.auth.token,
       partition: ctx.config.partition
     });
+
+    if (ctx.input.instructionId && ctx.input.documentId) {
+      throw createApiServiceError('Provide exactly one of instructionId or documentId.');
+    }
 
     if (ctx.input.instructionId) {
       let result = await client.getInstructionEntities(ctx.input.instructionId, {
@@ -70,18 +71,21 @@ Use this to access structured data extracted from documents by entity extraction
     }
 
     if (ctx.input.documentId) {
-      let entities = await client.getDocumentEntities(ctx.input.documentId, {
+      let result = await client.getDocumentEntities(ctx.input.documentId, {
+        cursor: ctx.input.cursor,
+        pageSize: ctx.input.pageSize,
         partition: ctx.input.partition
       });
       return {
         output: {
-          entities,
-          nextCursor: null
+          entities: result.entities,
+          nextCursor: result.pagination.nextCursor,
+          totalCount: result.pagination.totalCount
         },
-        message: `Retrieved **${entities.length}** entities for document \`${ctx.input.documentId}\`.`
+        message: `Retrieved **${result.entities.length}** entities for document \`${ctx.input.documentId}\`.`
       };
     }
 
-    throw new Error('Provide either instructionId or documentId.');
+    throw createApiServiceError('Provide either instructionId or documentId.');
   })
   .build();

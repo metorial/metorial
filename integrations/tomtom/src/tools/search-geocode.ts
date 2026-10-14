@@ -35,7 +35,7 @@ let searchResultSchema = z.object({
 export let searchGeocode = SlateTool.create(spec, {
   name: 'Search & Geocode',
   key: 'search_geocode',
-  description: `Search for addresses, places, and points of interest using TomTom's fuzzy search. Supports free-text queries, structured address lookups, and autocomplete suggestions. Geo-bias results around a specific location and filter by country or category.`,
+  description: `Search for addresses, places, and points of interest using TomTom's fuzzy search. Bias results around a specific location and filter by country or category. Use autocomplete to recognize query terms and list_poi_categories to discover category IDs.`,
   instructions: [
     'Use the "query" field for free-text search (addresses, POI names, coordinates)',
     'Set "lat" and "lon" to bias results near a specific location',
@@ -53,6 +53,7 @@ export let searchGeocode = SlateTool.create(spec, {
       lon: z.number().optional().describe('Longitude to bias results toward'),
       radius: z.number().optional().describe('Search radius in meters around the bias point'),
       limit: z.number().optional().describe('Maximum number of results (1-100, default 10)'),
+      offset: z.number().optional().describe('Starting result offset (default 0)'),
       countrySet: z
         .string()
         .optional()
@@ -82,6 +83,7 @@ export let searchGeocode = SlateTool.create(spec, {
       lon: ctx.input.lon,
       radius: ctx.input.radius,
       limit: ctx.input.limit,
+      offset: ctx.input.offset,
       countrySet: ctx.input.countrySet,
       language: ctx.input.language,
       categorySet: ctx.input.categorySet
@@ -113,7 +115,7 @@ export let searchGeocode = SlateTool.create(spec, {
 
     return {
       output: {
-        totalResults: data.summary?.totalResults || results.length,
+        totalResults: data.summary?.totalResults ?? results.length,
         results
       },
       message: `Found **${results.length}** results for "${ctx.input.query}".`

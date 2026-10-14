@@ -1,95 +1,36 @@
-Now let me check a few more services to get details on SearchScraper, Markdownify, SmartCrawler, and Sitemap:Now I have enough information to write the specification. Let me compile everything.
+# ScrapeGraphAI integration specification
 
-# Slates Specification for Scrapegraph Ai
+## Authentication and API versions
 
-## Overview
+API keys are sent in the `SGAI-APIKEY` header. The saved API key field and token output are preserved. Legacy v1 tools use `https://api.scrapegraphai.com/v1`; current tools use `https://v2-api.scrapegraphai.com/api`.
 
-ScrapeGraphAI is an AI-powered web scraping API that uses large language models to extract structured data from websites and HTML content using natural language prompts. It provides services for single-page scraping, multi-source web search, website crawling, HTML-to-markdown conversion, agentic browser automation, and sitemap discovery.
+Current API keys are available at [scrapegraphai.com](https://scrapegraphai.com). The current API rejects deprecated v1 keys. Use a connection with the credential appropriate to the tools being called. This integration does not silently migrate existing connections or reinterpret legacy tool inputs.
 
-## Authentication
+## Current API workflows
 
-ScrapeGraphAI uses API key authentication. All API requests must include the API key in a custom header:
+- `extract_data`: extract structured JSON from exactly one URL, raw HTML, or Markdown source. Supply a natural language prompt and an optional JSON schema. Raw content is limited to 2 MB. Output includes the request ID, structured result, optional raw model output, usage, and diagnostics.
+- `generate_schema`: create or extend an extraction schema from a prompt. An existing schema is sent as `existing_schema`. Output includes the schema and optional refined prompt and token usage.
+- `list_history`: inspect request metadata with page/limit pagination and optional service or partial session-ID filters. Output includes request IDs, lifecycle status, account ID, timing, errors, parent IDs, timestamps, and pagination totals.
 
-```
-SGAI-APIKEY: your-api-key-here
-```
+## Compatibility tools
 
-API keys are obtained from the ScrapeGraphAI dashboard at `https://dashboard.scrapegraphai.com`. There are no OAuth flows, scopes, or additional credentials required. The base URL for all API requests is `https://api.scrapegraphai.com/v1`.
+The existing keys remain: `smart_scrape`, `web_search`, `crawl_website`, `markdownify`, `raw_scrape`, `discover_sitemap`, `agentic_scrape`, `get_credits`, and `get_request_status`. Their input fields, numeric JSON types, and service enum are preserved. HTML and Markdown content values remain unchanged when returned; these outputs also allow null or absent content while a legacy request has no result available.
 
-## Features
+The provider labels v1 deprecated and documents no v2 equivalent for agentic browser steps or sitemap discovery. Those legacy tools remain subject to provider availability. The legacy crawl endpoint and field documentation are inconsistent, so the existing `/crawl` path and nested rule mapping are retained. The public `outputSchema` input is sent as `data_schema`, as confirmed by the official legacy Python SDK. Request status lookups keep the legacy service enum and URL-encode request IDs. Falsy results are preserved when choosing the returned result field.
 
-### Smart Scraping (SmartScraper)
+Invalid source combinations, empty prompts/credentials/browser steps, and invalid whole-number options fail with actionable validation messages. Search result counts remain between 3 and 20. The API does not document a current-user/profile endpoint suitable for a dedicated identity tool. No trigger changes are included.
 
-Extracts structured data from a single webpage using a natural language prompt. Users provide a URL (or raw HTML/Markdown content) and describe what data they want; the AI returns structured JSON.
+## Official references
 
-- Supports custom output schemas (Pydantic/Zod) for consistent data structure.
-- Can accept `website_url`, `website_html`, or `website_markdown` as input (mutually exclusive).
-- Supports infinite scroll handling via a configurable number of scrolls.
-- Stealth mode available for anti-detection on protected sites.
-- Configurable page load wait time and proxy routing by country code.
-- Supports returning results as plain text instead of JSON.
-
-### Web Search (SearchScraper)
-
-Performs AI-powered web searches from a natural language prompt and aggregates structured results from multiple web sources, with source attribution via reference URLs.
-
-- Two modes: AI Extraction (structured data) and Markdown Mode (raw content, lower cost).
-- Configurable number of websites to search (3–20).
-- Supports geo-targeted search by country code.
-- Supports time range filtering (past hour, 24 hours, week, month, year).
-- Custom output schemas for structured responses.
-
-### Website Crawling (SmartCrawler)
-
-Crawls multiple pages of a website starting from a given URL, following links with configurable depth and breadth.
-
-- Two modes: AI-powered extraction with structured output, and markdown conversion mode (no AI, lower cost).
-- Configurable crawl depth, breadth per level, and maximum pages.
-- Crawl rules allow include/exclude path patterns (with wildcards) and same-domain restriction.
-- Supports sitemap-based discovery.
-- Supports custom output schemas.
-- Supports webhook notifications on job completion (signed with `X-Webhook-Signature`).
-
-### Markdown Conversion (Markdownify)
-
-Converts a single webpage into clean, well-formatted Markdown, stripping ads, navigation, and irrelevant elements while preserving content structure, images, and links.
-
-- Stealth mode and proxy routing available.
-- Configurable page load wait time.
-
-### Raw HTML Scraping (Scrape)
-
-Fetches and returns the HTML of a webpage with optional JavaScript rendering and custom headers. Useful when you need the raw page content rather than AI-processed output.
-
-### Sitemap Discovery
-
-Extracts and returns the sitemap structure of a website, useful for understanding site organization before crawling.
-
-### Agentic Browser Automation (Agentic Scraper)
-
-Automates browser interactions using a sequence of natural language steps (clicking, typing, scrolling, form filling, logging in) before extracting data. Enables scraping of login-protected or interaction-heavy pages.
-
-- Steps are described in plain language (e.g., "Type email in input box", "click on login").
-- Supports session persistence for multi-step workflows.
-- Optional AI extraction with schema support; without AI, returns raw markdown.
-
-### Credits Management
-
-Allows checking remaining API credit balance and usage.
-
-### Request History
-
-Retrieve results of previous requests by service type, with pagination support.
-
-## Events
-
-ScrapeGraphAI supports webhooks for the SmartCrawler service. When a crawl job completes, a POST request is sent to a user-specified webhook URL.
-
-### Crawl Job Completion
-
-Notifies when a SmartCrawler crawl job has finished processing.
-
-- Configured by providing a `webhook_url` parameter when starting a crawl.
-- Webhook requests include an `X-Webhook-Signature` header for verification. The webhook secret is configured in the ScrapeGraphAI dashboard.
-
-No other services currently support webhook or event subscription mechanisms.
+- [Current API introduction and authentication](https://docs.scrapegraphai.com/api-reference/introduction)
+- [Current extraction request and response](https://docs.scrapegraphai.com/api-reference/endpoint/extract)
+- [Schema generation](https://docs.scrapegraphai.com/services/schema)
+- [History and pagination](https://docs.scrapegraphai.com/api-reference/endpoint/history)
+- [Current API errors and deprecated keys](https://docs.scrapegraphai.com/api-reference/errors)
+- [Legacy API reference](https://docs.scrapegraphai.com/v1/api-reference/introduction)
+- [Legacy SmartScraper](https://docs.scrapegraphai.com/v1/smartscraper)
+- [Legacy SearchScraper](https://docs.scrapegraphai.com/v1/searchscraper)
+- [Legacy Markdownify](https://docs.scrapegraphai.com/v1/markdownify)
+- [Legacy SmartCrawler](https://docs.scrapegraphai.com/v1/smartcrawler)
+- [Legacy Python SDK v1.47.0 client](https://github.com/ScrapeGraphAI/scrapegraph-py/blob/v1.47.0/scrapegraph-py/scrapegraph_py/client.py)
+- [Legacy AgenticScraper](https://docs.scrapegraphai.com/v1/agenticscraper)

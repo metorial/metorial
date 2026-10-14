@@ -1,10 +1,8 @@
-Now let me get more details on specific features like the Google Search API, Amazon Scraper API, and proxy mode:Now I have enough information to write the specification.
-
-# Slates Specification for Scrape Do
+# Scrape Do Integration
 
 ## Overview
 
-Scrape.do is a web scraping API and rotating proxy service that provides unblocked access to public web data. It handles anti-bot bypass, CAPTCHA solving, and proxy rotation across 110M+ IPs in 150 countries, and offers specialized plugins for structured data extraction from Amazon and Google Search.
+Scrape.do is a web scraping API and rotating proxy service that provides unblocked access to public web data. It handles anti-bot bypass, CAPTCHA solving, and proxy rotation across rotating IPs in 150 countries, and offers specialized plugins for structured data extraction from Amazon and Google Search.
 
 ## Authentication
 
@@ -52,7 +50,7 @@ Render JavaScript-heavy pages using a managed headless Chromium browser by setti
 
 ### Screenshots
 
-Capture visual screenshots of target web pages. Supports normal viewport screenshots, full-page screenshots, and partial screenshots targeting a specific CSS selector.
+Capture visual screenshots of target web pages. Supports normal viewport screenshots, full-page screenshots, and partial screenshots targeting a specific CSS selector. The tool prepares a downloadable PNG and preserves the existing `screenshotBase64` field with the provider image value.
 
 ### Headers and Cookies Management
 
@@ -66,7 +64,7 @@ Full control over HTTP headers and cookies sent to the target website.
 
 ### Amazon Scraper API
 
-A specialized plugin returning structured JSON data from Amazon across 21 international marketplaces.
+A specialized plugin returning structured JSON data from Amazon across international marketplaces.
 
 - **Product pages (PDP)**: Extract product details, pricing, images, ratings, and specifications by ASIN.
 - **Offer listings**: Get all seller offers with prices and shipping information.
@@ -92,9 +90,9 @@ Process large-scale scraping jobs asynchronously. Submit a batch of target URLs 
 - Supports webhook delivery of results via `WebhookURL` configuration.
 - All standard scraping parameters (geo-targeting, super proxy, render, etc.) are available.
 
-### Proxy Mode
+### Account Information
 
-Use Scrape.do as a standard HTTP/HTTPS proxy server (`proxy.scrape.do:8080`) compatible with any HTTP client, scraping library (Scrapy, Selenium, Puppeteer, Playwright), or tool that supports proxy configuration. Parameters are passed via the proxy username field.
+`get_current_user` reads async account capacity, active jobs, and available credits from the authenticated account. The provider response retains its original field names, including `AvaliableCredits`. It does not contain a user ID or email.
 
 ### Statistics API
 
@@ -111,3 +109,22 @@ When making a standard scraping request, provide a `callback` URL parameter. Ins
 ### Async Job Webhooks
 
 When creating asynchronous jobs via the Async API, configure a `WebhookURL` in the job payload. Scrape.do will POST the job results to this URL upon completion, eliminating the need to poll for status.
+
+
+## Tool contracts
+
+All existing tool keys and output field types remain available. Numeric input fields remain JSON Schema numbers; whole-number restrictions are validated at runtime. API failures return structured errors. Scraped target status codes remain available for target 404/410 responses and transparent response mode.
+
+Amazon product and search tools accept optional `countryName` and `currency`; choose either `zipcode` or `countryName`. Google Search accepts optional `googleDomain`. Async job listing accepts optional `status`, `startFrom`, `startTo`, and `sort`. Binary async task content is prepared as a downloadable file while its original task result remains available.
+
+## Official references
+
+- [Getting started](https://scrape.do/documentation/)
+- [Status codes](https://scrape.do/documentation/api-response/status-codes/)
+- [Screenshot response](https://scrape.do/documentation/headless-browser/screenshot/)
+- [Amazon product parameters](https://scrape.do/documentation/amazon-scraper-api/pdp/)
+- [Amazon search parameters](https://scrape.do/documentation/amazon-scraper-api/search/)
+- [Google SERP API](https://scrape.do/documentation/google-scraper-api/search/search/)
+- [Async job API](https://scrape.do/documentation/async-api/)
+- [Async job filters](https://scrape.do/documentation/async-api/list-jobs/)
+- [Async account information](https://scrape.do/documentation/async-api/get-me/)

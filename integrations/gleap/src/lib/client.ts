@@ -1,11 +1,18 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class GleapClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(config: { token: string; projectId: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.gleap.io/v3',
+  constructor(config: { token: string; projectId: string; region?: 'eu' | 'us' }) {
+    if (!config.token?.trim() || !config.projectId?.trim()) {
+      throw createApiServiceError('Reconnect Gleap with a non-empty API key and project ID.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL:
+        config.region === 'us' ? 'https://api.us.gleap.ai/v3' : 'https://api.gleap.io/v3',
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Gleap', reason: 'gleap_api_error' }),
+      timeout: 30_000,
       headers: {
         Authorization: `Bearer ${config.token}`,
         Project: config.projectId,
@@ -25,13 +32,20 @@ export class GleapClient {
     skip?: number;
     archived?: boolean;
     isSpam?: boolean;
+    ignoreArchived?: boolean;
   }): Promise<{ tickets: any[]; count: number; totalCount: number }> {
-    let response = await this.axios.get('/tickets', { params });
+    let response = await this.axios.get('/tickets', {
+      params: {
+        ...params,
+        ignoreArchived:
+          params?.ignoreArchived ?? (params?.archived === true ? true : undefined)
+      }
+    });
     return response.data;
   }
 
   async getTicket(ticketId: string): Promise<any> {
-    let response = await this.axios.get(`/tickets/${ticketId}`);
+    let response = await this.axios.get(`/tickets/${encodeURIComponent(ticketId)}`);
     return response.data;
   }
 
@@ -74,16 +88,18 @@ export class GleapClient {
       [key: string]: any;
     }
   ): Promise<any> {
-    let response = await this.axios.put(`/tickets/${ticketId}`, data);
+    let response = await this.axios.put(`/tickets/${encodeURIComponent(ticketId)}`, data);
     return response.data;
   }
 
   async deleteTicket(ticketId: string): Promise<void> {
-    await this.axios.delete(`/tickets/${ticketId}`);
+    await this.axios.delete(`/tickets/${encodeURIComponent(ticketId)}`);
   }
 
   async archiveTicket(ticketId: string): Promise<any> {
-    let response = await this.axios.put(`/tickets/${ticketId}`, { archived: true });
+    let response = await this.axios.put(`/tickets/${encodeURIComponent(ticketId)}`, {
+      archived: true
+    });
     return response.data;
   }
 
@@ -100,12 +116,12 @@ export class GleapClient {
   }
 
   async getSession(sessionId: string): Promise<any> {
-    let response = await this.axios.get(`/sessions/${sessionId}`);
+    let response = await this.axios.get(`/sessions/${encodeURIComponent(sessionId)}`);
     return response.data;
   }
 
   async getSessionByUserId(userId: string): Promise<any> {
-    let response = await this.axios.get(`/sessions/userid/${userId}`);
+    let response = await this.axios.get(`/sessions/by-user-id/${encodeURIComponent(userId)}`);
     return response.data;
   }
 
@@ -143,12 +159,12 @@ export class GleapClient {
       [key: string]: any;
     }
   ): Promise<any> {
-    let response = await this.axios.put(`/sessions/${sessionId}`, data);
+    let response = await this.axios.put(`/sessions/${encodeURIComponent(sessionId)}`, data);
     return response.data;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    await this.axios.delete(`/sessions/${sessionId}`);
+    await this.axios.delete(`/sessions/${encodeURIComponent(sessionId)}`);
   }
 
   async searchSessions(params?: {
@@ -188,12 +204,12 @@ export class GleapClient {
   }
 
   async updateMessage(messageId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/messages/${messageId}`, data);
+    let response = await this.axios.put(`/messages/${encodeURIComponent(messageId)}`, data);
     return response.data;
   }
 
   async deleteMessage(messageId: string): Promise<void> {
-    await this.axios.delete(`/messages/${messageId}`);
+    await this.axios.delete(`/messages/${encodeURIComponent(messageId)}`);
   }
 
   // --- Help Center Collections ---
@@ -204,7 +220,9 @@ export class GleapClient {
   }
 
   async getCollection(collectionId: string): Promise<any> {
-    let response = await this.axios.get(`/helpcenter/collections/${collectionId}`);
+    let response = await this.axios.get(
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}`
+    );
     return response.data;
   }
 
@@ -228,24 +246,34 @@ export class GleapClient {
       targetAudience?: string;
     }
   ): Promise<any> {
-    let response = await this.axios.put(`/helpcenter/collections/${collectionId}`, data);
+    let response = await this.axios.put(
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteCollection(collectionId: string): Promise<void> {
-    await this.axios.delete(`/helpcenter/collections/${collectionId}`);
+    await this.axios.delete(`/helpcenter/collections/${encodeURIComponent(collectionId)}`);
   }
 
   // --- Help Center Articles ---
 
   async listArticles(collectionId: string): Promise<any[]> {
-    let response = await this.axios.get(`/helpcenter/collections/${collectionId}/articles`);
+    let response = await this.axios.get(
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}/articles`
+    );
     return response.data;
   }
 
-  async getArticle(collectionId: string, articleId: string): Promise<any> {
+  async getArticle(
+    collectionId: string,
+    articleId: string,
+    format?: 'html' | 'markdown'
+  ): Promise<any> {
     let response = await this.axios.get(
-      `/helpcenter/collections/${collectionId}/articles/${articleId}`
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}/articles/${encodeURIComponent(articleId)}`,
+      { params: { format } }
     );
     return response.data;
   }
@@ -264,7 +292,7 @@ export class GleapClient {
     }
   ): Promise<any> {
     let response = await this.axios.post(
-      `/helpcenter/collections/${collectionId}/articles`,
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}/articles`,
       data
     );
     return response.data;
@@ -284,18 +312,35 @@ export class GleapClient {
     }
   ): Promise<any> {
     let response = await this.axios.put(
-      `/helpcenter/collections/${collectionId}/articles/${articleId}`,
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}/articles/${encodeURIComponent(articleId)}`,
       data
     );
     return response.data;
   }
 
   async deleteArticle(collectionId: string, articleId: string): Promise<void> {
-    await this.axios.delete(`/helpcenter/collections/${collectionId}/articles/${articleId}`);
+    await this.axios.delete(
+      `/helpcenter/collections/${encodeURIComponent(collectionId)}/articles/${encodeURIComponent(articleId)}`
+    );
   }
 
-  async searchArticles(params?: { searchTerm?: string }): Promise<any> {
-    let response = await this.axios.get('/helpcenter/search', { params });
+  async searchArticles(params: {
+    searchTerm: string;
+    helpCenterDomain?: string;
+    password?: string;
+    lang?: string;
+    collectionId?: string;
+  }): Promise<any> {
+    let { helpCenterDomain, password, ...query } = params;
+    let response = await this.axios.get(
+      helpCenterDomain ? '/shared/helpcenter/search' : '/helpcenter/search',
+      {
+        params: query,
+        headers: helpCenterDomain
+          ? { 'api-token': helpCenterDomain, ...(password ? { password } : {}) }
+          : undefined
+      }
+    );
     return response.data;
   }
 
@@ -316,12 +361,15 @@ export class GleapClient {
   }
 
   async updateMessageTemplate(templateId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/message-templates/${templateId}`, data);
+    let response = await this.axios.put(
+      `/message-templates/${encodeURIComponent(templateId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteMessageTemplate(templateId: string): Promise<void> {
-    await this.axios.delete(`/message-templates/${templateId}`);
+    await this.axios.delete(`/message-templates/${encodeURIComponent(templateId)}`);
   }
 
   // --- Teams ---
@@ -337,49 +385,51 @@ export class GleapClient {
   }
 
   async updateTeam(teamId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/teams/${teamId}`, data);
+    let response = await this.axios.put(`/teams/${encodeURIComponent(teamId)}`, data);
     return response.data;
   }
 
   async deleteTeam(teamId: string): Promise<void> {
-    await this.axios.delete(`/teams/${teamId}`);
+    await this.axios.delete(`/teams/${encodeURIComponent(teamId)}`);
   }
 
   // --- AI Content ---
 
   async createAiContent(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/ai-content', data);
+    let response = await this.axios.post('/aicontent', data);
     return response.data;
   }
 
   async getAiContent(contentId: string): Promise<any> {
-    let response = await this.axios.get(`/ai-content/${contentId}`);
+    let response = await this.axios.get(`/aicontent/${encodeURIComponent(contentId)}`);
     return response.data;
   }
 
   async updateAiContent(contentId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/ai-content/${contentId}`, data);
+    let response = await this.axios.put(`/aicontent/${encodeURIComponent(contentId)}`, data);
     return response.data;
   }
 
   async deleteAiContent(contentId: string): Promise<void> {
-    await this.axios.delete(`/ai-content/${contentId}`);
+    await this.axios.delete(`/aicontent/${encodeURIComponent(contentId)}`);
   }
 
   // --- Engagements (generic CRUD for various engagement types) ---
 
   async listEngagements(engagementType: string): Promise<any[]> {
-    let response = await this.axios.get(`/${engagementType}`);
+    let response = await this.axios.get(`/engagement/${engagementType}`);
     return response.data;
   }
 
   async getEngagement(engagementType: string, engagementId: string): Promise<any> {
-    let response = await this.axios.get(`/${engagementType}/${engagementId}`);
+    let response = await this.axios.get(
+      `/engagement/${engagementType}/${encodeURIComponent(engagementId)}`
+    );
     return response.data;
   }
 
   async createEngagement(engagementType: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/${engagementType}`, data);
+    let response = await this.axios.post(`/engagement/${engagementType}`, data);
     return response.data;
   }
 
@@ -388,15 +438,25 @@ export class GleapClient {
     engagementId: string,
     data: Record<string, any>
   ): Promise<any> {
-    let response = await this.axios.put(`/${engagementType}/${engagementId}`, data);
+    let response = await this.axios.put(
+      `/engagement/${engagementType}/${encodeURIComponent(engagementId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteEngagement(engagementType: string, engagementId: string): Promise<void> {
-    await this.axios.delete(`/${engagementType}/${engagementId}`);
+    await this.axios.delete(
+      `/engagement/${engagementType}/${encodeURIComponent(engagementId)}`
+    );
   }
 
   // --- Project Users ---
+
+  async getCurrentUser(): Promise<any> {
+    let response = await this.axios.get('/users/me');
+    return response.data;
+  }
 
   async listProjectUsers(): Promise<any[]> {
     let response = await this.axios.get('/projects/users');

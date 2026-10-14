@@ -1,15 +1,17 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.getpostman.com',
-      headers: {
-        'X-API-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.postman.com',
+      authHeader: { name: 'X-API-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Postman',
+          reason: 'postman_api_error'
+        })
     });
   }
 
@@ -21,7 +23,7 @@ export class Client {
   }
 
   async getWorkspace(workspaceId: string) {
-    let response = await this.axios.get(`/workspaces/${workspaceId}`);
+    let response = await this.axios.get(`/workspaces/${encodeURIComponent(workspaceId)}`);
     return response.data.workspace;
   }
 
@@ -38,12 +40,14 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.axios.put(`/workspaces/${workspaceId}`, { workspace });
+    let response = await this.axios.put(`/workspaces/${encodeURIComponent(workspaceId)}`, {
+      workspace
+    });
     return response.data.workspace;
   }
 
   async deleteWorkspace(workspaceId: string) {
-    let response = await this.axios.delete(`/workspaces/${workspaceId}`);
+    let response = await this.axios.delete(`/workspaces/${encodeURIComponent(workspaceId)}`);
     return response.data.workspace;
   }
 
@@ -55,7 +59,7 @@ export class Client {
   }
 
   async getCollection(collectionId: string) {
-    let response = await this.axios.get(`/collections/${collectionId}`);
+    let response = await this.axios.get(`/collections/${encodeURIComponent(collectionId)}`);
     return response.data.collection;
   }
 
@@ -71,13 +75,26 @@ export class Client {
   }
 
   async updateCollection(collectionId: string, collection: Record<string, any>) {
-    let response = await this.axios.put(`/collections/${collectionId}`, { collection });
+    let response = await this.axios.put(`/collections/${encodeURIComponent(collectionId)}`, {
+      collection
+    });
     return response.data.collection;
   }
 
   async deleteCollection(collectionId: string) {
-    let response = await this.axios.delete(`/collections/${collectionId}`);
+    let response = await this.axios.delete(`/collections/${encodeURIComponent(collectionId)}`);
     return response.data.collection;
+  }
+
+  async importOpenApi(input: Record<string, unknown>, workspaceId: string) {
+    let response = await this.axios.post(
+      '/import/openapi',
+      { type: 'json', input },
+      {
+        params: { workspace: workspaceId }
+      }
+    );
+    return response.data.collections ?? [];
   }
 
   // ── Collection Items ────────────────────────────────────────
@@ -87,9 +104,13 @@ export class Client {
     request: Record<string, any>,
     folderId?: string
   ) {
-    let response = await this.axios.post(`/collections/${collectionId}/requests`, request, {
-      params: folderId ? { folder: folderId } : undefined
-    });
+    let response = await this.axios.post(
+      `/collections/${encodeURIComponent(collectionId)}/requests`,
+      request,
+      {
+        params: folderId ? { folder: folderId } : undefined
+      }
+    );
     return response.data.data;
   }
 
@@ -99,7 +120,7 @@ export class Client {
     request: Record<string, any>
   ) {
     let response = await this.axios.put(
-      `/collections/${collectionId}/requests/${requestId}`,
+      `/collections/${encodeURIComponent(collectionId)}/requests/${encodeURIComponent(requestId)}`,
       request
     );
     return response.data.data;
@@ -107,13 +128,16 @@ export class Client {
 
   async deleteCollectionRequest(collectionId: string, requestId: string) {
     let response = await this.axios.delete(
-      `/collections/${collectionId}/requests/${requestId}`
+      `/collections/${encodeURIComponent(collectionId)}/requests/${encodeURIComponent(requestId)}`
     );
     return response.data.data;
   }
 
   async createCollectionFolder(collectionId: string, folder: Record<string, any>) {
-    let response = await this.axios.post(`/collections/${collectionId}/folders`, folder);
+    let response = await this.axios.post(
+      `/collections/${encodeURIComponent(collectionId)}/folders`,
+      folder
+    );
     return response.data.data;
   }
 
@@ -123,14 +147,16 @@ export class Client {
     folder: Record<string, any>
   ) {
     let response = await this.axios.put(
-      `/collections/${collectionId}/folders/${folderId}`,
+      `/collections/${encodeURIComponent(collectionId)}/folders/${encodeURIComponent(folderId)}`,
       folder
     );
     return response.data.data;
   }
 
   async deleteCollectionFolder(collectionId: string, folderId: string) {
-    let response = await this.axios.delete(`/collections/${collectionId}/folders/${folderId}`);
+    let response = await this.axios.delete(
+      `/collections/${encodeURIComponent(collectionId)}/folders/${encodeURIComponent(folderId)}`
+    );
     return response.data.data;
   }
 
@@ -138,7 +164,7 @@ export class Client {
 
   async forkCollection(collectionId: string, label: string, workspaceId: string) {
     let response = await this.axios.post(
-      `/collections/fork/${collectionId}`,
+      `/collections/fork/${encodeURIComponent(collectionId)}`,
       { label },
       {
         params: { workspace: workspaceId }
@@ -151,7 +177,10 @@ export class Client {
     collectionId: string,
     params?: { cursor?: string; limit?: number; sort?: string; direction?: string }
   ) {
-    let response = await this.axios.get(`/collections/${collectionId}/forks`, { params });
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionId)}/forks`,
+      { params }
+    );
     return response.data;
   }
 
@@ -165,7 +194,9 @@ export class Client {
   // ── Pull Requests ───────────────────────────────────────────
 
   async listPullRequests(collectionId: string) {
-    let response = await this.axios.get(`/collections/${collectionId}/pull-requests`);
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionId)}/pull-requests`
+    );
     return response.data.data ?? [];
   }
 
@@ -174,21 +205,20 @@ export class Client {
     pullRequest: {
       title: string;
       description?: string;
-      source: string;
-      destination: string;
+      destinationId: string;
       reviewers?: string[];
     }
   ) {
     let response = await this.axios.post(
-      `/collections/${collectionId}/pull-requests`,
+      `/collections/${encodeURIComponent(collectionId)}/pull-requests`,
       pullRequest
     );
-    return response.data.data;
+    return response.data;
   }
 
   async getPullRequest(pullRequestId: string) {
-    let response = await this.axios.get(`/pull-requests/${pullRequestId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/pull-requests/${encodeURIComponent(pullRequestId)}`);
+    return response.data;
   }
 
   async updatePullRequest(
@@ -196,10 +226,14 @@ export class Client {
     pullRequest: {
       title?: string;
       description?: string;
+      reviewers?: string[];
     }
   ) {
-    let response = await this.axios.put(`/pull-requests/${pullRequestId}`, pullRequest);
-    return response.data.data;
+    let response = await this.axios.put(
+      `/pull-requests/${encodeURIComponent(pullRequestId)}`,
+      pullRequest
+    );
+    return response.data;
   }
 
   // ── Environments ────────────────────────────────────────────
@@ -210,7 +244,7 @@ export class Client {
   }
 
   async getEnvironment(environmentId: string) {
-    let response = await this.axios.get(`/environments/${environmentId}`);
+    let response = await this.axios.get(`/environments/${encodeURIComponent(environmentId)}`);
     return response.data.environment;
   }
 
@@ -238,12 +272,16 @@ export class Client {
       values?: Array<{ key: string; value: string; enabled?: boolean; type?: string }>;
     }
   ) {
-    let response = await this.axios.put(`/environments/${environmentId}`, { environment });
+    let response = await this.axios.put(`/environments/${encodeURIComponent(environmentId)}`, {
+      environment
+    });
     return response.data.environment;
   }
 
   async deleteEnvironment(environmentId: string) {
-    let response = await this.axios.delete(`/environments/${environmentId}`);
+    let response = await this.axios.delete(
+      `/environments/${encodeURIComponent(environmentId)}`
+    );
     return response.data.environment;
   }
 
@@ -255,7 +293,7 @@ export class Client {
   }
 
   async getMock(mockId: string) {
-    let response = await this.axios.get(`/mocks/${mockId}`);
+    let response = await this.axios.get(`/mocks/${encodeURIComponent(mockId)}`);
     return response.data.mock;
   }
 
@@ -287,12 +325,12 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.axios.put(`/mocks/${mockId}`, { mock });
+    let response = await this.axios.put(`/mocks/${encodeURIComponent(mockId)}`, { mock });
     return response.data.mock;
   }
 
   async deleteMock(mockId: string) {
-    let response = await this.axios.delete(`/mocks/${mockId}`);
+    let response = await this.axios.delete(`/mocks/${encodeURIComponent(mockId)}`);
     return response.data.mock;
   }
 
@@ -304,7 +342,7 @@ export class Client {
   }
 
   async getMonitor(monitorId: string) {
-    let response = await this.axios.get(`/monitors/${monitorId}`);
+    let response = await this.axios.get(`/monitors/${encodeURIComponent(monitorId)}`);
     return response.data.monitor;
   }
 
@@ -334,29 +372,42 @@ export class Client {
       schedule?: { cron?: string; timezone?: string };
     }
   ) {
-    let response = await this.axios.put(`/monitors/${monitorId}`, { monitor });
+    let response = await this.axios.put(`/monitors/${encodeURIComponent(monitorId)}`, {
+      monitor
+    });
     return response.data.monitor;
   }
 
   async deleteMonitor(monitorId: string) {
-    let response = await this.axios.delete(`/monitors/${monitorId}`);
+    let response = await this.axios.delete(`/monitors/${encodeURIComponent(monitorId)}`);
     return response.data.monitor;
   }
 
-  async runMonitor(monitorId: string) {
-    let response = await this.axios.post(`/monitors/${monitorId}/run`);
+  async runMonitor(monitorId: string, asyncRun?: boolean) {
+    let response = await this.axios.post(
+      `/monitors/${encodeURIComponent(monitorId)}/run`,
+      undefined,
+      {
+        params: { async: asyncRun ?? false }
+      }
+    );
     return response.data.run;
   }
 
   // ── APIs ────────────────────────────────────────────────────
 
   async listApis(params?: { workspace?: string; cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/apis', { params });
-    return response.data.apis ?? [];
+    let response = await this.axios.get('/apis', {
+      params: { workspaceId: params?.workspace, cursor: params?.cursor, limit: params?.limit },
+      headers: { Accept: 'application/vnd.api.v10+json' }
+    });
+    return response.data;
   }
 
   async getApi(apiId: string) {
-    let response = await this.axios.get(`/apis/${apiId}`);
+    let response = await this.axios.get(`/apis/${encodeURIComponent(apiId)}`, {
+      headers: { Accept: 'application/vnd.api.v10+json' }
+    });
     return response.data;
   }
 
@@ -369,7 +420,8 @@ export class Client {
     workspaceId?: string
   ) {
     let response = await this.axios.post('/apis', api, {
-      params: workspaceId ? { workspace: workspaceId } : undefined
+      params: workspaceId ? { workspaceId } : undefined,
+      headers: { Accept: 'application/vnd.api.v10+json' }
     });
     return response.data;
   }
@@ -382,12 +434,16 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.axios.put(`/apis/${apiId}`, api);
+    let response = await this.axios.put(`/apis/${encodeURIComponent(apiId)}`, api, {
+      headers: { Accept: 'application/vnd.api.v10+json' }
+    });
     return response.data;
   }
 
   async deleteApi(apiId: string) {
-    let response = await this.axios.delete(`/apis/${apiId}`);
+    let response = await this.axios.delete(`/apis/${encodeURIComponent(apiId)}`, {
+      headers: { Accept: 'application/vnd.api.v10+json' }
+    });
     return response.data;
   }
 
@@ -396,7 +452,7 @@ export class Client {
   async listComments(entityType: string, entityId: string, parentEntityId?: string) {
     let path = this.buildCommentPath(entityType, entityId, parentEntityId);
     let response = await this.axios.get(path);
-    return response.data.comments ?? [];
+    return response.data.data ?? response.data.comments ?? [];
   }
 
   async createComment(
@@ -438,19 +494,24 @@ export class Client {
     entityId: string,
     parentEntityId?: string
   ): string {
+    if (['folder', 'request', 'response'].includes(entityType) && !parentEntityId) {
+      throw createApiServiceError(
+        'collectionId is required for folder, request, and response comments.'
+      );
+    }
     switch (entityType) {
       case 'collection':
-        return `/collections/${entityId}/comments`;
+        return `/collections/${encodeURIComponent(entityId)}/comments`;
       case 'folder':
-        return `/collections/${parentEntityId}/folders/${entityId}/comments`;
+        return `/collections/${encodeURIComponent(parentEntityId ?? '')}/folders/${encodeURIComponent(entityId)}/comments`;
       case 'request':
-        return `/collections/${parentEntityId}/requests/${entityId}/comments`;
+        return `/collections/${encodeURIComponent(parentEntityId ?? '')}/requests/${encodeURIComponent(entityId)}/comments`;
       case 'response':
-        return `/collections/${parentEntityId}/responses/${entityId}/comments`;
+        return `/collections/${encodeURIComponent(parentEntityId ?? '')}/responses/${encodeURIComponent(entityId)}/comments`;
       case 'api':
-        return `/apis/${entityId}/comments`;
+        return `/apis/${encodeURIComponent(entityId)}/comments`;
       default:
-        throw new Error(`Unsupported comment entity type: ${entityType}`);
+        throw createApiServiceError(`Unsupported comment entity type: ${entityType}`);
     }
   }
 
@@ -464,13 +525,13 @@ export class Client {
   // ── Tags ────────────────────────────────────────────────────
 
   async getTags(entityType: string, entityId: string) {
-    let path = `/${entityType}s/${entityId}/tags`;
+    let path = `/${entityType}s/${encodeURIComponent(entityId)}/tags`;
     let response = await this.axios.get(path);
     return response.data.tags ?? [];
   }
 
   async updateTags(entityType: string, entityId: string, tags: Array<{ slug: string }>) {
-    let path = `/${entityType}s/${entityId}/tags`;
+    let path = `/${entityType}s/${encodeURIComponent(entityId)}/tags`;
     let response = await this.axios.put(path, { tags });
     return response.data;
   }
@@ -479,7 +540,9 @@ export class Client {
     tagSlug: string,
     params?: { entityType?: string; limit?: number; cursor?: string; direction?: string }
   ) {
-    let response = await this.axios.get(`/tags/${tagSlug}/entities`, { params });
+    let response = await this.axios.get(`/tags/${encodeURIComponent(tagSlug)}/entities`, {
+      params
+    });
     return response.data;
   }
 

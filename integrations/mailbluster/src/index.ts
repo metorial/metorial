@@ -5,6 +5,7 @@ import {
   createLead,
   createOrder,
   createProduct,
+  deleteField,
   deleteLead,
   deleteOrder,
   deleteProduct,
@@ -14,6 +15,7 @@ import {
   listFields,
   listOrders,
   listProducts,
+  updateField,
   updateLead,
   updateOrder,
   updateProduct
@@ -36,7 +38,9 @@ export let provider = Slate.create({
     updateOrder,
     deleteOrder,
     listFields,
-    createField
+    createField,
+    updateField,
+    deleteField
   ],
   triggers: []
 });

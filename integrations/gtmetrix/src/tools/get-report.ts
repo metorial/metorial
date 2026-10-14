@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { reportOutputSchema } from '../lib/schemas';
@@ -31,6 +31,10 @@ export let getReport = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.reportId && ctx.input.testId) {
+      throw createApiServiceError('Provide only one of reportId or testId.');
+    }
+
     let reportId = ctx.input.reportId;
 
     if (ctx.input.testId && !reportId) {
@@ -38,18 +42,22 @@ export let getReport = SlateTool.create(spec, {
       let test = await client.pollTestUntilComplete(ctx.input.testId);
 
       if (test.state === 'error') {
-        throw new Error(`Test ${ctx.input.testId} failed: ${test.error ?? 'Unknown error'}`);
+        throw createApiServiceError(
+          `Test ${ctx.input.testId} failed: ${test.error ?? 'Unknown error'}`
+        );
       }
 
       if (!test.reportId) {
-        throw new Error(`Test ${ctx.input.testId} completed but no report ID was returned`);
+        throw createApiServiceError(
+          `Test ${ctx.input.testId} completed but no report ID was returned`
+        );
       }
 
       reportId = test.reportId;
     }
 
     if (!reportId) {
-      throw new Error('Either reportId or testId must be provided');
+      throw createApiServiceError('Either reportId or testId must be provided');
     }
 
     let report = await client.getReport(reportId);

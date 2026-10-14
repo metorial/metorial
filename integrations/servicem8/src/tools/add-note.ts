@@ -23,7 +23,7 @@ export let addNote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let noteUuid = await client.createNote({
       related_object: 'job',

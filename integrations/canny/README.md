@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/canny-logo.png" height="20"> Canny
 
-Collect, organize, and prioritize user feedback and feature requests. Create, update, and manage feedback posts on boards with voting, comments, and status tracking. Manage users, companies, categories, tags, and changelog entries. Track ideas, insights, and opportunities linked to sales tools. Use AI-powered Autopilot to extract feature requests from text content. Monitor post, comment, and vote events via webhooks.
+Collect, organize, and prioritize user feedback and feature requests. Create, update, and manage feedback posts on boards with voting, comments, and status tracking. Manage users, companies, categories, tags, and changelog entries. List sales opportunities linked to feedback posts. Use AI-powered Autopilot to extract feature requests from text content.
 
 ## Tools
 
@@ -50,7 +50,7 @@ Remove a vote from a feedback post. This reduces the post's score.
 
 ### Enqueue Autopilot Feedback
 
-Submit text content (e.g., call transcripts, conversation logs) to Canny's AI-powered Autopilot for automatic feature request extraction and deduplication. Each request consumes one Autopilot credit.
+Submit text content (e.g., call transcripts, conversation logs) to Canny's AI-powered Autopilot for automatic feature request extraction and deduplication. Each request consumes one Autopilot credit. Provide a unique conversation or call ID and identify the author by application user ID or Canny user ID. The author must have an application user ID.
 
 ### List Boards
 
@@ -94,7 +94,7 @@ Create, retrieve, list, or delete categories on a board. Categories help organiz
 
 ### Manage Post Organization
 
-Move a post to a different board, change its category, add/remove tags, or merge posts together. Use the \
+Move a post to a different board, change its category, add/remove tags, or merge posts together. Use the action field to specify the operation.
 
 ### Manage Tags
 
@@ -103,6 +103,14 @@ Create, retrieve, or list tags on a board. Tags are labels that can be applied t
 ### Retrieve Board
 
 Retrieve details about a specific feedback board by its ID. Returns the board's name, post count, privacy settings, and URL.
+
+### Retrieve Comment
+
+Retrieve a feedback comment by its Canny ID, including its author, post, images, and reply relationship.
+
+### Remove User from Company
+
+Remove a user from a company. Their votes will no longer count toward the company’s spend.
 
 ### Retrieve Post
 

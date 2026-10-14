@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type CompanyPayload } from '../lib/client';
 import { spec } from '../spec';
 
 export let createOrUpdateCompany = SlateTool.create(spec, {
@@ -55,15 +55,15 @@ Set a property to \`null\` to remove it. Supports custom properties and user rel
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let payload: Record<string, unknown> = {
+    let payload: CompanyPayload = {
       identifier: ctx.input.identifier
     };
-    if (ctx.input.name) payload.name = ctx.input.name;
+    if (ctx.input.name !== undefined) payload.name = ctx.input.name;
     if (ctx.input.signedUpAt) payload.signed_up_at = ctx.input.signedUpAt;
     if (ctx.input.properties) payload.properties = ctx.input.properties;
     if (ctx.input.relationships) payload.relationships = ctx.input.relationships;
 
-    await client.createOrUpdateCompany(payload as any);
+    await client.createOrUpdateCompany(payload);
 
     return {
       output: { success: true },

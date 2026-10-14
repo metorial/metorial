@@ -13,7 +13,7 @@ let userSchema = z.object({
 let mapUser = (user: any) => ({
   userId: user.id,
   userUrl: user.url,
-  name: user.name,
+  name: user.name ?? [user.first_name, user.last_name].filter(Boolean).join(' '),
   email: user.email
 });
 

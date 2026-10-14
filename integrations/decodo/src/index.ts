@@ -5,9 +5,11 @@ import {
   createScrapeTask,
   createSubUser,
   deleteSubUser,
+  getAllocatedTrafficLimit,
   getProxyEndpoints,
   getScrapeTaskResults,
   getSubscriptions,
+  getSubUser,
   getSubUserTraffic,
   listSubUsers,
   listWhitelistedIps,
@@ -25,12 +27,14 @@ export let provider = Slate.create({
     createSubUser,
     updateSubUser,
     deleteSubUser,
+    getSubUser,
     getSubUserTraffic,
     listWhitelistedIps,
     addWhitelistedIps,
     removeWhitelistedIp,
     getSubscriptions,
-    getProxyEndpoints
+    getProxyEndpoints,
+    getAllocatedTrafficLimit
   ],
   triggers: []
 });

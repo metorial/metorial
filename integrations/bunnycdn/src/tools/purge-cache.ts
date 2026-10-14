@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,6 +39,15 @@ export let purgeCache = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action === 'purge_url' && !ctx.input.url?.trim())
+      throw createApiServiceError('url is required to purge a single URL.');
+    if (
+      ctx.input.action === 'purge_pull_zone' &&
+      (ctx.input.pullZoneId === undefined ||
+        ctx.input.pullZoneId <= 0 ||
+        !Number.isInteger(ctx.input.pullZoneId))
+    )
+      throw createApiServiceError('A positive pullZoneId is required to purge a pull zone.');
     let client = new CoreClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'purge_url') {

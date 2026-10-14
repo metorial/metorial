@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Needle
 
-Manage document collections, perform AI-powered semantic search, and build automated workflows. Create, list, update, and delete collections that index documents for retrieval-augmented generation (RAG). Add files to collections via URL or signed upload, supporting PDFs, Word, Excel, CSV, Markdown, and more with OCR capabilities. Search across indexed documents using semantic search with automatic chunking, embedding, and reranking. Connect 25+ external data sources (Google Drive, SharePoint, Notion, Slack, GitHub, Salesforce, Gmail) that automatically sync and reindex content. Build visual AI-powered workflows with agent nodes, conditional logic, loops, and integrations to external services.
+Manage Needle document collections, add and remove indexed files, retrieve indexing statistics, and search document passages. Generate upload URLs for local files and download existing files. Inspect files synchronized by data source connectors.
+
+Create an API key in Needle Developer Settings. Collection IDs are available through `list_collections`; connector IDs are available through `list_connectors` when Needle reports collection assignments, or in the dashboard.
+
+The tools target Needle's document collection and RAG API. `get_collection_stats` reports unknown byte sizes as null. The existing `get_collection` and `list_connectors` tools report a clear error if the provider omits byte sizes or collection assignments required by their response contracts.
 
 ## License
 

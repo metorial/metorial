@@ -26,7 +26,7 @@ let mapSchema = z
 export let listMaps = SlateTool.create(spec, {
   name: 'List Maps',
   key: 'list_maps',
-  description: `Retrieve all maps in your Mapulus account, optionally including their layers. Use this to discover available maps and their layer structure before working with locations.`,
+  description: `Retrieve the first page of maps in your Mapulus account, optionally including their layers. Use this to discover available maps and their layer structure before working with locations.`,
   tags: {
     destructive: false,
     readOnly: true

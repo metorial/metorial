@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageLibrariesTool = SlateTool.create(spec, {
@@ -35,7 +35,7 @@ export let manageLibrariesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { action, fileId, libraryId } = ctx.input;
 
     switch (action) {
@@ -48,7 +48,7 @@ export let manageLibrariesTool = SlateTool.create(spec, {
         };
       }
       case 'link': {
-        if (!libraryId) throw new Error('libraryId is required for link action');
+        if (!libraryId) throw createApiServiceError('libraryId is required for link action');
         await client.linkFileToLibrary(fileId, libraryId);
         return {
           output: { success: true },
@@ -56,7 +56,7 @@ export let manageLibrariesTool = SlateTool.create(spec, {
         };
       }
       case 'unlink': {
-        if (!libraryId) throw new Error('libraryId is required for unlink action');
+        if (!libraryId) throw createApiServiceError('libraryId is required for unlink action');
         await client.unlinkFileFromLibrary(fileId, libraryId);
         return {
           output: { success: true },

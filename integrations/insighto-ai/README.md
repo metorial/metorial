@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Insighto.ai
 
-Build, configure, and deploy AI-powered chat and voice agents across multiple channels. Create and manage AI assistants with custom prompts, knowledge bases, and tool integrations. Initiate outbound voice calls and bulk calling campaigns. Send messages through chat channels including SMS, WhatsApp, web chat, Telegram, Instagram, and Messenger. Manage contacts, conversations, forms, intents, and conversation flows. Configure data sources and knowledge bases for AI agents. Run outbound campaigns for voice and chat outreach. Collect structured data via AI-driven forms with webhook delivery. Access conversation analytics and interaction logs. Manage webhooks to push real-time events (form submissions, new conversations, new contacts) to external systems. Supports agency white-label features and custom tool integrations with external APIs.
+Build and manage AI assistants, widgets, contacts, conversations, knowledge sources, and forms. Initiate outbound calls, disconnect active calls, and send SMS or WhatsApp messages through configured widgets. Discover and manage scheduled campaigns, link recipient contacts, inspect captured forms and webhook delivery logs, and identify the connected account.
+
+See [API behavior and available operations](docs/SPEC.md) for authentication, required campaign fields, pagination, and provider limitations.
 
 ## License
 

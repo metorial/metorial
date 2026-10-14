@@ -5,6 +5,9 @@ import {
   generateEmbeddings,
   generateImage,
   generateVideo,
+  getCurrentUser,
+  getTranscriptionResult,
+  getVideoResult,
   listModels,
   moderateContent,
   speechToText,
@@ -20,7 +23,10 @@ export let provider = Slate.create({
     generateEmbeddings,
     moderateContent,
     generateVideo,
-    listModels
+    listModels,
+    getCurrentUser,
+    getTranscriptionResult,
+    getVideoResult
   ],
   triggers: []
 });

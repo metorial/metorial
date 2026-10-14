@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,7 @@ export let deletePost = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -50,16 +50,24 @@ export let deletePost = SlateTool.create(spec, {
       deleteAllScheduled: ctx.input.deleteAllScheduled
     });
 
-    let description = ctx.input.postId
-      ? `Post **${ctx.input.postId}** deleted.`
-      : ctx.input.bulk
-        ? `**${ctx.input.bulk.length}** posts deleted in bulk.`
-        : 'All scheduled posts deleted.';
+    let deletedPosts =
+      result.postIds ||
+      result.posts ||
+      Object.entries(result).flatMap(([platform, value]) =>
+        isApiErrorRecord(value) && value.action === 'delete' ? [{ ...value, platform }] : []
+      );
+    let description = ctx.input.deleteAllScheduled
+      ? 'All scheduled posts deleted.'
+      : ctx.input.postId
+        ? `Post **${ctx.input.postId}** deleted.`
+        : ctx.input.bulk
+          ? `**${ctx.input.bulk.length}** posts deleted in bulk.`
+          : 'All scheduled posts deleted.';
 
     return {
       output: {
         status: result.status || 'success',
-        deletedPosts: result.postIds || result.posts
+        deletedPosts
       },
       message: `${description} Status: **${result.status || 'success'}**.`
     };

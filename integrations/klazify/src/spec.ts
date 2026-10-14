@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'klazify',
   name: 'Klazify',
   description:
-    'Content Classification API that turns any URL, domain, IP address, or email into a complete company profile with categories, logos, social media links, tech stack, and structured business data.',
+    'Classify URLs, domains, IP addresses, and emails into categories and available company data, retrieve logos and social profiles, inspect category taxonomies, and discover domains by company or technology filters.',
   metadata: {},
   config,
   auth

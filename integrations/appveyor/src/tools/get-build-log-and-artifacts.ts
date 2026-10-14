@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,21 +43,36 @@ export let getBuildLogAndArtifacts = SlateTool.create(spec, {
     z.object({
       log: z.string().optional().describe('Build log content'),
       artifacts: z.array(artifactSchema).optional().describe('List of build artifacts'),
-      artifactContent: z.string().optional().describe('Downloaded artifact content')
+      artifactContent: z.string().optional().describe('Downloaded artifact content'),
+      fileName: z.string().optional().describe('Name of the downloadable file'),
+      downloadUrl: z
+        .string()
+        .optional()
+        .describe('Provider endpoint for the downloadable file')
     })
   )
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
       case 'log': {
-        let log = await client.getBuildJobLog(ctx.input.jobId);
+        let downloadUrl = client.getBuildJobLogUrl(ctx.input.jobId);
+        let fileName = `build-${ctx.input.jobId}.log`;
+        let file = await client.downloadFile(downloadUrl);
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(new Uint8Array(file.bytes), {
+            headers: { 'Content-Type': 'text/plain' }
+          }),
+          filename: fileName,
+          mimeType: 'text/plain'
+        });
         return {
-          output: { log },
-          message: `Retrieved build log for job **${ctx.input.jobId}**.`
+          output: { log: file.text, fileName, downloadUrl },
+          message: `Prepared the build log for job **${ctx.input.jobId}** for download.`
         };
       }
 
@@ -65,10 +80,10 @@ export let getBuildLogAndArtifacts = SlateTool.create(spec, {
         let artifacts = await client.listBuildJobArtifacts(ctx.input.jobId);
         let mapped = artifacts.map((a: any) => ({
           fileName: a.fileName,
-          name: a.name,
-          type: a.type,
-          size: a.size,
-          created: a.created
+          name: typeof a.name === 'string' ? a.name : undefined,
+          type: typeof a.type === 'string' ? a.type : undefined,
+          size: typeof a.size === 'number' ? a.size : undefined,
+          created: typeof a.created === 'string' ? a.created : undefined
         }));
         return {
           output: { artifacts: mapped },
@@ -78,20 +93,30 @@ export let getBuildLogAndArtifacts = SlateTool.create(spec, {
 
       case 'downloadArtifact': {
         if (!ctx.input.artifactFileName) {
-          throw new Error('artifactFileName is required for downloadArtifact');
+          throw createApiServiceError('artifactFileName is required for downloadArtifact');
         }
-        let content = await client.downloadBuildJobArtifact(
+        let downloadUrl = client.getBuildJobArtifactUrl(
           ctx.input.jobId,
           ctx.input.artifactFileName
         );
+        let file = await client.downloadFile(downloadUrl);
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(new Uint8Array(file.bytes)),
+          filename: ctx.input.artifactFileName
+        });
         return {
-          output: { artifactContent: content },
-          message: `Downloaded artifact **${ctx.input.artifactFileName}** from job **${ctx.input.jobId}**.`
+          output: {
+            artifactContent: file.text,
+            fileName: ctx.input.artifactFileName,
+            downloadUrl
+          },
+          message: `Prepared artifact **${ctx.input.artifactFileName}** from job **${ctx.input.jobId}** for download.`
         };
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

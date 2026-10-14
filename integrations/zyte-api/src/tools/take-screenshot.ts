@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,13 @@ let actionSchema = z.object({
     .describe('Action type to perform'),
   selector: selectorSchema.optional().describe('Element selector'),
   text: z.string().optional().describe('Text to type'),
+  values: z
+    .array(z.string())
+    .optional()
+    .describe('Option values to choose for the select action'),
   timeout: z.number().optional().describe('Timeout in milliseconds'),
+  delay: z.number().optional().describe('Delay in milliseconds between keystrokes'),
+  url: z.string().optional().describe('URL pattern for waitForRequest or waitForResponse'),
   source: z.string().optional().describe('JavaScript code (for "evaluate" action)'),
   onError: z.enum(['return', 'ignore']).optional().describe('Error handling strategy')
 });
@@ -38,9 +44,9 @@ let actionSchema = z.object({
 export let takeScreenshot = SlateTool.create(spec, {
   name: 'Take Screenshot',
   key: 'take_screenshot',
-  description: `Capture a screenshot of any web page rendered in a headless browser. Returns a base64-encoded PNG image. Supports full-page screenshots, browser actions before capture (e.g. scrolling, clicking, waiting), and device emulation.`,
+  description: `Capture a screenshot of any web page rendered in a headless browser. Provides a downloadable JPEG image and retains the base64 response for existing workflows. Supports full-page screenshots, browser actions before capture (e.g. scrolling, clicking, waiting), and device emulation.`,
   instructions: [
-    'The screenshot is returned as a base64-encoded PNG string.',
+    'Screenshots use JPEG, which supports both viewport and full-page capture.',
     'Use actions to interact with the page before taking the screenshot (e.g. close popups, scroll to content).'
   ],
   tags: {
@@ -71,7 +77,7 @@ export let takeScreenshot = SlateTool.create(spec, {
     z.object({
       url: z.string().describe('Final URL after any redirects'),
       statusCode: z.number().optional().describe('HTTP status code'),
-      screenshot: z.string().describe('Base64-encoded PNG screenshot image')
+      screenshot: z.string().describe('Base64-encoded JPEG screenshot image')
     })
   )
   .handleInvocation(async ctx => {
@@ -82,18 +88,31 @@ export let takeScreenshot = SlateTool.create(spec, {
     let response = await client.extract({
       url: ctx.input.url,
       screenshot: true,
-      screenshotOptions: ctx.input.fullPage ? { fullPage: true } : undefined,
+      screenshotOptions: { fullPage: ctx.input.fullPage, format: 'jpeg' },
       actions: ctx.input.actions,
       device: ctx.input.device,
       geolocation: ctx.input.geolocation,
       ipType: ctx.input.ipType
     });
 
+    if (!response.screenshot) {
+      throw createApiServiceError(
+        'Zyte did not return the requested screenshot. Try the request again.'
+      );
+    }
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(Buffer.from(response.screenshot, 'base64'), {
+        headers: { 'content-type': 'image/jpeg' }
+      }),
+      filename: 'screenshot.jpg'
+    });
+
     return {
       output: {
         url: response.url,
         statusCode: response.statusCode,
-        screenshot: response.screenshot ?? ''
+        screenshot: response.screenshot
       },
       message: `Screenshot captured for **${response.url}**${ctx.input.fullPage ? ' (full page)' : ''}`
     };

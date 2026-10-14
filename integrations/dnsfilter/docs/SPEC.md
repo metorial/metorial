@@ -1,120 +1,45 @@
-Let me fetch the Swagger API documentation to get more details on the API features.Let me get the Rewst integration details page to see the full list of API actions available.Now I have a comprehensive picture. Let me also check on webhook support specifically.Now I have enough information to compile the specification.
+# DNSFilter specification
 
-# Slates Specification for Dnsfilter
-
-## Overview
-
-DNSFilter is a cloud-based DNS security service that provides AI-powered content filtering, threat protection (phishing, malware, botnets), and network visibility at the DNS layer. It serves both individual organizations and Managed Service Providers (MSPs) with multi-tenant management, roaming client agents for off-network devices, and policy-based domain filtering across 36 content categories and 400+ SaaS applications.
+DNSFilter provides DNS security, content filtering, threat protection, and network visibility for organizations and managed service providers.
 
 ## Authentication
 
-DNSFilter uses **API Key (JWT token)** authentication for its REST API.
+Use a DNSFilter API key created under Account Settings > Security > API Keys. The key inherits its user's permissions. Send the API key itself as the `Authorization` header value. Keys can expire or be revoked; replace the connection's key when necessary.
 
-DNSFilter users have self-service access to API JSON Web Tokens (JWT)—also called keys or tokens—through the DNSFilter dashboard.
+The REST API base URL is `https://api.dnsfilter.com/v1`.
 
-To generate an API key:
+## Tools
 
-1. Log in to the DNSFilter dashboard, navigate to your account icon, and enter a key name. The name is not editable after the key is created.
-2. Copy and securely store the token immediately upon creation.
+| Workflow | Tool keys |
+| --- | --- |
+| Authenticated identity | `get_current_user` |
+| Organizations | `list_organizations`, `get_organization`, `create_organization`, `update_organization` |
+| Filtering policies | `list_policies`, `get_policy`, `manage_policy`, `manage_scheduled_policy` |
+| Network sites | `list_networks`, `get_network`, `manage_network`, `manage_network_secret_key`, `manage_ip_addresses` |
+| Roaming clients | `list_roaming_clients`, `manage_roaming_client` |
+| Users and collections | `manage_organization_users`, `manage_collection`, `manage_collection_users` |
+| Block pages | `manage_block_page` |
+| Domain classification | `lookup_domain`, `suggest_domain_categorization`, `list_categories` |
+| Device identification | `manage_mac_addresses` |
+| Reporting | `get_traffic_report`, `get_query_log` |
+| Billing | `get_billing` |
 
-The token is passed in the `Authorization` header as a Bearer/Token value. Based on integration examples, the format is:
+Call `list_organizations`, `list_networks`, `list_policies`, and `list_categories` to discover resource IDs before configuring those resources. An MSP network listing requires an organization ID. Organization users use the roles `administrator` and `read_only`; the existing `admin` input is also accepted.
 
-```
-Authorization: Token <your_api_token>
-```
+Roaming clients use the `/user_agents` API resources. The `page` and `perPage` inputs become `page[number]` and `page[size]` query parameters.
 
-The API base URL is `https://api.dnsfilter.com/v1/`.
+Policy writes send `whitelist_domains`, `blacklist_domains`, `blacklist_categories`, and `block_applications`. Network policy assignments send `policy_ids`. IP and MAC address writes use `address`. Advanced documented fields remain available through the corresponding tool's `attributes` input.
 
-Access to the REST API requires a professional subscription to DNSFilter, which is a $50 monthly minimum.
+`get_traffic_report` retrieves total request counts from `/traffic_reports/total_requests`. `get_query_log` retrieves `/traffic_reports/query_logs`. Date bounds map to `from` and `to`; site and roaming-client inputs map to the provider's network and agent filters. Query-log pagination and additional report filters can be supplied through `filters` using provider field names.
 
-## Features
+Threat suggestions send the domain as `fqdn` and require explanatory notes. Optional category IDs come from `list_categories`; a supplied threat type is included in the notes.
 
-### Organization Management
+Scheduled policies accept the provider's full weekly `policy_ids` schedule, `organization_id`, `name`, and `timezone` through `attributes`. The documented weekly representation contains 672 fifteen-minute slots. The retained `startTime`, `endTime`, `days`, and roaming-client `autoUpdate` convenience fields are legacy fields whose acceptance is not confirmed by the current API contract.
 
-Create, update, list, and delete organizations. A single console governs every customer. Baseline policies can be applied to new tenants in seconds, then adjusted per organization without touching global settings. Supports MSP hierarchies including promoting organizations to MSP status and managing MSP customer lifecycle (cancellation, deletion).
+The current published contract omits top-level collection management and category-suggestion endpoints. Those existing tools remain available for compatibility; their availability requires account-specific verification.
 
-### Filtering Policy Management
+## Sources
 
-Create and configure DNS filtering policies that control what content is allowed or blocked. Policies support:
-
-- Adding/removing domains to allow lists (whitelists) and block lists (blacklists)
-- Blocking or allowing entire content categories (36 available categories)
-- Blocking or allowing specific applications (AppAware — 400+ SaaS apps)
-- Choose from 36 categories, more than 400 SaaS apps, block risky top-level domains (TLDs), and time-based rules.
-
-### Scheduled Policies
-
-Create time-based filtering schedules that apply different policies during specific time windows. Scheduled policies can be created, updated, listed, and deleted.
-
-### Network (Site) Management
-
-Manage network sites including creating, updating, and deleting networks. Includes management of:
-
-- IP addresses associated with networks (create, verify, update, delete)
-- Network subnets
-- Network LAN IPs
-- Network secret keys for agent authentication
-
-### Roaming Client (Agent) Management
-
-List, view, update, and delete roaming client agents deployed on endpoint devices. Agents carry metadata including hostname, OS, site association, policy assignment, tags, auto-update settings, and release channel. Supports managing agent local users and agent tags.
-
-### User Management
-
-Manage users across organizations:
-
-- List, create, and remove organization users
-- Update user permissions (Admin, Read-Only roles)
-- View user details and permissions per organization
-
-### User Collections
-
-Group users into collections for policy assignment. Collections support priority ordering — if a user belongs to multiple collections, the highest-priority collection's policy applies.
-
-### Block Page Customization
-
-Create and manage custom block pages that are displayed to end users when they attempt to access a blocked domain. Block pages can be associated with specific policies, sites, or collections.
-
-### Domain Lookup and Categorization
-
-Look up domains by FQDN to retrieve associated categories. Submit domains for categorization verification or threat categorization updates.
-
-### MAC Address Management
-
-Associate MAC addresses with organizations for device-level identification. Supports create, update, list, and delete operations.
-
-### Traffic Reports and Analytics
-
-Access DNS query analytics across multiple dimensions:
-
-- Total requests and threats over time for sites, organizations, roaming clients, users, and collections
-- Requests broken down by category, domain, or collection
-- Queries per second (QPS) metrics
-- Top requested domains, categories, organizations, networks, agents, users, and collections
-- Raw query logs (limited to 72-hour time ranges)
-
-### Billing and Invoices
-
-View estimated invoices, list historical invoices, and manage payment methods. Billing data is integrated with Stripe.
-
-### Data Export
-
-The Data Export feature enables automated export of DNS query log data to SIEM platforms via HTTP Event Collector (HEC) API, supporting real-time security monitoring and compliance reporting. DNSFilter's Data Export supports Amazon S3 buckets and also Splunk. Many SIEMs are able to pull data from an S3 bucket enabling many tools to access the exported data from DNSFilter. This is a paid add-on feature configured via the dashboard, not the API.
-
-## Events
-
-DNSFilter supports event-driven integrations through its **Zapier integration**, which exposes the following trigger categories:
-
-### Account Activity
-
-Triggers when an administrator takes certain actions in the DNSFilter dashboard. This covers events such as organizations or sites being added/deleted, roaming clients or relays being added or removed from your account, and users disabling multi-factor authentication.
-
-### Policy Block Events
-
-Triggers when a user's DNS query is blocked by a policy. This enables alerting and ticketing workflows when users encounter blocked content or request access to content currently blocked by a DNSFilter policy.
-
-### Dynamic Hostname Resolution Failures
-
-Triggers when a dynamic hostname is not resolving. Useful for monitoring network health on smaller or mobile/LTE networks that use dynamic DNS.
-
-Note: These event triggers are delivered through Zapier's infrastructure rather than a native webhook API endpoint. DNSFilter does not appear to expose a standalone webhook subscription API for arbitrary consumers.
+- [Current API reference](https://api.dnsfilter.com/docs)
+- [Official OpenAPI contract](https://api.dnsfilter.com/docs/api.json) — version `2026-10-07`
+- [API keys](https://help.dnsfilter.com/hc/en-us/articles/21169189058323-API-Keys)

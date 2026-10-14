@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrintMailClient } from '../lib/client';
 import { spec } from '../spec';
@@ -93,6 +93,61 @@ export let listTemplates = SlateTool.create(spec, {
         totalCount: result.totalCount || 0
       },
       message: `Found **${result.totalCount || 0}** templates, returning ${templates.length}.`
+    };
+  })
+  .build();
+
+export let updateTemplate = SlateTool.create(spec, {
+  name: 'Update Template',
+  key: 'update_template',
+  description:
+    'Update the HTML, description, or metadata of a reusable PostGrid template. Use list_templates to discover template IDs.',
+  tags: { destructive: false, readOnly: false }
+})
+  .input(
+    z.object({
+      templateId: z
+        .string()
+        .describe('Template ID. Use list_templates to discover templates.'),
+      html: z
+        .string()
+        .optional()
+        .describe('Replacement HTML content with optional merge variables'),
+      description: z.string().optional().describe('Replacement template description'),
+      metadata: z.record(z.string(), z.any()).optional().describe('Custom key-value metadata')
+    })
+  )
+  .output(
+    z.object({
+      templateId: z.string(),
+      description: z.string().optional().nullable(),
+      createdAt: z.string().optional().nullable(),
+      updatedAt: z.string().optional().nullable()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let { templateId, ...changes } = ctx.input;
+    if (
+      changes.html === undefined &&
+      changes.description === undefined &&
+      changes.metadata === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide html, description, or metadata to update the template.'
+      );
+    }
+    let template = await new PrintMailClient(ctx.auth.token).updateTemplate(
+      templateId,
+      changes
+    );
+    return {
+      output: {
+        templateId: template.id,
+        description: template.description,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt
+      },
+      message: `Updated template **${template.id}**.`
     };
   })
   .build();

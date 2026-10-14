@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,9 @@ export let auth = SlateAuth.create()
         .describe('Parsera API key found on the API tab of the Parsera web page')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a non-empty Parsera API key.');
+      }
       return {
         output: {
           token: ctx.input.token

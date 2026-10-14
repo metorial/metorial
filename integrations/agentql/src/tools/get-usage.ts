@@ -51,9 +51,9 @@ export let getUsage = SlateTool.create(spec, {
 
     return {
       output: {
-        apiKeyCurrentCycle: usage.api_key_usage.current_cycle,
+        apiKeyCurrentCycle: usage.api_key_usage.current_cycle ?? null,
         apiKeyLifetime: usage.api_key_usage.lifetime,
-        accountCurrentCycle: usage.total_account_usage.current_cycle,
+        accountCurrentCycle: usage.total_account_usage.current_cycle ?? null,
         accountLifetime: usage.total_account_usage.lifetime,
         lifetimeUsageLimit: usage.current_subscription?.lifetime_usage_limit ?? null,
         currentCycleFreeUsageLimit:

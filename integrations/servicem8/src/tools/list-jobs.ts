@@ -56,14 +56,14 @@ export let listJobs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let jobs = await client.listJobs({ filter: ctx.input.filter });
 
     let mapped = jobs.map((j: any) => ({
       jobUuid: j.uuid,
       generatedJobId: j.generated_job_id,
       status: j.status,
-      description: j.description,
+      description: j.job_description,
       jobAddress: j.job_address,
       billingAddress: j.billing_address,
       companyUuid: j.company_uuid,
@@ -71,7 +71,7 @@ export let listJobs = SlateTool.create(spec, {
       date: j.date,
       dueDate: j.due_date,
       totalPrice: j.total_price,
-      poNumber: j.po_number,
+      poNumber: j.purchase_order_number,
       active: j.active,
       editDate: j.edit_date
     }));

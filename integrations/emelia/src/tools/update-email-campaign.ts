@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,6 +36,8 @@ export let updateEmailCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new EmeliaClient(ctx.auth.token);
     let { campaignId, name, globalSettings, providerSettings, steps } = ctx.input;
+    if ([name, globalSettings, providerSettings, steps].every(value => value === undefined))
+      throw createApiServiceError('Provide at least one field to update.');
     let updatedFields: string[] = [];
 
     if (name) {

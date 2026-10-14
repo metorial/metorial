@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  collectApiErrorDetails,
+  createApiServiceError,
+  createAuthenticatedAxios
+} from 'slates';
 
 export interface PaginationParams {
   pageNumber?: number;
@@ -42,6 +47,7 @@ export interface Lead {
   facebookUrl: string;
   employeeCount: number;
   employeesRange: { min: number; max: number } | null;
+  employeeRangeBounds?: { min: number | null; max: number | null } | null;
   crmLeadId: string;
   crmOrganizationId: string;
   tags: string[];
@@ -129,7 +135,11 @@ let mapLocation = (locationData: any): LeadLocation | null => {
 };
 
 let mapLead = (leadData: any, included?: any[]): Lead => {
+  if (!leadData) {
+    throw createApiServiceError('Leadfeeder returned a response without the requested lead.');
+  }
   let attrs = leadData.attributes ?? {};
+  let range = attrs.employees_range;
   let locationRel = leadData.relationships?.location?.data;
   let location: LeadLocation | null = null;
 
@@ -146,7 +156,9 @@ let mapLead = (leadData: any, included?: any[]): Lead => {
     leadId: leadData.id ?? '',
     name: attrs.name ?? '',
     industry: attrs.industry ?? '',
-    industries: attrs.industries ?? [],
+    industries: (attrs.industries ?? []).map((industry: string | { name: string }) =>
+      typeof industry === 'string' ? industry : industry.name
+    ),
     firstVisitDate: attrs.first_visit_date ?? '',
     lastVisitDate: attrs.last_visit_date ?? '',
     status: attrs.status ?? '',
@@ -156,9 +168,11 @@ let mapLead = (leadData: any, included?: any[]): Lead => {
     twitterHandle: attrs.twitter_handle ?? '',
     facebookUrl: attrs.facebook_url ?? '',
     employeeCount: attrs.employee_count ?? 0,
-    employeesRange: attrs.employees_range ?? null,
-    crmLeadId: attrs.crm_lead_id ?? '',
-    crmOrganizationId: attrs.crm_organization_id ?? '',
+    employeesRange:
+      typeof range?.min === 'number' && typeof range?.max === 'number' ? range : null,
+    employeeRangeBounds: range ? { min: range.min ?? null, max: range.max ?? null } : null,
+    crmLeadId: String(attrs.crm_lead_id ?? ''),
+    crmOrganizationId: String(attrs.crm_organization_id ?? ''),
     tags: attrs.tags ?? [],
     logoUrl: attrs.logo_url ?? '',
     assignee: attrs.assignee ?? '',
@@ -196,7 +210,7 @@ let mapVisit = (visitData: any): Visit => {
     visitLength: attrs.visit_length ?? 0,
     startedAt: attrs.started_at ?? '',
     leadId: attrs.lead_id ?? '',
-    lfClientId: attrs.lf_client_id ?? '',
+    lfClientId: String(attrs.lf_client_id ?? ''),
     gaClientIds: attrs.ga_client_ids ?? [],
     visitorEmail: attrs.visitor_email ?? '',
     visitorFirstName: attrs.visitor_first_name ?? '',
@@ -210,12 +224,68 @@ export class LeadfeederClient {
   private http;
 
   constructor(token: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.leadfeeder.com',
-      headers: {
-        Authorization: `Token token=${token}`
-      }
+      authHeader: { value: `Token token=${token}` },
+      contentType: false,
+      errorMapping: {
+        mapAxiosError: (error, inferred) => {
+          let details: string[] = [];
+          collectApiErrorDetails(error.response?.data, details, {
+            detailKeys: ['title', 'detail', 'message', 'code']
+          });
+          return details.length ? { message: details.join(' - ') } : inferred;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Leadfeeder',
+          reason: 'leadfeeder_api_error'
+        })
     });
+  }
+
+  async resolveAccountId(accountId?: string): Promise<string> {
+    if (accountId) return accountId;
+    let accounts = await this.getAccounts();
+    if (!accounts[0]) {
+      throw createApiServiceError(
+        'No Leadfeeder accounts are available for this token. Check its account access.'
+      );
+    }
+    return accounts[0].accountId;
+  }
+
+  private validateParams(params: DateRangeParams & PaginationParams) {
+    let dates: [string, string][] = [
+      ['startDate', params.startDate],
+      ['endDate', params.endDate]
+    ];
+    for (let [name, value] of dates) {
+      let date = new Date(`${value}T00:00:00Z`);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+        !Number.isFinite(date.getTime()) ||
+        date.toISOString().slice(0, 10) !== value
+      ) {
+        throw createApiServiceError(`${name} must be a valid date in yyyy-mm-dd format.`);
+      }
+    }
+    if (params.startDate > params.endDate) {
+      throw createApiServiceError('startDate must be on or before endDate.');
+    }
+    if (
+      params.pageNumber !== undefined &&
+      (!Number.isInteger(params.pageNumber) || params.pageNumber < 1)
+    ) {
+      throw createApiServiceError('pageNumber must be a whole number greater than zero.');
+    }
+    if (
+      params.pageSize !== undefined &&
+      (!Number.isInteger(params.pageSize) || params.pageSize < 1 || params.pageSize > 100)
+    ) {
+      throw createApiServiceError('pageSize must be a whole number from 1 to 100.');
+    }
   }
 
   async getAccounts(): Promise<LeadfeederAccount[]> {
@@ -231,8 +301,13 @@ export class LeadfeederClient {
   }
 
   async getAccount(accountId: string): Promise<LeadfeederAccount> {
-    let response = await this.http.get(`/accounts/${accountId}`);
+    let response = await this.http.get(`/accounts/${encodeURIComponent(accountId)}`);
     let account = response.data?.data;
+    if (!account) {
+      throw createApiServiceError(
+        'Leadfeeder returned a response without the requested account.'
+      );
+    }
     return {
       accountId: account.id,
       name: account.attributes?.name ?? '',
@@ -246,9 +321,10 @@ export class LeadfeederClient {
     accountId: string,
     params: DateRangeParams & PaginationParams & { customFeedId?: string }
   ): Promise<PaginatedResponse<Lead>> {
+    this.validateParams(params);
     let basePath = params.customFeedId
-      ? `/accounts/${accountId}/custom-feeds/${params.customFeedId}/leads`
-      : `/accounts/${accountId}/leads`;
+      ? `/accounts/${encodeURIComponent(accountId)}/custom-feeds/${encodeURIComponent(params.customFeedId)}/leads`
+      : `/accounts/${encodeURIComponent(accountId)}/leads`;
 
     let response = await this.http.get(basePath, {
       params: {
@@ -271,7 +347,9 @@ export class LeadfeederClient {
   }
 
   async getLead(accountId: string, leadId: string): Promise<Lead> {
-    let response = await this.http.get(`/accounts/${accountId}/leads/${leadId}`);
+    let response = await this.http.get(
+      `/accounts/${encodeURIComponent(accountId)}/leads/${encodeURIComponent(leadId)}`
+    );
     return mapLead(response.data?.data, response.data?.included);
   }
 
@@ -280,14 +358,18 @@ export class LeadfeederClient {
     leadId: string,
     params: DateRangeParams & PaginationParams
   ): Promise<PaginatedResponse<Visit>> {
-    let response = await this.http.get(`/accounts/${accountId}/leads/${leadId}/visits`, {
-      params: {
-        start_date: params.startDate,
-        end_date: params.endDate,
-        'page[number]': params.pageNumber ?? 1,
-        'page[size]': params.pageSize ?? 100
+    this.validateParams(params);
+    let response = await this.http.get(
+      `/accounts/${encodeURIComponent(accountId)}/leads/${encodeURIComponent(leadId)}/visits`,
+      {
+        params: {
+          start_date: params.startDate,
+          end_date: params.endDate,
+          'page[number]': params.pageNumber ?? 1,
+          'page[size]': params.pageSize ?? 100
+        }
       }
-    });
+    );
 
     let items = (response.data?.data ?? []).map(mapVisit);
     return {
@@ -301,7 +383,8 @@ export class LeadfeederClient {
     accountId: string,
     params: DateRangeParams & PaginationParams
   ): Promise<PaginatedResponse<Visit>> {
-    let response = await this.http.get(`/accounts/${accountId}/visits`, {
+    this.validateParams(params);
+    let response = await this.http.get(`/accounts/${encodeURIComponent(accountId)}/visits`, {
       params: {
         start_date: params.startDate,
         end_date: params.endDate,
@@ -319,7 +402,9 @@ export class LeadfeederClient {
   }
 
   async getCustomFeeds(accountId: string): Promise<CustomFeed[]> {
-    let response = await this.http.get(`/accounts/${accountId}/custom-feeds`);
+    let response = await this.http.get(
+      `/accounts/${encodeURIComponent(accountId)}/custom-feeds`
+    );
     return (response.data?.data ?? []).map((feed: any) => ({
       feedId: feed.id,
       name: feed.attributes?.name ?? '',
@@ -328,8 +413,15 @@ export class LeadfeederClient {
   }
 
   async getCustomFeed(accountId: string, feedId: string): Promise<CustomFeed> {
-    let response = await this.http.get(`/accounts/${accountId}/custom-feeds/${feedId}`);
+    let response = await this.http.get(
+      `/accounts/${encodeURIComponent(accountId)}/custom-feeds/${encodeURIComponent(feedId)}`
+    );
     let feed = response.data?.data;
+    if (!feed) {
+      throw createApiServiceError(
+        'Leadfeeder returned a response without the requested feed.'
+      );
+    }
     return {
       feedId: feed.id,
       name: feed.attributes?.name ?? '',
@@ -342,18 +434,23 @@ export class LeadfeederClient {
     customFeedId: string,
     params: DateRangeParams
   ): Promise<ExportRequest> {
-    let response = await this.http.post('/export-requests', {
-      data: {
-        type: 'export_requests',
-        attributes: {
-          account_id: accountId,
-          custom_feed_id: customFeedId,
-          start_date: params.startDate,
-          end_date: params.endDate
-        }
-      }
-    });
+    this.validateParams(params);
+    let response = await this.http.post(
+      '/export-requests',
+      new URLSearchParams({
+        account_id: accountId,
+        custom_feed_id: customFeedId,
+        start_date: params.startDate,
+        end_date: params.endDate
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
     let exp = response.data?.data;
+    if (!exp) {
+      throw createApiServiceError(
+        'Leadfeeder returned a response without the export request.'
+      );
+    }
     return {
       exportId: exp.id,
       status: exp.attributes?.status ?? '',
@@ -364,8 +461,13 @@ export class LeadfeederClient {
   }
 
   async getExportStatus(exportId: string): Promise<ExportRequest> {
-    let response = await this.http.get(`/export-requests/${exportId}`);
+    let response = await this.http.get(`/export-requests/${encodeURIComponent(exportId)}`);
     let exp = response.data?.data;
+    if (!exp) {
+      throw createApiServiceError(
+        'Leadfeeder returned a response without the export request.'
+      );
+    }
     return {
       exportId: exp.id,
       status: exp.attributes?.status ?? '',
@@ -376,7 +478,9 @@ export class LeadfeederClient {
   }
 
   async getTrackingScript(accountId: string): Promise<TrackingScript> {
-    let response = await this.http.get(`/accounts/${accountId}/website-tracking-script`);
+    let response = await this.http.get(
+      `/accounts/${encodeURIComponent(accountId)}/website-tracking-script`
+    );
     let script = response.data?.data;
     return {
       scriptHash: script.attributes?.script_hash ?? '',

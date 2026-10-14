@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   analyzeSentiment,
+  classifyText,
   detectSpam,
+  extractEntities,
   extractKeywords,
   generateBlogPost,
   generateHeadline,
@@ -19,7 +21,9 @@ export let provider = Slate.create({
     generateText,
     generateHeadline,
     detectSpam,
-    runCustomModel
+    runCustomModel,
+    classifyText,
+    extractEntities
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApaleoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -52,46 +52,62 @@ export let manageFolio = SlateTool.create(spec, {
     z.object({
       folioId: z.string().describe('Folio ID'),
       action: z.string().describe('Action performed'),
+      chargeId: z.string().optional().describe('ID of the posted charge.'),
+      paymentId: z.string().optional().describe('ID of the posted payment.'),
+      refundId: z.string().optional().describe('ID of the posted refund.'),
       success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
     let client = new ApaleoClient(ctx.auth.token);
     let { folioId, action } = ctx.input;
+    let resourceId: string | undefined;
 
     switch (action) {
       case 'post_charge': {
-        if (!ctx.input.amount) throw new Error('amount is required for post_charge');
-        if (!ctx.input.name) throw new Error('name is required for post_charge');
-        await client.postCharge(folioId, {
+        if (!ctx.input.amount)
+          throw createApiServiceError('amount is required for post_charge');
+        if (!ctx.input.name) throw createApiServiceError('name is required for post_charge');
+        if (!ctx.input.vatType)
+          throw createApiServiceError(
+            'vatType is required for post_charge. Choose the applicable VAT type, such as Normal, Reduced, Null, or Without.'
+          );
+        let charge = await client.postCharge(folioId, {
           serviceType: ctx.input.serviceType || 'Other',
           name: ctx.input.name,
           amount: ctx.input.amount,
           receipt: ctx.input.receipt,
           vatType: ctx.input.vatType,
-          quantity: ctx.input.quantity
+          quantity: ctx.input.quantity ?? 1
         });
+        resourceId = charge.id;
         break;
       }
       case 'post_payment': {
-        if (!ctx.input.amount) throw new Error('amount is required for post_payment');
-        if (!ctx.input.method) throw new Error('method is required for post_payment');
-        await client.postPayment(folioId, {
+        if (!ctx.input.amount)
+          throw createApiServiceError('amount is required for post_payment');
+        if (!ctx.input.method)
+          throw createApiServiceError('method is required for post_payment');
+        let payment = await client.postPayment(folioId, {
           method: ctx.input.method,
           amount: ctx.input.amount,
           receipt: ctx.input.receipt
         });
+        resourceId = payment.id;
         break;
       }
       case 'post_refund': {
-        if (!ctx.input.amount) throw new Error('amount is required for post_refund');
-        if (!ctx.input.method) throw new Error('method is required for post_refund');
-        await client.postRefund(folioId, {
+        if (!ctx.input.amount)
+          throw createApiServiceError('amount is required for post_refund');
+        if (!ctx.input.method)
+          throw createApiServiceError('method is required for post_refund');
+        let refund = await client.postRefund(folioId, {
           method: ctx.input.method,
           amount: ctx.input.amount,
           receipt: ctx.input.receipt,
           reason: ctx.input.reason
         });
+        resourceId = refund.id;
         break;
       }
       case 'close':
@@ -110,6 +126,9 @@ export let manageFolio = SlateTool.create(spec, {
       output: {
         folioId,
         action,
+        chargeId: action === 'post_charge' ? resourceId : undefined,
+        paymentId: action === 'post_payment' ? resourceId : undefined,
+        refundId: action === 'post_refund' ? resourceId : undefined,
         success: true
       },
       message: `Folio **${folioId}** ${actionLabels[action]}.`

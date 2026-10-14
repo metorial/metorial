@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DiffbotClient } from '../lib/client';
+import { DiffbotClient, withEntityFields } from '../lib/client';
 import { spec } from '../spec';
 
 let entitySchema = z
@@ -41,7 +41,9 @@ export let searchKnowledgeGraph = SlateTool.create(spec, {
       filter: z
         .string()
         .optional()
-        .describe('Additional filter expression to apply to results')
+        .describe(
+          'Semicolon-separated field paths or JSONPath expressions to include, such as $.name;$.homepageUri'
+        )
     })
   )
   .output(
@@ -61,7 +63,7 @@ export let searchKnowledgeGraph = SlateTool.create(spec, {
       filter: ctx.input.filter
     });
 
-    let entities = result.data || [];
+    let entities = (result.data || []).map(withEntityFields);
     let totalHits = result.hits || 0;
 
     return {

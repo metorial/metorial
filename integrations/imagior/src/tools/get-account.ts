@@ -29,9 +29,9 @@ export let getAccount = SlateTool.create(spec, {
       output: {
         name: result.name,
         email: result.email,
-        remainingCredits: result.usage?.remainingCredits ?? 0
+        remainingCredits: result.usage.remainingCredits
       },
-      message: `Account: **${result.name}** (${result.email}). Remaining credits: **${result.usage?.remainingCredits ?? 0}**.`
+      message: `Account: **${result.name}** (${result.email}). Remaining credits: **${result.usage.remainingCredits}**.`
     };
   })
   .build();

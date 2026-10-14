@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageDeal = SlateTool.create(spec, {
   key: 'manage_deal',
   description: `Create, update, retrieve, or delete a deal (transaction) in Follow Up Boss. Deals track real estate transactions with associated properties, prices, commission, and pipeline stages.`,
   instructions: [
-    'To create a deal, provide at least a name and personId.',
+    'To create a deal, provide name and stageId. Use list_pipelines to discover deal stages.',
     'To update, provide the dealId and the fields to change.',
     'To retrieve, provide only the dealId.',
     'To delete, set "delete" to true with a dealId.'
@@ -26,7 +26,10 @@ export let manageDeal = SlateTool.create(spec, {
       personId: z.number().optional().describe('Contact ID associated with the deal'),
       name: z.string().optional().describe('Deal name'),
       pipelineId: z.number().optional().describe('Pipeline ID'),
-      stageId: z.number().optional().describe('Pipeline stage ID'),
+      stageId: z
+        .number()
+        .optional()
+        .describe('Deal pipeline stage ID; use list_pipelines to discover stages'),
       dealType: z.string().optional().describe('Deal type (e.g., "Buying", "Selling")'),
       price: z.number().optional().describe('Deal price'),
       commission: z.number().optional().describe('Commission amount'),
@@ -62,6 +65,10 @@ export let manageDeal = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
+    if (ctx.input.delete && ctx.input.dealId === undefined) {
+      throw createApiServiceError('Provide dealId to delete a deal.');
+    }
+
     if (ctx.input.delete && ctx.input.dealId) {
       await client.deleteDeal(ctx.input.dealId);
       return {
@@ -71,34 +78,22 @@ export let manageDeal = SlateTool.create(spec, {
     }
 
     if (
-      ctx.input.dealId &&
-      !ctx.input.name &&
-      !ctx.input.personId &&
-      !ctx.input.pipelineId &&
-      !ctx.input.stageId &&
-      !ctx.input.dealType &&
-      !ctx.input.price &&
-      !ctx.input.commission &&
-      !ctx.input.commissionPercent &&
-      !ctx.input.closingDate &&
-      !ctx.input.propertyStreet &&
-      !ctx.input.propertyCity &&
-      !ctx.input.propertyState &&
-      !ctx.input.propertyZip &&
-      !ctx.input.mlsNumber &&
-      !ctx.input.customFields
+      ctx.input.dealId !== undefined &&
+      Object.entries(ctx.input).every(
+        ([key, value]) => key === 'dealId' || key === 'delete' || value === undefined
+      )
     ) {
       let deal = await client.getDeal(ctx.input.dealId);
       return {
         output: {
           dealId: deal.id,
-          personId: deal.personId,
+          personId: deal.peopleIds?.[0] ?? deal.people?.[0]?.id ?? deal.personId,
           name: deal.name,
           pipelineId: deal.pipelineId,
           stageId: deal.stageId,
           dealType: deal.dealType,
           price: deal.price,
-          closingDate: deal.closingDate,
+          closingDate: deal.projectedCloseDate ?? undefined,
           created: deal.created,
           updated: deal.updated
         },
@@ -107,16 +102,16 @@ export let manageDeal = SlateTool.create(spec, {
     }
 
     let data: Record<string, any> = {};
-    if (ctx.input.personId !== undefined) data.personId = ctx.input.personId;
+    if (ctx.input.personId !== undefined) data.peopleIds = [ctx.input.personId];
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.pipelineId !== undefined) data.pipelineId = ctx.input.pipelineId;
     if (ctx.input.stageId !== undefined) data.stageId = ctx.input.stageId;
     if (ctx.input.dealType !== undefined) data.dealType = ctx.input.dealType;
     if (ctx.input.price !== undefined) data.price = ctx.input.price;
-    if (ctx.input.commission !== undefined) data.commission = ctx.input.commission;
+    if (ctx.input.commission !== undefined) data.commissionValue = ctx.input.commission;
     if (ctx.input.commissionPercent !== undefined)
       data.commissionPercent = ctx.input.commissionPercent;
-    if (ctx.input.closingDate !== undefined) data.closingDate = ctx.input.closingDate;
+    if (ctx.input.closingDate !== undefined) data.projectedCloseDate = ctx.input.closingDate;
     if (ctx.input.propertyStreet !== undefined) data.propertyStreet = ctx.input.propertyStreet;
     if (ctx.input.propertyCity !== undefined) data.propertyCity = ctx.input.propertyCity;
     if (ctx.input.propertyState !== undefined) data.propertyState = ctx.input.propertyState;
@@ -135,6 +130,11 @@ export let manageDeal = SlateTool.create(spec, {
       deal = await client.updateDeal(ctx.input.dealId, data);
       action = 'Updated';
     } else {
+      if (!ctx.input.name || ctx.input.stageId === undefined) {
+        throw createApiServiceError(
+          'Provide name and stageId to create a deal. Use list_pipelines to discover stages.'
+        );
+      }
       deal = await client.createDeal(data);
       action = 'Created';
     }
@@ -142,13 +142,13 @@ export let manageDeal = SlateTool.create(spec, {
     return {
       output: {
         dealId: deal.id,
-        personId: deal.personId,
+        personId: deal.peopleIds?.[0] ?? deal.people?.[0]?.id ?? deal.personId,
         name: deal.name,
         pipelineId: deal.pipelineId,
         stageId: deal.stageId,
         dealType: deal.dealType,
         price: deal.price,
-        closingDate: deal.closingDate,
+        closingDate: deal.projectedCloseDate ?? undefined,
         created: deal.created,
         updated: deal.updated
       },

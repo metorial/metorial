@@ -6,9 +6,11 @@ import {
   getCrawlerPages,
   getHistory,
   getMonitor,
+  getNotificationContent,
   listFolders,
   listNotifications,
   manageFolder,
+  moveItems,
   searchMonitors,
   updateMonitor
 } from './tools';
@@ -24,7 +26,9 @@ export let provider = Slate.create({
     getHistory,
     listFolders,
     manageFolder,
-    getCrawlerPages
+    getCrawlerPages,
+    getNotificationContent,
+    moveItems
   ],
   triggers: []
 });

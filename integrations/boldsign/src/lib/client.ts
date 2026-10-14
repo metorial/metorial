@@ -1,22 +1,58 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import type { FormField } from './schemas';
 
 export type BoldSignRegion = 'us' | 'eu';
 
 let getBaseUrl = (region: BoldSignRegion): string => {
-  return region === 'eu' ? 'https://eu-api.boldsign.com' : 'https://api.boldsign.com';
+  return region === 'eu' ? 'https://api-eu.boldsign.com' : 'https://api.boldsign.com';
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private baseUrl: string;
+  private headers: Record<string, string>;
 
-  constructor(options: { token: string; region: BoldSignRegion }) {
-    this.axios = createAxios({
-      baseURL: getBaseUrl(options.region),
-      headers: {
-        'X-API-KEY': options.token,
-        Authorization: `Bearer ${options.token}`
-      }
+  constructor(options: {
+    token: string;
+    region: BoldSignRegion;
+    authType?: 'oauth' | 'api_key';
+    refreshToken?: string;
+    expiresAt?: string;
+  }) {
+    this.baseUrl = getBaseUrl(options.region);
+    let isOauth =
+      options.authType === 'oauth' ||
+      (!options.authType && Boolean(options.refreshToken || options.expiresAt));
+    this.headers = isOauth
+      ? { Authorization: `Bearer ${options.token}` }
+      : { 'X-API-KEY': options.token };
+    this.axios = createAuthenticatedAxios({
+      baseURL: this.baseUrl,
+      headers: this.headers,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BoldSign',
+          reason: 'boldsign_api_error'
+        })
     });
+  }
+
+  getDownloadDetails(
+    documentId: string,
+    downloadType: 'document' | 'auditLog',
+    onBehalfOf?: string
+  ) {
+    return {
+      url: `${this.baseUrl}/v1/document/${downloadType === 'auditLog' ? 'downloadAuditLog' : 'download'}`,
+      headers: this.headers,
+      query: { documentId, ...(onBehalfOf ? { onBehalfOf } : {}) },
+      mimeType: 'application/pdf'
+    };
   }
 
   // ─── Documents ──────────────────────────────────────────
@@ -33,9 +69,9 @@ export class Client {
       privateMessage?: string;
       authenticationCode?: string;
       enableEmailOTP?: boolean;
+      formFields?: FormField[];
     }>;
     cc?: Array<{ emailAddress: string }>;
-    files?: Array<{ fileName: string; fileContent: string }>; // base64
     fileUrls?: string[];
     brandId?: string;
     labels?: string[];
@@ -44,13 +80,29 @@ export class Client {
     enablePrintAndSign?: boolean;
     disableEmails?: boolean;
     disableExpiryAlert?: boolean;
+    useTextTags?: boolean;
+    enableEmbeddedSigning?: boolean;
     enableSigningOrder?: boolean;
     onBehalfOf?: string;
     reminderSettings?: {
+      enableAutoReminder?: boolean;
       reminderDays?: number;
       reminderCount?: number;
     };
   }): Promise<{ documentId: string }> {
+    if (!params.title?.trim()) {
+      throw createApiServiceError(
+        'A document title is required. Provide title before sending.'
+      );
+    }
+    if (!params.fileUrls?.length) {
+      throw createApiServiceError('At least one public document URL is required in fileUrls.');
+    }
+    if (params.signers.some(s => s.authenticationCode && s.enableEmailOTP)) {
+      throw createApiServiceError(
+        'Use either an access code or email OTP for each signer, not both.'
+      );
+    }
     let body: Record<string, any> = {
       Title: params.title,
       Message: params.message,
@@ -62,7 +114,13 @@ export class Client {
         Locale: s.locale,
         PrivateMessage: s.privateMessage,
         AuthenticationCode: s.authenticationCode,
-        EnableEmailOTP: s.enableEmailOTP
+        EnableEmailOTP: s.enableEmailOTP,
+        AuthenticationType: s.authenticationCode
+          ? 'AccessCode'
+          : s.enableEmailOTP
+            ? 'EmailOTP'
+            : undefined,
+        FormFields: s.formFields
       })),
       CC: params.cc?.map(c => ({ EmailAddress: c.emailAddress })),
       FileUrls: params.fileUrls,
@@ -73,18 +131,18 @@ export class Client {
       EnablePrintAndSign: params.enablePrintAndSign,
       DisableEmails: params.disableEmails,
       DisableExpiryAlert: params.disableExpiryAlert,
+      UseTextTags: params.useTextTags,
+      EnableEmbeddedSigning: params.enableEmbeddedSigning,
       EnableSigningOrder: params.enableSigningOrder,
       OnBehalfOf: params.onBehalfOf,
       ReminderSettings: params.reminderSettings
         ? {
+            EnableAutoReminder: params.reminderSettings.enableAutoReminder ?? true,
             ReminderDays: params.reminderSettings.reminderDays,
             ReminderCount: params.reminderSettings.reminderCount
           }
         : undefined
     };
-
-    // Remove undefined values
-    body = JSON.parse(JSON.stringify(body));
 
     let response = await this.axios.post('/v1/document/send', body, {
       headers: { 'Content-Type': 'application/json' }
@@ -114,7 +172,7 @@ export class Client {
   }> {
     let queryParams = new URLSearchParams();
 
-    if (params.page) queryParams.set('page', String(params.page));
+    queryParams.set('page', String(params.page ?? 1));
     if (params.pageSize) queryParams.set('pageSize', String(params.pageSize));
     if (params.searchKey) queryParams.set('searchKey', params.searchKey);
     if (params.startDate) queryParams.set('startDate', params.startDate);
@@ -126,7 +184,13 @@ export class Client {
     params.labels?.forEach(l => queryParams.append('labels', l));
 
     let response = await this.axios.get(`/v1/document/list?${queryParams.toString()}`);
-    return response.data;
+    return {
+      ...response.data,
+      pageDetails: {
+        ...response.data.pageDetails,
+        currentPage: response.data.pageDetails.page ?? response.data.pageDetails.currentPage
+      }
+    };
   }
 
   async getDocument(documentId: string): Promise<Record<string, any>> {
@@ -141,8 +205,7 @@ export class Client {
     message: string,
     onBehalfOf?: string
   ): Promise<void> {
-    let body: Record<string, any> = { message };
-    if (onBehalfOf) body.onBehalfOf = onBehalfOf;
+    let body = pickDefined({ Message: message, OnBehalfOf: onBehalfOf });
 
     await this.axios.post(
       `/v1/document/revoke?documentId=${encodeURIComponent(documentId)}`,
@@ -171,42 +234,27 @@ export class Client {
     );
   }
 
-  async deleteDocument(documentId: string): Promise<void> {
+  async deleteDocument(documentId: string, deletePermanently?: boolean): Promise<void> {
     await this.axios.delete(`/v1/document/delete`, {
-      params: { documentId }
+      params: pickDefined({ documentId, deletePermanently })
     });
   }
 
-  async downloadDocument(
-    documentId: string,
-    onBehalfOf?: string
-  ): Promise<{ downloadUrl: string }> {
-    let params: Record<string, string> = { documentId };
-    if (onBehalfOf) params.onBehalfOf = onBehalfOf;
-
-    let response = await this.axios.get('/v1/document/download', {
-      params,
-      responseType: 'arraybuffer'
-    });
-
-    let base64 = Buffer.from(response.data).toString('base64');
-    return { downloadUrl: `data:application/pdf;base64,${base64}` };
-  }
-
-  async downloadAuditLog(
-    documentId: string,
-    onBehalfOf?: string
-  ): Promise<{ downloadUrl: string }> {
-    let params: Record<string, string> = { documentId };
-    if (onBehalfOf) params.onBehalfOf = onBehalfOf;
-
-    let response = await this.axios.get('/v1/document/downloadAuditLog', {
-      params,
-      responseType: 'arraybuffer'
-    });
-
-    let base64 = Buffer.from(response.data).toString('base64');
-    return { downloadUrl: `data:application/pdf;base64,${base64}` };
+  async extendDocumentExpiry(params: {
+    documentId: string;
+    newExpiryValue: string;
+    onBehalfOf?: string;
+    warnPrior?: boolean;
+  }): Promise<void> {
+    await this.axios.patch(
+      '/v1/document/extendExpiry',
+      pickDefined({
+        NewExpiryValue: params.newExpiryValue,
+        OnBehalfOf: params.onBehalfOf,
+        WarnPrior: params.warnPrior
+      }),
+      { params: { documentId: params.documentId } }
+    );
   }
 
   // ─── Templates ──────────────────────────────────────────
@@ -230,7 +278,7 @@ export class Client {
   }> {
     let queryParams = new URLSearchParams();
 
-    if (params.page) queryParams.set('page', String(params.page));
+    queryParams.set('page', String(params.page ?? 1));
     if (params.pageSize) queryParams.set('pageSize', String(params.pageSize));
     if (params.templateType) queryParams.set('templateType', params.templateType);
     if (params.searchKey) queryParams.set('searchKey', params.searchKey);
@@ -262,6 +310,7 @@ export class Client {
       signerOrder?: number;
       locale?: string;
       privateMessage?: string;
+      formFields?: FormField[];
     }>;
     cc?: Array<{ emailAddress: string }>;
     brandId?: string;
@@ -272,6 +321,7 @@ export class Client {
     disableEmails?: boolean;
     onBehalfOf?: string;
     reminderSettings?: {
+      enableAutoReminder?: boolean;
       reminderDays?: number;
       reminderCount?: number;
     };
@@ -286,7 +336,8 @@ export class Client {
         SignerType: r.signerType ?? 'Signer',
         SignerOrder: r.signerOrder,
         Locale: r.locale,
-        PrivateMessage: r.privateMessage
+        PrivateMessage: r.privateMessage,
+        FormFields: r.formFields
       })),
       CC: params.cc?.map(c => ({ EmailAddress: c.emailAddress })),
       BrandId: params.brandId,
@@ -298,13 +349,12 @@ export class Client {
       OnBehalfOf: params.onBehalfOf,
       ReminderSettings: params.reminderSettings
         ? {
+            EnableAutoReminder: params.reminderSettings.enableAutoReminder ?? true,
             ReminderDays: params.reminderSettings.reminderDays,
             ReminderCount: params.reminderSettings.reminderCount
           }
         : undefined
     };
-
-    body = JSON.parse(JSON.stringify(body));
 
     let response = await this.axios.post(
       `/v1/template/send?templateId=${encodeURIComponent(params.templateId)}`,
@@ -399,6 +449,7 @@ export class Client {
     page?: number;
     pageSize?: number;
     searchKey?: string;
+    contactType?: string;
   }): Promise<{
     pageDetails: Record<string, any>;
     result: Record<string, any>[];
@@ -407,7 +458,8 @@ export class Client {
       params: {
         page: params.page ?? 1,
         pageSize: params.pageSize ?? 10,
-        searchKey: params.searchKey
+        searchKey: params.searchKey,
+        contactType: params.contactType
       }
     });
     return response.data;

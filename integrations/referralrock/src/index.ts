@@ -6,6 +6,7 @@ import {
   createReferralAction,
   createReward,
   getMemberAccessUrls,
+  getMemberStats,
   getPayouts,
   getRewardRules,
   issueReward,
@@ -19,8 +20,10 @@ import {
   removeReferral,
   removeReward,
   sendInviteFeed,
+  submitCustomerFeed,
   updateMember,
-  updateReferral
+  updateReferral,
+  updateReward
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -33,6 +36,7 @@ export let provider = Slate.create({
     listReferrals,
     createReferral,
     updateReferral,
+    updateReward,
     removeReferral,
     createReferralAction,
     listRewards,
@@ -44,7 +48,9 @@ export let provider = Slate.create({
     processPayout,
     manageEmailSubscriptions,
     sendInviteFeed,
-    getMemberAccessUrls
+    submitCustomerFeed,
+    getMemberAccessUrls,
+    getMemberStats
   ],
   triggers: []
 });

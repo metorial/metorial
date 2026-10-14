@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listOrgMembersTool = SlateTool.create(spec, {
   name: 'List Organization Members',
   key: 'list_org_members',
-  description: `List all members in the organization. Useful for finding user IDs when assigning issues or managing project membership.`,
+  description: `List one page of organization members. Use member IDs when assigning issues or choosing version owners.`,
   tags: {
     readOnly: true
   }
@@ -19,7 +20,8 @@ export let listOrgMembersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      members: z.array(z.any()).describe('List of organization members')
+      members: z.array(z.any()).describe('List of organization members'),
+      total: z.number().optional().describe('Total organization members')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +33,10 @@ export let listOrgMembersTool = SlateTool.create(spec, {
       : (response.data as any)?.list || [];
 
     return {
-      output: { members },
+      output: {
+        members,
+        total: Array.isArray(response.data) ? undefined : response.data?.total
+      },
       message: `Found **${members.length}** member(s).`
     };
   })
@@ -47,7 +52,7 @@ export let listProjectMembersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID')
+      projectId: projectIdSchema
     })
   )
   .output(

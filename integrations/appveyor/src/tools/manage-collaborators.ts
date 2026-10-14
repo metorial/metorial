@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,7 @@ export let manageCollaborators = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
@@ -61,7 +61,7 @@ export let manageCollaborators = SlateTool.create(spec, {
 
       case 'get': {
         if (ctx.input.userId === undefined) {
-          throw new Error('userId is required for get');
+          throw createApiServiceError('userId is required for get');
         }
         let collaborator = await client.getCollaborator(ctx.input.userId);
         return {
@@ -72,7 +72,7 @@ export let manageCollaborators = SlateTool.create(spec, {
 
       case 'add': {
         if (!ctx.input.email || ctx.input.roleId === undefined) {
-          throw new Error('email and roleId are required for add');
+          throw createApiServiceError('email and roleId are required for add');
         }
         await client.addCollaborator({
           email: ctx.input.email,
@@ -86,7 +86,7 @@ export let manageCollaborators = SlateTool.create(spec, {
 
       case 'update': {
         if (ctx.input.userId === undefined || ctx.input.roleId === undefined) {
-          throw new Error('userId and roleId are required for update');
+          throw createApiServiceError('userId and roleId are required for update');
         }
         await client.updateCollaborator({
           userId: ctx.input.userId,
@@ -100,7 +100,7 @@ export let manageCollaborators = SlateTool.create(spec, {
 
       case 'remove': {
         if (ctx.input.userId === undefined) {
-          throw new Error('userId is required for remove');
+          throw createApiServiceError('userId is required for remove');
         }
         await client.deleteCollaborator(ctx.input.userId);
         return {
@@ -110,7 +110,7 @@ export let manageCollaborators = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

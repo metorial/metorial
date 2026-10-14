@@ -58,7 +58,7 @@ export let manageRoamingClient = SlateTool.create(spec, {
 
     let params: Record<string, any> = {};
     if (ctx.input.policyId) params.policy_id = ctx.input.policyId;
-    if (ctx.input.siteId) params.site_id = ctx.input.siteId;
+    if (ctx.input.siteId) params.network_id = ctx.input.siteId;
     if (ctx.input.autoUpdate !== undefined) params.auto_update = ctx.input.autoUpdate;
     if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
 

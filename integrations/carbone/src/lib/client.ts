@@ -1,4 +1,12 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  createAxios,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
+import { z } from 'zod';
 
 export interface ClientConfig {
   token: string;
@@ -27,20 +35,45 @@ export interface UploadTemplateResponse {
   createdAt: number;
 }
 
-export interface TemplateListItem {
+let templateItemSchema = z.object({
+  id: z.string(),
+  versionId: z.string(),
+  deployedAt: z
+    .number()
+    .nullish()
+    .transform(value => value ?? 0),
+  createdAt: z.number(),
+  expireAt: z
+    .number()
+    .nullish()
+    .transform(value => value ?? 0),
+  size: z.number(),
+  type: z.string(),
+  name: z
+    .string()
+    .nullish()
+    .transform(value => value ?? ''),
+  category: z
+    .string()
+    .nullish()
+    .transform(value => value ?? ''),
+  comment: z
+    .string()
+    .nullish()
+    .transform(value => value ?? ''),
+  tags: z
+    .array(z.string())
+    .nullish()
+    .transform(value => value ?? []),
+  origin: z
+    .number()
+    .nullish()
+    .transform(value => value ?? 0)
+});
+
+export type TemplateListItem = Omit<z.output<typeof templateItemSchema>, 'id'> & {
   templateId: string;
-  versionId: string;
-  deployedAt: number;
-  createdAt: number;
-  expireAt: number;
-  size: number;
-  type: string;
-  name: string;
-  category: string;
-  comment: string;
-  tags: string[];
-  origin: number;
-}
+};
 
 export interface ListTemplatesParams {
   templateId?: string;
@@ -103,196 +136,317 @@ export interface TagItem {
   name: string;
 }
 
-let headerValueToString = (value: unknown): string | undefined => {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.join(', ');
-  return undefined;
+let apiError = (error: unknown, operation: string) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Carbone',
+    reason: 'carbone_api_error',
+    operation
+  });
+
+let parseResponse = <T>(schema: z.ZodType<T>, value: unknown, operation: string): T => {
+  let result = schema.safeParse(value);
+  if (!result.success) {
+    throw createApiServiceError(`Carbone returned an invalid ${operation} response.`, {
+      reason: 'carbone_invalid_response'
+    });
+  }
+  return result.data;
+};
+
+let validateMetadata = (params: UpdateTemplateParams) => {
+  for (let field of ['deployedAt', 'expireAt'] as const) {
+    let value = params[field];
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      throw createApiServiceError(
+        `${field} must be a non-negative safe integer timestamp in seconds.`
+      );
+    }
+  }
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private baseUrl: string;
 
   constructor(private clientConfig: ClientConfig) {
-    this.axios = createAxios({
-      baseURL: clientConfig.baseUrl,
-      headers: {
-        Authorization: `Bearer ${clientConfig.token}`,
-        'carbone-version': String(clientConfig.carboneVersion)
-      }
+    let parsedUrl = z.url().safeParse(clientConfig.baseUrl);
+    if (!parsedUrl.success) {
+      throw createApiServiceError('The Carbone base URL must be a valid HTTP or HTTPS URL.');
+    }
+    let url = new URL(parsedUrl.data);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw createApiServiceError(
+        'The Carbone base URL must use HTTP or HTTPS without credentials, query parameters, or a fragment.'
+      );
+    }
+    if (
+      !Number.isSafeInteger(clientConfig.carboneVersion) ||
+      clientConfig.carboneVersion < 1
+    ) {
+      throw createApiServiceError('The Carbone API version must be a positive whole number.');
+    }
+    this.baseUrl = url.toString().replace(/\/$/, '');
+    this.axios = createAuthenticatedAxios({
+      baseURL: this.baseUrl,
+      authHeader: { value: `Bearer ${clientConfig.token}` },
+      headers: { 'carbone-version': String(clientConfig.carboneVersion) }
     });
+  }
+
+  private async request(
+    operation: string,
+    request: Parameters<typeof requestAxiosData>[1]
+  ): Promise<Record<string, unknown>> {
+    let body = await requestAxiosData(operation, request, apiError);
+    let response = parseResponse(
+      z
+        .object({
+          success: z.boolean(),
+          error: z.string().optional()
+        })
+        .passthrough(),
+      body,
+      operation
+    );
+    if (!response.success) {
+      throw createApiServiceError(
+        `Carbone API ${operation} failed: ${response.error ?? 'The provider rejected the request.'}`,
+        {
+          reason: 'carbone_api_error'
+        }
+      );
+    }
+    return response;
+  }
+
+  getDownloadDetails(kind: 'template' | 'render', id: string) {
+    if (!id.trim()) {
+      throw createApiServiceError(
+        `Provide a non-empty ${kind === 'template' ? 'template or version' : 'render'} ID.`
+      );
+    }
+    return {
+      url: `${this.baseUrl}/${kind}/${encodeURIComponent(id)}`,
+      ...(kind === 'template'
+        ? {
+            headers: {
+              Authorization: `Bearer ${this.clientConfig.token}`,
+              'carbone-version': String(this.clientConfig.carboneVersion)
+            }
+          }
+        : { query: { download: 'true' } })
+    };
   }
 
   async uploadTemplate(params: UploadTemplateParams): Promise<UploadTemplateResponse> {
-    let body: Record<string, unknown> = {
+    validateMetadata(params);
+    if (!params.template.trim()) {
+      throw createApiServiceError('Provide a non-empty base64-encoded template.');
+    }
+    let body = pickDefined({
+      versioning: params.versioning,
+      id: params.templateId,
+      name: params.name,
+      comment: params.comment,
+      tags: params.tags,
+      category: params.category,
+      sample: params.sample,
+      deployedAt: params.deployedAt,
+      expireAt: params.expireAt,
       template: params.template
-    };
-
-    if (params.versioning !== undefined) body.versioning = params.versioning;
-    if (params.templateId) body.id = params.templateId;
-    if (params.name) body.name = params.name;
-    if (params.comment) body.comment = params.comment;
-    if (params.tags) body.tags = params.tags;
-    if (params.category) body.category = params.category;
-    if (params.sample) body.sample = params.sample;
-    if (params.deployedAt !== undefined) body.deployedAt = params.deployedAt;
-    if (params.expireAt !== undefined) body.expireAt = params.expireAt;
-
-    let response = await this.axios.post('/template', body, {
-      headers: { 'Content-Type': 'application/json' }
     });
-
-    let data = response.data.data;
-    return {
-      templateId: data.id,
-      versionId: data.versionId,
-      type: data.type,
-      size: data.size,
-      createdAt: data.createdAt
-    };
-  }
-
-  async downloadTemplate(
-    templateIdOrVersionId: string
-  ): Promise<{ content: ArrayBuffer; contentType: string; filename: string }> {
-    let response = await this.axios.get(`/template/${templateIdOrVersionId}`, {
-      responseType: 'arraybuffer'
-    });
-
-    let contentDisposition =
-      headerValueToString(response.headers['content-disposition']) || '';
-    let filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
-    let filename = filenameMatch ? filenameMatch[1]! : 'template';
-
-    return {
-      content: response.data,
-      contentType:
-        headerValueToString(response.headers['content-type']) || 'application/octet-stream',
-      filename
-    };
+    let response = await this.request('upload template', () =>
+      this.axios.post('/template', body)
+    );
+    let data = parseResponse(
+      z.object({
+        id: z.string().optional(),
+        templateId: z.string().optional(),
+        versionId: z.string().optional(),
+        type: z.string().optional(),
+        templateExtension: z.string().optional(),
+        size: z.number().optional(),
+        createdAt: z.number().optional()
+      }),
+      response.data,
+      'upload template'
+    );
+    let templateId = data.id ?? data.templateId;
+    let versionId = data.versionId ?? data.templateId;
+    if (!templateId || !versionId) {
+      throw createApiServiceError(
+        'Carbone did not return the uploaded template identifiers.',
+        {
+          reason: 'carbone_invalid_response'
+        }
+      );
+    }
+    let type = data.type ?? data.templateExtension;
+    if (type !== undefined && data.size !== undefined && data.createdAt !== undefined) {
+      return { templateId, versionId, type, size: data.size, createdAt: data.createdAt };
+    }
+    // Unversioned uploads may return only the legacy hash and extension.
+    try {
+      let metadata = (await this.listTemplates({ versionId })).templates.find(
+        item => item.versionId === versionId
+      );
+      if (!metadata) {
+        throw createApiServiceError('Carbone returned no metadata for the uploaded version.', {
+          reason: 'carbone_invalid_response'
+        });
+      }
+      return {
+        templateId,
+        versionId,
+        type: type ?? metadata.type,
+        size: metadata.size,
+        createdAt: metadata.createdAt
+      };
+    } catch (error) {
+      let recoveryError = apiError(error, 'retrieve uploaded template metadata');
+      let message = `Template upload succeeded. Template ID: ${templateId}; Version ID: ${versionId}. Metadata recovery failed: ${recoveryError.data.message} Do not repeat the upload; use these IDs to render, download, or delete the existing template.`;
+      let uploadError = createApiServiceError(message, { parent: recoveryError });
+      Object.assign(uploadError.data, recoveryError.data, {
+        message,
+        uploadSucceeded: true,
+        templateId,
+        versionId
+      });
+      throw uploadError;
+    }
   }
 
   async deleteTemplate(templateIdOrVersionId: string): Promise<void> {
-    await this.axios.delete(`/template/${templateIdOrVersionId}`);
+    let url = this.getDownloadDetails('template', templateIdOrVersionId).url;
+    await this.request('delete template', () => this.axios.delete(url));
   }
 
   async updateTemplate(
     templateIdOrVersionId: string,
     params: UpdateTemplateParams
   ): Promise<void> {
-    let body: Record<string, unknown> = {};
-
-    if (params.name !== undefined) body.name = params.name;
-    if (params.comment !== undefined) body.comment = params.comment;
-    if (params.tags !== undefined) body.tags = params.tags;
-    if (params.category !== undefined) body.category = params.category;
-    if (params.deployedAt !== undefined) body.deployedAt = params.deployedAt;
-    if (params.expireAt !== undefined) body.expireAt = params.expireAt;
-
-    await this.axios.patch(`/template/${templateIdOrVersionId}`, body, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    validateMetadata(params);
+    let body = pickDefined(params);
+    if (Object.keys(body).length === 0) {
+      throw createApiServiceError('Provide at least one template metadata field to update.');
+    }
+    let url = this.getDownloadDetails('template', templateIdOrVersionId).url;
+    await this.request('update template', () => this.axios.patch(url, body));
   }
 
   async listTemplates(params: ListTemplatesParams = {}): Promise<ListTemplatesResponse> {
-    let queryParams: Record<string, string> = {};
-
-    if (params.templateId) queryParams.id = params.templateId;
-    if (params.versionId) queryParams.versionId = params.versionId;
-    if (params.category) queryParams.category = params.category;
-    if (params.origin !== undefined) queryParams.origin = String(params.origin);
-    if (params.includeVersions !== undefined)
-      queryParams.includeVersions = String(params.includeVersions);
-    if (params.search) queryParams.search = params.search;
-    if (params.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params.cursor) queryParams.cursor = params.cursor;
-
-    let response = await this.axios.get('/templates', { params: queryParams });
-
-    let data = response.data;
+    if (
+      params.limit !== undefined &&
+      (!Number.isSafeInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 100.');
+    }
+    if (
+      params.origin !== undefined &&
+      (!Number.isSafeInteger(params.origin) || params.origin < 0 || params.origin > 4)
+    ) {
+      throw createApiServiceError('origin must be a whole number from 0 to 4.');
+    }
+    let response = await this.request('list templates', () =>
+      this.axios.get('/templates', {
+        params: pickDefined({ ...params, templateId: undefined, id: params.templateId })
+      })
+    );
+    let data = parseResponse(
+      z.object({
+        data: z.array(templateItemSchema),
+        hasMore: z.boolean(),
+        nextCursor: z.string().nullish()
+      }),
+      response,
+      'list templates'
+    );
     return {
-      templates: (data.data || []).map((t: any) => ({
-        templateId: t.id,
-        versionId: t.versionId,
-        deployedAt: t.deployedAt,
-        createdAt: t.createdAt,
-        expireAt: t.expireAt,
-        size: t.size,
-        type: t.type,
-        name: t.name,
-        category: t.category,
-        comment: t.comment,
-        tags: t.tags || [],
-        origin: t.origin
-      })),
-      hasMore: data.hasMore || false,
-      nextCursor: data.nextCursor || null
+      templates: data.data.map(({ id, ...item }) => ({ templateId: id, ...item })),
+      hasMore: data.hasMore,
+      nextCursor: data.nextCursor ?? null
     };
   }
 
   async listCategories(): Promise<CategoryItem[]> {
-    let response = await this.axios.get('/templates/categories');
-    return response.data.data || [];
+    let response = await this.request('list categories', () =>
+      this.axios.get('/templates/categories')
+    );
+    return parseResponse(
+      z.array(z.object({ name: z.string() })),
+      response.data,
+      'list categories'
+    );
   }
 
   async listTags(): Promise<TagItem[]> {
-    let response = await this.axios.get('/templates/tags');
-    return response.data.data || [];
+    let response = await this.request('list tags', () => this.axios.get('/templates/tags'));
+    return parseResponse(z.array(z.object({ name: z.string() })), response.data, 'list tags');
   }
 
   async renderDocument(params: RenderDocumentParams): Promise<RenderDocumentResponse> {
-    let body: Record<string, unknown> = {
-      data: params.data
-    };
-
-    if (params.convertTo !== undefined) body.convertTo = params.convertTo;
-    if (params.converter) body.converter = params.converter;
-    if (params.timezone) body.timezone = params.timezone;
-    if (params.lang) body.lang = params.lang;
-    if (params.complement) body.complement = params.complement;
-    if (params.variableStr) body.variableStr = params.variableStr;
-    if (params.reportName) body.reportName = params.reportName;
-    if (params.enum) body.enum = params.enum;
-    if (params.translations) body.translations = params.translations;
-    if (params.currencySource) body.currencySource = params.currencySource;
-    if (params.currencyTarget) body.currencyTarget = params.currencyTarget;
-    if (params.currencyRates) body.currencyRates = params.currencyRates;
-    if (params.hardRefresh !== undefined) body.hardRefresh = params.hardRefresh;
-    if (params.batchSplitBy) body.batchSplitBy = params.batchSplitBy;
-    if (params.batchOutput) body.batchOutput = params.batchOutput;
-    if (params.template) body.template = params.template;
-
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if (params.webhookUrl) {
-      headers['carbone-webhook-url'] = params.webhookUrl;
+    if (params.batchSplitBy && !params.webhookUrl) {
+      throw createApiServiceError(
+        'Batch rendering requires webhookUrl for asynchronous processing.'
+      );
     }
-
-    if (params.webhookHeaders) {
-      for (let [key, value] of Object.entries(params.webhookHeaders)) {
-        headers[`carbone-webhook-header-${key}`] = value;
+    if (params.webhookHeaders && !params.webhookUrl) {
+      throw createApiServiceError('Provide webhookUrl when setting webhookHeaders.');
+    }
+    if (params.batchOutput && !params.batchSplitBy) {
+      throw createApiServiceError('Provide batchSplitBy when selecting batchOutput.');
+    }
+    if (params.hardRefresh && params.convertTo === undefined) {
+      throw createApiServiceError('Provide convertTo when enabling hardRefresh.');
+    }
+    let outputFormat =
+      typeof params.convertTo === 'string' ? params.convertTo : params.convertTo?.formatName;
+    if (params.batchOutput === 'pdf' && outputFormat !== 'pdf') {
+      throw createApiServiceError('Merged PDF batches require convertTo to be pdf.');
+    }
+    let { templateIdOrVersionId, webhookUrl, webhookHeaders, ...body } = params;
+    let headers: Record<string, string> = {};
+    if (webhookUrl) headers['carbone-webhook-url'] = webhookUrl;
+    for (let [key, value] of Object.entries(webhookHeaders ?? {})) {
+      if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(key) || /[\r\n]/.test(value)) {
+        throw createApiServiceError(
+          'Webhook headers must use valid HTTP header names and values without line breaks.'
+        );
       }
+      headers[`carbone-webhook-header-${key}`] = value;
     }
-
-    let response = await this.axios.post(`/render/${params.templateIdOrVersionId}`, body, {
-      headers
-    });
-
-    return {
-      renderId: response.data.data.renderId
-    };
+    let id = params.template !== undefined ? 'template' : templateIdOrVersionId;
+    if (!id.trim() || (params.template !== undefined && !params.template.trim())) {
+      throw createApiServiceError(
+        'Provide a stored template ID or a non-empty inlineTemplate.'
+      );
+    }
+    let response = await this.request('render document', () =>
+      this.axios.post(`/render/${encodeURIComponent(id)}`, pickDefined(body), { headers })
+    );
+    return parseResponse(z.object({ renderId: z.string() }), response.data, 'render document');
   }
 
   async getStatus(): Promise<{ success: boolean; message: string }> {
-    let statusAxios = createAxios({
-      baseURL: this.clientConfig.baseUrl
-    });
-
-    let response = await statusAxios.get('/status');
-    return {
-      success: response.data.success ?? true,
-      message: response.data.message ?? 'OK'
-    };
+    let statusAxios = createAxios({ baseURL: this.baseUrl });
+    let data = await requestAxiosData(
+      'check status',
+      () => statusAxios.get('/status'),
+      apiError
+    );
+    return parseResponse(
+      z.object({ success: z.boolean(), message: z.string().optional() }).transform(value => ({
+        success: value.success,
+        message: value.message ?? (value.success ? 'OK' : 'Unavailable')
+      })),
+      data,
+      'check status'
+    );
   }
 }

@@ -30,7 +30,9 @@ Use this to add new subscribers from your website, app, or other sources.`,
       subscribed: z
         .boolean()
         .optional()
-        .describe('Whether the lead is subscribed to receive emails'),
+        .describe(
+          'Whether the lead is subscribed to receive emails. Defaults to false when omitted.'
+        ),
       fields: z
         .record(z.string(), z.string())
         .optional()

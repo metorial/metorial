@@ -80,18 +80,16 @@ export let sendVoiceTool = SlateTool.create(spec, {
       status: msg.status || ''
     }));
 
-    let totalPrice = sentMessages.reduce(
-      (sum: number, msg: any) => sum + (Number.parseFloat(msg.message_price) || 0),
-      0
-    );
+    let totalPrice = Number(result.data?.total_price ?? 0);
+    let queuedCount = Number(result.data?.queued_count ?? 0);
 
     return {
       output: {
         totalPrice,
-        queuedCount: mappedMessages.length,
+        queuedCount,
         messages: mappedMessages
       },
-      message: `Queued **${mappedMessages.length}** voice call(s). Total cost: **$${totalPrice.toFixed(4)}**`
+      message: `Queued **${queuedCount}** voice call(s). Total cost: **$${totalPrice.toFixed(4)}**`
     };
   })
   .build();

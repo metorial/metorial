@@ -57,13 +57,13 @@ export let listDeals = SlateTool.create(spec, {
       output: {
         deals: deals.map((d: any) => ({
           dealId: d.id,
-          personId: d.personId,
+          personId: d.peopleIds?.[0] ?? d.people?.[0]?.id ?? d.personId,
           name: d.name,
           pipelineId: d.pipelineId,
           stageId: d.stageId,
           dealType: d.dealType,
           price: d.price,
-          closingDate: d.closingDate,
+          closingDate: d.projectedCloseDate ?? undefined,
           created: d.created
         })),
         total: result._metadata?.total

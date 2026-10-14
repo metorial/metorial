@@ -1,13 +1,4 @@
-import { createAxios } from 'slates';
-
-let createApiClient = (token: string) => {
-  return createAxios({
-    baseURL: 'https://api.textrazor.com',
-    headers: {
-      'X-TextRazor-Key': token
-    }
-  });
-};
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface AnalyzeTextParams {
   text?: string;
@@ -18,6 +9,8 @@ export interface AnalyzeTextParams {
   cleanupReturnCleaned?: boolean;
   cleanupReturnRaw?: boolean;
   cleanupUseMetadata?: boolean;
+  downloadRunJavascript?: boolean;
+  entityIncludeAddressPlaces?: boolean;
   entityDictionaries?: string[];
   entityFilterDbpediaTypes?: string[];
   entityFilterFreebaseTypes?: string[];
@@ -44,23 +37,23 @@ export interface AnalyzeTextResponse {
       stem?: string;
       lemma?: string;
       partOfSpeech?: string;
-      parentPosition?: number;
-      relationToParent?: string;
-      senses?: Array<{ synset: string; score: number }>;
+      parentPosition?: number | null;
+      relationToParent?: string | null;
+      senses?: Array<{ sense?: string; synset?: string; score: number }>;
       spellingSuggestions?: Array<{ suggestion: string; score: number }>;
     }>;
   }>;
   entities?: Array<{
-    entityId?: string;
-    entityEnglishId?: string;
+    entityId?: string | null;
+    entityEnglishId?: string | null;
     customEntityId?: string;
     confidenceScore?: number;
     relevanceScore?: number;
     type?: string[];
     freebaseTypes?: string[];
-    freebaseId?: string;
-    wikidataId?: string;
-    wikiLink?: string;
+    freebaseId?: string | null;
+    wikidataId?: string | null;
+    wikiLink?: string | null;
     matchingTokens?: number[];
     matchedText?: string;
     data?: Record<string, string[]>;
@@ -68,8 +61,8 @@ export interface AnalyzeTextResponse {
   topics?: Array<{
     label: string;
     score: number;
-    wikiLink?: string;
-    wikidataId?: string;
+    wikiLink?: string | null;
+    wikidataId?: string | null;
   }>;
   categories?: Array<{
     categoryId: string;
@@ -130,15 +123,66 @@ export interface ClassifierCategory {
 }
 
 export class Client {
-  private token: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token?.trim()) {
+      throw createApiServiceError('A TextRazor API key is required. Reconnect your account.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.textrazor.com',
+      authHeader: { name: 'X-TextRazor-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'TextRazor',
+          reason: 'textrazor_api_error'
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      if (response.data?.ok === false) {
+        throw createApiServiceError(
+          `TextRazor request failed: ${response.data.error || response.data.message || 'The provider could not process the request.'}`,
+          { reason: 'textrazor_api_error' }
+        );
+      }
+      return response;
+    });
   }
 
-  async analyzeText(params: AnalyzeTextParams): Promise<AnalyzeTextResponse> {
-    let http = createApiClient(this.token);
+  private unwrap<T>(data: { response?: T }): T {
+    if (data?.response === undefined || data.response === null) {
+      throw createApiServiceError('TextRazor returned an incomplete response. Try again.', {
+        reason: 'textrazor_invalid_response'
+      });
+    }
+    return data.response;
+  }
 
+  async analyzeText(params: AnalyzeTextParams) {
+    let hasText = params.text !== undefined;
+    let hasUrl = params.url !== undefined;
+    if (hasText === hasUrl) {
+      throw createApiServiceError('Provide exactly one of text or sourceUrl to analyze.');
+    }
+    if ((hasText && !params.text?.trim()) || (hasUrl && !params.url?.trim())) {
+      throw createApiServiceError('The text or sourceUrl to analyze must not be empty.');
+    }
+    if (params.text !== undefined && Buffer.byteLength(params.text, 'utf8') > 200 * 1024) {
+      throw createApiServiceError('Text must contain no more than 200KB of UTF-8 data.');
+    }
+    if (params.url) {
+      let url: URL;
+      try {
+        url = new URL(params.url);
+      } catch {
+        throw createApiServiceError(
+          'sourceUrl must be a valid publicly accessible HTTP or HTTPS URL.'
+        );
+      }
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw createApiServiceError('sourceUrl must use HTTP or HTTPS.');
+      }
+    }
     let formData = new URLSearchParams();
 
     if (params.text) {
@@ -165,6 +209,15 @@ export class Client {
     if (params.cleanupUseMetadata !== undefined) {
       formData.append('cleanup.useMetadata', String(params.cleanupUseMetadata));
     }
+    if (params.downloadRunJavascript !== undefined) {
+      formData.append('download.runJavascript', String(params.downloadRunJavascript));
+    }
+    if (params.entityIncludeAddressPlaces !== undefined) {
+      formData.append(
+        'entities.includeAddressPlaces',
+        String(params.entityIncludeAddressPlaces)
+      );
+    }
     if (params.entityDictionaries) {
       for (let dict of params.entityDictionaries) {
         formData.append('entities.dictionaries', dict);
@@ -184,55 +237,78 @@ export class Client {
       formData.append('entities.allowOverlap', String(params.entityAllowOverlap));
     }
     if (params.classifiers) {
-      for (let classifier of params.classifiers) {
-        formData.append('classifiers', classifier);
-      }
+      formData.append('classifiers', params.classifiers.join(','));
     }
     if (params.rules) {
       formData.append('rules', params.rules);
     }
 
-    let response = await http.post('/', formData.toString(), {
+    let response = await this.http.post('/', formData.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     });
 
     let data = response.data;
-    let result: AnalyzeTextResponse = {
+    let result = this.unwrap<Omit<AnalyzeTextResponse, 'time' | 'ok'>>(data);
+    return {
+      ...result,
       time: data.time,
-      ok: data.response?.ok ?? false,
-      error: data.response?.error,
-      message: data.response?.message,
-      language: data.response?.language,
-      languageIsReliable: data.response?.languageIsReliable,
-      cleanedText: data.response?.cleanedText,
-      rawText: data.response?.rawText,
-      sentences: data.response?.sentences,
-      entities: data.response?.entities,
-      topics: data.response?.topics,
-      categories: data.response?.categories,
-      relations: data.response?.relations,
-      entailments: data.response?.entailments,
-      nounPhrases: data.response?.nounPhrases,
-      properties: data.response?.properties,
-      customAnnotationOutput: data.response?.customAnnotationOutput,
-      matchingRules: data.response?.matchingRules
+      ok: data.ok,
+      error: data.error,
+      message: data.message,
+      sentences: result.sentences?.map(sentence => ({
+        ...sentence,
+        words: (sentence.words ?? []).map(word => ({
+          ...word,
+          parentPosition: word.parentPosition ?? undefined,
+          relationToParent: word.relationToParent ?? undefined,
+          senses: word.senses?.map(sense => {
+            let synset = sense.synset ?? sense.sense;
+            if (!synset) {
+              throw createApiServiceError(
+                'TextRazor returned a word sense without an identifier.',
+                {
+                  reason: 'textrazor_invalid_response'
+                }
+              );
+            }
+            return { synset, score: sense.score };
+          })
+        }))
+      })),
+      entities: result.entities?.map(entity => ({
+        ...entity,
+        entityId: entity.entityId ?? undefined,
+        entityEnglishId: entity.entityEnglishId ?? undefined,
+        freebaseId: entity.freebaseId ?? undefined,
+        wikidataId: entity.wikidataId ?? undefined,
+        wikiLink: entity.wikiLink ?? undefined
+      })),
+      topics: result.topics?.map(topic => ({
+        ...topic,
+        wikidataId: topic.wikidataId ?? undefined,
+        wikiLink: topic.wikiLink ?? undefined
+      }))
     };
-
-    if (!result.ok && result.error) {
-      throw new Error(
-        `TextRazor analysis failed: ${result.error}${result.message ? ` - ${result.message}` : ''}`
-      );
-    }
-
-    return result;
   }
 
   async getAccount(): Promise<AccountInfo> {
-    let http = createApiClient(this.token);
-    let response = await http.get('/account/');
-    return response.data;
+    let response = await this.http.get('/account/');
+    let account = this.unwrap<AccountInfo & { planDailyRequestsIncluded?: number }>(
+      response.data
+    );
+    let includedRequests =
+      account.planDailyIncludedRequests ?? account.planDailyRequestsIncluded;
+    if (includedRequests === undefined) {
+      throw createApiServiceError(
+        'TextRazor returned account details without a daily request allowance.',
+        {
+          reason: 'textrazor_invalid_response'
+        }
+      );
+    }
+    return { ...account, planDailyIncludedRequests: includedRequests };
   }
 
   // Dictionary management
@@ -244,27 +320,23 @@ export class Client {
       language?: string;
     }
   ): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.put(`/entities/${encodeURIComponent(dictionaryId)}`, options ?? {}, {
+    await this.http.put(`/entities/${encodeURIComponent(dictionaryId)}`, options ?? {}, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   async listDictionaries(): Promise<DictionaryInfo[]> {
-    let http = createApiClient(this.token);
-    let response = await http.get('/entities/');
+    let response = await this.http.get('/entities/');
     return response.data.dictionaries ?? [];
   }
 
   async getDictionary(dictionaryId: string): Promise<DictionaryInfo> {
-    let http = createApiClient(this.token);
-    let response = await http.get(`/entities/${encodeURIComponent(dictionaryId)}`);
-    return response.data;
+    let response = await this.http.get(`/entities/${encodeURIComponent(dictionaryId)}`);
+    return this.unwrap(response.data);
   }
 
   async deleteDictionary(dictionaryId: string): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.delete(`/entities/${encodeURIComponent(dictionaryId)}`);
+    await this.http.delete(`/entities/${encodeURIComponent(dictionaryId)}`);
   }
 
   // Dictionary entry management
@@ -273,34 +345,31 @@ export class Client {
     limit: number = 20,
     offset: number = 0
   ): Promise<{ entries: DictionaryEntry[]; total: number }> {
-    let http = createApiClient(this.token);
-    let response = await http.get(`/entities/${encodeURIComponent(dictionaryId)}/_all`, {
+    let response = await this.http.get(`/entities/${encodeURIComponent(dictionaryId)}/_all`, {
       params: { limit, offset }
     });
+    let result = this.unwrap<{ entries?: DictionaryEntry[]; total?: number }>(response.data);
     return {
-      entries: response.data.entries ?? [],
-      total: response.data.total ?? 0
+      entries: result.entries ?? [],
+      total: result.total ?? 0
     };
   }
 
   async addDictionaryEntries(dictionaryId: string, entries: DictionaryEntry[]): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.post(`/entities/${encodeURIComponent(dictionaryId)}/`, entries, {
+    await this.http.post(`/entities/${encodeURIComponent(dictionaryId)}/`, entries, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   async getDictionaryEntry(dictionaryId: string, entryId: string): Promise<DictionaryEntry> {
-    let http = createApiClient(this.token);
-    let response = await http.get(
+    let response = await this.http.get(
       `/entities/${encodeURIComponent(dictionaryId)}/${encodeURIComponent(entryId)}`
     );
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async deleteDictionaryEntry(dictionaryId: string, entryId: string): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.delete(
+    await this.http.delete(
       `/entities/${encodeURIComponent(dictionaryId)}/${encodeURIComponent(entryId)}`
     );
   }
@@ -310,15 +379,13 @@ export class Client {
     classifierId: string,
     categories: ClassifierCategory[]
   ): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.put(`/categories/${encodeURIComponent(classifierId)}`, categories, {
+    await this.http.put(`/categories/${encodeURIComponent(classifierId)}`, categories, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   async deleteClassifier(classifierId: string): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.delete(`/categories/${encodeURIComponent(classifierId)}`);
+    await this.http.delete(`/categories/${encodeURIComponent(classifierId)}`);
   }
 
   async listClassifierCategories(
@@ -326,13 +393,18 @@ export class Client {
     limit: number = 20,
     offset: number = 0
   ): Promise<{ categories: ClassifierCategory[]; total: number }> {
-    let http = createApiClient(this.token);
-    let response = await http.get(`/categories/${encodeURIComponent(classifierId)}/_all`, {
-      params: { limit, offset }
-    });
+    let response = await this.http.get(
+      `/categories/${encodeURIComponent(classifierId)}/_all`,
+      {
+        params: { limit, offset }
+      }
+    );
+    let result = this.unwrap<{ categories?: ClassifierCategory[]; total?: number }>(
+      response.data
+    );
     return {
-      categories: response.data.categories ?? [],
-      total: response.data.total ?? 0
+      categories: result.categories ?? [],
+      total: result.total ?? 0
     };
   }
 
@@ -340,16 +412,14 @@ export class Client {
     classifierId: string,
     categoryId: string
   ): Promise<ClassifierCategory> {
-    let http = createApiClient(this.token);
-    let response = await http.get(
+    let response = await this.http.get(
       `/categories/${encodeURIComponent(classifierId)}/${encodeURIComponent(categoryId)}`
     );
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async deleteClassifierCategory(classifierId: string, categoryId: string): Promise<void> {
-    let http = createApiClient(this.token);
-    await http.delete(
+    await this.http.delete(
       `/categories/${encodeURIComponent(classifierId)}/${encodeURIComponent(categoryId)}`
     );
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,10 +22,10 @@ let categoryOutputSchema = z.object({
 export let manageClassifier = SlateTool.create(spec, {
   name: 'Manage Classifier',
   key: 'manage_classifier',
-  description: `Create, delete, or browse custom classifiers and their categories. Custom classifiers let you define your own document classification taxonomy using concept queries.
+  description: `Create, update, delete, or browse custom classifiers and their categories. Custom classifiers let you define your own document classification taxonomy using concept queries.
 Use this to build domain-specific classifiers that categorize documents into custom categories beyond the built-in IAB and IPTC taxonomies.`,
   instructions: [
-    'Use "create" to create a new classifier with an array of categories. Each category needs a categoryId and a concept query.',
+    'Use "create" to create or update a classifier with an array of categories. Existing categories with the same categoryId are replaced. Each category needs a categoryId and a concept query.',
     'Use "list_categories" to browse categories within a classifier with pagination. Use "get_category" or "delete_category" for individual category operations.',
     'Use "delete" to remove an entire classifier.'
   ],
@@ -49,10 +49,18 @@ Use this to build domain-specific classifiers that categorize documents into cus
         .describe('Category ID (required for get_category and delete_category actions)'),
       limit: z
         .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'limit must be a positive whole number.'
+        )
         .optional()
         .describe('Number of categories to return for list_categories (default: 20)'),
       offset: z
         .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value >= 0,
+          'offset must be a nonnegative whole number.'
+        )
         .optional()
         .describe('Offset for pagination in list_categories (default: 0)')
     })
@@ -80,14 +88,24 @@ Use this to build domain-specific classifiers that categorize documents into cus
     let client = new Client({ token: ctx.auth.token });
     let { action, classifierId, categories, categoryId, limit, offset } = ctx.input;
 
+    if (!classifierId.trim()) {
+      throw createApiServiceError('classifierId must not be empty.');
+    }
     if (action === 'create') {
       if (!categories || categories.length === 0) {
-        throw new Error('At least one category is required for the create action.');
+        throw createApiServiceError(
+          'At least one category is required for the create action.'
+        );
+      }
+      if (categories.some(category => !category.categoryId.trim() || !category.query.trim())) {
+        throw createApiServiceError(
+          'Each category needs a nonempty categoryId and concept query.'
+        );
       }
       await client.createClassifier(classifierId, categories);
       return {
         output: { createdCount: categories.length },
-        message: `Created classifier **${classifierId}** with **${categories.length}** categories.`
+        message: `Saved classifier **${classifierId}** with **${categories.length}** categories.`
       };
     }
 
@@ -112,8 +130,8 @@ Use this to build domain-specific classifiers that categorize documents into cus
     }
 
     if (action === 'get_category') {
-      if (!categoryId) {
-        throw new Error('categoryId is required for the get_category action.');
+      if (!categoryId?.trim()) {
+        throw createApiServiceError('categoryId is required for the get_category action.');
       }
       let category = await client.getClassifierCategory(classifierId, categoryId);
       return {
@@ -123,8 +141,8 @@ Use this to build domain-specific classifiers that categorize documents into cus
     }
 
     if (action === 'delete_category') {
-      if (!categoryId) {
-        throw new Error('categoryId is required for the delete_category action.');
+      if (!categoryId?.trim()) {
+        throw createApiServiceError('categoryId is required for the delete_category action.');
       }
       await client.deleteClassifierCategory(classifierId, categoryId);
       return {
@@ -133,6 +151,6 @@ Use this to build domain-specific classifiers that categorize documents into cus
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

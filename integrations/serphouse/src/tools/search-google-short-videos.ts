@@ -46,9 +46,9 @@ export let searchGoogleShortVideos = SlateTool.create(spec, {
       lang: ctx.input.lang,
       device: ctx.input.device,
       ...(ctx.input.loc ? { loc: ctx.input.loc } : {}),
-      ...(ctx.input.locId ? { loc_id: ctx.input.locId } : {}),
+      ...(ctx.input.locId !== undefined ? { loc_id: ctx.input.locId } : {}),
       ...(ctx.input.dateRange ? { date_range: ctx.input.dateRange } : {}),
-      ...(ctx.input.page ? { page: ctx.input.page } : {}),
+      ...(ctx.input.page !== undefined ? { page: ctx.input.page } : {}),
       ...(ctx.input.videoQuality ? { video_quality: ctx.input.videoQuality } : {}),
       ...(ctx.input.videoCaptions ? { video_captions: ctx.input.videoCaptions } : {})
     });

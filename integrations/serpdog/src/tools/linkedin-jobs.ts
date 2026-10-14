@@ -32,7 +32,11 @@ export let linkedinJobs = SlateTool.create(spec, {
       experienceLevel: z
         .enum(['internship', 'entry_level', 'associate', 'mid_senior_level', 'director'])
         .optional()
-        .describe('Filter by experience level')
+        .describe('Filter by experience level'),
+      workType: z
+        .enum(['at_work', 'remote', 'hybrid'])
+        .optional()
+        .describe('Filter jobs by on-site, remote, or hybrid work')
     })
   )
   .output(
@@ -49,7 +53,8 @@ export let linkedinJobs = SlateTool.create(spec, {
       page: ctx.input.page,
       jobType: ctx.input.jobType,
       sortBy: ctx.input.sortBy,
-      expLevel: ctx.input.experienceLevel
+      expLevel: ctx.input.experienceLevel,
+      workType: ctx.input.workType
     });
 
     return {

@@ -1,6 +1,4 @@
-Now let me fetch the authentication overview page for more details on OAuth2:I now have comprehensive information. Let me compile the specification.
-
-# Slates Specification for Addressfinder
+# Addressfinder Integration Specification
 
 ## Overview
 
@@ -41,6 +39,8 @@ For machine-to-machine integrations, Addressfinder supports the OAuth2 client cr
 
 OAuth2 credentials (Client ID and Client Secret) are created in the Addressfinder Portal under a project's Credentials page. The Client Secret is only shown once at creation time.
 
+Choose the integration's OAuth2 Client Credentials connection method to exchange these credentials without a browser redirect. Tokens are renewed before expiry. The legacy OAuth2 connection registration is retained for existing connections, while new connections must use the client credentials method. OAuth2 requires an enabled Business or Enterprise plan.
+
 ## Features
 
 ### Address Autocomplete
@@ -67,17 +67,23 @@ Takes GPS coordinates (longitude and latitude) and returns the nearest addresses
 
 Interactive search for points of interest and their associated addresses (NZ only). Supports autocomplete and full metadata retrieval for selected results.
 
+Use `poi_autocomplete` with a partial name or address to obtain POI identifiers. Pass the selected `poiId` to `poi_metadata` to retrieve full metadata, including the associated `address_pxid` when available.
+
 ### Email Verification
 
 Validates an email address by checking syntax, domain existence and availability, and email account existence. Returns a verified state and associated metadata.
+
+The optional `features=format` performs syntax checks only. Nullable attributes that were not evaluated or could not be determined are omitted from the tool output. `deliverability` exposes the provider's graded confidence and is `UNDETERMINED` for format-only checks.
 
 ### Phone Verification
 
 Verifies a phone number through syntax and range checks followed by a network-level connection status check. Returns the verified number, line type, connection status, and other metadata.
 
+The optional `verifyFormatOnly` skips the network check. The tool returns national and international formatted numbers plus their raw equivalents when supplied by the provider; an unevaluated line status is omitted.
+
 ### Bulk Verification
 
-Allows verification of address data in bulk, suitable for cleaning up existing address databases rather than one-off lookups.
+The provider offers bulk verification separately. This integration verifies one address per invocation and does not expose a bulk-job endpoint.
 
 ## Events
 

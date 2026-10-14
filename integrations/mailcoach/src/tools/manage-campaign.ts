@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,10 @@ export let manageCampaign = SlateTool.create(spec, {
       replyToName: z.string().optional().describe('Reply-to name'),
       segmentUuid: z.string().optional().describe('UUID of a segment to target'),
       utmTags: z.boolean().optional().describe('Whether to add UTM tags to links'),
-      scheduleAt: z.string().optional().describe('ISO 8601 datetime to schedule the campaign')
+      scheduleAt: z
+        .string()
+        .optional()
+        .describe('Scheduled date and time in Mailcoach format: YYYY-MM-DD HH:mm:ss')
     })
   )
   .output(
@@ -65,7 +68,8 @@ export let manageCampaign = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.campaignUuid) throw new Error('campaignUuid is required for delete');
+      if (!ctx.input.campaignUuid)
+        throw createApiServiceError('campaignUuid is required for delete');
       await client.deleteCampaign(ctx.input.campaignUuid);
       return {
         output: { campaign: null },
@@ -74,8 +78,9 @@ export let manageCampaign = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
-      if (!ctx.input.emailListUuid) throw new Error('emailListUuid is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
+      if (!ctx.input.emailListUuid)
+        throw createApiServiceError('emailListUuid is required for create');
 
       let result = await client.createCampaign({
         name: ctx.input.name,
@@ -100,7 +105,8 @@ export let manageCampaign = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.campaignUuid) throw new Error('campaignUuid is required for update');
+    if (!ctx.input.campaignUuid)
+      throw createApiServiceError('campaignUuid is required for update');
 
     let result = await client.updateCampaign(ctx.input.campaignUuid, {
       name: ctx.input.name,

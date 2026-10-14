@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,8 +8,7 @@ export let createBatchCheck = SlateTool.create(spec, {
   key: 'create_batch_check',
   description: `Submit a list of email addresses for batch verification. Returns an operation that can be polled for completion using the **Get Batch Operation** tool.
 
-Mailcheck can process up to 1,000,000 email addresses in approximately 15 minutes. Once the operation completes, results include a download URL for the verified list.`,
-  constraints: ['Maximum of 1,000,000 email addresses per batch.']
+Once the operation completes, use **Get Batch Operation** to retrieve the verification results file.`
 })
   .input(
     z.object({
@@ -30,13 +29,19 @@ Mailcheck can process up to 1,000,000 email addresses in approximately 15 minute
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.emails.length === 0) {
+      throw createApiServiceError(
+        'Provide at least one email address for batch verification.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let operation = await client.createBatchCheck(ctx.input.emails);
 
     return {
       output: {
         operationName: operation.name,
-        done: operation.done,
+        done: operation.done ?? false,
         totalCount: operation.metadata?.totalCount,
         processedCount: operation.metadata?.processedCount,
         createTime: operation.metadata?.createTime

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUsage = SlateTool.create(spec, {
   name: 'Get API Usage',
   key: 'get_usage',
-  description: `Retrieve the current API usage statistics for your MXToolbox account. Shows how many API requests have been consumed and the maximum allowed for your subscription plan.`,
+  description: `Retrieve DNS and network API usage counters and plan limits. Includes combined totals for compatibility; each lookup type consumes its own quota, so check the separate counters before running diagnostics.`,
   tags: {
     readOnly: true
   }
@@ -14,10 +14,25 @@ export let getUsage = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      used: z.number().describe('Number of API requests consumed'),
-      limit: z.number().describe('Maximum number of API requests allowed in your plan'),
-      remaining: z.number().describe('Number of API requests remaining'),
-      usagePercentage: z.number().describe('Percentage of API quota used')
+      used: z.number().describe('Combined DNS and network requests consumed'),
+      limit: z.number().describe('Combined DNS and network request limits'),
+      remaining: z
+        .number()
+        .describe('Combined remaining requests; quotas are not interchangeable'),
+      usagePercentage: z.number().describe('Percentage of the combined request limits used'),
+      dnsRequests: z
+        .number()
+        .optional()
+        .describe('DNS requests consumed, when supplied by the API'),
+      dnsMax: z.number().optional().describe('DNS request limit, when supplied by the API'),
+      networkRequests: z
+        .number()
+        .optional()
+        .describe('Network requests consumed, when supplied by the API'),
+      networkMax: z
+        .number()
+        .optional()
+        .describe('Network request limit, when supplied by the API')
     })
   )
   .handleInvocation(async ctx => {
@@ -28,12 +43,14 @@ export let getUsage = SlateTool.create(spec, {
 
     return {
       output: {
-        used: usage.used,
-        limit: usage.limit,
+        ...usage,
         remaining,
         usagePercentage
       },
-      message: `API usage: **${usage.used}/${usage.limit}** requests used (**${usagePercentage}%**). ${remaining} requests remaining.`
+      message:
+        usage.dnsRequests !== undefined
+          ? `DNS API usage: **${usage.dnsRequests}/${usage.dnsMax}**. Network API usage: **${usage.networkRequests}/${usage.networkMax}**. These quotas are tracked separately.`
+          : `API usage: **${usage.used}/${usage.limit}** requests used (**${usagePercentage}%**). ${remaining} requests remaining.`
     };
   })
   .build();

@@ -65,7 +65,7 @@ export let getUsage = SlateTool.create(spec, {
       promptCharacters: item.prompt_char ?? 0,
       responseTokens: item.response_tokens ?? 0,
       responseCharacters: item.response_char ?? 0,
-      cost: item.cost ?? '0',
+      cost: String(item.cost ?? '0'),
       latencyMs: item.latency_ms ?? 0,
       sourceIp: item.source_ip
     }));

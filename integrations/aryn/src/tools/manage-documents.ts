@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,11 @@ export let listDocuments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to list documents from'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet to list documents from. Call list_docsets to discover DocSet IDs.'
+        ),
       pageSize: z.number().optional().describe('Number of results per page'),
       pageToken: z.string().optional().describe('Pagination token for next page')
     })
@@ -36,12 +40,13 @@ export let listDocuments = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let documents = result?.documents ?? (Array.isArray(result) ? result : []);
+    let documents =
+      result?.items ?? result?.documents ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         documents,
-        nextPageToken: result?.next_page_token
+        nextPageToken: result?.next_page_token ?? undefined
       },
       message: `Found **${documents.length}** document(s) in the DocSet.`
     };
@@ -59,8 +64,16 @@ export let getDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet containing the document'),
-      documentId: z.string().describe('ID of the document to retrieve'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet containing the document. Call list_docsets to discover DocSet IDs.'
+        ),
+      documentId: z
+        .string()
+        .describe(
+          'ID of the document to retrieve. Call list_documents to discover document IDs.'
+        ),
       includeElements: z
         .boolean()
         .optional()
@@ -101,8 +114,16 @@ export let deleteDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet containing the document'),
-      documentId: z.string().describe('ID of the document to delete')
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet containing the document. Call list_docsets to discover DocSet IDs.'
+        ),
+      documentId: z
+        .string()
+        .describe(
+          'ID of the document to delete. Call list_documents to discover document IDs.'
+        )
     })
   )
   .output(
@@ -128,9 +149,9 @@ export let deleteDocument = SlateTool.create(spec, {
 export let updateDocumentProperties = SlateTool.create(spec, {
   name: 'Update Document Properties',
   key: 'update_document_properties',
-  description: `Update metadata properties on a specific document using JSON Patch operations. Supports adding, replacing, and removing property values.`,
+  description: `Update metadata properties on a specific document using JSON Patch operations. Aryn currently supports only replacing property values.`,
   instructions: [
-    'Use op "add" or "replace" to set property values, and "remove" to delete them.',
+    'Use op "replace" to set property values. The provider currently rejects add and remove operations.',
     'The path should reference the property name, e.g. "/properties/my_property".'
   ],
   tags: {
@@ -140,8 +161,16 @@ export let updateDocumentProperties = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet containing the document'),
-      documentId: z.string().describe('ID of the document to update'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet containing the document. Call list_docsets to discover DocSet IDs.'
+        ),
+      documentId: z
+        .string()
+        .describe(
+          'ID of the document to update. Call list_documents to discover document IDs.'
+        ),
       operations: z
         .array(
           z.object({
@@ -163,6 +192,17 @@ export let updateDocumentProperties = SlateTool.create(spec, {
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
     });
+
+    for (let operation of ctx.input.operations) {
+      if (operation.op !== 'replace') {
+        throw createApiServiceError(
+          'Aryn currently supports only replace operations for document properties.'
+        );
+      }
+      if (operation.value === undefined) {
+        throw createApiServiceError('Provide a value for each replace operation.');
+      }
+    }
 
     let result = await client.updateDocumentProperties(
       ctx.input.docsetId,

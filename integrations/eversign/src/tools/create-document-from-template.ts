@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, isEnabled } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let templateSignerSchema = z.object({
@@ -28,7 +29,7 @@ let mergeFieldSchema = z.object({
 export let createDocumentFromTemplate = SlateTool.create(spec, {
   name: 'Create Document from Template',
   key: 'create_document_from_template',
-  description: `Create and send a new document based on an existing template. Assign real signers to template roles, fill in merge field values, and configure delivery and signing options.`,
+  description: `Create and send a new document based on an existing template. Assign real signers to template roles, fill in merge field values, and configure delivery and signing options. Call list_businesses to discover the businessId.`,
   instructions: [
     'All required signer roles from the template must be assigned.',
     'Use the "List Templates" tool to find available templates and their roles.'
@@ -40,6 +41,7 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       templateId: z.string().describe('Hash ID of the template to use'),
       title: z.string().optional().describe('Custom title for the new document'),
       message: z.string().optional().describe('Message for all signers'),
@@ -84,7 +86,12 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
+    if (ctx.input.expires !== undefined && !/^\d+$/.test(ctx.input.expires)) {
+      throw createApiServiceError(
+        'expires must be a Unix timestamp string containing only digits.'
+      );
+    }
 
     let body: Record<string, any> = {
       template_id: ctx.input.templateId
@@ -92,10 +99,11 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
 
     if (ctx.input.title) body.title = ctx.input.title;
     if (ctx.input.message) body.message = ctx.input.message;
-    if (ctx.input.embeddedSigningEnabled) body.embedded_signing_enabled = 1;
+    if (ctx.input.embeddedSigningEnabled !== undefined)
+      body.embedded_signing_enabled = ctx.input.embeddedSigningEnabled ? 1 : 0;
     if (ctx.input.redirect) body.redirect = ctx.input.redirect;
     if (ctx.input.redirectDecline) body.redirect_decline = ctx.input.redirectDecline;
-    if (ctx.input.expires) body.expires = ctx.input.expires;
+    if (ctx.input.expires !== undefined) body.expires = Number(ctx.input.expires);
     if (ctx.input.customRequesterName)
       body.custom_requester_name = ctx.input.customRequesterName;
     if (ctx.input.customRequesterEmail)
@@ -136,11 +144,11 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
     let doc = await client.createDocumentFromTemplate(body);
 
     let signers = (doc.signers || []).map((s: any) => ({
-      signerId: s.id,
+      signerId: Number(s.id),
       name: s.name || '',
       email: s.email || '',
       role: s.role || undefined,
-      signed: s.signed === 1 || s.signed === true,
+      signed: isEnabled(s.signed),
       embeddedSigningUrl: s.embedded_signing_url || undefined
     }));
 
@@ -148,9 +156,8 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
       output: {
         documentHash: doc.document_hash,
         title: doc.title || undefined,
-        isCompleted: doc.is_completed === 1 || doc.is_completed === true,
-        embeddedSigningEnabled:
-          doc.embedded_signing_enabled === 1 || doc.embedded_signing_enabled === true,
+        isCompleted: isEnabled(doc.is_completed),
+        embeddedSigningEnabled: isEnabled(doc.embedded_signing_enabled),
         signers
       },
       message: `Document "${doc.title || doc.document_hash}" created from template and sent to ${signers.length} signer(s).`

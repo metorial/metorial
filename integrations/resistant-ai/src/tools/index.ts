@@ -1,4 +1,6 @@
+export { deleteDocumentSubmission } from './delete-document-submission';
 export * from './get-aml-screening';
+export { getDocumentFraudResult } from './get-document-fraud-result';
 export * from './get-kyb-report';
 export * from './get-verification';
 export * from './list-verifications';
@@ -9,3 +11,4 @@ export * from './request-identity-verification';
 export * from './request-kyb-report';
 export * from './request-proof-of-address';
 export * from './run-aml-screening';
+export { submitDocument } from './submit-document';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,7 +32,7 @@ export let aiAssistant = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'chat':
-        if (!ctx.input.message) throw new Error('message is required for chat');
+        if (!ctx.input.message) throw createApiServiceError('message is required for chat');
         result = await client.chatWithAssistant(ctx.input.sheetHandle, ctx.input.message);
         break;
 

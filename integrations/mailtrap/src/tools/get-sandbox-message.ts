@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailtrapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,8 +51,7 @@ export let getSandboxMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let { inboxId, messageId, action, forwardEmail } = ctx.input;
@@ -129,7 +128,8 @@ export let getSandboxMessage = SlateTool.create(spec, {
     }
 
     if (action === 'forward') {
-      if (!forwardEmail) throw new Error('forwardEmail is required for forwarding a message');
+      if (!forwardEmail)
+        throw createApiServiceError('forwardEmail is required for forwarding a message');
       await client.forwardSandboxMessage(inboxId, messageId, forwardEmail);
       return {
         output: { messageId, forwarded: true },
@@ -137,6 +137,6 @@ export let getSandboxMessage = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

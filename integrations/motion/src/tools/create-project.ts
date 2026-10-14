@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -15,7 +16,7 @@ export let createProject = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Name of the project'),
-      workspaceId: z.string().describe('ID of the workspace to create the project in'),
+      workspaceId: workspaceIdSchema,
       dueDate: z.string().optional().describe('ISO 8601 due date for the project'),
       description: z.string().optional().describe('Project description. Accepts HTML.'),
       labels: z.array(z.string()).optional().describe('Label names to attach to the project'),

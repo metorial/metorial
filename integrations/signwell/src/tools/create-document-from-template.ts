@@ -11,7 +11,7 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
     'The placeholderName for each recipient must match a placeholder defined in the template.',
     'Use templateFields to pre-fill form fields defined in the template by their apiId.'
   ],
-  constraints: ['Rate limited to 30 document creation requests per minute.'],
+  constraints: ['Subject to the account API rate limits.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -20,6 +20,7 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
   .input(
     z.object({
       templateId: z.string().describe('ID of the template to create the document from'),
+      name: z.string().optional().describe('Name of the new document'),
       draft: z.boolean().optional().describe('If true, document is created but not sent'),
       embeddedSigning: z.boolean().optional().describe('Enable embedded signing'),
       embeddedSigningNotifications: z
@@ -85,6 +86,7 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
 
     let result = await client.createDocumentFromTemplate({
       templateId: ctx.input.templateId,
+      name: ctx.input.name,
       testMode: ctx.config.testMode,
       draft: ctx.input.draft,
       embeddedSigning: ctx.input.embeddedSigning,
@@ -95,22 +97,22 @@ export let createDocumentFromTemplate = SlateTool.create(spec, {
       expiresIn: ctx.input.expiresIn,
       recipients: ctx.input.recipients,
       templateFields: ctx.input.templateFields,
-      metadata: ctx.input.metadata as Record<string, string> | undefined
+      metadata: ctx.input.metadata
     });
 
     let output = {
       documentId: result.id,
-      name: result.name,
-      status: result.status,
-      embeddedSigningUrl: result.embedded_signing_url,
-      recipients: result.recipients?.map((r: any) => ({
-        recipientId: r.id,
-        name: r.name,
-        email: r.email,
-        status: r.status,
-        embeddedSigningUrl: r.embedded_signing_url
+      name: result.name ?? undefined,
+      status: result.status ?? undefined,
+      embeddedSigningUrl: result.embedded_signing_url ?? undefined,
+      recipients: result.recipients?.map(r => ({
+        recipientId: r.id ?? undefined,
+        name: r.name ?? undefined,
+        email: r.email ?? undefined,
+        status: r.status ?? undefined,
+        embeddedSigningUrl: r.embedded_signing_url ?? undefined
       })),
-      createdAt: result.created_at
+      createdAt: result.created_at ?? undefined
     };
 
     let statusMsg = ctx.input.draft ? 'as draft' : 'and sent';

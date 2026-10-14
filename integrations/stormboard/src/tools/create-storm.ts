@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -45,6 +45,11 @@ export let createStorm = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.plan === 'team' && !ctx.input.teamId?.trim()) {
+      throw createApiServiceError('teamId is required when creating a team Storm.', {
+        reason: 'stormboard_invalid_input'
+      });
+    }
     let client = new StormboardClient({ token: ctx.auth.token });
 
     let result = await client.createStorm({
@@ -60,10 +65,10 @@ export let createStorm = SlateTool.create(spec, {
     return {
       output: {
         stormId: result.id,
-        key: result.key,
+        key: result.key ?? undefined,
         title: result.title,
-        goals: result.goals,
-        lastActivity: result.lastactivity
+        goals: result.goals ?? undefined,
+        lastActivity: result.lastactivity ?? undefined
       },
       message: `Created Storm **"${result.title}"** (ID: ${result.id}).`
     };

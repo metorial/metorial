@@ -1,61 +1,40 @@
-Let me try to access the actual Signaturely API docs more thoroughly.Now I have a good picture. Let me compile the specification based on what I've found.
+# Signaturely Integration
 
-# Slates Specification for Signaturely
+Connect with an API key from [account settings](https://app.signaturely.com/settings/api).
+Requests use the Signaturely API v1 and the `Api-Key` authorization scheme.
 
-## Overview
+## Tools
 
-Signaturely is a cloud-based electronic signature platform that allows users to upload documents, add signature fields, and send them to one or multiple signers for legally binding electronic signatures. It supports templates, team collaboration, audit trails, and document management, with compliance to major e-signature laws including the US ESIGN Act and EU eIDAS regulation.
+| Tool | Purpose |
+| --- | --- |
+| `get_current_user` | Inspect the connected account identity. |
+| `list_templates` | Discover a page of API templates and available signer roles. |
+| `create_signature_request` | Create a signature request from an existing template. |
+| `list_documents` | Find documents using status, sorting, search, and pagination. |
+| `get_document_signers` | Discover signer IDs, roles, order, and available signing state. |
+| `download_document` | Get a downloadable PDF for a document. |
+| `send_reminders` | Send reminders to selected document signers. |
 
-## Authentication
+Use `list_templates` to find template IDs before creating a request. Signer roles
+must match the selected template. Use `fields` for text API tags and
+`checkboxFields` for boolean API tags. Each API tag can appear in only one of
+these dictionaries. Ordered requests require a positive whole-number order for
+every signer.
 
-Signaturely supports two authentication methods:
+List tools default to page 1 with 25 items. `list_documents` also retains offset
+pagination: supply either `offset` or `page`. Offset calls translate to provider
+pages and may read the following page to fill the requested result window.
+`totalCount` is omitted when the API does not return a total.
 
-### API Key
+Signer status and completion timestamps are returned only when present in the
+provider response. A completed document downloads as a signed PDF; otherwise
+Signaturely supplies the source PDF. PDF URLs are used when issued; the API
+documentation does not specify their expiration period.
 
-- Available on all API plans (Gold, Platinum, Titanium).
-- API keys can be generated from the Signaturely settings page at `https://app.signaturely.com/settings/api`.
-- You can create an unlimited number of API keys per account.
-- A free API key can be created from the documentation page for testing purposes.
-- The API key is included in requests to authenticate against the Signaturely API.
+## API reference
 
-### OAuth
-
-- Available only on Platinum and Titanium API plans.
-- OAuth is used to allow third-party applications to access Signaturely on behalf of users, following the standard OAuth access delegation model.
-- Specific OAuth endpoints and configuration details are available in the [Signaturely API documentation](https://docs.signaturely.com/).
-
-## Features
-
-### Signature Requests
-
-Send automated signature requests to one or multiple signers via the API. Documents can be sent for signing directly from your CRM or other platforms. The number of requests allowed depends on the API plan (50, 150, or 500 per month).
-
-### Templates
-
-Access and use pre-built document templates through the API. Templates support configurable roles (e.g., "Receiving Party", "Disclosing Party"), customizable field placements (signatures, initials, dates, textboxes, checkboxes), and adjustable message/name settings per request. Templates must be created in the Signaturely dashboard before being used via the API. The number of available templates depends on the plan (5, 25, or unlimited).
-
-### Embedded Signing
-
-Embed signature requests directly within your own application or website, allowing signers to complete the signing process without leaving your platform. Available only on Platinum and Titanium API plans.
-
-### Embedded Requesting
-
-Allow users to create and send signature requests from within your application, without needing to open the Signaturely platform. Available only on Platinum and Titanium API plans.
-
-### Personalized Branding
-
-Customize the signing experience with your own branding. Available on Platinum and Titanium API plans. The Titanium plan additionally supports full white-labeling.
-
-### Document Management
-
-Retrieve and manage documents, track signing status (signed, unsigned, pending), and download completed signed documents with audit trails.
-
-## Events
-
-Based on available information, Signaturely does not appear to offer a native webhook or event subscription system through its API. However, Signaturely provides a Zapier integration that exposes the following event triggers:
-
-- **Document Completed**: Fires when a document has been fully signed by all parties.
-- **Document Sent**: Fires when a document has been sent out for signing.
-- **Document Viewed**: Fires when a signer views the document.
-
-These triggers are available through Zapier and can be used to automate downstream workflows. It is unclear whether Signaturely exposes direct webhook endpoints outside of the Zapier integration, as the API documentation portal (docs.signaturely.com) requires JavaScript rendering and detailed endpoint-level documentation could not be fully confirmed.
+[Signaturely API documentation](https://docs.signaturely.com/) documents account
+identity, template-based creation, document/template lists, document signer
+lists, PDF retrieval, and reminder requests. Account API plan and quota limits
+apply. OAuth, embedded signing/requesting, triggers, and team administration are
+outside this integration's current tool set.

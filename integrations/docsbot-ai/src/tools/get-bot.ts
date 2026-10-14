@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getBot = SlateTool.create(spec, {
   name: 'Get Bot',
   key: 'get_bot',
-  description: `Retrieve full details for a specific bot including its configuration, model, status, widget settings, labels, and usage statistics.`,
+  description: `Retrieve full details for a specific bot including its configuration, model, status, widget settings, labels, and usage statistics. Call list_teams to discover accessible team IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to retrieve')
     })
   )
@@ -42,7 +44,10 @@ export let getBot = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
-    let bot = await client.getBot(ctx.config.teamId, ctx.input.botId);
+    let bot = await client.getBot(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId
+    );
 
     return {
       output: {
@@ -54,7 +59,7 @@ export let getBot = SlateTool.create(spec, {
         language: bot.language,
         status: bot.status,
         createdAt: bot.createdAt,
-        customPrompt: bot.customPrompt,
+        customPrompt: bot.customPrompt ?? undefined,
         questionCount: bot.questionCount,
         sourceCount: bot.sourceCount,
         pageCount: bot.pageCount,

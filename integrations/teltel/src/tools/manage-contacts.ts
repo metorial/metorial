@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelTelClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,6 +23,10 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
     'For bulk adding, provide an array of contacts in the "contacts" field.',
     'For single contact addition, provide the "phone" field directly.'
   ],
+  constraints: [
+    'The optional name field is preserved for existing calls, but the current TelTel API specification only documents the phone number and five custom fields. Name storage is unverified.',
+    'The status filter matches either call leg within the selected page, so a filtered page may contain fewer than limit contacts.'
+  ],
   tags: {
     destructive: true,
     readOnly: false
@@ -45,7 +49,12 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
       contactId: z.string().optional().describe('Contact ID (for delete)'),
       limit: z.number().optional().describe('Maximum results to return (for list)'),
       offset: z.number().optional().describe('Pagination offset (for list)'),
-      status: z.string().optional().describe('Filter contacts by status (for list)')
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Filter contacts by either call leg status within the selected page (for list)'
+        )
     })
   )
   .output(
@@ -62,7 +71,7 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
     switch (ctx.input.action) {
       case 'add': {
         if (!ctx.input.phone) {
-          throw new Error('Phone number is required when adding a contact');
+          throw createApiServiceError('Phone number is required when adding a contact');
         }
         result = await client.addCampaignContact(ctx.input.campaignId, {
           phone: ctx.input.phone,
@@ -78,7 +87,7 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
       }
       case 'add_bulk': {
         if (!ctx.input.contacts || ctx.input.contacts.length === 0) {
-          throw new Error('Contacts array is required for bulk add');
+          throw createApiServiceError('Contacts array is required for bulk add');
         }
         result = await client.addCampaignContactsBulk(
           ctx.input.campaignId,
@@ -106,7 +115,7 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
       }
       case 'delete': {
         if (!ctx.input.contactId) {
-          throw new Error('Contact ID is required when deleting a contact');
+          throw createApiServiceError('Contact ID is required when deleting a contact');
         }
         result = await client.deleteCampaignContact(ctx.input.campaignId, ctx.input.contactId);
         message = `Contact **${ctx.input.contactId}** removed from campaign **${ctx.input.campaignId}**.`;
@@ -114,9 +123,13 @@ When dynamically adding contacts via the API, enable the "Disable auto stop" opt
       }
     }
 
+    let invalid = result?.meta?.invalid;
+    if (typeof invalid === 'number' && invalid > 0) {
+      message = `TelTel accepted **${result.meta.created ?? 0}** contact(s) and rejected **${invalid}**. Review the returned import counts before retrying.`;
+    }
     return {
       output: {
-        success: true,
+        success: !(typeof invalid === 'number' && invalid > 0),
         contacts: result ? [result] : undefined
       },
       message

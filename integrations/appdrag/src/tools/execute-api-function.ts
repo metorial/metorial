@@ -10,7 +10,8 @@ export let executeApiFunction = SlateTool.create(spec, {
 The function is called at \`https://{appId}.appdrag.site/api/{path}\` with the specified HTTP method and parameters.`,
   instructions: [
     'The path should include the folder and function name, e.g., "/users/get-user" for a function named "get-user" in the "users" folder.',
-    'Parameters are passed as form-data (for POST/PUT/PATCH/DELETE) or query string (for GET).'
+    'Parameters are passed as URL-encoded form fields (for POST/PUT/PATCH/DELETE) or query string (for GET).',
+    'APIKey and appID are supplied by the connection and cannot be overridden by function parameters.'
   ],
   tags: {
     destructive: false,

@@ -61,8 +61,8 @@ export let listVideos = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     });
 
-    let items = result.Items ?? result.items ?? [];
-    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? 0;
+    let items = Array.isArray(result) ? result : (result.Items ?? result.items ?? []);
+    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? items.length;
     let page = result.Page ?? result.page ?? ctx.input.pageNumber;
     let pageSize = result.PageSize ?? result.pageSize ?? ctx.input.pageSize;
 

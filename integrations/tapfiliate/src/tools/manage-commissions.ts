@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TapfiliateClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,6 +12,10 @@ let commissionSchema = z.object({
     .describe('Conversion sub-amount used for calculation'),
   commissionType: z.string().optional().describe('Commission type identifier'),
   approved: z.boolean().optional().describe('Whether the commission is approved'),
+  approvalStatus: z
+    .enum(['approved', 'disapproved', 'pending'])
+    .optional()
+    .describe('Approval status, including pending when no decision has been made'),
   affiliate: z.any().optional().describe('Affiliate who earned the commission'),
   conversion: z.any().optional().describe('Conversion this commission belongs to'),
   kind: z.string().optional().describe('Kind of commission (e.g., regular, bonus)'),
@@ -36,6 +40,11 @@ export let listCommissions = SlateTool.create(spec, {
       affiliateId: z.string().optional().describe('Filter by affiliate ID'),
       approved: z.boolean().optional().describe('Filter by approval status'),
       pending: z.boolean().optional().describe('Filter by pending status'),
+      status: z
+        .enum(['approved', 'disapproved', 'pending'])
+        .optional()
+        .describe('Filter by the provider approval status'),
+      paid: z.boolean().optional().describe('Filter paid or unpaid commissions'),
       dateFrom: z.string().optional().describe('Filter from date (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('Filter to date (YYYY-MM-DD)'),
       page: z.number().optional().describe('Page number for pagination')
@@ -47,22 +56,47 @@ export let listCommissions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let expectedStatus =
+      ctx.input.pending === true
+        ? 'pending'
+        : ctx.input.approved === true
+          ? 'approved'
+          : ctx.input.approved === false
+            ? 'disapproved'
+            : undefined;
+    if (
+      (ctx.input.pending === true && ctx.input.approved !== undefined) ||
+      (ctx.input.status && expectedStatus && ctx.input.status !== expectedStatus) ||
+      (ctx.input.status === 'pending' && ctx.input.pending === false)
+    ) {
+      throw createApiServiceError(
+        'The approval filters conflict. Provide status, or compatible approved and pending values.'
+      );
+    }
     let client = new TapfiliateClient({ token: ctx.auth.token });
     let results = await client.listCommissions(ctx.input);
 
     let commissions = results.map((r: any) => ({
       commissionId: r.id,
-      amount: r.amount,
-      conversionSubAmount: r.conversion_sub_amount,
-      commissionType: r.commission_type,
-      approved: r.approved,
+      amount: r.amount ?? undefined,
+      conversionSubAmount: r.conversion_sub_amount ?? undefined,
+      commissionType: r.commission_type ?? undefined,
+      approved: r.approved ?? undefined,
+      approvalStatus:
+        r.approved === null
+          ? 'pending'
+          : r.approved === true
+            ? 'approved'
+            : r.approved === false
+              ? 'disapproved'
+              : undefined,
       affiliate: r.affiliate,
       conversion: r.conversion,
       kind: r.kind,
-      currency: r.currency,
-      createdAt: r.created_at,
+      currency: r.currency ?? undefined,
+      createdAt: r.created_at ?? undefined,
       payout: r.payout,
-      comment: r.comment
+      comment: r.comment ?? undefined
     }));
 
     return {
@@ -94,17 +128,25 @@ export let getCommission = SlateTool.create(spec, {
     return {
       output: {
         commissionId: result.id,
-        amount: result.amount,
-        conversionSubAmount: result.conversion_sub_amount,
-        commissionType: result.commission_type,
-        approved: result.approved,
+        amount: result.amount ?? undefined,
+        conversionSubAmount: result.conversion_sub_amount ?? undefined,
+        commissionType: result.commission_type ?? undefined,
+        approved: result.approved ?? undefined,
+        approvalStatus:
+          result.approved === null
+            ? 'pending'
+            : result.approved === true
+              ? 'approved'
+              : result.approved === false
+                ? 'disapproved'
+                : undefined,
         affiliate: result.affiliate,
         conversion: result.conversion,
         kind: result.kind,
-        currency: result.currency,
-        createdAt: result.created_at,
+        currency: result.currency ?? undefined,
+        createdAt: result.created_at ?? undefined,
         payout: result.payout,
-        comment: result.comment
+        comment: result.comment ?? undefined
       },
       message: `Retrieved commission **#${result.id}** — ${result.amount} ${result.currency || ''} (${result.approved ? 'approved' : 'not approved'}).`
     };
@@ -138,17 +180,25 @@ export let updateCommission = SlateTool.create(spec, {
     return {
       output: {
         commissionId: result.id,
-        amount: result.amount,
-        conversionSubAmount: result.conversion_sub_amount,
-        commissionType: result.commission_type,
-        approved: result.approved,
+        amount: result.amount ?? undefined,
+        conversionSubAmount: result.conversion_sub_amount ?? undefined,
+        commissionType: result.commission_type ?? undefined,
+        approved: result.approved ?? undefined,
+        approvalStatus:
+          result.approved === null
+            ? 'pending'
+            : result.approved === true
+              ? 'approved'
+              : result.approved === false
+                ? 'disapproved'
+                : undefined,
         affiliate: result.affiliate,
         conversion: result.conversion,
         kind: result.kind,
-        currency: result.currency,
-        createdAt: result.created_at,
+        currency: result.currency ?? undefined,
+        createdAt: result.created_at ?? undefined,
         payout: result.payout,
-        comment: result.comment
+        comment: result.comment ?? undefined
       },
       message: `Updated commission **#${result.id}**.`
     };
@@ -177,17 +227,25 @@ export let approveCommission = SlateTool.create(spec, {
     return {
       output: {
         commissionId: result.id,
-        amount: result.amount,
-        conversionSubAmount: result.conversion_sub_amount,
-        commissionType: result.commission_type,
-        approved: result.approved,
+        amount: result.amount ?? undefined,
+        conversionSubAmount: result.conversion_sub_amount ?? undefined,
+        commissionType: result.commission_type ?? undefined,
+        approved: result.approved ?? undefined,
+        approvalStatus:
+          result.approved === null
+            ? 'pending'
+            : result.approved === true
+              ? 'approved'
+              : result.approved === false
+                ? 'disapproved'
+                : undefined,
         affiliate: result.affiliate,
         conversion: result.conversion,
         kind: result.kind,
-        currency: result.currency,
-        createdAt: result.created_at,
+        currency: result.currency ?? undefined,
+        createdAt: result.created_at ?? undefined,
         payout: result.payout,
-        comment: result.comment
+        comment: result.comment ?? undefined
       },
       message: `Approved commission **#${result.id}** (${result.amount} ${result.currency || ''}).`
     };
@@ -216,17 +274,25 @@ export let disapproveCommission = SlateTool.create(spec, {
     return {
       output: {
         commissionId: result.id,
-        amount: result.amount,
-        conversionSubAmount: result.conversion_sub_amount,
-        commissionType: result.commission_type,
-        approved: result.approved,
+        amount: result.amount ?? undefined,
+        conversionSubAmount: result.conversion_sub_amount ?? undefined,
+        commissionType: result.commission_type ?? undefined,
+        approved: result.approved ?? undefined,
+        approvalStatus:
+          result.approved === null
+            ? 'pending'
+            : result.approved === true
+              ? 'approved'
+              : result.approved === false
+                ? 'disapproved'
+                : undefined,
         affiliate: result.affiliate,
         conversion: result.conversion,
         kind: result.kind,
-        currency: result.currency,
-        createdAt: result.created_at,
+        currency: result.currency ?? undefined,
+        createdAt: result.created_at ?? undefined,
         payout: result.payout,
-        comment: result.comment
+        comment: result.comment ?? undefined
       },
       message: `Disapproved commission **#${result.id}**.`
     };

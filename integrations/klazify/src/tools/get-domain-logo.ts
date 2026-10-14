@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDomainLogo = SlateTool.create(spec, {
   name: 'Get Domain Logo',
   key: 'get_domain_logo',
-  description: `Retrieves a company's up-to-date logo in real time from any URL or domain. Returns a direct URL to the logo image, working even for the newest and most obscure brands.`,
+  description: `Retrieves a company's logo from a URL or domain as a downloadable image and returns its hosted URL. Uses cached data unless refresh is requested.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,8 @@ export let getDomainLogo = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL or domain to retrieve the logo for')
+      url: z.string().describe('The URL or domain to retrieve the logo for'),
+      refresh: refreshSchema
     })
   )
   .output(
@@ -25,7 +27,7 @@ export let getDomainLogo = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.logo(ctx.input.url);
+    let result = await client.logo(ctx.input.url, ctx.input.refresh);
 
     let domain = result.domain ?? {};
 
@@ -33,6 +35,10 @@ export let getDomainLogo = SlateTool.create(spec, {
       logoUrl: domain.logo_url ?? null,
       domainUrl: domain.domain_url ?? null
     };
+
+    if (output.logoUrl) {
+      await ctx.addAttachment({ type: 'url', url: output.logoUrl });
+    }
 
     return {
       output,

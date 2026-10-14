@@ -11,8 +11,11 @@ export let runQuery = SlateTool.create(spec, {
 Supports both RAG-mode queries (retrieval-augmented generation) and full deep analytics queries with multi-step execution plans.`,
   instructions: [
     'Set ragMode to true for simple retrieval-augmented generation queries.',
-    'Set summarizeResult to true to get a plain-English summary of the results.',
+    'Aryn requires streaming for summaries. Use generate_query_plan followed by execute_query_plan with summarizeResult true when a summary is needed.',
     'For complex analytics, leave ragMode false to use the full Deep Analytics engine.'
+  ],
+  constraints: [
+    'This tool returns the original query result; the provider does not supply summaries for nonstreaming queries.'
   ],
   tags: {
     readOnly: true,
@@ -21,7 +24,9 @@ Supports both RAG-mode queries (retrieval-augmented generation) and full deep an
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to query'),
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to query. Call list_docsets to discover DocSet IDs.'),
       query: z.string().describe('Natural language query to run'),
       ragMode: z
         .boolean()
@@ -32,7 +37,9 @@ Supports both RAG-mode queries (retrieval-augmented generation) and full deep an
         .boolean()
         .optional()
         .default(false)
-        .describe('Include a plain-English summary of results')
+        .describe(
+          'Request a plain-English summary. Aryn currently supplies summaries only through execute_query_plan.'
+        )
     })
   )
   .output(
@@ -73,7 +80,11 @@ export let generateQueryPlan = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to plan the query against'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet to plan the query against. Call list_docsets to discover DocSet IDs.'
+        ),
       query: z.string().describe('Natural language query to plan')
     })
   )
@@ -96,6 +107,74 @@ export let generateQueryPlan = SlateTool.create(spec, {
     return {
       output: { plan: result },
       message: `Generated query plan for: "${ctx.input.query}"`
+    };
+  })
+  .build();
+
+export let executeQueryPlan = SlateTool.create(spec, {
+  name: 'Execute Query Plan',
+  key: 'execute_query_plan',
+  description:
+    'Execute a logical plan returned by generate_query_plan against a DocSet. This allows an inspected or modified plan to be run without generating a new one.',
+  constraints: [
+    'With summaries enabled, scalar results are returned as text and all query events are included.'
+  ],
+  tags: { readOnly: true, destructive: false }
+})
+  .input(
+    z.object({
+      docsetId: z.string().describe('DocSet ID. Call list_docsets to discover DocSets.'),
+      plan: z
+        .object({
+          query: z.string().describe('Original natural language query for this plan'),
+          nodes: z
+            .record(
+              z.string(),
+              z
+                .object({
+                  node_id: z.number().describe('Unique whole-number node ID'),
+                  node_type: z.string().nullable().optional().describe('Query operator type'),
+                  description: z
+                    .string()
+                    .nullable()
+                    .optional()
+                    .describe('Purpose of the operator'),
+                  inputs: z.array(z.number()).optional().describe('Input node IDs')
+                })
+                .passthrough()
+            )
+            .describe('Mapping of node IDs to query operators'),
+          result_node: z.number().describe('ID of the node that produces the result'),
+          llm_prompt: z.any().optional().describe('Optional original planner prompt'),
+          llm_plan: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Optional original planner response')
+        })
+        .describe('Logical plan returned by generate_query_plan'),
+      summarizeResult: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Include a plain-English summary of results')
+    })
+  )
+  .output(
+    z.object({
+      queryResult: z.any().describe('Execution result with data and optional summary')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let queryResult = await client.executeQueryPlan({
+      docsetId: ctx.input.docsetId,
+      plan: ctx.input.plan,
+      summarizeResult: ctx.input.summarizeResult
+    });
+    return {
+      output: { queryResult },
+      message: `Executed the query plan on DocSet \`${ctx.input.docsetId}\`.`
     };
   })
   .build();

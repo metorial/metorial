@@ -15,7 +15,7 @@ Monitors detect new information as it's published and can deliver results via we
   ],
   constraints: [
     'Frequency must be between 1 hour and 30 days.',
-    'Monitor API is in public alpha — endpoints may change.'
+    'Uses the documented Alpha monitor contract for compatible query and event outputs.'
   ]
 })
   .input(

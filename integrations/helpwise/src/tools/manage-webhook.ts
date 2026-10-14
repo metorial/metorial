@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,7 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!webhookId) throw new Error('webhookId is required for get action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for get action');
       let webhook = await client.getWebhook(webhookId);
       return {
         output: { webhook, success: true },
@@ -65,8 +65,8 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!url) throw new Error('url is required for create action');
-      if (!eventType) throw new Error('eventType is required for create action');
+      if (!url) throw createApiServiceError('url is required for create action');
+      if (!eventType) throw createApiServiceError('eventType is required for create action');
       let webhook = await client.createWebhook({
         url,
         event_type: eventType,
@@ -79,7 +79,7 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!webhookId) throw new Error('webhookId is required for delete action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for delete action');
       await client.deleteWebhook(webhookId);
       return {
         output: { success: true },
@@ -87,6 +87,6 @@ export let manageWebhook = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

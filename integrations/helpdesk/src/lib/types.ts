@@ -59,6 +59,8 @@ export interface Attachment {
 }
 
 export interface CreateTicketInput {
+  message?: { text: string; cannedResponseIDs?: string[] };
+  isPrivate?: boolean;
   subject: string;
   requester: {
     email: string;
@@ -76,6 +78,8 @@ export interface CreateTicketInput {
 }
 
 export interface UpdateTicketInput {
+  message?: { text: string; cannedResponseIDs?: string[] };
+  isPrivate?: boolean;
   subject?: string;
   status?: 'open' | 'pending' | 'on hold' | 'solved' | 'closed';
   priority?: 'low' | 'medium' | 'high' | 'urgent';

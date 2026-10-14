@@ -26,8 +26,8 @@ Geography is specified using the \`for\` and \`in\` clause format, e.g., \`count
     'The API returns data as a 2D array where the first row contains column headers.'
   ],
   constraints: [
-    'Maximum of 50 variables per query.',
-    'Up to 500 queries per day without an API key.'
+    'Maximum of 50 individually named variables per query; group(TABLE_ID) can retrieve a larger table.',
+    'A Census Bureau API key is required for all statistical data queries.'
   ],
   tags: {
     readOnly: true
@@ -73,7 +73,13 @@ Geography is specified using the \`for\` and \`in\` clause format, e.g., \`count
       headers: z.array(z.string()).describe('Column headers for the data'),
       rows: z
         .array(z.array(z.string()))
-        .describe('Data rows, each row is an array of string values'),
+        .describe(
+          'Data rows as string values; unavailable values are represented by empty strings'
+        ),
+      rawRows: z
+        .array(z.array(z.string().nullable()))
+        .optional()
+        .describe('Original data rows, preserving null values for unavailable data'),
       totalRows: z.number().describe('Total number of data rows returned (excluding header)')
     })
   )
@@ -89,13 +95,15 @@ Geography is specified using the \`for\` and \`in\` clause format, e.g., \`count
       predicates: ctx.input.predicates
     });
 
-    let headers = result[0] || [];
-    let rows = result.slice(1);
+    let headers = (result[0] || []).map(value => value ?? '');
+    let rawRows = result.slice(1);
+    let rows = rawRows.map(row => row.map(value => value ?? ''));
 
     return {
       output: {
         headers,
         rows,
+        rawRows,
         totalRows: rows.length
       },
       message: `Retrieved **${rows.length}** rows from **${ctx.input.dataset}**${ctx.input.vintage ? ` (${ctx.input.vintage})` : ''} with variables: ${ctx.input.variables.join(', ')}.`

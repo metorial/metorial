@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StartonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,8 +22,8 @@ export let listSmartContracts = SlateTool.create(spec, {
         .boolean()
         .default(false)
         .describe('Whether to include available functions for a specific contract'),
-      limit: z.number().default(20).describe('Number of contracts to return'),
-      page: z.number().default(0).describe('Page number for pagination')
+      limit: z.number().min(1).max(2500).default(20).describe('Number of contracts to return'),
+      page: z.number().min(0).default(0).describe('Page number for pagination')
     })
   )
   .output(
@@ -49,6 +49,12 @@ export let listSmartContracts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StartonClient({ token: ctx.auth.token });
 
+    if (ctx.input.contractAddress && !ctx.input.network) {
+      throw createApiServiceError(
+        'network is required when retrieving a specific contract address.'
+      );
+    }
+
     if (ctx.input.contractAddress && ctx.input.network) {
       let contract = await client.getSmartContract(
         ctx.input.network,
@@ -57,10 +63,16 @@ export let listSmartContracts = SlateTool.create(spec, {
       let functions: any[] | undefined;
 
       if (ctx.input.includeFunctions) {
-        functions = await client.getAvailableFunctions(
+        let available = await client.getAvailableFunctions(
           ctx.input.network,
           ctx.input.contractAddress
         );
+        functions = Array.isArray(available)
+          ? available
+          : [
+              ...(available.read ?? []).map((name: string) => ({ name, operation: 'read' })),
+              ...(available.call ?? []).map((name: string) => ({ name, operation: 'write' }))
+            ];
       }
 
       return {
@@ -70,7 +82,7 @@ export let listSmartContracts = SlateTool.create(spec, {
               contractAddress: contract.address || ctx.input.contractAddress,
               network: contract.network || ctx.input.network,
               name: contract.name || '',
-              description: contract.description,
+              description: contract.description ?? undefined,
               createdAt: contract.createdAt
             }
           ],
@@ -87,7 +99,7 @@ export let listSmartContracts = SlateTool.create(spec, {
       network: ctx.input.network
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
@@ -95,11 +107,11 @@ export let listSmartContracts = SlateTool.create(spec, {
           contractAddress: c.address || '',
           network: c.network || '',
           name: c.name || '',
-          description: c.description,
+          description: c.description ?? undefined,
           createdAt: c.createdAt
         })),
         availableFunctions: undefined,
-        totalCount: result.meta?.totalCount || items.length
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length
       },
       message: `Found **${items.length}** smart contracts${ctx.input.network ? ` on ${ctx.input.network}` : ''}.`
     };

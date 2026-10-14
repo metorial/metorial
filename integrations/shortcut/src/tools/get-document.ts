@@ -1,24 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { documentIdInputs, resolveDocumentId } from '../lib/documents';
 import { spec } from '../spec';
 
 export let getDocument = SlateTool.create(spec, {
   name: 'Get Document',
   key: 'get_document',
-  description: `Retrieves a document by its ID, including its full content.`,
+  description: `Retrieves a document's content by UUID. Call list_documents to discover accessible document UUIDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      documentId: z.number().describe('ID of the document to retrieve')
+      ...documentIdInputs,
+      contentFormat: z
+        .enum(['markdown', 'html'])
+        .optional()
+        .describe('Format to retrieve (default: markdown)')
     })
   )
   .output(
     z.object({
-      documentId: z.number().describe('ID of the document'),
+      documentId: z.number().optional().describe('Legacy numeric document ID, when available'),
+      documentUuid: z.string().describe('UUID of the document'),
       title: z.string().describe('Title of the document'),
       content: z.string().describe('Document content'),
       appUrl: z.string().describe('URL to view in Shortcut'),
@@ -29,13 +35,15 @@ export let getDocument = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let doc = await client.getDocument(ctx.input.documentId);
+    let doc = await client.getDocument(resolveDocumentId(ctx.input), ctx.input.contentFormat);
 
     return {
       output: {
-        documentId: doc.id,
+        documentId: typeof doc.id === 'number' ? doc.id : undefined,
+        documentUuid: String(doc.id),
         title: doc.title,
-        content: doc.content || '',
+        content:
+          (ctx.input.contentFormat === 'html' ? doc.content_html : doc.content_markdown) ?? '',
         appUrl: doc.app_url,
         archived: doc.archived ?? false,
         createdAt: doc.created_at,

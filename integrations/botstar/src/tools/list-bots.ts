@@ -32,7 +32,7 @@ export let listBots = SlateTool.create(spec, {
     let mapped = (Array.isArray(bots) ? bots : []).map((bot: any) => ({
       botId: bot.id || bot._id || '',
       name: bot.name || '',
-      teamName: bot.team_name
+      teamName: bot.team_name ?? undefined
     }));
 
     return {

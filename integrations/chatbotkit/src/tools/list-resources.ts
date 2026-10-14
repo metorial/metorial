@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,8 +29,21 @@ export let listResourcesTool = SlateTool.create(spec, {
           'blueprints'
         ])
         .describe('Type of resource to list'),
+      integrationType: z
+        .string()
+        .optional()
+        .describe(
+          'Channel type when listing integrations, such as widget, slack, discord, sitemap or notion; selects the documented channel-specific API'
+        ),
       cursor: z.string().optional().describe('Pagination cursor for next page'),
-      take: z.number().optional().describe('Number of items to return'),
+      take: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'take must be a positive whole number'
+        )
+        .optional()
+        .describe('Number of items to return'),
       order: z.enum(['desc', 'asc']).optional().describe('Sort order')
     })
   )
@@ -72,7 +85,7 @@ export let listResourcesTool = SlateTool.create(spec, {
         result = await client.listMemories(params);
         break;
       case 'integrations':
-        result = await client.listIntegrations(params);
+        result = await client.listIntegrations(params, ctx.input.integrationType);
         break;
       case 'files':
         result = await client.listFiles(params);
@@ -90,13 +103,13 @@ export let listResourcesTool = SlateTool.create(spec, {
         result = await client.listBlueprints(params);
         break;
       default:
-        throw new Error(`Unknown resource type: ${resourceType}`);
+        throw createApiServiceError(`Unknown resource type: ${resourceType}`);
     }
 
     return {
       output: {
         items: result.items,
-        cursor: result.cursor,
+        cursor: result.cursor ?? undefined,
         count: result.items.length
       },
       message: `Listed **${result.items.length}** ${resourceType}.${result.cursor ? ' More results available with cursor.' : ''}`

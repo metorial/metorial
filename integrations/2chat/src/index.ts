@@ -3,7 +3,10 @@ import { spec } from './spec';
 import {
   checkWhatsAppNumber,
   deleteWhatsAppMessage,
+  getAccountInfo,
   getWhatsAppMessages,
+  getWhatsAppNumber,
+  listContacts,
   listWhatsAppGroups,
   listWhatsAppNumbers,
   manageContacts,
@@ -21,6 +24,9 @@ export let provider = Slate.create({
     manageWhatsAppGroup,
     listWhatsAppGroups,
     getWhatsAppMessages,
+    getAccountInfo,
+    getWhatsAppNumber,
+    listContacts,
     manageContacts,
     deleteWhatsAppMessage
   ],

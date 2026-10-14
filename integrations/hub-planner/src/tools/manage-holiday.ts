@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,40 +40,46 @@ When creating, **name** and **date** are required. Holidays can be set to repeat
     let { action, holidayId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (!ctx.input.name?.trim() || !ctx.input.date?.trim()) {
+        throw createApiServiceError('name, date are required for create.');
+      }
       let result = await client.createHoliday(fields);
       return {
         output: {
           holidayId: result._id,
-          name: result.name,
-          date: result.date,
-          color: result.color,
-          repeat: result.repeat,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          name: result.name ?? undefined,
+          date: result.date ?? undefined,
+          color: result.color ?? undefined,
+          repeat: result.repeat ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created holiday **${result.name}** on ${result.date} (ID: \`${result._id}\`).`
       };
     }
 
     if (action === 'update') {
-      if (!holidayId) throw new Error('holidayId is required for update');
+      if (!holidayId) throw createApiServiceError('holidayId is required for update');
       let existing = await client.getHoliday(holidayId);
-      let result = await client.updateHoliday(holidayId, { ...existing, ...fields });
+      let result = await client.updateHoliday(holidayId, {
+        ...existing,
+        ...pickDefined(fields)
+      });
       return {
         output: {
           holidayId: result._id,
-          name: result.name,
-          date: result.date,
-          color: result.color,
-          repeat: result.repeat,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          name: result.name ?? undefined,
+          date: result.date ?? undefined,
+          color: result.color ?? undefined,
+          repeat: result.repeat ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Updated holiday **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
-    if (!holidayId) throw new Error('holidayId is required for delete');
+    if (!holidayId) throw createApiServiceError('holidayId is required for delete');
     await client.deleteHoliday(holidayId);
     return {
       output: { holidayId },

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let setAssetStatus = SlateTool.create(spec, {
   name: 'Set Asset Status',
   key: 'set_asset_status',
-  description: `Sets the operational status of an asset in MaintainX (Online, Offline, or Ignore). Can record planned or unplanned downtime with start/end times and descriptions.`,
+  description: `Sets the operational status of an asset in MaintainX (Online, Offline, or Ignore). Can record planned or unplanned downtime with start/end times and descriptions. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let setAssetStatus = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       assetId: z.number().describe('ID of the asset'),
       status: z.enum(['ONLINE', 'OFFLINE', 'IGNORE']).describe('New operational status'),
       customStatusId: z
@@ -40,10 +42,7 @@ export let setAssetStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createAssetStatus(ctx.input.assetId, {
       status: ctx.input.status,

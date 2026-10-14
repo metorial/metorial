@@ -1,4 +1,4 @@
-# Slates Specification for Formcarry
+# Formcarry Integration Specification
 
 ## Overview
 
@@ -35,11 +35,11 @@ A successful authentication response returns:
 
 ### Form Management
 
-Create, update, and delete forms programmatically via the API. When creating a form, you can specify the form name and notification email addresses. Each form receives a unique endpoint URL (e.g., `https://formcarry.com/s/XXXXXXX`) that can be used as the form action target.
+Create and delete forms via the documented management API. Creation accepts notification emails, redirects, reCAPTCHA settings, a webhook URL, retention settings, and thank-you page options. The returned endpoint URL includes the form ID for later operations. The published API documentation does not specify list or update routes.
 
 ### Submission Collection
 
-Formcarry allows you to collect submissions from your own HTML form, without any back-end code. Submissions can be sent via standard HTML form POST, or programmatically using AJAX/Fetch with JSON, form-data, or URL-encoded content types. File uploads are also supported using `multipart/form-data`.
+The `submit_form` tool posts named text fields as JSON to `https://formcarry.com/s/{formId}` and requests a JSON response. It uses the public form endpoint without sending the team API key. Form validation, spam protection, and configured notifications apply. This tool does not upload files.
 
 ### Submission Retrieval
 

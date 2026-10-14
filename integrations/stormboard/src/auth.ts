@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { StormboardClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,20 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.stormboard.com',
-        headers: {
-          'X-API-Key': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await http.get('/users');
-      let user = response.data;
+      let client = new StormboardClient({ token: ctx.output.token });
+      let user = await client.getUser();
 
       return {
         profile: {
-          id: user.id?.toString(),
+          id: user.id == null ? undefined : String(user.id),
           name: user.name || user.full || undefined,
           email: user.email || undefined
         }

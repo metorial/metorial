@@ -1,15 +1,15 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
+import { ahrefsApiError } from './errors';
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.ahrefs.com/v3',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: ahrefsApiError
     });
   }
 
@@ -67,7 +67,7 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/metrics-by-country', {
-      params: buildParams(params)
+      params: buildParams({ ...params, date: params.date || today() })
     });
     return response.data;
   }
@@ -83,7 +83,10 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/all-backlinks', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'url_from,url_to,anchor,domain_rating_source,is_dofollow'
+      })
     });
     return response.data;
   }
@@ -99,7 +102,10 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/broken-backlinks', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'url_from,url_to,anchor,http_code_target'
+      })
     });
     return response.data;
   }
@@ -115,7 +121,10 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/refdomains', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'domain,domain_rating,links_to_target,dofollow_links'
+      })
     });
     return response.data;
   }
@@ -131,7 +140,10 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/anchors', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'anchor,links_to_target,dofollow_links,refdomains'
+      })
     });
     return response.data;
   }
@@ -148,7 +160,11 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/organic-keywords', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'keyword,best_position,best_position_url,volume,sum_traffic',
+        date: params.date || today()
+      })
     });
     return response.data;
   }
@@ -165,7 +181,12 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/organic-competitors', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'competitor_domain,competitor_url,keywords_common,traffic',
+        date: params.date || today(),
+        country: params.country || 'us'
+      })
     });
     return response.data;
   }
@@ -182,7 +203,11 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/top-pages', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'url,sum_traffic,keywords,top_keyword',
+        date: params.date || today()
+      })
     });
     return response.data;
   }
@@ -199,7 +224,11 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/site-explorer/paid-pages', {
-      params: buildParams(params)
+      params: buildParams({
+        ...params,
+        select: params.select || 'url,sum_traffic,keywords',
+        date: params.date || today()
+      })
     });
     return response.data;
   }
@@ -231,8 +260,11 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
-    let response = await this.axios.get('/site-explorer/best-by-external-links', {
-      params: buildParams(params)
+    let response = await this.axios.get('/site-explorer/pages-by-backlinks', {
+      params: buildParams({
+        ...params,
+        select: params.select || 'url_to,links_to_target,refdomains_target'
+      })
     });
     return response.data;
   }
@@ -247,8 +279,8 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
-    let response = await this.axios.get('/site-explorer/best-by-internal-links', {
-      params: buildParams(params)
+    let response = await this.axios.get('/site-explorer/pages-by-internal-links', {
+      params: buildParams({ ...params, select: params.select || 'url_to,links_to_target' })
     });
     return response.data;
   }
@@ -263,8 +295,11 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
-    let response = await this.axios.get('/site-explorer/linked-domains', {
-      params: buildParams(params)
+    let response = await this.axios.get('/site-explorer/linkeddomains', {
+      params: buildParams({
+        ...params,
+        select: params.select || 'domain,domain_rating,links_from_target,linked_pages'
+      })
     });
     return response.data;
   }
@@ -355,13 +390,19 @@ export class Client {
   }) {
     let queryParams: Record<string, string | undefined> = {
       country: params.country || 'us',
-      select: params.select
+      select: params.select || 'keyword,volume,difficulty,cpc,clicks'
     };
 
     if (params.keywords && params.keywords.length > 0) {
       queryParams.keywords = params.keywords.join(',');
     } else if (params.keyword) {
-      queryParams.keyword = params.keyword;
+      queryParams.keywords = params.keyword;
+    }
+
+    if (!queryParams.keywords?.trim()) {
+      throw createApiServiceError('Provide a keyword or a non-empty list of keywords.', {
+        reason: 'ahrefs_keywords_missing'
+      });
     }
 
     let response = await this.axios.get('/keywords-explorer/overview', {
@@ -424,7 +465,13 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/keywords-explorer/matching-terms', {
-      params: buildParams({ ...params, country: params.country || 'us' })
+      params: buildParams({
+        ...params,
+        keyword: undefined,
+        keywords: params.keyword,
+        select: params.select || 'keyword,volume,difficulty,cpc',
+        country: params.country || 'us'
+      })
     });
     return response.data;
   }
@@ -439,7 +486,13 @@ export class Client {
     offset?: number;
   }) {
     let response = await this.axios.get('/keywords-explorer/related-terms', {
-      params: buildParams({ ...params, country: params.country || 'us' })
+      params: buildParams({
+        ...params,
+        keyword: undefined,
+        keywords: params.keyword,
+        select: params.select || 'keyword,volume,difficulty,cpc',
+        country: params.country || 'us'
+      })
     });
     return response.data;
   }
@@ -447,11 +500,11 @@ export class Client {
   // ─── SERP Overview ─────────────────────────────────────────
 
   async getSerpOverview(params: { keyword: string; country?: string; select?: string }) {
-    let response = await this.axios.get('/serp-overview', {
+    let response = await this.axios.get('/serp-overview/serp-overview', {
       params: {
         keyword: params.keyword,
         country: params.country || 'us',
-        select: params.select
+        select: params.select || 'position,url,title,domain_rating,traffic'
       }
     });
     return response.data;
@@ -584,11 +637,46 @@ export class Client {
 
   // ─── Batch Analysis ────────────────────────────────────────
 
-  async batchAnalysis(params: { targets: string[]; date?: string; select?: string }) {
-    let response = await this.axios.post('/batch-analysis', {
-      targets: params.targets,
-      date: params.date || today(),
-      select: params.select
+  async batchAnalysis(params: {
+    targets: string[];
+    date?: string;
+    select?: string;
+    mode?: string;
+    protocol?: string;
+  }) {
+    if (
+      params.targets.length < 1 ||
+      params.targets.length > 100 ||
+      params.targets.some(target => !target.trim())
+    ) {
+      throw createApiServiceError('Provide between 1 and 100 non-empty domains or URLs.', {
+        reason: 'ahrefs_batch_targets'
+      });
+    }
+    if (params.date && params.date !== today()) {
+      throw createApiServiceError(
+        `Ahrefs cannot fulfill the requested batch snapshot date ${params.date}. The current batch API returns current metrics and does not support date selection or historical snapshots. Omit date or use today for current metrics; use individual Site Explorer reports for historical snapshots.`,
+        { reason: 'ahrefs_batch_historical_date' }
+      );
+    }
+    let select = (
+      params.select || 'url,domain_rating,backlinks,refdomains,org_traffic,org_keywords'
+    )
+      .split(',')
+      .map(field => field.trim())
+      .filter(Boolean);
+    if (select.length === 0) {
+      throw createApiServiceError('Provide at least one metric in select.', {
+        reason: 'ahrefs_batch_select'
+      });
+    }
+    let response = await this.axios.post('/batch-analysis/batch-analysis', {
+      targets: params.targets.map(url => ({
+        url,
+        mode: params.mode || 'subdomains',
+        protocol: params.protocol || 'both'
+      })),
+      select
     });
     return response.data;
   }
@@ -655,22 +743,12 @@ export class Client {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-let today = (): string => {
-  let d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+let today = (): string => new Date().toISOString().slice(0, 10);
 
-let cleanParams = (
-  params: Record<string, string | number | boolean | undefined | null>
-): Record<string, string | number | boolean> => {
-  let result: Record<string, string | number | boolean> = {};
-  for (let [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      result[key] = value;
-    }
-  }
-  return result;
-};
+let cleanParams = (params: Record<string, string | number | boolean | undefined | null>) =>
+  pickDefined(
+    Object.fromEntries(Object.entries(params).filter(([, value]) => value !== null))
+  );
 
 let buildParams = (
   params: Record<string, string | number | boolean | string[] | undefined | null>
@@ -684,10 +762,6 @@ let buildParams = (
         result[key] = value;
       }
     }
-  }
-  if (!result.date && !result.date_from) {
-    // Some endpoints require a date; add today as default only if param key exists in original
-    // We handle this at the method level instead
   }
   return result;
 };

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,15 +28,10 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.getpostman.com',
-        headers: {
-          'X-API-Key': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/me');
-      let user = response.data.user;
+      let data = await new Client({ token: ctx.output.token }).getAuthenticatedUser();
+      let user = data.user;
+      if (!user?.id)
+        throw createApiServiceError('Postman did not return an authenticated user profile.');
 
       return {
         profile: {

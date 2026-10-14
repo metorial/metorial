@@ -1,86 +1,23 @@
-Now let me get more details on the API features:# Slates Specification for Process Street
+# Process Street integration
 
-## Overview
+The integration uses the [official public API](https://public-api.process.st/api/v1.1/docs/index.html) and its [OpenAPI contract](https://public-api.process.st/api/v1.1/docs/openapi.json), with `X-API-KEY` authentication. `get_current_api_key` returns the authorized key's label from `/testAuth`; it does not expose the credential.
 
-Process Street is a process management platform that allows teams to create, manage, and run structured workflows (checklists) built from templates. It supports task management, approvals, form data collection, and data sets for organizing structured records.
+## Supported workflows
 
-## Authentication
+- Discover active workflow templates and their form fields/options.
+- Search the latest 200 workflow runs by workflow, name, or status; omitted search status defaults to active.
+- Page through all accessible non-deleted workflow runs using `list_workflow_runs_page`.
+- Create, read, update, delete, and restore workflow runs.
+- List and update tasks, including assigned tasks; manage task and workflow-run assignees.
+- List completed approval decisions and approve or reject individual or all pending subject tasks.
+- Read and batch-update form field values. File fields require Process Street's upload API and cannot be changed by the batch value endpoint.
+- Discover data sets and columns; list, get, create, update, and delete records. List filters match column values exactly and case-insensitively, combining multiple columns with AND.
+- Discover users for assignment operations.
 
-Process Street offers a single form of authentication: the API is HTTPS-only and authentication is based on API keys.
+## Pagination and update semantics
 
-Each API key is associated with an individual organization in Process Street and can be managed from the **Integrations** tab in the organization settings area. You must be an administrator to manage API keys.
+Paged list tools accept an optional `cursor` and return `nextCursor` when another page exists. Reuse all filters with the next cursor. Omitting `nextCursor` means the page is complete. Task-assignee lists return all assignees without pagination; workflow-run assignee lists are paged. Cursor inputs on consolidated tools are used for list actions.
 
-The API key is passed via the `X-API-KEY` header in each request:
+Workflow run and task updates use the provider's PUT replacement semantics: the integration reads current values and merges the requested changes, preserving omitted fields. An empty due-date string clears the due date.
 
-```
-X-API-KEY: <your_api_key>
-```
-
-You must be on the Enterprise plan to use the API.
-
-**Base URL:** `https://public-api.process.st` (for the data extraction API) or `https://api.process.st/api/v1` (for the workflow management API).
-
-**Note:** Process Street recently renamed some of its domain entities. The endpoints and resources in the API match the old naming conventions and may not match names seen in the application or help sites. For example, "checklists" in the API correspond to "workflow runs" in the UI, and "templates" correspond to "workflows."
-
-## Features
-
-### Workflow Run Management
-
-Create, retrieve, update, and delete workflow runs (referred to as "checklists" in the API). You can set the name and due date for a new workflow run and toggle the workflow run share link on or off. You can populate form fields with data, check and uncheck subtasks, change the status of a workflow run (active, complete, archived), and change the name or due date.
-
-- Workflow runs are created from a specific workflow (template).
-- Runs can be deleted and un-deleted.
-
-### Task Management
-
-Manage individual tasks within a workflow run. You can list tasks, get task details (name, status, due date), complete tasks, set task due dates, and assign or unassign users or groups to tasks.
-
-- You can retrieve a list of approvals for a workflow run. Approvals are special tasks used to approve or reject another task.
-- Tasks that contain required form fields cannot be completed via the API until those fields are filled.
-
-### Form Field Management
-
-Read and update form field values within workflow runs. You can list all form field values for an entire workflow run or for a specific task, and update multiple form field values at once.
-
-- Values can be simple strings, arrays, or objects with multiple properties depending on the field type.
-
-### Data Set Management
-
-Manage structured data records in data sets. You can list data sets, list records, create records, get individual records, update records, and delete records.
-
-### Webhook Management
-
-Create and delete outgoing webhooks programmatically via the API.
-
-## Events
-
-Process Street supports outgoing webhooks that send event-driven notifications to external services. You must be an Administrator to set up webhooks. You can define up to 50 webhooks. Webhooks are configured per specific workflow, form, or data set.
-
-### Workflow Events
-
-Events related to workflow runs and their tasks:
-
-- **Task checked/unchecked** — Fires when a task is completed or uncompleted.
-- **Workflow run created** — Fires when a new workflow run is started.
-- **Workflow run completed** — Fires when a workflow run is fully completed.
-- **Task ready** — Fires when a task becomes ready to be checked (e.g., when a run starts, a task is shown by conditional logic, a task is unstopped, or a task becomes approvable).
-- **Task not ready** — Fires when a task is no longer ready to be checked.
-- **Task approved** — Fires when an approval task is approved.
-- **Task rejected** — Fires when an approval task is rejected.
-- **Task overdue** — Fires when a task passes its due date.
-
-### Form Events
-
-- **Form response completed** — Fires when a form response is submitted.
-
-### Data Set Events
-
-Events related to data set records:
-
-- **Record added** — Fires when a new record is added to a data set.
-- **Record updated** — Fires when a record is modified in a data set.
-- **Record deleted** — Fires when a record is removed from a data set.
-
-### Incoming Webhooks (Webhook Triggers)
-
-You can use incoming webhooks (webhook triggers) to run a workflow automatically when something happens in another app. Process Street provides a unique webhook URL that external services can POST to, which triggers a new workflow run and maps incoming payload fields to form fields in the workflow. Data set records can also be created via incoming webhooks.
+Tool keys and existing field types remain compatible. The legacy workflow-run search tool retains its endpoint and filtering semantics.

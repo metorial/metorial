@@ -1,6 +1,4 @@
-Now let me get more details on webhook trigger events:Now let me check the specific webhook trigger events available:Now I have enough information to write the specification. The Salesforce integration page revealed the webhook trigger events: "Survey completed", "User enters segment", and "Tag added". Combined with the other sources mentioning "Saw Survey" and "Dismissed Survey", I can compile a complete picture.
-
-# Slates Specification for Refiner
+# Refiner Integration Specification
 
 ## Overview
 
@@ -8,11 +6,13 @@ Refiner is a customer feedback survey platform for web and mobile applications. 
 
 ## Authentication
 
-Refiner uses API keys to allow access to the API. You can obtain your personal API key in your Refiner dashboard under "Integrations > Rest API".
+Refiner uses API keys to allow access to the API. You can obtain your personal API key in your Refiner dashboard under "Environment Settings > API Keys".
 
 Your API key can be provided in three different ways. The recommended authentication method is to provide your API key as a Bearer token, using the `Authorization: Bearer YOUR_API_KEY` header. Alternatively, you can also provide your API key as a request parameter (e.g., `?api_key=YOUR_API_KEY`).
 
 The API base URL is `https://api.refiner.io/v1/`.
+
+The `get_current_project` tool calls the API root to return the UUID and name of the environment associated with the connected API key.
 
 ## Features
 
@@ -40,6 +40,7 @@ This endpoint provides a simple way to track user events. To track a user event,
 Retrieve all survey views and responses. Included in the response is the response data itself, information about the survey, and basic information about the contact who responded. Responses can be filtered by survey, contact, date range, and completion status.
 
 - You can also store a survey response for a user. It allows you to store historical survey data, or use your own UI for surveying your users.
+- Response imports accept a user ID, email address, or Refiner contact UUID. Response listing preserves requested contact and account attributes.
 
 ### Response Tagging
 
@@ -52,6 +53,8 @@ This endpoint allows you to add and remove users to a manual segment in Refiner.
 ### Survey Listing
 
 Retrieve a list of all surveys in your Refiner project, including their UUIDs and names.
+
+`list_surveys` preserves survey configuration and question elements when requested. `list_survey_history` returns paginated survey versions with stable version UUIDs, actions, timestamps, and configuration snapshots. The `delete` action in `manage_survey` archives the survey instead of permanently deleting it.
 
 ### Account Information
 

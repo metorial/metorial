@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,9 @@ export let listSessions = SlateTool.create(spec, {
       searchTerm: z
         .string()
         .optional()
-        .describe('Search for sessions by name, email, or other fields'),
+        .describe(
+          'Autocomplete search with at least 3 characters; returns at most 50 contacts and ignores pagination and sorting'
+        ),
       limit: z.number().optional().describe('Maximum number of sessions to return'),
       skip: z.number().optional().describe('Number of sessions to skip for pagination'),
       sort: z.string().optional().describe('Sort field, prefix with - for descending')
@@ -30,8 +32,13 @@ export let listSessions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
+
+    if (ctx.input.searchTerm && ctx.input.searchTerm.length < 3) {
+      throw createApiServiceError('Use at least 3 characters to search contacts.');
+    }
 
     let sessions: any;
     if (ctx.input.searchTerm) {

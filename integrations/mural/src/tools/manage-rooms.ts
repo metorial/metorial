@@ -1,9 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let roomOutputSchema = z.object({
+export let roomOutputSchema = z.object({
   roomId: z.string(),
   name: z.string(),
   description: z.string().optional(),
@@ -25,7 +25,12 @@ export let listRoomsTool = SlateTool.create(spec, {
   .input(
     z.object({
       workspaceId: z.string().describe('ID of the workspace to list rooms from'),
-      limit: z.number().optional().describe('Maximum number of rooms to return'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a whole number.')
+        .min(1)
+        .optional()
+        .describe('Maximum number of rooms to return'),
       nextToken: z.string().optional().describe('Pagination token from a previous request')
     })
   )
@@ -36,7 +41,7 @@ export let listRoomsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listRooms(ctx.input.workspaceId, {
       limit: ctx.input.limit,
       next: ctx.input.nextToken
@@ -73,12 +78,17 @@ export let createRoomTool = SlateTool.create(spec, {
       workspaceId: z.string().describe('ID of the workspace to create the room in'),
       name: z.string().describe('Name for the new room'),
       description: z.string().optional().describe('Description of the room'),
-      type: z.string().optional().describe('Room type (e.g., "open" or "private")')
+      type: z
+        .string()
+        .optional()
+        .describe('Room type: "open" or "private". Defaults to private.')
     })
   )
   .output(roomOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
+    if (ctx.input.type !== undefined && !['open', 'private'].includes(ctx.input.type))
+      throw createApiServiceError('Room type must be open or private.');
     let room = await client.createRoom({
       workspaceId: ctx.input.workspaceId,
       name: ctx.input.name,
@@ -116,7 +126,7 @@ export let updateRoomTool = SlateTool.create(spec, {
   )
   .output(roomOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let room = await client.updateRoom(ctx.input.roomId, {
       name: ctx.input.name,
       description: ctx.input.description
@@ -157,7 +167,7 @@ export let deleteRoomTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteRoom(ctx.input.roomId);
 
     return {

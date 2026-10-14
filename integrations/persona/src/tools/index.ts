@@ -1,4 +1,5 @@
 export * from './list-events';
+export * from './list-inquiry-templates';
 export * from './manage-accounts';
 export * from './manage-cases';
 export * from './manage-inquiries';

@@ -1,18 +1,17 @@
 {
   "name": "@metorial/wati",
-  "description": "Send and receive WhatsApp messages, manage contacts, and run broadcast campaigns. Send session messages, template messages, interactive button and list messages, and file attachments. Manage contacts by adding, updating, and assigning them to teams. Retrieve conversation history and assign chats to operators. Create, retrieve, and delete WhatsApp message templates. Launch and manage chatbot flows for contacts. Run broadcast campaigns with targeted template messages. Access sales analytics and lead stage data. Send order details and track payment statuses via WhatsApp Pay. Configure webhooks to receive notifications for inbound messages, delivery statuses, template updates, and account events.",
+  "description": "Send WhatsApp session and approved template messages, manage contacts, retrieve contact counts and conversation history, assign conversations, inspect campaigns and their delivery statistics, discover additional channels, and start chatbot flows.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "send WhatsApp messages",
     "manage contacts",
     "send template messages",
-    "run broadcast campaigns",
+    "retrieve contact counts",
     "retrieve conversation history",
-    "manage message templates",
+    "assign conversations",
+    "inspect campaign delivery statistics",
     "trigger chatbot flows",
-    "send file attachments",
-    "configure webhooks",
-    "track sales analytics"
+    "send file attachments"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/wati.jpeg"
 }

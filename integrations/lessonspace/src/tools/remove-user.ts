@@ -24,8 +24,7 @@ export let removeUser = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     await client.removeUser(ctx.input.userId);

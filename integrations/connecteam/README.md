@@ -1,6 +1,10 @@
 # <img src="logo.jpeg" height="20"> Connecteam
 
-Manage workforce operations for deskless employees across operations, communications, and HR hubs. Create, update, archive, and sync employee/user profiles with custom fields and Smart Groups. Track employee time clock activities including clock-in/out, breaks, geofence-based tracking, and timesheet totals. Manage time-off policies, balances, and requests. Create and manage shift schedules with auto-assign, shift layers, and employee unavailability. Create and organize jobs and sub-jobs for scheduling and time tracking. Retrieve forms and form submissions for data collection workflows. Manage Quick Tasks with boards, labels, sub-tasks, and user assignments. Send private chat messages via custom publishers. Manage onboarding packs and assignments. Upload file attachments for use across platform features.
+Manage Connecteam employee profiles, custom fields, Smart Groups, time clocks, time-off requests, shift schedules, jobs, forms, Quick Tasks, chat messages, and onboarding assignments. Retrieve account identity and paginated leave requests. API access depends on the eligible subscription plan and purchased hubs.
+
+Authenticate with an API key or OAuth 2.0 client credentials. Choose the Australian API host in the authentication settings when signing in at `app-au.connecteam.com`. OAuth access tokens retain their expiry and support renewal with the stored client credentials. Existing connections retain the previously stored API host until reauthenticated.
+
+Use `get_account` to identify the company, `list_users` to discover employees, and the list actions in `manage_scheduler`, `manage_time_clock`, and `manage_tasks` to discover the IDs used by those tools. `list_time_off_requests` supports approved, pending, and denied requests within a date range of up to 365 days. Chat messages require a custom publisher ID, discoverable with `list_conversations` and `includePublishers`.
 
 ## License
 

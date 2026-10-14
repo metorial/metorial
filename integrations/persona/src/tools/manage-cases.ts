@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PersonaClient } from '../lib/client';
 import { normalizeResource } from '../lib/helpers';
@@ -14,7 +14,26 @@ export let createCase = SlateTool.create(spec, {
     z.object({
       caseTemplateId: z.string().optional().describe('Case template ID (starts with cstmpl_)'),
       caseName: z.string().optional().describe('Name for the case'),
-      creatorId: z.string().optional().describe('ID of the user creating the case')
+      creatorId: z
+        .string()
+        .optional()
+        .describe(
+          'User ID retained for existing inputs; provide creatorEmailAddress to select the creator'
+        ),
+      creatorEmailAddress: z
+        .string()
+        .optional()
+        .describe('Email address of the Persona user creating the case'),
+      fields: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Fields defined by the case template'),
+      objectIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Persona object IDs to associate with the case, such as inquiry or account IDs'
+        )
     })
   )
   .output(
@@ -25,13 +44,23 @@ export let createCase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.caseTemplateId?.trim()) {
+      throw createApiServiceError('Provide caseTemplateId for the review workflow.');
+    }
+    if (ctx.input.creatorId !== undefined && !ctx.input.creatorEmailAddress?.trim()) {
+      throw createApiServiceError(
+        'Persona requires creatorEmailAddress to select the creator. Provide the email address alongside creatorId.'
+      );
+    }
     let client = new PersonaClient({ token: ctx.auth.token });
     let attrs: Record<string, any> = {};
     if (ctx.input.caseTemplateId) attrs['case-template-id'] = ctx.input.caseTemplateId;
     if (ctx.input.caseName) attrs.name = ctx.input.caseName;
-    if (ctx.input.creatorId) attrs['creator-id'] = ctx.input.creatorId;
+    if (ctx.input.creatorEmailAddress)
+      attrs['creator-email-address'] = ctx.input.creatorEmailAddress;
+    if (ctx.input.fields) attrs.fields = ctx.input.fields;
 
-    let result = await client.createCase(attrs);
+    let result = await client.createCase(attrs, ctx.input.objectIds);
     let normalized = normalizeResource(result.data);
 
     return {
@@ -75,11 +104,12 @@ export let getCase = SlateTool.create(spec, {
     return {
       output: {
         caseId: result.data?.id,
-        caseName: n.name,
+        caseName: n.name ?? undefined,
         status: n.status,
-        assigneeId: n.relationships?.assignee?.id,
-        createdAt: n['created-at'] || n.created_at,
-        resolvedAt: n['resolved-at'] || n.resolved_at,
+        assigneeId:
+          n['assignee-id'] ?? n.assignee_id ?? n.relationships?.assignee?.id ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
+        resolvedAt: n['resolved-at'] ?? n.resolved_at ?? undefined,
         attributes: n
       },
       message: `Case **${result.data?.id}** is **${n.status}**.`
@@ -127,9 +157,9 @@ export let listCases = SlateTool.create(spec, {
       let n = normalizeResource(item);
       return {
         caseId: item.id,
-        caseName: n.name,
+        caseName: n.name ?? undefined,
         status: n.status,
-        createdAt: n['created-at'] || n.created_at
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 
@@ -160,7 +190,18 @@ export let updateCase = SlateTool.create(spec, {
     z.object({
       caseId: z.string().describe('Persona case ID (starts with case_)'),
       status: z.string().optional().describe('New status for the case'),
-      assigneeId: z.string().optional().describe('User ID to assign the case to'),
+      assigneeId: z
+        .string()
+        .optional()
+        .describe(
+          'User ID retained for existing inputs; provide assigneeEmailAddress for assignment'
+        ),
+      assigneeEmailAddress: z
+        .string()
+        .optional()
+        .describe(
+          'Email address of the Persona user to assign the case to. Required for assignment; the API does not accept a user ID.'
+        ),
       addTag: z.string().optional().describe('Tag to add'),
       removeTag: z.string().optional().describe('Tag to remove')
     })
@@ -173,6 +214,17 @@ export let updateCase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.assigneeId !== undefined && !ctx.input.assigneeEmailAddress) {
+      throw createApiServiceError(
+        'Persona case assignment requires assigneeEmailAddress. Provide the reviewer email address alongside assigneeId.'
+      );
+    }
+    if (
+      ctx.input.assigneeEmailAddress !== undefined &&
+      !ctx.input.assigneeEmailAddress.trim()
+    ) {
+      throw createApiServiceError('Provide a non-empty assigneeEmailAddress.');
+    }
     let client = new PersonaClient({ token: ctx.auth.token });
     let result: any;
 
@@ -180,8 +232,8 @@ export let updateCase = SlateTool.create(spec, {
       result = await client.setCaseStatus(ctx.input.caseId, ctx.input.status);
     }
 
-    if (ctx.input.assigneeId) {
-      result = await client.assignCase(ctx.input.caseId, ctx.input.assigneeId);
+    if (ctx.input.assigneeEmailAddress) {
+      result = await client.assignCase(ctx.input.caseId, ctx.input.assigneeEmailAddress);
     }
 
     if (ctx.input.addTag) {

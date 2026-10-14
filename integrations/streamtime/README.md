@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Streamtime
 
-Manage jobs (projects), time tracking, quoting, invoicing, and expenses for creative businesses and agencies. Create, update, and search jobs with phases, line items, team assignments, estimated hours, and deadlines. Track time through to-do lists auto-populated from job plans. Generate quotes and invoices from job plans or logged time and expenses. Manage contacts and companies linked to jobs. Search across all data types using advanced filtering with combinable AND/OR logic. Retrieve reporting statistics including column series and time series aggregations across logged hours, invoice totals, and quote totals. Manage expenses linked to jobs and supplier contacts. Retrieve user and team member information.
+Manage Streamtime jobs, job plans, time entries, expenses, companies, and contacts. Retrieve quotes and invoices, record invoice payments, and manage labels. Search jobs and invoices with documented filters and pagination, inspect job-item assignments, and discover organisation, branch, rate-card, role, and user information.
 
 ## License
 

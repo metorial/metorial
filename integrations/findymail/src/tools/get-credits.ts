@@ -16,7 +16,8 @@ export let getCredits = SlateTool.create(spec, {
     z.object({
       credits: z.number().optional().describe('Remaining credits in the account.'),
       used: z.number().optional().describe('Credits used in the current billing period.'),
-      total: z.number().optional().describe('Total credits in the current billing period.')
+      total: z.number().optional().describe('Total credits in the current billing period.'),
+      verifierCredits: z.number().optional().describe('Remaining email verifier credits.')
     })
   )
   .handleInvocation(async ctx => {
@@ -32,7 +33,8 @@ export let getCredits = SlateTool.create(spec, {
       output: {
         credits,
         used,
-        total
+        total,
+        verifierCredits: result?.verifier_credits ?? undefined
       },
       message:
         credits !== undefined

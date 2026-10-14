@@ -30,7 +30,11 @@ export let verifyPhoneTool = SlateTool.create(spec, {
       allowedCountryCodes: z
         .string()
         .optional()
-        .describe('Comma-separated ISO 2-letter country codes to restrict allowed countries')
+        .describe('Comma-separated ISO 2-letter country codes to restrict allowed countries'),
+      verifyFormatOnly: z
+        .boolean()
+        .optional()
+        .describe('Check syntax and number range only, without the network connection check.')
     })
   )
   .output(
@@ -48,6 +52,18 @@ export let verifyPhoneTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Phone number in international format'),
+      rawNational: z
+        .string()
+        .optional()
+        .describe('National phone number without whitespace or punctuation.'),
+      rawInternational: z
+        .string()
+        .optional()
+        .describe('International phone number without formatting.'),
+      lineStatusReason: z
+        .string()
+        .optional()
+        .describe('Provider explanation of the line status.'),
       notVerifiedReason: z
         .string()
         .optional()
@@ -71,20 +87,25 @@ export let verifyPhoneTool = SlateTool.create(spec, {
       defaultCountryCode: ctx.input.defaultCountryCode,
       mobileOnly: ctx.input.mobileOnly,
       timeout: ctx.input.timeout,
-      allowedCountryCodes: ctx.input.allowedCountryCodes
+      allowedCountryCodes: ctx.input.allowedCountryCodes,
+      verifyFormatOnly: ctx.input.verifyFormatOnly
     });
 
     return {
       output: {
         isVerified: data.is_verified ?? false,
-        lineType: data.line_type,
-        lineStatus: data.line_status,
-        countryCode: data.country_code,
-        callingCode: data.calling_code,
-        nationalNumber: data.national_number,
-        internationalNumber: data.international_number,
-        notVerifiedReason: data.not_verified_reason,
-        notVerifiedCode: data.not_verified_code,
+        lineType: data.line_type ?? undefined,
+        lineStatus: data.line_status ?? undefined,
+        lineStatusReason: data.line_status_reason ?? undefined,
+        countryCode: data.country_code ?? undefined,
+        callingCode: data.calling_code ?? undefined,
+        nationalNumber: data.formatted_national ?? data.national_number ?? undefined,
+        internationalNumber:
+          data.formatted_international ?? data.international_number ?? undefined,
+        rawNational: data.raw_national ?? undefined,
+        rawInternational: data.raw_international ?? undefined,
+        notVerifiedReason: data.not_verified_reason ?? undefined,
+        notVerifiedCode: data.not_verified_code ?? undefined,
         success: data.success ?? true
       },
       message: data.is_verified

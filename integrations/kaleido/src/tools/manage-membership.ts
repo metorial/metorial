@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageMembership = SlateTool.create(spec, {
@@ -15,7 +16,7 @@ Each membership can own nodes, services, and application credentials within envi
   .input(
     z.object({
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Action to perform'),
-      consortiumId: z.string().describe('Consortium ID'),
+      consortiumId,
       membershipId: z.string().optional().describe('Membership ID (required for get, delete)'),
       orgName: z.string().optional().describe('Organization name (required for create)')
     })
@@ -53,10 +54,10 @@ Each membership can own nodes, services, and application credentials within envi
       let mapped = memberships.map((m: any) => ({
         membershipId: m._id,
         orgName: m.org_name,
-        state: m.state || undefined,
-        orgId: m.org_id || undefined,
-        verificationProof: m.verification_proof || undefined,
-        createdAt: m.created_at || undefined
+        state: m.state ?? undefined,
+        orgId: m.org_id ?? undefined,
+        verificationProof: m.verification_proof ?? undefined,
+        createdAt: m.created_at ?? undefined
       }));
 
       return {
@@ -66,7 +67,10 @@ Each membership can own nodes, services, and application credentials within envi
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.orgName) throw new Error('Organization name is required');
+      if (!ctx.input.orgName)
+        throw createApiServiceError('Organization name is required', {
+          reason: 'invalid_input'
+        });
 
       let result = await client.createMembership(ctx.input.consortiumId, {
         org_name: ctx.input.orgName
@@ -74,25 +78,26 @@ Each membership can own nodes, services, and application credentials within envi
 
       return {
         output: {
-          membershipId: result._id,
-          orgName: result.org_name,
-          state: result.state,
-          orgId: result.org_id
+          membershipId: result._id ?? undefined,
+          orgName: result.org_name ?? undefined,
+          state: result.state ?? undefined,
+          orgId: result.org_id ?? undefined
         },
         message: `Created membership **${result.org_name}** (\`${result._id}\`).`
       };
     }
 
-    if (!ctx.input.membershipId) throw new Error('Membership ID is required');
+    if (!ctx.input.membershipId)
+      throw createApiServiceError('Membership ID is required', { reason: 'invalid_input' });
 
     if (ctx.input.action === 'get') {
       let result = await client.getMembership(ctx.input.consortiumId, ctx.input.membershipId);
       return {
         output: {
-          membershipId: result._id,
-          orgName: result.org_name,
-          state: result.state,
-          orgId: result.org_id
+          membershipId: result._id ?? undefined,
+          orgName: result.org_name ?? undefined,
+          state: result.state ?? undefined,
+          orgId: result.org_id ?? undefined
         },
         message: `Membership **${result.org_name}** — state: ${result.state || 'unknown'}.`
       };

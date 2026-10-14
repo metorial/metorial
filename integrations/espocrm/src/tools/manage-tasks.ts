@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -60,22 +60,22 @@ export let manageTasks = SlateTool.create(spec, {
       return {
         output: {
           taskId: result.id,
-          name: result.name,
-          status: result.status,
-          priority: result.priority,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          priority: result.priority ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Task **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!taskId) throw new Error('taskId is required for update');
+      if (!taskId) throw createApiServiceError('taskId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -84,22 +84,22 @@ export let manageTasks = SlateTool.create(spec, {
       return {
         output: {
           taskId: result.id,
-          name: result.name,
-          status: result.status,
-          priority: result.priority,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          priority: result.priority ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Task **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!taskId) throw new Error('taskId is required for delete');
+      if (!taskId) throw createApiServiceError('taskId is required for delete');
       await client.deleteRecord('Task', taskId);
       return {
         output: {
@@ -109,6 +109,6 @@ export let manageTasks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

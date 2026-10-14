@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,6 +10,11 @@ let bankAccountOutputSchema = z.object({
   accountType: z.string().describe('Account type: individual or company'),
   signatory: z.string().describe('Signatory name'),
   verified: z.boolean().describe('Whether the bank account has been verified'),
+  microdepositType: z
+    .string()
+    .optional()
+    .nullable()
+    .describe('Verification method: amounts or descriptor_code; null after verification'),
   description: z.string().optional().nullable().describe('Description'),
   metadata: z.record(z.string(), z.string()).optional().nullable().describe('Metadata'),
   dateCreated: z.string().optional().nullable().describe('Creation date'),
@@ -23,6 +28,7 @@ let mapBankAccount = (data: any) => ({
   accountType: data.account_type,
   signatory: data.signatory,
   verified: data.verified ?? false,
+  microdepositType: data.microdeposit_type ?? null,
   description: data.description ?? null,
   metadata: data.metadata ?? null,
   dateCreated: data.date_created ?? null,
@@ -65,7 +71,7 @@ export let createBankAccount = SlateTool.create(spec, {
 export let verifyBankAccount = SlateTool.create(spec, {
   name: 'Verify Bank Account',
   key: 'verify_bank_account',
-  description: `Verify a bank account using the two micro-deposit amounts sent by Lob. Both amounts must match exactly.`,
+  description: `Verify a bank account using its micro-deposit verification method. Call get_bank_account first: use two amounts in cents for amounts, or the statement code for descriptor_code.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -76,17 +82,37 @@ export let verifyBankAccount = SlateTool.create(spec, {
       bankAccountId: z
         .string()
         .describe('The bank account ID to verify (starts with "bank_")'),
-      amount1: z.number().describe('First micro-deposit amount in cents (e.g., 23 for $0.23)'),
-      amount2: z.number().describe('Second micro-deposit amount in cents')
+      amount1: z
+        .number()
+        .optional()
+        .describe(
+          'First micro-deposit amount in whole cents, 1–100 (e.g., 23 for $0.23); requires amount2'
+        ),
+      amount2: z
+        .number()
+        .optional()
+        .describe('Second micro-deposit amount in whole cents, 1–100; requires amount1'),
+      descriptorCode: z
+        .string()
+        .optional()
+        .describe(
+          'Six-character statement code beginning with SM; use instead of amount1 and amount2'
+        )
     })
   )
   .output(bankAccountOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.verifyBankAccount(ctx.input.bankAccountId, [
-      ctx.input.amount1,
-      ctx.input.amount2
-    ]);
+    if ((ctx.input.amount1 === undefined) !== (ctx.input.amount2 === undefined)) {
+      throw createApiServiceError('Provide both amount1 and amount2, or use descriptorCode.');
+    }
+    let result = await client.verifyBankAccount(ctx.input.bankAccountId, {
+      amounts:
+        ctx.input.amount1 !== undefined && ctx.input.amount2 !== undefined
+          ? [ctx.input.amount1, ctx.input.amount2]
+          : undefined,
+      descriptorCode: ctx.input.descriptorCode
+    });
     let mapped = mapBankAccount(result);
     return {
       output: mapped,
@@ -133,26 +159,48 @@ export let listBankAccounts = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Number of accounts to return (max 100, default 10)'),
-      offset: z.number().optional().describe('Number of accounts to skip')
+      offset: z.number().optional().describe('Number of accounts to skip'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor from previousUrl; cannot be combined with after'),
+      after: z
+        .string()
+        .optional()
+        .describe('Next-page cursor from nextUrl; cannot be combined with before')
     })
   )
   .output(
     z.object({
       bankAccounts: z.array(bankAccountOutputSchema),
-      totalCount: z.number().describe('Total count')
+      totalCount: z.number().describe('Total count'),
+      nextUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Next-page URL; pass its after query value to after'),
+      previousUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Previous-page URL; pass its before query value to before')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listBankAccounts({
       limit: ctx.input.limit,
+      before: ctx.input.before,
+      after: ctx.input.after,
       offset: ctx.input.offset
     });
     let bankAccounts = (result.data || []).map(mapBankAccount);
     return {
       output: {
         bankAccounts,
-        totalCount: result.total_count ?? result.count ?? bankAccounts.length
+        totalCount: result.total_count ?? result.count ?? bankAccounts.length,
+        nextUrl: result.next_url ?? null,
+        previousUrl: result.previous_url ?? null
       },
       message: `Found **${bankAccounts.length}** bank accounts`
     };
@@ -184,8 +232,11 @@ export let deleteBankAccount = SlateTool.create(spec, {
     return {
       output: {
         bankAccountId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted bank account **${ctx.input.bankAccountId}**`
+      message:
+        result.deleted === true
+          ? `Deleted bank account **${ctx.input.bankAccountId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

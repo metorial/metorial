@@ -1,6 +1,10 @@
 # Postman
 
-Manage API development workflows in Postman. Create, update, and delete collections, environments, workspaces, mock servers, and monitors. Import and export OpenAPI definitions, generate collections from API specifications, and synchronize specs with collections. Fork collections, create pull requests, and merge changes for version control. Run monitors and webhooks for CI/CD integration. Manage team members, user groups, roles, and permissions. Add and retrieve tags on collections and workspaces. Detect and manage secrets with the Secret Scanner. Run API security and governance checks on API definitions. Manage comments on APIs, collections, and requests for team collaboration. Configure webhooks for collection backup, monitor results, and team activity feeds. Access audit logs, billing information, and the Private API Network.
+Manage Postman collections, environments, workspaces, mock servers, and monitors. Import an OpenAPI JSON definition into a workspace as new collections, retrieve complete collection definitions, fork and merge collections, and manage pull requests, comments, and tags. Run monitors synchronously or start a job and inspect its latest run results. Create incoming webhooks that trigger collection runs. Retrieve the authenticated user and API usage limits.
+
+Use `list_workspaces` to discover a destination workspace before importing a definition. Collection updates replace the definition, so retrieve it with `get_collection` and retain scripts, variables, and requests that must survive the update.
+
+The `manage_api` tool retains compatibility with Postman's deprecated API Builder endpoints. Availability depends on the account and provider API support. This integration uses the global Postman API; EU Enterprise API routing is not currently configurable.
 
 ## License
 

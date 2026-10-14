@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { folderIdSchema, projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDoc = SlateTool.create(spec, {
   name: 'Manage Document',
   key: 'manage_doc',
-  description: `Create, update, or delete a document in Dovetail. Documents are used for research reports or standalone documentation. Supports setting title, content, and custom fields.`,
+  description: `Create, update, or delete a document in Dovetail. Documents are used for research reports or standalone documentation. Supports initial content, title changes, and custom fields.`,
   instructions: [
     'To create a doc, provide at least a title, content, or fields.',
     'To update, provide the docId and the fields to change.',
@@ -20,8 +21,25 @@ export let manageDoc = SlateTool.create(spec, {
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('The operation to perform'),
       docId: z.string().optional().describe('Document ID (required for update and delete)'),
+      contentType: z
+        .enum(['html', 'markdown', 'text'])
+        .optional()
+        .describe('Initial content format (create only).'),
+      projectId: projectIdSchema
+        .optional()
+        .describe(
+          'Project ID from list_projects (create only; cannot combine with folderId).'
+        ),
+      folderId: folderIdSchema
+        .optional()
+        .describe(
+          'Folder ID from browse_folders (create only; cannot combine with projectId).'
+        ),
       title: z.string().optional().describe('Document title'),
-      content: z.string().optional().describe('Document content body'),
+      content: z
+        .string()
+        .optional()
+        .describe('Initial document content (create only; content cannot be patched).'),
       fields: z
         .array(
           z.object({
@@ -30,7 +48,7 @@ export let manageDoc = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Custom fields (create only)')
+        .describe('Custom fields to set during create or update')
     })
   )
   .output(
@@ -44,11 +62,16 @@ export let manageDoc = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.projectId && ctx.input.folderId)
+      throw createApiServiceError('Choose projectId or folderId, not both.');
 
     if (ctx.input.action === 'create') {
       let doc = await client.createDoc({
         title: ctx.input.title,
         content: ctx.input.content,
+        contentType: ctx.input.contentType,
+        projectId: ctx.input.projectId,
+        folderId: ctx.input.folderId,
         fields: ctx.input.fields
       });
       return {
@@ -63,13 +86,27 @@ export let manageDoc = SlateTool.create(spec, {
     }
 
     if (!ctx.input.docId) {
-      throw new Error('docId is required for update and delete actions');
+      throw createApiServiceError('docId is required for update and delete actions');
     }
 
     if (ctx.input.action === 'update') {
+      if (
+        ctx.input.projectId !== undefined ||
+        ctx.input.folderId !== undefined ||
+        ctx.input.contentType !== undefined
+      )
+        throw createApiServiceError(
+          'projectId, folderId, and contentType are only supported when creating a document.'
+        );
+      if (ctx.input.content !== undefined)
+        throw createApiServiceError(
+          'Dovetail cannot patch doc content. Update its title or fields, or create a new document with initial content.'
+        );
+      if (ctx.input.title === undefined && !ctx.input.fields?.length)
+        throw createApiServiceError('Provide a title or custom fields to update.');
       let doc = await client.updateDoc(ctx.input.docId, {
         title: ctx.input.title,
-        content: ctx.input.content
+        fields: ctx.input.fields
       });
       return {
         output: {

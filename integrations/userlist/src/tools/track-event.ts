@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type EventPayload } from '../lib/client';
 import { spec } from '../spec';
 
 export let trackEvent = SlateTool.create(spec, {
@@ -52,7 +52,7 @@ Event names are normalized to \`snake_case\` internally.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let payload: Record<string, unknown> = {
+    let payload: EventPayload = {
       name: ctx.input.name
     };
     if (ctx.input.userIdentifier) payload.user = ctx.input.userIdentifier;
@@ -60,7 +60,7 @@ Event names are normalized to \`snake_case\` internally.`,
     if (ctx.input.occurredAt) payload.occurred_at = ctx.input.occurredAt;
     if (ctx.input.properties) payload.properties = ctx.input.properties;
 
-    await client.trackEvent(payload as any);
+    await client.trackEvent(payload);
 
     return {
       output: { success: true },

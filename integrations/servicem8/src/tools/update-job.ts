@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,7 @@ export let updateJob = SlateTool.create(spec, {
       companyUuid: z.string().optional().describe('UUID of client/company to associate'),
       categoryUuid: z.string().optional().describe('UUID of the job category'),
       date: z.string().optional().describe('Updated job date (YYYY-MM-DD HH:MM:SS)'),
-      dueDate: z.string().optional().describe('Updated due date (YYYY-MM-DD)'),
+      dueDate: z.string().optional().describe('Unsupported by this endpoint; omit this field'),
       poNumber: z.string().optional().describe('Updated customer purchase order number'),
       workDoneDescription: z.string().optional().describe('Description of work completed')
     })
@@ -39,19 +39,23 @@ export let updateJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.dueDate !== undefined) {
+      throw createApiServiceError(
+        'ServiceM8 does not support writing a job due date through this endpoint. Omit dueDate.'
+      );
+    }
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {};
     if (ctx.input.status) data.status = ctx.input.status;
-    if (ctx.input.description !== undefined) data.description = ctx.input.description;
+    if (ctx.input.description !== undefined) data.job_description = ctx.input.description;
     if (ctx.input.jobAddress !== undefined) data.job_address = ctx.input.jobAddress;
     if (ctx.input.billingAddress !== undefined)
       data.billing_address = ctx.input.billingAddress;
     if (ctx.input.companyUuid) data.company_uuid = ctx.input.companyUuid;
     if (ctx.input.categoryUuid) data.category_uuid = ctx.input.categoryUuid;
     if (ctx.input.date) data.date = ctx.input.date;
-    if (ctx.input.dueDate) data.due_date = ctx.input.dueDate;
-    if (ctx.input.poNumber !== undefined) data.po_number = ctx.input.poNumber;
+    if (ctx.input.poNumber !== undefined) data.purchase_order_number = ctx.input.poNumber;
     if (ctx.input.workDoneDescription !== undefined)
       data.work_done_description = ctx.input.workDoneDescription;
 

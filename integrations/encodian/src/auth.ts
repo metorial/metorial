@@ -14,6 +14,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .trim()
+        .min(1)
         .describe('Your Encodian API key. Obtain one at https://www.encodian.com/apikey')
     }),
     getOutput: async ctx => {

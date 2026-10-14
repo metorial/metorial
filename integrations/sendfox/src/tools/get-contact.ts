@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type SendFoxContact } from '../lib/client';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -55,17 +55,22 @@ export let getContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.contactId && !ctx.input.email) {
-      throw new Error('Either contactId or email must be provided.');
+      throw createApiServiceError('Either contactId or email must be provided.', {
+        reason: 'missing_contact_identifier'
+      });
     }
 
-    let contact: any;
+    let contact: SendFoxContact;
     if (ctx.input.contactId) {
       contact = await client.getContact(ctx.input.contactId);
     } else {
-      contact = await client.getContactByEmail(ctx.input.email!);
-      if (!contact) {
-        throw new Error(`Contact with email "${ctx.input.email}" not found.`);
+      let match = await client.getContactByEmail(ctx.input.email!);
+      if (!match) {
+        throw createApiServiceError(`Contact with email "${ctx.input.email}" not found.`, {
+          reason: 'contact_not_found'
+        });
       }
+      contact = match;
     }
 
     return {
@@ -81,7 +86,7 @@ export let getContact = SlateTool.create(spec, {
         lastClickedAt: contact.last_clicked_at,
         createdAt: contact.created_at,
         contactFields: contact.contact_fields || [],
-        lists: contact.lists?.map((l: any) => ({ listId: l.id, name: l.name }))
+        lists: contact.lists?.map(l => ({ listId: l.id, name: l.name }))
       },
       message: `Retrieved contact **${contact.email}** (ID: ${contact.id}).`
     };

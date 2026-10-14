@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageSkillsetTool = SlateTool.create(spec, {
@@ -26,6 +27,15 @@ export let manageSkillsetTool = SlateTool.create(spec, {
         .describe('Skillset ID (required for update, delete, fetch, and ability actions)'),
       name: z.string().optional().describe('Skillset or ability name'),
       description: z.string().optional().describe('Skillset or ability description'),
+      cursor: z.string().optional().describe('Pagination cursor for nested list actions'),
+      take: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'take must be a positive whole number'
+        )
+        .optional()
+        .describe('Page size for nested list actions'),
       meta: z.record(z.string(), z.any()).optional().describe('Arbitrary metadata'),
       abilityAction: z
         .enum(['create', 'update', 'delete', 'list'])
@@ -48,6 +58,10 @@ export let manageSkillsetTool = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('List of abilities'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor for the next page of nested list results'),
       createdAt: z.string().optional().describe('Creation timestamp')
     })
   )
@@ -67,6 +81,10 @@ export let manageSkillsetTool = SlateTool.create(spec, {
       abilityId,
       instruction
     } = ctx.input;
+
+    if (abilityAction && !skillsetId) {
+      throw createApiServiceError('skillsetId is required for ability actions.');
+    }
 
     // Ability-level actions
     if (abilityAction && skillsetId) {
@@ -88,7 +106,8 @@ export let manageSkillsetTool = SlateTool.create(spec, {
         };
       }
       if (abilityAction === 'update') {
-        if (!abilityId) throw new Error('abilityId is required to update an ability');
+        if (!abilityId)
+          throw createApiServiceError('abilityId is required to update an ability');
         let updateData: Record<string, any> = {};
         if (name !== undefined) updateData.name = name;
         if (description !== undefined) updateData.description = description;
@@ -101,7 +120,8 @@ export let manageSkillsetTool = SlateTool.create(spec, {
         };
       }
       if (abilityAction === 'delete') {
-        if (!abilityId) throw new Error('abilityId is required to delete an ability');
+        if (!abilityId)
+          throw createApiServiceError('abilityId is required to delete an ability');
         await client.deleteAbility(skillsetId, abilityId);
         return {
           output: { skillsetId, abilityId },
@@ -109,9 +129,12 @@ export let manageSkillsetTool = SlateTool.create(spec, {
         };
       }
       if (abilityAction === 'list') {
-        let result = await client.listAbilities(skillsetId);
+        let result = await client.listAbilities(skillsetId, {
+          cursor: ctx.input.cursor,
+          take: ctx.input.take
+        });
         return {
-          output: { skillsetId, abilities: result.items },
+          output: { skillsetId, abilities: result.items, cursor: result.cursor ?? undefined },
           message: `Found **${result.items.length}** abilities in skillset **${skillsetId}**.`
         };
       }
@@ -123,30 +146,30 @@ export let manageSkillsetTool = SlateTool.create(spec, {
       return {
         output: {
           skillsetId: result.id,
-          name: result.name,
-          description: result.description,
-          createdAt: result.createdAt
+          name: result.name ?? name,
+          description: result.description ?? description,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Skillset **${result.name || result.id}** created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!skillsetId) throw new Error('skillsetId is required for fetch');
+      if (!skillsetId) throw createApiServiceError('skillsetId is required for fetch');
       let result = await client.fetchSkillset(skillsetId);
       return {
         output: {
           skillsetId: result.id,
           name: result.name,
           description: result.description,
-          createdAt: result.createdAt
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Fetched skillset **${result.name || result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!skillsetId) throw new Error('skillsetId is required for update');
+      if (!skillsetId) throw createApiServiceError('skillsetId is required for update');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
@@ -159,7 +182,7 @@ export let manageSkillsetTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!skillsetId) throw new Error('skillsetId is required for delete');
+      if (!skillsetId) throw createApiServiceError('skillsetId is required for delete');
       await client.deleteSkillset(skillsetId);
       return {
         output: { skillsetId },
@@ -167,6 +190,6 @@ export let manageSkillsetTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

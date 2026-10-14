@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -144,13 +144,17 @@ Configure XPath selectors, check frequency, alert conditions, notification chann
       note: ctx.input.note
     });
 
+    if (!result.id) {
+      throw createApiServiceError('Wachete did not return the created monitor ID.');
+    }
+
     return {
       output: {
-        wachetId: result.id ?? '',
-        name: result.name,
-        url: result.url,
-        jobType: result.jobType,
-        recurrenceInSeconds: result.recurrenceInSeconds
+        wachetId: result.id,
+        name: result.name ?? undefined,
+        url: result.url ?? undefined,
+        jobType: result.jobType == null ? undefined : String(result.jobType),
+        recurrenceInSeconds: result.recurrenceInSeconds ?? undefined
       },
       message: `Created monitor **${result.name}** for URL \`${result.url}\` (ID: \`${result.id}\`).`
     };

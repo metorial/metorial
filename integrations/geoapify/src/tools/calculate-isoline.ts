@@ -29,7 +29,7 @@ export let calculateIsoline = SlateTool.create(spec, {
   description: `Calculate reachability areas from a point — either isochrones (areas reachable within a travel time) or isodistances (areas reachable within a distance). Returns GeoJSON polygons representing the reachable area. Supports multiple ranges in a single request.`,
   instructions: [
     'For isochrones (time-based), set type to "time" and provide range in seconds (e.g. "300,600,900" for 5, 10, 15 min).',
-    'For isodistances (distance-based), set type to "distance" and provide range in meters (e.g. "1000,5000,10000").',
+    'For isodistances (distance-based), set type to "distance" and provide range in meters for metric units or miles for imperial units.',
     'Multiple comma-separated ranges generate multiple polygons in one request.'
   ],
   constraints: [
@@ -50,7 +50,9 @@ export let calculateIsoline = SlateTool.create(spec, {
       mode: travelModeEnum.describe('Travel mode'),
       range: z
         .string()
-        .describe('Comma-separated range values (seconds for time, meters for distance)'),
+        .describe(
+          'Comma-separated ranges: seconds for time; meters for metric distance or miles for imperial distance'
+        ),
       avoid: z.string().optional().describe('Road types to avoid (e.g. "tolls|ferries")'),
       traffic: z.enum(['free_flow', 'approximated']).optional().describe('Traffic model'),
       routeType: z
@@ -103,16 +105,17 @@ export let calculateIsoline = SlateTool.create(spec, {
       geometry: f.geometry
     }));
 
+    let isolineId = data.properties?.id ?? data.features?.[0]?.properties?.id;
     let pending = data.properties?.id !== undefined && isolines.length === 0;
 
     return {
       output: {
         isolines,
-        isolineId: data.properties?.id,
+        isolineId,
         pending
       },
       message: pending
-        ? `Isoline calculation is processing. Use the isolineId to retrieve results later.`
+        ? `Isoline calculation is processing. Use check_isoline with the isolineId to retrieve results later.`
         : `Generated **${isolines.length}** isoline polygon(s) for ${ctx.input.type === 'time' ? 'time' : 'distance'}-based reachability from (${ctx.input.lat}, ${ctx.input.lon}).`
     };
   })

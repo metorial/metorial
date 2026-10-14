@@ -1,6 +1,10 @@
 # Sender
 
-Manage subscribers, groups, and segments for email and SMS marketing. Create and send email campaigns, transactional emails, and SMS campaigns. Build marketing automation workflows with triggers, conditions, and delays. Design subscription forms for lead capture. Track campaign performance including opens, clicks, conversions, and revenue. Send transactional emails with personalization, templates, and attachments via API or SMTP. Configure webhooks for real-time subscriber, campaign, and group event notifications.
+Manage subscribers, subscription statuses, and group memberships. Discover custom fields and automation workflows, create and inspect email campaign drafts, send transactional emails with templates and personalization, and retrieve campaign opens and clicks.
+
+Use `list_fields` to find custom-field keys and `list_workflows` to discover active workflows before enrolling a subscriber. `get_campaign` reads back a campaign's content, audience IDs, and status.
+
+Subscriber read tools return `subscriberKey`, the opaque ID accepted by subscriber lookup and update tools. The optional numeric `subscriberId` remains available for legacy numeric responses. Transactional file attachments use publicly accessible HTTPS URLs with a 25 MB per-file limit.
 
 ## License
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateWholeNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 export let generateFashionModel = SlateTool.create(spec, {
@@ -68,8 +69,9 @@ This is an async operation — a task ID is returned immediately for status poll
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    validateWholeNumber(ctx.input.numberOfImages, 'numberOfImages');
 
-    let input: Record<string, unknown> = {
+    let input: { clothing: string[]; model?: string } = {
       clothing: ctx.input.clothingUrls
     };
     if (ctx.input.modelImageUrl) {
@@ -88,9 +90,9 @@ This is an async operation — a task ID is returned immediately for status poll
 
     ctx.info('Submitting AI fashion model generation request');
     let result = await client.generateFashionModel({
-      input: input as any,
+      input,
       output: Object.keys(output).length > 0 ? output : undefined,
-      options: Object.keys(options).length > 0 ? options : undefined
+      options
     });
 
     let data = result.data;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,9 +51,20 @@ Use this to populate dictionaries with domain-specific entities for enhanced ent
         .describe('Entry ID (required for get and delete actions)'),
       limit: z
         .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'limit must be a positive whole number.'
+        )
         .optional()
         .describe('Number of entries to return for list (default: 20)'),
-      offset: z.number().optional().describe('Offset for pagination in list (default: 0)')
+      offset: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value >= 0,
+          'offset must be a nonnegative whole number.'
+        )
+        .optional()
+        .describe('Offset for pagination in list (default: 0)')
     })
   )
   .output(
@@ -71,6 +82,9 @@ Use this to populate dictionaries with domain-specific entities for enhanced ent
     let client = new Client({ token: ctx.auth.token });
     let { action, dictionaryId, entries, entryId, limit, offset } = ctx.input;
 
+    if (!dictionaryId.trim()) {
+      throw createApiServiceError('dictionaryId must not be empty.');
+    }
     if (action === 'list') {
       let result = await client.listDictionaryEntries(dictionaryId, limit ?? 20, offset ?? 0);
       let mapped = result.entries.map(e => ({
@@ -86,7 +100,16 @@ Use this to populate dictionaries with domain-specific entities for enhanced ent
 
     if (action === 'add') {
       if (!entries || entries.length === 0) {
-        throw new Error('At least one entry is required for the add action.');
+        throw createApiServiceError('At least one entry is required for the add action.');
+      }
+      if (
+        entries.some(
+          entry => !entry.text.trim() || (entry.entryId !== undefined && !entry.entryId.trim())
+        )
+      ) {
+        throw createApiServiceError(
+          'Each entry needs nonempty text and a nonempty entryId when supplied.'
+        );
       }
       let apiEntries = entries.map(e => ({
         id: e.entryId,
@@ -100,8 +123,8 @@ Use this to populate dictionaries with domain-specific entities for enhanced ent
       };
     }
 
-    if (!entryId) {
-      throw new Error('entryId is required for get and delete actions.');
+    if (!entryId?.trim()) {
+      throw createApiServiceError('entryId is required for get and delete actions.');
     }
 
     if (action === 'get') {
@@ -126,6 +149,6 @@ Use this to populate dictionaries with domain-specific entities for enhanced ent
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

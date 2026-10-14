@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,7 +53,11 @@ export let createJob = SlateTool.create(spec, {
       body.jobLeadUserId = ctx.input.jobLeadUserId;
     }
     if (ctx.input.budget !== undefined) {
-      body.budget = ctx.input.budget;
+      let budget = Number(ctx.input.budget);
+      if (!ctx.input.budget.trim() || !Number.isFinite(budget)) {
+        throw createApiServiceError('budget must be a valid numeric amount, such as 5000.00.');
+      }
+      body.budget = budget;
     }
     if (ctx.input.number !== undefined) {
       body.number = ctx.input.number;
@@ -65,7 +69,7 @@ export let createJob = SlateTool.create(spec, {
       output: {
         jobId: result.id,
         name: result.name,
-        number: result.number,
+        number: result.number ?? undefined,
         raw: result
       },
       message: `Created job **${result.name}**${result.number ? ` (#${result.number})` : ''} with ID ${result.id}.`

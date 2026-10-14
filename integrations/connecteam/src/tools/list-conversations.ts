@@ -24,13 +24,15 @@ export let listConversations = SlateTool.create(spec, {
       publishers: z
         .array(z.any())
         .optional()
-        .describe('List of custom publishers (if requested)')
+        .describe('List of custom publishers (if requested)'),
+      nextOffset: z.number().optional().describe('Next conversations page offset'),
+      nextPublisherOffset: z.number().optional().describe('Next publishers page offset')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let convResult = await client.getConversations({
@@ -38,18 +40,25 @@ export let listConversations = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let conversations = convResult.data?.conversations ?? convResult.data ?? [];
+    let conversations = convResult.data?.conversations ?? [];
     let publishers: any[] | undefined;
+    let nextPublisherOffset: number | undefined;
 
     if (ctx.input.includePublishers) {
-      let pubResult = await client.getPublishers();
-      publishers = pubResult.data?.publishers ?? pubResult.data ?? [];
+      let pubResult = await client.getPublishers({
+        limit: ctx.input.limit,
+        offset: ctx.input.offset
+      });
+      publishers = pubResult.data?.publishers ?? [];
+      nextPublisherOffset = pubResult.paging?.offset;
     }
 
     return {
       output: {
         conversations,
-        publishers
+        publishers,
+        nextOffset: convResult.paging?.offset,
+        nextPublisherOffset
       },
       message: `Retrieved **${Array.isArray(conversations) ? conversations.length : 0}** conversation(s).${publishers ? ` Also found **${publishers.length}** publisher(s).` : ''}`
     };

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateTask = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let updateTask = SlateTool.create(spec, {
   description: `Update an existing task's properties. Can modify the name, description, due date, duration, priority, status, labels, assignee, project, and auto-scheduling settings. Also supports moving a task to a different workspace (which resets project, status, labels, and assignee) and unassigning a task.`,
   instructions: [
     "To move a task to a different workspace, provide `moveToWorkspaceId`. This will reset the task's project, status, labels, and assignee.",
-    'To unassign a task, set `unassign` to true. This cannot be combined with `assigneeId`.'
+    'To unassign a task, set `unassign` to true. This cannot be combined with `assigneeId` or `moveAssigneeId`. Provide `moveToWorkspaceId` when using `moveAssigneeId`.'
   ],
   tags: {
     destructive: false,
@@ -57,11 +58,10 @@ export let updateTask = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Auto-scheduling settings, or null to disable'),
-      moveToWorkspaceId: z
-        .string()
+      moveToWorkspaceId: workspaceIdSchema
         .optional()
         .describe(
-          'Move the task to this workspace. Resets project, status, labels, and assignee.'
+          'Workspace ID from list_workspaces. Moving resets project, status, labels, and assignee.'
         ),
       moveAssigneeId: z
         .string()
@@ -89,6 +89,18 @@ export let updateTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.unassign &&
+      (ctx.input.assigneeId !== undefined || ctx.input.moveAssigneeId !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Do not combine unassign with assigneeId or moveAssigneeId.'
+      );
+    }
+    if (ctx.input.moveAssigneeId !== undefined && !ctx.input.moveToWorkspaceId) {
+      throw createApiServiceError('Provide moveToWorkspaceId when using moveAssigneeId.');
+    }
+
     let client = new MotionClient({ token: ctx.auth.token });
     let task: any;
 
@@ -106,18 +118,18 @@ export let updateTask = SlateTool.create(spec, {
     }
 
     // Handle regular updates
-    let updateData: Record<string, unknown> = {};
-    if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-    if (ctx.input.dueDate !== undefined) updateData.dueDate = ctx.input.dueDate;
-    if (ctx.input.duration !== undefined) updateData.duration = ctx.input.duration;
-    if (ctx.input.status !== undefined) updateData.status = ctx.input.status;
-    if (ctx.input.projectId !== undefined) updateData.projectId = ctx.input.projectId;
-    if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
-    if (ctx.input.priority !== undefined) updateData.priority = ctx.input.priority;
-    if (ctx.input.labels !== undefined) updateData.labels = ctx.input.labels;
-    if (ctx.input.assigneeId !== undefined) updateData.assigneeId = ctx.input.assigneeId;
-    if (ctx.input.autoScheduled !== undefined)
-      updateData.autoScheduled = ctx.input.autoScheduled;
+    let updateData = pickDefined({
+      name: ctx.input.name,
+      dueDate: ctx.input.dueDate,
+      duration: ctx.input.duration,
+      status: ctx.input.status,
+      projectId: ctx.input.projectId,
+      description: ctx.input.description,
+      priority: ctx.input.priority,
+      labels: ctx.input.labels,
+      assigneeId: ctx.input.assigneeId,
+      autoScheduled: ctx.input.autoScheduled
+    });
 
     if (Object.keys(updateData).length > 0) {
       task = await client.updateTask(ctx.input.taskId, updateData);

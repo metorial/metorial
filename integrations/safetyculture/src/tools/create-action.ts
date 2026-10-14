@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createAction = SlateTool.create(spec, {
@@ -18,7 +19,7 @@ export let createAction = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Priority level (e.g., "NONE", "LOW", "MEDIUM", "HIGH")'),
-      siteId: z.string().optional().describe('Site ID to associate the action with'),
+      siteId: siteIdSchema.optional(),
       inspectionId: z.string().optional().describe('Inspection ID to link the action to'),
       inspectionItemId: z
         .string()
@@ -49,7 +50,7 @@ export let createAction = SlateTool.create(spec, {
       labels: ctx.input.labelIds
     });
 
-    let actionId = result.task_id || result.id;
+    let actionId = result.action_id || result.task_id || result.id;
 
     return {
       output: {

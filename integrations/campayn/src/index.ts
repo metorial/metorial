@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createContact,
   getContact,
+  getEmail,
   getForm,
   listContacts,
   listEmails,
@@ -22,6 +23,7 @@ export let provider = Slate.create({
     updateContact,
     unsubscribeContact,
     listEmails,
+    getEmail,
     listReports,
     listForms,
     getForm

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateAsset = SlateTool.create(spec, {
@@ -10,6 +11,7 @@ export let updateAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       assetId: z.string().describe('Internal ID of the asset to update'),
       title: z.string().optional().describe('New title for the asset'),
       descriptions: z
@@ -36,7 +38,7 @@ export let updateAsset = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let descriptions = ctx.input.descriptions?.map(d => ({

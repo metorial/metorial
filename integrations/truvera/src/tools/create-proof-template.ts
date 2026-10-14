@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -39,6 +39,12 @@ export let createProofTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.expirationAmount === undefined) !==
+      (ctx.input.expirationUnit === undefined)
+    ) {
+      throw createApiServiceError('Provide expirationAmount and expirationUnit together.');
+    }
     let client = createClient(ctx);
 
     let body: Record<string, any> = {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,34 +29,56 @@ export let scheduleJob = SlateTool.create(spec, {
       allocationUuid: z
         .string()
         .optional()
-        .describe('UUID of the staff allocation, if staff was assigned')
+        .describe('UUID of the staff allocation, if staff was assigned'),
+      allocationError: z
+        .string()
+        .optional()
+        .describe(
+          'Details if the booking was created but the separate staff allocation failed'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let dates = [ctx.input.startDate, ctx.input.endDate];
+    if (
+      dates.some(date => !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(date)) ||
+      ctx.input.endDate <= ctx.input.startDate
+    ) {
+      throw createApiServiceError(
+        'Provide startDate and endDate in YYYY-MM-DD HH:MM:SS format, with endDate after startDate.'
+      );
+    }
+    let client = new Client(ctx.auth);
 
     let activityUuid = await client.createJobActivity({
       job_uuid: ctx.input.jobUuid,
       start_date: ctx.input.startDate,
       end_date: ctx.input.endDate,
+      activity_was_scheduled: '1',
+      activity_was_recorded: '0',
       ...(ctx.input.staffUuid ? { staff_uuid: ctx.input.staffUuid } : {})
     });
 
     let allocationUuid: string | undefined;
+    let allocationError: string | undefined;
     if (ctx.input.staffUuid) {
       try {
         allocationUuid = await client.createJobAllocation({
           job_uuid: ctx.input.jobUuid,
-          staff_uuid: ctx.input.staffUuid
+          staff_uuid: ctx.input.staffUuid,
+          allocation_date: ctx.input.startDate
         });
-      } catch {
-        // Allocation might already exist or not be supported for this context
+      } catch (error) {
+        allocationError =
+          error instanceof Error
+            ? error.message
+            : 'The staff allocation could not be confirmed.';
       }
     }
 
     return {
-      output: { activityUuid, allocationUuid },
-      message: `Scheduled job **${ctx.input.jobUuid}** from ${ctx.input.startDate} to ${ctx.input.endDate}${ctx.input.staffUuid ? ` and assigned staff ${ctx.input.staffUuid}` : ''}.`
+      output: { activityUuid, allocationUuid, allocationError },
+      message: `Scheduled job **${ctx.input.jobUuid}** from ${ctx.input.startDate} to ${ctx.input.endDate}${ctx.input.staffUuid ? ` with staff ${ctx.input.staffUuid} on the booking` : ''}.${allocationError ? ' The separate staff allocation failed; the booking already exists. Check it before retrying.' : ''}`
     };
   })
   .build();

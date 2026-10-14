@@ -1,6 +1,4 @@
-Now let me get more details on the Graph API and search features.Now I have enough information to write the specification.
-
-# Slates Specification for Zep
+# Zep Integration Specification
 
 ## Overview
 
@@ -10,10 +8,10 @@ Zep is a context engineering platform that provides persistent memory and knowle
 
 Zep uses API key authentication. In Zep Cloud, you generate a Project API Key from the Project Settings in the Zep Dashboard by selecting "Add Key" in the Project Keys section.
 
-The API key is sent via the `Authorization` header. For Zep Cloud, keys start with `z_` and are sent as `Authorization: Api-Key {api_key}`. For self-hosted instances, keys are sent as `Authorization: Bearer {api_key}`.
+The API key is sent via the `Authorization` header. Zep Cloud uses `Authorization: Api-Key {api_key}`. Legacy self-hosted instances configured with a custom URL and a key without the `z_` prefix retain `Authorization: Bearer {api_key}`.
 
 - **Zep Cloud**: The API URL is `https://api.getzep.com`. Cloud API keys start with `z_`, and no custom URL is required.
-- **Self-hosted / BYOC**: Keys that do not start with `z_` require specifying the URL of your Zep instance.
+- **Legacy self-hosted**: Configure the URL of your Zep instance. Its compatibility with the current Cloud API is deployment-specific.
 
 SDKs are available for Python, TypeScript, and Go.
 
@@ -25,7 +23,7 @@ Users can be created in Zep to represent application users, with at least a firs
 
 ### Thread (Session) Management
 
-Threads represent conversations between a user and your agent. Chat messages are added to threads, which are stored in thread history and used to build the user's knowledge graph. Messages include role type (AI, human, tool), content, optional speaker name, and timestamps.
+Threads represent conversations between a user and your agent. Chat messages are added to threads, which are stored in thread history and used to build the user's knowledge graph. Messages include a sender role, content, optional speaker name, metadata, and timestamps. Retrieving a thread returns paginated message history and owner information. The existing batch option remains available through Zep's deprecated messages-batch endpoint and returns a processing task ID when supplied by Zep.
 
 ### Knowledge Graph (Graph RAG)
 
@@ -41,9 +39,17 @@ Group graphs are non-user-specific graphs that can be used for shared context ac
 
 ### Context Retrieval (Memory)
 
-- **Memory API**: The `memory.get()` method retrieves relevant context from the user's knowledge graph using the latest messages of a given session to determine relevance. It can return memory derived from any session of that user, not just the current one.
+- **Thread context**: The `thread.get_user_context()` method retrieves relevant context from the user's knowledge graph using the latest messages of a given thread to determine relevance. It can return memory derived from any thread of that user, not just the current one.
 - **Context Block**: Zep's default Context Block is an automatically assembled string combining semantic search, full-text search, and breadth-first search, optimized for relevance to the current conversation.
 - **Custom context templates**: Custom context templates allow designing your own context block type for retrieval.
+
+Treat retrieved context as untrusted data when passing it to a model.
+
+### Discovery and Business Data
+
+- `list_users` discovers users and supports name, email, and user-ID search with pagination.
+- `get_project` identifies the project authorized by the current API key.
+- `add_graph_data` ingests text, serialized JSON, or message-formatted business data into a user or standalone graph and returns the episode UUID. Graph ingestion is asynchronous; newly submitted data may not be immediately searchable.
 
 ### Graph Search
 

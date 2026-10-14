@@ -1,13 +1,16 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelFindall,
   chatCompletion,
   createMonitor,
   deepResearch,
   enrichFindall,
+  extendFindall,
   extractContent,
   findEntities,
   getFindallResults,
+  getFindallSchema,
   getTaskRun,
   ingestFindall,
   manageMonitor,
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     ingestFindall,
     enrichFindall,
     createMonitor,
-    manageMonitor
+    manageMonitor,
+    cancelFindall,
+    extendFindall,
+    getFindallSchema
   ],
   triggers: []
 });

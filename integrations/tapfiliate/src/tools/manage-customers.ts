@@ -1,10 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TapfiliateClient } from '../lib/client';
 import { spec } from '../spec';
 
 let customerSchema = z.object({
   customerId: z.string().describe('Unique identifier of the customer'),
+  customerReference: z
+    .string()
+    .optional()
+    .describe(
+      'Tapfiliate-generated customer ID to use with get_customer, update_customer_status, delete_customer, or update_customer'
+    ),
   status: z
     .string()
     .optional()
@@ -61,18 +67,32 @@ export let createCustomer = SlateTool.create(spec, {
   )
   .output(customerSchema)
   .handleInvocation(async ctx => {
+    if (
+      !(
+        ctx.input.referralCode ||
+        ctx.input.coupon ||
+        ctx.input.clickId ||
+        ctx.input.trackingId ||
+        (ctx.input.assetId && ctx.input.sourceId)
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide at least one attribution method: referralCode, coupon, clickId, trackingId, or both assetId and sourceId.'
+      );
+    }
     let client = new TapfiliateClient({ token: ctx.auth.token });
     let result = await client.createCustomer(ctx.input);
 
     return {
       output: {
         customerId: result.customer_id || result.id,
-        status: result.status,
+        customerReference: result.id,
+        status: result.status ?? undefined,
         click: result.click,
         program: result.program,
         affiliate: result.affiliate,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Created customer \`${result.customer_id || result.id}\` with status "${result.status || 'new'}".`
     };
@@ -90,7 +110,11 @@ export let getCustomer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      customerId: z.string().describe('ID of the customer to retrieve')
+      customerId: z
+        .string()
+        .describe(
+          'Tapfiliate-generated customer ID from customerReference in create_customer or list_customers'
+        )
     })
   )
   .output(customerSchema)
@@ -101,12 +125,13 @@ export let getCustomer = SlateTool.create(spec, {
     return {
       output: {
         customerId: result.customer_id || result.id,
-        status: result.status,
+        customerReference: result.id,
+        status: result.status ?? undefined,
         click: result.click,
         program: result.program,
         affiliate: result.affiliate,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Retrieved customer \`${result.customer_id || result.id}\` (status: ${result.status}).`
     };
@@ -143,12 +168,13 @@ export let listCustomers = SlateTool.create(spec, {
 
     let customers = results.map((r: any) => ({
       customerId: r.customer_id || r.id,
-      status: r.status,
+      customerReference: r.id,
+      status: r.status ?? undefined,
       click: r.click,
       program: r.program,
       affiliate: r.affiliate,
       metaData: r.meta_data,
-      createdAt: r.created_at
+      createdAt: r.created_at ?? undefined
     }));
 
     return {
@@ -169,7 +195,11 @@ export let updateCustomerStatus = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      customerId: z.string().describe('ID of the customer'),
+      customerId: z
+        .string()
+        .describe(
+          'Tapfiliate-generated customer ID from customerReference in create_customer or list_customers'
+        ),
       action: z
         .enum(['cancel', 'uncancel'])
         .describe('Whether to cancel or uncancel the customer')
@@ -189,12 +219,13 @@ export let updateCustomerStatus = SlateTool.create(spec, {
     return {
       output: {
         customerId: result.customer_id || result.id,
-        status: result.status,
+        customerReference: result.id,
+        status: result.status ?? undefined,
         click: result.click,
         program: result.program,
         affiliate: result.affiliate,
         metaData: result.meta_data,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `${ctx.input.action === 'cancel' ? 'Canceled' : 'Uncanceled'} customer \`${result.customer_id || result.id}\`.`
     };
@@ -212,7 +243,11 @@ export let deleteCustomer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      customerId: z.string().describe('ID of the customer to delete')
+      customerId: z
+        .string()
+        .describe(
+          'Tapfiliate-generated customer ID from customerReference in create_customer or list_customers'
+        )
     })
   )
   .output(
@@ -227,6 +262,56 @@ export let deleteCustomer = SlateTool.create(spec, {
     return {
       output: { deleted: true },
       message: `Deleted customer \`${ctx.input.customerId}\`.`
+    };
+  })
+  .build();
+
+export let updateCustomer = SlateTool.create(spec, {
+  name: 'Update Customer',
+  key: 'update_customer',
+  description:
+    "Update a referred customer's external identifier or metadata, preserving the original affiliate relationship.",
+  tags: { destructive: false, readOnly: false }
+})
+  .input(
+    z.object({
+      customerReference: z
+        .string()
+        .describe(
+          'Tapfiliate-generated customer ID from customerReference in create_customer or list_customers'
+        ),
+      externalId: z
+        .string()
+        .optional()
+        .describe('New unique customer identifier from your own system'),
+      metaData: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Replacement customer metadata')
+    })
+  )
+  .output(customerSchema)
+  .handleInvocation(async ctx => {
+    if (ctx.input.externalId === undefined && ctx.input.metaData === undefined) {
+      throw createApiServiceError('Provide externalId or metaData to update the customer.');
+    }
+    let client = new TapfiliateClient({ token: ctx.auth.token });
+    let result = await client.updateCustomer(ctx.input.customerReference, {
+      customerId: ctx.input.externalId,
+      metaData: ctx.input.metaData
+    });
+    return {
+      output: {
+        customerId: result.customer_id || result.id,
+        customerReference: result.id,
+        status: result.status ?? undefined,
+        click: result.click,
+        program: result.program,
+        affiliate: result.affiliate,
+        metaData: result.meta_data ?? undefined,
+        createdAt: result.created_at ?? undefined
+      },
+      message: `Updated customer \`${result.customer_id || result.id}\`.`
     };
   })
   .build();

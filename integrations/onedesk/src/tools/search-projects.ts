@@ -10,9 +10,15 @@ let filterPropertySchema = z.object({
       'Property name to filter on (e.g. "name", "creationTime", "dueDate", "invoiceType").'
     ),
   operation: z
-    .enum(['EQ', 'CONTAINS', 'NOT_EMPTY', 'GT', 'LT', 'GE', 'LE'])
+    .enum(['EQ', 'CONTAINS', 'NOT_EMPTY', 'GT', 'LT', 'GE', 'LE', 'NE', 'NOT_CONTAINS'])
     .describe('Filter operation.'),
   value: z.string().describe('Value to compare against. For dates use format "YYYY-MM-DD".'),
+  typedValue: z
+    .union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()])
+    .optional()
+    .describe(
+      'Optional typed filter value. Overrides value for numeric, boolean, array, or empty custom-field comparisons.'
+    ),
   isCustomField: z.boolean().optional().describe('Set to true if filtering on a custom field.')
 });
 
@@ -42,12 +48,12 @@ Returns matching projects with their full details.`,
         .number()
         .optional()
         .default(50)
-        .describe('Maximum number of results to return.'),
+        .describe('Maximum number of results to return, a whole number from 1 to 50.'),
       offset: z
         .number()
         .optional()
         .default(0)
-        .describe('Number of results to skip for pagination.')
+        .describe('Number of results to skip for pagination, a non-negative whole number.')
     })
   )
   .output(
@@ -67,7 +73,8 @@ Returns matching projects with their full details.`,
         property: f.property,
         operation: f.operation,
         value: f.value,
-        isCustomField: f.isCustomField
+        isCustomField: f.isCustomField,
+        typedValue: f.typedValue
       })),
       isAsc: ctx.input.sortAscending,
       limit: ctx.input.limit,

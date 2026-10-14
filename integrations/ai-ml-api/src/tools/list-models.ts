@@ -12,7 +12,31 @@ Use this to discover available model IDs before making generation requests.`,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      modelId: z
+        .string()
+        .optional()
+        .describe('Filter by model ID or alias; comma-separated values use OR'),
+      type: z
+        .string()
+        .optional()
+        .describe('Filter by endpoint type, e.g. openai/chat-completions'),
+      tags: z.string().optional().describe('Filter by tags, e.g. playground:video'),
+      modalities: z
+        .string()
+        .optional()
+        .describe('Filter by input or output modality, e.g. video'),
+      capabilities: z
+        .string()
+        .optional()
+        .describe('Filter by capabilities, e.g. image_to_video'),
+      include: z
+        .enum(['pricing', 'modalities', 'capabilities', 'all'])
+        .optional()
+        .describe('Include additional model details')
+    })
+  )
   .output(
     z.object({
       models: z
@@ -23,7 +47,23 @@ Use this to discover available model IDs before making generation requests.`,
             ownedBy: z
               .string()
               .optional()
-              .describe('Organization or developer that owns the model')
+              .describe('Organization or developer that owns the model'),
+            name: z.string().optional().describe('Human-readable model name'),
+            type: z.string().optional().describe('Endpoint type serving this model'),
+            aliases: z.array(z.string()).optional().describe('Accepted alternate model IDs'),
+            tags: z.array(z.string()).optional(),
+            capabilities: z.array(z.string()).optional(),
+            modalities: z
+              .object({
+                input: z.array(z.string()).optional(),
+                output: z.array(z.string()).optional()
+              })
+              .optional(),
+            docsUrl: z.string().optional().describe('Official model API documentation URL'),
+            pricing: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Provider pricing; read price together with its per-unit quantity')
           })
         )
         .describe('Available models'),
@@ -36,12 +76,27 @@ Use this to discover available model IDs before making generation requests.`,
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.listModels();
+    let result = await client.listModels({
+      id: ctx.input.modelId,
+      type: ctx.input.type,
+      tags: ctx.input.tags,
+      modalities: ctx.input.modalities,
+      capabilities: ctx.input.capabilities,
+      include: ctx.input.include
+    });
 
     let models = (result.data ?? []).map(m => ({
       modelId: m.id,
-      object: m.object,
-      ownedBy: m.owned_by
+      object: m.object ?? 'model',
+      ownedBy: m.owned_by ?? m.info?.developer,
+      name: m.info?.name,
+      type: m.type,
+      aliases: m.aliases,
+      tags: m.tags,
+      capabilities: m.capabilities,
+      modalities: m.modalities,
+      docsUrl: m.info?.docsUrl,
+      pricing: m.pricing
     }));
 
     return {

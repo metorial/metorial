@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushV4Client } from '../lib/v4-client';
 import { spec } from '../spec';
@@ -86,7 +86,8 @@ Requires OAuth 2.0 authentication.`,
       }
 
       case 'create_campaign': {
-        if (!ctx.input.domain) throw new Error('domain is required for create_campaign.');
+        if (!ctx.input.domain)
+          throw createApiServiceError('domain is required for create_campaign.');
         let campaign = await client.createPositionTrackingCampaign(ctx.input.projectId, {
           domain: ctx.input.domain,
           searchEngine: ctx.input.searchEngine,
@@ -102,7 +103,8 @@ Requires OAuth 2.0 authentication.`,
       }
 
       case 'get_keywords': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for get_keywords.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for get_keywords.');
         let keywords = await client.getPositionTrackingKeywords(
           ctx.input.projectId,
           ctx.input.campaignId,
@@ -115,9 +117,10 @@ Requires OAuth 2.0 authentication.`,
       }
 
       case 'add_keywords': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for add_keywords.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for add_keywords.');
         if (!ctx.input.keywords?.length)
-          throw new Error('keywords array is required for add_keywords.');
+          throw createApiServiceError('keywords array is required for add_keywords.');
         let result = await client.addPositionTrackingKeywords(
           ctx.input.projectId,
           ctx.input.campaignId,
@@ -131,9 +134,9 @@ Requires OAuth 2.0 authentication.`,
 
       case 'remove_keywords': {
         if (!ctx.input.campaignId)
-          throw new Error('campaignId is required for remove_keywords.');
+          throw createApiServiceError('campaignId is required for remove_keywords.');
         if (!ctx.input.keywords?.length)
-          throw new Error('keywords array is required for remove_keywords.');
+          throw createApiServiceError('keywords array is required for remove_keywords.');
         await client.removePositionTrackingKeywords(
           ctx.input.projectId,
           ctx.input.campaignId,
@@ -146,7 +149,8 @@ Requires OAuth 2.0 authentication.`,
       }
 
       case 'get_report': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for get_report.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for get_report.');
         let report = await client.getPositionTrackingReport(
           ctx.input.projectId,
           ctx.input.campaignId,
@@ -159,7 +163,7 @@ Requires OAuth 2.0 authentication.`,
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

@@ -1,8 +1,24 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { createMonitor, deleteMonitor, getUsage, listMonitors, runLookup } from './tools';
+import {
+  createMonitor,
+  deleteMonitor,
+  getMonitor,
+  getUsage,
+  listMonitors,
+  listMonitorTags,
+  runLookup
+} from './tools';
 export let provider = Slate.create({
   spec,
-  tools: [runLookup, listMonitors, createMonitor, deleteMonitor, getUsage],
+  tools: [
+    runLookup,
+    listMonitors,
+    createMonitor,
+    deleteMonitor,
+    getUsage,
+    getMonitor,
+    listMonitorTags
+  ],
   triggers: []
 });

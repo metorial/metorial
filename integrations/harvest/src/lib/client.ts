@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface HarvestClientConfig {
   token: string;
@@ -16,6 +16,8 @@ export interface PaginatedResponse<T> {
   totalEntries: number;
   totalPages: number;
   nextPage: number | null;
+  nextCursor: string | null;
+  pageNumberKnown: boolean;
   previousPage: number | null;
   page: number;
   perPage: number;
@@ -25,13 +27,14 @@ export class HarvestClient {
   private api;
 
   constructor(clientConfig: HarvestClientConfig) {
-    this.api = createAxios({
+    this.api = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Harvest', reason: 'harvest_api_error' }),
       baseURL: 'https://api.harvestapp.com/v2',
       headers: {
         Authorization: `Bearer ${clientConfig.token}`,
         'Harvest-Account-Id': clientConfig.accountId,
-        'User-Agent':
-          clientConfig.userAgent || 'Slates Harvest Integration (support@slates.dev)',
+        'User-Agent': clientConfig.userAgent || 'Harvest Integration',
         'Content-Type': 'application/json'
       }
     });
@@ -173,6 +176,7 @@ export class HarvestClient {
     isActive?: boolean;
     clientId?: number;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -181,7 +185,8 @@ export class HarvestClient {
         is_active: params?.isActive,
         client_id: params?.clientId,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -306,6 +311,7 @@ export class HarvestClient {
   async listClients(params?: {
     isActive?: boolean;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -313,7 +319,8 @@ export class HarvestClient {
       params: {
         is_active: params?.isActive,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -366,6 +373,7 @@ export class HarvestClient {
   async listContacts(params?: {
     clientId?: number;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -373,7 +381,8 @@ export class HarvestClient {
       params: {
         client_id: params?.clientId,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -858,6 +867,7 @@ export class HarvestClient {
   async listExpenseCategories(params?: {
     isActive?: boolean;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -865,7 +875,8 @@ export class HarvestClient {
       params: {
         is_active: params?.isActive,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -877,6 +888,7 @@ export class HarvestClient {
   async listTasks(params?: {
     isActive?: boolean;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -884,7 +896,8 @@ export class HarvestClient {
       params: {
         is_active: params?.isActive,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -945,6 +958,7 @@ export class HarvestClient {
   async listUsers(params?: {
     isActive?: boolean;
     updatedSince?: string;
+    cursor?: string;
     page?: number;
     perPage?: number;
   }): Promise<PaginatedResponse<any>> {
@@ -952,7 +966,8 @@ export class HarvestClient {
       params: {
         is_active: params?.isActive,
         updated_since: params?.updatedSince,
-        page: params?.page,
+        cursor: params?.cursor,
+        page: params?.cursor ? undefined : params?.page,
         per_page: params?.perPage
       }
     });
@@ -1289,13 +1304,29 @@ export class HarvestClient {
   // --- Helpers ---
 
   private parsePaginatedResponse(data: any, key: string): PaginatedResponse<any> {
+    let nextCursor: string | null = null;
+    if (typeof data.links?.next === 'string') {
+      try {
+        nextCursor = new URL(data.links.next, 'https://api.harvestapp.com').searchParams.get(
+          'cursor'
+        );
+      } catch (error) {
+        throw buildApiServiceError(error, {
+          providerLabel: 'Harvest',
+          reason: 'harvest_api_error',
+          operation: 'pagination response'
+        });
+      }
+    }
     return {
       results: data[key] ?? [],
       totalEntries: data.total_entries ?? 0,
       totalPages: data.total_pages ?? 0,
       nextPage: data.next_page ?? null,
+      nextCursor,
       previousPage: data.previous_page ?? null,
       page: data.page ?? 1,
+      pageNumberKnown: typeof data.page === 'number',
       perPage: data.per_page ?? 100
     };
   }

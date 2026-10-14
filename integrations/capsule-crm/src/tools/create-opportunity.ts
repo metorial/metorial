@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createOpportunity = SlateTool.create(spec, {
@@ -22,8 +23,12 @@ export let createOpportunity = SlateTool.create(spec, {
       valueCurrency: z.string().optional().describe('Currency code (e.g. USD, GBP, EUR)'),
       expectedCloseOn: z.string().optional().describe('Expected close date (YYYY-MM-DD)'),
       probability: z.number().optional().describe('Win probability percentage (0-100)'),
-      ownerId: z.number().optional().describe('Owner user ID'),
-      teamId: z.number().optional().describe('Team ID'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('Owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('Team ID. Use list_teams to discover IDs.'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
@@ -64,6 +69,13 @@ export let createOpportunity = SlateTool.create(spec, {
       if (ctx.input.valueCurrency) opportunity.value.currency = ctx.input.valueCurrency;
     }
 
+    if (ctx.input.fields) {
+      opportunity.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
+
     if (ctx.input.tags) {
       opportunity.tags = ctx.input.tags.map(t =>
         t.tagId ? { id: t.tagId } : { name: t.name }
@@ -75,8 +87,8 @@ export let createOpportunity = SlateTool.create(spec, {
     return {
       output: {
         opportunityId: result.id,
-        name: result.name,
-        createdAt: result.createdAt
+        name: result.name ?? undefined,
+        createdAt: result.createdAt ?? undefined
       },
       message: `Created opportunity **${result.name}** (ID: ${result.id}).`
     };

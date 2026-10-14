@@ -1,4 +1,75 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  SlateError
+} from 'slates';
+import { z } from 'zod';
+import { parseScimUser } from './scim-user';
+
+let normalizeBaseUrl = (value: string, label: string) => {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw createApiServiceError(`Provide a valid ${label} HTTPS base URL.`);
+  }
+
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw createApiServiceError(
+      `The ${label} base URL must use HTTPS and must not contain credentials, a query, or a fragment.`
+    );
+  }
+
+  return url.toString().replace(/\/+$/, '');
+};
+
+let requireToken = (token: string) => {
+  if (!token?.trim()) {
+    throw createApiServiceError('Configure an InVision API key or SCIM bearer token.');
+  }
+  return token.trim();
+};
+
+let createClient = (baseURL: string, token: string, isScim: boolean) =>
+  createAuthenticatedAxios({
+    baseURL,
+    authHeader: isScim
+      ? { value: `Bearer ${requireToken(token)}` }
+      : { name: 'X-API-KEY', value: requireToken(token) },
+    contentType: isScim ? 'application/scim+json' : false,
+    headers: isScim ? { Accept: 'application/scim+json' } : undefined,
+    timeout: 30_000,
+    maxRedirects: 0,
+    errorMapping: {
+      mapAxiosError: (error, inferred) => {
+        let data = error.response?.data;
+        if (!isApiErrorRecord(data)) return undefined;
+        return {
+          message:
+            typeof data.detail === 'string' && data.detail.trim()
+              ? data.detail
+              : inferred.message,
+          upstream: {
+            ...inferred.upstream,
+            code: typeof data.scimType === 'string' ? data.scimType : inferred.upstream?.code
+          }
+        };
+      }
+    },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'InVision',
+        reason: 'invision_api_error',
+        extractUpstreamCode: (mappedError, response) =>
+          SlateError.is(mappedError)
+            ? mappedError.data.upstream?.code
+            : isApiErrorRecord(response?.data) && typeof response.data.scimType === 'string'
+              ? response.data.scimType
+              : undefined
+      })
+  });
 
 export interface DsmClientConfig {
   token: string;
@@ -6,73 +77,34 @@ export interface DsmClientConfig {
 }
 
 export class DsmClient {
-  private token: string;
   private dsmBaseUrl: string;
+  private axios: ReturnType<typeof createClient>;
 
   constructor(config: DsmClientConfig) {
-    this.token = config.token;
-    this.dsmBaseUrl = config.dsmBaseUrl;
+    this.dsmBaseUrl = normalizeBaseUrl(config.dsmBaseUrl, 'DSM export');
+    this.axios = createClient(this.dsmBaseUrl, config.token, false);
   }
 
-  async getDesignTokens(
-    format: string = 'json',
-    exportFormat: string = 'lookup'
-  ): Promise<any> {
-    let url = `${this.dsmBaseUrl}/style-data.${format}`;
-    let params: Record<string, string> = {};
-    if (format === 'json') {
-      params.exportFormat = exportFormat;
+  async getDesignTokens(format = 'json', exportFormat = 'lookup'): Promise<unknown> {
+    let response = await this.axios.get(`/style-data.${format}`, {
+      params: format === 'json' ? { exportFormat } : undefined
+    });
+    if (
+      format === 'json' &&
+      !isApiErrorRecord(response.data) &&
+      !Array.isArray(response.data)
+    ) {
+      throw createApiServiceError('InVision returned an invalid DSM JSON token response.');
     }
-
-    let axios = createAxios();
-    let response = await axios.get(url, {
-      headers: {
-        'X-API-KEY': this.token
-      },
-      params
-    });
-
     return response.data;
   }
 
-  async getDesignTokensStyleDictionary(): Promise<ArrayBuffer> {
-    let url = `${this.dsmBaseUrl}/tokens-style-dictionary.zip`;
-
-    let axios = createAxios();
-    let response = await axios.get(url, {
-      headers: {
-        'X-API-KEY': this.token
-      },
-      responseType: 'arraybuffer'
-    });
-
-    return response.data;
+  getStyleParamsUrl(type: string): string {
+    return `${this.dsmBaseUrl}/_style-params.${type}`;
   }
 
-  async getIcons(): Promise<ArrayBuffer> {
-    let url = `${this.dsmBaseUrl}/icons.zip`;
-
-    let axios = createAxios();
-    let response = await axios.get(url, {
-      headers: {
-        'X-API-KEY': this.token
-      },
-      responseType: 'arraybuffer'
-    });
-
-    return response.data;
-  }
-
-  async getStyleParams(type: string): Promise<string> {
-    let url = `${this.dsmBaseUrl}/_style-params.${type}`;
-
-    let axios = createAxios();
-    let response = await axios.get(url, {
-      headers: {
-        'X-API-KEY': this.token
-      }
-    });
-
+  async getStyleParams(type: string): Promise<unknown> {
+    let response = await this.axios.get(this.getStyleParamsUrl(type));
     return response.data;
   }
 }
@@ -82,39 +114,51 @@ export interface ScimClientConfig {
   scimBaseUrl: string;
 }
 
+type ScimUserUpdates = {
+  userName?: string;
+  givenName?: string;
+  familyName?: string;
+  email?: string;
+  active?: boolean;
+};
+
+type ScimPatchOperation = {
+  op: 'replace' | 'add';
+  path: string;
+  value: string | boolean | Array<{ value: string; type: 'work' }>;
+};
+
+let scimListSchema = z.object({
+  totalResults: z.number().int().nonnegative(),
+  Resources: z.array(z.unknown()).optional(),
+  startIndex: z.number().int().min(1).optional(),
+  itemsPerPage: z.number().int().nonnegative().optional()
+});
+
 export class ScimClient {
-  private token: string;
-  private scimBaseUrl: string;
+  private axios: ReturnType<typeof createClient>;
 
   constructor(config: ScimClientConfig) {
-    this.token = config.token;
-    this.scimBaseUrl = config.scimBaseUrl;
+    let scimBaseUrl = normalizeBaseUrl(config.scimBaseUrl, 'SCIM');
+    this.axios = createClient(scimBaseUrl, config.token, true);
   }
 
-  private getAxios() {
-    return createAxios({
-      baseURL: this.scimBaseUrl,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/scim+json'
-      }
+  async listUsers(filter?: string, startIndex?: number, count?: number) {
+    let response = await this.axios.get('/Users', {
+      params: { filter, startIndex, count }
     });
+    let result = scimListSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError('InVision returned an invalid SCIM user list.');
+    }
+    if (count !== 0 && result.data.totalResults > 0 && !result.data.Resources) {
+      throw createApiServiceError('InVision omitted users from its SCIM list response.');
+    }
+    return result.data;
   }
 
-  async listUsers(filter?: string, startIndex?: number, count?: number): Promise<any> {
-    let axios = this.getAxios();
-    let params: Record<string, string | number> = {};
-    if (filter) params.filter = filter;
-    if (startIndex !== undefined) params.startIndex = startIndex;
-    if (count !== undefined) params.count = count;
-
-    let response = await axios.get('/Users', { params });
-    return response.data;
-  }
-
-  async getUser(userId: string): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Users/${userId}`);
+  async getUser(userId: string): Promise<unknown> {
+    let response = await this.axios.get(`/Users/${encodeURIComponent(userId)}`);
     return response.data;
   }
 
@@ -124,73 +168,73 @@ export class ScimClient {
     familyName: string;
     email: string;
     active?: boolean;
-  }): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Users', {
+  }): Promise<unknown> {
+    let response = await this.axios.post('/Users', {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
       userName: user.userName,
       name: {
         givenName: user.givenName,
         familyName: user.familyName
       },
-      emails: [
-        {
-          value: user.email,
-          type: 'work',
-          primary: true
-        }
-      ],
+      emails: [{ value: user.email, type: 'work', primary: true }],
       active: user.active ?? true
     });
     return response.data;
   }
 
-  async updateUser(
-    userId: string,
-    updates: {
-      userName?: string;
-      givenName?: string;
-      familyName?: string;
-      email?: string;
-      active?: boolean;
+  async updateUser(userId: string, updates: ScimUserUpdates): Promise<unknown> {
+    let operations: ScimPatchOperation[] = [];
+    let paths = {
+      userName: 'userName',
+      givenName: 'name.givenName',
+      familyName: 'name.familyName',
+      active: 'active'
+    } as const;
+    for (let key of Object.keys(paths) as Array<keyof typeof paths>) {
+      let value = updates[key];
+      if (value !== undefined) {
+        operations.push({ op: 'replace', path: paths[key], value });
+      }
     }
-  ): Promise<any> {
-    let axios = this.getAxios();
-    let body: Record<string, any> = {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User']
-    };
 
-    if (updates.userName !== undefined) body.userName = updates.userName;
-    if (updates.givenName !== undefined || updates.familyName !== undefined) {
-      body.name = {};
-      if (updates.givenName !== undefined) body.name.givenName = updates.givenName;
-      if (updates.familyName !== undefined) body.name.familyName = updates.familyName;
-    }
     if (updates.email !== undefined) {
-      body.emails = [{ value: updates.email, type: 'work', primary: true }];
+      let user = parseScimUser(await this.getUser(userId));
+      let hasWorkEmail = user.emails?.some(email => email.type?.toLowerCase() === 'work');
+      operations.push(
+        hasWorkEmail
+          ? {
+              op: 'replace',
+              path: 'emails[type eq "work"].value',
+              value: updates.email
+            }
+          : {
+              op: 'add',
+              path: 'emails',
+              value: [{ value: updates.email, type: 'work' }]
+            }
+      );
     }
-    if (updates.active !== undefined) body.active = updates.active;
 
-    let response = await axios.put(`/Users/${userId}`, body);
-    return response.data;
+    if (operations.length === 0) {
+      throw createApiServiceError('Provide at least one user attribute to update.');
+    }
+
+    await this.axios.patch(`/Users/${encodeURIComponent(userId)}`, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: operations
+    });
+
+    return this.getUser(userId);
   }
 
-  async deactivateUser(userId: string): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.patch(`/Users/${userId}`, {
+  async deactivateUser(userId: string): Promise<void> {
+    await this.axios.patch(`/Users/${encodeURIComponent(userId)}`, {
       schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-      Operations: [
-        {
-          op: 'replace',
-          value: { active: false }
-        }
-      ]
+      Operations: [{ op: 'replace', path: 'active', value: false }]
     });
-    return response.data;
   }
 
   async deleteUser(userId: string): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Users/${userId}`);
+    await this.axios.delete(`/Users/${encodeURIComponent(userId)}`);
   }
 }

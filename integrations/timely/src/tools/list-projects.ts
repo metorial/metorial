@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -25,11 +26,12 @@ let projectSchema = z.object({
 export let listProjects = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `Retrieve projects from Timely. Filter by status (active, archived, all, mine). Includes client, budget, and rate information.`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve projects from Timely. Filter by status (active, archived, all, mine). Includes client, budget, and rate information.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       filter: z
         .enum(['active', 'all', 'mine', 'archived'])
         .optional()
@@ -46,10 +48,7 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let projects = await client.listProjects({
       filter: ctx.input.filter,

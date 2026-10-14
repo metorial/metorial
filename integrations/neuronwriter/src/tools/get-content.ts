@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getContent = SlateTool.create(spec, {
   name: 'Get Content',
   key: 'get_content',
-  description: `Retrieve the last saved content revision for a query, including HTML content, title, and meta description. Optionally include autosave revisions in addition to manually saved ones.`,
+  description: `Retrieve the last saved content revision for a query, including HTML content, title, and meta description, and prepare an HTML file for download. Optionally include autosave revisions in addition to manually saved ones.`,
   tags: {
     readOnly: true
   }
@@ -35,6 +35,14 @@ export let getContent = SlateTool.create(spec, {
     let client = new NeuronWriterClient(ctx.auth.token);
     let revisionType = ctx.input.includeAutosave ? 'all' : undefined;
     let result = await client.getContent(ctx.input.queryId, revisionType);
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(result.content, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      }),
+      filename: 'neuronwriter-content.html'
+    });
 
     return {
       output: {

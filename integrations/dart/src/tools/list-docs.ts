@@ -21,19 +21,39 @@ export let listDocs = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Full-text search across title, text, and folder'),
-      inTrash: z.boolean().optional().describe('Include trashed documents'),
+      inTrash: z
+        .boolean()
+        .optional()
+        .describe('Return trashed documents instead of active documents'),
       ordering: z
         .array(z.string())
         .optional()
         .describe('Ordering fields (e.g., ["-updated_at", "title"])'),
       limit: z.number().optional().describe('Max results per page'),
       offset: z.number().optional().describe('Pagination offset'),
-      noDefaults: z.boolean().optional().describe('Disable default filters')
+      noDefaults: z
+        .boolean()
+        .optional()
+        .describe(
+          'Skip workspace filters (defaults to true); ordering and trash exclusion still apply'
+        )
     })
   )
   .output(
     z.object({
       count: z.number().describe('Total number of matching documents'),
+      next: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Next page URL, or null when there are no more results; use its offset with the same filters'
+        ),
+      previous: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Previous page URL, or null on the first page'),
       documents: z.array(conciseDocSchema).describe('List of documents')
     })
   )
@@ -44,6 +64,8 @@ export let listDocs = SlateTool.create(spec, {
     return {
       output: {
         count: result.count,
+        next: result.next,
+        previous: result.previous,
         documents: result.results
       },
       message: `Found **${result.count}** document(s). Returned ${result.results.length} result(s).`

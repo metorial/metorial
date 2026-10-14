@@ -1,60 +1,51 @@
-Now let me check the Custom API 2.0 page for any newer API features:The Custom API 2.0 page appears to only contain a Swagger embed that didn't render. I have enough information to compile the specification now.
+# Pointagram integration
 
-# Slates Specification for Pointagram
-
-## Overview
-
-Pointagram is a SaaS gamification platform that allows organizations to manage players, track points via score series, run competitions (leaderboards, head-to-head, etc.), award badges, create quests, and operate reward stores. It is used to motivate teams and individuals by turning performance metrics into point-based games and competitions.
+Pointagram is a gamification platform for players, teams, points, score series, and competitions. This integration exposes 13 tools for managing players and teams, awarding points, and retrieving competition and score data.
 
 ## Authentication
 
-Pointagram uses **API key authentication**. All API requests must include the following HTTP headers:
+The API key and Pointagram login email are generated or selected under Settings → Integrations → Custom Integration. Credential verification uses the documented POST `/test` endpoint, with no request body. Legacy requests use `api_key` and `api_user` headers; Custom API 2.0 uses `Api-Key` and `Api-User`. Both use `Content-Type: application/json`. API keys have no documented OAuth exchange or refresh flow. Configuration has no duplicate authentication fields or required resource identifiers.
 
-- **`api_key`**: Your API key, generated within Pointagram.
-- **`api_user`**: Your Pointagram login email address.
-- **`Content-Type`**: `application/json`
+## API coverage
 
-**Obtaining an API key:**
+| Tool | Method and endpoint |
+| --- | --- |
+| `create_player` | POST `/create_player` |
+| `list_players` | GET `/list_players`, optional `search_by` and `filter` |
+| `remove_player` | POST `/remove_player` |
+| `create_team` | POST `/add_team` |
+| `list_teams` | GET `/list_teams` |
+| `manage_team_membership` | POST `/add_to_team` or DELETE `/remove_from_team` |
+| `add_score` | POST `/add_score` |
+| `list_score_series` | GET `/list_score_series`, optional GET `/list_score_series_point_types` |
+| `list_score_history` | GET `/list_score_series_history` |
+| `list_competitions` | GET `/list_competitions`; optional API 2.0 GET `/competitions/{id}/players` for each selected competition |
+| `get_player` | API 2.0 GET `/players/{id}` |
+| `update_player` | API 2.0 POST `/players/{id}` |
+| `list_team_players` | API 2.0 GET `/teams/{id}/players` |
 
-Go to your profile and click **Settings**, then **Integrations**. Add a Custom Integration and click **Create Credentials**. Name your integration and click "Show Key" to get your key. This key is the equivalent of a password. Click save and you're done.
+Legacy endpoints use `https://app.pointagram.com/server/externalapi.php`; API 2.0 uses `https://app.pointagram.com/api/20`.
 
-The base API endpoint is `https://app.pointagram.com/server/externalapi.php/`.
+Player and team identifiers can be discovered using the list tools. Team membership accepts a player ID, email, or external ID. A name-only request first searches players and requires a unique exact match. Legacy documentation lists both `teamid` and `team_id`, so both documented spellings carry the same identifier. Membership removal sends a DELETE request with a JSON body.
 
-A test endpoint is available at `https://app.pointagram.com/server/externalapi.php/test` to verify credentials.
+Scores require a player identity, a score series ID or name, and numeric points or a point-type name. Numeric points retain support for decimals and zero. `sourceScoreId` causes the provider to revoke the previous matching transaction and create a replacement; this is provider-side deduplication rather than a no-op on repeated requests.
 
-For **embed/sharing** use cases (embedding profile pages, competitions, widgetboards, or the reward store into external sites), Pointagram uses an **App ID** and **App Shared Secret** to generate an HMAC-based authentication code. These are retrieved from the Custom Integration settings screen and should be kept server-side.
+History supports JSON-string tag and OR-tag filters, JSON arrays of team/player IDs, UTC time bounds, revoked entries, and page sizes from 1 to 1000. Legacy pagination uses both the final row's timestamp and ID. List outputs preserve provider rows and support arrays as well as named arrays in response envelopes.
 
-## Features
+Competition player filters are sent as `search_by` and `filter`; access keys use `accesskey`. When several player identifiers are provided, email takes precedence, then name, then external ID. The participant option retrieves each selected competition's players using its ID and returns one combined list; player filters select competitions rather than limiting their participant lists.
 
-### Player Management
+## Limits
 
-Create, list, and remove players. Players can be either online (with their own login) or offline (managed by an admin). Players are identified by name, email, or an external ID you provide. Removed players are soft-deleted; full anonymization must be done within the Pointagram UI. Admin users cannot be removed via the API.
+Player removal is soft deletion. Missing players can produce an HTTP-success error response, and administrator removal is ignored. Full anonymization requires the Pointagram UI. Inspect the API result and list players to confirm removal.
 
-### Team Management
+The documented endpoint inventory does not expose a dedicated current-user/account profile endpoint. Authentication retains the configured login email as the connection profile. None of these tools generates or downloads a file. Profile icon URLs are resource metadata.
 
-Create and list teams, and add or remove players from teams. Team icons are mandatory and can use standard built-in icons (e.g., Bears, Bulls, Sharks) or custom-uploaded icons. Teams can be configured to be exempt from filter settings.
+This integration does not expose badge, quest, reward-store, point-type creation, embed-generation, or trigger capabilities. Provider acceptance of requests and response formats requires live verification.
 
-### Score & Points Management
+## Official references
 
-Add points to players within specific score series. At the core of Pointagram's system is the Score Series — this is where all points are stored and structured. When adding points, you specify the player, score series, and point amount. Additional options include:
-
-- **Tags**: Categorize score entries with tags for filtering.
-- **Point types**: Use named point types instead of raw numeric values.
-- **Source score ID**: A deduplication/idempotency key that revokes old transactions when resubmitted.
-- **Comments**: Visible in the news feed.
-- **Score time**: Backdate transactions to a specific time.
-- **Auto-create players**: Optionally create players on-the-fly when adding scores.
-
-You can also list score series, their point types, and query score history with filters by tags, teams, players, and time ranges.
-
-### Competition Data
-
-List competitions and their participating players. Competitions can be filtered by player (via email, name, or external ID), competition ID, or access key.
-
-### Embeddable Widgets
-
-Embed Pointagram content (player profiles, competitions, widgetboards, and reward stores) into external websites using iframes secured with HMAC authentication. This allows displaying gamification data directly within your own applications or portals.
-
-## Events
-
-The provider does not support webhooks or event subscriptions through its own API. Pointagram acts as a data sink — it receives points and player data via its API but does not provide a mechanism to push notifications or events back to external systems.
+- [Legacy Custom Integration API](https://www.pointagram.com/custom-integration-gamification/)
+- [Custom API 2.0](https://www.pointagram.com/custom-api-2-0-gamification/)
+- [Official Swagger UI](https://www.pointagram.com/wp-content/swagger-ui/index.html)
+- [OpenAPI 1.0.1](https://www.pointagram.com/wp-content/uploads/2025/02/openapi.yaml)
+- [Developers overview](https://www.pointagram.com/gamification-api-for-developers/)

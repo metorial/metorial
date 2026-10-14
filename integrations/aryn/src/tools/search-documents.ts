@@ -12,7 +12,7 @@ Supports property-based filtering to narrow results, and can return results at t
   instructions: [
     'Use queryType "hybrid" for best results combining semantic and keyword matching.',
     'Use returnType "element" to get chunk-level results, or "doc" for document-level results.',
-    'Use propertiesFilter for boolean expressions to filter by document properties, e.g. "status == \'active\'".'
+    `Use propertiesFilter for boolean expressions to filter by document properties, e.g. '(properties.entity.status="active")'.`
   ],
   tags: {
     readOnly: true,
@@ -21,7 +21,9 @@ Supports property-based filtering to narrow results, and can return results at t
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to search'),
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to search. Call list_docsets to discover DocSet IDs.'),
       query: z.string().optional().describe('Search query text'),
       queryType: z
         .enum(['keyword', 'lexical', 'vector', 'hybrid'])
@@ -77,7 +79,7 @@ Supports property-based filtering to narrow results, and can return results at t
     return {
       output: {
         results: result.results ?? [],
-        nextPageToken: result.next_page_token
+        nextPageToken: result.next_page_token ?? undefined
       },
       message: `Found **${result.results?.length ?? 0}** result(s) using **${ctx.input.queryType}** search.`
     };

@@ -1,14 +1,27 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class PlaygroundClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(apiKey: string) {
-    this.axios = createAxios({
+  constructor(auth: { token: string; authType: 'playground' | 'studio' }) {
+    if (auth.authType !== 'playground') {
+      throw createApiServiceError(
+        'This tool requires Playground authentication. Connect with the Playground authentication method and try again.'
+      );
+    }
+    if (!auth.token.trim()) {
+      throw createApiServiceError(
+        'The Playground credential is missing. Reconnect the account and try again.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://os.gan.ai',
-      headers: {
-        'ganos-api-key': apiKey
-      }
+      authHeader: { name: 'ganos-api-key', value: auth.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Gan.AI Playground',
+          reason: 'gan_ai_api_error'
+        })
     });
   }
 

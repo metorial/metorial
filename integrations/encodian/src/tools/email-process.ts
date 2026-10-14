@@ -40,15 +40,19 @@ export let emailProcess = SlateTool.create(spec, {
         .any()
         .optional()
         .describe('Email metadata (sender, recipients, subject, dates, body, etc.)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     if (ctx.input.operation === 'extract_attachments') {
       let body: Record<string, any> = {
-        fileContent: ctx.input.fileContent
+        fileContent: ctx.input.fileContent,
+        fileName: ctx.input.fileName || 'email.eml',
+        getInlineAttachments: ctx.input.getInlineAttachments ?? true
       };
       if (ctx.input.fileName) body.fileName = ctx.input.fileName;
       if (ctx.input.getInlineAttachments !== undefined)
@@ -62,9 +66,13 @@ export let emailProcess = SlateTool.create(spec, {
             fileName: d.fileName,
             fileContent: d.fileContent
           })),
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Extracted **${result.documents?.length || 0} attachments** from email.`
+        message: client.message(
+          `Extracted **${result.documents?.length || 0} attachments** from email.`
+        )
       };
     } else {
       let result = await client.getEmailMetadata({
@@ -74,9 +82,11 @@ export let emailProcess = SlateTool.create(spec, {
       return {
         output: {
           emailMetadata: result,
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId || ''
         },
-        message: `Successfully extracted email metadata.`
+        message: client.message(`Successfully extracted email metadata.`)
       };
     }
   })

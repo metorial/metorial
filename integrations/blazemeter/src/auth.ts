@@ -1,5 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { BlazeMeterClient } from './lib/client';
+import { RunscopeClient } from './lib/runscope-client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,6 +28,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKeyId.trim() || !ctx.input.apiKeySecret.trim()) {
+        throw createApiServiceError('BlazeMeter API Key ID and Secret are required.');
+      }
       let token = Buffer.from(`${ctx.input.apiKeyId}:${ctx.input.apiKeySecret}`).toString(
         'base64'
       );
@@ -37,27 +47,18 @@ export let auth = SlateAuth.create()
       output: { token: string };
       input: { apiKeyId: string; apiKeySecret: string };
     }) => {
-      let client = createAxios({
-        baseURL: 'https://a.blazemeter.com/api/v4',
-        headers: {
-          Authorization: `Basic ${ctx.output.token}`
-        }
-      });
-
-      let response = await client.get('/user');
-      let data = response.data as {
-        result?: {
-          id?: number;
-          email?: string;
-          displayName?: string;
-        };
-      };
+      let data = await new BlazeMeterClient({ token: ctx.output.token }).getCurrentUser();
+      if (data?.id === undefined || data?.id === null) {
+        throw createApiServiceError('BlazeMeter did not return an authenticated user ID.');
+      }
 
       return {
         profile: {
-          id: data.result?.id?.toString(),
-          email: data.result?.email,
-          name: data.result?.displayName
+          id: String(data.id),
+          email: data.email ?? undefined,
+          name:
+            data.displayName ??
+            ([data.firstName, data.lastName].filter(Boolean).join(' ') || undefined)
         }
       };
     }
@@ -75,9 +76,24 @@ export let auth = SlateAuth.create()
         scope: 'api:read'
       },
       {
-        title: 'Write Messages',
-        description: 'Write access to messages',
+        title: 'Create Buckets',
+        description: 'Create API monitoring buckets',
         scope: 'message:write'
+      },
+      {
+        title: 'Bucket Access',
+        description: 'Access authenticated monitoring buckets',
+        scope: 'bucket:write'
+      },
+      {
+        title: 'Read Tests',
+        description: 'Read API monitoring tests and results',
+        scope: 'test:read'
+      },
+      {
+        title: 'Manage Tests',
+        description: 'Create, update, delete, and run API monitoring tests',
+        scope: 'test:write'
       }
     ],
 
@@ -96,15 +112,26 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let client = createAxios({ baseURL: 'https://www.runscope.com' });
-
-      let response = await client.post('/signin/oauth/access_token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code,
-        grant_type: 'authorization_code',
-        redirect_uri: ctx.redirectUri
+      let client = createAuthenticatedAxios({
+        baseURL: 'https://www.runscope.com',
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'BlazeMeter API Monitoring OAuth',
+            reason: 'blazemeter_oauth_error'
+          })
       });
+
+      let response = await client.post(
+        '/signin/oauth/access_token',
+        new URLSearchParams({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          code: ctx.code,
+          grant_type: 'authorization_code',
+          redirect_uri: ctx.redirectUri
+        }).toString()
+      );
 
       let data = response.data as {
         access_token?: string;
@@ -113,7 +140,7 @@ export let auth = SlateAuth.create()
       };
 
       if (!data.access_token) {
-        throw new Error(`Runscope OAuth error: ${data.error || 'Unknown error'}`);
+        throw createApiServiceError(`Runscope OAuth error: ${data.error || 'Unknown error'}`);
       }
 
       return {
@@ -125,27 +152,18 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let client = createAxios({ baseURL: 'https://api.runscope.com' });
-
-      let response = await client.get('/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data as {
-        data?: {
-          id?: string;
-          name?: string;
-          email?: string;
-        };
-      };
+      let data = await new RunscopeClient({ token: ctx.output.token }).getAccount();
+      if (!data?.uuid) {
+        throw createApiServiceError(
+          'API Monitoring did not return an authenticated account UUID.'
+        );
+      }
 
       return {
         profile: {
-          id: data.data?.id,
-          name: data.data?.name,
-          email: data.data?.email
+          id: data.uuid,
+          name: data.name ?? undefined,
+          email: data.email ?? undefined
         }
       };
     }

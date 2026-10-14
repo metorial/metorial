@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageEnterpriseStore = SlateTool.create(spec, {
@@ -60,14 +60,14 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(profiles) ? profiles : [];
+        let items = getAppcircleList(profiles, 'list');
         return {
           output: items,
           message: `Found **${items.length}** Enterprise Store profile(s).`
         };
       }
       case 'get_profile': {
-        if (!ctx.input.profileId) throw new Error('profileId is required');
+        if (!ctx.input.profileId) throw createApiServiceError('profileId is required');
         let profile = await client.getEnterpriseStoreProfile(ctx.input.profileId);
         return {
           output: profile,
@@ -75,12 +75,15 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
         };
       }
       case 'list_app_versions': {
-        if (!ctx.input.profileId) throw new Error('profileId is required');
+        if (!ctx.input.profileId) throw createApiServiceError('profileId is required');
         let versions = await client.listEnterpriseStoreAppVersions(ctx.input.profileId, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(versions) ? versions : [];
+        let items = getAppcircleList(
+          Array.isArray(versions) ? versions : (versions?.appVersions ?? []),
+          'app versions'
+        );
         return {
           output: items,
           message: `Found **${items.length}** app version(s) in Enterprise Store.`
@@ -88,7 +91,7 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
       }
       case 'get_app_version': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         let version = await client.getEnterpriseStoreAppVersion(
           ctx.input.profileId,
           ctx.input.appVersionId
@@ -100,7 +103,7 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
       }
       case 'publish': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         let result = await client.publishEnterpriseStoreAppVersion(
           ctx.input.profileId,
           ctx.input.appVersionId,
@@ -117,7 +120,7 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
       }
       case 'unpublish': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         let result = await client.unpublishEnterpriseStoreAppVersion(
           ctx.input.profileId,
           ctx.input.appVersionId
@@ -129,7 +132,7 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
       }
       case 'get_download_link': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         let link = await client.getEnterpriseStoreDownloadLink(
           ctx.input.profileId,
           ctx.input.appVersionId
@@ -141,7 +144,7 @@ export let manageEnterpriseStore = SlateTool.create(spec, {
       }
       case 'delete_app_version': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         await client.deleteEnterpriseStoreAppVersion(
           ctx.input.profileId,
           ctx.input.appVersionId

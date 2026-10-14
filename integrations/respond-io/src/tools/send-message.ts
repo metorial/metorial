@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,8 @@ import { spec } from '../spec';
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a message to a contact through a connected channel. Supports text messages, media/attachments (image, video, audio, file), and custom payloads. If no channel is specified, the message is sent through the last interacted channel.`,
+  description: `Send a message to a contact through a connected channel. Supports text messages and media (image, video, audio, file). If no channel is specified, the message is sent through the last interacted channel.`,
   instructions: [
-    'Custom payload messages are only supported for Telegram, Facebook, Viber, and LINE channels.',
     'For WhatsApp template messages, use the Send Template Message tool instead.'
   ],
   tags: {
@@ -43,11 +42,19 @@ export let sendMessage = SlateTool.create(spec, {
     let message: Record<string, any>;
 
     if (ctx.input.messageType === 'text') {
+      if (!ctx.input.text?.trim())
+        throw createApiServiceError('Provide text for a text message.');
       message = {
         type: 'text',
         text: ctx.input.text
       };
     } else {
+      if (!ctx.input.attachmentType || !ctx.input.attachmentUrl)
+        throw createApiServiceError(
+          'Provide attachmentType and attachmentUrl for an attachment message.'
+        );
+      if (!/^https?:\/\//i.test(ctx.input.attachmentUrl))
+        throw createApiServiceError('attachmentUrl must be an HTTP or HTTPS URL.');
       message = {
         type: 'attachment',
         attachment: {

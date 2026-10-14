@@ -37,9 +37,15 @@ export let updateContact = SlateTool.create(spec, {
         .describe('Email addresses (replaces all emails)'),
       phones: z.array(phoneSchema).optional().describe('Phone numbers (replaces all phones)'),
       urls: z.array(urlSchema).optional().describe('URLs (replaces all URLs)'),
-      address: addressSchema.optional().describe('Postal address'),
+      address: addressSchema
+        .optional()
+        .describe('Postal address; replaces the address list with this single address'),
       tags: z.array(z.string()).optional().describe('Tags (replaces all tags)'),
-      starValue: z.number().optional().describe('Star rating (0-5)'),
+      starValue: z
+        .number()
+        .optional()
+        .describe('Legacy unsupported star rating. Use starred instead.'),
+      starred: z.boolean().optional().describe('Whether the contact is starred'),
       customFields: z.array(customFieldValueSchema).optional().describe('Custom field values')
     })
   )

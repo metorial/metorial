@@ -25,7 +25,7 @@ export let createBrowserSession = SlateTool.create(spec, {
 
 Returns a CDP URL for connecting via Playwright, Puppeteer, or other CDP-compatible tools, along with a session ID and base URL.`,
   instructions: [
-    'Use "stealth" browser profile to help avoid bot detection on protected sites.',
+    'Use "tf-browser" for full browser features; "stealth" remains a supported alias.',
     'Use "on_inactivity_timeout" shutdown mode to keep sessions alive for reuse within the timeout window.'
   ],
   constraints: ['Inactivity timeout must be between 5 and 86400 seconds.'],
@@ -42,10 +42,10 @@ Returns a CDP URL for connecting via Playwright, Puppeteer, or other CDP-compati
           'User agent preset to simulate a specific operating system. Defaults to "linux"'
         ),
       browserProfile: z
-        .enum(['light', 'stealth'])
+        .enum(['light', 'stealth', 'tf-browser'])
         .optional()
         .describe(
-          'Browser profile: "light" (default) or "stealth" for enhanced bot detection avoidance'
+          'Browser profile: "light" (default), "tf-browser" for full browser features, or its "stealth" alias'
         ),
       shutdownMode: z
         .enum(['on_disconnect', 'on_inactivity_timeout'])
@@ -57,6 +57,23 @@ Returns a CDP URL for connecting via Playwright, Puppeteer, or other CDP-compati
         .number()
         .optional()
         .describe('Session timeout duration in seconds (5-86400). Defaults to 300'),
+      sessionMaxDurationSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .max(86400)
+        .optional()
+        .describe('Hard session duration limit in seconds (1-86400)'),
+      browserStartupUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Optional HTTP(S) startup URL, or about:blank, to open before the CDP client connects'
+        ),
+      subUserId: z
+        .string()
+        .optional()
+        .describe('Optional sub-user identifier for session usage attribution'),
       proxy: z
         .union([tetraProxySchema, customProxySchema])
         .optional()
@@ -80,6 +97,9 @@ Returns a CDP URL for connecting via Playwright, Puppeteer, or other CDP-compati
       browserProfile: ctx.input.browserProfile,
       shutdownMode: ctx.input.shutdownMode,
       inactivityTimeoutSeconds: ctx.input.inactivityTimeoutSeconds,
+      sessionMaxDurationSeconds: ctx.input.sessionMaxDurationSeconds,
+      browserStartupUrl: ctx.input.browserStartupUrl,
+      subUserId: ctx.input.subUserId,
       proxy: ctx.input.proxy
     });
 

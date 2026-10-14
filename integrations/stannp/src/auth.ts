@@ -1,47 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { createClient } from './lib/client';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string(), region: z.enum(['us', 'uk']).optional() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
-      token: z
-        .string()
-        .describe('Your Stannp API key, found at the bottom of your account settings page')
+      token: z.string().describe('Your Stannp API key from your account settings'),
+      region: z
+        .enum(['us', 'uk'])
+        .default('us')
+        .describe('Region of your Stannp account: US or UK/EU')
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api-us1.stannp.com/v1/',
-        auth: {
-          username: ctx.output.token,
-          password: ''
-        }
-      });
-
-      let response = await axios.get('/user/info');
-      let data = response.data?.data;
-
+    getOutput: async ctx => ({ output: { token: ctx.input.token, region: ctx.input.region } }),
+    getProfile: async (ctx: { output: { token: string; region?: 'us' | 'uk' } }) => {
+      let data = await createClient(ctx.output).getAccountInfo();
       return {
         profile: {
-          id: data?.id?.toString(),
-          email: data?.email,
+          id: data?.id != null ? String(data.id) : undefined,
+          email: data?.email ?? undefined,
           name: data?.firstname ? `${data.firstname} ${data.lastname || ''}`.trim() : undefined
         }
       };

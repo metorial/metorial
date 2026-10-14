@@ -1,16 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class StreamtimeClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Streamtime API key is required. Reconnect with the key from Settings > Integrations.'
+      );
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.streamtime.net/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token.trim()}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Streamtime',
+          reason: 'streamtime_api_error'
+        })
     });
   }
 
@@ -101,8 +109,10 @@ export class StreamtimeClient {
     return response.data;
   }
 
-  async updateJobStatus(jobId: number, statusData: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/jobs/${jobId}/job_status`, statusData);
+  async updateJobStatus(jobId: number, statusId: number): Promise<any> {
+    let response = await this.axios.put(`/jobs/${jobId}/job_status`, undefined, {
+      params: { job_status_id: statusId }
+    });
     return response.data;
   }
 
@@ -111,8 +121,10 @@ export class StreamtimeClient {
     return response.data;
   }
 
-  async listJobActivityEntries(jobId: number): Promise<any[]> {
-    let response = await this.axios.get(`/jobs/${jobId}/activity_entries`);
+  async listJobActivityEntries(jobId: number, activityEntryTypeId?: number): Promise<any[]> {
+    let response = await this.axios.get(`/jobs/${jobId}/activity_entries`, {
+      params: { activity_entry_type_id: activityEntryTypeId }
+    });
     return response.data;
   }
 
@@ -248,8 +260,14 @@ export class StreamtimeClient {
     return response.data;
   }
 
-  async createInvoicePayment(invoiceId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/invoices/${invoiceId}/invoice_payments`, data);
+  async createInvoicePayment(
+    invoiceId: number,
+    data: Record<string, any>,
+    paymentAccountId?: number
+  ): Promise<any> {
+    let response = await this.axios.post(`/invoices/${invoiceId}/invoice_payments`, data, {
+      params: { paymentAccountId }
+    });
     return response.data;
   }
 
@@ -278,7 +296,7 @@ export class StreamtimeClient {
   }
 
   async createLoggedTimesBulk(entries: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.post('/logged_times/bulk', entries);
+    let response = await this.axios.post('/logged_times/bulk', { loggedTimes: entries });
     return response.data;
   }
 
@@ -299,7 +317,7 @@ export class StreamtimeClient {
   // ── Logged Expenses ───────────────────────────────────────────
 
   async createLoggedExpense(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/logged_expenses', data);
+    let response = await this.axios.post('/logged_expenses', { loggedExpense: data });
     return response.data;
   }
 
@@ -332,8 +350,10 @@ export class StreamtimeClient {
     return response.data;
   }
 
-  async createLabel(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/labels', data);
+  async createLabel(data: Record<string, any>, createMasterLabel?: boolean): Promise<any> {
+    let response = await this.axios.post('/labels', data, {
+      params: { create_master_label: createMasterLabel }
+    });
     return response.data;
   }
 
@@ -372,8 +392,18 @@ export class StreamtimeClient {
 
   // ── Search ────────────────────────────────────────────────────
 
+  async getSearchSetup(searchView: number): Promise<any> {
+    let response = await this.axios.get('/search/setup', {
+      params: { search_view: searchView }
+    });
+    return response.data;
+  }
+
   async search(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/search', data);
+    let { searchView, ...body } = data;
+    let response = await this.axios.post('/search', body, {
+      params: { search_view: searchView }
+    });
     return response.data;
   }
 

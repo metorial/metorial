@@ -1,4 +1,5 @@
 export * from './compute-funnel';
+export * from './compute-metric';
 export * from './list-sessions';
 export * from './list-websites';
 export * from './manage-alerts';

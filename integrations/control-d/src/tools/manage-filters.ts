@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -51,7 +51,7 @@ export let manageFilters = SlateTool.create(spec, {
 
     if (operation === 'update') {
       if (!filterUpdates || filterUpdates.length === 0) {
-        throw new Error('Filters array is required for update operation');
+        throw createApiServiceError('Filters array is required for update operation');
       }
       let mapped = filterUpdates.map(f => ({
         filter: f.filterId,

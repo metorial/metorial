@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { snippetSchema } from '../lib/types';
@@ -38,6 +38,24 @@ export let manageSnippets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.action === 'update' || ctx.input.action === 'delete') &&
+      ctx.input.snippetId === undefined
+    ) {
+      throw createApiServiceError('Provide snippetId for snippet update or deletion.');
+    }
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Provide a name when creating a snippet.');
+    }
+    if (
+      ctx.input.action === 'update' &&
+      ctx.input.name === undefined &&
+      ctx.input.tags === undefined &&
+      ctx.input.contentText === undefined &&
+      ctx.input.contentHtml === undefined
+    ) {
+      throw createApiServiceError('Provide at least one snippet field to update.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       companySubdomain: ctx.config.companySubdomain

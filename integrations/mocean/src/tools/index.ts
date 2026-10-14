@@ -5,6 +5,7 @@ export { hangupCall } from './hangup-call';
 export { makeVoiceCall } from './make-voice-call';
 export { manageWhatsAppTemplates } from './manage-whatsapp-templates';
 export { numberLookup } from './number-lookup';
+export { reportSmsConversion } from './report-sms-conversion';
 export { resendVerification } from './resend-verification';
 export { sendSms } from './send-sms';
 export { sendVerification } from './send-verification';

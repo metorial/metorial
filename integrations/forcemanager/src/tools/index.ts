@@ -1,10 +1,12 @@
 export { getAccount } from './get-account';
 export { getActivity } from './get-activity';
+export { getBranch } from './get-branch';
 export { getCalendarEntry } from './get-calendar-entry';
 export { getContact } from './get-contact';
 export { getOpportunity } from './get-opportunity';
 export { getProduct } from './get-product';
 export { getSalesOrder } from './get-sales-order';
+export { getSalesOrderLine } from './get-sales-order-line';
 export { getUser } from './get-user';
 export { getValues } from './get-values';
 export { lookupExternalId } from './lookup-external-id';

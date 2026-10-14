@@ -23,6 +23,7 @@ export let updateLead = SlateTool.create(spec, {
   .input(
     z.object({
       email: z.string().describe('Email address of the lead to update'),
+      newEmail: z.string().optional().describe('New email address for the existing lead'),
       firstName: z.string().optional().describe('New first name'),
       lastName: z.string().optional().describe('New last name'),
       subscribed: z.boolean().optional().describe('Updated subscription status'),
@@ -32,7 +33,20 @@ export let updateLead = SlateTool.create(spec, {
         .describe('Custom fields to update as merge tag key-value pairs'),
       timezone: z.string().optional().describe('Updated timezone'),
       ipAddress: z.string().optional().describe('Updated IP address'),
-      tags: z.array(z.string()).optional().describe('Updated tags list')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Replacement tags list. Do not combine with addTags or removeTags.'),
+      addTags: z
+        .array(z.string())
+        .optional()
+        .describe('Tags to attach. Do not combine with tags.'),
+      removeTags: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Tags to detach. Do not combine with tags. When also adding tags, removals happen last.'
+        )
     })
   )
   .output(

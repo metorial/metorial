@@ -1,133 +1,133 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let authAxios = createAxios({
-  baseURL: 'https://api.todoist.com'
+let authAxios = createAuthenticatedAxios({
+  baseURL: 'https://api.todoist.com',
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Todoist',
+      operation: 'OAuth token exchange',
+      reason: 'todoist_oauth_error'
+    })
 });
+
+let getProfile = async (ctx: { output: { token: string } }) => {
+  let user = await new Client({ token: ctx.output.token }).getUser();
+  return {
+    profile: { id: user.id, email: user.email, name: user.name, imageUrl: user.imageUrl }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
     scopes: [
       {
-        title: 'Add Tasks',
-        description: 'Add new tasks only',
-        scope: 'task:add'
-      },
-      {
-        title: 'Read Data',
-        description: 'Read-only access to tasks, projects, labels, and filters',
-        scope: 'data:read'
-      },
-      {
         title: 'Read & Write Data',
-        description:
-          'Read and write access to tasks, projects, labels, and filters (includes task:add and data:read)',
+        description: 'Read and write tasks, projects, labels, comments, and filters',
         scope: 'data:read_write'
       },
       {
         title: 'Delete Data',
-        description: 'Delete tasks, labels, and filters',
+        description: 'Delete tasks, comments, labels, and filters',
         scope: 'data:delete'
       },
       {
         title: 'Delete Projects',
         description: 'Delete projects',
         scope: 'project:delete'
-      },
-      {
-        title: 'Read Backups',
-        description: 'List backups bypassing MFA requirements',
-        scope: 'backups:read'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
+        redirect_uri: ctx.redirectUri,
+        response_type: 'code',
         scope: ctx.scopes.join(','),
         state: ctx.state
       });
-
-      return {
-        url: `https://app.todoist.com/oauth/authorize?${params.toString()}`
-      };
+      return { url: `https://app.todoist.com/oauth/authorize?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
-      let response = await authAxios.post('/oauth/access_token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code
-      });
-
+      let response = await authAxios.post(
+        '/oauth/access_token',
+        new URLSearchParams({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          grant_type: 'authorization_code',
+          redirect_uri: ctx.redirectUri,
+          code: ctx.code
+        })
+      );
+      let tokens = normalizeOAuthTokenResponse(response.data, { providerLabel: 'Todoist' });
       return {
         output: {
-          token: response.data.access_token
+          ...tokens,
+          // Legacy apps have long-lived tokens and a compatibility expires_in without refresh tokens.
+          expiresAt: tokens.refreshToken ? tokens.expiresAt : undefined
         }
       };
     },
-
-    getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await authAxios.get('/api/v1/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
-
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'This Todoist connection has no refresh token. Reconnect to renew access.'
+        );
+      }
+      let response = await authAxios.post(
+        '/oauth/access_token',
+        new URLSearchParams({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken
+        })
+      );
       return {
-        profile: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          imageUrl: user.image_url || user.avatar_big || user.avatar_medium
+        output: {
+          ...ctx.output,
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Todoist',
+            operation: 'refresh',
+            required: true,
+            previousRefreshToken: ctx.output.refreshToken
+          })
         }
       };
-    }
+    },
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
-      apiToken: z.string()
+      apiToken: z
+        .string()
+        .min(1)
+        .describe('API token from Settings → Integrations → Developer')
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiToken
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let response = await authAxios.get('/api/v1/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
-
-      return {
-        profile: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          imageUrl: user.image_url || user.avatar_big || user.avatar_medium
-        }
-      };
-    }
+    getOutput: async ctx => ({ output: { token: ctx.input.apiToken } }),
+    getProfile
   });

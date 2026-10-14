@@ -1,6 +1,12 @@
-# Callerapi
+# CallerAPI
 
-Look up phone number intelligence and caller identification data. Retrieve comprehensive phone info aggregated from multiple caller ID providers (Truecaller, Hiya, CallApp, etc.), including caller name, business details, carrier info, and spam reputation scores. Detect spam and fraud risk with complaint histories and scoring. Check number porting status and retrieve full porting history. Assess port-out fraud risk. Retrieve caller profile pictures. Check online presence across platforms like WhatsApp, Telegram, Instagram, LinkedIn, and more. Validate carriers via HLR lookup. Manage account credits and usage.
+Look up phone number intelligence and caller identification data, including carrier details, spam scores, and complaint history. Check number portability and past porting events, assess port-out fraud risk, retrieve caller pictures, and check online presence. Compare identity details with carrier records through KYC matching. Read account credits and usage.
+
+Connect with an API key from the CallerAPI dashboard. Current documented APIs use `https://api.callerapi.com` and the `X-Auth` header. Phone numbers use E.164 format. KYC matching and some phone intelligence operations consume account credits.
+
+Caller pictures remain available as `pictureBase64` and are also provided as downloadable files when the response contains a base64 image. Existing caller ID, picture, and port-fraud tools retain their original endpoints because these are not listed in the current reference; availability needs confirmation with an authorized account.
+
+See the [official API documentation](https://docs.callerapi.com/) and [capability reference](./docs/SPEC.md).
 
 ## License
 

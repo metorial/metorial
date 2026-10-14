@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SuperchatClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +16,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Superchat API key. Found under Settings > Integrations > API Key in the Superchat dashboard. Requires administrator access.'
+          'Your Superchat API key. Found under Settings > API in the Superchat dashboard. Requires administrator access.'
         )
     }),
     getOutput: async ctx => {
@@ -26,20 +27,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.superchat.com/v1.0',
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/me');
+      let user = await new SuperchatClient(ctx.output).getMe();
 
       return {
         profile: {
-          id: response.data.id,
-          email: response.data.email,
-          name: response.data.name
+          id: user.id,
+          email: user.email,
+          name: user.name
         }
       };
     }

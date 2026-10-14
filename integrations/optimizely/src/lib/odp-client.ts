@@ -1,11 +1,18 @@
 import { createAxios } from 'slates';
+import { optimizelyErrorMapping } from './api-errors';
 
 export class OdpClient {
   private axios: ReturnType<typeof createAxios>;
 
-  constructor(token: string) {
+  constructor(token: string, region: 'us' | 'eu' | 'apac' = 'us') {
     this.axios = createAxios({
-      baseURL: 'https://api.zaius.com',
+      errorMapping: optimizelyErrorMapping,
+      timeout: 30000,
+      baseURL: {
+        us: 'https://api.zaius.com',
+        eu: 'https://api.eu1.odp.optimizely.com',
+        apac: 'https://api.au1.odp.optimizely.com'
+      }[region],
       headers: {
         'x-api-key': token,
         'Content-Type': 'application/json'
@@ -27,7 +34,7 @@ export class OdpClient {
     identifiers: Record<string, string>;
     attributes?: Record<string, any>;
   }) {
-    let response = await this.axios.post('/v3/profiles', data);
+    let response = await this.axios.post('/v3/profiles', [data]);
     return response.data;
   }
 
@@ -38,7 +45,7 @@ export class OdpClient {
     identifiers: Record<string, string>;
     data?: Record<string, any>;
   }) {
-    let response = await this.axios.post('/v3/events', data);
+    let response = await this.axios.post('/v3/events', [data]);
     return response.data;
   }
 
@@ -80,7 +87,7 @@ export class OdpClient {
 
   async getCustomerSegments(identifierField: string, identifierValue: string) {
     let response = await this.axios.get(
-      `/v3/profiles/${identifierField}/${identifierValue}/segments`
+      `/v3/profiles/${encodeURIComponent(identifierField)}/${encodeURIComponent(identifierValue)}/segments`
     );
     return response.data;
   }
@@ -92,13 +99,17 @@ export class OdpClient {
   }
 
   async getObject(objectType: string) {
-    let response = await this.axios.get(`/v3/schema/objects/${objectType}`);
+    let response = await this.axios.get(
+      `/v3/schema/objects/${encodeURIComponent(objectType)}`
+    );
     return response.data;
   }
 
   // Fields
   async listFields(objectType: string) {
-    let response = await this.axios.get(`/v3/schema/objects/${objectType}/fields`);
+    let response = await this.axios.get(
+      `/v3/schema/objects/${encodeURIComponent(objectType)}/fields`
+    );
     return response.data;
   }
 }

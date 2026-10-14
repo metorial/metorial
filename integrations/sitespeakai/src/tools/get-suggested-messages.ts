@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { chatbotIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let suggestedMessageSchema = z.object({
@@ -25,7 +26,7 @@ export let getSuggestedMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot.')
+      chatbotId: chatbotIdSchema
     })
   )
   .output(

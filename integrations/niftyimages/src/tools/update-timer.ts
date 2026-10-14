@@ -7,12 +7,12 @@ export let updateTimer = SlateTool.create(spec, {
   name: 'Update Timer Target Date',
   key: 'update_timer_target_date',
   description: `Update the target date of a NiftyImages countdown timer image. Countdown timers are dynamic images that count down to a particular event and update every time a user re-opens an email.
-You can set an absolute target date, or use relative adjustments (addHours, addMinutes, addDays, addMonths) to shift the target date dynamically.
+You can set an absolute target date, or use documented relative adjustments (addHours, addDays, addMonths). The legacy addMinutes option remains available, but support is not confirmed by the public v1 reference.
 Requires a **Timer API Key** (found under the timer image > More Options > Target Date Automation > "Show API Key").`,
   instructions: [
     'The Timer API Key is separate from your account API Key. Find it by choosing a timer image, clicking "More Options", scrolling to "Target Date Automation" and clicking "Show API Key".',
     'Dates should be in ISO 8601 format (e.g., 2024-03-12T12:00Z) unless a custom format is specified.',
-    'Use addHours, addMinutes, addDays, or addMonths to dynamically adjust the target date relative to the provided date.'
+    'Use addHours, addDays, or addMonths to adjust the target date relative to the provided date. The public v1 reference does not confirm support for the retained addMinutes option.'
   ],
   tags: {
     destructive: false,
@@ -46,7 +46,9 @@ Requires a **Timer API Key** (found under the timer image > More Options > Targe
       addMinutes: z
         .number()
         .optional()
-        .describe('Number of minutes to add to the target date.'),
+        .describe(
+          'Legacy minute adjustment to the target date. Provider support is not confirmed by the public v1 reference.'
+        ),
       addDays: z.number().optional().describe('Number of days to add to the target date.'),
       addMonths: z.number().optional().describe('Number of months to add to the target date.')
     })

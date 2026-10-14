@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let commentOutputSchema = z.object({
@@ -38,6 +39,7 @@ export let listComments = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       commentableType: z
         .enum(['Company', 'Contact', 'Deal', 'Invoice', 'Offer', 'Project', 'Purchase'])
         .optional()
@@ -56,6 +58,8 @@ export let listComments = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.commentableType) params.commentable_type = ctx.input.commentableType;
     if (ctx.input.commentableId) params.commentable_id = ctx.input.commentableId;
     if (ctx.input.userId) params.user_id = ctx.input.userId;

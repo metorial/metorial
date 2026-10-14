@@ -31,7 +31,12 @@ export let recordPayment = SlateTool.create(spec, {
       currency: z.string().describe('ISO 4217 currency code (e.g. USD, EUR)'),
       paymentTime: z.string().optional().describe('Custom payment timestamp'),
       extraInfo: z.string().optional().describe('Additional payment metadata'),
-      suppressNotifications: z.boolean().optional().describe('Suppress payment notifications')
+      suppressNotifications: z
+        .boolean()
+        .optional()
+        .describe(
+          'Suppress post-payment processing, including notifications and automatic reservation status changes'
+        )
     })
   )
   .output(
@@ -58,7 +63,7 @@ export let recordPayment = SlateTool.create(spec, {
     return {
       output: {
         paymentId: String(result.payment_id),
-        reservationStatus: result.status ? String(result.status) : undefined
+        reservationStatus: result.status != null ? String(result.status) : undefined
       },
       message: `Payment of **${ctx.input.currency} ${ctx.input.amount}** recorded for reservation #${ctx.input.reservationId} (payment #${result.payment_id}).`
     };

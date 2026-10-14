@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let personSchema = z.object({
@@ -16,13 +17,14 @@ let personSchema = z.object({
 export let listPeopleTool = SlateTool.create(spec, {
   name: 'List People',
   key: 'list_people',
-  description: `List all people visible to the current user in the Basecamp account, or list people assigned to a specific project.`,
+  description: `Call list_accounts to discover the accountId for this operation. List all people visible to the current user in the Basecamp account, or list people assigned to a specific project.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z
         .string()
         .optional()
@@ -37,7 +39,8 @@ export let listPeopleTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let people = ctx.input.projectId

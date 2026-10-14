@@ -1,6 +1,4 @@
-Let me get the full API v5 reference to understand all available methods and features.Now I have enough information to compile the specification. Let me put it together.
-
-# Slates Specification for Simla.com
+# Simla.com API Specification
 
 ## Overview
 

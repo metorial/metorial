@@ -13,11 +13,11 @@ export interface PaginatedResponse<T> {
 export class Client {
   private axios;
 
-  constructor(credentials: { token: string; appKey: string }) {
+  constructor(credentials: { token: string; appKey?: string }) {
     this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.pipelinecrm.com/api/v3',
       authHeader: { value: `Bearer ${credentials.token}` },
-      headers: { 'app-key': credentials.appKey },
+      headers: credentials.appKey ? { 'app-key': credentials.appKey } : {},
       errorAdapter: error =>
         buildApiServiceError(error, {
           providerLabel: 'Pipeline CRM',
@@ -29,6 +29,27 @@ export class Client {
   private params(extra: Record<string, any> = {}): Record<string, any> {
     return {
       ...extra
+    };
+  }
+
+  private paginated<T>(
+    data: PaginatedResponse<T>,
+    options: { page?: number; perPage?: number }
+  ): PaginatedResponse<T> {
+    let entries = data.entries ?? [];
+    let page = data.pagination?.page ?? options.page ?? 1;
+    let perPage = data.pagination?.per_page ?? options.perPage ?? 200;
+    let total = data.pagination?.total ?? entries.length;
+    return {
+      ...data,
+      entries,
+      pagination: {
+        ...data.pagination,
+        page,
+        per_page: perPage,
+        total,
+        pages: data.pagination?.pages ?? Math.max(1, Math.ceil(total / perPage))
+      }
     };
   }
 
@@ -53,7 +74,7 @@ export class Client {
       }
     }
     let response = await this.axios.get('/deals.json', { params });
-    return response.data;
+    return this.paginated(response.data, options);
   }
 
   async getDeal(dealId: number): Promise<any> {
@@ -112,7 +133,7 @@ export class Client {
       }
     }
     let response = await this.axios.get('/people.json', { params });
-    return response.data;
+    return this.paginated(response.data, options);
   }
 
   async getPerson(personId: number): Promise<any> {
@@ -171,7 +192,7 @@ export class Client {
       }
     }
     let response = await this.axios.get('/companies.json', { params });
-    return response.data;
+    return this.paginated(response.data, options);
   }
 
   async getCompany(companyId: number): Promise<any> {
@@ -220,6 +241,9 @@ export class Client {
       companyId?: number;
     } = {}
   ): Promise<PaginatedResponse<any>> {
+    if ([options.dealId, options.personId, options.companyId].every(id => id === undefined)) {
+      throw createApiServiceError('Provide a deal, person, or company ID to list its notes.');
+    }
     if (
       [options.dealId, options.personId, options.companyId].filter(id => id !== undefined)
         .length > 1
@@ -243,7 +267,7 @@ export class Client {
         per_page: options.perPage ?? 200
       })
     });
-    return response.data;
+    return this.paginated(response.data, options);
   }
 
   async getNote(noteId: number): Promise<any> {
@@ -302,7 +326,7 @@ export class Client {
       }
     }
     let response = await this.axios.get('/calendar_entries.json', { params });
-    return response.data;
+    return this.paginated(response.data, options);
   }
 
   async getCalendarEntry(entryId: number): Promise<any> {
@@ -375,6 +399,10 @@ export class Client {
 
   async listLeadSources(): Promise<any[]> {
     return this.listMetadata('/admin/lead_sources.json');
+  }
+
+  async listDealLossReasons(): Promise<any[]> {
+    return this.listMetadata('/admin/deal_loss_reasons.json');
   }
 
   async listCustomFieldLabels(resourceType: 'deal' | 'person' | 'company'): Promise<any[]> {

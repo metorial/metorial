@@ -22,7 +22,15 @@ export let listManagers = SlateTool.create(spec, {
     z.object({
       managers: z
         .array(z.any())
-        .describe('List of manager objects with business hours and department info')
+        .describe('List of manager objects with business hours and department info'),
+      pagination: z
+        .object({
+          totalCount: z.number(),
+          limit: z.number(),
+          offset: z.number()
+        })
+        .optional()
+        .describe('Total matching records and the current page limit and offset')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,7 +43,14 @@ export let listManagers = SlateTool.create(spec, {
     });
 
     return {
-      output: { managers: result.managers },
+      output: {
+        managers: result.managers,
+        pagination: {
+          totalCount: result.meta.count,
+          limit: result.meta.limit,
+          offset: result.meta.offset
+        }
+      },
       message: `Retrieved **${result.managers.length}** managers for widget **#${ctx.input.widgetId}**.`
     };
   })

@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Signpath
+# <img src="logo.png" height="20"> SignPath
 
-Submit, manage, and track code signing requests for software artifacts (e.g., Authenticode, Java, macOS, Docker, Office macros). Approve or deny signing requests, resubmit requests with different signing policies, and retrieve signed artifacts. Manage projects, signing policies, artifact configurations, and certificates. Download X.509 certificates and GPG public keys. Query audit logs for signing and administrative changes.
+Submit artifact or hash signing requests, approve or deny requests, resubmit completed requests, poll progress, and download signed artifacts. Discover projects, signing policies, and certificate details; read paginated audit logs and inspect the authenticated CI or personal user.
+
+Authenticate with an API token, the organization ID shown on your SignPath organization page, and the instance URL when using a self-hosted installation. Artifact submission accepts Base64-encoded file contents and a filename. Hash signing accepts structured hash data and produces a downloadable signature result.
 
 ## License
 

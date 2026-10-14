@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseNumericValue } from '../lib/response';
 import { spec } from '../spec';
 
 export let listTimeEntries = SlateTool.create(spec, {
@@ -59,7 +60,7 @@ export let listTimeEntries = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
 
     let result = await client.getTimeEntries({
@@ -86,9 +87,9 @@ export let listTimeEntries = SlateTool.create(spec, {
       taskName: e.task_name || undefined,
       subtaskId: e.subtask_id ? String(e.subtask_id) : undefined,
       subtaskName: e.subtask_name || undefined,
-      hours: e.hours ?? undefined,
-      minutes: e.minutes ?? undefined,
-      seconds: e.seconds ?? undefined,
+      hours: parseNumericValue(e.hours),
+      minutes: parseNumericValue(e.minutes),
+      seconds: parseNumericValue(e.seconds),
       description: e.description || undefined,
       billed:
         e.billed === 1 || e.billed === true

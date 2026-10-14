@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCampaign,
+  getContactCount,
   getMessages,
   listCampaigns,
   listChannels,
@@ -15,6 +17,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCampaign,
+    getContactCount,
     sendMessage,
     sendTemplateMessage,
     listContacts,

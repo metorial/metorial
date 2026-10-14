@@ -132,6 +132,14 @@ export let workspaceConfigSchema = z.object({
   customProperties: z.array(customPropertySchema).describe('Custom property definitions')
 });
 
+export let currentUserSchema = z.object({
+  isLoggedIn: z.boolean().describe('Whether the token is authenticated'),
+  userId: z.string().describe('Authenticated Dart user ID'),
+  name: z.string().describe('Authenticated user name'),
+  email: z.string().describe('Authenticated user email')
+});
+
+export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type ConciseTask = z.infer<typeof conciseTaskSchema>;
 export type Comment = z.infer<typeof commentSchema>;

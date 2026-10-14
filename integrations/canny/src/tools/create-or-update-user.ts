@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,9 @@ export let createOrUpdateUserTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.userId && !ctx.input.email) {
+      throw createApiServiceError('Provide userId or email to identify the user.');
+    }
     let client = new CannyClient(ctx.auth.token);
     let result = await client.createOrUpdateUser({
       name: ctx.input.name,

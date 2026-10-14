@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -42,11 +42,16 @@ export let getReviewWidget = SlateTool.create(spec, {
       fullVersion: ctx.input.includeStyles ? 1 : 0
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to get widget HTML: ${data.errorMessage} (code: ${data.errorCode})`
-      );
+    if (typeof data.widgetHTML !== 'string') {
+      throw createApiServiceError('GatherUp did not return widget HTML.');
     }
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(data.widgetHTML, {
+        headers: { 'content-type': 'text/html; charset=utf-8' }
+      }),
+      filename: 'gatherup-review-widget.html'
+    });
 
     return {
       output: {

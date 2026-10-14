@@ -1,15 +1,57 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  pickDefined
+} from 'slates';
+
+type PageParams = { limit?: number; after?: string; before?: string };
+
+let pageParams = (params?: PageParams) => {
+  if (
+    params?.limit !== undefined &&
+    (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+  ) {
+    throw createApiServiceError('The page limit must be a whole number between 1 and 100.');
+  }
+  if (params?.after !== undefined && params?.before !== undefined) {
+    throw createApiServiceError('Provide either after or before for pagination, not both.');
+  }
+  return pickDefined(params ?? {});
+};
 
 export class SuperchatClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.superchat.com/v1.0',
-      headers: {
-        'X-API-KEY': config.token,
-        'Content-Type': 'application/json'
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorMapping: {
+        mapAxiosError: error => ({
+          message: extractApiErrorMessage(error, {
+            detailKeys: ['title', 'detail', 'message']
+          })
+        })
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Superchat',
+          reason: 'superchat_api_error',
+          detailKeys: ['title', 'detail', 'message']
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      let pagination = response.data?.pagination;
+      if (pagination) {
+        response.data.pagination = {
+          ...pagination,
+          next: pagination.next_cursor ?? pagination.next ?? null,
+          previous: pagination.previous_cursor ?? pagination.previous ?? null
+        };
       }
+      return response;
     });
   }
 
@@ -25,9 +67,9 @@ export class SuperchatClient {
       to: params.to,
       from: {
         channel_id: params.from.channelId,
-        ...(params.from.name ? { name: params.from.name } : {})
+        name: params.from.name ?? null
       },
-      content: params.content
+      content: this.messageContent(params.content)
     };
 
     if (params.inReplyTo) {
@@ -38,17 +80,82 @@ export class SuperchatClient {
     return response.data;
   }
 
-  async getMessageAnalytics(
-    messageIds: string[],
-    params?: { limit?: number; after?: string; before?: string }
-  ) {
-    let response = await this.axios.post('/messages/analytics', messageIds, {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
+  private messageContent(content: Record<string, any>) {
+    if (content.type === 'email') {
+      return pickDefined({ type: 'email', subject: content.subject, text: content.body });
+    }
+    if (content.type === 'media') {
+      if (!content.file_id) {
+        throw createApiServiceError(
+          'Media messages require file_id from an uploaded Superchat file. Use list_files to find an existing file; a remote media_url cannot be sent directly.'
+        );
       }
+      return pickDefined({
+        type: 'media',
+        file_id: content.file_id,
+        caption: content.caption
+      });
+    }
+    if (content.type === 'whats_app_template' || content.type === 'generic_template') {
+      if (!content.template_id) {
+        throw createApiServiceError(
+          'Template messages require template_id. Use list_templates to find the approved template; names and language codes cannot identify a template in this API.'
+        );
+      }
+      return pickDefined({
+        type: content.type,
+        template_id: content.template_id,
+        variables: content.template_variables?.map((value: string, index: number) => ({
+          position: index + 1,
+          value
+        }))
+      });
+    }
+    return content;
+  }
+
+  async getMessageAnalytics(messageIds: string[]) {
+    if (messageIds.length > 100) {
+      throw createApiServiceError('Request analytics for at most 100 message IDs at a time.');
+    }
+    let response = await this.axios.get('/analytics/messages', {
+      params: { message_ids: messageIds },
+      paramsSerializer: { indexes: null }
     });
+    return Object.fromEntries(
+      (response.data.results ?? []).map((result: { message_id: string }) => [
+        result.message_id,
+        result
+      ])
+    );
+  }
+
+  async getMessage(messageId: string) {
+    let response = await this.axios.get(`/messages/${encodeURIComponent(messageId)}`);
+    return response.data;
+  }
+
+  async getConversationMessages(
+    conversationId: string,
+    params: PageParams & {
+      createdAfter?: string;
+      createdBefore?: string;
+      direction?: 'INBOUND' | 'OUTBOUND';
+    }
+  ) {
+    let response = await this.axios.get(
+      `/conversations/${encodeURIComponent(conversationId)}/messages`,
+      {
+        params: {
+          ...pageParams({ limit: params.limit, after: params.after, before: params.before }),
+          ...pickDefined({
+            created_after: params.createdAfter,
+            created_before: params.createdBefore,
+            direction: params.direction
+          })
+        }
+      }
+    );
     return response.data;
   }
 
@@ -62,11 +169,11 @@ export class SuperchatClient {
     customAttributes?: Record<string, any>[];
   }) {
     let body: Record<string, any> = {
-      handles: params.handles
+      handles: params.handles.map(handle => ({ id: null, ...handle })),
+      first_name: params.firstName ?? null,
+      last_name: params.lastName ?? null,
+      gender: params.gender ?? null
     };
-    if (params.firstName) body.first_name = params.firstName;
-    if (params.lastName) body.last_name = params.lastName;
-    if (params.gender) body.gender = params.gender;
     if (params.customAttributes) body.custom_attributes = params.customAttributes;
 
     let response = await this.axios.post('/contacts', body);
@@ -75,11 +182,7 @@ export class SuperchatClient {
 
   async listContacts(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/contacts', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -134,11 +237,7 @@ export class SuperchatClient {
     params?: { limit?: number; after?: string; before?: string }
   ) {
     let response = await this.axios.get(`/contacts/${contactId}/conversations`, {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -147,11 +246,7 @@ export class SuperchatClient {
 
   async listContactLists(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/contact-lists', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -166,11 +261,7 @@ export class SuperchatClient {
     params?: { limit?: number; after?: string; before?: string }
   ) {
     let response = await this.axios.get(`/contact-lists/${listId}/contacts`, {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -182,7 +273,7 @@ export class SuperchatClient {
 
   async addContactToList(contactId: string, listId: string) {
     let response = await this.axios.post(`/contacts/${contactId}/contact-lists`, {
-      contact_list_id: listId
+      id: listId
     });
     return response.data;
   }
@@ -196,11 +287,7 @@ export class SuperchatClient {
 
   async listConversations(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/conversations', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -262,11 +349,7 @@ export class SuperchatClient {
     params?: { limit?: number; after?: string; before?: string }
   ) {
     let response = await this.axios.get(`/conversations/${conversationId}/notes`, {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -292,11 +375,7 @@ export class SuperchatClient {
 
   async listTemplates(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/templates', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -330,11 +409,7 @@ export class SuperchatClient {
 
   async listTemplateFolders(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/template-folders', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -358,11 +433,7 @@ export class SuperchatClient {
 
   async listChannels(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/channels', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -376,11 +447,7 @@ export class SuperchatClient {
 
   async listInboxes(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/inboxes', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -394,11 +461,7 @@ export class SuperchatClient {
 
   async listLabels(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/labels', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -419,11 +482,7 @@ export class SuperchatClient {
 
   async listFiles(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/files', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -442,16 +501,16 @@ export class SuperchatClient {
 
   async getMe() {
     let response = await this.axios.get('/me');
-    return response.data;
+    let user = response.data.user ?? response.data;
+    return {
+      ...user,
+      name: user.name ?? [user.first_name, user.last_name].filter(Boolean).join(' ')
+    };
   }
 
   async listUsers(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/users', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }
@@ -463,8 +522,8 @@ export class SuperchatClient {
 
   // ─── Custom Attributes ───
 
-  async listContactAttributes() {
-    let response = await this.axios.get('/contact-attributes');
+  async listContactAttributes(params?: PageParams) {
+    let response = await this.axios.get('/custom-attributes', { params: pageParams(params) });
     return response.data;
   }
 
@@ -483,11 +542,7 @@ export class SuperchatClient {
 
   async listWebhooks(params?: { limit?: number; after?: string; before?: string }) {
     let response = await this.axios.get('/webhooks', {
-      params: {
-        ...(params?.limit ? { limit: params.limit } : {}),
-        ...(params?.after ? { after: params.after } : {}),
-        ...(params?.before ? { before: params.before } : {})
-      }
+      params: pageParams(params)
     });
     return response.data;
   }

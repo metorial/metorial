@@ -10,7 +10,19 @@ let extractionFieldSchema = z.object({
   type: z
     .enum(['string', 'object', 'array'])
     .optional()
-    .describe('Field type: string, object, or array')
+    .describe('Field type: string, object, or array'),
+  properties: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe(
+      'Nested field definitions for object fields, using key, description, type, properties, and items as needed'
+    ),
+  items: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe(
+      'Array item definition, such as {type: "string", example: "English"} or {type: "object", properties: [...]}'
+    )
 });
 
 let extractionOptionsSchema = z

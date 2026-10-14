@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwoChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,12 +26,31 @@ export let sendGroupMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the message was sent successfully'),
+      success: z.boolean().describe('Whether 2Chat accepted the message for sending'),
       messageUuid: z.string().optional().describe('UUID of the sent message'),
       sentAt: z.string().optional().describe('Timestamp when the message was sent')
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.text?.trim() && !ctx.input.mediaUrl?.trim()) {
+      throw createApiServiceError('Provide text or a publicly accessible mediaUrl.', {
+        reason: 'missing_message_content'
+      });
+    }
+    if (ctx.input.mediaUrl) {
+      let url: URL;
+      try {
+        url = new URL(ctx.input.mediaUrl);
+      } catch {
+        throw createApiServiceError('mediaUrl must be a valid HTTP or HTTPS URL.', {
+          reason: 'invalid_media_url'
+        });
+      }
+      if (!['http:', 'https:'].includes(url.protocol))
+        throw createApiServiceError('mediaUrl must use HTTP or HTTPS.', {
+          reason: 'invalid_media_url'
+        });
+    }
     let client = new TwoChatClient({ token: ctx.auth.token });
 
     let result: any;
@@ -53,11 +72,11 @@ export let sendGroupMessage = SlateTool.create(spec, {
 
     return {
       output: {
-        success: result.success ?? true,
+        success: result.success === true,
         messageUuid: result.uuid || result.message_uuid,
-        sentAt: result.sent_at || result.created_at
+        sentAt: result.sent_at ?? result.created_at ?? undefined
       },
-      message: `Group message sent to group **${ctx.input.groupUuid}**.`
+      message: `Group message accepted for sending to **${ctx.input.groupUuid}**.`
     };
   })
   .build();

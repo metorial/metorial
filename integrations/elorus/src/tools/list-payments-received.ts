@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPaymentsReceived = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listPaymentsReceived = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       search: z
         .string()
         .optional()
@@ -21,7 +23,9 @@ export let listPaymentsReceived = SlateTool.create(spec, {
       transactionType: z
         .string()
         .optional()
-        .describe('Filter by type: "dp" (client payment), "icm" (income).'),
+        .describe(
+          'Filter by type: "ip" (client payment), "dp" (other payment), "cnp" (supplier refund), "icm" (income).'
+        ),
       ordering: z
         .string()
         .optional()
@@ -48,7 +52,7 @@ export let listPaymentsReceived = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
     let result = await client.listCashReceipts({

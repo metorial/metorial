@@ -1,16 +1,123 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+
+type BusinessTime = {
+  day: string;
+  from: string;
+  to: string;
+  timezone?: string;
+};
+
+type Pagination = { offset: number; limit: number; count: number };
+
+let weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+let smsMessageIds: Record<string, string> = {
+  post_call_visitor: 'visitor.dial-completed',
+  scheduled_call_reminder: 'visitor.call-scheduled',
+  post_call_manager: 'manager.call-completed',
+  missed_call_notification: 'user.missed-call-complaint'
+};
+let voiceMessageIds: Record<string, string> = {
+  manager_greeting: 'manager.call',
+  visitor_greeting: 'visitor.call'
+};
+
+let toUnixTimestamp = (value: string) => {
+  if (/^-?\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value))) return value;
+  let timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    throw createApiServiceError(
+      'Use an ISO 8601 date or Unix timestamp for call history dates.'
+    );
+  }
+  return String(Math.floor(timestamp / 1000));
+};
+
+let toBusinessTimes = (times: BusinessTime[]) =>
+  times.map(time => ({
+    day_of_week: weekdays.indexOf(time.day),
+    enabled: true,
+    start_time: time.from,
+    end_time: time.to,
+    ...pickDefined({ timezone: time.timezone })
+  }));
+
+let paginationNumber = (value: unknown, fallback: number) => {
+  if (typeof value !== 'number' && typeof value !== 'string') return fallback;
+  if (typeof value === 'string' && !value.trim()) return fallback;
+  let number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+let getPagination = (
+  meta: unknown,
+  params: { limit?: number; offset?: number },
+  count: number
+): Pagination => {
+  let values = isApiErrorRecord(meta) ? meta : {};
+  return {
+    count: paginationNumber(values.count, count),
+    limit: paginationNumber(values.limit, params.limit ?? 100),
+    offset: paginationNumber(values.offset, params.offset ?? 0)
+  };
+};
 
 export class CallPageClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A CallPage API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://core.callpage.io',
-      headers: {
-        Authorization: config.token,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
+      authHeader: { value: config.token },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CallPage',
+          reason: 'callpage_api_error',
+          detailKeys: ['message', 'errorCode', 'error'],
+          extractResponse: (error, helpers) => {
+            let response = helpers.getResponse(error);
+            if (response?.data !== undefined) return response;
+            if (!helpers.isRecord(error) || error.name !== 'SlateError') return response;
+            let data = helpers.isRecord(error.data) ? error.data : undefined;
+            let baggage = data && helpers.isRecord(data.baggage) ? data.baggage : undefined;
+            // The shared HTTP client normalizes errors before this adapter runs.
+            return baggage?.response !== undefined
+              ? { ...response, data: baggage.response }
+              : response;
+          },
+          extractUpstreamCode: (_error, response) => {
+            let data = response?.data;
+            return isApiErrorRecord(data) && data.errorCode != null
+              ? String(data.errorCode)
+              : undefined;
+          }
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      let data: unknown = response.data;
+      if (isApiErrorRecord(data) && data.hasError === true) {
+        let message =
+          typeof data.message === 'string' && data.message.trim()
+            ? data.message
+            : 'The provider rejected the request.';
+        throw createApiServiceError(`CallPage API request failed: ${message}`, {
+          reason: 'callpage_api_error',
+          upstreamStatus: response.status,
+          upstreamCode: data.errorCode != null ? String(data.errorCode) : undefined
+        });
       }
+      return response;
     });
   }
 
@@ -43,8 +150,8 @@ export class CallPageClient {
     if (params.userIds?.length) query['user_ids[]'] = params.userIds;
     if (params.callIds?.length) query['call_id[]'] = params.callIds;
     if (params.tagIds?.length) query['tag_ids[]'] = params.tagIds;
-    if (params.dateFrom) query.date_from = params.dateFrom;
-    if (params.dateTo) query.date_to = params.dateTo;
+    if (params.dateFrom !== undefined) query.date_from = toUnixTimestamp(params.dateFrom);
+    if (params.dateTo !== undefined) query.date_to = toUnixTimestamp(params.dateTo);
     if (params.url) query.url = params.url;
     if (params.incomingNumberIds?.length)
       query['incoming_number_ids[]'] = params.incomingNumberIds;
@@ -56,7 +163,7 @@ export class CallPageClient {
     let response = await this.axios.get('/api/v3/external/calls/history', { params: query });
     return {
       calls: response.data.data || [],
-      meta: response.data.meta || { offset: 0, limit: 100, count: 0 }
+      meta: getPagination(response.data.meta, params, response.data.data?.length ?? 0)
     };
   }
 
@@ -87,7 +194,7 @@ export class CallPageClient {
     let response = await this.axios.get('/api/v1/external/widgets/all', { params: query });
     return {
       widgets: response.data.data || [],
-      meta: response.data.meta || {}
+      meta: getPagination(response.data.meta, params, response.data.data?.length ?? 0)
     };
   }
 
@@ -119,8 +226,17 @@ export class CallPageClient {
     enabled?: boolean;
     settings?: Record<string, any>;
   }): Promise<{ widgetId: number }> {
-    let body: Record<string, any> = { id: data.widgetId };
-    if (data.url) body.url = data.url;
+    let url = data.url;
+    if (url === undefined) {
+      let widget = await this.getWidget(data.widgetId);
+      if (typeof widget?.url !== 'string' || !widget.url) {
+        throw createApiServiceError(
+          'The widget has no website URL. Provide url when updating it.'
+        );
+      }
+      url = widget.url;
+    }
+    let body: Record<string, any> = { id: data.widgetId, url };
     if (data.description !== undefined) body.description = data.description;
     if (data.localeCode) body.locale_code = data.localeCode;
     if (data.enabled !== undefined) body.enabled = data.enabled;
@@ -139,6 +255,16 @@ export class CallPageClient {
     userIds: number[];
     businessTimes?: any[];
   }): Promise<Array<{ userId: number; managerId: number }>> {
+    if (!data.userIds.length) {
+      throw createApiServiceError('Provide at least one user ID to assign to the widget.');
+    }
+    if (
+      data.userIds.length > 1 &&
+      data.businessTimes !== undefined &&
+      data.businessTimes.length !== data.userIds.length
+    ) {
+      throw createApiServiceError('Provide one business-hours array for each user ID.');
+    }
     let body: Record<string, any> = {
       id: data.widgetId,
       user_id: data.userIds.length === 1 ? data.userIds[0] : data.userIds
@@ -163,7 +289,7 @@ export class CallPageClient {
       id: data.widgetId,
       tel: data.phoneNumber
     };
-    if (data.departmentId) body.department_id = data.departmentId;
+    if (data.departmentId !== undefined) body.department_id = data.departmentId;
 
     let response = await this.axios.post('/api/v1/external/widgets/call', body);
     return { callId: response.data.data.id };
@@ -178,7 +304,7 @@ export class CallPageClient {
       id: data.widgetId,
       tel: data.phoneNumber
     };
-    if (data.departmentId) body.department_id = data.departmentId;
+    if (data.departmentId !== undefined) body.department_id = data.departmentId;
 
     let response = await this.axios.post('/api/v1/external/widgets/call-or-schedule', body);
     return { callId: response.data.data.id };
@@ -198,14 +324,15 @@ export class CallPageClient {
     let response = await this.axios.get('/api/v1/external/users/all', { params: query });
     return {
       users: response.data.data || [],
-      meta: response.data.meta || {}
+      meta: getPagination(response.data.meta, params, response.data.data?.length ?? 0)
     };
   }
 
   async getUser(params: { userId?: number; email?: string }): Promise<any> {
-    let query: Record<string, any> = {};
-    if (params.userId) query.id = params.userId;
-    if (params.email) query.email = params.email;
+    if (params.userId === undefined && !params.email?.trim()) {
+      throw createApiServiceError('Provide a user ID or email address to retrieve a user.');
+    }
+    let query = pickDefined({ id: params.userId, email: params.email });
 
     let response = await this.axios.get('/api/v1/external/users/get', { params: query });
     return response.data.data;
@@ -267,7 +394,7 @@ export class CallPageClient {
     let response = await this.axios.get('/api/v1/external/managers/all', { params: query });
     return {
       managers: response.data.data || [],
-      meta: response.data.meta || {}
+      meta: getPagination(response.data.meta, params, response.data.data?.length ?? 0)
     };
   }
 
@@ -282,14 +409,14 @@ export class CallPageClient {
     userId: number;
     widgetId: number;
     enabled: boolean;
-    businessTimes?: any[];
+    businessTimes?: BusinessTime[];
   }): Promise<{ managerId: number }> {
     let body: Record<string, any> = {
       user_id: data.userId,
       widget_id: data.widgetId,
       enabled: data.enabled
     };
-    if (data.businessTimes) body.business_times = data.businessTimes;
+    if (data.businessTimes) body.business_times = toBusinessTimes(data.businessTimes);
 
     let response = await this.axios.post('/api/v1/external/managers/create', body);
     return { managerId: response.data.data.id };
@@ -299,14 +426,29 @@ export class CallPageClient {
     userId: number;
     widgetId: number;
     enabled?: boolean;
-    businessTimes?: any[];
+    businessTimes?: BusinessTime[];
   }): Promise<{ managerId: number }> {
     let body: Record<string, any> = {
       user_id: data.userId,
       widget_id: data.widgetId
     };
-    if (data.enabled !== undefined) body.enabled = data.enabled;
-    if (data.businessTimes) body.business_times = data.businessTimes;
+    let enabled = data.enabled;
+    if (enabled === undefined) {
+      let manager = await this.getManager(data.widgetId, data.userId);
+      if (
+        manager?.enabled !== true &&
+        manager?.enabled !== false &&
+        manager?.enabled !== 0 &&
+        manager?.enabled !== 1
+      ) {
+        throw createApiServiceError(
+          'The manager enabled state is unavailable. Provide enabled when updating it.'
+        );
+      }
+      enabled = Boolean(manager.enabled);
+    }
+    body.enabled = enabled;
+    if (data.businessTimes) body.business_times = toBusinessTimes(data.businessTimes);
 
     let response = await this.axios.post('/api/v1/external/managers/update', body);
     return { managerId: response.data.data.id };
@@ -336,9 +478,12 @@ export class CallPageClient {
     enabled: boolean;
     text: string;
   }): Promise<{ smsId: number }> {
+    if (data.text.length > 240) {
+      throw createApiServiceError('SMS text must not exceed 240 characters.');
+    }
     let response = await this.axios.post('/api/v1/external/sms/create', {
       widget_id: data.widgetId,
-      message_id: data.messageId,
+      message_id: smsMessageIds[data.messageId] ?? data.messageId,
       enabled: data.enabled,
       text: data.text
     });
@@ -351,12 +496,15 @@ export class CallPageClient {
     enabled?: boolean;
     text?: string;
   }): Promise<{ smsId: number }> {
+    if (data.text !== undefined && data.text.length > 240) {
+      throw createApiServiceError('SMS text must not exceed 240 characters.');
+    }
     let body: Record<string, any> = {
       widget_id: data.widgetId,
-      message_id: data.messageId
+      message_id: smsMessageIds[data.messageId] ?? data.messageId
     };
     if (data.enabled !== undefined) body.enabled = data.enabled;
-    if (data.text) body.text = data.text;
+    if (data.text !== undefined) body.text = data.text;
 
     let response = await this.axios.post('/api/v1/external/sms/update', body);
     return { smsId: response.data.data.id };
@@ -364,7 +512,7 @@ export class CallPageClient {
 
   async resetSmsMessage(widgetId: number, messageId?: string): Promise<void> {
     let body: Record<string, any> = { widget_id: widgetId };
-    if (messageId) body.message_id = messageId;
+    if (messageId) body.message_id = smsMessageIds[messageId] ?? messageId;
 
     await this.axios.post('/api/v1/external/sms/reset', body);
   }
@@ -388,10 +536,10 @@ export class CallPageClient {
   }): Promise<{ voiceId: number }> {
     let body: Record<string, any> = {
       widget_id: data.widgetId,
-      message_id: data.messageId,
+      message_id: voiceMessageIds[data.messageId] ?? data.messageId,
       enabled: data.enabled
     };
-    if (data.fileUrl) body.file = data.fileUrl;
+    if (data.fileUrl !== undefined) body.file = data.fileUrl;
 
     let response = await this.axios.post('/api/v1/external/voice/create', body);
     return { voiceId: response.data.data.id };
@@ -405,10 +553,10 @@ export class CallPageClient {
   }): Promise<{ voiceId: number }> {
     let body: Record<string, any> = {
       widget_id: data.widgetId,
-      message_id: data.messageId
+      message_id: voiceMessageIds[data.messageId] ?? data.messageId
     };
     if (data.enabled !== undefined) body.enabled = data.enabled;
-    if (data.fileUrl) body.file = data.fileUrl;
+    if (data.fileUrl !== undefined) body.file = data.fileUrl;
 
     let response = await this.axios.post('/api/v1/external/voice/update', body);
     return { voiceId: response.data.data.id };
@@ -416,7 +564,7 @@ export class CallPageClient {
 
   async resetVoiceMessage(widgetId: number, messageId?: string): Promise<void> {
     let body: Record<string, any> = { widget_id: widgetId };
-    if (messageId) body.message_id = messageId;
+    if (messageId) body.message_id = voiceMessageIds[messageId] ?? messageId;
 
     await this.axios.post('/api/v1/external/voice/reset', body);
   }

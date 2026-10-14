@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,23 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.app.shortcut.com/api/v3',
-        headers: {
-          'Shortcut-Token': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await http.get('/member');
-      let member = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let member = await client.getCurrentMember();
 
       return {
         profile: {
           id: member.id,
-          name: member.profile?.name || member.profile?.mention_name,
-          email: member.profile?.email_address,
-          imageUrl: member.profile?.display_icon?.url
+          name: member.name || member.mention_name
         }
       };
     }

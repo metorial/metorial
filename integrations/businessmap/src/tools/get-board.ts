@@ -6,7 +6,11 @@ import { spec } from '../spec';
 let columnSchema = z.object({
   columnId: z.number().describe('Column ID'),
   workflowId: z.number().optional().describe('Workflow ID'),
-  section: z.number().optional().describe('Section type (1=Backlog, 2=In Progress, 3=Done)'),
+  section: z
+    .number()
+    .optional()
+    .nullable()
+    .describe('Section type (1=Backlog, 2=Requested, 3=In Progress, 4=Done, 5=Archive)'),
   parentColumnId: z
     .number()
     .optional()
@@ -31,7 +35,7 @@ let laneSchema = z.object({
 
 let workflowSchema = z.object({
   workflowId: z.number().describe('Workflow ID'),
-  type: z.number().optional().describe('Workflow type (1=Cards, 2=Initiatives)'),
+  type: z.number().optional().describe('Workflow type (0=Cards, 1=Initiatives, 2=Timeline)'),
   name: z.string().optional().describe('Workflow name'),
   position: z.number().optional().describe('Workflow position'),
   isEnabled: z.number().optional().describe('Whether the workflow is enabled')
@@ -67,10 +71,7 @@ export let getBoardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let board = await client.getBoard(ctx.input.boardId);
     let includeStructure = ctx.input.includeStructure !== false;

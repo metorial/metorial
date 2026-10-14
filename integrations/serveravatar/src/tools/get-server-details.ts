@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getServerDetails = SlateTool.create(spec, {
   name: 'Get Server Details',
   key: 'get_server_details',
   description: `Retrieve comprehensive details about a server including resource usage (CPU, RAM, disk), running services and their status, and server logs.
-Specify which details to include using the include parameter.`,
+Specify which details to include using the include parameter.
+${organizationScopeGuidance}`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,7 +17,7 @@ Specify which details to include using the include parameter.`,
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       include: z
         .array(z.enum(['usage', 'services', 'logs', 'summary']))
@@ -41,7 +43,8 @@ Specify which details to include using the include parameter.`,
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId } = ctx.input;
     let include = ctx.input.include || ['usage', 'services', 'logs', 'summary'];

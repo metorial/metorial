@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -13,10 +14,7 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       projectId: z.string().describe('Project ID to list tasks for')
     })
   )
@@ -30,7 +28,7 @@ export let listTasks = SlateTool.create(spec, {
             active: z.boolean().describe('Whether active'),
             estimatedSeconds: z.number().nullable().describe('Estimated duration in seconds'),
             trackedSeconds: z.number().nullable().describe('Tracked time in seconds'),
-            userId: z.number().nullable().describe('Assigned user ID'),
+            userId: z.number().nullable().describe('Creator user ID'),
             projectId: z.number().describe('Parent project ID')
           })
         )
@@ -39,8 +37,8 @@ export let listTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
 
     let raw = await client.listTasks(wsId, ctx.input.projectId);
 
@@ -49,7 +47,7 @@ export let listTasks = SlateTool.create(spec, {
       name: t.name,
       active: t.active ?? true,
       estimatedSeconds: t.estimated_seconds ?? null,
-      trackedSeconds: t.tracked_seconds ?? null,
+      trackedSeconds: t.tracked_seconds == null ? null : t.tracked_seconds / 1000,
       userId: t.user_id ?? null,
       projectId: t.project_id ?? Number.parseInt(ctx.input.projectId, 10)
     }));

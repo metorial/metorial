@@ -44,12 +44,12 @@ Only applicable to monitors with jobType "Portal".`,
     let pages = await client.getCrawlerPages(ctx.input.wachetId);
 
     let mappedPages = pages.map(p => ({
-      pageId: p.id,
-      name: p.name,
-      url: p.url,
-      lastCheckTimestamp: p.data?.lastCheckTimestamp,
-      lastValue: p.data?.raw,
-      lastError: p.data?.error
+      pageId: p.id ?? undefined,
+      name: p.name ?? undefined,
+      url: p.url ?? undefined,
+      lastCheckTimestamp: p.data?.lastCheckTimestamp ?? undefined,
+      lastValue: p.data?.raw ?? undefined,
+      lastError: p.data?.error ?? undefined
     }));
 
     return {

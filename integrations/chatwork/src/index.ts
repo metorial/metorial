@@ -7,9 +7,12 @@ import {
   editMessage,
   getContacts,
   getFiles,
+  getFileUrl,
+  getMessage,
   getMessages,
   getProfile,
   getRoom,
+  getTask,
   getTasks,
   handleContactRequest,
   leaveOrDeleteRoom,
@@ -32,15 +35,18 @@ export let provider = Slate.create({
     manageRoomMembers,
     sendMessage,
     getMessages,
+    getMessage,
     editMessage,
     deleteMessage,
     markMessages,
     createTask,
     getTasks,
+    getTask,
     updateTaskStatus,
     getContacts,
     handleContactRequest,
-    getFiles
+    getFiles,
+    getFileUrl
   ],
   triggers: []
 });

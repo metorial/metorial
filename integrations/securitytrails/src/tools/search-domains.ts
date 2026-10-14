@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,7 +31,8 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
     'Use DSL query syntax: e.g., `ipv4 = "1.2.3.4"`, `whois_email = "admin@example.com"`, `tld = "com" AND ns = "ns1.example.com"`.',
     'Available DSL fields: ipv4, ipv6, asn, mx, ns, cname, subdomain, apex_domain, soa_email, tld, whois_email, whois_name, whois_organization, whois_street1-4, whois_city, whois_country, whois_postalCode, whois_telephone, whois_registrar, whois_created, whois_expires, keyword, first_seen, dropped.',
     'Operators: =, !=, >, <, >=, <=, IN, between ... and ..., AND, OR.',
-    'Either provide "query" (DSL string) or "filter" (JSON object), not both.'
+    'Either provide "query" (DSL string) or "filter" (JSON object), not both.',
+    'For DSL results, set scroll to true and use continue_domain_search with the returned scrollId to retrieve subsequent batches.'
   ],
   tags: {
     destructive: false,
@@ -57,6 +58,10 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
         .optional()
         .describe('Resolve A records and include IP addresses in results'),
       page: z.number().optional().describe('Page number for pagination'),
+      scroll: z
+        .boolean()
+        .optional()
+        .describe('Start scrolling DSL query results; unavailable with filter or statsOnly'),
       statsOnly: z
         .boolean()
         .optional()
@@ -70,6 +75,10 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
       .object({
         records: z.array(domainRecordSchema).optional().describe('Matching domain records'),
         recordCount: z.number().optional().describe('Total number of matching records'),
+        scrollId: z
+          .string()
+          .optional()
+          .describe('Short-lived identifier to pass to continue_domain_search'),
         meta: z
           .object({
             totalPages: z.number().optional(),
@@ -85,8 +94,20 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
       .passthrough()
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let hasQuery = ctx.input.query !== undefined;
+    let hasFilter = ctx.input.filter !== undefined;
+    if (hasQuery === hasFilter || (hasQuery && !ctx.input.query?.trim())) {
+      throw createApiServiceError('Provide exactly one non-empty "query" or "filter".', {
+        reason: 'invalid_search_criteria'
+      });
+    }
+    if (ctx.input.scroll && (!hasQuery || ctx.input.statsOnly)) {
+      throw createApiServiceError('Scrolling requires a DSL query with statsOnly disabled.', {
+        reason: 'unsupported_scroll_options'
+      });
+    }
 
+    let client = new Client({ token: ctx.auth.token });
     if (ctx.input.statsOnly) {
       let result = await client.searchDomainsStats(ctx.input.query, ctx.input.filter);
       return {
@@ -102,7 +123,8 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
     if (ctx.input.query) {
       result = await client.searchDomainsDsl(ctx.input.query, {
         includeIps: ctx.input.includeIps,
-        page: ctx.input.page
+        page: ctx.input.page,
+        scroll: ctx.input.scroll
       });
     } else if (ctx.input.filter) {
       result = await client.searchDomainsFilter(ctx.input.filter, {
@@ -110,17 +132,20 @@ Use the **query** parameter for DSL syntax like \`whois_email = 'admin@example.c
         page: ctx.input.page
       });
     } else {
-      throw new Error('Either "query" or "filter" must be provided.');
+      throw createApiServiceError('Provide exactly one non-empty "query" or "filter".', {
+        reason: 'invalid_search_criteria'
+      });
     }
 
     let records = result.records ?? [];
 
     return {
       output: {
+        ...result,
         records,
         recordCount: result.record_count ?? records.length,
-        meta: result.meta,
-        ...result
+        scrollId: result.meta?.scroll_id ?? result.scroll_id ?? undefined,
+        meta: result.meta ?? undefined
       },
       message: `Found **${result.record_count ?? records.length}** domains matching the search criteria (page ${result.meta?.page ?? 1}).`
     };

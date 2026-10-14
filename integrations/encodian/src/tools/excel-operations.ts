@@ -55,11 +55,13 @@ export let excelOperations = SlateTool.create(spec, {
       fileName: z.string().optional().describe('Output filename'),
       fileContent: z.string().optional().describe('Base64-encoded output file'),
       rows: z.any().optional().describe('Extracted row data (for extract_rows operation)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
 
     switch (ctx.input.operation) {
@@ -75,9 +77,11 @@ export let excelOperations = SlateTool.create(spec, {
         return {
           output: {
             rows: result.rows || result.Rows || result,
+            operationStatus: client.operationStatus,
+            statusUrl: client.statusUrl,
             operationId: result.OperationId || ''
           },
-          message: `Successfully extracted rows from Excel workbook.`
+          message: client.message(`Successfully extracted rows from Excel workbook.`)
         };
 
       case 'merge':
@@ -114,9 +118,13 @@ export let excelOperations = SlateTool.create(spec, {
       output: {
         fileName: result.Filename || '',
         fileContent: result.FileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}** on Excel workbook.`
+      message: client.message(
+        `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}** on Excel workbook.`
+      )
     };
   })
   .build();

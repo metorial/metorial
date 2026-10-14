@@ -1,6 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCurrentUser,
+  listEnvironments,
+  listEvents,
   manageAudience,
   manageCmpAsset,
   manageCmpCampaign,
@@ -17,6 +20,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listEnvironments,
+    listEvents,
     manageProject,
     manageExperiment,
     manageAudience,

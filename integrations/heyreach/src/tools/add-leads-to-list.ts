@@ -48,7 +48,7 @@ export let addLeadsToList = SlateTool.create(spec, {
 
     return {
       output: { result: result?.data ?? result },
-      message: `Added **${ctx.input.leads.length}** lead(s) to list **${ctx.input.listId}**.`
+      message: `Processed import of **${ctx.input.leads.length}** lead(s) into list **${ctx.input.listId}**. Check the result for added, updated, and failed counts.`
     };
   })
   .build();

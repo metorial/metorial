@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,8 +33,20 @@ export let updateDeal = SlateTool.create(spec, {
       companyId: z.number().optional().describe('New associated company ID'),
       companyName: z.string().optional().describe('Company name to associate'),
       primaryContactId: z.number().optional().describe('New primary contact person ID'),
-      sourceId: z.number().optional().describe('Updated lead source ID'),
-      lossReason: z.string().optional().describe('Reason for losing the deal'),
+      sourceId: z
+        .number()
+        .optional()
+        .describe('Updated lead source ID. Call list_lead_sources to discover IDs.'),
+      lossReason: z
+        .string()
+        .optional()
+        .describe('Configured loss reason name, matched without case sensitivity'),
+      lossReasonId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Configured deal loss reason ID; use instead of lossReason'),
       lossReasonNotes: z
         .string()
         .optional()
@@ -77,7 +89,23 @@ export let updateDeal = SlateTool.create(spec, {
     if (ctx.input.primaryContactId !== undefined)
       dealData.primary_contact_id = ctx.input.primaryContactId;
     if (ctx.input.sourceId !== undefined) dealData.deal_source = ctx.input.sourceId;
-    if (ctx.input.lossReason !== undefined) dealData.loss_reason = ctx.input.lossReason;
+    if (ctx.input.lossReason !== undefined && ctx.input.lossReasonId !== undefined) {
+      throw createApiServiceError('Provide lossReason or lossReasonId, not both.');
+    }
+    if (ctx.input.lossReasonId !== undefined) {
+      dealData.deal_loss_reason_id = ctx.input.lossReasonId;
+    } else if (ctx.input.lossReason !== undefined) {
+      let reasons = await client.listDealLossReasons();
+      let matches = reasons.filter(
+        reason => reason.name?.toLowerCase() === ctx.input.lossReason?.trim().toLowerCase()
+      );
+      if (matches.length !== 1) {
+        throw createApiServiceError(
+          'Provide a unique configured loss reason name or use lossReasonId. Use lossReasonNotes for free-text explanation.'
+        );
+      }
+      dealData.deal_loss_reason_id = matches[0].id;
+    }
     if (ctx.input.lossReasonNotes !== undefined)
       dealData.deal_loss_reason_notes = ctx.input.lossReasonNotes;
     if (ctx.input.customFields !== undefined) dealData.custom_fields = ctx.input.customFields;

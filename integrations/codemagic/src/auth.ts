@@ -14,9 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiToken: z
         .string()
-        .describe(
-          'Codemagic API token. Found at Teams > Personal Account > Integrations > Codemagic API > Show.'
-        )
+        .trim()
+        .min(1)
+        .describe('Codemagic API token. Found at Account settings > API token.')
     }),
     getOutput: async ctx => ({
       output: {

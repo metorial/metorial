@@ -108,7 +108,7 @@ Supports custom form fields, voucher codes, pricing overrides, and shopping cart
       output: {
         reservationId,
         shoppingCartId: result.shopping_cart_id ? String(result.shopping_cart_id) : undefined,
-        status: result.status ? String(result.status) : undefined,
+        status: result.status != null ? String(result.status) : undefined,
         totalPrice: result.total_price != null ? Number(result.total_price) : undefined,
         originalPrice:
           result.original_price != null ? Number(result.original_price) : undefined,

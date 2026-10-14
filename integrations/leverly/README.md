@@ -1,6 +1,8 @@
 # Leverly
 
-Convert inbound leads into instant phone calls to sales reps. Submit lead data (phone number, name, source) to trigger automated call sequences with configurable persistence and reattempt intervals. Send multi-channel follow-ups via SMS, email, and voicemail drops between call attempts. Route calls using round-robin, simultaneous ring, or rules-based distribution across rep groups. Use AI call handling to answer inbound calls, qualify leads, book appointments, and take messages. Record calls and track response speed, close rates, and connection KPIs. Sync call results back to CRMs like Salesforce, HubSpot, and GoHighLevel. Monitor call finished events to push outcomes to external systems.
+Submit lead details to Leverly for an automated call sequence, or request that call reattempts stop for a lead's phone number. Existing optional lead details, group routing, call delay, and the provider's raw response are retained.
+
+Leverly manages account setup and routing rules. Its [official FAQ](https://www.leverly.com/faq/) describes the setup process. A public endpoint and authentication reference was not available during the October 2026 audit; confirm account-specific ingestion settings with Leverly before using these actions.
 
 ## License
 

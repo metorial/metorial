@@ -3,12 +3,14 @@ import { spec } from './spec';
 import {
   createApplication,
   createServer,
+  getOrganization,
   getServerDetails,
   listApplications,
   listBackups,
   listOrganizations,
   listServerProviders,
   listServers,
+  listTimezones,
   manageApplication,
   manageCronJobs,
   manageDatabase,
@@ -23,6 +25,8 @@ export let provider = Slate.create({
   spec,
   tools: [
     listOrganizations,
+    getOrganization,
+    listTimezones,
     listServerProviders,
     listServers,
     getServerDetails,

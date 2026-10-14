@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let sendEmailTool = SlateTool.create(spec, {
   name: 'Send Email',
   key: 'send_email',
-  description: `Send transactional emails via ClickSend's SMTP gateway. Requires a verified sender email address (identified by its email address ID). Supports HTML body content, multiple recipients, and scheduled delivery.`,
+  description: `Send transactional emails via ClickSend's SMTP gateway. Requires a verified sender email address (identified by its email address ID). Supports HTML body content, multiple recipients, and scheduled delivery. Transactional email is available only to existing customers with access to this service.`,
   instructions: [
-    'The from.emailAddressId must reference a verified email address in your ClickSend account',
-    'Use the "Get Account Info" tool to find your allowed email addresses and their IDs',
+    'The fromEmailAddressId must reference a verified email address in your ClickSend account',
+    'Use list_email_addresses to find your allowed email addresses and their IDs',
     'The body supports HTML content'
   ],
   tags: {
@@ -30,7 +30,9 @@ export let sendEmailTool = SlateTool.create(spec, {
         .describe('List of email recipients'),
       fromEmailAddressId: z
         .number()
-        .describe('ID of the verified sender email address in your ClickSend account'),
+        .describe(
+          'ID of the verified sender email address. Call list_email_addresses to discover sender IDs.'
+        ),
       fromName: z.string().optional().describe('Sender display name'),
       subject: z.string().describe('Email subject line'),
       body: z.string().describe('Email body content (supports HTML)'),
@@ -40,7 +42,9 @@ export let sendEmailTool = SlateTool.create(spec, {
   .output(
     z.object({
       sent: z.boolean().describe('Whether the email was successfully queued'),
-      recipientCount: z.number().describe('Number of recipients')
+      recipientCount: z.number().describe('Number of recipients'),
+      messageId: z.string().optional().describe('Email message ID for tracking'),
+      status: z.string().optional().describe('Provider queue status')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,7 +55,7 @@ export let sendEmailTool = SlateTool.create(spec, {
 
     ctx.progress('Sending email...');
 
-    await client.sendEmail({
+    let result = await client.sendEmail({
       to: ctx.input.to,
       from: {
         emailAddressId: ctx.input.fromEmailAddressId,
@@ -65,7 +69,9 @@ export let sendEmailTool = SlateTool.create(spec, {
     return {
       output: {
         sent: true,
-        recipientCount: ctx.input.to.length
+        recipientCount: ctx.input.to.length,
+        messageId: result.data?.message_id || undefined,
+        status: result.data?.status || undefined
       },
       message: `Email queued to **${ctx.input.to.length}** recipient(s) with subject "${ctx.input.subject}".`
     };

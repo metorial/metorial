@@ -19,6 +19,8 @@ export let updateLead = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Updated last name'),
       email: z.string().optional().describe('Updated email address'),
       phoneNumber: z.string().optional().describe('Updated phone number'),
+      source: z.string().optional().describe('Updated lead source'),
+      company: z.string().optional().describe('Updated company name'),
       status: z.string().optional().describe('Updated lead status'),
       result: z.string().optional().describe('Updated lead result'),
       stage: z.string().optional().describe('Updated lead stage'),
@@ -45,20 +47,22 @@ export let updateLead = SlateTool.create(spec, {
     if (ctx.input.lastName !== undefined) data.lname = ctx.input.lastName;
     if (ctx.input.email !== undefined) data.email = ctx.input.email;
     if (ctx.input.phoneNumber !== undefined) data.phone_number = ctx.input.phoneNumber;
+    if (ctx.input.source !== undefined) data.source = ctx.input.source;
+    if (ctx.input.company !== undefined) data.company = ctx.input.company;
     if (ctx.input.status !== undefined) data.status = ctx.input.status;
     if (ctx.input.result !== undefined) data.result = ctx.input.result;
     if (ctx.input.stage !== undefined) data.stage = ctx.input.stage;
-    if (ctx.input.isStopped !== undefined) data.is_stopped = ctx.input.isStopped;
-    if (ctx.input.isBlocked !== undefined) data.is_blocked = ctx.input.isBlocked;
+    if (ctx.input.isStopped !== undefined) data.is_stopped = ctx.input.isStopped ? 1 : 0;
+    if (ctx.input.isBlocked !== undefined) data.is_blocked = ctx.input.isBlocked ? 1 : 0;
 
     let result = await client.updateLead(ctx.input.leadId, data);
 
     return {
       output: {
         leadId: String(result.id),
-        firstName: result.fname,
-        lastName: result.lname,
-        status: result.status
+        firstName: result.fname ?? undefined,
+        lastName: result.lname ?? undefined,
+        status: result.status ?? undefined
       },
       message: `Lead **${result.fname ?? ''} ${result.lname ?? ''}** updated successfully.`
     };

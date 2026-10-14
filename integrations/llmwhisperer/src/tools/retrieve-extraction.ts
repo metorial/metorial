@@ -17,7 +17,7 @@ Returns the full extracted text along with confidence and document metadata.`,
   ],
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: false
   }
 })
   .input(

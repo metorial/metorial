@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPurchaseOrders = SlateTool.create(spec, {
   name: 'List Purchase Orders',
   key: 'list_purchase_orders',
-  description: `Lists purchase orders from MaintainX. Purchase orders track item procurement from vendors, including quantities and pricing.`,
+  description: `Lists purchase orders from MaintainX. Purchase orders track item procurement from vendors, including quantities and pricing. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,14 @@ export let listPurchaseOrders = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      organizationId: organizationIdSchema,
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -36,10 +44,7 @@ export let listPurchaseOrders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listPurchaseOrders({
       limit: ctx.input.limit,
@@ -47,12 +52,12 @@ export let listPurchaseOrders = SlateTool.create(spec, {
     });
 
     let purchaseOrders = (result.purchaseOrders ?? []).map((po: any) => ({
-      purchaseOrderId: po.id,
-      title: po.title,
-      status: po.status,
-      vendorId: po.vendorId,
-      createdAt: po.createdAt,
-      updatedAt: po.updatedAt
+      purchaseOrderId: po.id ?? undefined,
+      title: po.title ?? undefined,
+      status: po.status ?? undefined,
+      vendorId: po.vendorId ?? undefined,
+      createdAt: po.createdAt ?? undefined,
+      updatedAt: po.updatedAt ?? undefined
     }));
 
     return {

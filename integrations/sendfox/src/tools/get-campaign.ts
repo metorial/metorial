@@ -39,6 +39,7 @@ export let getCampaign = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let campaign = await client.getCampaign(ctx.input.campaignId);
+    let stats = await client.getCampaignStats(ctx.input.campaignId);
 
     return {
       output: {
@@ -50,15 +51,15 @@ export let getCampaign = SlateTool.create(spec, {
         fromEmail: campaign.from_email,
         scheduledAt: campaign.scheduled_at,
         sentAt: campaign.sent_at,
-        sentCount: campaign.sent_count,
-        uniqueOpenCount: campaign.unique_open_count,
-        uniqueClickCount: campaign.unique_click_count,
-        unsubscribeCount: campaign.unsubscribe_count,
-        bounceCount: campaign.bounce_count,
-        spamCount: campaign.spam_count,
+        sentCount: stats.sent_count,
+        uniqueOpenCount: stats.unique_open_count,
+        uniqueClickCount: stats.unique_click_count,
+        unsubscribeCount: stats.unsubscribe_count,
+        bounceCount: stats.bounce_count,
+        spamCount: stats.spam_count,
         createdAt: campaign.created_at
       },
-      message: `Retrieved campaign **${campaign.title}** (ID: ${campaign.id}). Sent: ${campaign.sent_count}, Opens: ${campaign.unique_open_count}, Clicks: ${campaign.unique_click_count}.`
+      message: `Retrieved campaign **${campaign.title}** (ID: ${campaign.id}). Sent: ${stats.sent_count}, Opens: ${stats.unique_open_count}, Clicks: ${stats.unique_click_count}.`
     };
   })
   .build();

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getSfxHistory = SlateTool.create(spec, {
   name: 'Get Sound Effects History',
   key: 'get_sfx_history',
-  description: `Retrieve the history of previously generated sound effects, or fetch audio for a specific sound effect by inference ID. History entries include prompt, generation parameters, and timestamps. Use the inference ID to retrieve the actual audio data.`,
+  description: `Retrieve the history of previously generated sound effects, or fetch audio for a specific sound effect by inference ID. History entries include prompt, generation parameters, and timestamps. Use the inference ID to retrieve a downloadable WAV file and the audio data.`,
   tags: {
     readOnly: true
   }
@@ -41,10 +41,17 @@ export let getSfxHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.inferenceId) {
       let result = await client.getSfxAudio(ctx.input.inferenceId);
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Buffer.from(result.wav_base64, 'base64'), {
+          headers: { 'content-type': 'audio/wav' }
+        }),
+        filename: 'sound-effect.wav'
+      });
       return {
         output: {
           total: 1,

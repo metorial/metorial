@@ -18,7 +18,7 @@ Returns monthly aggregated data showing document and page counts per tag.`,
         .string()
         .optional()
         .describe(
-          'Semicolon-separated list of tags to filter by (e.g., "invoice;report"). Omit to get all tags.'
+          'Semicolon-separated tags to query (e.g., "invoice;report"). Docmosis requires at least one tag.'
         )
     })
   )
@@ -59,12 +59,13 @@ Returns monthly aggregated data showing document and page counts per tag.`,
     let result = await client.getRenderTags(ctx.input.tags);
 
     let renderTags = (result.renderTags || []).map(month => ({
-      year: month.year,
-      month: month.month,
-      tags: month.tags.map(tag => ({
+      year: String(month.year),
+      month: String(month.month),
+      tags: (month.tags || []).map(tag => ({
         tagName: tag.name,
-        pageCount: tag.countPages,
-        documentCount: tag.countDocuments
+        pageCount: tag.countPages !== undefined ? String(tag.countPages) : undefined,
+        documentCount:
+          tag.countDocuments !== undefined ? String(tag.countDocuments) : undefined
       }))
     }));
 

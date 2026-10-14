@@ -1,4 +1,9 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let getTokenUrl = (environment: string) =>
@@ -6,11 +11,54 @@ let getTokenUrl = (environment: string) =>
     ? 'https://tokenapiuat.veo.co.uk/oauth2/token'
     : 'https://tokenapi.veo.co.uk/oauth2/token';
 
+let credentialsSchema = z.object({
+  username: z.string().describe('Your VEO email address'),
+  password: z.string().describe('Your VEO password'),
+  clientId: z.string().describe('Client ID provided by your VEO representative'),
+  clientSecret: z.string().describe('Client secret provided by your VEO representative'),
+  environment: z
+    .enum(['production', 'development'])
+    .default('production')
+    .describe('VEO environment')
+});
+
+let requestToken = async (input: z.infer<typeof credentialsSchema>) => {
+  let http = createAuthenticatedAxios({
+    contentType: 'application/x-www-form-urlencoded',
+    timeout: 30_000,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'VEO',
+        operation: 'authentication',
+        reason: 'veo_auth_error'
+      })
+  });
+  let params = new URLSearchParams({
+    Username: input.username,
+    Password: input.password,
+    Grant_type: 'password',
+    Client_id: input.clientId
+  });
+  let response = await http.post(getTokenUrl(input.environment), params.toString(), {
+    auth: { username: input.clientId, password: input.clientSecret }
+  });
+  let token = normalizeOAuthTokenResponse(response.data, {
+    providerLabel: 'VEO',
+    required: true
+  });
+  return {
+    token: token.token,
+    expiresAt: token.expiresAt,
+    environment: input.environment
+  };
+};
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      environment: z.string()
+      environment: z.string(),
+      expiresAt: z.string().optional()
     })
   )
   .addCustomAuth({
@@ -18,43 +66,12 @@ export let auth = SlateAuth.create()
     name: 'VEO Credentials',
     key: 'veo_credentials',
 
-    inputSchema: z.object({
-      username: z.string().describe('Your VEO email address'),
-      password: z.string().describe('Your VEO password'),
-      clientId: z.string().describe('Client ID provided by your VEO representative'),
-      clientSecret: z.string().describe('Client secret provided by your VEO representative'),
-      environment: z
-        .enum(['production', 'development'])
-        .default('production')
-        .describe('VEO environment')
-    }),
+    inputSchema: credentialsSchema,
 
     getOutput: async ctx => {
-      let tokenUrl = getTokenUrl(ctx.input.environment);
-
-      let http = createAxios();
-
-      let params = new URLSearchParams();
-      params.append('Username', ctx.input.username);
-      params.append('Password', ctx.input.password);
-      params.append('Grant_type', 'password');
-      params.append('Client_id', ctx.input.clientId);
-
-      let response = await http.post(tokenUrl, params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        auth: {
-          username: ctx.input.clientId,
-          password: ctx.input.clientSecret
-        }
-      });
-
-      return {
-        output: {
-          token: response.data.access_token,
-          environment: ctx.input.environment
-        }
-      };
-    }
+      return { output: await requestToken(ctx.input) };
+    },
+    handleTokenRefresh: async (ctx: { input: z.infer<typeof credentialsSchema> }) => ({
+      output: await requestToken(ctx.input)
+    })
   });

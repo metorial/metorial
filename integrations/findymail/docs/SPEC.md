@@ -1,68 +1,38 @@
-Let me fetch the actual API documentation for more details.Now let me check for more details on Findymail's contact lists management and webhook support.I now have enough information to write the specification.
+# Findymail Integration Specification
 
-# Slates Specification for Findymail
-
-## Overview
-
-Findymail is a B2B email and phone data enrichment service that finds and verifies professional email addresses, phone numbers, and company information. It provides a REST API for programmatic access to email finding, email verification, reverse email lookup, company enrichment, employee search, and AI-powered lead discovery.
+Find and verify B2B contact details, enrich companies, search employees, and discover leads.
 
 ## Authentication
 
-All API requests require a Bearer token passed in the `Authorization` header. You can get your API key instantly from your dashboard after signing up.
+Connect with a Findymail API key from the dashboard's API section. Requests use `Authorization: Bearer <API_KEY>` against `https://app.findymail.com/api`. Connection configuration has no duplicate or required resource IDs.
 
-In the Findymail dashboard, navigate to the API section, name a new API key, and click "Create" to generate it.
+## Tools
 
-**Authentication method:** API Key (Bearer Token)
+| Tool | API operation |
+| --- | --- |
+| `find_email` | `POST /search/name` or `POST /search/business-profile` |
+| `verify_email` | `POST /verify` |
+| `reverse_email_lookup` | `POST /search/reverse-email` |
+| `find_phone` | `POST /search/phone` |
+| `enrich_company` | `POST /search/company` |
+| `search_employees` | `POST /search/employees` |
+| `intellimatch_search` | `POST /intellimatch/search` |
+| `get_intellimatch_status` | `GET /intellimatch/status?hash=...` |
+| `get_intellimatch_results` | `GET /intellimatch/data?hash=...&page=...&per_page=...` |
+| `get_contact_lists` | `GET /lists` |
+| `list_contacts` | `GET /contacts/get/{listId}` |
+| `get_credits` | `GET /credits` |
 
-- **Header:** `Authorization: Bearer YOUR_API_KEY`
-- **Content-Type:** `application/json`
-- **Base URL:** `https://app.findymail.com/api`
+## Workflows
 
-No OAuth or additional scopes are required. A single API key provides access to all available API endpoints.
+IntelliMatch returns an export hash. The existing `searchId` output and the additive `hash` output both expose that value. Check status, then retrieve results when it is `success`. Results retain contact details and page metadata. Request subsequent pages through `lastPage`; `perPage` accepts up to 500.
 
-## Features
+Use `get_contact_lists` to discover string list IDs. `list_contacts` accepts those IDs directly; omitting the ID selects all contacts. The contacts endpoint identifies a list, rather than a single contact. Its response includes `recordsTotal`, `recordsFiltered`, and the number of returned contacts. No undocumented pagination query is sent.
 
-### Email Finder
+Employee searches accept up to 10 job titles and return at most 5 people. Email verification and email finding use separate credit balances. Credit, subscription, and HTTP failures are reported as service failures, including provider error bodies sent with HTTP 200.
 
-Find someone's verified email from their name and company. You provide a full name and a company domain (or company name), and Findymail returns a verified email address. Email Finder works from names, domains, or social profile URLs, and every email is automatically verified as it is found.
+## Compatibility and verification
 
-- Duplicate searches are free.
-- It doesn't return risky or invalid catch-all emails — only safe, verified results.
+Existing tool keys and input field types remain available. New output fields are optional. No identity endpoint is documented, so this package does not invent an account identity tool. No triggers are registered.
 
-### Email Verification
-
-Verify any email address for deliverability. Returns verification status and email provider. Email Verifier is for checking lists you already have — data you bought elsewhere or exported from your CRM. Upload your list and it will tell you which emails are safe to use.
-
-### Reverse Email Lookup
-
-Find a LinkedIn profile from an email address. Uses 1 credit without profile data, 2 credits with full profile enrichment. Returns details such as full name, headline, job title, and company name. The `with_profile` parameter controls whether full profile enrichment is included.
-
-### Phone Number Finder
-
-Find direct phone numbers from LinkedIn profiles. Requires a LinkedIn profile URL as input. GDPR compliant — excludes EU citizens.
-
-### Company Enrichment
-
-Get company information from LinkedIn URL, domain, or name. Returns data such as company name, domain, company size, and industry.
-
-### Employee Search
-
-Find employees at a company by website and job title. Returns LinkedIn profiles.
-
-### AI-Powered Lead Search (IntelliMatch)
-
-Find companies and contacts using natural language queries. Build targeted lead lists automatically. You can provide a plain-English query (e.g., "SaaS companies in US") along with configuration options to also find contacts and their emails in the same request.
-
-- Configurable options include `find_contact` and `find_email` flags and a `limit` parameter.
-
-### Contact Lists Management
-
-Get a list of all contact lists in Findymail. The API allows you to manage and retrieve saved contacts and lists within your Findymail account.
-
-### Credits Balance
-
-The API exposes an endpoint (`/api/credits`) to check your current account credit balance programmatically.
-
-## Events
-
-Findymail mentions webhook support for async operations. However, based on available documentation, there is no detailed specification of subscribable webhook event types or a webhook management API. The provider does not appear to offer a purpose-built event subscription system with defined event categories that can be configured programmatically through the API.
+The current API audit uses the [official Findymail API documentation](https://app.findymail.com/docs/), last updated July 31, 2026. Provider behavior was not verified live during this refresh.

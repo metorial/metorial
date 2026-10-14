@@ -1,8 +1,10 @@
 export { enrichCompany } from './enrich-company';
 export { enrichPerson } from './enrich-person';
 export { findDecisionMakers } from './find-decision-makers';
+export { getCreditBalance } from './get-credit-balance';
 export { getInvestorPortfolio } from './get-investor-portfolio';
 export { getSocialPosts } from './get-social-posts';
+export { listEndpointPermissions } from './list-endpoint-permissions';
 export { screenCompanies } from './screen-companies';
 export { searchCompanies } from './search-companies';
 export { searchJobListings } from './search-job-listings';

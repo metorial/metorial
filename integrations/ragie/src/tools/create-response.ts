@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,17 +55,33 @@ Best for complex questions that require multi-hop reasoning across multiple docu
       partition: ctx.input.partition
     });
 
+    if (result.status === 'failed' || result.status === 'cancelled') {
+      throw createApiServiceError(
+        `Ragie response ${result.status}: ${result.error ?? 'Try the query again.'}`
+      );
+    }
+
     let answer = '';
     if (result.output) {
       if (typeof result.output === 'string') {
         answer = result.output;
       } else if (Array.isArray(result.output)) {
         answer = result.output
-          .filter((item: any) => item.type === 'message' && item.content)
+          .filter(
+            (item: any) =>
+              (item.type === 'message' ||
+                item.role === 'assistant' ||
+                item.type === undefined) &&
+              item.content
+          )
           .map((item: any) => {
             if (Array.isArray(item.content)) {
               return item.content
-                .filter((c: any) => c.type === 'output_text')
+                .filter(
+                  (c: any) =>
+                    (c.type === 'text' || c.type === 'output_text' || c.type === undefined) &&
+                    typeof c.text === 'string'
+                )
                 .map((c: any) => c.text)
                 .join('');
             }
@@ -73,6 +89,10 @@ Best for complex questions that require multi-hop reasoning across multiple docu
           })
           .join('\n');
       }
+    }
+
+    if (!answer && result.output_parsed?.text) {
+      answer = result.output_parsed.text;
     }
 
     if (!answer && result.text) {

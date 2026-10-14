@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IgnisignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,8 +38,8 @@ export let updateSigner = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     if (ctx.input.revoke) {
@@ -54,16 +54,21 @@ export let updateSigner = SlateTool.create(spec, {
       };
     }
 
-    let updateData: Record<string, any> = {};
-    if (ctx.input.firstName) updateData.firstName = ctx.input.firstName;
-    if (ctx.input.lastName) updateData.lastName = ctx.input.lastName;
-    if (ctx.input.email) updateData.email = ctx.input.email;
-    if (ctx.input.phoneNumber) updateData.phoneNumber = ctx.input.phoneNumber;
-    if (ctx.input.nationality) updateData.nationality = ctx.input.nationality;
-    if (ctx.input.birthDate) updateData.birthDate = ctx.input.birthDate;
-    if (ctx.input.birthPlace) updateData.birthPlace = ctx.input.birthPlace;
-    if (ctx.input.birthCountry) updateData.birthCountry = ctx.input.birthCountry;
+    let updateData = pickDefined({
+      firstName: ctx.input.firstName,
+      lastName: ctx.input.lastName,
+      email: ctx.input.email,
+      phoneNumber: ctx.input.phoneNumber,
+      nationality: ctx.input.nationality,
+      birthDate: ctx.input.birthDate,
+      birthPlace: ctx.input.birthPlace,
+      birthCountry: ctx.input.birthCountry
+    });
 
+    if (!Object.keys(updateData).length)
+      throw createApiServiceError(
+        'Provide at least one signer field to update, or set revoke to true.'
+      );
     let result = await client.updateSigner(ctx.input.signerId, updateData);
 
     return {

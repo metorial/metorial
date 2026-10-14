@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -110,7 +110,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.customFieldId) {
-        throw new Error('customFieldId is required for the "get" action');
+        throw createApiServiceError('customFieldId is required for the "get" action');
       }
       let customField = await client.getCustomField(ctx.input.customFieldId);
       return {
@@ -121,10 +121,10 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for the "create" action');
+        throw createApiServiceError('name is required for the "create" action');
       }
       if (!ctx.input.type) {
-        throw new Error('type is required for the "create" action');
+        throw createApiServiceError('type is required for the "create" action');
       }
       let input: Record<string, unknown> = {
         name: ctx.input.name,
@@ -144,7 +144,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.customFieldId) {
-        throw new Error('customFieldId is required for the "update" action');
+        throw createApiServiceError('customFieldId is required for the "update" action');
       }
       let input: Record<string, unknown> = {};
       if (ctx.input.name !== undefined) input.name = ctx.input.name;
@@ -162,7 +162,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.customFieldId) {
-        throw new Error('customFieldId is required for the "delete" action');
+        throw createApiServiceError('customFieldId is required for the "delete" action');
       }
       await client.deleteCustomField(ctx.input.customFieldId);
       return {
@@ -171,6 +171,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

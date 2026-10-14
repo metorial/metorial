@@ -1,8 +1,4 @@
-import { createAxios } from 'slates';
-
-let api = createAxios({
-  baseURL: 'https://api.paradym.id/v1'
-});
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   pageSize?: number;
@@ -21,30 +17,56 @@ export interface ListResponse<T> {
 }
 
 export class Client {
-  private token: string;
-  private projectId: string;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
+  private projectId: unknown;
 
-  constructor(config: { token: string; projectId: string }) {
-    this.token = config.token;
+  constructor(config: { token: string; projectId?: unknown }) {
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError(
+        'A Paradym API key is required. Reconnect with a valid API key.'
+      );
+    }
     this.projectId = config.projectId;
-  }
-
-  private headers() {
-    return {
-      'x-access-token': this.token,
-      'Content-Type': 'application/json'
-    };
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.paradym.id/v1',
+      timeout: 30000,
+      authHeader: { name: 'x-access-token', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Paradym',
+          reason: 'paradym_api_error',
+          nestedKeys: ['errors', 'details'],
+          extractResponse: (error, helpers) => {
+            let response = helpers.getResponse(error);
+            if (!helpers.isRecord(error) || !helpers.isRecord(error.data)) return response;
+            let baggage = error.data.baggage;
+            if (!helpers.isRecord(baggage) || !helpers.isRecord(baggage.response))
+              return response;
+            return { ...response, data: baggage.response };
+          },
+          extractUpstreamCode: (_error, response, helpers) => {
+            let data = response?.data;
+            return helpers.isRecord(data) && typeof data.code === 'number'
+              ? String(data.code)
+              : undefined;
+          }
+        })
+    });
   }
 
   private projectUrl(path: string) {
-    return `/projects/${this.projectId}${path}`;
+    if (typeof this.projectId !== 'string' || !this.projectId.trim()) {
+      throw createApiServiceError(
+        'projectId is required. Call list_projects and pass a project ID.'
+      );
+    }
+    return `/projects/${encodeURIComponent(this.projectId)}${path}`;
   }
 
   // ─── Projects ───
 
   async listProjects(params?: PaginationParams) {
-    let res = await api.get('/projects', {
-      headers: this.headers(),
+    let res = await this.api.get('/projects', {
       params: this.paginationQuery(params)
     });
     return res.data;
@@ -52,49 +74,43 @@ export class Client {
 
   async getProject(projectId?: string) {
     let id = projectId ?? this.projectId;
-    let res = await api.get(`/projects/${id}`, {
-      headers: this.headers()
-    });
+    let res = await this.api.get(`/projects/${id}`);
     return res.data;
   }
 
   async createProject(data: { name: string }) {
-    let res = await api.post('/projects', data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post('/projects', data);
     return res.data;
   }
 
   async getProjectProfile(projectId?: string) {
     let id = projectId ?? this.projectId;
-    let res = await api.get(`/projects/${id}/profile`, {
-      headers: this.headers()
-    });
+    let res = await this.api.get(`/projects/${id}/profiles/default`);
     return res.data;
   }
 
   async listProjectMembers(projectId?: string) {
     let id = projectId ?? this.projectId;
-    let res = await api.get(`/projects/${id}/members`, {
-      headers: this.headers()
-    });
+    let res = await this.api.get(`/projects/${id}/members`);
     return res.data;
   }
 
   // ─── Credential Templates ───
 
-  async listCredentialTemplates(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/templates/credentials'), {
-      headers: this.headers(),
+  async listCredentialTemplates(
+    format: 'sd-jwt-vc' | 'mdoc' | 'anoncreds',
+    params?: PaginationParams
+  ) {
+    let res = await this.api.get(this.projectUrl(`/templates/credentials/${format}`), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
-  async getCredentialTemplate(templateId: string) {
-    let res = await api.get(this.projectUrl(`/templates/credentials/${templateId}`), {
-      headers: this.headers()
-    });
+  async getCredentialTemplate(format: 'sd-jwt-vc' | 'mdoc' | 'anoncreds', templateId: string) {
+    let res = await this.api.get(
+      this.projectUrl(`/templates/credentials/${format}/${encodeURIComponent(templateId)}`)
+    );
     return res.data;
   }
 
@@ -102,17 +118,20 @@ export class Client {
     name: string;
     type: string;
     attributes: Record<string, any>;
-    issuer: Record<string, any>;
+    issuer?: Record<string, any>;
     description?: string;
     revocable?: boolean;
     background?: Record<string, any>;
     text?: Record<string, any>;
     validFrom?: string;
-    validUntil?: string;
+    validUntil?:
+      | string
+      | {
+          future: { days?: number; months?: number; years?: number };
+          start?: 'issuance' | 'validFrom';
+        };
   }) {
-    let res = await api.post(this.projectUrl('/templates/credentials/sd-jwt-vc'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/templates/credentials/sd-jwt-vc'), data);
     return res.data;
   }
 
@@ -120,55 +139,57 @@ export class Client {
     name: string;
     type: string;
     attributes: Record<string, any>;
-    issuer: Record<string, any>;
+    issuer?: Record<string, any>;
     description?: string;
+    revocable?: boolean;
     background?: Record<string, any>;
     text?: Record<string, any>;
-    validUntil?: string;
+    validUntil?:
+      | string
+      | {
+          future: { days?: number; months?: number; years?: number };
+          start?: 'issuance' | 'validFrom';
+        };
   }) {
-    let res = await api.post(this.projectUrl('/templates/credentials/mdoc'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/templates/credentials/mdoc'), data);
     return res.data;
   }
 
   async createAnonCredsCredentialTemplate(data: {
     name: string;
-    schema: Record<string, any>;
+    schema?: string;
     attributes: Record<string, any>;
-    issuer: Record<string, any>;
+    issuer?: Record<string, any>;
     description?: string;
     revocable?: boolean;
     background?: Record<string, any>;
     text?: Record<string, any>;
   }) {
-    let res = await api.post(this.projectUrl('/templates/credentials/anoncreds'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/templates/credentials/anoncreds'), data);
     return res.data;
   }
 
   async updateCredentialTemplate(templateId: string, data: Record<string, any>) {
-    let res = await api.patch(this.projectUrl(`/templates/credentials/${templateId}`), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.patch(
+      this.projectUrl(`/templates/credentials/${encodeURIComponent(templateId)}`),
+      data
+    );
     return res.data;
   }
 
   // ─── Presentation Templates ───
 
   async listPresentationTemplates(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/templates/presentations'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/templates/presentations'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getPresentationTemplate(templateId: string) {
-    let res = await api.get(this.projectUrl(`/templates/presentations/${templateId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/templates/presentations/${encodeURIComponent(templateId)}`)
+    );
     return res.data;
   }
 
@@ -178,19 +199,14 @@ export class Client {
     credentials: Record<string, any>[];
     verifier?: Record<string, any>;
   }) {
-    let res = await api.post(this.projectUrl('/templates/presentations'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/templates/presentations'), data);
     return res.data;
   }
 
   async updatePresentationTemplate(templateId: string, data: Record<string, any>) {
-    let res = await api.patch(
-      this.projectUrl(`/templates/presentations/${templateId}`),
-      data,
-      {
-        headers: this.headers()
-      }
+    let res = await this.api.put(
+      this.projectUrl(`/templates/presentations/${encodeURIComponent(templateId)}`),
+      data
     );
     return res.data;
   }
@@ -204,24 +220,21 @@ export class Client {
     }>;
     expirationInMinutes?: number;
   }) {
-    let res = await api.post(this.projectUrl('/openid4vc/issuance/offer'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/openid4vc/issuance/offer'), data);
     return res.data;
   }
 
   async listOpenId4VcIssuances(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/openid4vc/issuance'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/openid4vc/issuance'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getOpenId4VcIssuance(issuanceId: string) {
-    let res = await api.get(this.projectUrl(`/openid4vc/issuance/${issuanceId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/openid4vc/issuance/${encodeURIComponent(issuanceId)}`)
+    );
     return res.data;
   }
 
@@ -231,8 +244,8 @@ export class Client {
     credentialTemplateId: string;
     attributes?: Record<string, any>;
   }) {
-    let res = await api.post(this.projectUrl('/issuance/sd-jwt-vc'), data, {
-      headers: this.headers()
+    let res = await this.api.post(this.projectUrl('/issuance/sd-jwt-vc'), {
+      credential: data
     });
     return res.data;
   }
@@ -244,24 +257,21 @@ export class Client {
     expirationInMinutes?: number;
     requireResponseEncryption?: boolean;
   }) {
-    let res = await api.post(this.projectUrl('/openid4vc/verification/request'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/openid4vc/verification/request'), data);
     return res.data;
   }
 
   async listOpenId4VcVerifications(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/openid4vc/verification'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/openid4vc/verification'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getOpenId4VcVerification(verificationId: string) {
-    let res = await api.get(this.projectUrl(`/openid4vc/verification/${verificationId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/openid4vc/verification/${encodeURIComponent(verificationId)}`)
+    );
     return res.data;
   }
 
@@ -277,24 +287,21 @@ export class Client {
     };
     didcommConnectionId?: string;
   }) {
-    let res = await api.post(this.projectUrl('/didcomm/issuance/offer'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/didcomm/issuance/offer'), data);
     return res.data;
   }
 
   async listDidcommIssuances(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/didcomm/issuance'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/didcomm/issuance'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getDidcommIssuance(issuanceId: string) {
-    let res = await api.get(this.projectUrl(`/didcomm/issuance/${issuanceId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/didcomm/issuance/${encodeURIComponent(issuanceId)}`)
+    );
     return res.data;
   }
 
@@ -307,70 +314,69 @@ export class Client {
     };
     didcommConnectionId?: string;
   }) {
-    let res = await api.post(this.projectUrl('/didcomm/verification/request'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/didcomm/verification/request'), data);
     return res.data;
   }
 
   async listDidcommVerifications(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/didcomm/verification'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/didcomm/verification'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getDidcommVerification(verificationId: string) {
-    let res = await api.get(this.projectUrl(`/didcomm/verification/${verificationId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/didcomm/verification/${encodeURIComponent(verificationId)}`)
+    );
     return res.data;
   }
 
   // ─── DIDComm Connections ───
 
   async listDidcommConnections(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/didcomm/connections'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/didcomm/connections'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getDidcommConnection(connectionId: string) {
-    let res = await api.get(this.projectUrl(`/didcomm/connections/${connectionId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/didcomm/connections/${encodeURIComponent(connectionId)}`)
+    );
     return res.data;
   }
 
   async updateDidcommConnection(connectionId: string, data: { displayName: string }) {
-    let res = await api.patch(this.projectUrl(`/didcomm/connections/${connectionId}`), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(
+      this.projectUrl(`/didcomm/connections/${encodeURIComponent(connectionId)}`),
+      data
+    );
     return res.data;
   }
 
-  async createDidcommInvitation(data: { reusable?: boolean; did?: string; goal?: string }) {
-    let res = await api.post(this.projectUrl('/didcomm/invitations'), data, {
-      headers: this.headers()
-    });
+  async createDidcommInvitation(data: {
+    reusable?: boolean;
+    did?: string;
+    goal?: { description: string; code?: string };
+  }) {
+    let res = await this.api.post(
+      this.projectUrl('/didcomm/invitations/create-connection'),
+      data
+    );
     return res.data;
   }
 
   async listDidcommInvitations(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/didcomm/invitations'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/didcomm/invitations'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async receiveDidcommInvitation(data: { didcommInvitation: string; displayName?: string }) {
-    let res = await api.post(this.projectUrl('/didcomm/receive-invitation'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/didcomm/invitations/receive'), data);
     return res.data;
   }
 
@@ -385,8 +391,7 @@ export class Client {
         query[`filter[${key}]`] = value;
       }
     }
-    let res = await api.get(this.projectUrl('/issuance'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/issuance'), {
       params: query
     });
     return res.data;
@@ -396,48 +401,47 @@ export class Client {
     issuedCredentialIds: string[];
     notifyWallet?: boolean;
   }) {
-    let res = await api.post(this.projectUrl('/issuance/revoke'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/revocation/batch'), data);
     return res.data;
   }
 
   // ─── Trusted Entities ───
 
   async listTrustedEntities(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/trusted-entities'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/trusted-entities'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async getTrustedEntity(entityId: string) {
-    let res = await api.get(this.projectUrl(`/trusted-entities/${entityId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.get(
+      this.projectUrl(`/trusted-entities/${encodeURIComponent(entityId)}`)
+    );
     return res.data;
   }
 
-  async createTrustedEntity(data: { name: string; dids?: string[]; certificates?: string[] }) {
-    let res = await api.post(this.projectUrl('/trusted-entities'), data, {
-      headers: this.headers()
-    });
+  async createTrustedEntity(data: {
+    name: string;
+    dids?: { did: string }[];
+    certificates?: { certificate: string }[];
+  }) {
+    let res = await this.api.post(this.projectUrl('/trusted-entities'), data);
     return res.data;
   }
 
   async updateTrustedEntity(entityId: string, data: Record<string, any>) {
-    let res = await api.patch(this.projectUrl(`/trusted-entities/${entityId}`), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.put(
+      this.projectUrl(`/trusted-entities/${encodeURIComponent(entityId)}`),
+      data
+    );
     return res.data;
   }
 
   // ─── Attribute Providers ───
 
   async listAttributeProviders(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/attribute-providers'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/attribute-providers'), {
       params: this.paginationQuery(params)
     });
     return res.data;
@@ -448,17 +452,14 @@ export class Client {
     url: string;
     credentialTemplateId: string;
   }) {
-    let res = await api.post(this.projectUrl('/attribute-providers'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/attribute-providers'), data);
     return res.data;
   }
 
   // ─── DIDs ───
 
   async listDids(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/dids'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/dids'), {
       params: this.paginationQuery(params)
     });
     return res.data;
@@ -467,24 +468,21 @@ export class Client {
   // ─── Webhooks ───
 
   async createWebhook(data: { name: string; url: string; eventTypes: string[] }) {
-    let res = await api.post(this.projectUrl('/webhooks'), data, {
-      headers: this.headers()
-    });
+    let res = await this.api.post(this.projectUrl('/webhooks'), data);
     return res.data;
   }
 
   async listWebhooks(params?: PaginationParams) {
-    let res = await api.get(this.projectUrl('/webhooks'), {
-      headers: this.headers(),
+    let res = await this.api.get(this.projectUrl('/webhooks'), {
       params: this.paginationQuery(params)
     });
     return res.data;
   }
 
   async deleteWebhook(webhookId: string) {
-    let res = await api.delete(this.projectUrl(`/webhooks/${webhookId}`), {
-      headers: this.headers()
-    });
+    let res = await this.api.delete(
+      this.projectUrl(`/webhooks/${encodeURIComponent(webhookId)}`)
+    );
     return res.data;
   }
 
@@ -492,7 +490,15 @@ export class Client {
 
   private paginationQuery(params?: PaginationParams): Record<string, any> {
     let query: Record<string, any> = {};
-    if (params?.pageSize) query['page[size]'] = params.pageSize;
+    if (params?.pageSize !== undefined) {
+      if (!Number.isInteger(params.pageSize) || params.pageSize < 1) {
+        throw createApiServiceError('pageSize must be a positive integer.');
+      }
+      query['page[size]'] = params.pageSize;
+    }
+    if (params?.pageAfter && params.pageBefore) {
+      throw createApiServiceError('Provide only one of pageAfter or pageBefore.');
+    }
     if (params?.pageAfter) query['page[after]'] = params.pageAfter;
     if (params?.pageBefore) query['page[before]'] = params.pageBefore;
     return query;

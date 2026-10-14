@@ -5,10 +5,13 @@ import {
   addVariables,
   cancelBuild,
   createArtifactUrl,
+  downloadArtifact,
   getApplication,
   getBuild,
+  getCurrentUser,
   listApplications,
   listBuilds,
+  listVariableGroups,
   manageCaches,
   startBuild
 } from './tools';
@@ -23,8 +26,11 @@ export let provider = Slate.create({
     listBuilds,
     cancelBuild,
     createArtifactUrl,
+    downloadArtifact,
     manageCaches,
-    addVariables
+    addVariables,
+    listVariableGroups,
+    getCurrentUser
   ],
   triggers: []
 });

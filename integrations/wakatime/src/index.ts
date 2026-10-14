@@ -8,6 +8,8 @@ import {
   getCodingStats,
   getCodingSummaries,
   getDurations,
+  getExternalDurations,
+  getFileUrl,
   getGoals,
   getHeartbeats,
   getInsights,
@@ -15,6 +17,7 @@ import {
   getMachines,
   getOrganizations,
   getPrivateLeaderboards,
+  getProjectCommit,
   getProjectCommits,
   getUserProfile,
   listProjects,
@@ -26,11 +29,13 @@ export let provider = Slate.create({
     getCodingSummaries,
     getCodingStats,
     getDurations,
+    getExternalDurations,
     getHeartbeats,
     createHeartbeat,
     deleteHeartbeat,
     listProjects,
     getProjectCommits,
+    getProjectCommit,
     getGoals,
     createExternalDuration,
     getLeaderboard,
@@ -40,7 +45,8 @@ export let provider = Slate.create({
     getInsights,
     getOrganizations,
     getMachines,
-    manageDataExports
+    manageDataExports,
+    getFileUrl
   ],
   triggers: []
 });

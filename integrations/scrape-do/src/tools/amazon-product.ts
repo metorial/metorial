@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ScrapeDoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let amazonProduct = SlateTool.create(spec, {
   name: 'Amazon Product Details',
   key: 'amazon_product',
-  description: `Retrieve structured product data from Amazon by ASIN. Returns JSON with product details including title, pricing, images, ratings, specifications, and more. Also supports fetching offer listings (all sellers) for a product. Covers 21 international Amazon marketplaces with ZIP code-based location targeting for local pricing.`,
+  description: `Retrieve structured product data from Amazon by ASIN. Returns JSON with product details including title, pricing, images, ratings, specifications, and more. Also supports fetching offer listings (all sellers) for a product. Covers international Amazon marketplaces with ZIP code-based location targeting for local pricing.`,
   instructions: [
     'Use geocode to specify the Amazon marketplace (e.g., "us", "gb", "de", "jp").',
     'Use zipcode for location-specific pricing and availability.',
@@ -29,6 +29,14 @@ export let amazonProduct = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Postal/ZIP code for location-specific pricing and availability'),
+      countryName: z
+        .string()
+        .optional()
+        .describe('Country-level delivery destination; use instead of zipcode'),
+      currency: z
+        .string()
+        .optional()
+        .describe('ISO 4217 display currency, such as USD or EUR'),
       language: z
         .string()
         .optional()
@@ -60,11 +68,16 @@ export let amazonProduct = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ScrapeDoClient(ctx.auth.token);
     let input = ctx.input;
+    if (input.zipcode && input.countryName) {
+      throw createApiServiceError('Choose either zipcode or countryName, not both.');
+    }
 
     let product = await client.amazonProductDetail({
       asin: input.asin,
       geocode: input.geocode,
       zipcode: input.zipcode,
+      countryName: input.countryName,
+      currency: input.currency,
       language: input.language,
       includeHtml: input.includeHtml,
       super: input.super
@@ -76,17 +89,25 @@ export let amazonProduct = SlateTool.create(spec, {
         asin: input.asin,
         geocode: input.geocode,
         zipcode: input.zipcode,
+        countryName: input.countryName,
+        currency: input.currency,
         language: input.language,
+        includeHtml: input.includeHtml,
         super: input.super
       });
     }
 
-    let title = (product.title as string) || input.asin;
+    let title =
+      typeof product.name === 'string'
+        ? product.name
+        : typeof product.title === 'string'
+          ? product.title
+          : input.asin;
 
     return {
       output: {
         product,
-        offers: offers || null
+        offers: offers ?? null
       },
       message: `Retrieved Amazon product **${title}** (ASIN: ${input.asin}) from **${input.geocode}** marketplace.${input.includeOffers ? ' Offers included.' : ''}`
     };

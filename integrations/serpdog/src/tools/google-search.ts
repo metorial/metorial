@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -92,13 +92,29 @@ export let googleSearch = SlateTool.create(spec, {
       lr: ctx.input.languageRestrict,
       uule: ctx.input.location,
       duration: ctx.input.timeFilter,
-      nfpr: ctx.input.noAutoCorrect ? 1 : undefined,
+      nfpr:
+        ctx.input.noAutoCorrect === undefined ? undefined : ctx.input.noAutoCorrect ? 1 : 0,
       tbs: ctx.input.advancedFilter,
       safe: ctx.input.safeSearch,
       domain: ctx.input.googleDomain,
       html: ctx.input.returnHtml,
       lite: ctx.input.lite
     });
+
+    if (ctx.input.returnHtml) {
+      if (typeof data !== 'string') {
+        throw createApiServiceError(
+          'Serpdog returned an unexpected HTML response. Try the search again.'
+        );
+      }
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(data, {
+          headers: { 'content-type': 'text/html; charset=utf-8' }
+        }),
+        filename: 'google-search.html'
+      });
+    }
 
     let variant = ctx.input.lite ? 'lite' : 'advanced';
     return {

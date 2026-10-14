@@ -4,11 +4,14 @@ import {
   dnsLookup,
   domainAvailability,
   domainDiscovery,
+  domainReputationLookup,
   domainWhoisLookup,
+  getApiUsage,
   historicalDnsLookup,
   historicalWhoisLookup,
   ipAsnWhoisLookup,
   ipGeolocation,
+  ipReputationLookup,
   reverseDnsLookup,
   reverseWhoisSearch,
   sslCertificateLookup,
@@ -29,7 +32,10 @@ export let provider = Slate.create({
     domainAvailability,
     domainDiscovery,
     sslCertificateLookup,
-    ipGeolocation
+    ipGeolocation,
+    getApiUsage,
+    ipReputationLookup,
+    domainReputationLookup
   ],
   triggers: []
 });

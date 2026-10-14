@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let discoverSitemap = SlateTool.create(spec, {
   name: 'Discover Sitemap',
   key: 'discover_sitemap',
-  description: `Extracts and returns the sitemap structure of a website by discovering URLs from sitemap.xml, robots.txt, and common sitemap locations.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Extracts and returns the sitemap structure of a website by discovering URLs from sitemap.xml, robots.txt, and common sitemap locations.
 Useful for understanding site organization, URL discovery, and SEO audits before performing a larger crawl.`,
   tags: {
     destructive: false,

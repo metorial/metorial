@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,6 +20,12 @@ export let sendCampaign = SlateTool.create(spec, {
       action: z
         .enum(['schedule', 'draft', 'duplicate', 'resend'])
         .describe('Action to perform on the campaign'),
+      newCampaignName: z
+        .string()
+        .optional()
+        .describe(
+          'Name for the duplicate campaign; defaults to the original name followed by (copy)'
+        ),
       scheduleDate: z
         .string()
         .optional()
@@ -53,13 +59,15 @@ export let sendCampaign = SlateTool.create(spec, {
     switch (action) {
       case 'schedule': {
         if (!ctx.input.scheduleDate || !ctx.input.timezone) {
-          throw new Error('scheduleDate and timezone are required when action is "schedule"');
+          throw createApiServiceError(
+            'scheduleDate and timezone are required when action is "schedule"'
+          );
         }
         let result = await client.scheduleCampaign(campaignId, {
           scheduleDate: ctx.input.scheduleDate,
           timezone: ctx.input.timezone
         });
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         message = success
           ? `Scheduled campaign \`${campaignId}\` for **${ctx.input.scheduleDate}** (${ctx.input.timezone}).`
           : `Failed to schedule campaign \`${campaignId}\`.`;
@@ -67,16 +75,23 @@ export let sendCampaign = SlateTool.create(spec, {
       }
       case 'draft': {
         let result = await client.setToDraft(campaignId);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         message = success
           ? `Set campaign \`${campaignId}\` back to draft.`
           : `Failed to set campaign \`${campaignId}\` to draft.`;
         break;
       }
       case 'duplicate': {
-        let result = await client.duplicateCampaign(campaignId);
-        success = result?.Status === 1;
-        newCampaignId = String(result?.Data ?? '');
+        let name = ctx.input.newCampaignName;
+        if (!name) {
+          let original = await client.getCampaign(campaignId);
+          name = `${original?.Data?.Name ?? campaignId} (copy)`;
+        }
+        let result = await client.duplicateCampaign(campaignId, name);
+        success = String(result?.Status) === '1';
+        newCampaignId = String(result?.Data?.ID ?? '');
+        if (!newCampaignId)
+          throw createApiServiceError('Benchmark Email did not return the created record ID.');
         message = success
           ? `Duplicated campaign \`${campaignId}\`. New campaign ID: \`${newCampaignId}\`.`
           : `Failed to duplicate campaign \`${campaignId}\`.`;
@@ -84,7 +99,7 @@ export let sendCampaign = SlateTool.create(spec, {
       }
       case 'resend': {
         let result = await client.resendCampaign(campaignId);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         message = success
           ? `Resending campaign \`${campaignId}\` to newly added contacts.`
           : `Failed to resend campaign \`${campaignId}\`.`;

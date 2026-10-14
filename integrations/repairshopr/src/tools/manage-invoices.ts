@@ -35,28 +35,31 @@ let invoiceSchema = z.object({
 let mapInvoice = (inv: any) => ({
   invoiceId: inv.id,
   number: inv.number?.toString(),
-  customerId: inv.customer_id,
+  customerId: inv.customer_id ?? undefined,
   customerName: inv.customer_business_then_name || inv.customer?.fullname,
-  ticketId: inv.ticket_id,
-  date: inv.date,
-  dueDate: inv.due_date,
-  subtotal: inv.subtotal ? Number(inv.subtotal) : undefined,
-  total: inv.total ? Number(inv.total) : undefined,
-  tax: inv.tax ? Number(inv.tax) : undefined,
-  balance: inv.balance ? Number(inv.balance) : undefined,
-  status: inv.status,
-  notes: inv.notes,
+  ticketId: inv.ticket_id ?? undefined,
+  date: inv.date ?? undefined,
+  dueDate: inv.due_date ?? undefined,
+  subtotal: inv.subtotal == null ? undefined : Number(inv.subtotal),
+  total: inv.total == null ? undefined : Number(inv.total),
+  tax: inv.tax == null ? undefined : Number(inv.tax),
+  balance:
+    (inv.balance_due ?? inv.balance) == null
+      ? undefined
+      : Number(inv.balance_due ?? inv.balance),
+  status: inv.status ?? undefined,
+  notes: inv.note ?? inv.notes ?? undefined,
   lineItems: (inv.line_items || []).map((li: any) => ({
     lineItemId: li.id,
-    name: li.name,
-    description: li.description,
-    quantity: li.quantity,
-    price: li.price ? Number(li.price) : undefined,
-    taxable: li.taxable,
-    productId: li.product_id
+    name: li.name ?? undefined,
+    description: li.item ?? li.description ?? undefined,
+    quantity: li.quantity ?? undefined,
+    price: li.price == null ? undefined : Number(li.price),
+    taxable: li.taxable ?? undefined,
+    productId: li.product_id ?? undefined
   })),
-  createdAt: inv.created_at,
-  updatedAt: inv.updated_at
+  createdAt: inv.created_at ?? undefined,
+  updatedAt: inv.updated_at ?? undefined
 });
 
 export let searchInvoices = SlateTool.create(spec, {
@@ -129,7 +132,7 @@ export let getInvoice = SlateTool.create(spec, {
 
     return {
       output: mapInvoice(inv),
-      message: `Retrieved invoice **#${inv.number || inv.id}** — Total: $${inv.total || 0}, Balance: $${inv.balance || 0}.`
+      message: `Retrieved invoice **#${inv.number || inv.id}** — Total: $${inv.total || 0}, Balance: $${inv.balance_due ?? inv.balance ?? 0}.`
     };
   })
   .build();
@@ -228,6 +231,33 @@ export let deleteInvoice = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted invoice **${ctx.input.invoiceId}**.`
+    };
+  })
+  .build();
+
+export let convertEstimateToInvoice = SlateTool.create(spec, {
+  name: 'Convert Estimate to Invoice',
+  key: 'convert_estimate_to_invoice',
+  description:
+    'Convert an existing estimate into an invoice and return the new invoice ID and totals.'
+})
+  .input(
+    z.object({
+      estimateId: z
+        .number()
+        .int()
+        .positive()
+        .describe('Estimate ID from search_estimates or get_estimate')
+    })
+  )
+  .output(invoiceSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, subdomain: ctx.config.subdomain });
+    let result = await client.convertEstimateToInvoice(ctx.input.estimateId);
+    let invoice = result.invoice || result;
+    return {
+      output: mapInvoice(invoice),
+      message: `Converted estimate **${ctx.input.estimateId}** to invoice **${invoice.number || invoice.id}**.`
     };
   })
   .build();

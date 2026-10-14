@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { folderIdSchema, projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let importFile = SlateTool.create(spec, {
@@ -25,11 +26,20 @@ export let importFile = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('MIME type of the file (required if URL lacks file extension)'),
-      title: z.string().optional().describe('Title for the imported resource (insight only)'),
-      projectId: z
+      title: z
         .string()
         .optional()
-        .describe('Project to associate the import with (data only)')
+        .describe('Title for the imported resource (required for every targetType).'),
+      projectId: projectIdSchema
+        .optional()
+        .describe(
+          'Project ID from list_projects (required for note/data; optional for doc/insight).'
+        ),
+      folderId: folderIdSchema
+        .optional()
+        .describe(
+          'Folder ID from browse_folders (doc/insight only; cannot combine with projectId).'
+        )
     })
   )
   .output(
@@ -42,9 +52,27 @@ export let importFile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (!ctx.input.title)
+      throw createApiServiceError('title is required for every file import.');
+    if (
+      ctx.input.folderId &&
+      (ctx.input.targetType === 'note' || ctx.input.targetType === 'data')
+    )
+      throw createApiServiceError(
+        'folderId is only supported for document and insight imports.'
+      );
+    if (ctx.input.projectId && ctx.input.folderId)
+      throw createApiServiceError('Choose projectId or folderId, not both.');
 
     if (ctx.input.targetType === 'note') {
-      let note = await client.importNoteFromFile(ctx.input.url, ctx.input.mimeType);
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for note file imports.');
+      let note = await client.importNoteFromFile(
+        ctx.input.url,
+        ctx.input.title,
+        ctx.input.projectId,
+        ctx.input.mimeType
+      );
       return {
         output: {
           resourceId: note.id,
@@ -57,8 +85,11 @@ export let importFile = SlateTool.create(spec, {
     }
 
     if (ctx.input.targetType === 'data') {
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for data file imports.');
       let data = await client.importDataFromFile(
         ctx.input.url,
+        ctx.input.title,
         ctx.input.projectId,
         ctx.input.mimeType
       );
@@ -77,7 +108,9 @@ export let importFile = SlateTool.create(spec, {
       let insight = await client.importInsightFromFile(
         ctx.input.url,
         ctx.input.title,
-        ctx.input.mimeType
+        ctx.input.mimeType,
+        ctx.input.projectId,
+        ctx.input.folderId
       );
       return {
         output: {
@@ -91,7 +124,13 @@ export let importFile = SlateTool.create(spec, {
     }
 
     // doc
-    let doc = await client.importDocFromFile(ctx.input.url, ctx.input.mimeType);
+    let doc = await client.importDocFromFile(
+      ctx.input.url,
+      ctx.input.title,
+      ctx.input.mimeType,
+      ctx.input.projectId,
+      ctx.input.folderId
+    );
     return {
       output: {
         resourceId: doc.id,

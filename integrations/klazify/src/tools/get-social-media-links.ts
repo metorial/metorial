@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getSocialMediaLinks = SlateTool.create(spec, {
   name: 'Get Social Media Links',
   key: 'get_social_media_links',
-  description: `Retrieves all social media channel links for a domain in real time. Returns URLs for platforms including Facebook, Twitter, Instagram, Medium, YouTube, Pinterest, LinkedIn, and GitHub.`,
+  description: `Retrieves social media channel links for a domain. Uses cached data unless refresh is requested. Returns URLs for platforms including Facebook, Twitter, Instagram, Medium, YouTube, Pinterest, LinkedIn, and GitHub.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,8 @@ export let getSocialMediaLinks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL or domain to retrieve social media links for')
+      url: z.string().describe('The URL or domain to retrieve social media links for'),
+      refresh: refreshSchema
     })
   )
   .output(
@@ -31,7 +33,7 @@ export let getSocialMediaLinks = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.socialMedia(ctx.input.url);
+    let result = await client.socialMedia(ctx.input.url, ctx.input.refresh);
 
     let social = result.domain?.social_media ?? {};
 

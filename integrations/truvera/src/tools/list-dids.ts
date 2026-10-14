@@ -13,8 +13,19 @@ export let listDids = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of items to return (max 64)')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(0)
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('Maximum number of items to return (max 64)')
     })
   )
   .output(
@@ -48,7 +59,10 @@ export let listDids = SlateTool.create(spec, {
       did: d.did || d.id || '',
       didType: d.type,
       controller: d.controller,
-      credentialCount: d.credentialCount
+      credentialCount:
+        d.credentialCount != null && Number.isFinite(Number(d.credentialCount))
+          ? Number(d.credentialCount)
+          : undefined
     }));
 
     return {

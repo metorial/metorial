@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PdflessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,17 +6,17 @@ import { spec } from '../spec';
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Generate a PDF document from a pre-designed HTML/CSS template by providing dynamic data as a JSON payload. Optionally encrypt the PDF with passwords and set granular permission controls.
-The generated PDF is available via a temporary download URL that **expires after 10 minutes**.
+  description: `Generate a downloadable PDF document from a pre-designed HTML/CSS template by providing dynamic data as a JSON payload. Optionally encrypt the PDF with passwords and set granular permission controls.
+The provider download URL **expires after 10 minutes**; the generated file is also prepared for download immediately.
 Templates support Handlebars-like expressions for variable interpolation, conditionals, loops, and barcode generation.`,
   instructions: [
-    'The templateId must reference a template already created in the Pdfless dashboard.',
+    'The templateId must reference a template already created in the Pdfless dashboard. Call list_templates to discover its ID.',
     'The templatePayload should match the variables defined in the template using Handlebars-like expressions (e.g., {{ variableName }}).',
-    'Encryption features (passwords and permissions) require an Essentials or Pro plan.'
+    'Encryption features depend on your subscription. Set encryption.userPassword when using protection or permission controls.'
   ],
   constraints: [
     'The download URL expires after 10 minutes.',
-    'Encryption and permission controls are only available on Essentials or Pro plans.'
+    'Document generation consumes account quota. Encryption and permission controls depend on your subscription.'
   ],
   tags: {
     destructive: false,
@@ -27,7 +27,9 @@ Templates support Handlebars-like expressions for variable interpolation, condit
     z.object({
       templateId: z
         .string()
-        .describe('Unique identifier of the template to use for PDF generation'),
+        .describe(
+          'Template ID to use for PDF generation. Call list_templates to discover IDs.'
+        ),
       templatePayload: z
         .record(z.string(), z.unknown())
         .describe('JSON object containing dynamic data to populate template variables'),
@@ -101,15 +103,26 @@ Templates support Handlebars-like expressions for variable interpolation, condit
       encryption: ctx.input.encryption
     });
 
-    ctx.info({
-      message: 'PDF generated successfully',
-      templateId: result.templateId,
-      downloadUrl: result.downloadUrl
-    });
+    try {
+      let content = await client.downloadPdf(result.downloadUrl);
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(content, {
+          headers: { 'content-type': 'application/pdf' }
+        }),
+        mimeType: 'application/pdf',
+        filename: 'document.pdf'
+      });
+    } catch (error) {
+      throw createApiServiceError(
+        `Pdfless generated the PDF, but it could not be prepared for download. Download it directly from ${result.downloadUrl} before ${result.expires}. Generating it again consumes additional quota.`,
+        { reason: 'pdfless_delivery_error', parent: error }
+      );
+    }
 
     return {
       output: result,
-      message: `PDF generated successfully from template \`${result.templateId}\`. [Download PDF](${result.downloadUrl}) (expires at ${result.expires}).`
+      message: `PDF generated successfully from template \`${result.templateId}\` and prepared for download. The provider URL expires at ${result.expires}.`
     };
   })
   .build();

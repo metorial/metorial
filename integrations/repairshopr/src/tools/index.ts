@@ -1,3 +1,4 @@
+export * from './account';
 export * from './manage-appointments';
 export * from './manage-assets';
 export * from './manage-contacts';

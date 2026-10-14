@@ -6,17 +6,26 @@ import { spec } from '../spec';
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a direct LinkedIn message to a lead through HeyReach. Requires the conversation ID, LinkedIn account ID, sender ID, and message text.`,
+  description: `Send a direct LinkedIn message to a lead through HeyReach. Requires the conversation ID, LinkedIn sender account ID, and message text.`,
   instructions: [
     'You must have an active conversation with the lead to send a message.',
-    'Use the "Get Conversations" tool to find conversation and sender IDs.'
+    'Use get_conversations to find conversation IDs and their linkedInAccountId sender account IDs.'
   ]
 })
   .input(
     z.object({
       conversationId: z.string().describe('The ID of the LinkedIn conversation'),
       accountId: z.number().describe('The LinkedIn account ID to send from'),
-      senderId: z.string().describe('The sender profile ID'),
+      senderId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy sender profile ID; no longer needed. The sender is selected with accountId.'
+        ),
+      subject: z
+        .string()
+        .optional()
+        .describe('Message subject, when applicable to the conversation'),
       message: z.string().min(1).max(2000).describe('Message text to send (1-2000 characters)')
     })
   )
@@ -31,8 +40,8 @@ export let sendMessage = SlateTool.create(spec, {
     let result = await client.sendMessage(
       ctx.input.conversationId,
       ctx.input.accountId,
-      ctx.input.senderId,
-      ctx.input.message
+      ctx.input.message,
+      ctx.input.subject
     );
 
     return {

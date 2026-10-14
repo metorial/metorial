@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getResult, getText } from '../lib/response';
 import { spec } from '../spec';
 
 export let findEmail = SlateTool.create(spec, {
   name: 'Find Email',
   key: 'find_email',
-  description: `Find the business email address of a prospect using their first name, last name, and company domain. Returns the email along with a confidence score indicating verification status: **1.0** = confirmed, **0.5** = server accepts all (may be correct), **0.1** = unsure.`,
-  constraints: ['Each API call consumes 1 credit from your AeroLeads account.'],
+  description:
+    'Find a prospect’s business email using their first name, last name, and company domain. Returns the email and any verification status or confidence supplied by AeroLeads.',
+  constraints: ['Lookups may consume credits from your AeroLeads account.'],
   tags: {
     readOnly: true
   }
@@ -30,8 +32,11 @@ export let findEmail = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Confidence score: 1.0 = confirmed, 0.5 = server accepts all pings, 0.1 = unsure.'
+          'Confidence score, when supplied by AeroLeads. No score is inferred from the email status.'
         ),
+      status: z.string().optional().describe('Email validity status supplied by AeroLeads.'),
+      name: z.string().optional().describe('Prospect name supplied by AeroLeads.'),
+      companyDomain: z.string().optional().describe('The company domain used for the lookup.'),
       rawResponse: z
         .any()
         .optional()
@@ -41,29 +46,36 @@ export let findEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getCompanyEmail(
+    let response = await client.getCompanyEmail(
       ctx.input.firstName,
       ctx.input.lastName,
       ctx.input.companyDomain
     );
+    let result = getResult(response);
 
-    let email = result.email || undefined;
-    let confidence = result.confidence !== undefined ? Number(result.confidence) : undefined;
+    let email = getText(result.email, result.address);
+    let score = result.confidence;
+    let parsedScore =
+      typeof score === 'number' || (typeof score === 'string' && score.trim())
+        ? Number(score)
+        : undefined;
+    let confidence =
+      parsedScore !== undefined && Number.isFinite(parsedScore) ? parsedScore : undefined;
+    let status = getText(result.email_status, result.status);
 
     let output = {
       email,
       confidence,
-      rawResponse: result
+      status,
+      name: getText(result.name),
+      companyDomain: getText(result.company_url, result.domain) ?? ctx.input.companyDomain,
+      rawResponse: response
     };
 
-    let confidenceLabel = 'unknown';
-    if (confidence === 1.0) confidenceLabel = 'confirmed';
-    else if (confidence === 0.5) confidenceLabel = 'possible (server accepts all)';
-    else if (confidence === 0.1) confidenceLabel = 'unsure';
-    else if (confidence !== undefined) confidenceLabel = `${confidence}`;
-
+    let details = status ? ` (status: ${status})` : '';
+    if (confidence !== undefined) details += ` (confidence: ${confidence})`;
     let message = email
-      ? `Found email **${email}** for ${ctx.input.firstName} ${ctx.input.lastName} (confidence: ${confidenceLabel}).`
+      ? `Found email **${email}** for ${ctx.input.firstName} ${ctx.input.lastName}${details}.`
       : `No email found for ${ctx.input.firstName} ${ctx.input.lastName} at ${ctx.input.companyDomain}.`;
 
     return {

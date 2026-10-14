@@ -18,7 +18,11 @@ export let manageTypingIndicator = SlateTool.create(spec, {
   .input(
     z.object({
       channelUrl: z.string().describe('URL of the group channel'),
-      botUserId: z.string().describe('User ID of the bot to show/hide typing indicator for'),
+      botUserId: z
+        .string()
+        .min(1)
+        .max(80)
+        .describe('User ID of the bot to show/hide typing indicator for'),
       action: z
         .enum(['start', 'stop'])
         .describe('Whether to start or stop the typing indicator')
@@ -33,7 +37,7 @@ export let manageTypingIndicator = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     if (ctx.input.action === 'start') {

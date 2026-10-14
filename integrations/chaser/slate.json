@@ -1,6 +1,6 @@
 {
   "name": "@metorial/chaser",
-  "description": "Automate accounts receivable and payment chasing. Create, retrieve, and update customers, invoices, credit notes, and overpayments. Manage contact persons per customer, upload invoice PDFs, and trigger organization data syncs. Track invoice statuses, monitor amounts due and paid, and manage customer payment records to improve cash flow and credit control.",
+  "description": "Automate accounts receivable and payment chasing. Create, retrieve, and update customers, invoices, credit notes, and overpayments. Manage contact persons per customer, provide invoice PDF source URLs, pause or resume payment reminders, and trigger organization data syncs. Track invoice statuses, monitor amounts due and paid, and manage customer payment records to improve cash flow and credit control.",
   "categories": ["financial-data-and-stock-market"],
   "skills": [
     "manage customers",
@@ -8,9 +8,10 @@
     "manage credit notes",
     "track overpayments",
     "manage contact persons",
-    "upload invoice PDFs",
     "trigger organization sync",
     "retrieve organization details",
-    "filter invoices by status"
+    "filter invoices by status",
+    "provide invoice PDF source URLs",
+    "pause and resume payment chasing"
   ]
 }

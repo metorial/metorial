@@ -63,7 +63,7 @@ export let createContact = SlateTool.create(spec, {
         city: contact.city,
         provinceOrState: contact.provinceOrState,
         postalOrZip: contact.postalOrZip,
-        country: contact.country,
+        country: contact.countryCode ?? contact.country,
         addressStatus: contact.addressStatus,
         createdAt: contact.createdAt
       },

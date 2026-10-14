@@ -1,4 +1,4 @@
-# Slates Specification for Sendbird
+# Sendbird Integration Specification
 
 ## Overview
 

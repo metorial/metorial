@@ -1,11 +1,21 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  requestAxios
+} from 'slates';
+import { z } from 'zod';
 
 let apiAxios = createAxios({
-  baseURL: 'https://api.scrape.do'
+  baseURL: 'https://api.scrape.do',
+  timeout: 130000
 });
 
 let asyncAxios = createAxios({
-  baseURL: 'https://q.scrape.do'
+  baseURL: 'https://q.scrape.do',
+  timeout: 30000
 });
 
 export interface ScrapeOptions {
@@ -60,12 +70,15 @@ export interface GoogleSearchOptions {
   tbs?: string;
   nfpr?: string;
   includeHtml?: boolean;
+  googleDomain?: string;
 }
 
 export interface AmazonPdpOptions {
   asin: string;
   geocode: string;
   zipcode?: string;
+  countryName?: string;
+  currency?: string;
   language?: string;
   includeHtml?: boolean;
   super?: boolean;
@@ -75,6 +88,8 @@ export interface AmazonSearchOptions {
   keyword: string;
   geocode: string;
   zipcode?: string;
+  countryName?: string;
+  currency?: string;
   page?: number;
   language?: string;
   includeHtml?: boolean;
@@ -85,6 +100,8 @@ export interface AmazonOfferListingOptions {
   asin: string;
   geocode: string;
   zipcode?: string;
+  countryName?: string;
+  currency?: string;
   language?: string;
   includeHtml?: boolean;
   super?: boolean;
@@ -173,11 +190,124 @@ export interface AccountStats {
   RemainingMonthlyRequest: number;
 }
 
+export let validateWholeNumber = (
+  name: string,
+  value: number | undefined,
+  min: number,
+  max = Number.MAX_SAFE_INTEGER
+) => {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < min || value > max)) {
+    throw createApiServiceError(`${name} must be a whole number between ${min} and ${max}.`);
+  }
+};
+
+let accountStatsSchema = z
+  .object({
+    IsActive: z.boolean(),
+    ConcurrentRequest: z.number(),
+    MaxMonthlyRequest: z.number(),
+    RemainingConcurrentRequest: z.number(),
+    RemainingMonthlyRequest: z.number()
+  })
+  .passthrough();
+
+let asyncJobCreatedSchema = z
+  .object({
+    JobID: z.string(),
+    Message: z.string(),
+    TaskIDs: z.array(z.string())
+  })
+  .passthrough();
+
+export interface AsyncJobListOptions {
+  status?: 'queuing' | 'queued' | 'pending' | 'rotating' | 'success' | 'error' | 'canceled';
+  startFrom?: string;
+  startTo?: string;
+  sort?: 'start_time_asc' | 'start_time_desc';
+}
+
 export class ScrapeDoClient {
   private token: string;
 
   constructor(token: string) {
+    if (!token.trim())
+      throw createApiServiceError(
+        'A Scrape.do API token is required. Reconnect with a valid token.'
+      );
     this.token = token;
+  }
+
+  private apiError(error: unknown, operation: string) {
+    return buildApiServiceError(error, {
+      providerLabel: 'Scrape.do',
+      reason: 'scrape_do_api_error',
+      operation,
+      detailKeys: ['Error', 'Code', 'error', 'message', 'errorMessage'],
+      formatMessage: ({ statusLabel, message }) =>
+        `Scrape.do API ${operation} failed: ${statusLabel}${message}`.replaceAll(
+          this.token,
+          '[redacted]'
+        )
+    });
+  }
+
+  private async request<T>(
+    client: typeof apiAxios,
+    config: Parameters<typeof apiAxios.request>[0],
+    operation: string,
+    preserveTargetStatus:
+      | boolean
+      | ((response: { status: number; headers: unknown }) => boolean) = false
+  ) {
+    let response = await requestAxios<T>(
+      operation,
+      () =>
+        client.request<T>({
+          ...config,
+          validateStatus: () => true
+        }),
+      (error, name) => this.apiError(error, name)
+    );
+    if (
+      (response.status < 200 || response.status >= 300) &&
+      !(typeof preserveTargetStatus === 'function'
+        ? preserveTargetStatus(response)
+        : preserveTargetStatus)
+    ) {
+      let data: unknown = response.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          /* Retain non-JSON upstream error text. */
+        }
+      }
+      throw this.apiError(
+        { response: { status: response.status, statusText: response.statusText, data } },
+        operation
+      );
+    }
+    return response;
+  }
+
+  private async requestJson<T = Record<string, unknown>>(
+    client: typeof apiAxios,
+    config: Parameters<typeof apiAxios.request>[0],
+    operation: string
+  ): Promise<T> {
+    let response = await this.request<unknown>(client, config, operation);
+    if (!isApiErrorRecord(response.data)) {
+      throw createApiServiceError(
+        `Scrape.do returned an invalid JSON response for ${operation}.`
+      );
+    }
+    if (response.data.status === 'error' || typeof response.data.Error === 'string') {
+      throw this.apiError(
+        { response: { status: response.status, data: response.data } },
+        operation
+      );
+    }
+    return response.data as T;
   }
 
   async scrapeUrl(
@@ -231,22 +361,24 @@ export class ScrapeDoClient {
     if (options.particularScreenShot)
       params.particularScreenShot = options.particularScreenShot;
 
-    let requestConfig: Record<string, unknown> = {
-      params,
-      responseType: 'text' as const,
-      validateStatus: () => true
-    };
-
-    if (headers) {
-      requestConfig.headers = headers;
-    }
-
-    let response: any;
-    if (method === 'POST') {
-      response = await apiAxios.post('/', postBody || '', requestConfig);
-    } else {
-      response = await apiAxios.get('/', requestConfig);
-    }
+    let response = await this.request<string>(
+      apiAxios,
+      {
+        url: '/',
+        method,
+        params,
+        responseType: 'text',
+        data: method === 'POST' ? (postBody ?? '') : undefined,
+        headers,
+        timeout: (options.timeout ?? 120000) + 10000
+      },
+      'scrape webpage',
+      response =>
+        options.transparentResponse === true ||
+        [404, 410].includes(response.status) ||
+        (response.status === 400 &&
+          Number(getResponseHeaderValue(response.headers, 'scrape.do-request-cost')) > 0)
+    );
 
     let responseHeaders: Record<string, string> = {};
     if (response.headers) {
@@ -283,13 +415,13 @@ export class ScrapeDoClient {
     if (options.tbs) params.tbs = options.tbs;
     if (options.nfpr) params.nfpr = options.nfpr;
     if (options.includeHtml !== undefined) params.include_html = options.includeHtml;
+    if (options.googleDomain) params.google_domain = options.googleDomain;
 
-    let response = await apiAxios.get('/plugin/google/search', {
-      params,
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      apiAxios,
+      { url: '/plugin/google/search', params },
+      'Google search'
+    );
   }
 
   async amazonProductDetail(options: AmazonPdpOptions): Promise<Record<string, unknown>> {
@@ -300,16 +432,13 @@ export class ScrapeDoClient {
     };
 
     if (options.zipcode) params.zipcode = options.zipcode;
+    if (options.countryName) params.countryName = options.countryName;
+    if (options.currency) params.currency = options.currency;
     if (options.language) params.language = options.language;
     if (options.includeHtml !== undefined) params.include_html = options.includeHtml;
     if (options.super !== undefined) params.super = options.super;
 
-    let response = await apiAxios.get('/plugin/amazon/pdp', {
-      params,
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(apiAxios, { url: '/plugin/amazon/pdp', params }, 'Amazon product');
   }
 
   async amazonSearch(options: AmazonSearchOptions): Promise<Record<string, unknown>> {
@@ -320,17 +449,18 @@ export class ScrapeDoClient {
     };
 
     if (options.zipcode) params.zipcode = options.zipcode;
+    if (options.countryName) params.countryName = options.countryName;
+    if (options.currency) params.currency = options.currency;
     if (options.page !== undefined) params.page = options.page;
     if (options.language) params.language = options.language;
     if (options.includeHtml !== undefined) params.include_html = options.includeHtml;
     if (options.super !== undefined) params.super = options.super;
 
-    let response = await apiAxios.get('/plugin/amazon/search', {
-      params,
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      apiAxios,
+      { url: '/plugin/amazon/search', params },
+      'Amazon search'
+    );
   }
 
   async amazonOfferListing(
@@ -343,16 +473,17 @@ export class ScrapeDoClient {
     };
 
     if (options.zipcode) params.zipcode = options.zipcode;
+    if (options.countryName) params.countryName = options.countryName;
+    if (options.currency) params.currency = options.currency;
     if (options.language) params.language = options.language;
     if (options.includeHtml !== undefined) params.include_html = options.includeHtml;
     if (options.super !== undefined) params.super = options.super;
 
-    let response = await apiAxios.get('/plugin/amazon/offer-listing', {
-      params,
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      apiAxios,
+      { url: '/plugin/amazon/offer-listing', params },
+      'Amazon offers'
+    );
   }
 
   async amazonRawHtml(options: AmazonRawOptions): Promise<string> {
@@ -364,12 +495,15 @@ export class ScrapeDoClient {
     if (options.geocode) params.geocode = options.geocode;
     if (options.super !== undefined) params.super = options.super;
 
-    let response = await apiAxios.get('/plugin/amazon/', {
-      params,
-      responseType: 'text',
-      validateStatus: () => true
-    });
-
+    let response = await this.request<string>(
+      apiAxios,
+      {
+        url: '/plugin/amazon/',
+        params,
+        responseType: 'text'
+      },
+      'Amazon HTML'
+    );
     return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
   }
 
@@ -381,7 +515,7 @@ export class ScrapeDoClient {
     };
 
     if (options.method) body.Method = options.method;
-    if (options.body) body.Body = options.body;
+    if (options.body !== undefined) body.Body = options.body;
     if (options.geoCode) body.GeoCode = options.geoCode;
     if (options.regionalGeoCode) body.RegionalGeoCode = options.regionalGeoCode;
     if (options.super !== undefined) body.Super = options.super;
@@ -402,60 +536,96 @@ export class ScrapeDoClient {
     if (options.webhookHeaders) body.WebhookHeaders = options.webhookHeaders;
     if (options.render) body.Render = options.render;
 
-    let response = await asyncAxios.post('/api/v1/jobs', body, {
-      headers: { 'X-Token': this.token },
-      validateStatus: () => true
-    });
-
-    return response.data;
+    let data = await this.requestJson(
+      asyncAxios,
+      {
+        url: '/api/v1/jobs',
+        method: 'POST',
+        data: body,
+        headers: { 'X-Token': this.token }
+      },
+      'create async job'
+    );
+    let result = asyncJobCreatedSchema.safeParse(data);
+    if (!result.success)
+      throw createApiServiceError('Scrape.do returned an invalid job creation response.');
+    return result.data;
   }
 
   async getAsyncJobStatus(jobId: string): Promise<AsyncJobStatus> {
-    let response = await asyncAxios.get(`/api/v1/jobs/${jobId}`, {
-      headers: { 'X-Token': this.token },
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      asyncAxios,
+      {
+        url: `/api/v1/jobs/${encodeURIComponent(jobId)}`,
+        headers: { 'X-Token': this.token }
+      },
+      'get async job'
+    );
   }
 
   async getAsyncTaskResult(jobId: string, taskId: string): Promise<AsyncTaskResult> {
-    let response = await asyncAxios.get(`/api/v1/jobs/${jobId}/${taskId}`, {
-      headers: { 'X-Token': this.token },
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      asyncAxios,
+      {
+        url: `/api/v1/jobs/${encodeURIComponent(jobId)}/${encodeURIComponent(taskId)}`,
+        headers: { 'X-Token': this.token }
+      },
+      'get async task'
+    );
   }
 
   async listAsyncJobs(
-    page: number = 1,
-    pageSize: number = 10
+    page = 1,
+    pageSize = 10,
+    filters: AsyncJobListOptions = {}
   ): Promise<Record<string, unknown>> {
-    let response = await asyncAxios.get('/api/v1/jobs', {
-      headers: { 'X-Token': this.token },
-      params: { page, page_size: pageSize },
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      asyncAxios,
+      {
+        url: '/api/v1/jobs',
+        headers: { 'X-Token': this.token },
+        params: {
+          page,
+          page_size: pageSize,
+          status: filters.status,
+          start_from: filters.startFrom,
+          start_to: filters.startTo,
+          sort: filters.sort
+        }
+      },
+      'list async jobs'
+    );
   }
 
   async cancelAsyncJob(jobId: string): Promise<Record<string, unknown>> {
-    let response = await asyncAxios.delete(`/api/v1/jobs/${jobId}`, {
-      headers: { 'X-Token': this.token },
-      validateStatus: () => true
-    });
-
-    return response.data;
+    return this.requestJson(
+      asyncAxios,
+      {
+        url: `/api/v1/jobs/${encodeURIComponent(jobId)}`,
+        method: 'DELETE',
+        headers: { 'X-Token': this.token }
+      },
+      'cancel async job'
+    );
   }
 
   async getAccountStats(): Promise<AccountStats> {
-    let response = await apiAxios.get('/info', {
-      params: { token: this.token },
-      validateStatus: () => true
-    });
+    let data = await this.requestJson(
+      apiAxios,
+      { url: '/info', params: { token: this.token } },
+      'get account stats'
+    );
+    let result = accountStatsSchema.safeParse(data);
+    if (!result.success)
+      throw createApiServiceError('Scrape.do returned invalid account statistics.');
+    return result.data;
+  }
 
-    return response.data;
+  async getCurrentUser(): Promise<Record<string, unknown>> {
+    return this.requestJson(
+      asyncAxios,
+      { url: '/api/v1/me', headers: { 'X-Token': this.token } },
+      'get current user'
+    );
   }
 }

@@ -1,26 +1,86 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  getApiErrorStatus
+} from 'slates';
 import type {
   Brand,
   BulkCampaign,
   Contact,
   ContactList,
   Field,
+  FieldValue,
   PaginatedResponse,
   Sender,
-  SuppressionList
+  SuppressionList,
+  TransactionalCampaign
 } from './types';
 
 export class Client {
   private http;
 
   constructor(token: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.bigmailer.io/v1',
-      headers: {
-        'X-API-Key': token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-API-Key', value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'BigMailer', reason: 'upstream_error' })
     });
+  }
+
+  async getIdentity(): Promise<Record<string, unknown>> {
+    let response = await this.http.get('/me');
+    return response.data;
+  }
+
+  private async hydrateMutation<T>(
+    result: { id?: string },
+    operation: string,
+    read: (id: string) => Promise<T>
+  ): Promise<T> {
+    if (!result.id) {
+      throw createApiServiceError(
+        `BigMailer ${operation} was accepted but returned no resource ID. Check the resource before repeating the operation.`
+      );
+    }
+    let id = result.id;
+    try {
+      return await read(id);
+    } catch (error) {
+      throw createApiServiceError(
+        `BigMailer ${operation} succeeded for resource ${id}, but retrieving its details failed: ${extractApiErrorMessage(error)}. Retry retrieving this resource instead of repeating the mutation.`,
+        {
+          reason: 'mutation_read_failed',
+          upstreamStatus: getApiErrorStatus(error),
+          parent: error
+        }
+      );
+    }
+  }
+
+  private validateFieldValues(values?: FieldValue[]) {
+    for (let value of values ?? []) {
+      let supplied = [value.string, value.date, value.integer].filter(
+        item => item !== undefined
+      );
+      if (supplied.length !== 1) {
+        throw createApiServiceError(
+          `Field ${value.name} must have exactly one string, date, or integer value.`
+        );
+      }
+      if (value.integer !== undefined && !Number.isInteger(value.integer)) {
+        throw createApiServiceError(
+          `Field ${value.name} must use a whole number for its integer value.`
+        );
+      }
+      if (value.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(value.date)) {
+        throw createApiServiceError(
+          `Field ${value.name} must use YYYY-MM-DD for its date value.`
+        );
+      }
+    }
   }
 
   // ---- Brands ----
@@ -34,7 +94,7 @@ export class Client {
   }
 
   async getBrand(brandId: string): Promise<Brand> {
-    let response = await this.http.get(`/brands/${brandId}`);
+    let response = await this.http.get(`/brands/${encodeURIComponent(brandId)}`);
     return response.data;
   }
 
@@ -50,7 +110,7 @@ export class Client {
     connection_id?: string;
   }): Promise<Brand> {
     let response = await this.http.post('/brands', data);
-    return response.data;
+    return this.hydrateMutation(response.data, 'brand creation', id => this.getBrand(id));
   }
 
   async updateBrand(
@@ -67,8 +127,8 @@ export class Client {
       connection_id?: string;
     }
   ): Promise<Brand> {
-    let response = await this.http.post(`/brands/${brandId}`, data);
-    return response.data;
+    let response = await this.http.post(`/brands/${encodeURIComponent(brandId)}`, data);
+    return this.hydrateMutation(response.data, 'brand update', id => this.getBrand(id));
   }
 
   // ---- Contacts ----
@@ -77,12 +137,16 @@ export class Client {
     brandId: string,
     params?: { limit?: number; cursor?: string; list_id?: string }
   ): Promise<PaginatedResponse<Contact>> {
-    let response = await this.http.get(`/brands/${brandId}/contacts`, { params });
+    let response = await this.http.get(`/brands/${encodeURIComponent(brandId)}/contacts`, {
+      params
+    });
     return response.data;
   }
 
   async getContact(brandId: string, contactId: string): Promise<Contact> {
-    let response = await this.http.get(`/brands/${brandId}/contacts/${contactId}`);
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/contacts/${encodeURIComponent(contactId)}`
+    );
     return response.data;
   }
 
@@ -90,17 +154,24 @@ export class Client {
     brandId: string,
     data: {
       email: string;
-      field_values?: Array<{ name: string; string?: string; date?: string; integer?: number }>;
+      field_values?: FieldValue[];
       list_ids?: string[];
       unsubscribe_all?: boolean;
       unsubscribe_ids?: string[];
     },
     validate?: boolean
   ): Promise<Contact> {
-    let response = await this.http.post(`/brands/${brandId}/contacts`, data, {
-      params: validate ? { validate: true } : undefined
-    });
-    return response.data;
+    this.validateFieldValues(data.field_values);
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/contacts`,
+      data,
+      {
+        params: validate ? { validate: true } : undefined
+      }
+    );
+    return this.hydrateMutation(response.data, 'contact creation', id =>
+      this.getContact(brandId, id)
+    );
   }
 
   async updateContact(
@@ -108,35 +179,50 @@ export class Client {
     contactId: string,
     data: {
       email?: string;
-      field_values?: Array<{ name: string; string?: string; date?: string; integer?: number }>;
+      field_values?: FieldValue[];
       list_ids?: string[];
       unsubscribe_all?: boolean;
       unsubscribe_ids?: string[];
     }
   ): Promise<Contact> {
-    let response = await this.http.post(`/brands/${brandId}/contacts/${contactId}`, data);
-    return response.data;
+    this.validateFieldValues(data.field_values);
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/contacts/${encodeURIComponent(contactId)}`,
+      data
+    );
+    return this.hydrateMutation(response.data, 'contact update', id =>
+      this.getContact(brandId, id)
+    );
   }
 
   async upsertContact(
     brandId: string,
     data: {
       email: string;
-      field_values?: Array<{ name: string; string?: string; date?: string; integer?: number }>;
+      field_values?: FieldValue[];
       list_ids?: string[];
       unsubscribe_all?: boolean;
       unsubscribe_ids?: string[];
     },
     validate?: boolean
   ): Promise<Contact> {
-    let response = await this.http.post(`/brands/${brandId}/contacts/upsert`, data, {
-      params: validate ? { validate: true } : undefined
-    });
-    return response.data;
+    this.validateFieldValues(data.field_values);
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/contacts/upsert`,
+      data,
+      {
+        params: validate ? { validate: true } : undefined
+      }
+    );
+    return this.hydrateMutation(response.data, 'contact upsert', id =>
+      this.getContact(brandId, id)
+    );
   }
 
   async deleteContact(brandId: string, contactId: string): Promise<void> {
-    await this.http.delete(`/brands/${brandId}/contacts/${contactId}`);
+    await this.http.delete(
+      `/brands/${encodeURIComponent(brandId)}/contacts/${encodeURIComponent(contactId)}`
+    );
   }
 
   // ---- Lists ----
@@ -145,18 +231,24 @@ export class Client {
     brandId: string,
     params?: { limit?: number; cursor?: string }
   ): Promise<PaginatedResponse<ContactList>> {
-    let response = await this.http.get(`/brands/${brandId}/lists`, { params });
+    let response = await this.http.get(`/brands/${encodeURIComponent(brandId)}/lists`, {
+      params
+    });
     return response.data;
   }
 
   async getList(brandId: string, listId: string): Promise<ContactList> {
-    let response = await this.http.get(`/brands/${brandId}/lists/${listId}`);
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/lists/${encodeURIComponent(listId)}`
+    );
     return response.data;
   }
 
   async createList(brandId: string, data: { name: string }): Promise<ContactList> {
-    let response = await this.http.post(`/brands/${brandId}/lists`, data);
-    return response.data;
+    let response = await this.http.post(`/brands/${encodeURIComponent(brandId)}/lists`, data);
+    return this.hydrateMutation(response.data, 'list creation', id =>
+      this.getList(brandId, id)
+    );
   }
 
   async updateList(
@@ -164,8 +256,11 @@ export class Client {
     listId: string,
     data: { name: string }
   ): Promise<ContactList> {
-    let response = await this.http.post(`/brands/${brandId}/lists/${listId}`, data);
-    return response.data;
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/lists/${encodeURIComponent(listId)}`,
+      data
+    );
+    return this.hydrateMutation(response.data, 'list update', id => this.getList(brandId, id));
   }
 
   // ---- Fields ----
@@ -174,7 +269,16 @@ export class Client {
     brandId: string,
     params?: { limit?: number; cursor?: string }
   ): Promise<PaginatedResponse<Field>> {
-    let response = await this.http.get(`/brands/${brandId}/fields`, { params });
+    let response = await this.http.get(`/brands/${encodeURIComponent(brandId)}/fields`, {
+      params
+    });
+    return response.data;
+  }
+
+  async getField(brandId: string, fieldId: string): Promise<Field> {
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/fields/${encodeURIComponent(fieldId)}`
+    );
     return response.data;
   }
 
@@ -187,8 +291,10 @@ export class Client {
       sample_value?: string;
     }
   ): Promise<Field> {
-    let response = await this.http.post(`/brands/${brandId}/fields`, data);
-    return response.data;
+    let response = await this.http.post(`/brands/${encodeURIComponent(brandId)}/fields`, data);
+    return this.hydrateMutation(response.data, 'field creation', id =>
+      this.getField(brandId, id)
+    );
   }
 
   // ---- Senders ----
@@ -197,7 +303,16 @@ export class Client {
     brandId: string,
     params?: { limit?: number; cursor?: string }
   ): Promise<PaginatedResponse<Sender>> {
-    let response = await this.http.get(`/brands/${brandId}/senders`, { params });
+    let response = await this.http.get(`/brands/${encodeURIComponent(brandId)}/senders`, {
+      params
+    });
+    return response.data;
+  }
+
+  async getSender(brandId: string, senderId: string): Promise<Sender> {
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/senders/${encodeURIComponent(senderId)}`
+    );
     return response.data;
   }
 
@@ -209,12 +324,19 @@ export class Client {
       share_type: 'all' | 'none';
     }
   ): Promise<Sender> {
-    let response = await this.http.post(`/brands/${brandId}/senders`, data);
-    return response.data;
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/senders`,
+      data
+    );
+    return this.hydrateMutation(response.data, 'sender creation', id =>
+      this.getSender(brandId, id)
+    );
   }
 
   async deleteSender(brandId: string, senderId: string): Promise<void> {
-    await this.http.delete(`/brands/${brandId}/senders/${senderId}`);
+    await this.http.delete(
+      `/brands/${encodeURIComponent(brandId)}/senders/${encodeURIComponent(senderId)}`
+    );
   }
 
   // ---- Suppression Lists ----
@@ -224,7 +346,7 @@ export class Client {
     suppressionListId: string
   ): Promise<SuppressionList> {
     let response = await this.http.get(
-      `/brands/${brandId}/suppression-lists/${suppressionListId}`
+      `/brands/${encodeURIComponent(brandId)}/suppression-lists/${encodeURIComponent(suppressionListId)}`
     );
     return response.data;
   }
@@ -235,7 +357,17 @@ export class Client {
     brandId: string,
     params?: { limit?: number; cursor?: string }
   ): Promise<PaginatedResponse<BulkCampaign>> {
-    let response = await this.http.get(`/brands/${brandId}/bulk-campaigns`, { params });
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/bulk-campaigns`,
+      { params }
+    );
+    return response.data;
+  }
+
+  async getBulkCampaign(brandId: string, campaignId: string): Promise<BulkCampaign> {
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/bulk-campaigns/${encodeURIComponent(campaignId)}`
+    );
     return response.data;
   }
 
@@ -245,8 +377,8 @@ export class Client {
       name?: string;
       subject?: string;
       preview?: string;
-      from?: { email: string; name: string };
-      reply_to?: { email: string; name: string };
+      from?: { email?: string; name?: string };
+      reply_to?: { email?: string; name?: string };
       recipient_name?: string;
       html?: string;
       text?: string;
@@ -267,23 +399,40 @@ export class Client {
       ready?: boolean;
     }
   ): Promise<BulkCampaign> {
-    let response = await this.http.post(`/brands/${brandId}/bulk-campaigns`, data);
-    return response.data;
+    let response = await this.http.post(
+      `/brands/${encodeURIComponent(brandId)}/bulk-campaigns`,
+      data
+    );
+    return this.hydrateMutation(response.data, 'bulk campaign creation', id =>
+      this.getBulkCampaign(brandId, id)
+    );
   }
 
   // ---- Transactional Campaigns ----
+
+  async listTransactionalCampaigns(
+    brandId: string,
+    params?: { limit?: number; cursor?: string }
+  ): Promise<PaginatedResponse<TransactionalCampaign>> {
+    let response = await this.http.get(
+      `/brands/${encodeURIComponent(brandId)}/transactional-campaigns`,
+      { params }
+    );
+    return response.data;
+  }
 
   async sendTransactionalEmail(
     brandId: string,
     campaignId: string,
     data: {
       email: string;
-      field_values?: Array<{ name: string; string?: string; date?: string; integer?: number }>;
+      field_values?: FieldValue[];
       variables?: Array<{ name: string; value: string }>;
     }
-  ): Promise<Record<string, unknown>> {
+  ): Promise<{ contact_id: string }> {
+    this.validateFieldValues(data.field_values);
     let response = await this.http.post(
-      `/brands/${brandId}/transactional-campaigns/${campaignId}/send`,
+      `/brands/${encodeURIComponent(brandId)}/transactional-campaigns/${encodeURIComponent(campaignId)}/send`,
       data
     );
     return response.data;

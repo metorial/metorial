@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let listImpressions = SlateTool.create(spec, {
   name: 'List Image Impressions',
   key: 'list_image_impressions',
-  description: `List the most recent personalized image impressions (views) for a specific image template. Track when recipients view personalized images in your campaigns. Optionally filter by date to only see recent impressions.`,
+  description: `List the most recent personalized image impressions (views) for a specific image template. Track when recipients view personalized images in your campaigns. Optionally filter by date to see impressions since that date. Without dateFrom, Hyperise returns views since the previous API call.`,
   instructions: [
     'The imageTemplateHash can be obtained from the List Image Templates tool.',
+    'Without dateFrom, only views since the previous API call are returned.',
     'Use dateFrom to filter impressions since a specific date (ISO 8601 format, e.g. "2024-01-15T00:00:00Z").'
   ],
   tags: {

@@ -37,6 +37,10 @@ export let predictTimeSeries = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       prediction: z
         .array(
           z.object({
@@ -50,12 +54,7 @@ export let predictTimeSeries = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let dataset = ctx.input.dataset
-      .filter(point => point.value !== undefined)
-      .map(point => ({
-        date: point.date,
-        value: point.value as string | number
-      }));
+    let dataset = ctx.input.dataset;
 
     let result = await client.predict({
       dataset,
@@ -65,6 +64,7 @@ export let predictTimeSeries = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         prediction: result.prediction,
         steps: result.steps
       },

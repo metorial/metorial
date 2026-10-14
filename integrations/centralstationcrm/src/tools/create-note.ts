@@ -15,6 +15,7 @@ export let createNote = SlateTool.create(spec, {
   .input(
     z.object({
       content: z.string().describe('Content/text of the note'),
+      title: z.string().max(100).optional().describe('Optional note title'),
       attachableType: z
         .enum(['Person', 'Company', 'Deal', 'Project'])
         .describe('Type of object to attach the note to'),
@@ -36,16 +37,24 @@ export let createNote = SlateTool.create(spec, {
 
     let result = await client.createNote({
       content: ctx.input.content,
-      attachable_type: ctx.input.attachableType,
-      attachable_id: ctx.input.attachableId
+      name: ctx.input.title,
+      type: 'ProtocolObjectNote',
+      badge: 'note',
+      format: 'plaintext',
+      person_ids: ctx.input.attachableType === 'Person' ? [ctx.input.attachableId] : undefined,
+      company_ids:
+        ctx.input.attachableType === 'Company' ? [ctx.input.attachableId] : undefined,
+      deal_ids: ctx.input.attachableType === 'Deal' ? [ctx.input.attachableId] : undefined,
+      project_ids:
+        ctx.input.attachableType === 'Project' ? [ctx.input.attachableId] : undefined
     });
 
-    let note = result?.action ?? result;
+    let note = result?.protocol_object_note ?? result?.protocol ?? result?.action ?? result;
 
     return {
       output: {
         noteId: note.id,
-        content: note.content,
+        content: note.content ?? undefined,
         createdAt: note.created_at
       },
       message: `Created note on ${ctx.input.attachableType} (ID: ${ctx.input.attachableId}).`

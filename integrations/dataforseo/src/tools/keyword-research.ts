@@ -11,6 +11,7 @@ let keywordMetricsSchema = z
     searchVolume: z.number().optional().describe('Average monthly search volume'),
     cpc: z.number().optional().describe('Cost per click in USD'),
     competition: z.number().optional().describe('Competition level (0-1)'),
+    competitionIndex: z.number().optional().describe('Google Ads competition index (0-100)'),
     competitionLevel: z
       .string()
       .optional()
@@ -89,8 +90,15 @@ export let keywordResearch = SlateTool.create(spec, {
       keyword: item.keyword,
       searchVolume: optionalNumber(item.search_volume),
       cpc: optionalNumber(item.cpc),
-      competition: optionalNumber(item.competition),
-      competitionLevel: item.competition_level,
+      competition:
+        optionalNumber(item.competition) ??
+        (typeof item.competition_index === 'number'
+          ? item.competition_index / 100
+          : undefined),
+      competitionIndex: optionalNumber(item.competition_index),
+      competitionLevel:
+        item.competition_level ??
+        (typeof item.competition === 'string' ? item.competition : undefined),
       lowTopOfPageBid: optionalNumber(item.low_top_of_page_bid),
       highTopOfPageBid: optionalNumber(item.high_top_of_page_bid),
       monthlySearches: item.monthly_searches?.map((ms: any) => ({

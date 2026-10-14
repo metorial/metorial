@@ -44,6 +44,10 @@ export let summarizeText = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       summary: z
         .union([z.string(), z.array(z.string())])
         .describe('Summary as a paragraph string or array of bullet points')
@@ -67,6 +71,7 @@ export let summarizeText = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         summary: result.summary
       },
       message: `Generated ${format} summary from ${source}.`

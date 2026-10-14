@@ -50,16 +50,18 @@ export let createProject = SlateTool.create(spec, {
       name: ctx.input.name
     };
 
-    if (ctx.input.location) body.location = ctx.input.location;
-    if (ctx.input.contact) body.contact = ctx.input.contact;
-    if (ctx.input.planPeriodFrom) body.planperiod_start = ctx.input.planPeriodFrom;
-    if (ctx.input.planPeriodTo) body.planperiod_end = ctx.input.planPeriodTo;
-    if (ctx.input.equipmentPeriodFrom)
+    if (ctx.input.location !== undefined) body.location = ctx.input.location;
+    if (ctx.input.contact !== undefined) body.contact = ctx.input.contact;
+    if (ctx.input.planPeriodFrom !== undefined)
+      body.planperiod_start = ctx.input.planPeriodFrom;
+    if (ctx.input.planPeriodTo !== undefined) body.planperiod_end = ctx.input.planPeriodTo;
+    if (ctx.input.equipmentPeriodFrom !== undefined)
       body.equipment_period_from = ctx.input.equipmentPeriodFrom;
-    if (ctx.input.equipmentPeriodTo) body.equipment_period_to = ctx.input.equipmentPeriodTo;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
-    if (ctx.input.projectType) body.project_type = ctx.input.projectType;
-    if (ctx.input.status) body.status = ctx.input.status;
+    if (ctx.input.equipmentPeriodTo !== undefined)
+      body.equipment_period_to = ctx.input.equipmentPeriodTo;
+    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
+    if (ctx.input.projectType !== undefined) body.project_type = ctx.input.projectType;
+    if (ctx.input.status !== undefined) body.status = ctx.input.status;
 
     let result = await client.create('projects', body);
     let p = result.data as any;
@@ -69,7 +71,7 @@ export let createProject = SlateTool.create(spec, {
         projectId: p.id,
         name: p.name,
         number: p.number,
-        createdAt: p.created
+        createdAt: p.created ?? undefined
       },
       message: `Created project **${p.name}** (ID: ${p.id}).`
     };

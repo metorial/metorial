@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/wrike.png" height="20"> Wrike
 
-Create, read, update, and delete tasks, folders, and projects in Wrike's hierarchical work management structure. Manage task properties including titles, descriptions, statuses, dates, assignees, custom fields, and dependencies. Organize work using spaces, folders, and projects with support for workflows, approvals, and blueprints. Track time with timelogs and timesheets. Upload and manage file attachments and comments on tasks and folders. Administer users, groups, invitations, access roles, and work schedules. Define custom fields, custom item types, and workflows with configurable statuses. Manage resource bookings, hourly rates, and job roles. Export data for BI analytics. Access audit logs for compliance.
+Manage Wrike tasks, folders and projects, comments, time entries, custom fields, and task dependencies. Discover contacts, spaces, and workflows. List attachment metadata and identify the connected user and account memberships.
 
 ## Tools
 
@@ -63,6 +63,22 @@ Update an existing folder or project's properties including title, description, 
 ### Update Task
 
 Update an existing task's properties including title, description, status, importance, dates, assignees, custom fields, and parent folders. Supports adding/removing assignees and parent folders independently.
+
+### Get Current User
+
+Identify the authenticated user and their account memberships.
+
+### Delete Folder or Project
+
+Move a folder or project and its descendants to the recycle bin. Items with parents outside the deletion scope remain accessible there.
+
+### Update Comment
+
+Edit a comment during the first five minutes after its creation.
+
+## Authentication and Limits
+
+OAuth requests workspace read/write access, which also permits workflow listing. Permanent access tokens use the API host matching the account's data center. Task listings accept `pageSize` and `nextPageToken`; repeat optional fields when continuing a page. Wrike permissions and account plan limits apply to every operation.
 
 ## License
 

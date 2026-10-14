@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fieldOptionColorSchema, pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCustomFields = SlateTool.create(spec, {
@@ -13,6 +14,8 @@ export let listCustomFields = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageToken: pageTokenSchema,
+      limit: z.number().optional().describe('Maximum number of field definitions per page'),
       entityType: z
         .enum(['project', 'task', 'company'])
         .describe('Type of entity to list custom fields for')
@@ -20,6 +23,7 @@ export let listCustomFields = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       fields: z
         .array(
           z.object({
@@ -43,17 +47,26 @@ export let listCustomFields = SlateTool.create(spec, {
 
     let result: any;
     if (ctx.input.entityType === 'project') {
-      result = await client.listProjectFields();
+      result = await client.listProjectFields({
+        pageToken: ctx.input.pageToken,
+        limit: ctx.input.limit
+      });
     } else if (ctx.input.entityType === 'task') {
-      result = await client.listTaskFields();
+      result = await client.listTaskFields({
+        pageToken: ctx.input.pageToken,
+        limit: ctx.input.limit
+      });
     } else {
-      result = await client.listCompanyFields();
+      result = await client.listCompanyFields({
+        pageToken: ctx.input.pageToken,
+        limit: ctx.input.limit
+      });
     }
 
     let fields = Array.isArray(result) ? result : (result.fields ?? result.data ?? []);
 
     return {
-      output: { fields },
+      output: { fields, pagination: result.pagination },
       message: `Found **${fields.length}** custom field(s) for ${ctx.input.entityType}.`
     };
   })
@@ -73,7 +86,13 @@ export let createCustomField = SlateTool.create(spec, {
       fieldLabel: z.string().describe('Display label for the field'),
       fieldType: z
         .string()
-        .describe('Field type (e.g. text, number, dropdown, date, checkbox)'),
+        .describe(
+          'Field type: TEXT, MULTI_LINE_TEXT, NUMBER, DATE, YES_OR_NO, SINGLE_CHOICE, MULTIPLE_CHOICE, SINGLE_USER, MULTIPLE_USER, NOTE, or RATING. RATING requires ratingScale.'
+        ),
+      ratingScale: z
+        .enum(['THREE', 'FIVE', 'SEVEN', 'TEN'])
+        .optional()
+        .describe('Required when fieldType is RATING'),
       entityType: z
         .string()
         .describe('Entity type this field belongs to (project, task, or company)'),
@@ -81,7 +100,14 @@ export let createCustomField = SlateTool.create(spec, {
         .array(
           z.object({
             label: z.string().describe('Option label'),
-            value: z.string().describe('Option value')
+            color: fieldOptionColorSchema
+              .optional()
+              .describe('Option color. Defaults to GRAY when omitted.'),
+            value: z
+              .string()
+              .describe(
+                'Legacy option value; Rocketlane assigns numeric option IDs automatically'
+              )
           })
         )
         .optional()
@@ -102,6 +128,7 @@ export let createCustomField = SlateTool.create(spec, {
     let result = await client.createField({
       fieldLabel: ctx.input.fieldLabel,
       fieldType: ctx.input.fieldType,
+      ratingScale: ctx.input.ratingScale,
       entityType: ctx.input.entityType,
       options: ctx.input.options
     });

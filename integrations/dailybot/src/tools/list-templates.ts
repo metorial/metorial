@@ -14,7 +14,22 @@ export let listTemplates = SlateTool.create(spec, {
   .input(
     z.object({
       type: z.enum(['check-ins', 'forms']).describe('Type of templates to retrieve'),
-      systemDefault: z.boolean().optional().describe('Filter to system default templates only')
+      systemDefault: z
+        .boolean()
+        .optional()
+        .describe('Filter to system default templates only'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      pageSize: z.number().optional().describe('Number of templates per page'),
+      renderSpecialVars: z
+        .boolean()
+        .optional()
+        .describe('Render question variable placeholders inline'),
+      followupId: z
+        .string()
+        .optional()
+        .describe(
+          'Check-in UUID used to render question variables. Use list_checkins to discover check-ins.'
+        )
     })
   )
   .output(
@@ -31,16 +46,17 @@ export let listTemplates = SlateTool.create(spec, {
             raw: z.any().describe('Full template object from the API')
           })
         )
-        .describe('List of templates')
+        .describe('List of templates'),
+      count: z.number().optional().describe('Total number of matching templates'),
+      next: z.string().nullable().optional().describe('URL of the next page, or null'),
+      previous: z.string().nullable().optional().describe('URL of the previous page, or null')
     })
   )
   .handleInvocation(async ctx => {
     let client = new DailyBotClient({ token: ctx.auth.token });
 
-    let templates = await client.listTemplates({
-      type: ctx.input.type,
-      systemDefault: ctx.input.systemDefault
-    });
+    let result = await client.listTemplates(ctx.input);
+    let templates = result?.results ?? result;
 
     let mapped = templates.map((t: any) => ({
       templateUuid: t.uuid,
@@ -50,7 +66,12 @@ export let listTemplates = SlateTool.create(spec, {
     }));
 
     return {
-      output: { templates: mapped },
+      output: {
+        templates: mapped,
+        count: result?.count,
+        next: result?.next,
+        previous: result?.previous
+      },
       message: `Found **${mapped.length}** ${ctx.input.type} template(s).`
     };
   })

@@ -1,16 +1,123 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+
+export let SIGNWELL_API_BASE_URL = 'https://www.signwell.com/api/v1';
+
+let accountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  plan_tier: z.string().nullish()
+});
+let credentialsSchema = z.object({
+  id: z.string(),
+  role: z.string(),
+  user: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+  account: accountSchema,
+  workspace: accountSchema.optional()
+});
+
+export type SignWellRecipient = {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  status?: string | null;
+  signed_at?: string | null;
+  embedded_signing_url?: string | null;
+  signing_url?: string | null;
+};
+
+export type SignWellField = {
+  api_id?: string | null;
+  type?: string | null;
+  page?: number | null;
+  recipient_id?: string | null;
+  placeholder_name?: string | null;
+};
+
+export type SignWellDocument = {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+  subject?: string | null;
+  message?: string | null;
+  is_draft?: boolean | null;
+  apply_signing_order?: boolean | null;
+  embedded_signing?: boolean | null;
+  embedded_signing_url?: string | null;
+  expires_in?: number | null;
+  metadata?: Record<string, string> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  recipients?: SignWellRecipient[] | null;
+  fields?: SignWellField[][] | null;
+};
+
+export type SignWellTemplate = {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+  subject?: string | null;
+  message?: string | null;
+  is_draft?: boolean | null;
+  reminders?: boolean | null;
+  apply_signing_order?: boolean | null;
+  allow_decline?: boolean | null;
+  expires_in?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  placeholders?: Array<{ id?: string; name?: string | null }> | null;
+  fields?: SignWellField[][] | null;
+};
 
 export class SignWellClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://www.signwell.com/api/v1',
-      headers: {
-        'X-Api-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A SignWell API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: SIGNWELL_API_BASE_URL,
+      timeout: 30000,
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SignWell',
+          reason: 'signwell_api_error',
+          nestedKeys: ['errors', 'meta', 'messages']
+        })
     });
+  }
+
+  private validateFiles(
+    files: Array<{ fileUrl?: string; fileBase64?: string }> | undefined,
+    fields: Array<Array<{ page: number }>> | undefined
+  ) {
+    if (!files?.length) {
+      throw createApiServiceError('Provide at least one file.');
+    }
+    if (files.some(file => !!file.fileUrl === !!file.fileBase64)) {
+      throw createApiServiceError(
+        'Provide exactly one of fileUrl or fileBase64 for each file.'
+      );
+    }
+    if (fields && fields.length !== files.length) {
+      throw createApiServiceError(
+        'Provide one field array per file, using an empty array for files without fields.'
+      );
+    }
+    if (
+      fields?.some(group =>
+        group.some(field => !Number.isInteger(field.page) || field.page < 1)
+      )
+    ) {
+      throw createApiServiceError(
+        'Field page numbers must be positive integers starting at 1 within each file.'
+      );
+    }
   }
 
   // ── Documents ──────────────────────────────────────────────
@@ -26,6 +133,7 @@ export class SignWellClient {
     reminders?: boolean;
     applySigningOrder?: boolean;
     textTags?: boolean;
+    withSignaturePage?: boolean;
     allowDecline?: boolean;
     allowReassign?: boolean;
     expiresIn?: number;
@@ -56,7 +164,21 @@ export class SignWellClient {
     metadata?: Record<string, string>;
     copiedContacts?: Array<{ email: string; name?: string }>;
   }) {
-    let body: Record<string, any> = {
+    this.validateFiles(params.files, params.fields);
+    if (!params.recipients.length) {
+      throw createApiServiceError('Provide at least one document recipient.');
+    }
+    if (
+      !params.draft &&
+      !params.textTags &&
+      !params.withSignaturePage &&
+      !params.fields?.some(group => group.length)
+    ) {
+      throw createApiServiceError(
+        'Provide signing fields, enable textTags or withSignaturePage, or create the document as a draft.'
+      );
+    }
+    let body: Record<string, unknown> = {
       recipients: params.recipients.map(r => ({
         id: r.id,
         name: r.name,
@@ -77,6 +199,8 @@ export class SignWellClient {
     if (params.applySigningOrder !== undefined)
       body.apply_signing_order = params.applySigningOrder;
     if (params.textTags !== undefined) body.text_tags = params.textTags;
+    if (params.withSignaturePage !== undefined)
+      body.with_signature_page = params.withSignaturePage;
     if (params.allowDecline !== undefined) body.allow_decline = params.allowDecline;
     if (params.allowReassign !== undefined) body.allow_reassign = params.allowReassign;
     if (params.expiresIn !== undefined) body.expires_in = params.expiresIn;
@@ -103,7 +227,7 @@ export class SignWellClient {
           ...(f.width !== undefined ? { width: f.width } : {}),
           ...(f.height !== undefined ? { height: f.height } : {}),
           ...(f.dateFormat ? { date_format: f.dateFormat } : {}),
-          ...(f.value ? { value: f.value } : {}),
+          ...(f.value !== undefined ? { value: f.value } : {}),
           ...(f.fixedWidth !== undefined ? { fixed_width: f.fixedWidth } : {}),
           ...(f.lockSignDate !== undefined ? { lock_sign_date: f.lockSignDate } : {})
         }))
@@ -117,12 +241,13 @@ export class SignWellClient {
       }));
     }
 
-    let response = await this.axios.post('/documents', body);
+    let response = await this.axios.post<SignWellDocument>('/documents', body);
     return response.data;
   }
 
   async createDocumentFromTemplate(params: {
     templateId: string;
+    name?: string;
     testMode?: boolean;
     draft?: boolean;
     embeddedSigning?: boolean;
@@ -142,7 +267,12 @@ export class SignWellClient {
     }>;
     metadata?: Record<string, string>;
   }) {
-    let body: Record<string, any> = {
+    if (!params.recipients.length) {
+      throw createApiServiceError(
+        'Provide at least one recipient mapped to a template placeholder.'
+      );
+    }
+    let body: Record<string, unknown> = {
       template_id: params.templateId,
       recipients: params.recipients.map(r => ({
         placeholder_name: r.placeholderName,
@@ -151,6 +281,7 @@ export class SignWellClient {
       }))
     };
 
+    if (params.name !== undefined) body.name = params.name;
     if (params.testMode !== undefined) body.test_mode = params.testMode;
     if (params.draft !== undefined) body.draft = params.draft;
     if (params.embeddedSigning !== undefined) body.embedded_signing = params.embeddedSigning;
@@ -169,33 +300,64 @@ export class SignWellClient {
       }));
     }
 
-    let response = await this.axios.post('/document_templates/documents', body);
+    let response = await this.axios.post<SignWellDocument>(
+      '/document_templates/documents',
+      body
+    );
     return response.data;
   }
 
   async getDocument(documentId: string) {
-    let response = await this.axios.get(`/documents/${documentId}`);
+    let response = await this.axios.get<SignWellDocument>(
+      `/documents/${encodeURIComponent(documentId)}`
+    );
     return response.data;
   }
 
-  async sendDocument(documentId: string) {
-    let response = await this.axios.post(`/documents/${documentId}/send`);
+  async sendDocument(
+    documentId: string,
+    params: {
+      name?: string;
+      subject?: string;
+      message?: string;
+      expiresIn?: number;
+      reminders?: boolean;
+      metadata?: Record<string, string>;
+    } = {}
+  ) {
+    let body = {
+      name: params.name,
+      subject: params.subject,
+      message: params.message,
+      expires_in: params.expiresIn,
+      reminders: params.reminders,
+      metadata: params.metadata
+    };
+    let response = await this.axios.post<SignWellDocument>(
+      `/documents/${encodeURIComponent(documentId)}/send`,
+      body
+    );
     return response.data;
   }
 
   async sendReminder(documentId: string) {
-    let response = await this.axios.post(`/documents/${documentId}/remind`);
+    let response = await this.axios.post(
+      `/documents/${encodeURIComponent(documentId)}/remind`
+    );
     return response.data;
   }
 
   async deleteDocument(documentId: string) {
-    await this.axios.delete(`/documents/${documentId}`);
+    await this.axios.delete(`/documents/${encodeURIComponent(documentId)}`);
   }
 
   async getCompletedPdf(documentId: string, urlOnly: boolean = true) {
-    let response = await this.axios.get(`/documents/${documentId}/completed_pdf`, {
-      params: { url_only: urlOnly }
-    });
+    let response = await this.axios.get(
+      `/documents/${encodeURIComponent(documentId)}/completed_pdf`,
+      {
+        params: { url_only: urlOnly }
+      }
+    );
     return response.data;
   }
 
@@ -207,21 +369,44 @@ export class SignWellClient {
       email?: string;
     }>
   ) {
+    if (
+      !recipients.length ||
+      recipients.some(r => r.name === undefined && r.email === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide at least one recipient and a name or email to update for each recipient.'
+      );
+    }
+    // The API requires both name and email; retain the unedited value for partial updates.
+    let current = recipients.some(r => r.name === undefined || r.email === undefined)
+      ? await this.getDocument(documentId)
+      : undefined;
     let body = {
-      recipients: recipients.map(r => ({
-        id: r.recipientId,
-        ...(r.name !== undefined ? { name: r.name } : {}),
-        ...(r.email !== undefined ? { email: r.email } : {})
-      }))
+      recipients: recipients.map(r => {
+        let existing = current?.recipients?.find(item => item.id === r.recipientId);
+        let name = r.name ?? existing?.name;
+        let email = r.email ?? existing?.email;
+        if (!name || !email) {
+          throw createApiServiceError(
+            'Provide both name and email, or use a recipient ID returned by get_document so existing details can be retained.'
+          );
+        }
+        return { id: r.recipientId, name, email };
+      })
     };
-    let response = await this.axios.patch(`/documents/${documentId}/recipients`, body);
+    let response = await this.axios.patch<SignWellDocument>(
+      `/documents/${encodeURIComponent(documentId)}/recipients`,
+      body
+    );
     return response.data;
   }
 
   // ── Templates ──────────────────────────────────────────────
 
   async getTemplate(templateId: string) {
-    let response = await this.axios.get(`/document_templates/${templateId}`);
+    let response = await this.axios.get<SignWellTemplate>(
+      `/document_templates/${encodeURIComponent(templateId)}`
+    );
     return response.data;
   }
 
@@ -261,7 +446,11 @@ export class SignWellClient {
       }>
     >;
   }) {
-    let body: Record<string, any> = {
+    this.validateFiles(params.files, params.fields);
+    if (!params.placeholders.length) {
+      throw createApiServiceError('Provide at least one template placeholder.');
+    }
+    let body: Record<string, unknown> = {
       name: params.name,
       placeholders: params.placeholders.map(p => ({
         id: p.id,
@@ -303,14 +492,14 @@ export class SignWellClient {
           ...(f.width !== undefined ? { width: f.width } : {}),
           ...(f.height !== undefined ? { height: f.height } : {}),
           ...(f.dateFormat ? { date_format: f.dateFormat } : {}),
-          ...(f.value ? { value: f.value } : {}),
+          ...(f.value !== undefined ? { value: f.value } : {}),
           ...(f.fixedWidth !== undefined ? { fixed_width: f.fixedWidth } : {}),
           ...(f.lockSignDate !== undefined ? { lock_sign_date: f.lockSignDate } : {})
         }))
       );
     }
 
-    let response = await this.axios.post('/template', body);
+    let response = await this.axios.post<SignWellTemplate>('/document_templates', body);
     return response.data;
   }
 
@@ -320,6 +509,7 @@ export class SignWellClient {
       name?: string;
       subject?: string;
       message?: string;
+      draft?: boolean;
       reminders?: boolean;
       applySigningOrder?: boolean;
       allowDecline?: boolean;
@@ -327,8 +517,12 @@ export class SignWellClient {
       expiresIn?: number;
     }
   ) {
-    let body: Record<string, any> = {};
+    if (!Object.values(params).some(value => value !== undefined)) {
+      throw createApiServiceError('Provide at least one template setting to update.');
+    }
+    let body: Record<string, unknown> = {};
 
+    if (params.draft !== undefined) body.draft = params.draft;
     if (params.name !== undefined) body.name = params.name;
     if (params.subject !== undefined) body.subject = params.subject;
     if (params.message !== undefined) body.message = params.message;
@@ -339,12 +533,15 @@ export class SignWellClient {
     if (params.allowReassign !== undefined) body.allow_reassign = params.allowReassign;
     if (params.expiresIn !== undefined) body.expires_in = params.expiresIn;
 
-    let response = await this.axios.put(`/document_templates/${templateId}`, body);
+    let response = await this.axios.put<SignWellTemplate>(
+      `/document_templates/${encodeURIComponent(templateId)}`,
+      body
+    );
     return response.data;
   }
 
   async deleteTemplate(templateId: string) {
-    await this.axios.delete(`/document_templates/${templateId}`);
+    await this.axios.delete(`/document_templates/${encodeURIComponent(templateId)}`);
   }
 
   // ── Webhooks ───────────────────────────────────────────────
@@ -355,7 +552,7 @@ export class SignWellClient {
   }
 
   async createWebhook(callbackUrl: string, testMode?: boolean) {
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       callback_url: callbackUrl
     };
     if (testMode !== undefined) body.test_mode = testMode;
@@ -372,13 +569,21 @@ export class SignWellClient {
 
   async getMe() {
     let response = await this.axios.get('/me');
-    return response.data;
+    let result = credentialsSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError(
+        'SignWell returned incomplete account credentials. Reconnect with a valid API key.'
+      );
+    }
+    return result.data;
   }
 
   // ── API Applications ───────────────────────────────────────
 
   async getApiApplication(applicationId: string) {
-    let response = await this.axios.get(`/api_applications/${applicationId}`);
+    let response = await this.axios.get(
+      `/api_applications/${encodeURIComponent(applicationId)}`
+    );
     return response.data;
   }
 
@@ -391,7 +596,7 @@ export class SignWellClient {
     subject?: string;
     message?: string;
   }) {
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       template_id: params.templateId,
       file: params.csvFile
     };
@@ -404,7 +609,7 @@ export class SignWellClient {
   }
 
   async getBulkSend(bulkSendId: string) {
-    let response = await this.axios.get(`/bulk_sends/${bulkSendId}`);
+    let response = await this.axios.get(`/bulk_sends/${encodeURIComponent(bulkSendId)}`);
     return response.data;
   }
 }

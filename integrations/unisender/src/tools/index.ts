@@ -1,4 +1,6 @@
 export * from './cancel-campaign';
+export * from './check-email-delivery';
+export * from './check-sms-delivery';
 export * from './create-email-message';
 export * from './delete-tag';
 export * from './get-account-info';
@@ -16,6 +18,7 @@ export * from './manage-lists';
 export * from './manage-templates';
 export * from './send-email';
 export * from './send-sms';
+export * from './send-test-email';
 export * from './subscribe-contact';
 export * from './unsubscribe-contact';
 export * from './update-email-message';

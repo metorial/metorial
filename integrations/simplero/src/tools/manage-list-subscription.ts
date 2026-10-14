@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageListSubscription = SlateTool.create(spec, {
 Bulk subscribe is asynchronous and returns a tracking token.`,
   instructions: [
     'Use action "get_lists" to retrieve all available mailing lists and their IDs.',
-    'Bulk subscribe accepts up to 1,000 entries and returns a token for polling status.'
+    'Bulk subscribe accepts up to 1,000 entries. Pass the returned bulkToken to get_request_status to check completion and results.'
   ],
   tags: {
     destructive: false,
@@ -52,8 +52,11 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
         )
         .optional()
         .describe('Array of subscribers for bulk subscribe (max 1,000)'),
-      page: z.number().optional().describe('Page number for listing subscriptions'),
-      perPage: z.number().optional().describe('Results per page'),
+      page: z
+        .number()
+        .optional()
+        .describe('Page number for listing subscriptions, starting at 0'),
+      perPage: z.number().optional().describe('Results per page, from 1 to 100'),
       status: z
         .enum(['active', 'unsubscribed', 'suspended'])
         .optional()
@@ -106,12 +109,12 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
     }
 
     if (!ctx.input.listId) {
-      throw new Error('listId is required for this action.');
+      throw createApiServiceError('listId is required for this action.');
     }
 
     if (ctx.input.action === 'subscribe') {
       if (!ctx.input.email) {
-        throw new Error('email is required for subscribing.');
+        throw createApiServiceError('email is required for subscribing.');
       }
       let subscription = await client.subscribeToList(ctx.input.listId, {
         email: ctx.input.email,
@@ -132,7 +135,7 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
 
     if (ctx.input.action === 'bulk_subscribe') {
       if (!ctx.input.subscribers || ctx.input.subscribers.length === 0) {
-        throw new Error('subscribers array is required for bulk subscribe.');
+        throw createApiServiceError('subscribers array is required for bulk subscribe.');
       }
       let result = await client.bulkSubscribeToList(ctx.input.listId, ctx.input.subscribers);
       return {
@@ -143,7 +146,7 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
 
     if (ctx.input.action === 'unsubscribe') {
       if (!ctx.input.email) {
-        throw new Error('email is required for unsubscribing.');
+        throw createApiServiceError('email is required for unsubscribing.');
       }
       let result = await client.unsubscribeFromList(ctx.input.listId, ctx.input.email);
       return {
@@ -154,7 +157,7 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
 
     if (ctx.input.action === 'find_subscription') {
       if (!ctx.input.email) {
-        throw new Error('email is required for finding subscriptions.');
+        throw createApiServiceError('email is required for finding subscriptions.');
       }
       let subscriptions = await client.findSubscription(ctx.input.listId, ctx.input.email);
       return {
@@ -163,6 +166,6 @@ Bulk subscribe is asynchronous and returns a tracking token.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

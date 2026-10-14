@@ -20,7 +20,13 @@ Useful for monitoring usage and ensuring sufficient credits before running scrap
       resetsAt: z.string().describe('Timestamp when API credits will reset.'),
       remainingConcurrency: z
         .number()
-        .describe('Number of available concurrent request slots.')
+        .describe('Number of available concurrent request slots.'),
+      remainingMonthlyCredits: z
+        .number()
+        .optional()
+        .describe('Remaining monthly plan credits.'),
+      remainingPaygCredits: z.number().optional().describe('Remaining pay-as-you-go credits.'),
+      remainingTotalCredits: z.number().optional().describe('Combined remaining credits.')
     })
   )
   .handleInvocation(async ctx => {

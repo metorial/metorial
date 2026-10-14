@@ -7,6 +7,9 @@ export let trackPageview = SlateTool.create(spec, {
   name: 'Track Pageview',
   key: 'track_pageview',
   description: `Track a pageview in GoSquared server-side. Useful for recording page visits from non-browser environments or server-rendered pages.`,
+  constraints: [
+    'Provide both visitorId and pageUrl for every pageview. A personId alone cannot identify the visitor for this operation.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -15,7 +18,10 @@ export let trackPageview = SlateTool.create(spec, {
   .input(
     z.object({
       pageTitle: z.string().optional().describe('Title of the page visited'),
-      pageUrl: z.string().optional().describe('URL of the page visited'),
+      pageUrl: z
+        .string()
+        .optional()
+        .describe('URL of the page visited. Required by GoSquared for every pageview.'),
       personId: z
         .string()
         .optional()
@@ -25,7 +31,9 @@ export let trackPageview = SlateTool.create(spec, {
       visitorId: z
         .string()
         .optional()
-        .describe('Anonymous visitor ID to associate the pageview with')
+        .describe(
+          'Anonymous visitor ID to associate the pageview with. Required by GoSquared even when personId is provided.'
+        )
     })
   )
   .output(

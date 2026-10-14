@@ -35,12 +35,12 @@ export let getDocument = SlateTool.create(spec, {
 
     return {
       output: {
-        documentId: doc._id || doc.id,
-        name: doc.name || doc.subject,
-        status: doc.status,
-        createdAt: doc.created_at || doc.createdAt,
-        mailboxId: doc.mailbox_id || doc.mailboxId || doc.mb,
-        parsedData: doc.parsed || doc.data
+        documentId: doc.doc_id || doc._id || doc.id || ctx.input.documentId,
+        name: doc.name || doc.subject || undefined,
+        status: doc.status ?? undefined,
+        createdAt: doc.created_at || doc.createdAt || undefined,
+        mailboxId: doc.mailbox_id || doc.mailboxId || doc.mb || undefined,
+        parsedData: doc.json ?? doc.parsed ?? doc.data ?? doc
       },
       message: `Retrieved document **${doc.name || doc._id || doc.id}** (status: ${doc.status || 'unknown'}).`
     };

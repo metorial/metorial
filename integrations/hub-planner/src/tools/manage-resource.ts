@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,42 +50,45 @@ When creating, **firstName** is required. Resources can have statuses like Activ
     let { action, resourceId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (!ctx.input.firstName?.trim()) {
+        throw createApiServiceError('firstName is required for create.');
+      }
       let result = await client.createResource(fields);
       return {
         output: {
           resourceId: result._id,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          email: result.email,
-          status: result.status,
-          role: result.role,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          firstName: result.firstName ?? undefined,
+          lastName: result.lastName ?? undefined,
+          email: result.email ?? undefined,
+          status: result.status ?? undefined,
+          role: result.role ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created resource **${result.firstName} ${result.lastName || ''}** (ID: \`${result._id}\`).`
       };
     }
 
     if (action === 'update') {
-      if (!resourceId) throw new Error('resourceId is required for update');
+      if (!resourceId) throw createApiServiceError('resourceId is required for update');
       let result = await client.updateResource(resourceId, fields);
       let resource = Array.isArray(result) ? result[0] : result;
       return {
         output: {
           resourceId: resource._id,
-          firstName: resource.firstName,
-          lastName: resource.lastName,
-          email: resource.email,
-          status: resource.status,
-          role: resource.role,
-          createdDate: resource.createdDate,
-          updatedDate: resource.updatedDate
+          firstName: resource.firstName ?? undefined,
+          lastName: resource.lastName ?? undefined,
+          email: resource.email ?? undefined,
+          status: resource.status ?? undefined,
+          role: resource.role ?? undefined,
+          createdDate: resource.createdDate ?? undefined,
+          updatedDate: resource.updatedDate ?? undefined
         },
         message: `Updated resource **${resource.firstName} ${resource.lastName || ''}** (ID: \`${resource._id}\`).`
       };
     }
 
-    if (!resourceId) throw new Error('resourceId is required for delete');
+    if (!resourceId) throw createApiServiceError('resourceId is required for delete');
     await client.deleteResource(resourceId);
     return {
       output: { resourceId },

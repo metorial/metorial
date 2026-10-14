@@ -1,15 +1,40 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.vectorshift.ai/v1';
 
 export let createApiClient = (token: string) => {
-  return createAxios({
+  if (!token.trim()) {
+    throw createApiServiceError(
+      'A VectorShift API key is required. Reconnect with an API key.'
+    );
+  }
+
+  let api = createAuthenticatedAxios({
     baseURL: BASE_URL,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+    authHeader: { value: `Bearer ${token}` },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'VectorShift',
+        reason: 'vectorshift_api_error'
+      })
   });
+
+  api.interceptors.response.use(response => {
+    if (isApiErrorRecord(response.data) && response.data.status === 'failed') {
+      throw buildApiServiceError(
+        { response: { status: response.status, data: response.data } },
+        { providerLabel: 'VectorShift', reason: 'vectorshift_api_error' }
+      );
+    }
+    return response;
+  });
+
+  return api;
 };
 
 type ApiClient = ReturnType<typeof createApiClient>;
@@ -41,6 +66,9 @@ export let fetchPipeline = async (
     orgName?: string;
   }
 ) => {
+  if (!params.pipelineId && !params.name) {
+    throw createApiServiceError('Provide a pipeline ID or name.');
+  }
   let response = await api.get('/pipeline', {
     params: {
       id: params.pipelineId,
@@ -57,15 +85,17 @@ export let createPipeline = async (
   data: {
     name: string;
     description?: string;
-    config: Record<string, unknown>;
   }
 ) => {
-  let response = await api.post('/pipeline', data);
+  let response = await api.post('/pipeline', {
+    name: data.name,
+    description: data.description
+  });
   return response.data;
 };
 
 export let deletePipeline = async (api: ApiClient, pipelineId: string) => {
-  let response = await api.delete(`/pipeline/${pipelineId}`);
+  let response = await api.delete(`/pipeline/${encodeURIComponent(pipelineId)}`);
   return response.data;
 };
 
@@ -81,7 +111,7 @@ export let runPipeline = async (
   if (data.conversationId) {
     body.conversation_id = data.conversationId;
   }
-  let response = await api.post(`/pipeline/${pipelineId}/run`, body);
+  let response = await api.post(`/pipeline/${encodeURIComponent(pipelineId)}/run`, body);
   return response.data;
 };
 
@@ -93,7 +123,7 @@ export let bulkRunPipeline = async (
     conversationId?: string;
   }>
 ) => {
-  let response = await api.post(`/pipeline/${pipelineId}/bulk_run`, {
+  let response = await api.post(`/pipeline/${encodeURIComponent(pipelineId)}/bulk_run`, {
     runs: runs.map(r => ({
       inputs: r.inputs,
       ...(r.conversationId ? { conversation_id: r.conversationId } : {})
@@ -107,14 +137,14 @@ export let terminatePipelineRun = async (
   pipelineId: string,
   runId: string
 ) => {
-  let response = await api.post(`/pipeline/${pipelineId}/terminate`, {
+  let response = await api.post(`/pipeline/${encodeURIComponent(pipelineId)}/terminate`, {
     run_id: runId
   });
   return response.data;
 };
 
 export let pausePipelineRun = async (api: ApiClient, pipelineId: string, runId: string) => {
-  let response = await api.post(`/pipeline/${pipelineId}/pause`, {
+  let response = await api.post(`/pipeline/${encodeURIComponent(pipelineId)}/pause`, {
     run_id: runId
   });
   return response.data;
@@ -125,7 +155,7 @@ export let resumePipelineRun = async (
   pipelineId: string,
   runIds: string[]
 ) => {
-  let response = await api.post(`/pipeline/${pipelineId}/resume`, {
+  let response = await api.post(`/pipeline/${encodeURIComponent(pipelineId)}/resume`, {
     run_ids: runIds
   });
   return response.data;
@@ -158,6 +188,9 @@ export let fetchKnowledgeBase = async (
     orgName?: string;
   }
 ) => {
+  if (!params.knowledgeBaseId && !params.name) {
+    throw createApiServiceError('Provide a knowledge base ID or name.');
+  }
   let response = await api.get('/knowledge-base', {
     params: {
       id: params.knowledgeBaseId,
@@ -192,7 +225,7 @@ export let createKnowledgeBase = async (
 };
 
 export let deleteKnowledgeBase = async (api: ApiClient, knowledgeBaseId: string) => {
-  let response = await api.delete(`/knowledge-base/${knowledgeBaseId}`);
+  let response = await api.delete(`/knowledge-base/${encodeURIComponent(knowledgeBaseId)}`);
   return response.data;
 };
 
@@ -207,15 +240,20 @@ export let addUrlToKnowledgeBase = async (
     rescrapeFrequency?: string;
   }
 ) => {
-  let response = await api.post(`/knowledge-base/${knowledgeBaseId}/index`, {
-    request: {
-      url: data.url,
-      recursive: data.recursive ?? false,
-      return_type: data.returnType ?? 'CHUNKS',
-      url_limit: data.urlLimit
-    },
-    rescrape_frequency: data.rescrapeFrequency ?? 'never'
-  });
+  let response = await api.post(
+    `/knowledge-base/${encodeURIComponent(knowledgeBaseId)}/index`,
+    {
+      url_data: {
+        request: {
+          url: data.url,
+          recursive: data.recursive ?? false,
+          return_type: data.returnType ?? 'CHUNKS',
+          url_limit: data.urlLimit
+        },
+        rescrape_frequency: data.rescrapeFrequency ?? 'never'
+      }
+    }
+  );
   return response.data;
 };
 
@@ -228,16 +266,21 @@ export let addTextToKnowledgeBase = async (
   }
 ) => {
   let base64Content = Buffer.from(data.text).toString('base64');
-  let response = await api.post(`/knowledge-base/${knowledgeBaseId}/index`, {
-    file: {
-      type: 'file',
-      raw_bytes: base64Content,
-      metadata: {
-        name: data.fileName ?? 'text-document.txt',
-        mime_type: 'text/plain'
+  let response = await api.post(
+    `/knowledge-base/${encodeURIComponent(knowledgeBaseId)}/index`,
+    {
+      file_data: {
+        file: {
+          type: 'file',
+          raw_bytes: base64Content,
+          metadata: {
+            name: data.fileName ?? 'text-document.txt',
+            mime_type: 'text/plain'
+          }
+        }
       }
     }
-  });
+  );
   return response.data;
 };
 
@@ -269,7 +312,10 @@ export let queryKnowledgeBase = async (
       ...(data.transformQuery !== undefined ? { transform_query: data.transformQuery } : {})
     };
   }
-  let response = await api.post(`/knowledge-base/${knowledgeBaseId}/query`, body);
+  let response = await api.post(
+    `/knowledge-base/${encodeURIComponent(knowledgeBaseId)}/query`,
+    body
+  );
   return response.data;
 };
 
@@ -282,13 +328,16 @@ export let listDocuments = async (
     folderId?: string;
   }
 ) => {
-  let response = await api.get(`/knowledge-base/${knowledgeBaseId}/documents`, {
-    params: {
-      title: params?.title,
-      integration_id: params?.integrationId,
-      folder_id: params?.folderId
+  let response = await api.get(
+    `/knowledge-base/${encodeURIComponent(knowledgeBaseId)}/documents`,
+    {
+      params: {
+        title: params?.title,
+        integration_id: params?.integrationId,
+        folder_id: params?.folderId
+      }
     }
-  });
+  );
   return response.data;
 };
 
@@ -297,11 +346,14 @@ export let deleteDocuments = async (
   knowledgeBaseId: string,
   documentIds: string[]
 ) => {
-  let response = await api.delete(`/knowledge-base/${knowledgeBaseId}/documents`, {
-    params: {
-      document_ids: documentIds.join(',')
+  let response = await api.delete(
+    `/knowledge-base/${encodeURIComponent(knowledgeBaseId)}/documents`,
+    {
+      params: {
+        document_ids: documentIds.join(',')
+      }
     }
-  });
+  );
   return response.data;
 };
 
@@ -332,6 +384,9 @@ export let fetchChatbot = async (
     orgName?: string;
   }
 ) => {
+  if (!params.chatbotId && !params.name) {
+    throw createApiServiceError('Provide a chatbot ID or name.');
+  }
   let response = await api.get('/chatbot', {
     params: {
       id: params.chatbotId,
@@ -353,6 +408,10 @@ export let createChatbot = async (
     input?: string;
     output?: string;
     deployed?: boolean;
+    deploymentOptions?: Record<string, unknown>;
+    accessConfig?: Record<string, unknown>;
+    twilioConfig?: Record<string, unknown>;
+    slackConfig?: Record<string, unknown>;
   }
 ) => {
   let response = await api.post('/chatbot', {
@@ -364,13 +423,17 @@ export let createChatbot = async (
     },
     input: data.input,
     output: data.output,
-    deployed: data.deployed
+    deployed: data.deployed ?? false,
+    deployment_options: data.deploymentOptions ?? {},
+    access_config: data.accessConfig ?? {},
+    twilio_config: data.twilioConfig ?? {},
+    slack_config: data.slackConfig ?? {}
   });
   return response.data;
 };
 
 export let deleteChatbot = async (api: ApiClient, chatbotId: string) => {
-  let response = await api.delete(`/chatbot/${chatbotId}`);
+  let response = await api.delete(`/chatbot/${encodeURIComponent(chatbotId)}`);
   return response.data;
 };
 
@@ -389,7 +452,7 @@ export let runChatbot = async (
   if (data.conversationId) {
     body.conversation_id = data.conversationId;
   }
-  let response = await api.post(`/chatbot/${chatbotId}/run`, body);
+  let response = await api.post(`/chatbot/${encodeURIComponent(chatbotId)}/run`, body);
   return response.data;
 };
 
@@ -398,8 +461,23 @@ export let terminateChatbotSession = async (
   chatbotId: string,
   pipelineRunId: string
 ) => {
-  let response = await api.post(`/chatbot/${chatbotId}/terminate`, {
+  let response = await api.post(`/chatbot/${encodeURIComponent(chatbotId)}/terminate`, {
     pipeline_run_id: pipelineRunId
+  });
+  return response.data;
+};
+
+export let uploadChatbotFiles = async (
+  api: ApiClient,
+  chatbotId: string,
+  data: {
+    files: Array<{ rawBytes: string }>;
+    conversationId?: string;
+  }
+) => {
+  let response = await api.post(`/chatbot/${encodeURIComponent(chatbotId)}/upload`, {
+    files: data.files.map(file => ({ type: 'file', raw_bytes: file.rawBytes })),
+    conversation_id: data.conversationId
   });
   return response.data;
 };
@@ -431,6 +509,9 @@ export let fetchTransformation = async (
     orgName?: string;
   }
 ) => {
+  if (!params.transformationId && !params.name) {
+    throw createApiServiceError('Provide a transformation ID or name.');
+  }
   let response = await api.get('/transformation', {
     params: {
       id: params.transformationId,
@@ -465,7 +546,7 @@ export let createTransformation = async (
 };
 
 export let deleteTransformation = async (api: ApiClient, transformationId: string) => {
-  let response = await api.delete(`/transformation/${transformationId}`);
+  let response = await api.delete(`/transformation/${encodeURIComponent(transformationId)}`);
   return response.data;
 };
 
@@ -474,8 +555,11 @@ export let runTransformation = async (
   transformationId: string,
   inputs: Record<string, unknown>
 ) => {
-  let response = await api.post(`/transformation/${transformationId}/run`, {
-    inputs
-  });
+  let response = await api.post(
+    `/transformation/${encodeURIComponent(transformationId)}/run`,
+    {
+      inputs
+    }
+  );
   return response.data;
 };

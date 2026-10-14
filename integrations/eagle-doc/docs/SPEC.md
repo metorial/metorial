@@ -1,6 +1,4 @@
-Now let me get more details on the authentication and specific API endpoints for Eagle Doc (eagle-doc.com):Now let me check the batch OCR and human feedback endpoints for completeness:Now I have enough information to write the specification.
-
-# Slates Specification for Eagle doc
+# Eagle Doc API Specification
 
 ## Overview
 
@@ -46,9 +44,13 @@ Extract structured data from any document type in any language. Supported docume
 
 - **Options:** Specify a `docType` to get targeted extraction, or omit it to let the API auto-classify. Use a `configId` for custom extraction configurations provided by the Eagle Doc team.
 
+### Document Classification
+
+Classify a document before routing it for extraction using `/api/anydoc/v1/classify`. Returns the case-sensitive document type, page count, checksum, processing duration, and engine version.
+
 ### Document Splitting
 
-Split a multi-page document (e.g., a PDF containing multiple separate documents) into individual documents.
+Split a multi-page document into page ranges. The provider returns `splits` plus `meta.emptyPages`; the tool exposes these as `segments` and `emptyPages`.
 
 ### Signature Extraction
 
@@ -56,7 +58,7 @@ Extract signatures from any document. Returns base64-encoded signature images, b
 
 ### Batch Document Processing
 
-Process multiple documents at once asynchronously when you do not need the result immediately. Submit a batch task, then poll for status and results using a task ID. Available for both finance documents (receipts/invoices) and any-doc types. Tasks progress through statuses: Received → Processing → Finished (or Error). Tasks and their results can also be deleted.
+Process multiple documents at once asynchronously when you do not need the result immediately. Submit a batch task, then poll for status and results using a task ID. Available for both finance documents (receipts/invoices) and any-doc types. Tasks progress through statuses: Received → Processing → Finished (or Error). Tasks and their results can also be deleted with the Delete Batch Task tool, including failed tasks.
 
 ### Human Feedback
 

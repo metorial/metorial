@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapContact } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
   key: 'list_contacts',
-  description: `List all research contacts (participants/customers) in the workspace, or retrieve a specific contact by ID.`,
+  description: `List a page of research contacts (participants/customers) in the workspace, or retrieve a specific contact by ID.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +17,18 @@ export let listContacts = SlateTool.create(spec, {
       contactId: z
         .string()
         .optional()
-        .describe('Retrieve a specific contact by ID. If omitted, lists all contacts.')
+        .describe('Retrieve a specific contact by ID. If omitted, lists contacts.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum contacts per page (default 100).'),
+      startCursor: z
+        .string()
+        .optional()
+        .describe('Pagination cursor from the preceding response.')
     })
   )
   .output(
@@ -27,10 +39,12 @@ export let listContacts = SlateTool.create(spec, {
           name: z.string(),
           email: z.string().optional(),
           createdAt: z.string(),
-          updatedAt: z.string()
+          updatedAt: z.string().optional()
         })
       ),
-      total: z.number().optional()
+      total: z.number().optional(),
+      hasMore: z.boolean().optional(),
+      nextCursor: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -40,35 +54,26 @@ export let listContacts = SlateTool.create(spec, {
       let contact = await client.getContact(ctx.input.contactId);
       return {
         output: {
-          contacts: [
-            {
-              contactId: contact.id,
-              name: contact.name,
-              email: contact.email,
-              createdAt: contact.created_at,
-              updatedAt: contact.updated_at
-            }
-          ]
+          contacts: [mapContact(contact)]
         },
         message: `Retrieved contact **${contact.name}**.`
       };
     }
 
-    let result = await client.listContacts();
-    let contacts = result.contacts.map(c => ({
-      contactId: c.id,
-      name: c.name,
-      email: c.email,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
-    }));
+    let result = await client.listContacts({
+      limit: ctx.input.limit,
+      startCursor: ctx.input.startCursor
+    });
+    let contacts = result.data.map(mapContact);
 
     return {
       output: {
         contacts,
-        total: result.total
+        total: result.page.total_count,
+        hasMore: result.page.has_more,
+        nextCursor: result.page.next_cursor
       },
-      message: `Found **${result.total}** contacts.`
+      message: `Found **${result.page.total_count}** contacts.`
     };
   })
   .build();

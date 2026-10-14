@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
   createApiClient,
@@ -36,6 +36,11 @@ export let controlPipelineRunTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let controlledRunIds =
+      ctx.input.action === 'resume' ? ctx.input.runIds : ctx.input.runIds.slice(0, 1);
+    if (controlledRunIds.length === 0 || controlledRunIds.some(id => !id.trim())) {
+      throw createApiServiceError('Provide at least one non-empty run ID.');
+    }
     let api = createApiClient(ctx.auth.token);
 
     if (ctx.input.action === 'terminate') {

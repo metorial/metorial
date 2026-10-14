@@ -1,6 +1,6 @@
-# <img src="logo.jpeg" height="20"> Nextdns
+# <img src="logo.jpeg" height="20"> NextDNS
 
-Manage DNS filtering profiles with customizable security, privacy, and parental control rules. Configure threat protection (malware, cryptojacking, phishing), ad/tracker blocklists, and content filtering. Manage per-profile allow and deny lists, logging settings, and performance options. Access detailed DNS query analytics by domain, device, protocol, IP, and encryption status. Stream real-time DNS query logs via SSE and download or clear log history.
+Manage NextDNS filtering profiles, including creating, renaming, inspecting, and deleting profiles. Configure security, privacy, parental controls, allow and deny lists, DNS rewrites, logging, and performance. Retrieve paginated DNS query logs and analytics, including time series, and clear log history.
 
 ## License
 

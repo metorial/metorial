@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let sendSurveyEmail = SlateTool.create(spec, {
   name: 'Send Survey Email',
   key: 'send_survey_email',
-  description: `Send an event-based survey email to a customer. Triggers a survey email from Simplesat, useful for collecting feedback after key moments such as purchases, support resolutions, or onboarding completion. You can include customer details, ticket info, and team member data. Simplesat's email suppression feature automatically prevents sending too many surveys to the same customer.`,
+  description: `Request an event-based survey email for a customer. Triggers a survey email from Simplesat, useful for collecting feedback after key moments such as purchases, support resolutions, or onboarding completion. You can include customer details, ticket info, and team member data. Simplesat's email suppression feature automatically prevents sending too many surveys to the same customer.`,
   instructions: [
-    'The survey token can be found in the survey delivery settings in Simplesat.'
+    'Call list_surveys to find a survey token with surveyType event_based_email, or use the survey delivery settings.'
   ],
   tags: {
     destructive: false
@@ -16,7 +16,11 @@ export let sendSurveyEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      surveyToken: z.string().describe('The survey token identifying which survey to send'),
+      surveyToken: z
+        .string()
+        .describe(
+          'The token of an event_based_email survey. Call list_surveys to discover tokens.'
+        ),
       customerEmail: z.string().describe('Email address of the customer to survey'),
       customerName: z.string().optional().describe('Customer name'),
       customerCompany: z.string().optional().describe('Customer company name'),
@@ -82,7 +86,7 @@ export let sendSurveyEmail = SlateTool.create(spec, {
       output: {
         result
       },
-      message: `Survey email sent to **${ctx.input.customerEmail}**.`
+      message: `Survey email request accepted for **${ctx.input.customerEmail}**. Check the result for scheduling or suppression details.`
     };
   })
   .build();

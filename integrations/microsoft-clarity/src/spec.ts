@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'microsoft-clarity',
   name: 'Microsoft Clarity',
   description:
-    'Free web analytics tool providing session recordings, heatmaps, and behavioral insights including rage clicks, dead clicks, and excessive scrolling.',
+    'Retrieve Microsoft Clarity dashboard metrics, query traffic and behavioral analytics, and sample session recordings for the connected project.',
   metadata: {},
   config,
   auth

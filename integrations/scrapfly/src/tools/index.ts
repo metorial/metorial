@@ -1,4 +1,6 @@
+export * from './cancel-crawl';
 export * from './capture-screenshot';
+export * from './download-crawl-artifact';
 export * from './extract-data';
 export * from './get-account-info';
 export * from './get-crawl-results';

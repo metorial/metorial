@@ -22,9 +22,9 @@ Use this to assess the reputation of a network range.`,
     'Free accounts are limited to /24 subnets; paid plans support up to /16.'
   ],
   constraints: [
-    'Free tier: maximum /24 subnet size',
-    'Basic tier: maximum /20 subnet size',
-    'Premium tier: maximum /16 subnet size'
+    'Free tier: maximum /24 subnet size and 30-day lookback',
+    'Basic tier: maximum /20 subnet size and 60-day lookback',
+    'Premium tier: maximum /16 subnet size and 365-day lookback'
   ],
   tags: {
     readOnly: true

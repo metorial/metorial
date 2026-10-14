@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,8 +20,14 @@ export let manageTimerTool = SlateTool.create(spec, {
       action: z
         .enum(['start', 'pause', 'resume', 'get', 'add_time'])
         .describe('Timer action to perform'),
+      soundEnabled: z
+        .boolean()
+        .optional()
+        .describe('Play a sound when a started timer ends; defaults to true'),
       durationInSeconds: z
         .number()
+        .min(1)
+        .max(5400)
         .optional()
         .describe('Timer duration in seconds (required for "start")'),
       extraTimeInSeconds: z
@@ -38,15 +44,15 @@ export let manageTimerTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let { muralId, action, durationInSeconds, extraTimeInSeconds } = ctx.input;
+    let client = new Client(ctx.auth);
+    let { muralId, action, durationInSeconds, extraTimeInSeconds, soundEnabled } = ctx.input;
     let timer: any;
 
     switch (action) {
       case 'start':
-        if (!durationInSeconds)
-          throw new Error('durationInSeconds is required for starting a timer');
-        timer = await client.startTimer(muralId, { durationInSeconds });
+        if (durationInSeconds === undefined)
+          throw createApiServiceError('durationInSeconds is required for starting a timer');
+        timer = await client.startTimer(muralId, { durationInSeconds, soundEnabled });
         break;
       case 'pause':
         timer = await client.updateTimer(muralId, { status: 'paused' });
@@ -58,19 +64,33 @@ export let manageTimerTool = SlateTool.create(spec, {
         timer = await client.getTimer(muralId);
         break;
       case 'add_time':
-        if (!extraTimeInSeconds)
-          throw new Error('extraTimeInSeconds is required for adding time');
+        if (extraTimeInSeconds === undefined)
+          throw createApiServiceError('extraTimeInSeconds is required for adding time');
         timer = await client.updateTimer(muralId, { extraTimeInSeconds });
         break;
     }
 
+    let elapsedTimeInSeconds = Math.max(
+      0,
+      ((timer.pausedTimestamp ?? timer.now) - timer.initialTimestamp) / 1000
+    );
+    let remainingTimeInSeconds = Math.max(
+      0,
+      timer.remainingSeconds ?? timer.duration - elapsedTimeInSeconds
+    );
+    let status =
+      remainingTimeInSeconds <= 0
+        ? 'inactive'
+        : timer.pausedTimestamp != null
+          ? 'paused'
+          : 'running';
     return {
       output: {
-        status: timer?.status,
-        remainingTimeInSeconds: timer?.remainingTimeInSeconds,
-        totalDurationInSeconds: timer?.totalDurationInSeconds
+        status,
+        remainingTimeInSeconds,
+        totalDurationInSeconds: timer?.duration
       },
-      message: `Timer ${action}: status is **${timer?.status || 'unknown'}**.`
+      message: `Timer ${action}: status is **${status}**.`
     };
   })
   .build();
@@ -83,7 +103,11 @@ export let managePrivateModeTool = SlateTool.create(spec, {
   .input(
     z.object({
       muralId: z.string().describe('ID of the mural'),
-      action: z.enum(['start', 'end', 'get']).describe('Private mode action to perform')
+      action: z.enum(['start', 'end', 'get']).describe('Private mode action to perform'),
+      hideAuthors: z
+        .boolean()
+        .optional()
+        .describe('Hide content authors when starting private mode; defaults to false')
     })
   )
   .output(
@@ -93,13 +117,13 @@ export let managePrivateModeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { muralId, action } = ctx.input;
     let result: any;
 
     switch (action) {
       case 'start':
-        result = await client.startPrivateMode(muralId);
+        result = await client.startPrivateMode(muralId, ctx.input.hideAuthors);
         break;
       case 'end':
         result = await client.endPrivateMode(muralId);
@@ -112,7 +136,10 @@ export let managePrivateModeTool = SlateTool.create(spec, {
     return {
       output: {
         active: result?.active ?? result?.status === 'active',
-        startedOn: result?.startedOn
+        startedOn:
+          typeof result?.initialTimestamp === 'number'
+            ? new Date(result.initialTimestamp).toISOString()
+            : undefined
       },
       message: `Private mode ${action}: **${result?.active || result?.status === 'active' ? 'active' : 'inactive'}**.`
     };
@@ -145,7 +172,7 @@ export let getChatHistoryTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let messages = await client.getChat(ctx.input.muralId);
 
     let mapped = (messages || []).map((m: any) => ({

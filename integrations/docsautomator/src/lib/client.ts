@@ -1,15 +1,43 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export interface DocumentResult {
+  message?: string | null;
+  pdfUrl?: string | null;
+  documentName?: string | null;
+  googleDocUrl?: string | null;
+  savePdfGoogleDriveFolderId?: string | null;
+  savePdfGoogleDriveFileId?: string | null;
+  signingSessionId?: string | null;
+  jobId?: string | null;
+}
+
+export interface JobResult extends DocumentResult {
+  status?: string | null;
+  progress?: number | null;
+  error?: string | null;
+  result?: DocumentResult | null;
+}
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    let token = config.token?.trim();
+    if (!token || /[\r\n]/.test(token)) {
+      throw createApiServiceError(
+        'A valid DocsAutomator API key is required. Reconnect with your workspace API key.'
+      );
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.docsautomator.co',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 310000,
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'DocsAutomator',
+          reason: 'docsautomator_api_error'
+        })
     });
   }
 
@@ -21,16 +49,18 @@ export class Client {
     documentName?: string;
     data?: Record<string, unknown>;
     recId?: string;
-    rowId?: number;
+    rowNumber?: number;
     taskId?: string;
     webhookParams?: Record<string, unknown>;
+    async?: boolean;
+    skipEsign?: boolean;
   }) {
-    let response = await this.axios.post('/createDocument', params);
+    let response = await this.axios.post<DocumentResult>('/createDocument', params);
     return response.data;
   }
 
   async getJobStatus(jobId: string) {
-    let response = await this.axios.get(`/job/${jobId}`);
+    let response = await this.axios.get<JobResult>(`/job/${encodeURIComponent(jobId)}`);
     return response.data;
   }
 
@@ -114,29 +144,47 @@ export class Client {
   }
 
   async getEsignSession(sessionId: string) {
-    let response = await this.axios.get(`/esign/sessions/${sessionId}`);
+    let response = await this.axios.get(`/esign/sessions/${encodeURIComponent(sessionId)}`);
     return response.data;
   }
 
   async getEsignSessionLinks(sessionId: string) {
-    let response = await this.axios.get(`/esign/sessions/${sessionId}/links`);
+    let response = await this.axios.get(
+      `/esign/sessions/${encodeURIComponent(sessionId)}/links`
+    );
     return response.data;
   }
 
   async getEsignSessionAudit(sessionId: string) {
-    let response = await this.axios.get(`/esign/sessions/${sessionId}/audit`);
+    let response = await this.axios.get(
+      `/esign/sessions/${encodeURIComponent(sessionId)}/audit`
+    );
     return response.data;
   }
 
   async cancelEsignSession(sessionId: string, reason?: string) {
-    let response = await this.axios.post(`/esign/sessions/${sessionId}/cancel`, {
-      reason
-    });
+    let response = await this.axios.post(
+      `/esign/sessions/${encodeURIComponent(sessionId)}/cancel`,
+      {
+        reason
+      }
+    );
     return response.data;
   }
 
   async resendEsignInvitation(sessionId: string, signerIndex: number) {
-    let response = await this.axios.post(`/esign/sessions/${sessionId}/resend/${signerIndex}`);
+    let response = await this.axios.post(
+      `/esign/sessions/${encodeURIComponent(sessionId)}/resend/${signerIndex}`
+    );
+    return response.data;
+  }
+
+  async sendTestEmail(automationId: string, recipient: string) {
+    let response = await this.axios.post<{
+      success?: boolean;
+      message?: string;
+      rateLimit?: { remaining?: number; resetAt?: string };
+    }>('/sendTestEmail', { automationId, recipient });
     return response.data;
   }
 }

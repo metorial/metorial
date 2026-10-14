@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieve CraftMyPDF account details including account name, remaining credits, team information, and subscription level.`,
+  description: `Retrieve the connected CraftMyPDF account username, quota counters, template limits, and creation date. Additional account details are included when available.`,
   tags: {
     readOnly: true
   }
@@ -15,9 +15,18 @@ export let getAccountInfo = SlateTool.create(spec, {
   .output(
     z.object({
       accountName: z.string().describe('Name of the account.'),
-      credits: z.number().describe('Remaining API credits.'),
-      teamId: z.string().describe('Team identifier.'),
-      subscription: z.string().describe('Current subscription level.')
+      credits: z.number().optional().describe('Remaining API credits when provided.'),
+      teamId: z.string().optional().describe('Team identifier when provided.'),
+      subscription: z
+        .string()
+        .optional()
+        .describe('Current subscription level when provided.'),
+      username: z.string().describe('Username of the connected account.'),
+      quotaCounter: z.number().describe('Current quota counter.'),
+      quotaMax: z.number().describe('Maximum account quota.'),
+      templateCounter: z.number().describe('Current template count.'),
+      templateMax: z.number().describe('Maximum template count.'),
+      createdAt: z.string().describe('Account creation timestamp.')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,12 +39,18 @@ export let getAccountInfo = SlateTool.create(spec, {
 
     return {
       output: {
-        accountName: result.account_name,
+        accountName: result.account_name ?? result.username,
         credits: result.credits,
         teamId: result.team_id,
-        subscription: result.subscription
+        subscription: result.subscription,
+        username: result.username,
+        quotaCounter: result.quota_counter,
+        quotaMax: result.quota_max,
+        templateCounter: Number(result.template_counter),
+        templateMax: result.template_max,
+        createdAt: result.created_at
       },
-      message: `Account **${result.account_name}** — ${result.credits} credits remaining (${result.subscription}).`
+      message: `Connected CraftMyPDF account **${result.username}**; quota counter ${result.quota_counter} of ${result.quota_max}.`
     };
   })
   .build();

@@ -1,97 +1,40 @@
-Now let me get more details from the BugHerd API documentation page:# Slates Specification for Bugherd
-
-## Overview
-
-BugHerd is a visual feedback and bug tracking tool for websites. It allows users (including clients) to pin feedback directly on web pages, which is then organized into a Kanban-style task board for project teams to manage and resolve.
+# BugHerd integration specification
 
 ## Authentication
 
-BugHerd uses basic HTTP authentication with the API key as user and 'x' as password. All requests must use HTTPS.
+Uses BugHerd API v2 at `https://www.bugherd.com/api_v2` with HTTP Basic authentication: the API key is the username and `x` is the password. Find the organization API key in **Settings > General**. `get_organization` reads the authenticated organization's ID and name; connection profiles use the same endpoint.
 
-To use the BugHerd API, generate an API key for your organization from within the application, under **Settings > General Settings**.
+## Projects and users
 
-The API key is organization-scoped. When making requests, pass the API key as the username and the literal string `x` as the password in the HTTP Basic Auth header. For example:
+- `list_projects` lists projects, optionally restricting them to active projects or a user discovered with `list_users`. `page` starts at 1 and returns up to 100 projects. `createdSince` is available with `userId`.
+- `get_project` returns settings, members, and guests. `create_project`, `update_project`, and `delete_project` manage projects. Deleting a project permanently removes its associated data.
+- `update_project.permission` retains `guests_see_guests` and `guests_see_self` and maps them to BugHerd's boolean `guests_see_guests`. Existing member and guest additions remain available.
+- `list_users` lists all users, members, or guests/clients. `page` starts at 1 and returns up to 100 users. `updatedSince` is supported only with role `all`. User timestamps are returned when the API supplies them.
 
-```
-curl -u YOUR_API_KEY:x https://www.bugherd.com/api_v2/organization.json
-```
+## Tasks
 
-There is no OAuth support or token-based authentication. Only API key authentication via HTTP Basic Auth is available.
+- `list_tasks` lists project tasks by category (`all`, `feedback`, `archived`, or `taskboard`). It supports existing status, priority, tag, assignee, external ID, date, and page fields. Task pages contain up to 100 records. Where returned, `totalCount` uses the provider's count across pages.
+- `list_user_tasks` lists tasks assigned to a user across projects, with documented priority, tag, assignee, date, and page filters.
+- `get_task` looks up a global task ID, optionally scoped to a project. `get_task_by_local_id` resolves the project-scoped task number (`#number` in the UI) to its global task ID.
+- `create_task` and `update_task` retain priority values `not set`, `critical`, `important`, `normal`, and `minor`. Status remains a string so custom column names are supported.
+- `update_task.assignedToId: null` unassigns all users. `unassignUserId` removes one assignee. An update must contain at least one changed field.
+- `move_tasks` sends project-scoped `localTaskId` values as `task_ids` to `/projects/{project_id}/move_tasks.json`, with `targetProjectId` mapped to `destination_project_id`. The endpoint may be unavailable for some accounts; contact BugHerd support on 404.
 
-## Features
+## Comments, attachments, and columns
 
-### Organization Management
+- `list_comments` and `create_comment` retain task IDs from the request when a comment response omits `task_id`. Comments can be attributed by user ID or email and marked private.
+- `list_attachments`, `add_attachment`, and `delete_attachment` manage task file metadata. `add_attachment` asks BugHerd to fetch a file from its publicly accessible URL. Direct file upload and downloading are not exposed.
+- `list_columns` includes built-in and custom columns. `create_column` and `update_column` manage custom column names. A legacy `sortorder` field is returned when present, otherwise null.
 
-Retrieve details about your BugHerd account/organization, including account-level information.
+## API behavior and limits
 
-### User Management
+Provider failures are normalized to service errors. Requests use a 30-second timeout. BugHerd documents a sustained limit of 60 requests per minute plus a burst allowance of 10. List endpoints use pages starting at 1; an empty page signals the end.
 
-- List all users (members and clients/guests) in your organization.
-- View tasks assigned to or created by a specific user.
-- View projects a specific user has access to.
-- Filter user tasks by date, priority, tag, or assignee.
+The ID and page schemas updated in this refresh accept JSON numbers and require positive safe whole numbers at runtime. All original tool keys and enum values are retained. No webhook or trigger changes are included.
 
-### Project Management
+## Sources
 
-- Create, update, and delete projects. Projects are associated with a website URL.
-- List all projects or only active ones.
-- Add members (team users) and guests/clients to projects.
-- Configure project settings such as public feedback, guest visibility, and active status.
-- **Consideration:** Deleting a project permanently removes all associated data and cannot be undone.
+- [BugHerd API reference](https://docs.bugherd.com/api)
+- [Official OpenAPI specification](https://docs.bugherd.com/api/openapi.yaml)
 
-### Task Management
-
-- Create, update, and list tasks (bugs/feedback) within projects.
-- Tasks support properties including description, priority (critical, important, normal, minor), status, tags, assignee, requester, and an external ID for cross-system tracking.
-- List tasks by category: all tasks, feedback-only, archived, or taskboard view.
-- Filter tasks by status, priority, tag, assignee, external ID, and date ranges.
-- Move tasks between projects in bulk.
-- **Consideration:** Projects with custom columns extend the default status values (backlog, todo, doing, done, closed) with custom column names. Integrations must handle dynamic status values.
-
-### Custom Columns (Kanban Board)
-
-- Create, update, list, and view custom columns on a project's task board.
-- Allows customizing the workflow beyond the default columns.
-
-### Comments
-
-- List and create comments on tasks.
-- Comments can be posted on behalf of a specific user (by user ID or email).
-- Comments can be marked as private (members only) or visible to everyone.
-
-### Attachments
-
-- List, view, create, upload, and delete file attachments on tasks.
-- Attachments can be added via URL or direct file upload.
-- **Consideration:** Direct uploads must be reasonably small (roughly within a 30-second request window). For larger files, host externally and attach via URL.
-
-## Events
-
-BugHerd supports webhooks for real-time event notifications. When installing a webhook, specify an event you wish to hook into. Choose from: "project_create", "task_create", "task_update", "comment" or "task_destroy".
-
-### Project Created
-
-Fires when a new project is created in BugHerd.
-
-### Task Created
-
-Fires when a new task (bug/feedback item) is created within a project.
-
-### Task Updated
-
-Fires when an existing task is modified (e.g., status change, reassignment, priority change).
-
-### Task Destroyed
-
-Fires when a task is deleted.
-
-### Comment Created
-
-Fires when a new comment is added to a task.
-
-**Configuration options:**
-
-- **project_id** (optional): Scope the webhook to a specific project. If omitted, the webhook fires for activity across all projects in the organization.
-- **target_url** (required): The URL that BugHerd will POST event data to.
-- Each webhook subscription covers a single event type. To listen to multiple events, create a separate webhook for each.
-- When a webhook is returned a 410 (Gone) HTTP error code, it is interpreted as an explicit instruction that the webhook is pointing to an incorrect target and will result in the webhook being removed automatically.
+The OpenAPI overview and individual operations disagree about task, column, and comment deletion. No new deletion tools were added without resolving that discrepancy.

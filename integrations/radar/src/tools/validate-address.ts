@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RadarClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,9 @@ export let validateAddressTool = SlateTool.create(spec, {
   name: 'Validate Address',
   key: 'validate_address',
   description: `Validate and standardize a postal address. Returns the validated address with standardized formatting and verification status. Useful for ensuring address correctness before shipping, delivery, or record storage.`,
-  constraints: ['Rate limited to 100 requests per second.'],
+  constraints: [
+    'Available for US and Canada addresses for enterprise customers. Default rate limit is 25 requests per second.'
+  ],
   tags: {
     readOnly: true
   }
@@ -47,6 +49,11 @@ export let validateAddressTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.addressLabel && (!ctx.input.number || !ctx.input.street)) {
+      throw createApiServiceError(
+        'Provide addressLabel or both number and street to validate an address.'
+      );
+    }
     let client = new RadarClient({ token: ctx.auth.token });
     let result = await client.validateAddress({
       city: ctx.input.city,
@@ -60,6 +67,7 @@ export let validateAddressTool = SlateTool.create(spec, {
     });
 
     let a = result.address || result.addresses?.[0] || {};
+    let verificationStatus = result.result?.verificationStatus ?? a.verificationStatus;
 
     return {
       output: {
@@ -74,11 +82,11 @@ export let validateAddressTool = SlateTool.create(spec, {
           stateCode: a.stateCode,
           postalCode: a.postalCode,
           countryCode: a.countryCode,
-          verificationStatus: a.verificationStatus
+          verificationStatus
         }
       },
       message: a.formattedAddress
-        ? `Address validated: **${a.formattedAddress}**${a.verificationStatus ? ` (${a.verificationStatus})` : ''}.`
+        ? `Address validated: **${a.formattedAddress}**${verificationStatus ? ` (${verificationStatus})` : ''}.`
         : `Address validation returned no results.`
     };
   })

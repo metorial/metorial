@@ -1,70 +1,57 @@
-Now let me check the webhooks guide and the authentication details more specifically:Now let me check if there's a webhooks guide:Let me check the Zapier integration to understand what triggers/events LeadBoxer natively supports:Now I have enough information to write the specification. Let me also check the legacy API endpoint structure and the management API for lead assignment:
+# LeadBoxer integration
 
-# Slates Specification for LeadBoxer
+LeadBoxer identifies website visitors and enriches company and contact records with behavioral and firmographic data.
 
-## Overview
+## Authentication and datasets
 
-LeadBoxer is a B2B lead generation and intelligence platform that identifies website visitors, enriches lead data with firmographic information, and scores/qualifies leads for sales teams. LeadBoxer is a Lead Data Platform, to identify, qualify and manage leads. It provides APIs for tracking behavioral events, looking up company data by IP or domain, and retrieving lead/session information.
+The App and Lookup APIs use `x-api-key` authentication at `https://api.leadboxer.com`. Lead details and dataset discovery additionally require the email address of the account that owns the key. Save this as `accountEmail` with the connection or supply it to the relevant tool; it is distinct from a lead’s email address.
 
-## Authentication
+Connection setup does not require an opaque dataset ID. Use `list_datasets` to discover accessible IDs and pass `datasetId` to scoped tools. Existing saved dataset configuration remains a fallback. Lookup operations can omit the dataset to use an account-linked default.
 
-LeadBoxer uses API key authentication. The API is stateless – all requests are validated against an API key (token).
+## Tools
 
-**API Key via Header (new API):**
+| Key | Purpose | Provider operation |
+| --- | --- | --- |
+| `get_leads` | Filter and paginate identified leads | `GET /v1/leads` |
+| `get_lead_details` | Retrieve a lead and optionally a page of its sessions | `GET /v1/leads/{leadId}` and `GET /v1/leads/sessions` |
+| `ip_lookup` | Identify the company and location associated with an IP | `GET /v1/ip-lookup` |
+| `domain_lookup` | Enrich a clean domain with company data | `GET /v1/domain-lookup` |
+| `track_event` | Submit behavioral events and profile properties | `GET https://log.leadboxer.com/` |
+| `manage_lead_tags` | Add, remove, or replace a lead’s tags | Retained legacy compatibility route: `GET https://kibana.leadboxer.com/api/management/update_lead_tags`; runtime support is unverified |
+| `list_datasets` | Discover accessible datasets and their names | `GET /v1/users/datasets` |
+| `get_lead_events` | Retrieve events for a session | `GET /v1/leads/events` |
+| `email_lookup` | Enrich a work email with professional profile data | `POST /v1/email-lookup` |
 
-Include your API key in the `x-api-key` request header:
+## Read workflows
 
-```
-x-api-key: YOUR_API_KEY
-```
+`get_leads` defaults to 50 records from the last 30 days. The existing `period` input translates to the provider’s time-filter grammar; day, week, month, and year suffixes use fixed day counts (a month is 30 days and a year is 365 days). `criteriaTimeFilter` overrides `period` for exact date ranges or other provider time filters. The existing `email` input filters lead email addresses using the provider’s text-filter grammar.
 
-**API Key via Query String (legacy API):**
+Lead list responses contain a `data` array and `metaData`. The tool returns normalized leads, their returned count, and available `nextToken` and `totalCount` values. Pass `nextToken` back within 10 minutes to continue.
 
-The API key can also be passed as a query string parameter named `apiKey`, e.g., `?apiKey=YOUR_API_KEY`.
+Pass a returned lead ID (`use_id`) to `get_lead_details`. Set `includeSessions` to retrieve sessions; its default session limit is 100 (maximum 10000). Pass `sessionsNextToken` back as `sessionsPageToken` within 10 minutes to continue. Requested session failures are surfaced rather than presented as an empty history.
 
-**Obtaining Credentials:**
+Use a session ID with `get_lead_events` to retrieve up to 100 event records, preserving provider identifiers, timestamps, custom properties, and query metadata. The API does not document event-page continuation parameters.
 
-1. Log in to your LeadBoxer account at `https://app.leadboxer.com`
-2. Navigate to Integrations > Data to get your API key from `https://app.leadboxer.com/integrations-connectors/data/api-key`.
-3. Copy your API Key and note your Dataset ID. If you're managing multiple datasets, ensure you're selecting the correct ID for your intended workflow.
+## Enrichment and tracking
 
-**Required parameters:**
+Domain lookup maps the provider’s nested `organizationAddress` and `organizationSocialLinks` into the existing address and social output fields. Provider specialty arrays become a comma-separated string to preserve the established output type. Existing optional fields for technologies, revenue, and other legacy attributes remain available when returned; the current domain response does not guarantee them.
 
-- **API Key**: Used for authentication on all API calls.
-- **Dataset ID** (`site`): Identifies which dataset (website/property) to query or send data to. Multiple datasets can be added to one LeadBoxer account. Domains and site sections can be added as separate datasets with different accesses.
+Email enrichment sends email and optional name/company hints in a JSON POST body. A successful match costs 50 credits; unmatched requests are not charged. Other enrichment calls also consume provider credits.
 
-## Features
+Event tracking uses dataset `si`, title `ti`, and the documented `json` return format. User, session, and event identifiers may be supplied through `leadboxerUserId`, `sessionId`, and `eventId`. Custom property names must be ASCII and cannot override dedicated routing or response-format parameters. The existing `rawResponse` is returned unchanged, and plain event-ID responses are also exposed as `eventId`.
 
-### Lead Retrieval and Management
+The existing tag tool retains its legacy route and action inputs for compatibility. An older indexed official guide documents the legacy add/remove parameters and action omission as overwrite; its current runtime support has not been verified. The current official guide documents authenticated `PUT /v1/management/lead-tags` as replacement of the complete tag list. It explains adding or removing a tag by reading the current tags and submitting a revised list. That workflow has not been substituted for the existing tool in this refresh.
 
-Retrieve lists of identified leads/visitors with filtering, sorting, and search capabilities. You can retrieve a list of users using the `GET /api/views/c_view_leads` request, and using available parameters and filters you can customize the output to your needs. Leads can be filtered by criteria such as industry, location, engagement level, and time period. Leads can also be assigned to sales team members via the management API.
+## Official documentation
 
-### Lead Detail and Behavioral Data
-
-LeadBoxer groups received events into sessions and users. A session is made up of a series of events. A user is made up of a series of sessions. A single user can generate multiple sessions. You can retrieve detailed session history and individual events for any lead to build a complete behavioral profile.
-
-### IP Address Lookup (Company Identification)
-
-LeadBoxer's Lookup APIs allow you to enrich your existing data with firmographics, company intelligence, and person-level insights—without using the tracking pixel. Given an IP address, the API returns company domain, company name, industry, employee count, revenue range, location, ISP/type detection, and confidence score.
-
-### Domain/Company Lookup (Data Enrichment)
-
-The Domain Lookup operation transforms a simple domain name into detailed insights about a company, from its size to its technology stack. Given a domain, the API returns company name, employee count, revenue, industry, technologies, location, and more. Useful for enriching CRM records or scoring ICP fit.
-
-### Server-Side Event Tracking
-
-Capture behavioral data from any backend system and send high-quality signals to LeadBoxer. Server-side tracking lets you submit events directly from your backend, application server, automation platform or mobile app. This is ideal for actions that do not occur in a browser. Events are submitted to the ingestion endpoint (`https://log.leadboxer.com/`) with a dataset ID and optional user/session IDs. Any property attached to an event is copied to the user profile, enabling progressive enrichment over time.
-
-- Supports custom properties as name/value pairs on each event.
-- Can be used to track sign-ups, logins, subscription changes, CRM activities, and other backend events.
-- Requires a dataset ID; optionally accepts user ID (`uid`) and session ID (`sid`) to update existing records.
-
-### Lead Enrichment with Custom Properties
-
-You can set the properties of an event. These properties are automatically passed to the parent objects: users and sessions. After inserting an event with property name/value, the session and user will also have this property name/value. This allows progressive enrichment of lead profiles over time by sending events with additional metadata.
-
-## Events
-
-LeadBoxer does not provide a native webhook subscription API for pushing events to external endpoints. The platform's Zapier integration offers a polling-based trigger that triggers when a new lead has been identified. However, this is a Zapier-specific polling mechanism, not a purpose-built webhook or event subscription system within the LeadBoxer API itself.
-
-The provider does not support events.
+- [Authentication](https://developers.leadboxer.com/reference/authentication)
+- [Lead retrieval](https://developers.leadboxer.com/reference/users)
+- [Lead details](https://developers.leadboxer.com/reference/leaddetail)
+- [Lead sessions](https://developers.leadboxer.com/reference/getsessions)
+- [Session events](https://developers.leadboxer.com/reference/getevents)
+- [Datasets](https://developers.leadboxer.com/reference/getuserdatasets)
+- [IP lookup](https://developers.leadboxer.com/reference/lookupip)
+- [Domain lookup](https://developers.leadboxer.com/reference/lookupdomain)
+- [Email lookup](https://developers.leadboxer.com/reference/lookupemail)
+- [Server-side tracking](https://developers.leadboxer.com/docs/server-side-events)
+- [Lead tags](https://help.leadboxer.com/leadboxer/fundamentals/elements/lead-tags)

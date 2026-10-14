@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   addTicketComment,
+  convertEstimateToInvoice,
   createAppointment,
   createAsset,
   createClockEntry,
@@ -30,6 +31,7 @@ import {
   listClockEntries,
   listContacts,
   listTicketComments,
+  listUsers,
   searchAppointments,
   searchAssets,
   searchCustomers,
@@ -48,11 +50,15 @@ import {
   updateInvoice,
   updateLead,
   updateProduct,
-  updateTicket
+  updateTicket,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
+    listUsers,
+    convertEstimateToInvoice,
     searchCustomers,
     getCustomer,
     createCustomer,

@@ -97,49 +97,56 @@ export let getReservation = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ApaleoClient(ctx.auth.token);
-    let r = await client.getReservation(ctx.input.reservationId);
+    let r = await client.getReservation(ctx.input.reservationId, ['booker', 'company']);
 
     let output = {
-      reservationId: r.id,
-      bookingId: r.bookingId,
-      status: r.status,
-      arrival: r.arrival,
-      departure: r.departure,
-      adults: r.adults,
-      childrenAges: r.childrenAges,
-      primaryGuest: r.primaryGuest
-        ? {
-            firstName: r.primaryGuest.firstName,
-            lastName: r.primaryGuest.lastName,
-            email: r.primaryGuest.email,
-            phone: r.primaryGuest.phone
-          }
+      reservationId: r.id ?? undefined,
+      bookingId: r.bookingId ?? undefined,
+      status: r.status ?? undefined,
+      arrival: r.arrival ?? undefined,
+      departure: r.departure ?? undefined,
+      adults: r.adults ?? undefined,
+      childrenAges: r.childrenAges ?? undefined,
+      primaryGuest:
+        (r.primaryGuest ?? undefined)
+          ? {
+              firstName: r.primaryGuest.firstName ?? undefined,
+              lastName: r.primaryGuest.lastName ?? undefined,
+              email: r.primaryGuest.email ?? undefined,
+              phone: r.primaryGuest.phone ?? undefined
+            }
+          : undefined,
+      booker:
+        (r.booker ?? undefined)
+          ? {
+              firstName: r.booker.firstName ?? undefined,
+              lastName: r.booker.lastName ?? undefined,
+              email: r.booker.email ?? undefined
+            }
+          : undefined,
+      property: r.property
+        ? { propertyId: r.property.id ?? undefined, name: r.property.name ?? undefined }
         : undefined,
-      booker: r.booker
-        ? {
-            firstName: r.booker.firstName,
-            lastName: r.booker.lastName,
-            email: r.booker.email
-          }
+      unitGroup:
+        (r.unitGroup ?? undefined)
+          ? { unitGroupId: r.unitGroup.id ?? undefined, name: r.unitGroup.name ?? undefined }
+          : undefined,
+      unit: r.unit
+        ? { unitId: r.unit.id ?? undefined, name: r.unit.name ?? undefined }
         : undefined,
-      property: r.property ? { propertyId: r.property.id, name: r.property.name } : undefined,
-      unitGroup: r.unitGroup
-        ? { unitGroupId: r.unitGroup.id, name: r.unitGroup.name }
-        : undefined,
-      unit: r.unit ? { unitId: r.unit.id, name: r.unit.name } : undefined,
-      totalGrossAmount: r.totalGrossAmount,
-      balance: r.balance,
-      guaranteeType: r.guaranteeType,
-      channelCode: r.channelCode,
-      travelPurpose: r.travelPurpose,
-      comment: r.comment,
-      guestComment: r.guestComment,
+      totalGrossAmount: r.totalGrossAmount ?? undefined,
+      balance: r.balance ?? undefined,
+      guaranteeType: r.guaranteeType ?? undefined,
+      channelCode: r.channelCode ?? undefined,
+      travelPurpose: r.travelPurpose ?? undefined,
+      comment: r.comment ?? undefined,
+      guestComment: r.guestComment ?? undefined,
       companyId: r.company?.id,
-      corporateCode: r.corporateCode,
-      cancellationFee: r.cancellationFee,
-      noShowFee: r.noShowFee,
-      created: r.created,
-      modified: r.modified
+      corporateCode: r.corporateCode ?? undefined,
+      cancellationFee: r.cancellationFee?.fee ?? r.cancellationFee,
+      noShowFee: r.noShowFee?.fee ?? r.noShowFee,
+      created: r.created ?? undefined,
+      modified: r.modified ?? undefined
     };
 
     let guestName =

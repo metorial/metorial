@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SevdeskClient } from '../lib/client';
 import { spec } from '../spec';
@@ -83,6 +83,12 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.contactType === 'person' && !ctx.input.familyName?.trim()) {
+      throw createApiServiceError('familyName is required when creating a person contact.');
+    }
+    if (ctx.input.contactType === 'company' && !ctx.input.companyName?.trim()) {
+      throw createApiServiceError('companyName is required when creating a company contact.');
+    }
     let client = new SevdeskClient({ token: ctx.auth.token });
 
     let contactData: Record<string, any> = {
@@ -134,7 +140,7 @@ export let createContact = SlateTool.create(spec, {
           contact: { id: contactId, objectName: 'Contact' },
           type: cw.type,
           value: cw.value,
-          key: cw.key ? Number.parseInt(cw.key, 10) : 2
+          key: { id: cw.key ?? '2', objectName: 'CommunicationWayKey' }
         });
       }
     }

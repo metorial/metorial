@@ -1,15 +1,64 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://app.scrapingbee.com';
 
+let amazonMarketplaceCountries: Record<string, string> = {
+  com: 'us',
+  ae: 'ae',
+  ca: 'ca',
+  cn: 'cn',
+  'co.jp': 'jp',
+  'co.uk': 'gb',
+  'com.au': 'au',
+  'com.be': 'be',
+  'com.br': 'br',
+  'com.mx': 'mx',
+  'com.tr': 'tr',
+  de: 'de',
+  eg: 'eg',
+  es: 'es',
+  fr: 'fr',
+  in: 'in',
+  it: 'it',
+  nl: 'nl',
+  pl: 'pl',
+  sa: 'sa',
+  se: 'se',
+  sg: 'sg'
+};
+
+let getAmazonLocationParams = (params: { domain?: string; countryCode?: string }) => {
+  let domain = params.domain
+    ?.trim()
+    .toLowerCase()
+    .replace(/^(?:www\.)?amazon\./, '');
+  let country = params.countryCode?.trim().toLowerCase();
+  let marketplace = domain || 'com';
+  if (country && amazonMarketplaceCountries[marketplace] === country) {
+    throw createApiServiceError(
+      `countryCode "${country}" matches the amazon.${marketplace} marketplace. Omit countryCode to use that marketplace's own country.`
+    );
+  }
+  let queryParams: Record<string, string> = {};
+  if (domain) queryParams.domain = domain;
+  if (country) queryParams.country = country;
+  return queryParams;
+};
+
 export class Client {
   private axios;
-  private apiKey: string;
 
   constructor(config: { token: string }) {
-    this.apiKey = config.token;
-    this.axios = createAxios({
-      baseURL: BASE_URL
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${config.token}` },
+      contentType: false,
+      timeout: 145000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ScrapingBee',
+          reason: 'scrapingbee_api_error'
+        })
     });
   }
 
@@ -30,9 +79,10 @@ export class Client {
     timeout?: number;
     ownProxy?: string;
     jsonResponse?: boolean;
+    returnPageText?: boolean;
+    returnPageMarkdown?: boolean;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       url: params.url
     };
 
@@ -47,15 +97,26 @@ export class Client {
     if (params.waitFor) queryParams.wait_for = params.waitFor;
     if (params.returnPageSource !== undefined)
       queryParams.return_page_source = params.returnPageSource;
-    if (params.timeout !== undefined) queryParams.timeout = params.timeout;
+    if (params.timeout !== undefined) {
+      if (params.timeout < 1 || params.timeout > 140) {
+        throw createApiServiceError('Timeout must be between 1 and 140 seconds.');
+      }
+      queryParams.timeout = Math.round(params.timeout * 1000);
+    }
     if (params.ownProxy) queryParams.own_proxy = params.ownProxy;
     if (params.jsonResponse !== undefined) queryParams.json_response = params.jsonResponse;
+    if (params.returnPageText !== undefined)
+      queryParams.return_page_text = params.returnPageText;
+    if (params.returnPageMarkdown !== undefined) {
+      queryParams.return_page_markdown = params.returnPageMarkdown;
+    }
     if (params.forwardHeaders !== undefined)
       queryParams.forward_headers = params.forwardHeaders;
     if (params.cookies) queryParams.cookies = params.cookies;
 
     let headers: Record<string, string> = {};
-    if (params.customHeaders) {
+    if (params.customHeaders && Object.keys(params.customHeaders).length > 0) {
+      queryParams.forward_headers = params.forwardHeaders ?? true;
       for (let [key, value] of Object.entries(params.customHeaders)) {
         headers[`Spb-${key}`] = value;
       }
@@ -64,7 +125,8 @@ export class Client {
     let response = await this.axios.get('/api/v1/', {
       params: queryParams,
       headers,
-      timeout: (params.timeout || 140) * 1000
+      responseType: params.jsonResponse ? 'json' : 'text',
+      timeout: (params.timeout ?? 140) * 1000 + 1000
     });
 
     return response.data;
@@ -81,7 +143,6 @@ export class Client {
     waitFor?: string;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       url: params.url
     };
 
@@ -114,7 +175,6 @@ export class Client {
     waitFor?: string;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       url: params.url
     };
 
@@ -150,7 +210,6 @@ export class Client {
     waitFor?: string;
   }): Promise<string> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       url: params.url,
       screenshot: true
     };
@@ -190,7 +249,6 @@ export class Client {
     jsonResponse?: boolean;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       url: params.url,
       js_scenario: JSON.stringify(params.jsScenario)
     };
@@ -223,11 +281,12 @@ export class Client {
     additionalParams?: Record<string, string>;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       search: params.search
     };
 
-    if (params.searchType) queryParams.search_type = params.searchType;
+    if (params.searchType) {
+      queryParams.search_type = params.searchType === 'search' ? 'classic' : params.searchType;
+    }
     if (params.language) queryParams.language = params.language;
     if (params.countryCode) queryParams.country_code = params.countryCode;
     if (params.location) queryParams.location = params.location;
@@ -235,13 +294,11 @@ export class Client {
     if (params.page !== undefined) queryParams.page = params.page;
     if (params.device) queryParams.device = params.device;
 
-    if (params.additionalParams) {
-      for (let [key, value] of Object.entries(params.additionalParams)) {
-        queryParams[key] = value;
-      }
+    if (params.additionalParams && Object.keys(params.additionalParams).length > 0) {
+      queryParams.extra_params = new URLSearchParams(params.additionalParams).toString();
     }
 
-    let response = await this.axios.get('/api/v1/store/google', {
+    let response = await this.axios.get('/api/v1/google', {
       params: queryParams
     });
 
@@ -260,20 +317,26 @@ export class Client {
     page?: number;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
-      query: params.query
+      query: params.query,
+      ...getAmazonLocationParams(params)
     };
 
-    if (params.domain) queryParams.domain = params.domain;
     if (params.language) queryParams.language = params.language;
-    if (params.countryCode) queryParams.country_code = params.countryCode;
     if (params.device) queryParams.device = params.device;
-    if (params.sortBy) queryParams.sort_by = params.sortBy;
+    if (params.sortBy) {
+      let legacySort: Record<string, string> = {
+        'price-asc-rank': 'price_low_to_high',
+        'price-desc-rank': 'price_high_to_low',
+        'review-rank': 'average_review',
+        'date-desc-rank': 'most_recent'
+      };
+      queryParams.sort_by = legacySort[params.sortBy] ?? params.sortBy;
+    }
     if (params.minPrice !== undefined) queryParams.min_price = params.minPrice;
     if (params.maxPrice !== undefined) queryParams.max_price = params.maxPrice;
     if (params.page !== undefined) queryParams.page = params.page;
 
-    let response = await this.axios.get('/api/v1/store/amazon', {
+    let response = await this.axios.get('/api/v1/amazon/search', {
       params: queryParams
     });
 
@@ -288,19 +351,35 @@ export class Client {
     device?: 'desktop' | 'mobile';
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
-      asin: params.asin
+      query: params.asin,
+      ...getAmazonLocationParams(params)
     };
 
-    if (params.domain) queryParams.domain = params.domain;
     if (params.language) queryParams.language = params.language;
-    if (params.countryCode) queryParams.country_code = params.countryCode;
     if (params.device) queryParams.device = params.device;
 
-    let response = await this.axios.get('/api/v1/store/amazon/product', {
+    let response = await this.axios.get('/api/v1/amazon/product', {
       params: queryParams
     });
 
+    return response.data;
+  }
+
+  async amazonPricing(params: {
+    asin: string;
+    domain?: string;
+    language?: string;
+    countryCode?: string;
+    currency?: string;
+  }): Promise<any> {
+    let queryParams: Record<string, string> = {
+      asin: params.asin,
+      ...getAmazonLocationParams(params)
+    };
+    if (params.language) queryParams.language = params.language;
+    if (params.currency) queryParams.currency = params.currency;
+
+    let response = await this.axios.get('/api/v1/amazon/pricing/', { params: queryParams });
     return response.data;
   }
 
@@ -310,14 +389,22 @@ export class Client {
     page?: number;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       search: params.query
     };
 
-    if (params.uploadDate) queryParams.upload_date = params.uploadDate;
+    if (params.uploadDate) {
+      let uploadDates: Record<string, string> = {
+        hour: 'last_hour',
+        today: 'today',
+        week: 'this_week',
+        month: 'this_month',
+        year: 'this_year'
+      };
+      queryParams.upload_date = uploadDates[params.uploadDate] ?? params.uploadDate;
+    }
     if (params.page !== undefined) queryParams.page = params.page;
 
-    let response = await this.axios.get('/api/v1/store/youtube/search', {
+    let response = await this.axios.get('/api/v1/youtube/search', {
       params: queryParams
     });
 
@@ -326,11 +413,10 @@ export class Client {
 
   async youtubeMetadata(params: { videoId: string }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       video_id: params.videoId
     };
 
-    let response = await this.axios.get('/api/v1/store/youtube/video', {
+    let response = await this.axios.get('/api/v1/youtube/metadata', {
       params: queryParams
     });
 
@@ -339,13 +425,12 @@ export class Client {
 
   async youtubeTranscript(params: { videoId: string; language?: string }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       video_id: params.videoId
     };
 
     if (params.language) queryParams.language = params.language;
 
-    let response = await this.axios.get('/api/v1/store/youtube/transcript', {
+    let response = await this.axios.get('/api/v1/youtube/subtitles', {
       params: queryParams
     });
 
@@ -354,7 +439,6 @@ export class Client {
 
   async youtubeTrainability(params: { videoId: string }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       video_id: params.videoId
     };
 
@@ -376,7 +460,6 @@ export class Client {
     page?: number;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       query: params.query
     };
 
@@ -385,10 +468,10 @@ export class Client {
     if (params.maxPrice !== undefined) queryParams.max_price = params.maxPrice;
     if (params.fulfillmentType) queryParams.fulfillment_type = params.fulfillmentType;
     if (params.fulfillmentSpeed) queryParams.fulfillment_speed = params.fulfillmentSpeed;
-    if (params.domain) queryParams.domain = params.domain;
+    if (params.domain) queryParams.domain = params.domain.replace(/^(?:www\.)?walmart\./i, '');
     if (params.page !== undefined) queryParams.page = params.page;
 
-    let response = await this.axios.get('/api/v1/store/walmart/search', {
+    let response = await this.axios.get('/api/v1/walmart/search', {
       params: queryParams
     });
 
@@ -401,14 +484,13 @@ export class Client {
     storeId?: string;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
-      api_key: this.apiKey,
       product_id: params.productId
     };
 
     if (params.deliveryZip) queryParams.delivery_zip = params.deliveryZip;
     if (params.storeId) queryParams.store_id = params.storeId;
 
-    let response = await this.axios.get('/api/v1/store/walmart/product', {
+    let response = await this.axios.get('/api/v1/walmart/product', {
       params: queryParams
     });
 
@@ -416,11 +498,7 @@ export class Client {
   }
 
   async getUsage(): Promise<any> {
-    let response = await this.axios.get('/api/v1/usage', {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.get('/api/v1/usage');
 
     return response.data;
   }

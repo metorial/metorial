@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,7 @@ export let manageCollection = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!collectionId) throw new Error('collectionId is required for delete');
+      if (!collectionId) throw createApiServiceError('collectionId is required for delete');
       await client.deleteCollection(collectionId);
       return {
         output: { deleted: true },
@@ -76,7 +76,7 @@ export let manageCollection = SlateTool.create(spec, {
       };
     }
 
-    if (!collectionId) throw new Error('collectionId is required for update');
+    if (!collectionId) throw createApiServiceError('collectionId is required for update');
     let collection = await client.updateCollection(collectionId, params);
     return {
       output: { collection },

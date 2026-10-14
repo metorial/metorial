@@ -6,6 +6,8 @@ import {
   getFeatureFlag,
   listEnvironments,
   listFeatureFlags,
+  listFlagDefinitions,
+  listRolloutStatuses,
   listSegments,
   listTrafficTypes,
   listWorkspaces,
@@ -20,6 +22,8 @@ export let provider = Slate.create({
   spec,
   tools: [
     listFeatureFlags,
+    listFlagDefinitions,
+    listRolloutStatuses,
     getFeatureFlag,
     createFeatureFlag,
     updateFeatureFlag,

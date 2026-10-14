@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,8 +18,8 @@ Returns resource details including name, email, status, role, and custom fields.
         .string()
         .optional()
         .describe('Specific resource ID to retrieve. If omitted, lists all resources.'),
-      page: z.number().optional().describe('Page number for pagination (0-based)'),
-      limit: z.number().optional().describe('Number of resources per page')
+      page: z.number().min(0).optional().describe('Page number for pagination (0-based)'),
+      limit: z.number().min(1).max(1000).optional().describe('Number of resources per page')
     })
   )
   .output(
@@ -33,6 +33,7 @@ Returns resource details including name, email, status, role, and custom fields.
             email: z.string().optional().describe('Email address'),
             status: z.string().optional().describe('Resource status'),
             role: z.string().optional().describe('Role'),
+            customFields: z.array(z.any()).optional().describe('Resource custom fields'),
             metadata: z.string().optional().describe('Custom metadata'),
             createdDate: z.string().optional().describe('Creation timestamp'),
             updatedDate: z.string().optional().describe('Last update timestamp')
@@ -42,6 +43,12 @@ Returns resource details including name, email, status, role, and custom fields.
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.page !== undefined && !Number.isInteger(ctx.input.page)) {
+      throw createApiServiceError('page must be a whole number starting at 0.');
+    }
+    if (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) {
+      throw createApiServiceError('limit must be a whole number between 1 and 1000.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.resourceId) {
@@ -51,14 +58,15 @@ Returns resource details including name, email, status, role, and custom fields.
           resources: [
             {
               resourceId: resource._id,
-              firstName: resource.firstName,
-              lastName: resource.lastName,
-              email: resource.email,
-              status: resource.status,
-              role: resource.role,
-              metadata: resource.metadata,
-              createdDate: resource.createdDate,
-              updatedDate: resource.updatedDate
+              firstName: resource.firstName ?? undefined,
+              lastName: resource.lastName ?? undefined,
+              email: resource.email ?? undefined,
+              status: resource.status ?? undefined,
+              role: resource.role ?? undefined,
+              customFields: resource.customFields ?? undefined,
+              metadata: resource.metadata ?? undefined,
+              createdDate: resource.createdDate ?? undefined,
+              updatedDate: resource.updatedDate ?? undefined
             }
           ]
         },
@@ -71,14 +79,15 @@ Returns resource details including name, email, status, role, and custom fields.
       output: {
         resources: resources.map((r: any) => ({
           resourceId: r._id,
-          firstName: r.firstName,
-          lastName: r.lastName,
-          email: r.email,
-          status: r.status,
-          role: r.role,
-          metadata: r.metadata,
-          createdDate: r.createdDate,
-          updatedDate: r.updatedDate
+          firstName: r.firstName ?? undefined,
+          lastName: r.lastName ?? undefined,
+          email: r.email ?? undefined,
+          status: r.status ?? undefined,
+          role: r.role ?? undefined,
+          customFields: r.customFields ?? undefined,
+          metadata: r.metadata ?? undefined,
+          createdDate: r.createdDate ?? undefined,
+          updatedDate: r.updatedDate ?? undefined
         }))
       },
       message: `Retrieved **${resources.length}** resources.`

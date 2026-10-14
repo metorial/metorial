@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDataset = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let manageDataset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       action: z
         .enum(['create', 'update', 'delete', 'upload_version'])
         .describe('Action to perform'),
@@ -51,27 +53,28 @@ export let manageDataset = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a dataset');
+      if (!ctx.input.name) throw createApiServiceError('Name is required to create a dataset');
       let dataset = await client.createDataset({
         name: ctx.input.name,
         description: ctx.input.description
       });
       return {
         output: {
-          datasetId: dataset.id,
-          name: dataset.name,
-          description: dataset.description
+          datasetId: dataset.id ?? undefined,
+          name: dataset.name ?? undefined,
+          description: dataset.description ?? undefined
         },
         message: `Dataset **${dataset.name || ctx.input.name}** created.`
       };
     }
 
-    if (!ctx.input.datasetId) throw new Error('datasetId is required for this action');
+    if (!ctx.input.datasetId)
+      throw createApiServiceError('datasetId is required for this action');
 
     if (ctx.input.action === 'delete') {
       await client.deleteDataset(ctx.input.datasetId);
@@ -82,9 +85,14 @@ export let manageDataset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'upload_version') {
-      let content = ctx.input.csvContent || ctx.input.tsvContent;
+      if (ctx.input.csvContent !== undefined && ctx.input.tsvContent !== undefined) {
+        throw createApiServiceError('Provide either csvContent or tsvContent, not both.');
+      }
+      let content = ctx.input.csvContent ?? ctx.input.tsvContent;
       if (!content)
-        throw new Error('csvContent or tsvContent is required to upload a version');
+        throw createApiServiceError(
+          'csvContent or tsvContent is required to upload a version'
+        );
       let mediaType = ctx.input.tsvContent ? 'text/tab-separated-values' : 'text/csv';
       await client.uploadDatasetVersion(ctx.input.datasetId, content, mediaType);
       return {

@@ -1,6 +1,4 @@
-Now let me get more details on the features available:Now let me check the remaining features - inbox, mailboxes, reports, blacklist, manual tasks, and LinkedIn accounts:I now have sufficient information to write the specification. Let me compile it.
-
-# Slates Specification for Woodpecker Co
+# Woodpecker Co API Specification
 
 ## Overview
 

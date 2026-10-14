@@ -1,11 +1,39 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let http = createAxios({
-  baseURL: 'https://gateway.datagma.net'
+  baseURL: 'https://gateway.datagma.net',
+  errorMapping: {
+    mapAxiosError: error => {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Datagma',
+        reason: 'datagma_api_error',
+        nestedKeys: ['errors', 'details'],
+        extractUpstreamCode: (_error, response) => {
+          let data = response?.data;
+          if (
+            isApiErrorRecord(data) &&
+            (typeof data.code === 'string' || typeof data.code === 'number')
+          ) {
+            return String(data.code);
+          }
+          return undefined;
+        }
+      });
+    }
+  }
 });
 
 export class Client {
-  constructor(private apiId: string) {}
+  constructor(private apiId: string) {
+    if (!apiId.trim()) {
+      throw createApiServiceError('A Datagma API key is required. Reconnect your account.');
+    }
+  }
 
   private params(extra: Record<string, string | number | boolean | undefined> = {}) {
     let params: Record<string, string | number | boolean> = { apiId: this.apiId };
@@ -63,7 +91,31 @@ export class Client {
         company: options.company,
         findEmailV2Step: options.findEmailV2Step,
         findEmailV2Country: options.findEmailV2Country,
-        linkedInSlug: options.linkedInSlug
+        linkedInSlug: this.companyLinkedInUrl(options.linkedInSlug)
+      })
+    });
+    return response.data;
+  }
+
+  private companyLinkedInUrl(value?: string) {
+    if (!value || value.includes('/')) return value;
+    return `https://www.linkedin.com/company/${encodeURIComponent(value)}`;
+  }
+
+  async findVerifiedEmail(options: {
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    company?: string;
+    linkedInSlug?: string;
+  }) {
+    let response = await http.get('/api/ingress/v8/findEmail', {
+      params: this.params({
+        fullName: options.fullName,
+        firstName: options.firstName,
+        lastName: options.lastName,
+        company: options.company,
+        linkedInSlug: this.companyLinkedInUrl(options.linkedInSlug)
       })
     });
     return response.data;

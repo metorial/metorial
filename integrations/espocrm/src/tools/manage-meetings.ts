@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -49,6 +49,7 @@ export let manageMeetings = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let { action, meetingId, customFields, ...fields } = ctx.input;
+    if (fields.duration !== undefined) fields.duration *= 60;
 
     if (action === 'create') {
       let data: Record<string, any> = { ...fields, ...customFields };
@@ -56,21 +57,21 @@ export let manageMeetings = SlateTool.create(spec, {
       return {
         output: {
           meetingId: result.id,
-          name: result.name,
-          status: result.status,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Meeting **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!meetingId) throw new Error('meetingId is required for update');
+      if (!meetingId) throw createApiServiceError('meetingId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -79,21 +80,21 @@ export let manageMeetings = SlateTool.create(spec, {
       return {
         output: {
           meetingId: result.id,
-          name: result.name,
-          status: result.status,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Meeting **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!meetingId) throw new Error('meetingId is required for delete');
+      if (!meetingId) throw createApiServiceError('meetingId is required for delete');
       await client.deleteRecord('Meeting', meetingId);
       return {
         output: {
@@ -103,6 +104,6 @@ export let manageMeetings = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

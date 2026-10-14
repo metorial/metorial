@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,8 +39,10 @@ export let getIssueTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (!ctx.input.issueId && !ctx.input.issueNumber) {
-      throw new Error('Either issueId or issueNumber must be provided');
+    if (ctx.input.issueId === undefined && !ctx.input.issueNumber?.trim()) {
+      throw createApiServiceError('Either issueId or issueNumber must be provided', {
+        reason: 'missing_issue_identifier'
+      });
     }
 
     let response: any;
@@ -50,25 +52,34 @@ export let getIssueTool = SlateTool.create(spec, {
       response = await client.getIssue(ctx.input.issueId!);
     }
 
-    let issue = response.data;
+    let raw = response.data;
+    let issue = raw?.data ?? raw;
+    let issueId = raw?.id ?? issue?.id;
+    if (typeof issueId !== 'number') {
+      throw createApiServiceError('Leiga did not return the requested issue details.', {
+        reason: 'invalid_issue_response'
+      });
+    }
+    let text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+    let number = (value: unknown) => (typeof value === 'number' ? value : undefined);
 
     return {
       output: {
-        issueId: issue.id,
-        issueNumber: issue.number,
-        summary: issue.summary,
-        description: issue.description,
-        projectId: issue.project?.id,
-        projectName: issue.project?.name,
-        typeName: issue.type?.name,
-        statusName: issue.status?.name,
-        priorityName: issue.priority?.name,
-        assigneeName: issue.assignee?.name,
-        ownerName: issue.owner?.name,
-        createdAt: issue.createTime ? String(issue.createTime) : undefined,
-        updatedAt: issue.updateTime ? String(issue.updateTime) : undefined,
-        url: issue.url,
-        raw: issue
+        issueId,
+        issueNumber: number(issue.issueNumber ?? issue.number),
+        summary: text(issue.summary),
+        description: text(issue.description),
+        projectId: number(raw.projectId ?? issue.projectId ?? issue.project?.id),
+        projectName: text(issue.project?.name),
+        typeName: text(issue.issueTypeIdVO?.name ?? issue.type?.name),
+        statusName: text(issue.statusVO?.name ?? issue.status?.name),
+        priorityName: text(issue.priorityVO?.name ?? issue.priority?.name),
+        assigneeName: text(issue.assigneeVO?.name ?? issue.assignee?.name),
+        ownerName: text(issue.ownerVO?.name ?? issue.owner?.name),
+        createdAt: raw.createTime == null ? undefined : String(raw.createTime),
+        updatedAt: raw.updateTime == null ? undefined : String(raw.updateTime),
+        url: text(issue.url),
+        raw
       },
       message: `Retrieved issue **${issue.summary || issue.id}**.`
     };

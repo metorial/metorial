@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDomains = SlateTool.create(spec, {
   name: 'Manage Domains',
   key: 'manage_domains',
-  description: `List, add, or remove custom domains for an application. After adding a new domain, you may need to update the SSL certificate using the Manage SSL tool.`,
+  description: `List, add, or remove custom domains for an application. After adding a new domain, you may need to update the SSL certificate using the Manage SSL tool.
+${organizationScopeGuidance}`,
   instructions: [
     'After adding a domain, use the Manage SSL tool with action "update" to refresh the SSL certificate.'
   ],
@@ -17,7 +19,7 @@ export let manageDomains = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       applicationId: z.string().describe('Application ID'),
       action: z.enum(['list', 'add', 'remove']).describe('Action to perform'),
@@ -37,7 +39,8 @@ export let manageDomains = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, applicationId, action } = ctx.input;
 
@@ -50,7 +53,7 @@ export let manageDomains = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!ctx.input.domain) throw new Error('domain is required for add action');
+      if (!ctx.input.domain) throw createApiServiceError('domain is required for add action');
       let result = await client.addDomain(orgId, serverId, applicationId, ctx.input.domain);
       return {
         output: {
@@ -63,7 +66,8 @@ export let manageDomains = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!ctx.input.domainId) throw new Error('domainId is required for remove action');
+      if (!ctx.input.domainId)
+        throw createApiServiceError('domainId is required for remove action');
       let result = await client.removeDomain(
         orgId,
         serverId,
@@ -80,6 +84,6 @@ export let manageDomains = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -25,7 +25,7 @@ export let deleteLipsyncs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.deleteLipsyncs(ctx.input.inferenceIds);
 
     return {

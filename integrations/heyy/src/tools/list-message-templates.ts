@@ -34,18 +34,18 @@ export let listMessageTemplatesTool = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listMessageTemplates();
 
-    let templates = (Array.isArray(result) ? result : (result?.templates ?? [])).map(
-      (t: any) => ({
-        templateId: t.id,
-        name: t.name,
-        status: t.status,
-        category: t.category ?? null,
-        language: t.language ?? null,
-        components: t.components,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt
-      })
-    );
+    let templates = (
+      Array.isArray(result) ? result : (result?.messageTemplates ?? result?.templates ?? [])
+    ).map((t: any) => ({
+      templateId: t.id,
+      name: t.name,
+      status: t.status,
+      category: t.category ?? null,
+      language: t.language ?? null,
+      components: t.components,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt
+    }));
 
     return {
       output: { templates },

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'invision',
   name: 'InVision',
   description:
-    'InVision was a digital product design platform providing design tokens, icons, and SCIM user provisioning APIs. The service was permanently shut down on December 31, 2024.',
+    'Legacy design token and Enterprise SCIM user provisioning tools for InVision. InVision discontinued its design products on December 31, 2024; API availability is not guaranteed.',
   metadata: {},
   config,
   auth

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ export let getInfluencerReport = SlateTool.create(spec, {
     let { platform, username, userId, features } = ctx.input;
 
     if (!username && !userId) {
-      throw new Error('Either username or userId must be provided');
+      throw createApiServiceError('Either username or userId must be provided.');
     }
 
     let response: any;
@@ -108,7 +108,7 @@ export let getInfluencerReport = SlateTool.create(spec, {
 
     let result = response?.result;
 
-    if (result?.retryTtl) {
+    if (result?.retryTtl !== undefined || result?.report_state === 'NOT_READY') {
       return {
         output: {
           reportState: 'NOT_READY',
@@ -116,7 +116,7 @@ export let getInfluencerReport = SlateTool.create(spec, {
           report: null,
           remainingCredits: result.restTokens
         },
-        message: `Report is still generating. Retry in **${result.retryTtl}** seconds.`
+        message: `Report is still generating. Retry in **${result.retryTtl ?? 30}** seconds.`
       };
     }
 

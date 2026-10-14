@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,9 @@ The returned URL can be used as the \`src\` attribute of an iframe element.`,
         .describe('Course ID (required for view, optional for edit)'),
       identifier: z.string().describe('Unique user identifier from your system'),
       clientIdentifier: z.string().optional().describe('Client/tenant identifier'),
+      themeId: z.number().optional().describe('Theme ID to render the embedded course with'),
+      name: z.string().optional().describe('Display name for the learner'),
+      avatar: z.string().optional().describe('Avatar URL for the learner'),
       flow: z
         .enum(['generate', 'transform', 'convert', 'preview'])
         .optional()
@@ -59,29 +62,36 @@ The returned URL can be used as the \`src\` attribute of an iframe element.`,
       authScheme: ctx.auth.authScheme
     });
 
-    let options: Record<string, unknown> = {};
-    if (ctx.input.flow !== undefined) options.flow = ctx.input.flow;
-    if (ctx.input.back !== undefined) options.back = ctx.input.back;
-    if (ctx.input.color !== undefined) options.color = ctx.input.color;
-    if (ctx.input.language !== undefined) options.language = ctx.input.language;
-    if (ctx.input.translations !== undefined) options.translations = ctx.input.translations;
-    if (ctx.input.feedback !== undefined) options.feedback = ctx.input.feedback;
-    if (ctx.input.googleDrive !== undefined) options.googleDrive = ctx.input.googleDrive;
-    if (ctx.input.oneDrive !== undefined) options.oneDrive = ctx.input.oneDrive;
-    if (ctx.input.loom !== undefined) options.loom = ctx.input.loom;
-    if (ctx.input.narrations !== undefined) options.narrations = ctx.input.narrations;
-    if (ctx.input.ai !== undefined) options.ai = ctx.input.ai;
-    if (ctx.input.publishing !== undefined) options.publishing = ctx.input.publishing;
+    let options = pickDefined({
+      flow: ctx.input.flow,
+      back: ctx.input.back,
+      color: ctx.input.color,
+      language: ctx.input.language,
+      translations: ctx.input.translations,
+      feedback: ctx.input.feedback,
+      googleDrive: ctx.input.googleDrive,
+      oneDrive: ctx.input.oneDrive,
+      loom: ctx.input.loom,
+      narrations: ctx.input.narrations,
+      ai: ctx.input.ai,
+      publishing: ctx.input.publishing
+    });
 
     let result = await client.getSignedUrl({
       action: ctx.input.action,
       id: ctx.input.courseId,
       identifier: ctx.input.identifier,
       clientIdentifier: ctx.input.clientIdentifier,
-      options: Object.keys(options).length > 0 ? (options as any) : undefined
+      themeId: ctx.input.themeId,
+      name: ctx.input.name,
+      avatar: ctx.input.avatar,
+      options: Object.keys(options).length > 0 ? options : undefined
     });
 
     let url = typeof result === 'string' ? result : (result?.url ?? result?.signedUrl ?? '');
+    if (typeof url !== 'string' || !url.trim()) {
+      throw createApiServiceError('Coassemble did not return a signed URL.');
+    }
 
     return {
       output: {

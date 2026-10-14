@@ -17,7 +17,7 @@ export let listDocs = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'List documents for a specific user. If provided, other filters are ignored.'
+          'Legacy personal-document endpoint. Prefer workspace listing; filters and pagination remain available.'
         ),
       projectId: z.string().optional().describe('Filter by project ID'),
       folderId: z.string().optional().describe('Filter by folder ID'),
@@ -29,7 +29,12 @@ export let listDocs = SlateTool.create(spec, {
         .enum(['created_at:asc', 'created_at:desc', 'title:asc', 'title:desc'])
         .optional()
         .describe('Sort order'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -53,23 +58,8 @@ export let listDocs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.userId) {
-      let userDocs = await client.listUserDocs(ctx.input.userId);
-      let docs = (Array.isArray(userDocs) ? userDocs : []).map(d => ({
-        docId: d.id,
-        title: d.title,
-        createdAt: d.created_at,
-        projectId: d.project?.id ?? null,
-        projectTitle: d.project?.title ?? null,
-        folderId: d.folder?.id ?? null
-      }));
-      return {
-        output: { docs },
-        message: `Found **${docs.length}** documents for user ${ctx.input.userId}.`
-      };
-    }
-
     let result = await client.listDocs({
+      userId: ctx.input.userId,
       projectId: ctx.input.projectId,
       folderId: ctx.input.folderId,
       titleContains: ctx.input.titleContains,

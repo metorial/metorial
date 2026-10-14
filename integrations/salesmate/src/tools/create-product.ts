@@ -16,6 +16,8 @@ export let createProduct = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Product name (required)'),
       owner: z.number().describe('User ID of the product owner'),
+      sku: z.string().optional().describe('Unique product SKU or code'),
+      isActive: z.boolean().optional().describe('Whether the product is active for sales'),
       unitPrice: z.number().optional().describe('Unit price of the product'),
       currency: z.string().optional().describe('Currency code (e.g., "USD")'),
       description: z.string().optional().describe('Product description'),

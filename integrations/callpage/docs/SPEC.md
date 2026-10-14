@@ -1,4 +1,4 @@
-# Slates Specification for Callpage
+# CallPage Integration Specification
 
 ## Overview
 
@@ -53,7 +53,7 @@ Create, retrieve, update, and delete users (agents). Users have roles: owner (fu
 
 ### Manager Management
 
-Managers are the link between users and widgets. Create, update, delete, and list managers for a specific widget. Each manager has configurable business hours (per day of week with timezone support) and can be assigned to departments. Adding users to a widget automatically creates corresponding manager records.
+Managers are the link between users and widgets. Create, update, delete, list, and retrieve individual managers for a specific widget. Each manager has configurable business hours (per day of week with timezone support) and can be assigned to departments. Adding users to a widget automatically creates corresponding manager records.
 
 ### SMS Message Customization
 

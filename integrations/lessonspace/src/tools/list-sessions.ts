@@ -23,7 +23,12 @@ let sessionSchema = z.object({
   billableSeconds: z.number().describe('Duration in seconds billed for this session.'),
   tags: z.string().describe('Tags associated with the session.'),
   summary: z.string().nullable().describe('AI-generated lesson summary, if available.'),
-  playbackUrl: z.string().nullable().describe('URL to access the session recording playback.'),
+  playbackUrl: z
+    .string()
+    .nullable()
+    .describe(
+      'Authenticated API endpoint for playback. Call get_recording for a viewing URL.'
+    ),
   recordingAvailable: z
     .boolean()
     .describe('Whether a recording is available for the session.'),
@@ -91,7 +96,13 @@ export let listSessions = SlateTool.create(spec, {
       userName: z
         .string()
         .optional()
-        .describe('Filter by user name (partial, case-insensitive).')
+        .describe('Filter by user name (partial, case-insensitive).'),
+      tags: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Session tags to match. Use an empty value to match the presence of a tag key.'
+        )
     })
   )
   .output(
@@ -103,8 +114,7 @@ export let listSessions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let result = await client.listSessions({
@@ -121,7 +131,8 @@ export let listSessions = SlateTool.create(spec, {
       launchId: ctx.input.launchId,
       inProgressOnly: ctx.input.inProgressOnly,
       userExternalId: ctx.input.userExternalId,
-      userName: ctx.input.userName
+      userName: ctx.input.userName,
+      tags: ctx.input.tags !== undefined ? JSON.stringify(ctx.input.tags) : undefined
     });
 
     let sessions = result.results.map(s => ({

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let smsEventTypes = z.enum(['delivered', 'failed', 'rejected', 'sending', 'submitted']);
+
 let emailEventTypes = z.enum([
   'processed',
   'delivered',
@@ -23,7 +25,7 @@ export let listWebhooks = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ subaccountId: z.string().optional().describe('Subaccount ID') }))
   .output(
     z.object({
       webhooks: z.array(z.any()).describe('List of configured webhooks')
@@ -35,12 +37,12 @@ export let listWebhooks = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.viewWebhooks();
+    let result = await client.viewWebhooks(ctx.input);
     let data = result.data || result;
 
     return {
       output: {
-        webhooks: data.webhooks || data
+        webhooks: data.webhooks ?? (Array.isArray(data) ? data : [])
       },
       message: `Retrieved webhooks.`
     };
@@ -64,7 +66,14 @@ export let createWebhook = SlateTool.create(spec, {
         .array(emailEventTypes)
         .optional()
         .describe('Email event types to trigger the webhook'),
-      smsEvents: z.boolean().optional().describe('Whether to include SMS events'),
+      smsEvents: z
+        .boolean()
+        .optional()
+        .describe('Include all supported SMS event types when true'),
+      smsEventTypes: z
+        .array(smsEventTypes)
+        .optional()
+        .describe('Specific SMS events; takes precedence over smsEvents'),
       usernames: z
         .array(z.string())
         .optional()
@@ -77,7 +86,12 @@ export let createWebhook = SlateTool.create(spec, {
       customHeaders: z
         .array(z.string())
         .optional()
-        .describe('Custom email headers to include in webhook data')
+        .describe('Custom email headers to include in webhook data'),
+      httpHeaders: z
+        .array(z.string())
+        .optional()
+        .describe('Custom HTTP header strings to send with webhook requests'),
+      subaccountId: z.string().optional().describe('Subaccount ID')
     })
   )
   .output(
@@ -114,14 +128,30 @@ export let editWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      webhookId: z.string().describe('ID of the webhook to edit'),
+      webhookId: z.string().describe('Positive numeric ID of the webhook to edit'),
       url: z.string().optional().describe('New URL endpoint'),
       events: z.array(emailEventTypes).optional().describe('Updated email event types'),
-      smsEvents: z.boolean().optional().describe('Whether to include SMS events'),
+      smsEvents: z
+        .boolean()
+        .optional()
+        .describe('Include all supported SMS event types when true'),
+      smsEventTypes: z
+        .array(smsEventTypes)
+        .optional()
+        .describe('Specific SMS events; takes precedence over smsEvents'),
       usernames: z.array(z.string()).optional().describe('Updated SMTP users/API keys scope'),
       outputType: z.enum(['json', 'form']).optional().describe('Webhook output format'),
       authorizationHeader: z.string().optional().describe('Authorization header value'),
-      customHeaders: z.array(z.string()).optional().describe('Custom email headers to include')
+      customHeaders: z
+        .array(z.string())
+        .optional()
+        .describe('Custom email headers to include'),
+      httpHeaders: z
+        .array(z.string())
+        .optional()
+        .describe('Custom HTTP header strings to send with webhook requests'),
+      disabled: z.boolean().optional().describe('Pause this webhook when true'),
+      subaccountId: z.string().optional().describe('Subaccount ID')
     })
   )
   .output(
@@ -158,7 +188,8 @@ export let removeWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      webhookId: z.string().describe('ID of the webhook to remove')
+      webhookId: z.string().describe('Positive numeric ID of the webhook to remove'),
+      subaccountId: z.string().optional().describe('Subaccount ID')
     })
   )
   .output(

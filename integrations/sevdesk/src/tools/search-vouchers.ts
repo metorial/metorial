@@ -66,8 +66,8 @@ export let searchVouchers = SlateTool.create(spec, {
       description: v.description ?? undefined,
       voucherDate: v.voucherDate ?? undefined,
       status: v.status != null ? String(v.status) : undefined,
-      totalNet: v.sumNet ?? undefined,
-      totalGross: v.sumGross ?? undefined,
+      totalNet: v.sumNet != null ? String(v.sumNet) : undefined,
+      totalGross: v.sumGross != null ? String(v.sumGross) : undefined,
       supplierContactId: v.supplier?.id ? String(v.supplier.id) : undefined,
       creditDebit: v.creditDebit ?? undefined,
       createdAt: v.create ?? undefined

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,8 @@ export let manageStoryTasks = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.description) throw new Error('Description is required to create a task');
+      if (!ctx.input.description)
+        throw createApiServiceError('Description is required to create a task');
       let params: Record<string, any> = { description: ctx.input.description };
       if (ctx.input.complete !== undefined) params.complete = ctx.input.complete;
       if (ctx.input.ownerIds) params.owner_ids = ctx.input.ownerIds;
@@ -55,7 +56,7 @@ export let manageStoryTasks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.taskId) throw new Error('Task ID is required for update');
+      if (!ctx.input.taskId) throw createApiServiceError('Task ID is required for update');
       let params: Record<string, any> = {};
       if (ctx.input.description !== undefined) params.description = ctx.input.description;
       if (ctx.input.complete !== undefined) params.complete = ctx.input.complete;
@@ -74,7 +75,7 @@ export let manageStoryTasks = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.taskId) throw new Error('Task ID is required for delete');
+    if (!ctx.input.taskId) throw createApiServiceError('Task ID is required for delete');
     await client.deleteStoryTask(ctx.input.storyId, ctx.input.taskId);
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -77,15 +77,17 @@ To create, provide a username and password. To update, provide the userId of an 
         output: {
           userId: result.id,
           username: result.username,
-          firstName: result.first_name,
-          lastName: result.last_name,
+          firstName: result.first_name ?? '',
+          lastName: result.last_name ?? '',
           created: false
         },
         message: `Updated mobile worker **${result.username}**.`
       };
     } else {
       if (!ctx.input.username || !ctx.input.password) {
-        throw new Error('Username and password are required to create a new mobile worker.');
+        throw createApiServiceError(
+          'Username and password are required to create a new mobile worker.'
+        );
       }
 
       let result = await client.createMobileWorker({
@@ -103,8 +105,8 @@ To create, provide a username and password. To update, provide the userId of an 
         output: {
           userId: result.id,
           username: result.username,
-          firstName: result.first_name,
-          lastName: result.last_name,
+          firstName: result.first_name ?? '',
+          lastName: result.last_name ?? '',
           created: true
         },
         message: `Created mobile worker **${result.username}**.`

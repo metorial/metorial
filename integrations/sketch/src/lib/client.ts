@@ -1,3 +1,4 @@
+import { createApiServiceError } from 'slates';
 // Sketch file format utilities
 // Sketch documents are ZIP archives containing JSON files.
 // This module provides helpers for working with the JSON data structures
@@ -126,6 +127,9 @@ export type SketchDocumentJson = {
     gradients?: unknown[];
     images?: unknown[];
   };
+  sharedSwatches?: {
+    objects: Array<{ name: string; value: SketchColor }>;
+  };
   foreignLayerStyles?: unknown[];
   foreignSymbols?: unknown[];
   foreignTextStyles?: unknown[];
@@ -232,6 +236,9 @@ export let extractColorsFromStyle = (style: SketchStyle | undefined): SketchColo
       }
     }
   }
+
+  let textColor = style.textStyle?.encodedAttributes?.MSAttributedStringColorAttribute;
+  if (textColor) colors.push(textColor as SketchColor);
 
   return colors;
 };
@@ -357,7 +364,15 @@ export let createColor = (
 });
 
 export let hexToColor = (hex: string): SketchColor => {
-  let clean = hex.replace('#', '');
+  let clean = hex.replace(/^#/, '');
+  if (!/^(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(clean)) {
+    throw createApiServiceError(
+      'Use a valid hex color with 3, 4, 6, or 8 hexadecimal digits, optionally prefixed with #.'
+    );
+  }
+  if (clean.length === 3 || clean.length === 4) {
+    clean = [...clean].map(character => character.repeat(2)).join('');
+  }
   let r = Number.parseInt(clean.substring(0, 2), 16) / 255;
   let g = Number.parseInt(clean.substring(2, 4), 16) / 255;
   let b = Number.parseInt(clean.substring(4, 6), 16) / 255;
@@ -365,14 +380,19 @@ export let hexToColor = (hex: string): SketchColor => {
   return createColor(r, g, b, a);
 };
 
-export let createRect = (x: number, y: number, width: number, height: number): SketchRect => ({
-  _class: 'rect',
-  x,
-  y,
-  width,
-  height,
-  constrainProportions: false
-});
+export let createRect = (x: number, y: number, width: number, height: number): SketchRect => {
+  if (width < 0 || height < 0) {
+    throw createApiServiceError('Sketch layer width and height must be non-negative.');
+  }
+  return {
+    _class: 'rect',
+    x,
+    y,
+    width,
+    height,
+    constrainProportions: false
+  };
+};
 
 export let createStyle = (options?: {
   fillColor?: SketchColor;
@@ -380,6 +400,12 @@ export let createStyle = (options?: {
   borderThickness?: number;
   opacity?: number;
 }): SketchStyle => {
+  if (options?.opacity !== undefined && (options.opacity < 0 || options.opacity > 1)) {
+    throw createApiServiceError('Sketch layer opacity must be between 0 and 1.');
+  }
+  if (options?.borderThickness !== undefined && options.borderThickness < 0) {
+    throw createApiServiceError('Sketch border thickness must be non-negative.');
+  }
   let style: SketchStyle = {
     _class: 'style',
     do_objectID: generateObjectId()
@@ -589,6 +615,10 @@ export let collectAllColors = (
     }
   };
 
+  for (let swatch of documentJson?.sharedSwatches?.objects ?? []) {
+    addColor(swatch.value, 'sharedSwatch', swatch.name);
+  }
+
   if (documentJson?.assets?.colorAssets) {
     for (let ca of documentJson.assets.colorAssets) {
       addColor(ca.color, 'colorAsset', ca.name);
@@ -623,6 +653,12 @@ export let collectAllColors = (
     let allLayers = flattenLayers(page.layers);
     for (let layer of allLayers) {
       let layerColors = extractColorsFromStyle(layer.style);
+      for (let attribute of layer.attributedString?.attributes ?? []) {
+        let textColor = (
+          attribute as { attributes?: { MSAttributedStringColorAttribute?: SketchColor } }
+        ).attributes?.MSAttributedStringColorAttribute;
+        if (textColor) layerColors.push(textColor);
+      }
       for (let color of layerColors) {
         addColor(color, 'layer', layer.name);
       }
@@ -654,8 +690,13 @@ export let collectAllSymbols = (
   for (let page of pages) {
     let masters = findLayersByClass(page.layers, 'symbolMaster');
     for (let master of masters) {
+      if (!master.symbolID?.trim()) {
+        throw createApiServiceError(
+          'Sketch symbol sources must include a non-empty symbolID referenced by instances.'
+        );
+      }
       symbols.push({
-        symbolId: (master.symbolID as string) ?? master.do_objectID,
+        symbolId: master.symbolID,
         objectId: master.do_objectID,
         name: master.name,
         pageName: page.name,
@@ -686,7 +727,7 @@ export let collectTextContent = (
   for (let page of pages) {
     let textLayers = findLayersByClass(page.layers, 'text');
     for (let layer of textLayers) {
-      if (layer.attributedString?.string) {
+      if (layer.attributedString) {
         texts.push({
           objectId: layer.do_objectID,
           layerName: layer.name,

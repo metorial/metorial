@@ -12,12 +12,11 @@ Optionally supports ordered signing, custom titles/messages, and test mode for v
   instructions: [
     'The templateId must reference a template that has already been created in the Signaturely dashboard.',
     'Each signer\'s role must match one of the roles defined in the template (e.g., "Receiving Party", "Disclosing Party").',
-    'Use the signer fields property to pre-fill tagged fields in the template (e.g., {"RecievingP_FullName_1": "John Doe"}).',
-    'Set testMode to true for testing without consuming signature request quota.'
+    'Call list_templates to discover template IDs and signer roles.',
+    'Use fields for text API tags and checkboxFields for boolean checkbox API tags.',
+    'Set testMode to true to request test mode.'
   ],
-  constraints: [
-    'The number of signature requests allowed per month depends on your API plan (50, 150, or 500).'
-  ],
+  constraints: ['Signature request quotas depend on the connected account API plan.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -45,7 +44,15 @@ Optionally supports ordered signing, custom titles/messages, and test mode for v
             fields: z
               .record(z.string(), z.string())
               .optional()
-              .describe('Key-value pairs mapping template field tags to pre-filled values')
+              .describe(
+                'Key-value pairs mapping text template field tags to pre-filled values'
+              ),
+            checkboxFields: z
+              .record(z.string(), z.boolean())
+              .optional()
+              .describe(
+                'Key-value pairs mapping checkbox template field tags to true or false; do not duplicate tags in fields'
+              )
           })
         )
         .describe('List of signers who need to sign the document'),
@@ -58,18 +65,16 @@ Optionally supports ordered signing, custom titles/messages, and test mode for v
         .boolean()
         .optional()
         .describe('Whether signers must sign in a specific order'),
-      testMode: z
-        .boolean()
-        .optional()
-        .describe(
-          'When true, creates a test signature request that does not count against your quota'
-        )
+      testMode: z.boolean().optional().describe('When true, requests a test signature request')
     })
   )
   .output(
     z.object({
       requestId: z.string().describe('ID of the created signature request'),
-      title: z.string().optional().describe('Title of the signature request')
+      title: z.string().optional().describe('Title of the signature request'),
+      status: z.string().optional().describe('Document state returned by Signaturely'),
+      createdAt: z.string().optional().describe('Document creation timestamp'),
+      testMode: z.boolean().optional().describe('Test mode flag returned by Signaturely')
     })
   )
   .handleInvocation(async ctx => {
@@ -89,15 +94,18 @@ Optionally supports ordered signing, custom titles/messages, and test mode for v
       testMode: ctx.input.testMode
     });
 
-    let requestId = result.id?.toString() || result.documentId?.toString() || '';
-    let title = result.title || ctx.input.title || '';
+    let requestId = result.id;
+    let title = result.title ?? ctx.input.title;
 
     return {
       output: {
         requestId,
-        title
+        title,
+        status: result.status ?? undefined,
+        createdAt: result.createdAt ?? undefined,
+        testMode: result.testMode ?? undefined
       },
-      message: `Successfully created signature request${title ? ` "${title}"` : ''} (ID: ${requestId}) and sent to ${ctx.input.signers.length} signer(s).`
+      message: `Created signature request${title ? ` "${title}"` : ''} (ID: ${requestId}) for ${ctx.input.signers.length} signer(s)${result.status ? ` with status "${result.status}"` : ''}.`
     };
   })
   .build();

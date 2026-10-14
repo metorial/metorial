@@ -1,18 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getVerificationSession = SlateTool.create(spec, {
   name: 'Get Verification Session',
   key: 'get_verification_session',
   description: `Retrieve details and results of a credential verification session. Use this to check if a holder has presented their credentials and to access the verified credential data.`,
+  instructions: [
+    'Call list_projects to choose the projectId for this operation.',
+    'Verified attributes are returned only when the project verification-data access setting permits API retrieval; the default is webhook-only.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       protocol: z
         .enum(['openid4vc', 'didcomm'])
         .describe('Protocol used for the verification'),
@@ -36,7 +42,7 @@ export let getVerificationSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let result: any;

@@ -15,12 +15,12 @@ let clockEntrySchema = z.object({
 
 let mapClockEntry = (e: any) => ({
   entryId: e.id,
-  userId: e.user_id,
-  startTime: e.start_time,
-  endTime: e.end_time,
-  notes: e.notes,
-  createdAt: e.created_at,
-  updatedAt: e.updated_at
+  userId: e.user_id ?? undefined,
+  startTime: e.start_time ?? undefined,
+  endTime: e.end_time ?? undefined,
+  notes: e.notes ?? undefined,
+  createdAt: e.created_at ?? undefined,
+  updatedAt: e.updated_at ?? undefined
 });
 
 export let listClockEntries = SlateTool.create(spec, {

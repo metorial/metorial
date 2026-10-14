@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -64,12 +64,21 @@ export let aiExtract = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasQuery = Boolean(ctx.input.aiQuery?.trim());
+    let hasRules = Boolean(
+      ctx.input.aiExtractRules && Object.keys(ctx.input.aiExtractRules).length
+    );
+    if (hasQuery === hasRules) {
+      throw createApiServiceError(
+        'Provide either a non-empty aiQuery or non-empty aiExtractRules, not both.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.aiExtract({
       url: ctx.input.url,
-      aiQuery: ctx.input.aiQuery,
-      aiExtractRules: ctx.input.aiExtractRules,
+      aiQuery: hasQuery ? ctx.input.aiQuery : undefined,
+      aiExtractRules: hasRules ? ctx.input.aiExtractRules : undefined,
       aiSelector: ctx.input.aiSelector,
       renderJs: ctx.input.renderJs,
       premiumProxy: ctx.input.premiumProxy,
@@ -83,7 +92,7 @@ export let aiExtract = SlateTool.create(spec, {
       output: {
         extractedData: result
       },
-      message: ctx.input.aiQuery
+      message: hasQuery
         ? `AI extraction completed for **${ctx.input.url}** with query: "${ctx.input.aiQuery}"`
         : `AI extraction completed for **${ctx.input.url}** with ${Object.keys(ctx.input.aiExtractRules || {}).length} extraction rules.`
     };

@@ -29,12 +29,6 @@ export let searchBusiness = SlateTool.create(spec, {
       search: ctx.input.searchValue
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Business search failed: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
-
     return {
       output: {
         businessId: data.businessId

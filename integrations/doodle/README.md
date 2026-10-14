@@ -1,8 +1,14 @@
 # <img src="https://provider-logos.metorial-cdn.com/doodle.png" height="20"> Doodle
 
-Create and manage group scheduling polls where participants vote on preferred meeting times. Set up booking pages for direct appointment scheduling, and create sign-up sheets for events and workshops. Integrate with Google Calendar, Outlook, and iCloud to sync availability. Automatically attach video conferencing links from Zoom, Google Meet, or Webex to scheduled meetings. Configure poll voting modes (YES/NO or YES/NO/MAYBE), add participant comments, and collect payments via Stripe for bookings. Note: Doodle's API has been officially deprecated; these capabilities may only be available for legacy Enterprise integrations.
+Manage legacy Doodle group scheduling polls through an existing Enterprise API connection. Create, retrieve, list, and delete polls, submit or remove participant votes, read and add comments, and retrieve the connected user's identity.
+
+[Doodle no longer supports new API access](https://help.doodle.com/en/articles/9457023-doodle-api-deprecation). Existing Enterprise API customers should contact Doodle support about their connection's availability. The legacy request and response contracts have not been verified against a current public API reference.
 
 ## Tools
+
+### Get Current User
+
+Retrieve the authenticated Doodle user's identifier, name, and email address when available.
 
 ### Create Poll
 
@@ -23,6 +29,10 @@ List Doodle polls from the authenticated user's dashboard. Can retrieve polls yo
 ### Add Comment
 
 Add a comment to a Doodle poll. Comments are visible to all participants and can be used to share notes, preferences, or constraints related to the scheduling poll.
+
+### Get Comments
+
+Retrieve comments on a Doodle poll with author names and available timestamps.
 
 ### Participate in Poll
 

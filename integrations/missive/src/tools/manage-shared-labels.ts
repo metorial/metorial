@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,6 +54,7 @@ export let manageSharedLabels = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let params: Record<string, string | number> = {};
+      if (ctx.input.organizationId) params.organization = ctx.input.organizationId;
       if (ctx.input.limit) params.limit = ctx.input.limit;
       if (ctx.input.offset) params.offset = ctx.input.offset;
 
@@ -61,9 +62,10 @@ export let manageSharedLabels = SlateTool.create(spec, {
       let labels = (data.shared_labels || []).map((l: any) => ({
         labelId: l.id,
         name: l.name,
-        color: l.color,
-        parentId: l.parent?.id,
-        organizationId: l.organization?.id,
+        color: l.color ?? undefined,
+        parentId: typeof l.parent === 'string' ? l.parent : l.parent?.id,
+        organizationId:
+          typeof l.organization === 'string' ? l.organization : l.organization?.id,
         visibility: l.visibility
       }));
 
@@ -85,8 +87,8 @@ export let manageSharedLabels = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for creating labels');
-      if (!ctx.input.name) throw new Error('name is required for creating labels');
+        throw createApiServiceError('organizationId is required for creating labels');
+      if (!ctx.input.name) throw createApiServiceError('name is required for creating labels');
       fields.organization = ctx.input.organizationId;
       let data = await client.createSharedLabels(fields);
       let labels = Array.isArray(data.shared_labels)
@@ -97,9 +99,10 @@ export let manageSharedLabels = SlateTool.create(spec, {
           labels: labels.map((l: any) => ({
             labelId: l.id,
             name: l.name,
-            color: l.color,
-            parentId: l.parent?.id,
-            organizationId: l.organization?.id,
+            color: l.color ?? undefined,
+            parentId: typeof l.parent === 'string' ? l.parent : l.parent?.id,
+            organizationId:
+              typeof l.organization === 'string' ? l.organization : l.organization?.id,
             visibility: l.visibility
           }))
         },
@@ -108,7 +111,8 @@ export let manageSharedLabels = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.labelId) throw new Error('labelId is required for updating labels');
+    if (!ctx.input.labelId)
+      throw createApiServiceError('labelId is required for updating labels');
     let data = await client.updateSharedLabels([ctx.input.labelId], fields);
     let labels = Array.isArray(data.shared_labels) ? data.shared_labels : [data.shared_labels];
     return {
@@ -116,9 +120,10 @@ export let manageSharedLabels = SlateTool.create(spec, {
         labels: labels.map((l: any) => ({
           labelId: l.id,
           name: l.name,
-          color: l.color,
-          parentId: l.parent?.id,
-          organizationId: l.organization?.id,
+          color: l.color ?? undefined,
+          parentId: typeof l.parent === 'string' ? l.parent : l.parent?.id,
+          organizationId:
+            typeof l.organization === 'string' ? l.organization : l.organization?.id,
           visibility: l.visibility
         }))
       },

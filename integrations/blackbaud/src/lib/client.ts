@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.sky.blackbaud.com';
 
@@ -12,10 +12,16 @@ export class Client {
   private http;
 
   constructor(config: { token: string; subscriptionKey: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${config.token}` },
+      paramsSerializer: { indexes: null },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Blackbaud',
+          reason: 'blackbaud_api_error'
+        }),
       headers: {
-        Authorization: `Bearer ${config.token}`,
         'Bb-Api-Subscription-Key': config.subscriptionKey,
         'Content-Type': 'application/json'
       }
@@ -41,7 +47,7 @@ export class Client {
     dateAdded?: string;
     lastModified?: string;
     sort?: string;
-    constituentCodeId?: string;
+    constituentCodes?: string[];
     constituentListId?: string;
     includeDeceased?: boolean;
     includeInactive?: boolean;
@@ -53,7 +59,7 @@ export class Client {
         date_added: params?.dateAdded,
         last_modified: params?.lastModified,
         sort: params?.sort,
-        constituent_code_id: params?.constituentCodeId,
+        constituent_code: params?.constituentCodes,
         list_id: params?.constituentListId,
         include_deceased: params?.includeDeceased,
         include_inactive: params?.includeInactive
@@ -260,17 +266,33 @@ export class Client {
     dateAdded?: string;
     lastModified?: string;
     listId?: string;
-    sort?: string;
+    sortToken?: string;
+    continuationToken?: string;
   }) {
+    if (params?.constituentId) {
+      let response = await this.http.get(
+        `/constituent/v1/constituents/${encodeURIComponent(params.constituentId)}/actions`
+      );
+      let actions = response.data?.value ?? [];
+      let offset = params.offset ?? 0;
+      return {
+        ...response.data,
+        count: response.data?.count ?? actions.length,
+        value: actions.slice(
+          offset,
+          params.limit === undefined ? undefined : offset + params.limit
+        )
+      };
+    }
     let response = await this.http.get('/constituent/v1/actions', {
       params: {
         limit: params?.limit,
         offset: params?.offset,
-        constituent_id: params?.constituentId,
         date_added: params?.dateAdded,
         last_modified: params?.lastModified,
         list_id: params?.listId,
-        sort: params?.sort
+        sort_token: params?.sortToken,
+        continuation_token: params?.continuationToken
       }
     });
     return response.data;
@@ -413,14 +435,22 @@ export class Client {
     constituentId?: string;
     dateAdded?: string;
     lastModified?: string;
+    includeInactive?: boolean;
+    searchText?: string;
+    listId?: string;
+    sortToken?: string;
   }) {
     let response = await this.http.get('/opportunity/v1/opportunities', {
       params: {
         limit: params?.limit,
         offset: params?.offset,
-        constituent_id: params?.constituentId,
+        constituent_id: params?.constituentId ? [params.constituentId] : undefined,
         date_added: params?.dateAdded,
-        last_modified: params?.lastModified
+        last_modified: params?.lastModified,
+        include_inactive: params?.includeInactive,
+        search_text: params?.searchText,
+        list_id: params?.listId,
+        sort_token: params?.sortToken
       }
     });
     return response.data;
@@ -453,12 +483,9 @@ export class Client {
 
   // ── Lists ──
 
-  async listLists(params?: { limit?: number; offset?: number }) {
-    let response = await this.http.get('/list/v1/lists', {
-      params: {
-        limit: params?.limit,
-        offset: params?.offset
-      }
+  async listLists(listType: 'Constituent' | 'Gift' | 'Action' | 'Opportunity') {
+    let response = await this.http.get('/list/lists', {
+      params: { list_type: listType }
     });
     return response.data;
   }
@@ -468,12 +495,24 @@ export class Client {
     params?: {
       limit?: number;
       offset?: number;
+      listType?: 'Constituent' | 'Gift' | 'Action' | 'Opportunity';
+      sortToken?: string;
+      continuationToken?: string;
     }
   ) {
-    let response = await this.http.get(`/list/v1/lists/${listId}`, {
+    let routes = {
+      Constituent: '/constituent/v1/constituents',
+      Gift: '/gift/v1/gifts',
+      Action: '/constituent/v1/actions',
+      Opportunity: '/opportunity/v1/opportunities'
+    };
+    let response = await this.http.get(routes[params?.listType ?? 'Constituent'], {
       params: {
+        list_id: listId,
         limit: params?.limit,
-        offset: params?.offset
+        offset: params?.offset,
+        sort_token: params?.sortToken,
+        continuation_token: params?.continuationToken
       }
     });
     return response.data;

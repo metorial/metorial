@@ -48,6 +48,7 @@ export let searchInfluencers = SlateTool.create(spec, {
           isPrivate: z.boolean().optional().describe('Whether the account is private'),
           isVerified: z.boolean().optional().describe('Whether the account is verified'),
           username: z.string().optional().describe('Username'),
+          userId: z.string().optional().describe('Platform-specific user or channel ID'),
           networkType: z.string().optional().describe('Primary social network type'),
           linkedNetworks: z
             .array(socialNetworkSchema)
@@ -69,7 +70,7 @@ export let searchInfluencers = SlateTool.create(spec, {
       excludeNetworks: ctx.input.excludeNetworks
     });
 
-    let list = response?.result?.list ?? [];
+    let list = Array.isArray(response?.result?.list) ? response.result.list : [];
 
     let influencers = list.map((item: any) => ({
       title: item.title,
@@ -78,6 +79,7 @@ export let searchInfluencers = SlateTool.create(spec, {
       isPrivate: item.is_private,
       isVerified: item.is_verified,
       username: item.username,
+      userId: item.user_id ?? item.channel_id,
       networkType: item.type,
       linkedNetworks: (item.social_networks ?? []).map((sn: any) => ({
         networkType: sn.type,

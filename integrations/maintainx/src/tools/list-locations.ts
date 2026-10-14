@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listLocations = SlateTool.create(spec, {
   name: 'List Locations',
   key: 'list_locations',
-  description: `Lists all locations configured in MaintainX. Locations can be associated with assets, work orders, vendors, and teams.`,
+  description: `Lists all locations configured in MaintainX. Locations can be associated with assets, work orders, vendors, and teams. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,14 @@ export let listLocations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      organizationId: organizationIdSchema,
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -35,10 +43,7 @@ export let listLocations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listLocations({
       limit: ctx.input.limit,
@@ -46,11 +51,11 @@ export let listLocations = SlateTool.create(spec, {
     });
 
     let locations = (result.locations ?? []).map((l: any) => ({
-      locationId: l.id,
-      name: l.name,
-      address: l.address,
-      createdAt: l.createdAt,
-      updatedAt: l.updatedAt
+      locationId: l.id ?? undefined,
+      name: l.name ?? undefined,
+      address: l.address ?? undefined,
+      createdAt: l.createdAt ?? undefined,
+      updatedAt: l.updatedAt ?? undefined
     }));
 
     return {

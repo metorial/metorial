@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -60,10 +60,10 @@ export let manageTagSessionNotes = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.tagId) {
-        throw new Error('tagId is required when creating a note');
+        throw createApiServiceError('tagId is required when creating a note');
       }
       if (!ctx.input.message) {
-        throw new Error('message is required when creating a note');
+        throw createApiServiceError('message is required when creating a note');
       }
       await client.createTagSessionNote(
         ctx.input.tagSessionId,
@@ -79,10 +79,10 @@ export let manageTagSessionNotes = SlateTool.create(spec, {
     }
 
     if (!ctx.input.tagId) {
-      throw new Error('tagId is required when deleting a note');
+      throw createApiServiceError('tagId is required when deleting a note');
     }
     if (!ctx.input.noteId) {
-      throw new Error('noteId is required when deleting a note');
+      throw createApiServiceError('noteId is required when deleting a note');
     }
     await client.deleteTagSessionNote(
       ctx.input.tagSessionId,

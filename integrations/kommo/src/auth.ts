@@ -43,8 +43,11 @@ export let auth = SlateAuth.create()
     }),
 
     getAuthorizationUrl: async ctx => {
-      let url = `https://www.kommo.com/oauth?client_id=${ctx.clientId}&state=${ctx.state}&mode=popup`;
-      return { url };
+      let url = new URL('https://www.kommo.com/oauth');
+      url.searchParams.set('client_id', ctx.clientId);
+      url.searchParams.set('state', ctx.state);
+      url.searchParams.set('mode', 'popup');
+      return { url: url.toString() };
     },
 
     handleCallback: async ctx => {
@@ -132,16 +135,12 @@ export let auth = SlateAuth.create()
       });
 
       let accountRes = await http.get('/account');
-      let currentUserId = accountRes.data.current_user_id;
-
-      let userRes = await http.get(`/users/${currentUserId}`);
-      let user = userRes.data;
+      let account = accountRes.data;
 
       return {
         profile: {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
+          id: String(account.current_user_id),
+          name: `${account.name} (user ${account.current_user_id})`,
           subdomain
         }
       };
@@ -180,16 +179,12 @@ export let auth = SlateAuth.create()
       });
 
       let accountRes = await http.get('/account');
-      let currentUserId = accountRes.data.current_user_id;
-
-      let userRes = await http.get(`/users/${currentUserId}`);
-      let user = userRes.data;
+      let account = accountRes.data;
 
       return {
         profile: {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
+          id: String(account.current_user_id),
+          name: `${account.name} (user ${account.current_user_id})`,
           subdomain: ctx.input.subdomain
         }
       };

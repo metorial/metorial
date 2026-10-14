@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getSignedPdfDetails } from '../lib/files';
 import { spec } from '../spec';
 
 let signerOutputSchema = z.object({
@@ -19,7 +20,10 @@ let signerOutputSchema = z.object({
 export let queryContract = SlateTool.create(spec, {
   name: 'Get Contract',
   key: 'query_contract',
-  description: `Retrieves the full details of a contract including its status, signer information, signer-entered field values, and the signed PDF URL (available after all parties have signed).`,
+  description: `Retrieves the full details of a contract including its status, signer information, signer-entered field values, and a downloadable signed PDF when all parties have signed. The original signed PDF URL is also returned for compatibility.`,
+  instructions: [
+    'Avoid frequent polling. The provider may limit data for contracts older than two weeks.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -61,11 +65,11 @@ export let queryContract = SlateTool.create(spec, {
 
     let result = await client.queryContract(ctx.input.contractId);
 
-    let contract = result?.data?.contract || result?.contract || result;
+    let contract = result.data.contract;
 
-    let signers = (contract?.signers || []).map((s: any) => ({
+    let signers = contract.signers.map(s => ({
       signerId: s.id,
-      name: s.name,
+      name: s.name ?? '',
       email: s.email,
       mobile: s.mobile,
       companyName: s.companyName,
@@ -84,6 +88,17 @@ export let queryContract = SlateTool.create(spec, {
       labels: contract?.labels,
       signers
     };
+
+    if (contract.contractPdfUrl) {
+      let pdf = getSignedPdfDetails(contract);
+      await ctx.addAttachment({
+        type: 'url',
+        url: pdf.url,
+        mimeType: 'application/pdf',
+        refreshReference: { contractId: contract.id },
+        refreshAt: pdf.expiresAt
+      });
+    }
 
     let statusText = output.status ? ` (status: ${output.status})` : '';
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailtrapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -21,7 +21,19 @@ export let manageSuppressions = SlateTool.create(spec, {
       suppressionId: z
         .number()
         .optional()
-        .describe('Suppression ID to delete. Required for delete.'),
+        .describe(
+          'Legacy numeric suppression ID. For current suppressions use suppressionUuid.'
+        ),
+      suppressionUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Suppression UUID returned by the list action. Required for deleting current suppression entries.'
+        ),
+      lastId: z
+        .string()
+        .optional()
+        .describe('Suppression UUID of the last item on the previous page (for list).'),
       email: z.string().optional().describe('Filter by email address (for list)'),
       startTime: z
         .string()
@@ -38,7 +50,12 @@ export let manageSuppressions = SlateTool.create(spec, {
       suppressions: z
         .array(
           z.object({
-            suppressionId: z.number().describe('Suppression ID'),
+            suppressionId: z.number().optional().describe('Legacy numeric suppression ID'),
+            suppressionUuid: z.string().optional().describe('Suppression UUID'),
+            sendingStream: z
+              .string()
+              .optional()
+              .describe('Sending stream for this suppression'),
             email: z.string().describe('Suppressed email address'),
             reason: z
               .string()
@@ -53,18 +70,20 @@ export let manageSuppressions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
-    let { action, suppressionId, email, startTime, endTime } = ctx.input;
+    let { action, suppressionId, suppressionUuid, email, startTime, endTime, lastId } =
+      ctx.input;
 
     if (action === 'list') {
-      let result = await client.listSuppressions({ email, startTime, endTime });
+      let result = await client.listSuppressions({ email, startTime, endTime, lastId });
       let suppressions = (Array.isArray(result) ? result : []).map((s: any) => ({
-        suppressionId: s.id,
+        suppressionId: typeof s.id === 'number' ? s.id : undefined,
+        suppressionUuid: typeof s.id === 'string' ? s.id : undefined,
+        sendingStream: s.sending_stream,
         email: s.email,
-        reason: s.reason || 'unknown',
+        reason: s.type ?? s.reason ?? 'unknown',
         createdAt: s.created_at || ''
       }));
       return {
@@ -74,15 +93,18 @@ export let manageSuppressions = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!suppressionId)
-        throw new Error('suppressionId is required for removing a suppression');
-      await client.deleteSuppression(suppressionId);
+      let identifier = suppressionUuid ?? suppressionId;
+      if (!identifier)
+        throw createApiServiceError(
+          'Provide suppressionUuid from the list action, or a legacy suppressionId, to remove a suppression.'
+        );
+      await client.deleteSuppression(identifier);
       return {
         output: { deleted: true },
-        message: `Suppression **${suppressionId}** removed. The email address is now reactivated for sending.`
+        message: `Suppression **${identifier}** removed. The email address is now reactivated for sending.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

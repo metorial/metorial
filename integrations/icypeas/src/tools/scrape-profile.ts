@@ -15,7 +15,11 @@ export let scrapeProfile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      profileUrls: z.array(z.string()).describe('One or more LinkedIn profile URLs to scrape')
+      profileUrls: z
+        .array(z.string().url())
+        .min(1)
+        .max(50)
+        .describe('One or more LinkedIn profile URLs to scrape')
     })
   )
   .output(

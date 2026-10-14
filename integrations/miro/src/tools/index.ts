@@ -5,6 +5,8 @@ export * from './delete-board';
 export * from './delete-board-item';
 export * from './get-board';
 export * from './get-board-items';
+export * from './get-current-user';
+export * from './get-frame-items';
 export * from './list-boards';
 export * from './manage-board-members';
 export * from './manage-connectors';

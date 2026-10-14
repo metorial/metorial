@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { FUNNEL_COMPUTE_MUTATION } from '../lib/graphql';
+import { FUNNEL_COMPUTE_MUTATION, normalizeFunnelFilters } from '../lib/graphql';
 import { spec } from '../spec';
 
 let filterDataStringSchema = z.object({
@@ -45,7 +45,8 @@ let filterDataCustomEventPropertySchema = z.object({
   name: z.string().optional(),
   string: filterDataStringSchema.optional(),
   int: filterDataIntSchema.optional(),
-  bool: filterDataBoolSchema.optional()
+  bool: filterDataBoolSchema.optional(),
+  float: filterDataIntSchema.optional()
 });
 
 let filterDataSchema = z.object({
@@ -95,6 +96,25 @@ let stepResultSchema = z.object({
   sessions: z.number().describe('Number of sessions reaching this step'),
   visitors: z.number().describe('Number of unique visitors at this step'),
   events: z.number().describe('Number of events in this step')
+});
+
+let computeResponseSchema = z.object({
+  total_sessions: z.number(),
+  total_visitors: z.number(),
+  total_events: z.number(),
+  steps: z.array(stepResultSchema),
+  conversion_value: z
+    .object({ value: z.number().optional(), label: z.string().optional() })
+    .nullable()
+    .optional(),
+  cached_response: z
+    .object({
+      id: z.string().optional(),
+      computed_at: z.number().optional(),
+      fresh: z.boolean().optional()
+    })
+    .nullable()
+    .optional()
 });
 
 export let computeFunnel = SlateTool.create(spec, {
@@ -150,16 +170,23 @@ export let computeFunnel = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let result = await client.graphql(FUNNEL_COMPUTE_MUTATION, {
       website_id: ctx.input.websiteId,
-      input: {
+      input: normalizeFunnelFilters({
         type: ctx.input.type,
         date_range: ctx.input.dateRange,
         steps: ctx.input.steps,
         filters: ctx.input.filters || { must: [], should: [], must_not: [] },
         conversion_value: ctx.input.conversionValue
-      }
+      })
     });
 
-    let compute = result.data.funnelCompute;
+    let parsed = computeResponseSchema.safeParse(result.data.funnelCompute);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'LiveSession returned an invalid funnel computation response. Expected numeric totals and non-null steps with numeric counts.',
+        { reason: parsed.error.message }
+      );
+    }
+    let compute = parsed.data;
 
     return {
       output: {
@@ -172,7 +199,7 @@ export let computeFunnel = SlateTool.create(spec, {
               label: compute.conversion_value.label
             }
           : undefined,
-        steps: (compute.steps || []).map((s: any) => ({
+        steps: compute.steps.map(s => ({
           sessions: s.sessions,
           visitors: s.visitors,
           events: s.events
@@ -181,7 +208,7 @@ export let computeFunnel = SlateTool.create(spec, {
         cachedResponseComputedAt: compute.cached_response?.computed_at,
         cachedResponseFresh: compute.cached_response?.fresh
       },
-      message: `Funnel computed: **${compute.total_sessions}** sessions, **${compute.total_visitors}** visitors across **${(compute.steps || []).length}** steps.`
+      message: `Funnel computed: **${compute.total_sessions}** sessions, **${compute.total_visitors}** visitors across **${compute.steps.length}** steps.`
     };
   })
   .build();

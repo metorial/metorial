@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ Activities track sales interactions and can include check-in geolocation data.`,
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating an activity');
+        throw createApiServiceError('Fields are required for creating an activity');
       }
       let result = await client.createActivity(ctx.input.fields);
       let activityId = result?.id;
@@ -70,7 +70,7 @@ Activities track sales interactions and can include check-in geolocation data.`,
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.activityId) {
-        throw new Error('activityId is required for updating an activity');
+        throw createApiServiceError('activityId is required for updating an activity');
       }
       await client.updateActivity(ctx.input.activityId, ctx.input.fields || {});
       let activity = await client.getActivity(ctx.input.activityId);
@@ -86,7 +86,7 @@ Activities track sales interactions and can include check-in geolocation data.`,
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.activityId) {
-        throw new Error('activityId is required for deleting an activity');
+        throw createApiServiceError('activityId is required for deleting an activity');
       }
       await client.deleteActivity(ctx.input.activityId);
       return {
@@ -95,6 +95,6 @@ Activities track sales interactions and can include check-in geolocation data.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

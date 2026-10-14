@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -43,8 +43,19 @@ export let manageList = SlateTool.create(spec, {
         .describe(
           'Data rows to add. Used with add_rows. Each row is an object with column names as keys.'
         ),
-      offset: z.number().optional().describe('Pagination offset for list action.'),
-      limit: z.number().optional().describe('Pagination limit for list action.')
+      offset: z
+        .number()
+        .min(0)
+        .refine(Number.isInteger, 'Use a whole-number offset.')
+        .optional()
+        .describe('Pagination offset for list action.'),
+      limit: z
+        .number()
+        .min(1)
+        .max(1000)
+        .refine(Number.isInteger, 'Use a whole-number limit.')
+        .optional()
+        .describe('Pagination limit for list action.')
     })
   )
   .output(
@@ -65,6 +76,25 @@ export let manageList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!['list', 'create'].includes(ctx.input.action) && !ctx.input.listId?.trim()) {
+      throw createApiServiceError(
+        'listId is required for this action. Use the list action to discover list IDs.'
+      );
+    }
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('name is required when creating a list.');
+    }
+    if (
+      ctx.input.action === 'update' &&
+      ctx.input.name === undefined &&
+      ctx.input.description === undefined
+    ) {
+      throw createApiServiceError('Provide name or description when updating a list.');
+    }
+    if (ctx.input.action === 'add_rows' && !ctx.input.rows?.length) {
+      throw createApiServiceError('Provide at least one row to add.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
@@ -114,7 +144,7 @@ export let manageList = SlateTool.create(spec, {
       });
       return {
         output: {
-          statusCode: result.status_code || 200,
+          statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
           message: result.message || 'List updated successfully.'
         },
         message: `Updated list **${ctx.input.listId}**.`
@@ -125,7 +155,7 @@ export let manageList = SlateTool.create(spec, {
       let result = await client.deleteList(ctx.input.listId!);
       return {
         output: {
-          statusCode: result.status_code || 200,
+          statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
           message: result.message || 'List deleted successfully.'
         },
         message: `Deleted list **${ctx.input.listId}**.`
@@ -136,7 +166,7 @@ export let manageList = SlateTool.create(spec, {
     let result = await client.addListRows(ctx.input.listId!, ctx.input.rows || []);
     return {
       output: {
-        statusCode: result.status_code || 200,
+        statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
         message: result.message || 'Rows added successfully.'
       },
       message: `Added **${(ctx.input.rows || []).length}** rows to list **${ctx.input.listId}**.`

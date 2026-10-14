@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrightDataClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageZone = SlateTool.create(spec, {
   ],
   constraints: [
     'Creating or deleting zones may affect billing and operations.',
-    'Only Admin-level API keys can create or delete zones.'
+    'Zone management requires an Admin or Ops API key; permissions vary by action.'
   ],
   tags: {
     destructive: true
@@ -31,7 +31,7 @@ export let manageZone = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Type of zone to create (e.g., "serp", "dc", "residential", "isp", "mobile", "unblocker"). Required for "create" action.'
+          'Type of zone to create, such as "serp", "dc", "resident", "ISP", or "unblocker". Match the selected provider plan.'
         ),
       planConfig: z
         .record(z.string(), z.unknown())
@@ -53,7 +53,7 @@ export let manageZone = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.planConfig) {
-        throw new Error('planConfig is required when creating a zone.');
+        throw createApiServiceError('planConfig is required when creating a zone.');
       }
       await client.createZone({
         name: zoneName,

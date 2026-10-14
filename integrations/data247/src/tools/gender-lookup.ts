@@ -20,7 +20,7 @@ export let genderLookup = SlateTool.create(spec, {
   .output(
     z.object({
       name: z.string().optional().describe('The name that was checked'),
-      gender: z.string().optional().describe('Probable gender ("M" or "F")'),
+      gender: z.string().optional().describe('Probable gender (MALE or FEMALE)'),
       genderPercent: z
         .string()
         .optional()
@@ -33,14 +33,14 @@ export let genderLookup = SlateTool.create(spec, {
     let raw = await client.genderLookup(ctx.input.name);
 
     let result = {
-      name: raw.name || ctx.input.name,
+      name: raw.fname || raw.name || ctx.input.name,
       gender: raw.gender,
-      genderPercent: raw.gender_prcnt || raw.gender_percent
+      genderPercent: raw.gender_pct || raw.gender_prcnt || raw.gender_percent
     };
 
     return {
       output: result,
-      message: `Gender lookup for **${ctx.input.name}**: **${result.gender || 'Unknown'}** (${result.genderPercent || 'N/A'}% confidence).`
+      message: `Gender lookup for **${ctx.input.name}**: **${result.gender || 'Unknown'}** (provider confidence: ${result.genderPercent || 'N/A'}).`
     };
   })
   .build();

@@ -1,8 +1,11 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://apps.emaillistverify.com/api'
-});
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
 
 export interface VerifyEmailResult {
   status: string;
@@ -21,6 +24,7 @@ export interface EnrichEmailResult {
 export interface FindEmailContact {
   email: string;
   confidence: string;
+  result?: string;
 }
 
 export interface BulkUploadResult {
@@ -39,61 +43,125 @@ export interface BulkFileStatus {
   linkOk: string;
 }
 
+let creditSchema = z.object({
+  onDemand: z.object({ available: z.number() }),
+  subscription: z.object({ available: z.number(), expiresAt: z.string() }).nullable()
+});
+
+let disposableSchema = z.object({
+  domain: z.string(),
+  result: z.string(),
+  internalResult: z.string().nullable(),
+  mxServer: z.string().nullable(),
+  mxServerIp: z.string().nullable()
+});
+
+let contactSchema = z.array(
+  z.object({ email: z.string(), confidence: z.string(), result: z.string().optional() })
+);
+
+let apiErrors: Record<string, string> = {
+  error_credit: 'Insufficient credits. Add credits before retrying.',
+  no_credit: 'Insufficient credits. Add credits before retrying.',
+  cannot_upload_file: 'The file could not be uploaded. Check its format and contents.',
+  key_not_valid: 'The API key is invalid. Reconnect with a valid API key.',
+  'missing parameters': 'Required request parameters are missing.',
+  error_file_not_exists: 'The file does not exist under this account.'
+};
+
+let nullableString = (value: unknown) => (typeof value === 'string' ? value : null);
+let nullableBoolean = (value: unknown) => (typeof value === 'boolean' ? value : null);
+
 export class Client {
-  constructor(private config: { token: string }) {}
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+
+  constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('An EmailListVerify API key is required.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.emaillistverify.com/api',
+      authHeader: { name: 'x-api-key', value: config.token },
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'EmailListVerify',
+          reason: 'emaillistverify_api_error'
+        })
+    });
+  }
+
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    data?: Record<string, unknown> | FormData,
+    params?: Record<string, unknown>
+  ): Promise<unknown> {
+    let response = await this.http.request({ method, url: path, data, params });
+    let result: unknown = response.data;
+    if (typeof result === 'string') {
+      let text = result.trim();
+      result = text;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        // Verification, upload, and compatibility endpoints also return plain text.
+      }
+    }
+    if (typeof result === 'string' && Object.hasOwn(apiErrors, result)) {
+      throw createApiServiceError(`EmailListVerify: ${apiErrors[result]}`, {
+        upstreamCode: result,
+        reason: 'emaillistverify_api_error'
+      });
+    }
+    if (isApiErrorRecord(result) && (result.error || Number(result.statusCode) >= 400)) {
+      throw createApiServiceError(
+        `EmailListVerify: ${nullableString(result.message) ?? 'The request was rejected.'}`,
+        {
+          reason: 'emaillistverify_api_error',
+          upstreamCode: nullableString(result.error) ?? undefined
+        }
+      );
+    }
+    return result;
+  }
 
   async verifyEmail(email: string, timeout?: number): Promise<VerifyEmailResult> {
-    let params: Record<string, string | number> = {
-      secret: this.config.token,
-      email
-    };
-    if (timeout !== undefined) {
-      params.timeout = timeout;
+    let result = await this.request(
+      'GET',
+      '/verifyEmail',
+      undefined,
+      pickDefined({ email, timeout })
+    );
+    if (typeof result !== 'string' || !result) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid verification response.'
+      );
     }
-
-    let response = await http.get('/verifyEmail', { params });
-    let status =
-      typeof response.data === 'string' ? response.data.trim() : String(response.data).trim();
-
-    return { status };
+    return { status: result };
   }
 
   async verifyEmailDetailed(email: string, timeout?: number): Promise<EnrichEmailResult> {
-    let params: Record<string, string | number> = {
-      secret: this.config.token,
-      email
-    };
-    if (timeout !== undefined) {
-      params.timeout = timeout;
+    let result = await this.request(
+      'GET',
+      '/verifyEmailDetailed',
+      undefined,
+      pickDefined({ email, timeout })
+    );
+    if (!isApiErrorRecord(result) || typeof (result.result ?? result.status) !== 'string') {
+      throw createApiServiceError('EmailListVerify returned an invalid enrichment response.');
     }
-
-    let response = await http.get('/verifyEmailDetailed', { params });
-    let data = response.data;
-
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data);
-      } catch {
-        return {
-          email,
-          status: data.trim(),
-          fullName: null,
-          gender: null,
-          esp: null,
-          free: null,
-          noreply: null
-        };
-      }
-    }
-
+    let fullName = [nullableString(result.firstName), nullableString(result.lastName)]
+      .filter(Boolean)
+      .join(' ');
     return {
-      email: data.email ?? email,
-      status: data.status ?? 'unknown',
-      fullName: data.fullName ?? data.full_name ?? null,
-      gender: data.gender ?? null,
-      esp: data.esp ?? data.ESP ?? null,
-      free: data.free ?? null,
-      noreply: data.noreply ?? data.no_reply ?? null
+      email: nullableString(result.email) ?? email,
+      status: String(result.result ?? result.status),
+      fullName: nullableString(result.fullName ?? result.full_name) ?? (fullName || null),
+      gender: nullableString(result.gender),
+      esp: nullableString(result.esp ?? result.ESP),
+      free: nullableBoolean(result.isFree ?? result.free),
+      noreply: nullableBoolean(result.isNoReply ?? result.noreply ?? result.no_reply)
     };
   }
 
@@ -102,128 +170,118 @@ export class Client {
     lastName?: string;
     domain: string;
   }): Promise<FindEmailContact[]> {
-    let response = await http.post('/find-contact', null, {
-      params: {
-        secret: this.config.token,
-        first_name: params.firstName,
-        last_name: params.lastName,
-        domain: params.domain
-      }
-    });
-
-    let data = response.data;
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data);
-      } catch {
-        return [];
-      }
+    let result = await this.request('POST', '/findContact', pickDefined(params));
+    let parsed = contactSchema.safeParse(result);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid contact-search response.'
+      );
     }
-
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    return data.map((item: any) => ({
-      email: item.email ?? '',
-      confidence: item.confidence ?? 'unknown'
-    }));
+    return parsed.data;
   }
 
   async domainSearch(domain: string): Promise<FindEmailContact[]> {
-    let response = await http.post('/find-contact', null, {
-      params: {
-        secret: this.config.token,
-        domain
-      }
-    });
-
-    let data = response.data;
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data);
-      } catch {
-        return [];
-      }
-    }
-
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    return data.map((item: any) => ({
-      email: item.email ?? '',
-      confidence: item.confidence ?? 'unknown'
-    }));
+    return this.findEmail({ domain });
   }
 
-  async uploadBulkFile(filename: string, fileContents: string): Promise<BulkUploadResult> {
+  async uploadBulkFile(
+    filename: string,
+    fileContents: string,
+    quality?: 'standard' | 'high',
+    deepScan?: boolean
+  ): Promise<BulkUploadResult> {
     let formData = new FormData();
-    let blob = new Blob([fileContents], { type: 'text/plain' });
-    formData.append('file_contents', blob, filename);
-
-    let response = await http.post('/verifApiFile', formData, {
-      params: {
-        secret: this.config.token,
-        filename
-      },
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-
-    let data =
-      typeof response.data === 'string' ? response.data.trim() : String(response.data).trim();
-
-    if (data === 'no_credit') {
-      throw new Error('Account balance is zero. Please add credits to continue.');
+    formData.append(
+      'file_contents',
+      new Blob([fileContents], { type: 'text/plain' }),
+      filename
+    );
+    if (quality !== undefined) formData.append('quality', quality);
+    if (deepScan !== undefined) formData.append('deepScan', String(deepScan));
+    let result = await this.request('POST', '/verifyApiFile', formData);
+    if (
+      (typeof result !== 'string' && typeof result !== 'number') ||
+      !/^\d+$/.test(String(result))
+    ) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid bulk verification job ID.'
+      );
     }
-    if (data === 'cannot_upload_file') {
-      throw new Error('File upload failed due to incorrect formatting or broken upload.');
-    }
-    if (data === 'key_not_valid') {
-      throw new Error('Invalid API key provided.');
-    }
-    if (data === 'missing parameters') {
-      throw new Error('Missing required parameters for the request.');
-    }
-
-    return { fileId: data };
+    return { fileId: String(result) };
   }
 
   async getBulkFileStatus(fileId: string): Promise<BulkFileStatus> {
-    let response = await http.get('/getApiFileInfo', {
-      params: {
-        secret: this.config.token,
-        id: fileId
-      }
-    });
-
-    let data =
-      typeof response.data === 'string' ? response.data.trim() : String(response.data).trim();
-
-    if (data === 'error_file_not_exists') {
-      throw new Error('File does not exist under your account.');
+    // Keep the compatibility endpoint because it supplies the existing line-count output fields.
+    let result = await this.request('GET', '/getApiFileInfo', undefined, { id: fileId });
+    if (typeof result !== 'string') {
+      throw createApiServiceError('EmailListVerify returned an invalid bulk status response.');
     }
-    if (data === 'key_not_valid') {
-      throw new Error('Invalid API key provided.');
+    if (result === 'waiting' || result === 'errored') {
+      return {
+        fileId,
+        filename: '',
+        unique: '',
+        lines: '',
+        linesProcessed: '',
+        status: result,
+        timestamp: '',
+        linkAll: '',
+        linkOk: ''
+      };
     }
-    if (data === 'missing parameters') {
-      throw new Error('Missing required parameters for the request.');
+    let parts = result.replace(/^\|/, '').split('|');
+    if (parts.length < 9 || parts[0] !== fileId) {
+      throw createApiServiceError('EmailListVerify returned an invalid bulk status response.');
     }
-
-    let parts = data.split('|');
-
+    let finished = parts[5] === 'finished';
+    // Never expose secret query values returned by the compatibility endpoint.
+    let url = `https://api.emaillistverify.com/api/maillists/${encodeURIComponent(fileId)}`;
     return {
-      fileId: parts[0] ?? '',
+      fileId: parts[0] ?? fileId,
       filename: parts[1] ?? '',
       unique: parts[2] ?? '',
       lines: parts[3] ?? '0',
       linesProcessed: parts[4] ?? '0',
       status: parts[5] ?? 'unknown',
       timestamp: parts[6] ?? '',
-      linkAll: parts[7] ?? '',
-      linkOk: parts[8] ?? ''
+      linkAll: finished ? `${url}?format=csv&addDuplicates=true&addNoEmailRows=true` : '',
+      linkOk: finished ? `${url}?format=csv&results=ok` : ''
     };
+  }
+
+  async getBulkProgress(fileId: string) {
+    let result = await this.request(
+      'GET',
+      `/maillists/${encodeURIComponent(fileId)}/progress`
+    );
+    let parsed = z.object({ status: z.string(), name: z.string() }).safeParse(result);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid bulk progress response.'
+      );
+    }
+    return parsed.data;
+  }
+
+  async getCredits() {
+    let result = await this.request('GET', '/credits');
+    let parsed = creditSchema.safeParse(result);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid credit balance response.'
+      );
+    }
+    return parsed.data;
+  }
+
+  async checkDisposable(domain: string) {
+    let result = await this.request('POST', '/checkDisposable', undefined, { domain });
+    let parsed = disposableSchema.safeParse(result);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'EmailListVerify returned an invalid disposable-domain response.'
+      );
+    }
+    return parsed.data;
   }
 }

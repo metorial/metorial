@@ -1,18 +1,115 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let BASE_URL = 'https://api.getprospect.com/public/v1';
+let V2_BASE_URL = 'https://api.getprospect.com/v2';
+
+type ApiEnvelope<T> = {
+  success: boolean;
+  data: T | null;
+  errors?: { name: string; message: string }[];
+};
+
+type EmailResult = {
+  email?: string | null;
+  status?: string;
+  confidence?: number;
+  domain?: string | null;
+  domain_status?: string | null;
+  smtp_provider?: string | null;
+  free_email?: boolean | null;
+};
+
+type CurrentUser = {
+  id: string;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  timezone?: string | null;
+  created_at?: string | null;
+  workspace?: { id: number; name: string; role: string } | null;
+  auth?: { channel: string; api_key_id?: string | null };
+};
+
+type CreditBalance = {
+  available: number;
+  allowance: number;
+  additional: number;
+  permanent: number;
+};
+
+type CreditBalances = {
+  email_search: CreditBalance;
+  email_verification: CreditBalance;
+  phone_search: CreditBalance;
+  reset_at: string | null;
+};
 
 export class Client {
   private axios;
+  private v2Axios;
 
   constructor(private config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
+    this.axios = this.createHttpClient(BASE_URL, 'apiKey');
+    this.v2Axios = this.createHttpClient(V2_BASE_URL, 'x-api-key');
+  }
+
+  private createHttpClient(baseURL: string, authHeader: string) {
+    let client = createAxios({
+      baseURL,
+      timeout: 100_000,
+      validateStatus: () => true,
       headers: {
-        apiKey: this.config.token,
+        [authHeader]: this.config.token,
         'Content-Type': 'application/json'
       }
     });
+
+    client.interceptors.response.use(
+      response => {
+        if (response.status >= 400) {
+          throw buildApiServiceError(
+            { response },
+            { providerLabel: 'GetProspect', reason: 'getprospect_request_failed' }
+          );
+        }
+        return response;
+      },
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'GetProspect',
+            reason: 'getprospect_request_failed'
+          })
+        )
+    );
+
+    return client;
+  }
+
+  private readV2Result<T>(result: ApiEnvelope<T>, permittedError?: string): T {
+    if (!result || typeof result !== 'object' || typeof result.success !== 'boolean') {
+      throw createApiServiceError('GetProspect returned an invalid response. Please retry.', {
+        reason: 'getprospect_invalid_response'
+      });
+    }
+    let expectedOutcome =
+      permittedError &&
+      result.errors?.length &&
+      result.errors.every(error => error.name === permittedError) &&
+      result.data !== null;
+
+    if (result.success === false && !expectedOutcome) {
+      throw buildApiServiceError(
+        { response: { status: 200, data: result } },
+        { providerLabel: 'GetProspect', reason: 'getprospect_request_failed' }
+      );
+    }
+    if (result.data === null || result.data === undefined) {
+      throw createApiServiceError('GetProspect returned no result data. Please retry.', {
+        reason: 'getprospect_invalid_response'
+      });
+    }
+    return result.data;
   }
 
   // ---- Leads ----
@@ -180,21 +277,39 @@ export class Client {
   // ---- Email ----
 
   async findEmail(params: { domain: string; firstName: string; lastName: string }) {
-    let response = await this.axios.get('/email/find', {
-      params: {
+    if (!params.domain.trim() || !params.firstName.trim() || !params.lastName.trim()) {
+      throw createApiServiceError(
+        'Provide a domain, first name, and last name to find an email.'
+      );
+    }
+    let response = await this.v2Axios.post<ApiEnvelope<EmailResult>>('/email/find', {
+      data: {
         domain: params.domain,
-        firstName: params.firstName,
-        lastName: params.lastName
+        first_name: params.firstName,
+        last_name: params.lastName
       }
     });
-    return response.data;
+    return this.readV2Result(response.data, 'NOT_FOUND');
   }
 
   async verifyEmail(email: string) {
-    let response = await this.axios.get('/email/verify', {
-      params: { email }
+    if (!email.trim()) {
+      throw createApiServiceError('Provide an email address to verify.');
+    }
+    let response = await this.v2Axios.post<ApiEnvelope<EmailResult>>('/email/verify', {
+      data: { email }
     });
-    return response.data;
+    return this.readV2Result(response.data);
+  }
+
+  async getCurrentUser() {
+    let response = await this.v2Axios.get<ApiEnvelope<CurrentUser>>('/me');
+    return this.readV2Result(response.data);
+  }
+
+  async getCreditBalances() {
+    let response = await this.v2Axios.get<ApiEnvelope<CreditBalances>>('/credits');
+    return this.readV2Result(response.data);
   }
 
   // ---- Sequences ----

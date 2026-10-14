@@ -4,6 +4,7 @@ import {
   checkAsyncStatus,
   createAsyncDocument,
   createDocument,
+  createHostedAsyncDocument,
   createHostedDocument,
   expireHostedDocument,
   listDocuments,
@@ -17,6 +18,7 @@ export let provider = Slate.create({
     createAsyncDocument,
     checkAsyncStatus,
     createHostedDocument,
+    createHostedAsyncDocument,
     expireHostedDocument,
     listDocuments,
     listIps

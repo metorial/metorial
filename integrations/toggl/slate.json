@@ -1,16 +1,16 @@
 {
   "name": "@metorial/toggl",
-  "description": "Track time spent on tasks and projects. Create, start, stop, and manage time entries within workspaces. Manage projects, clients, tags, and tasks for organizing tracked time. Assign time entries to projects and tasks, mark them as billable, and add tags for cross-project filtering. Generate detailed, summary, and weekly reports with filtering by projects, clients, tags, users, date ranges, and billable status. Manage workspace settings, organization-level users, roles, and groups. Invite users, assign permissions, and control workspace access.",
+  "description": "Track time with Toggl Track. Create, inspect, update, stop, and delete time entries. Manage projects, clients, tags, and tasks, and retrieve individual project or client details. Discover available workspaces, inspect your account, and list workspace members. Generate summary and detailed reports with date ranges, resource filters, billable status, and detailed-report pagination. Tasks and some billing or reporting capabilities require an eligible plan.",
   "categories": ["apis-and-http-requests", "task-and-project-management"],
   "skills": [
     "track time entries",
     "manage projects and tasks",
     "manage clients and tags",
-    "generate time reports",
+    "generate summary and detailed reports",
     "start and stop timers",
-    "manage workspace users",
-    "manage organizations",
-    "bulk edit time entries"
+    "discover workspaces",
+    "list workspace members",
+    "inspect account identity"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/toggl.svg"
 }

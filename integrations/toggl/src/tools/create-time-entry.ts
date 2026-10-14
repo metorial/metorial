@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTimeEntry = SlateTool.create(spec, {
@@ -13,10 +14,7 @@ export let createTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       description: z.string().optional().describe('Description of the time entry'),
       start: z
         .string()
@@ -25,7 +23,7 @@ export let createTimeEntry = SlateTool.create(spec, {
       stop: z
         .string()
         .optional()
-        .describe('Stop time in ISO 8601 format. Required for completed entries.'),
+        .describe('Stop time in ISO 8601 format. Optional when the duration is provided.'),
       projectId: z.number().optional().describe('Project ID to assign the time entry to'),
       taskId: z.number().optional().describe('Task ID to assign the time entry to'),
       tags: z.array(z.string()).optional().describe('Tag names to apply to the time entry'),
@@ -50,8 +48,8 @@ export let createTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
 
     let entry = await client.createTimeEntry(wsId, {
       description: ctx.input.description,
@@ -62,7 +60,7 @@ export let createTimeEntry = SlateTool.create(spec, {
       taskId: ctx.input.taskId,
       tags: ctx.input.tags,
       billable: ctx.input.billable,
-      createdWith: 'slates'
+      createdWith: 'Metorial'
     });
 
     return {

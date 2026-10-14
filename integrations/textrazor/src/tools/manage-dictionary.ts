@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -76,15 +76,23 @@ Use the **action** field to specify the operation. When creating, configure matc
       };
     }
 
-    if (!dictionaryId) {
-      throw new Error('dictionaryId is required for create, get, and delete actions.');
+    if (!dictionaryId?.trim()) {
+      throw createApiServiceError(
+        'dictionaryId is required for create, get, and delete actions.'
+      );
     }
 
     if (action === 'create') {
       await client.createDictionary(dictionaryId, { matchType, caseInsensitive, language });
+      let dictionary = await client.getDictionary(dictionaryId);
       return {
         output: {
-          dictionary: { dictionaryId, matchType, caseInsensitive, language }
+          dictionary: {
+            dictionaryId: dictionary.id,
+            matchType: dictionary.matchType,
+            caseInsensitive: dictionary.caseInsensitive,
+            language: dictionary.language
+          }
         },
         message: `Dictionary **${dictionaryId}** created successfully.`
       };
@@ -113,6 +121,6 @@ Use the **action** field to specify the operation. When creating, configure matc
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

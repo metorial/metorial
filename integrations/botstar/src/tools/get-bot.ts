@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getBot = SlateTool.create(spec, {
   name: 'Get Bot',
   key: 'get_bot',
-  description: `Retrieve details for a specific chatbot by its ID, including its name and team association.`,
+  description: `Retrieve details for a specific chatbot by its ID, including its name and team association. ${botScopeGuidance}`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot to retrieve')
+      botId: botIdSchema
     })
   )
   .output(
@@ -31,7 +32,7 @@ export let getBot = SlateTool.create(spec, {
       output: {
         botId: bot.id || bot._id || '',
         name: bot.name || '',
-        teamName: bot.team_name
+        teamName: bot.team_name ?? undefined
       },
       message: `Retrieved bot **${bot.name}**.`
     };

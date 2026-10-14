@@ -7,13 +7,13 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Default workspace (project) ID to use for API operations. If not set, must be provided per-tool.'
+        'Optional default workspace (project) ID. Call list_workspaces to discover available IDs; it can also be supplied per tool.'
       ),
     environmentId: z
       .string()
       .optional()
       .describe(
-        'Default environment ID or name to use for flag definitions and segment operations.'
+        'Optional default environment ID or name for flag definitions and segment operations. Call list_environments to discover environments.'
       )
   })
 );

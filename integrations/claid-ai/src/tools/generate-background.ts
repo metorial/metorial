@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addResultFiles, validateWholeNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 let placementSchema = z
@@ -10,6 +11,12 @@ let placementSchema = z
       .optional()
       .describe(
         'Placement type: "absolute" for manual control, "original" to keep input position, "padding" for uniform spacing'
+      ),
+    padding: z
+      .string()
+      .optional()
+      .describe(
+        'Space around the product, such as "10%" or "5% 10%". Required for padding placement.'
       ),
     scale: z
       .number()
@@ -158,6 +165,46 @@ Provide a product image URL and configure object placement, scene type, and outp
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    validateWholeNumber(ctx.input.numberOfImages, 'numberOfImages');
+    validateWholeNumber(ctx.input.promptScene?.steps, 'promptScene.steps');
+    let sceneCount = [
+      ctx.input.promptScene,
+      ctx.input.templateScene,
+      ctx.input.effectScene
+    ].filter(scene => scene !== undefined).length;
+    if (sceneCount !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one of promptScene, templateScene, or effectScene.'
+      );
+    }
+    if (ctx.input.templateScene && !ctx.input.templateScene.view) {
+      throw createApiServiceError(
+        'templateScene.view is required for template-based generation.'
+      );
+    }
+    if (ctx.input.effectScene && !ctx.input.effectScene.effect) {
+      throw createApiServiceError(
+        'effectScene.effect is required for effect-based generation.'
+      );
+    }
+    if (ctx.input.placement?.type === 'padding' && !ctx.input.placement.padding) {
+      throw createApiServiceError('placement.padding is required for padding placement.');
+    }
+    if (
+      ctx.input.placement?.type &&
+      ctx.input.placement.type !== 'absolute' &&
+      [
+        ctx.input.placement.scale,
+        ctx.input.placement.positionX,
+        ctx.input.placement.positionY,
+        ctx.input.placement.rotationDegree
+      ].some(value => value !== undefined)
+    ) {
+      throw createApiServiceError('Scale, position, and rotation require absolute placement.');
+    }
+    if (ctx.input.placement?.padding !== undefined && ctx.input.placement.type !== 'padding') {
+      throw createApiServiceError('placement.padding requires the padding placement type.');
+    }
 
     let objectConfig: Record<string, unknown> = {
       image_url: ctx.input.imageUrl
@@ -166,6 +213,7 @@ Provide a product image URL and configure object placement, scene type, and outp
     if (ctx.input.placement) {
       let p = ctx.input.placement;
       if (p.type) objectConfig.placement_type = p.type;
+      if (p.padding !== undefined) objectConfig.padding = p.padding;
       if (p.scale !== undefined) objectConfig.scale = p.scale;
       if (p.rotationDegree !== undefined) objectConfig.rotation_degree = p.rotationDegree;
       if (p.positionX !== undefined || p.positionY !== undefined) {
@@ -217,8 +265,9 @@ Provide a product image URL and configure object placement, scene type, and outp
 
     let data = result.data;
     let outputs = Array.isArray(data.output) ? data.output : [data.output];
+    await addResultFiles(ctx, outputs);
 
-    let images = outputs.map((img: any) => ({
+    let images = outputs.map(img => ({
       format: img.format,
       width: img.width,
       height: img.height,

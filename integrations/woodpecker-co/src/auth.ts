@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,17 +25,7 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.woodpecker.co/rest'
-      });
-
-      let response = await axios.get('/v1/me', {
-        headers: {
-          'x-api-key': ctx.output.token
-        }
-      });
-
-      let data = response.data;
+      let data = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {

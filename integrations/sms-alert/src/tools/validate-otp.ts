@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SmsAlertClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,11 +23,17 @@ export let validateOtp = SlateTool.create(spec, {
       status: z
         .string()
         .describe('Status of the verification (e.g., "success" or "failure").'),
+      verified: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the provider explicitly confirmed the OTP matched. Omitted for an unrecognized verification response.'
+        ),
       description: z.any().describe('Detailed verification response.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
     ctx.info(`Validating OTP for ${ctx.input.mobileNumber}`);
     let result = await client.validateOtp({
@@ -35,16 +41,31 @@ export let validateOtp = SlateTool.create(spec, {
       otp: ctx.input.otp
     });
 
-    let verified = result.status === 'success';
+    let detail =
+      typeof result.description === 'string'
+        ? result.description
+        : isApiErrorRecord(result.description) && typeof result.description.desc === 'string'
+          ? result.description.desc
+          : undefined;
+    let verified =
+      detail && /^code matched successfully\.?$/i.test(detail.trim())
+        ? true
+        : detail && /^code does not match\.?$/i.test(detail.trim())
+          ? false
+          : undefined;
 
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        verified,
+        description: result.description ?? result
       },
-      message: verified
-        ? `OTP for **${ctx.input.mobileNumber}** verified successfully.`
-        : `OTP validation failed for **${ctx.input.mobileNumber}**: ${result.description || 'invalid or expired'}`
+      message:
+        verified === true
+          ? `OTP for **${ctx.input.mobileNumber}** verified successfully.`
+          : verified === false
+            ? `OTP for **${ctx.input.mobileNumber}** did not match.`
+            : `OTP verification response received for **${ctx.input.mobileNumber}**. Review the response details.`
     };
   })
   .build();

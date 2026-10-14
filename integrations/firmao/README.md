@@ -1,6 +1,10 @@
 # Firmao
 
-Manage CRM and ERP operations for small and medium businesses. Create, read, update, and delete customers, contact persons, projects, tasks, and sales opportunities. Generate and manage invoices, pro forma invoices, receipts, correction invoices, offers, orders, and contracts with line items and pricing. Track products and services with stock levels, manage warehouse documents (GRN/GIN), and monitor sales pipelines. Record employee work time entries, create sales notes linked to customers and projects, and query emails stored in Firmao's mail system. Upload and download file attachments on tasks, projects, products, customers, and other objects. Retrieve PDF versions of invoices and offers using configured templates. Supports filtering with comparison operators, sorting, and custom fields across all object types.
+Manage customers, contacts, projects, tasks, products, sales opportunities, sales notes, and work time in Firmao. Create invoices, offers, orders, and agreements with product-linked or free-text line items. Query stored emails, document metadata, transactions, and warehouse documents. Discover numbering series and suggested document numbers, and finish an existing work time entry.
+
+Connect with the API login and password generated in **Company → Settings → API**. Enable the API and provide the organization identifier shown in your signed-in Firmao URL.
+
+For reference, see the [Firmao API documentation](https://firmao.io/API-Documentation_EN.pdf) and the [current Polish API documentation](https://firmao.pl/API%20Firmao.pdf).
 
 ## License
 

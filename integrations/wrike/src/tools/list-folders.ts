@@ -62,19 +62,15 @@ export let listFolders = SlateTool.create(spec, {
       host: ctx.auth.host
     });
 
-    let result: any;
-    if (ctx.input.spaceId) {
-      result = await client.getFolderTree({ spaceId: ctx.input.spaceId });
-    } else {
-      result = await client.getFolders({
-        folderId: ctx.input.parentFolderId,
-        folderIds: ctx.input.folderIds,
-        fields: ctx.input.fields,
-        project: ctx.input.projectsOnly
-      });
-    }
+    let result = await client.getFolders({
+      folderId: ctx.input.parentFolderId,
+      folderIds: ctx.input.folderIds,
+      spaceId: ctx.input.spaceId,
+      fields: ctx.input.fields,
+      project: ctx.input.projectsOnly
+    });
 
-    let folders = result.data.map((f: any) => ({
+    let folders = result.data.map(f => ({
       folderId: f.id,
       title: f.title,
       scope: f.scope,

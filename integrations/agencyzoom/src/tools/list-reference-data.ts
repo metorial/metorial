@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,6 +44,10 @@ export let listReferenceData = SlateTool.create(spec, {
         .describe(
           'Pipeline ID, required when dataType is "pipeline_stages" to fetch stages for a specific pipeline'
         ),
+      pipelineType: z
+        .enum(['lead', 'service'])
+        .optional()
+        .describe('Pipeline type for pipelines. Omit to retrieve both types.'),
       searchQuery: z
         .string()
         .optional()
@@ -58,11 +62,7 @@ export let listReferenceData = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let result: any;
     let label = ctx.input.dataType.replace(/_/g, ' ');
@@ -96,11 +96,13 @@ export let listReferenceData = SlateTool.create(spec, {
         result = await client.getCustomFields();
         break;
       case 'pipelines':
-        result = await client.getPipelines();
+        result = await client.getPipelines(ctx.input.pipelineType);
         break;
       case 'pipeline_stages': {
         if (!ctx.input.pipelineId) {
-          throw new Error('pipelineId is required when dataType is "pipeline_stages"');
+          throw createApiServiceError(
+            'pipelineId is required when dataType is "pipeline_stages"'
+          );
         }
         result = await client.getPipelineStages(ctx.input.pipelineId);
         break;
@@ -130,10 +132,12 @@ export let listReferenceData = SlateTool.create(spec, {
         result = await client.getLifeProfessionals();
         break;
       default:
-        throw new Error(`Unsupported dataType: ${ctx.input.dataType}`);
+        throw createApiServiceError(`Unsupported dataType: ${ctx.input.dataType}`);
     }
 
-    let items = Array.isArray(result) ? result : (result?.data ?? result?.items ?? [result]);
+    let items = Array.isArray(result)
+      ? result
+      : (result?.csrs ?? result?.data ?? result?.items ?? [result]);
 
     return {
       output: {

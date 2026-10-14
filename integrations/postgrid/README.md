@@ -1,6 +1,8 @@
-# <img src="logo.jpeg" height="20"> Postgrid
+# <img src="logo.jpeg" height="20"> PostGrid
 
-Send physical mail programmatically including letters, postcards, cheques, and self-mailers. Manage contacts and reusable templates with merge variables for personalized mailings. Verify, standardize, and autocomplete postal addresses across the US, Canada, and 245+ countries. Track mail order status through printing, delivery, and completion stages. Run bulk mail campaigns to contact lists. Process PDFs with OCR address extraction and HTML-to-PDF rendering. Add QR codes and personalized URLs to track mailpiece engagement. Manage return envelopes and detect recipient address changes via NCOA.
+Send physical letters, postcards, cheques, and self-mailers through PostGrid. Create and retrieve contacts, create and update reusable HTML templates, and list, track, or cancel mail orders. Verify and autocomplete domestic and international postal addresses. Download available PDF previews.
+
+Print & Mail and Address Verification use separate API keys. Supply the optional Address Verification key when using both services in one connection. For address-only connections, the main API key can be an Address Verification key.
 
 ## License
 

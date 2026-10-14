@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlaygroundClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generateSoundEffect = SlateTool.create(spec, {
   name: 'Generate Sound Effect',
   key: 'generate_sound_effect',
-  description: `Generate audio sound effects from a text description. Configure duration, number of variations, and a creativity slider. Returns base64-encoded WAV audio for each variation. Examples: "thunderstorm rumbling", "birdsong at dawn", "keyboard typing".`,
+  description: `Generate audio sound effects from a text description. Configure duration, number of variations, and a creativity slider. Provides a downloadable WAV file and base64-encoded WAV audio for each variation. Examples: "thunderstorm rumbling", "birdsong at dawn", "keyboard typing".`,
   constraints: [
     'Prompt must be between 5 and 256 characters.',
     'Duration: 1-20 seconds.',
@@ -58,13 +58,26 @@ export let generateSoundEffect = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    if (ctx.input.numVariations !== undefined && !Number.isInteger(ctx.input.numVariations)) {
+      throw createApiServiceError('numVariations must be a whole number from 1 to 4.');
+    }
+    let client = new PlaygroundClient(ctx.auth);
     let results = await client.generateSoundEffect({
       prompt: ctx.input.prompt,
       numVariations: ctx.input.numVariations,
       durationSeconds: ctx.input.durationSeconds,
       creativity: ctx.input.creativity
     });
+
+    for (let [index, result] of results.entries()) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Buffer.from(result.wav_base64, 'base64'), {
+          headers: { 'content-type': 'audio/wav' }
+        }),
+        filename: `sound-effect-${index + 1}.wav`
+      });
+    }
 
     return {
       output: {

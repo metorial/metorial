@@ -15,7 +15,10 @@ export let createJobMessageTool = SlateTool.create(spec, {
     z.object({
       jobId: z.string().describe('The unique ID of the job'),
       body: z.string().describe('Message body content'),
-      subject: z.string().optional().describe('Message subject (for new messages)'),
+      subject: z
+        .string()
+        .optional()
+        .describe('Optional heading prepended to the text of a new message'),
       replyToMessageId: z
         .string()
         .optional()

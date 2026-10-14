@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scheduleIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listResourcesTool = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ export let listResourcesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scheduleId: z.string().optional().describe('Schedule ID to list resources/services for'),
+      scheduleId: scheduleIdSchema.optional(),
       includeFields: z
         .boolean()
         .optional()

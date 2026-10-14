@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createIssue = SlateTool.create(spec, {
@@ -22,7 +23,7 @@ export let createIssue = SlateTool.create(spec, {
         .optional()
         .describe('User IDs to assign as collaborators'),
       dueAt: z.string().optional().describe('Due date in ISO 8601 format'),
-      siteId: z.string().optional().describe('Site ID to associate with'),
+      siteId: siteIdSchema.optional(),
       assetId: z.string().optional().describe('Asset ID to associate with'),
       occurredAt: z
         .string()

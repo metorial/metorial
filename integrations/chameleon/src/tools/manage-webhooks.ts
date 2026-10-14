@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChameleonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,6 +64,9 @@ Available topics include: tour.started, tour.completed, tour.exited, tour.snooze
     let client = new ChameleonClient(ctx.auth.token);
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.url || !ctx.input.topics?.length) {
+        throw createApiServiceError('Provide url and at least one topic to create a webhook.');
+      }
       let result = await client.createWebhook({
         url: ctx.input.url!,
         topics: ctx.input.topics!,
@@ -76,6 +79,8 @@ Available topics include: tour.started, tour.completed, tour.exited, tour.snooze
     }
 
     if (ctx.input.action === 'delete') {
+      if (!ctx.input.webhookId)
+        throw createApiServiceError('Provide webhookId to delete a webhook.');
       await client.deleteWebhook(ctx.input.webhookId!);
       return {
         output: { deleted: true },

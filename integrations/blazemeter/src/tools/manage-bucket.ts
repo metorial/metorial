@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunscopeClient } from '../lib/runscope-client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageBucket = SlateTool.create(spec, {
   description: `List, create, or delete API monitoring buckets. Buckets are containers that organize monitoring tests in BlazeMeter's API Monitoring (Runscope).`,
   instructions: [
     'Use "list" to see all available buckets.',
-    'Use "create" with a **name** to create a new bucket.',
+    'Use "create" with a **name** and **teamUuid** from get_current_user to create a new bucket.',
     'Use "delete" with a **bucketKey** to remove a bucket.'
   ],
   tags: {
@@ -21,7 +21,12 @@ export let manageBucket = SlateTool.create(spec, {
       action: z.enum(['list', 'create', 'delete']).describe('Operation to perform'),
       bucketKey: z.string().optional().describe('Bucket key (required for delete)'),
       name: z.string().optional().describe('Bucket name (required for create)'),
-      teamUuid: z.string().optional().describe('Team UUID to associate the bucket with')
+      teamUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Team UUID required for create; call get_current_user with an API Monitoring connection to discover team IDs'
+        )
     })
   )
   .output(
@@ -43,8 +48,14 @@ export let manageBucket = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.runscopeToken && !ctx.auth.token) {
-      throw new Error('Runscope OAuth token is required for API Monitoring operations');
+    if (
+      ctx.auth.apiKeyId ||
+      ctx.auth.apiKeySecret ||
+      (!ctx.auth.runscopeToken && !ctx.auth.token)
+    ) {
+      throw createApiServiceError(
+        'Runscope OAuth token is required for API Monitoring operations'
+      );
     }
     let client = new RunscopeClient({ token: ctx.auth.runscopeToken || ctx.auth.token });
 
@@ -63,7 +74,10 @@ export let manageBucket = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a bucket');
+      if (!ctx.input.name || !ctx.input.teamUuid)
+        throw createApiServiceError(
+          'name and teamUuid are required for creating a bucket. Call get_current_user to discover team UUIDs.'
+        );
       let bucket = await client.createBucket({
         name: ctx.input.name,
         teamUuid: ctx.input.teamUuid
@@ -75,7 +89,8 @@ export let manageBucket = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.bucketKey) throw new Error('bucketKey is required for deleting a bucket');
+      if (!ctx.input.bucketKey)
+        throw createApiServiceError('bucketKey is required for deleting a bucket');
       await client.deleteBucket(ctx.input.bucketKey);
       return {
         output: { bucketKey: ctx.input.bucketKey, deleted: true },
@@ -83,6 +98,6 @@ export let manageBucket = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

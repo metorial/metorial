@@ -1,7 +1,7 @@
 import { OdooClient, type OdooTransport } from './client';
 
 export interface OdooContext {
-  config: { instanceUrl: string; database?: string };
+  config: { instanceUrl?: string; database?: string };
   auth: {
     token: string;
     username: string;
@@ -17,7 +17,9 @@ export let createClient = (ctx: OdooContext): OdooClient => {
   let hasBoundAuthState = ctx.auth.transport !== undefined;
 
   return new OdooClient({
-    instanceUrl: hasBoundAuthState ? (ctx.auth.instanceUrl ?? '') : ctx.config.instanceUrl,
+    instanceUrl: hasBoundAuthState
+      ? (ctx.auth.instanceUrl ?? '')
+      : (ctx.config.instanceUrl ?? ''),
     // A transport-bound JSON-2 connection may intentionally omit the database.
     // Only connections created before auth binding may inherit mutable config.
     database: hasBoundAuthState ? ctx.auth.database : ctx.config.database,

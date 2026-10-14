@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageConnectors = SlateTool.create(spec, {
 
     if (action === 'list') {
       let connectors = await client.listConnectors(stormId);
-      let list = Array.isArray(connectors) ? connectors : [];
+      let list = connectors;
       return {
         output: { connectors: list, success: true },
         message: `Found **${list.length}** connector(s) in Storm ${stormId}.`
@@ -46,7 +46,10 @@ export let manageConnectors = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!fromIdeaId || !toIdeaId) {
-        throw new Error('fromIdeaId and toIdeaId are required for creating a connector');
+        throw createApiServiceError(
+          'fromIdeaId and toIdeaId are required for creating a connector',
+          { reason: 'stormboard_invalid_input' }
+        );
       }
       let connector = await client.createConnector(stormId, {
         from: fromIdeaId,
@@ -61,7 +64,14 @@ export let manageConnectors = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!connectorId) {
-        throw new Error('connectorId is required for updating a connector');
+        throw createApiServiceError('connectorId is required for updating a connector', {
+          reason: 'stormboard_invalid_input'
+        });
+      }
+      if (label === undefined) {
+        throw createApiServiceError('label is required for updating a connector.', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let connector = await client.updateConnector(stormId, connectorId, { label });
       return {
@@ -72,7 +82,9 @@ export let manageConnectors = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!connectorId) {
-        throw new Error('connectorId is required for deleting a connector');
+        throw createApiServiceError('connectorId is required for deleting a connector', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       await client.deleteConnector(stormId, connectorId);
       return {

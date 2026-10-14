@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getRunData = SlateTool.create(spec, {
   name: 'Get Run Data',
   key: 'get_run_data',
-  description: `Retrieve the extracted data from a completed scraping run. You can either provide a specific run token, or provide a project token to get data from the most recent completed run automatically.`,
+  description: `Retrieve the extracted JSON data and a downloadable JSON file from a ready scraping run. Provide a run token, or set useLastReady with a project token to use the most recent run with available data.`,
   instructions: [
-    'If you only have a project token and want the latest data, set useLastReady to true and provide the projectToken.',
-    'If you have a specific run token, provide it directly.'
+    'If you only have a project token and want the latest data, set useLastReady to true and provide the projectToken. Call list_projects to discover project tokens.',
+    'If you have a specific run token, provide it directly. Use export_run_data for a CSV download.'
   ],
   tags: {
     readOnly: true
@@ -21,15 +21,11 @@ export let getRunData = SlateTool.create(spec, {
       projectToken: z
         .string()
         .optional()
-        .describe(
-          'Token of the project to get the last ready run data from (use with useLastReady)'
-        ),
+        .describe('Project token from list_projects to use with useLastReady'),
       useLastReady: z
         .boolean()
         .optional()
-        .describe(
-          'When true, retrieves data from the most recent completed run of the project instead of a specific run'
-        )
+        .describe('When true, use the most recent run with available data for projectToken')
     })
   )
   .output(
@@ -38,25 +34,39 @@ export let getRunData = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let extractedData: any;
-
-    if (ctx.input.useLastReady && ctx.input.projectToken) {
-      extractedData = await client.getLastReadyRunData(ctx.input.projectToken);
-    } else if (ctx.input.runToken) {
-      extractedData = await client.getRunData(ctx.input.runToken);
-    } else {
-      throw new Error('Provide either a runToken or set useLastReady with a projectToken.');
+    if (ctx.input.useLastReady && !ctx.input.projectToken?.trim()) {
+      throw createApiServiceError('Provide projectToken when useLastReady is true.');
+    }
+    if (!ctx.input.useLastReady && !ctx.input.runToken?.trim()) {
+      throw createApiServiceError('Provide runToken, or set useLastReady with projectToken.');
     }
 
+    let client = new Client({ token: ctx.auth.token });
+    let runToken = ctx.input.runToken;
+    if (ctx.input.useLastReady && ctx.input.projectToken) {
+      let project = await client.getProject(ctx.input.projectToken);
+      if (!project.last_ready_run?.run_token) {
+        throw createApiServiceError('This project has no run with available data yet.');
+      }
+      runToken = project.last_ready_run.run_token;
+    }
+    if (!runToken) {
+      throw createApiServiceError('A run token is required to retrieve data.');
+    }
+
+    let extractedData = await client.getRunData(runToken);
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://www.parsehub.com/api/v2/runs/${encodeURIComponent(runToken)}/data`,
+      query: { api_key: ctx.auth.token, format: 'json' },
+      mimeType: 'application/json'
+    });
+
     return {
-      output: {
-        extractedData
-      },
+      output: { extractedData },
       message: ctx.input.useLastReady
-        ? `Retrieved data from the last ready run of project **${ctx.input.projectToken}**.`
-        : `Retrieved data from run **${ctx.input.runToken}**.`
+        ? `Retrieved data from the last ready run **${runToken}** of project **${ctx.input.projectToken}**.`
+        : `Retrieved data from run **${runToken}**.`
     };
   })
   .build();

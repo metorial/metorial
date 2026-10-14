@@ -1,15 +1,58 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://clientapi.benchmarkemail.com',
-      headers: {
-        AuthToken: config.token,
-        'Content-Type': 'application/json'
+      authHeader: { name: 'AuthToken', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Benchmark Email',
+          reason: 'benchmark_email_api_error',
+          detailKeys: ['Message', 'message', 'Code', 'code'],
+          nestedKeys: ['Error', 'Errors', 'Response']
+        })
+    });
+
+    this.axios.interceptors.response.use(response => {
+      let result = response.data?.Response;
+      if (!isApiErrorRecord(result)) {
+        throw createApiServiceError('Benchmark Email returned an invalid response.', {
+          reason: 'benchmark_email_invalid_response'
+        });
       }
+      if (String(result.Status) === '-1') {
+        let error = { response: { status: response.status, data: result } };
+        let options = {
+          providerLabel: 'Benchmark Email',
+          reason: 'benchmark_email_api_error',
+          detailKeys: ['Message', 'message', 'Code', 'code'],
+          nestedKeys: ['Error', 'Errors']
+        };
+        let path = response.config.url?.split('?')[0] ?? '';
+        let isListRequest =
+          response.config.method === 'get' &&
+          (path === '/Emails' ||
+            path === '/Contact' ||
+            /^\/Contact\/[^/]+\/ContactDetails$/.test(path));
+        if (
+          isListRequest &&
+          /NO_RECORDS_FOUND/i.test(extractApiErrorMessage(error, options))
+        ) {
+          response.data.Response = { ...result, Status: '1', Count: 0, Data: [] };
+        } else {
+          throw buildApiServiceError(error, options);
+        }
+      }
+      return response;
     });
   }
 
@@ -41,13 +84,13 @@ export class Client {
     return response.data?.Response;
   }
 
-  async createCampaign(data: Record<string, any>) {
-    let response = await this.axios.post('/Emails', { Data: data });
+  async createCampaign(data: Record<string, unknown>) {
+    let response = await this.axios.post('/Emails', { Detail: data });
     return response.data?.Response;
   }
 
-  async updateCampaign(emailId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/Emails/${emailId}`, { Data: data });
+  async updateCampaign(emailId: string, data: Record<string, unknown>) {
+    let response = await this.axios.patch(`/Emails/${emailId}`, { Detail: data });
     return response.data?.Response;
   }
 
@@ -56,17 +99,15 @@ export class Client {
     return response.data?.Response;
   }
 
-  async duplicateCampaign(emailId: string) {
-    let response = await this.axios.post(`/Emails/${emailId}/Copy`);
+  async duplicateCampaign(emailId: string, name: string) {
+    let response = await this.axios.post(`/Emails/${emailId}`, { Name: name });
     return response.data?.Response;
   }
 
   async scheduleCampaign(emailId: string, data: { scheduleDate: string; timezone: string }) {
     let response = await this.axios.post(`/Emails/${emailId}/Schedule`, {
-      Data: {
-        ScheduleDate: data.scheduleDate,
-        Zone: data.timezone
-      }
+      ScheduleDate: data.scheduleDate,
+      TimeZone: data.timezone
     });
     return response.data?.Response;
   }
@@ -175,12 +216,12 @@ export class Client {
     return response.data?.Response;
   }
 
-  async createContactList(data: Record<string, any>) {
+  async createContactList(data: Record<string, unknown>) {
     let response = await this.axios.post('/Contact', { Data: data });
     return response.data?.Response;
   }
 
-  async updateContactList(listId: string, data: Record<string, any>) {
+  async updateContactList(listId: string, data: Record<string, unknown>) {
     let response = await this.axios.patch(`/Contact/${listId}`, { Data: data });
     return response.data?.Response;
   }
@@ -204,6 +245,8 @@ export class Client {
       pageSize?: number;
       filter?: string;
       searchFilter?: string;
+      searchField?: string;
+      searchType?: string;
       orderBy?: string;
       sortOrder?: string;
     }
@@ -213,6 +256,8 @@ export class Client {
     if (params?.pageSize !== undefined) query.set('PageSize', String(params.pageSize));
     if (params?.filter) query.set('Filter', params.filter);
     if (params?.searchFilter) query.set('SearchFilter', params.searchFilter);
+    if (params?.searchField) query.set('SearchField', params.searchField);
+    if (params?.searchType) query.set('SearchType', params.searchType);
     if (params?.orderBy) query.set('OrderBy', params.orderBy);
     if (params?.sortOrder) query.set('SortOrder', params.sortOrder);
 
@@ -223,12 +268,12 @@ export class Client {
     return response.data?.Response;
   }
 
-  async addContact(listId: string, data: Record<string, any>) {
+  async addContact(listId: string, data: Record<string, unknown>) {
     let response = await this.axios.post(`/Contact/${listId}/ContactDetails`, { Data: data });
     return response.data?.Response;
   }
 
-  async updateContact(listId: string, contactId: string, data: Record<string, any>) {
+  async updateContact(listId: string, contactId: string, data: Record<string, unknown>) {
     let response = await this.axios.patch(`/Contact/${listId}/ContactDetails/${contactId}`, {
       Data: data
     });
@@ -277,7 +322,7 @@ export class Client {
     return response.data?.Response;
   }
 
-  async updateWebhook(listId: string, webhookId: string, data: Record<string, any>) {
+  async updateWebhook(listId: string, webhookId: string, data: Record<string, unknown>) {
     let response = await this.axios.patch(`/Contact/${listId}/Webhooks/${webhookId}`, {
       Data: data
     });
@@ -293,6 +338,22 @@ export class Client {
 
   async getProfile() {
     let response = await this.axios.get('/Client/ProfileDetails');
-    return response.data?.Response;
+    let profile = response.data.Response;
+    let clientId = profile.client_id ?? profile['Client ID'];
+    if (clientId === undefined || clientId === null || String(clientId).trim() === '') {
+      throw createApiServiceError('Benchmark Email returned a profile without a client ID.', {
+        reason: 'benchmark_email_invalid_profile'
+      });
+    }
+    return {
+      clientId: String(clientId),
+      email: String(profile.email ?? profile.Email ?? ''),
+      firstName: String(profile.first_name ?? profile['First Name'] ?? ''),
+      lastName: String(profile.last_name ?? profile['Last Name'] ?? ''),
+      login: String(profile.login ?? profile.Login ?? ''),
+      company: String(profile.Company ?? profile.company ?? ''),
+      status: String(profile.client_status ?? profile['Client Status'] ?? ''),
+      planName: String(profile.plan_name ?? profile['Plan Name'] ?? '')
+    };
   }
 }

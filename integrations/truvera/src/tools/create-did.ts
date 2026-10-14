@@ -55,7 +55,7 @@ export let createDid = SlateTool.create(spec, {
         did,
         jobId: jobId ? String(jobId) : undefined
       },
-      message: `Created DID **${did}** using the ${ctx.input.didType} method with ${ctx.input.keyType} key type.`
+      message: `Submitted creation of DID **${did}** using the ${ctx.input.didType} method with ${ctx.input.keyType} key type.${jobId ? ` Check get_job with job ID **${jobId}** for completion.` : ''}`
     };
   })
   .build();

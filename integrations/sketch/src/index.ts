@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   extractColorsTool,
+  extractSymbolsTool,
   extractTextContentTool,
   generateDocumentTool,
   generatePageTool,
@@ -16,6 +17,7 @@ export let provider = Slate.create({
     inspectLayersTool,
     extractColorsTool,
     extractTextContentTool,
+    extractSymbolsTool,
     generatePageTool,
     generateDocumentTool
   ],

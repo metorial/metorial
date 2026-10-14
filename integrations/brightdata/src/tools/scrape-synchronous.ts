@@ -61,13 +61,33 @@ export let scrapeSynchronous = SlateTool.create(spec, {
 
     if (result.inProgress) {
       return {
-        output: result,
+        output: {
+          records: result.records,
+          snapshotId: result.snapshotId,
+          inProgress: result.inProgress
+        },
         message: `Scraping job is still processing. Snapshot ID: **${result.snapshotId}**. Use "Get Scraping Job Status" to track progress and "Download Snapshot" to retrieve results once ready.`
       };
     }
 
+    let format = ctx.input.format ?? 'ndjson';
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(result.content, {
+        headers: {
+          'content-type':
+            format === 'csv'
+              ? 'text/csv'
+              : format === 'json'
+                ? 'application/json'
+                : 'application/x-ndjson'
+        }
+      }),
+      filename: `scrape-results.${format}`
+    });
+
     return {
-      output: result,
+      output: { records: result.records, inProgress: result.inProgress },
       message: `Scraped **${result.records.length}** record(s) successfully.`
     };
   })

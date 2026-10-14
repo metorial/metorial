@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listWorkspacesTool = SlateTool.create(spec, {
   name: 'List Workspaces',
   key: 'list_workspaces',
-  description: `List all workspaces in your Kanbanize account. Workspaces are organizational containers that group related boards.`,
+  description: `List all workspaces in your Businessmap account. Workspaces are organizational containers that group related boards.`,
   tags: {
     readOnly: true
   }
@@ -30,10 +30,7 @@ export let listWorkspacesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let result = await client.listWorkspaces();
     let workspaces = Array.isArray(result) ? result : [];

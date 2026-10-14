@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { DiffbotClient } from '../lib/client';
+import { DiffbotClient, withEntityFields } from '../lib/client';
 import { spec } from '../spec';
 
 let enhancedEntitySchema = z
@@ -59,6 +59,15 @@ export let enhanceEntity = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ![ctx.input.name, ctx.input.url, ctx.input.email, ctx.input.phone].some(value =>
+        value?.trim()
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide a name, URL, email, or phone to identify the entity.'
+      );
+    }
     let client = new DiffbotClient({ token: ctx.auth.token });
 
     let enhanceOptions = {
@@ -75,7 +84,9 @@ export let enhanceEntity = SlateTool.create(spec, {
 
     if (ctx.input.includeCombined && ctx.input.entityType === 'person') {
       let result = await client.enhanceCombine(enhanceOptions);
-      let entities = result.data || [];
+      let entities = (result.data || [])
+        .filter((entry: any) => entry.entity !== null)
+        .map(withEntityFields);
       let personEntity = entities.find((e: any) => e.type === 'Person') || entities[0];
       let orgEntity = entities.find((e: any) => e.type === 'Organization');
 
@@ -92,7 +103,9 @@ export let enhanceEntity = SlateTool.create(spec, {
     }
 
     let result = await client.enhanceEntity(enhanceOptions);
-    let entities = result.data || [];
+    let entities = (result.data || [])
+      .filter((entry: any) => entry.entity !== null)
+      .map(withEntityFields);
     let entity = entities[0];
 
     return {

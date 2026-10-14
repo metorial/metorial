@@ -1,6 +1,6 @@
 {
   "name": "@metorial/sendfox",
-  "description": "Manage email marketing for content creators. Create, update, and delete contacts, lists, campaigns, automations, and subscription forms. Send or schedule email campaigns with HTML content and track performance statistics including opens, clicks, bounces, and unsubscribes. Batch import up to 1,000 contacts at once. Build email automations with triggers and timed sequences. Define custom contact fields, manage sender domains, and view subscriber engagement metrics.",
+  "description": "Manage SendFox contacts, list memberships, and email campaigns. Import contacts in batches, send or schedule campaigns, view campaign statistics and link clicks, and browse contacts within a list. Read account details, automations, and subscription forms.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage email contacts",
@@ -8,11 +8,9 @@
     "schedule email campaigns",
     "track campaign performance",
     "manage contact lists",
-    "create email automations",
     "batch import contacts",
-    "manage subscription forms",
-    "configure sender domains",
-    "define custom contact fields"
+    "view email automations",
+    "view subscription forms"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/sendfox.png"
 }

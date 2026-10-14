@@ -39,7 +39,7 @@ export let listContacts = SlateTool.create(spec, {
         output: {
           contacts: response.data,
           totalPages: response.meta?.pagination?.totalPages,
-          total: response.meta?.pagination?.total
+          total: response.meta?.pagination?.totalItems ?? response.meta?.pagination?.total
         },
         message: `Retrieved **${response.data.length}** contacts (page ${ctx.input.page} of ${response.meta?.pagination?.totalPages ?? 1}).`
       };

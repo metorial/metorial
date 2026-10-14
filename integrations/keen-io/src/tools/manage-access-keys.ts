@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let accessKeyDefinitionSchema = z
@@ -9,7 +9,15 @@ let accessKeyDefinitionSchema = z
     isActive: z.boolean().optional().describe('Whether the key is active'),
     permitted: z
       .array(
-        z.enum(['writes', 'queries', 'saved_queries', 'cached_queries', 'datasets', 'schema'])
+        z.enum([
+          'writes',
+          'queries',
+          'saved_queries',
+          'cached_queries',
+          'datasets',
+          'schema',
+          'query_definition'
+        ])
       )
       .optional()
       .describe('Permitted operations'),
@@ -81,6 +89,12 @@ export let manageAccessKeys = SlateTool.create(spec, {
         .describe(
           'ID of the access key. Required for "get", "update", "revoke", and "unrevoke" actions.'
         ),
+      page: z.number().optional().describe('Zero-based access-key list page (default 0)'),
+      perPage: z
+        .number()
+        .optional()
+        .describe('Access keys per list page, from 1 to 200 (default 200)'),
+      name: z.string().optional().describe('For list, an exact access-key name to filter by'),
       keyDefinition: accessKeyDefinitionSchema
         .optional()
         .describe('Access key configuration. Required for "create" and "update" actions.')
@@ -97,14 +111,29 @@ export let manageAccessKeys = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     switch (ctx.input.action) {
       case 'list': {
-        let keys = await client.listAccessKeys();
+        if (
+          ctx.input.page !== undefined &&
+          (!Number.isInteger(ctx.input.page) || ctx.input.page < 0)
+        ) {
+          throw createApiServiceError('page must be a non-negative whole number.');
+        }
+        if (
+          ctx.input.perPage !== undefined &&
+          (!Number.isInteger(ctx.input.perPage) ||
+            ctx.input.perPage < 1 ||
+            ctx.input.perPage > 200)
+        ) {
+          throw createApiServiceError('perPage must be a whole number from 1 to 200.');
+        }
+        let keys = await client.listAccessKeys({
+          page: ctx.input.page,
+          per_page: ctx.input.perPage,
+          name: ctx.input.name
+        });
         return {
           output: { accessKeys: keys, success: true },
           message: `Found **${keys.length}** access keys.`
@@ -113,7 +142,7 @@ export let manageAccessKeys = SlateTool.create(spec, {
 
       case 'get': {
         if (!ctx.input.accessKeyId)
-          throw new Error('accessKeyId is required for "get" action');
+          throw createApiServiceError('accessKeyId is required for "get" action');
         let key = await client.getAccessKey(ctx.input.accessKeyId);
         return {
           output: { accessKey: key, success: true },
@@ -123,7 +152,7 @@ export let manageAccessKeys = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.keyDefinition)
-          throw new Error('keyDefinition is required for "create" action');
+          throw createApiServiceError('keyDefinition is required for "create" action');
         let def: Record<string, any> = {};
         if (ctx.input.keyDefinition.name) def.name = ctx.input.keyDefinition.name;
         if (ctx.input.keyDefinition.isActive !== undefined)
@@ -163,9 +192,9 @@ export let manageAccessKeys = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.accessKeyId)
-          throw new Error('accessKeyId is required for "update" action');
+          throw createApiServiceError('accessKeyId is required for "update" action');
         if (!ctx.input.keyDefinition)
-          throw new Error('keyDefinition is required for "update" action');
+          throw createApiServiceError('keyDefinition is required for "update" action');
         let def: Record<string, any> = {};
         if (ctx.input.keyDefinition.name) def.name = ctx.input.keyDefinition.name;
         if (ctx.input.keyDefinition.isActive !== undefined)
@@ -205,7 +234,7 @@ export let manageAccessKeys = SlateTool.create(spec, {
 
       case 'revoke': {
         if (!ctx.input.accessKeyId)
-          throw new Error('accessKeyId is required for "revoke" action');
+          throw createApiServiceError('accessKeyId is required for "revoke" action');
         await client.revokeAccessKey(ctx.input.accessKeyId);
         return {
           output: { success: true },
@@ -215,7 +244,7 @@ export let manageAccessKeys = SlateTool.create(spec, {
 
       case 'unrevoke': {
         if (!ctx.input.accessKeyId)
-          throw new Error('accessKeyId is required for "unrevoke" action');
+          throw createApiServiceError('accessKeyId is required for "unrevoke" action');
         let key = await client.unrevokeAccessKey(ctx.input.accessKeyId);
         return {
           output: { accessKey: key, success: true },

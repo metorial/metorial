@@ -1,4 +1,4 @@
-Let me fetch the full API documentation to get more details on the features.# Slates Specification for Nextdns
+# NextDNS API Capabilities
 
 ## Overview
 
@@ -20,7 +20,7 @@ Note: The API is currently in beta and is subject to breaking changes without no
 
 ### Profile Management
 
-Create, read, update, and delete DNS configuration profiles. You can create a new profile by POSTing to the profiles endpoint, and then GET, PATCH, and DELETE individual profiles. Each profile contains a full configuration including security settings, privacy settings, parental controls, allowlists, denylists, and performance settings.
+Create, read, rename, and delete DNS configuration profiles with the profile tools. You can create a new profile by POSTing to the profiles endpoint, and then GET, PATCH, and DELETE individual profiles. Each profile contains a full configuration including security settings, privacy settings, parental controls, allowlists, denylists, and performance settings.
 
 ### Security Configuration
 
@@ -84,11 +84,11 @@ All analytics endpoints support time series mode for charting, with configurable
 
 ### DNS Query Logs
 
-Access detailed per-query DNS logs for each profile. Each log entry includes timestamp, domain, protocol, client IP, device info, status, and blocking reasons. Logs can be filtered by date range, device, status, and search query. Logs can also be downloaded as a file or cleared entirely.
+Access detailed per-query DNS logs for each profile. Each log entry includes timestamp, domain, protocol, client IP, device info, status, and blocking reasons. Logs can be filtered by date range, device, status, and search query. Use `get_logs` to retrieve logs with a pagination cursor, optional sorting, and raw query mode, or `clear_logs` to clear them entirely. The provider also documents downloading logs; that operation is not exposed by the current tools.
 
 ### Real-Time Log Streaming
 
-Stream new logs in real-time using Server-Sent Events (SSE). Supports resuming from the last received event ID. Filtering by device, status, and search query is supported during streaming.
+The provider API supports streaming new logs in real-time using Server-Sent Events (SSE). The current tools retrieve finite log pages and do not expose an SSE stream. Supports resuming from the last received event ID. Filtering by device, status, and search query is supported during streaming.
 
 ## Events
 

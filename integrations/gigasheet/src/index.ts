@@ -11,7 +11,10 @@ import {
   filterData,
   findAndReplace,
   getActivity,
+  getCurrentUser,
+  getFileUrl,
   getSheet,
+  listExports,
   listFiles,
   manageColumns,
   manageComments,
@@ -26,6 +29,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    listExports,
     listFiles,
     getSheet,
     createSheet,
@@ -45,6 +49,8 @@ export let provider = Slate.create({
     deduplicateRows,
     enrichData,
     getActivity,
+    getCurrentUser,
+    getFileUrl,
     manageSavedFilters
   ],
   triggers: []

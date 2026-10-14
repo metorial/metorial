@@ -45,7 +45,7 @@ export let getAgent = SlateTool.create(spec, {
     return {
       output: {
         agentId: a.agent_id,
-        accountId: a.account_id,
+        accountId: a.account_id == null ? a.account_id : String(a.account_id),
         name: a.name,
         type: a.type,
         description: a.description,
@@ -53,7 +53,7 @@ export let getAgent = SlateTool.create(spec, {
         version: a.version,
         createdAt: a.created_at,
         updatedAt: a.updated_at,
-        projectId: a.project_id,
+        projectId: a.project_id == null ? a.project_id : String(a.project_id),
         config: a.config
       },
       message: `Retrieved agent **${a.name}** (${a.type}, ID: ${a.agent_id}).`

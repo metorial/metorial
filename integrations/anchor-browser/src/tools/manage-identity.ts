@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -75,7 +75,7 @@ export let manageIdentity = SlateTool.create(spec, {
     let input = ctx.input;
 
     if (input.action === 'create') {
-      if (!input.source) throw new Error('source is required for create.');
+      if (!input.source) throw createApiServiceError('source is required for create.');
       let result = await client.createIdentity({
         name: input.name,
         source: input.source,
@@ -115,7 +115,7 @@ export let manageIdentity = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.identityId) throw new Error('identityId is required for get.');
+      if (!input.identityId) throw createApiServiceError('identityId is required for get.');
       let result = await client.getIdentity(input.identityId);
       return {
         output: {
@@ -132,7 +132,7 @@ export let manageIdentity = SlateTool.create(spec, {
     }
 
     if (input.action === 'update') {
-      if (!input.identityId) throw new Error('identityId is required for update.');
+      if (!input.identityId) throw createApiServiceError('identityId is required for update.');
       let result = await client.updateIdentity(input.identityId, {
         name: input.name,
         metadata: input.metadata,
@@ -151,7 +151,7 @@ export let manageIdentity = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.identityId) throw new Error('identityId is required for delete.');
+      if (!input.identityId) throw createApiServiceError('identityId is required for delete.');
       await client.deleteIdentity(input.identityId);
       return {
         output: { deleted: true },
@@ -160,7 +160,8 @@ export let manageIdentity = SlateTool.create(spec, {
     }
 
     if (input.action === 'get_credentials') {
-      if (!input.identityId) throw new Error('identityId is required for get_credentials.');
+      if (!input.identityId)
+        throw createApiServiceError('identityId is required for get_credentials.');
       let result = await client.getIdentityCredentials(input.identityId);
       return {
         output: {
@@ -170,6 +171,6 @@ export let manageIdentity = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

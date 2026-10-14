@@ -13,7 +13,18 @@ export let listWorkspacesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of workspaces to return')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a whole number.')
+        .min(1)
+        .optional()
+        .describe(
+          'Maximum number of workspaces per page; keep the same limit for subsequent pages'
+        ),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Pagination token returned by a previous list_workspaces call')
     })
   )
   .output(
@@ -31,8 +42,8 @@ export let listWorkspacesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.listWorkspaces(ctx.input.limit);
+    let client = new Client(ctx.auth);
+    let result = await client.listWorkspaces(ctx.input.limit, ctx.input.nextToken);
 
     let workspaces = result.value.map(w => ({
       workspaceId: w.id,

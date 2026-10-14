@@ -1,19 +1,48 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
-  private projectId: string;
-  private token: string;
+  readonly projectId: string;
   private axios;
 
-  constructor(config: { projectId: string; token: string }) {
+  constructor(config: { projectId?: string; token: string }) {
+    if (!config.projectId) {
+      throw createApiServiceError(
+        'Reconnect with the Project ID paired with your Keen.io API key.'
+      );
+    }
+    if (!config.token) {
+      throw createApiServiceError('Reconnect with a Keen.io API key.');
+    }
     this.projectId = config.projectId;
-    this.token = config.token;
-    this.axios = createAxios({
-      baseURL: `https://api.keen.io/3.0/projects/${config.projectId}`,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://api.keen.io/3.0/projects/${encodeURIComponent(config.projectId)}`,
+      authHeader: { value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Keen.io',
+          reason: 'keenio_api_error',
+          detailKeys: ['message', 'description', 'error_code', 'name', 'code'],
+          nestedKeys: ['error', 'errors'],
+          extractResponse: (input, helpers) => {
+            let response = helpers.getResponse(input);
+            if (!isApiErrorRecord(input) || !isApiErrorRecord(input.data)) return response;
+            let baggage = input.data.baggage;
+            return isApiErrorRecord(baggage)
+              ? { ...response, data: baggage.response }
+              : response;
+          },
+          extractUpstreamCode: (_input, response) => {
+            let data = response?.data;
+            return isApiErrorRecord(data) && typeof data.error_code === 'string'
+              ? data.error_code
+              : undefined;
+          }
+        })
     });
   }
 
@@ -48,7 +77,10 @@ export class Client {
   }
 
   async runMultiAnalysis(params: Record<string, any>): Promise<Record<string, any>> {
-    let response = await this.axios.post('/queries/multi_analysis', params);
+    let { include_metadata, ...body } = params;
+    let response = await this.axios.post('/queries/multi_analysis', body, {
+      params: { include_metadata }
+    });
     return response.data;
   }
 
@@ -151,8 +183,11 @@ export class Client {
 
   // ── Cached Datasets ──
 
-  async listDatasets(): Promise<Record<string, any>> {
-    let response = await this.axios.get('/datasets');
+  async listDatasets(params?: {
+    limit?: number;
+    after_name?: string;
+  }): Promise<Record<string, any>> {
+    let response = await this.axios.get('/datasets', { params });
     return response.data;
   }
 
@@ -207,9 +242,17 @@ export class Client {
 
   // ── Access Keys ──
 
-  async listAccessKeys(): Promise<Record<string, any>[]> {
-    let response = await this.axios.get('/keys');
-    return response.data;
+  async listAccessKeys(params?: {
+    page?: number;
+    per_page?: number;
+    name?: string;
+  }): Promise<Record<string, any>[]> {
+    let response = await this.axios.get('/keys', { params });
+    let keys = Array.isArray(response.data) ? response.data : response.data.keys;
+    if (!Array.isArray(keys)) {
+      throw createApiServiceError('Keen.io returned an access-key list without a keys array.');
+    }
+    return keys;
   }
 
   async getAccessKey(keyId: string): Promise<Record<string, any>> {
@@ -231,12 +274,12 @@ export class Client {
   }
 
   async revokeAccessKey(keyId: string): Promise<void> {
-    await this.axios.delete(`/keys/${encodeURIComponent(keyId)}`);
+    await this.axios.post(`/keys/${encodeURIComponent(keyId)}/revoke`);
   }
 
   async unrevokeAccessKey(keyId: string): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/keys/${encodeURIComponent(keyId)}/unrevoke`);
-    return response.data;
+    await this.axios.post(`/keys/${encodeURIComponent(keyId)}/unrevoke`);
+    return this.getAccessKey(keyId);
   }
 
   // ── Deletion ──
@@ -246,7 +289,14 @@ export class Client {
     params?: Record<string, any>
   ): Promise<Record<string, any>> {
     let response = await this.axios.delete(`/events/${encodeURIComponent(collectionName)}`, {
-      data: params
+      params:
+        params &&
+        Object.fromEntries(
+          Object.entries(params).map(([key, value]) => [
+            key,
+            typeof value === 'object' ? JSON.stringify(value) : value
+          ])
+        )
     });
     return response.data;
   }
@@ -258,3 +308,17 @@ export class Client {
     return response.data;
   }
 }
+
+export let createClient = (ctx: {
+  auth: { token: string; projectId?: string };
+  config: unknown;
+}) => {
+  let legacyProjectId =
+    isApiErrorRecord(ctx.config) && typeof ctx.config.projectId === 'string'
+      ? ctx.config.projectId
+      : undefined;
+  return new Client({
+    projectId: ctx.auth.projectId ?? legacyProjectId,
+    token: ctx.auth.token
+  });
+};

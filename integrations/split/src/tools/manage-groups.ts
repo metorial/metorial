@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageGroups = SlateTool.create(spec, {
@@ -37,28 +38,37 @@ export let manageGroups = SlateTool.create(spec, {
         })
         .optional(),
       deleted: z.boolean().optional(),
-      totalCount: z.number().optional()
+      totalCount: z.number().optional(),
+      count: z.number().optional().describe('Provider-reported count for this page.'),
+      nextMarker: z.string().optional(),
+      previousMarker: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
-        if (!ctx.input.groupName) throw new Error('groupName is required to create a group.');
+        if (!ctx.input.groupName)
+          throw createApiServiceError('groupName is required to create a group.');
         let group = await client.createGroup({
           name: ctx.input.groupName,
           description: ctx.input.description
         });
         return {
           output: {
-            group: { groupId: group.id, groupName: group.name, description: group.description }
+            group: {
+              groupId: group.id,
+              groupName: group.name,
+              description: group.description ?? undefined
+            }
           },
           message: `Created group **${group.name}**.`
         };
       }
 
       case 'list': {
+        validatePagination(ctx.input.offset, ctx.input.limit, 200);
         let result = await client.listGroups({
           offset: ctx.input.offset,
           limit: ctx.input.limit
@@ -66,31 +76,42 @@ export let manageGroups = SlateTool.create(spec, {
         let groups = result.objects.map(g => ({
           groupId: g.id,
           groupName: g.name,
-          description: g.description
+          description: g.description ?? undefined
         }));
         return {
-          output: { groups, totalCount: result.totalCount },
-          message: `Found **${result.totalCount}** groups.`
+          output: {
+            groups,
+            totalCount: result.totalCount,
+            count: result.count,
+            nextMarker: result.nextMarker ?? undefined,
+            previousMarker: result.previousMarker ?? undefined
+          },
+          message: `Returned **${groups.length}** groups.`
         };
       }
 
       case 'update': {
-        if (!ctx.input.groupId) throw new Error('groupId is required.');
-        if (!ctx.input.groupName) throw new Error('groupName is required to update a group.');
+        if (!ctx.input.groupId) throw createApiServiceError('groupId is required.');
+        if (!ctx.input.groupName)
+          throw createApiServiceError('groupName is required to update a group.');
         let group = await client.updateGroup(ctx.input.groupId, {
           name: ctx.input.groupName,
           description: ctx.input.description
         });
         return {
           output: {
-            group: { groupId: group.id, groupName: group.name, description: group.description }
+            group: {
+              groupId: group.id,
+              groupName: group.name,
+              description: group.description ?? undefined
+            }
           },
           message: `Updated group **${group.name}**.`
         };
       }
 
       case 'delete': {
-        if (!ctx.input.groupId) throw new Error('groupId is required.');
+        if (!ctx.input.groupId) throw createApiServiceError('groupId is required.');
         await client.deleteGroup(ctx.input.groupId);
         return {
           output: { deleted: true },

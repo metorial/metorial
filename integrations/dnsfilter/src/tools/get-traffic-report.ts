@@ -6,11 +6,10 @@ import { spec } from '../spec';
 export let getTrafficReport = SlateTool.create(spec, {
   name: 'Get Traffic Report',
   key: 'get_traffic_report',
-  description: `Retrieve DNS traffic analytics and reports. Provides total requests and threats over time, requests by category or domain, top requested domains, and other traffic metrics. Useful for security monitoring, compliance reporting, and understanding network usage patterns.`,
+  description: `Retrieve total DNS request counts over time. Filter by network, organization, or roaming client to monitor usage and filtering results.`,
   tags: {
     readOnly: true
-  },
-  constraints: ['Query log requests are limited to 72-hour time ranges.']
+  }
 })
   .input(
     z.object({
@@ -34,11 +33,11 @@ export let getTrafficReport = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let params: Record<string, any> = {};
 
-    if (ctx.input.startDate) params.start = ctx.input.startDate;
-    if (ctx.input.endDate) params.end = ctx.input.endDate;
-    if (ctx.input.siteId) params.site_id = ctx.input.siteId;
-    if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
-    if (ctx.input.roamingClientId) params.roaming_client_id = ctx.input.roamingClientId;
+    if (ctx.input.startDate) params.from = ctx.input.startDate;
+    if (ctx.input.endDate) params.to = ctx.input.endDate;
+    if (ctx.input.siteId) params.network_ids = ctx.input.siteId;
+    if (ctx.input.organizationId) params.organization_ids = ctx.input.organizationId;
+    if (ctx.input.roamingClientId) params.agent_ids = ctx.input.roamingClientId;
     if (ctx.input.filters) Object.assign(params, ctx.input.filters);
 
     let report = await client.getTrafficReport(params);

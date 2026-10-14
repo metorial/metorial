@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,12 +54,38 @@ export let batchGeocode = SlateTool.create(spec, {
       bias: ctx.input.bias
     });
 
-    let jobId = submitResponse.id || submitResponse;
+    if (Array.isArray(submitResponse)) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(JSON.stringify(submitResponse), {
+          headers: { 'content-type': 'application/json' }
+        }),
+        filename: 'geocoding-results.json'
+      });
+      return {
+        output: { pending: false, results: submitResponse },
+        message: `Batch geocoding completed. **${submitResponse.length}** result(s) returned.`
+      };
+    }
+
+    let jobId = typeof submitResponse === 'string' ? submitResponse : submitResponse?.id;
+    if (typeof jobId !== 'string' || !jobId.trim()) {
+      throw createApiServiceError(
+        'Geoapify did not return a batch geocoding job ID or results.'
+      );
+    }
 
     // Try to get results (may return 202 if still processing)
     if (typeof jobId === 'string') {
       let resultResponse = await client.batchGeocodeResults(jobId);
       if (resultResponse.status === 200 && Array.isArray(resultResponse.data)) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: 'https://api.geoapify.com/v1/batch/geocode/search',
+          query: { id: jobId, format: 'json', apiKey: ctx.auth.token },
+          mimeType: 'application/json',
+          filename: 'geocoding-results.json'
+        });
         return {
           output: {
             jobId,
@@ -68,6 +94,9 @@ export let batchGeocode = SlateTool.create(spec, {
           },
           message: `Batch geocoding completed. **${resultResponse.data.length}** result(s) returned.`
         };
+      }
+      if (resultResponse.status !== 202 && resultResponse.data?.status !== 'pending') {
+        throw createApiServiceError('Geoapify returned an unexpected batch geocoding result.');
       }
     }
 

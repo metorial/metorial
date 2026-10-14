@@ -21,7 +21,9 @@ export let trackCustomEvent = SlateTool.create(spec, {
       properties: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Additional event properties as key-value pairs')
+        .describe(
+          'Additional event properties as key-value pairs. Do not include event, token, email, or event_id; use the dedicated input fields.'
+        )
     })
   )
   .output(

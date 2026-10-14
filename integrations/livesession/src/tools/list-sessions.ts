@@ -33,9 +33,12 @@ let visitorSchema = z
 let sessionSchema = z.object({
   sessionId: z.string().describe('Unique session identifier'),
   websiteId: z.string().describe('Associated website ID'),
+  sessionUrl: z.string().optional().describe('URL to replay the session in LiveSession'),
   visitorId: z.string().optional().describe('Visitor identifier'),
   creationTimestamp: z.string().optional().describe('Session creation timestamp'),
   endTimestamp: z.string().optional().describe('Session end timestamp'),
+  expirationTimestamp: z.number().optional().describe('Recording expiry Unix timestamp'),
+  lastEventTimestamp: z.number().optional().describe('Last recorded event Unix timestamp'),
   duration: z.number().optional().describe('Session duration in seconds'),
   activeTime: z.number().optional().describe('Active time in seconds'),
   engagementScore: z.number().optional().describe('Engagement score (0-100)'),
@@ -46,7 +49,8 @@ let sessionSchema = z.object({
   browser: z
     .object({
       name: z.string().optional(),
-      version: z.string().optional()
+      version: z.string().optional(),
+      description: z.string().optional()
     })
     .optional()
     .describe('Browser information'),
@@ -75,11 +79,17 @@ let sessionSchema = z.object({
     .object({
       source: z.string().optional(),
       medium: z.string().optional(),
-      campaign: z.string().optional()
+      campaign: z.string().optional(),
+      term: z.string().optional(),
+      content: z.string().optional()
     })
     .optional()
     .describe('UTM tracking parameters'),
   visitor: visitorSchema.optional(),
+  pageViewsStatistics: z
+    .object({ count: z.number().optional() })
+    .optional()
+    .describe('Page view counts for this session'),
   eventsStatistics: z
     .object({
       clicks: z.number().optional(),
@@ -92,12 +102,18 @@ let sessionSchema = z.object({
     .describe('Event statistics for this session')
 });
 
+let timestampString = (value: string | number | null | undefined) =>
+  value == null ? undefined : String(value);
+
 let mapSession = (s: any) => ({
   sessionId: s.id || s.session_id,
   websiteId: s.website_id,
-  visitorId: s.visitor_id,
-  creationTimestamp: s.creation_timestamp,
-  endTimestamp: s.end_timestamp,
+  sessionUrl: s.session_url,
+  visitorId: s.visitor_id ?? s.visitor?.id,
+  creationTimestamp: timestampString(s.creation_timestamp),
+  endTimestamp: timestampString(s.end_timestamp),
+  expirationTimestamp: s.expiration_timestamp,
+  lastEventTimestamp: s.last_event_timestamp,
   duration: s.duration,
   activeTime: s.active_time,
   engagementScore: s.engagment_score ?? s.engagement_score,
@@ -126,11 +142,19 @@ let mapSession = (s: any) => ({
               region: s.visitor.geolocation.region
             }
           : undefined,
-        params: s.visitor.params,
-        firstSessionTimestamp: s.visitor.first_session_timestamp,
-        lastSessionTimestamp: s.visitor.last_session_timestamp
+        params: Array.isArray(s.visitor.params)
+          ? Object.fromEntries(
+              s.visitor.params.map((param: { name: string; value: unknown }) => [
+                param.name,
+                param.value
+              ])
+            )
+          : s.visitor.params,
+        firstSessionTimestamp: timestampString(s.visitor.first_session_timestamp),
+        lastSessionTimestamp: timestampString(s.visitor.last_session_timestamp)
       }
     : undefined,
+  pageViewsStatistics: s.page_views_statistics,
   eventsStatistics: s.events_statistics
     ? {
         clicks: s.events_statistics.clicks,
@@ -163,11 +187,11 @@ export let listSessions = SlateTool.create(spec, {
       dateFrom: z
         .string()
         .optional()
-        .describe('Start date filter (ISO 8601 or relative: "today", "yesterday", etc.)'),
+        .describe('Start date (ISO 8601 or relative: TODAY, YESTERDAY, TODAY-7DAYS)'),
       dateTo: z
         .string()
         .optional()
-        .describe('End date filter (ISO 8601 or relative: "today", "yesterday", etc.)')
+        .describe('End date (ISO 8601 or relative: TODAY, YESTERDAY, TODAY-30DAYS)')
     })
   )
   .output(

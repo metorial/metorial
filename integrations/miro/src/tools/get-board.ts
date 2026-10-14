@@ -49,10 +49,10 @@ export let getBoard = SlateTool.create(spec, {
       output: {
         boardId: board.id,
         name: board.name,
-        description: board.description,
-        viewLink: board.viewLink,
-        createdAt: board.createdAt,
-        modifiedAt: board.modifiedAt,
+        description: board.description ?? undefined,
+        viewLink: board.viewLink ?? undefined,
+        createdAt: board.createdAt ?? undefined,
+        modifiedAt: board.modifiedAt ?? undefined,
         owner: board.owner
           ? {
               userId: board.owner.id?.toString(),

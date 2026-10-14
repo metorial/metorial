@@ -1,17 +1,37 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.kadoa.com';
 
 export class KadoaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(opts: { token: string }) {
-    this.axios = createAxios({
+    if (!opts.token.trim()) {
+      throw createApiServiceError(
+        'A Kadoa API key is required. Reconnect with your workspace API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'x-api-key': opts.token,
-        'Content-Type': 'application/json'
+      authHeader: { name: 'x-api-key', value: opts.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Kadoa', reason: 'kadoa_api_error' })
+    });
+    this.axios.interceptors.response.use(response => {
+      let body = response.data;
+      if (
+        body &&
+        typeof body === 'object' &&
+        (body.success === false ||
+          body.error === true ||
+          (typeof body.error === 'string' && body.error.length > 0))
+      ) {
+        throw createApiServiceError(
+          `Kadoa request failed: ${body.message || body.error || 'The API reported an unsuccessful result.'}`,
+          { upstreamStatus: response.status }
+        );
       }
+      return response;
     });
   }
 
@@ -31,13 +51,28 @@ export class KadoaClient {
     return res.data;
   }
 
+  async createWorkflow(body: {
+    urls: string[];
+    userPrompt: string;
+    name?: string;
+    description?: string;
+    tags?: string[];
+    interval?: string;
+    schedules?: string[];
+    timezone?: string;
+    limit?: number;
+  }): Promise<any> {
+    let res = await this.axios.post('/v4/workflows', body);
+    return res.data;
+  }
+
   async getWorkflow(workflowId: string): Promise<any> {
-    let res = await this.axios.get(`/v4/workflows/${workflowId}`);
+    let res = await this.axios.get(`/v4/workflows/${encodeURIComponent(workflowId)}`);
     return res.data;
   }
 
   async deleteWorkflow(workflowId: string): Promise<any> {
-    let res = await this.axios.delete(`/v4/workflows/${workflowId}`);
+    let res = await this.axios.delete(`/v4/workflows/${encodeURIComponent(workflowId)}`);
     return res.data;
   }
 
@@ -54,12 +89,14 @@ export class KadoaClient {
       includeAnomalies?: boolean;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/v4/workflows/${workflowId}/data`, { params });
+    let res = await this.axios.get(`/v4/workflows/${encodeURIComponent(workflowId)}/data`, {
+      params
+    });
     return res.data;
   }
 
   async getWorkflowHistory(workflowId: string): Promise<any> {
-    let res = await this.axios.get(`/v4/workflows/${workflowId}/history`);
+    let res = await this.axios.get(`/v4/workflows/${encodeURIComponent(workflowId)}/history`);
     return res.data;
   }
 
@@ -70,22 +107,28 @@ export class KadoaClient {
       limit?: number;
     }
   ): Promise<any> {
-    let res = await this.axios.put(`/v4/workflows/${workflowId}/run`, body || {});
+    let res = await this.axios.put(
+      `/v4/workflows/${encodeURIComponent(workflowId)}/run`,
+      body || {}
+    );
     return res.data;
   }
 
   async pauseWorkflow(workflowId: string): Promise<any> {
-    let res = await this.axios.put(`/v4/workflows/${workflowId}/pause`);
+    let res = await this.axios.put(`/v4/workflows/${encodeURIComponent(workflowId)}/pause`);
     return res.data;
   }
 
   async resumeWorkflow(workflowId: string): Promise<any> {
-    let res = await this.axios.put(`/v4/workflows/${workflowId}/resume`);
+    let res = await this.axios.put(`/v4/workflows/${encodeURIComponent(workflowId)}/resume`);
     return res.data;
   }
 
   async scheduleWorkflow(workflowId: string, date: string): Promise<any> {
-    let res = await this.axios.put(`/v4/workflows/${workflowId}/schedule`, { date });
+    let res = await this.axios.put(
+      `/v4/workflows/${encodeURIComponent(workflowId)}/schedule`,
+      { date }
+    );
     return res.data;
   }
 
@@ -93,9 +136,10 @@ export class KadoaClient {
     workflowId: string,
     body: {
       urls?: string[];
-      limit?: number;
+      limit?: number | null;
       updateInterval?: string;
       schedules?: string[];
+      timezone?: string;
       name?: string;
       description?: string;
       tags?: string[];
@@ -128,7 +172,10 @@ export class KadoaClient {
       userPrompt?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.put(`/v4/workflows/${workflowId}/metadata`, body);
+    let res = await this.axios.put(
+      `/v4/workflows/${encodeURIComponent(workflowId)}/metadata`,
+      body
+    );
     return res.data;
   }
 
@@ -158,7 +205,7 @@ export class KadoaClient {
   }
 
   async getCrawlStatus(sessionId: string): Promise<any> {
-    let res = await this.axios.get(`/v4/crawl/${sessionId}`);
+    let res = await this.axios.get(`/v4/crawl/${encodeURIComponent(sessionId)}/status`);
     return res.data;
   }
 
@@ -169,14 +216,19 @@ export class KadoaClient {
       pageSize?: number;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/v4/crawl/${sessionId}/pages`, { params });
+    let res = await this.axios.get(`/v4/crawl/${encodeURIComponent(sessionId)}/pages`, {
+      params
+    });
     return res.data;
   }
 
   async getCrawlPageContent(sessionId: string, pageId: string, format?: string): Promise<any> {
-    let res = await this.axios.get(`/v4/crawl/${sessionId}/pages/${pageId}`, {
-      params: format ? { format } : undefined
-    });
+    let res = await this.axios.get(
+      `/v4/crawl/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}`,
+      {
+        params: format ? { format } : undefined
+      }
+    );
     return res.data;
   }
 
@@ -189,7 +241,7 @@ export class KadoaClient {
       location?: { type: string; isoCode?: string };
     }
   ): Promise<any> {
-    let res = await this.axios.post(`/v4/adhoc/${schemaId}`, body);
+    let res = await this.axios.post(`/v4/adhoc/${encodeURIComponent(schemaId)}`, body);
     return res.data;
   }
 
@@ -208,7 +260,7 @@ export class KadoaClient {
   }
 
   async getDataChange(changeId: string): Promise<any> {
-    let res = await this.axios.get(`/v4/changes/${changeId}`);
+    let res = await this.axios.get(`/v4/changes/${encodeURIComponent(changeId)}`);
     return res.data;
   }
 

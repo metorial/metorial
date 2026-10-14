@@ -1,138 +1,79 @@
-Now let me get the specific webhook event types:Now I have enough information. Let me compile the specification.
+# Productboard Integration Specification
 
-# Slates Specification for Productboard
+## Current API availability
 
-## Overview
+The [official April 9, 2026 announcement](https://developer.productboard.com/v1.0.0/changelog/2026-04-09) made API v2 generally available and set the API v1 sunset to **July 8, 2026**, after which v1 endpoints would no longer be available.
 
-Productboard is a product management platform that helps teams collect and organize user feedback, prioritize features, and plan product roadmaps. It provides a REST API (v1, with v2 in beta) for managing product hierarchy, notes/feedback, releases, objectives, initiatives, custom fields, and integrations programmatically.
+This package provides three current read tools:
+
+- `list_entity_configurations`: `GET https://api.productboard.com/v2/entities/configurations`; discovers workspace entity types and their fields, filters, and validation rules.
+- `list_entities`: `GET https://api.productboard.com/v2/entities`; lists entity records by type, name, archived state, or parent, with optional response field selection.
+- `get_current_user`: `GET https://app.productboard.com/oauth2/token/info`; inspects the OAuth user, workspace, application, scopes, and remaining token lifetime. Requires an OAuth connection.
+
+Entity results preserve the provider's current `id`, `type`, `fields`, and `links` structure. The entity tools accept a `pageCursor` and return the cursor extracted from `links.next` when another page is available. Call subsequent pages with the same filters. Page size is controlled by Productboard.
 
 ## Authentication
 
-Productboard supports two authentication methods:
+Both API tokens and OAuth connections authenticate entity reads using a Bearer token. OAuth authorization and refresh use the documented `app.productboard.com/oauth2` endpoints, with token exchange parameters in the query string. The OAuth method requests `entities:read`, which covers entity records and configurations; unused legacy v1 scopes are no longer requested. Existing OAuth connections may need to reconnect to grant this scope. No additional PII scope is requested, so entity PII can be redacted.
 
-### 1. API Token (Bearer Token)
+The identity endpoint is documented for active OAuth access tokens. API token connections are rejected locally by `get_current_user`. Legacy OAuth connections with stored refresh tokens remain eligible. OAuth refresh validates that a refresh token exists, validates returned token fields, and preserves the prior refresh token when the provider omits a replacement.
 
-Accessing the Productboard API requires authentication, which can be done through a Public API Access token. For simpler, one-off integrations or initial experimentation, the API token is recommended.
+## Legacy API v1 operations
 
-- Workspace admins can generate a developer token from the Integrations page in workspace settings.
-- The token is passed as a Bearer token in the `Authorization` header along with an `X-Version: 1` header.
+The following retained tool keys still call API v1 and are unavailable under the announced sunset. Their routes and input schemas are preserved in this bounded refresh; the package does not claim that these operations have been restored:
 
-Example:
+- `assign_feature_to_release`
+- `create_company`
+- `create_feature`
+- `create_initiative`
+- `create_key_result`
+- `create_note`
+- `create_objective`
+- `create_release`
+- `create_user`
+- `delete_feature`
+- `delete_initiative`
+- `delete_key_result`
+- `delete_note`
+- `delete_objective`
+- `delete_release`
+- `delete_user`
+- `get_custom_field_values`
+- `get_feature`
+- `get_initiative`
+- `get_note`
+- `get_objective`
+- `list_companies`
+- `list_custom_fields`
+- `list_feature_statuses`
+- `list_features`
+- `list_initiatives`
+- `list_key_results`
+- `list_notes`
+- `list_objectives`
+- `list_product_hierarchy`
+- `list_releases`
+- `list_users`
+- `set_custom_field_value`
+- `update_company`
+- `update_feature`
+- `update_initiative`
+- `update_key_result`
+- `update_objective`
+- `update_release`
+- `update_user`
 
-```
-Authorization: Bearer <your-api-token>
-X-Version: 1
-```
+A separate migration is required for these operations. API v2 changes entity payloads, note attribution, write response shapes, and cascading delete behavior; changing URL paths alone cannot safely migrate them.
 
-Base URL: `https://api.productboard.com`
+## Official sources
 
-### 2. OAuth 2.0 (Authorization Code Grant)
+- [API v1 sunset announcement](https://developer.productboard.com/v1.0.0/changelog/2026-04-09)
+- [Migration guide](https://developer.productboard.com/reference/migration-guide)
+- [List entity configurations](https://developer.productboard.com/reference/listentityconfigurations)
+- [List entities](https://developer.productboard.com/reference/listentities)
+- [Pagination](https://developer.productboard.com/reference/pagination)
+- [OAuth authorization, refresh, and token information](https://developer.productboard.com/reference/oauth-authorization-code)
 
-Productboard provides the ability to allow users to grant access to their workspaces to an external application in a safe, transparent, and restricted manner using OAuth2, an industry-standard protocol for authorization.
+## Verification limits
 
-- **Application Registration**: Register your OAuth2 application at `https://app.productboard.com/oauth2/applications`. Requires an active Productboard account.
-- **Authorization Endpoint**: `https://app.productboard.com/oauth2/authorize`
-  - Required parameters: `client_id`, `response_type=code`, `redirect_uri`
-  - Optional parameters: `state`, `code_challenge`, `code_challenge_method` (for PKCE)
-- **Token Endpoint**: `https://app.productboard.com/oauth2/token`
-  - Required parameters: `client_id`, `client_secret`, `grant_type=authorization_code`, `redirect_uri`, `code`
-- **Token Refresh**: Same endpoint with `grant_type=refresh_token`
-- **Token Info**: `GET https://app.productboard.com/oauth2/token/info?access_token=<TOKEN>`
-- **Token Revocation**: `POST https://app.productboard.com/oauth2/revoke`
-
-**Token Lifetimes:**
-
-- Access token expires after 24 hours
-- Refresh token expires after 180 days (or 60 minutes after being used once)
-- Authorization code expires after 10 minutes
-
-Only Makers with admin access are able to authorize OAuth2 applications to access their workspaces.
-
-**Scopes** (organized in read/create/manage categories):
-
-| Scope                                                            | Description                                               |
-| ---------------------------------------------------------------- | --------------------------------------------------------- |
-| `product_hierarchy_data:read`                                    | Read products, components, features, and their attributes |
-| `product_hierarchy_data:create`                                  | Create features, releases, roadmaps                       |
-| `product_hierarchy_data:manage`                                  | Edit and delete features and attributes                   |
-| `custom_fields:read`                                             | Read custom field definitions                             |
-| `releases:read`                                                  | Read releases and release groups                          |
-| `releases:create`                                                | Create releases and release groups                        |
-| `releases:manage`                                                | Edit and delete releases and release groups               |
-| `notes:create`                                                   | Create notes                                              |
-| `users:read`                                                     | List users                                                |
-| `users:manage`                                                   | Edit users                                                |
-| `users_pii:read`                                                 | Read PII from note-creating users                         |
-| `members_pii:read`                                               | Read PII from Productboard workspace members              |
-| `plugin_integrations:manage`                                     | Manage UI plugins                                         |
-| `objectives:read` / `objectives:create` / `objectives:manage`    | Read, create, edit/delete objectives                      |
-| `key_results:read` / `key_results:create` / `key_results:manage` | Read, create, edit/delete key results                     |
-| `initiatives:read` / `initiatives:create` / `initiatives:manage` | Read, create, edit/delete initiatives                     |
-| `feedback_form_configurations:read`                              | Read feedback form configurations                         |
-| `feedback_forms:create`                                          | Submit notes via feedback forms                           |
-
-Not all roles can authorize all scopes. Makers can only authorize a subset; Contributors are limited to `notes:create`, `users:read`, `users_pii:read`, `members_pii:read`, and `feedback_forms:create`.
-
-## Features
-
-### Notes & Feedback Management
-
-Create, list, retrieve, update, and delete notes (feedback items) on the Insights board. The Notes API allows you to capture product ideas, requests, and feedback from any source and import them as notes on your Insights board. Notes support tags, links, followers, and user attribution. Feedback forms can also be configured and submitted via API.
-
-### Product Hierarchy Management
-
-Manage the full product hierarchy including products, components, and features. Features can be created, listed, retrieved, updated, and deleted. Features support statuses, descriptions, owners, and parent-child relationships (features and subfeatures). You can also list available feature statuses.
-
-### Companies & Users
-
-Create and manage companies and users that provide feedback. Companies support custom fields with configurable values. Users can be created, updated, and deleted, and associated with feedback.
-
-### Custom Fields
-
-Read custom field definitions and their values for hierarchy entities (products, components, features). Set or delete custom field values on specific entities.
-
-### Releases & Release Groups
-
-Create, manage, and organize releases and release groups for planning delivery timelines. Assign features to releases and manage those assignments.
-
-### Objectives & Key Results
-
-Create, read, update, and delete objectives and key results. Link objectives to features and initiatives to align product work with strategic goals.
-
-### Initiatives
-
-Create, read, update, and delete initiatives. Link initiatives to objectives and features to organize larger product efforts that span multiple features.
-
-### Plugin Integrations
-
-Display a column in Productboard UI allowing users to push features to third-party systems, create tickets in external systems based on feature data, and propagate changes between Productboard and connected tools. Plugin integrations support connection management between features and external entities.
-
-### Jira Integration Management
-
-Retrieve information about existing Jira integrations and their connections (read-only via API). The native Jira integration supports two-way field synchronization and automatic issue import.
-
-## Events
-
-Productboard's API offers webhook functionality, allowing you to subscribe to various events and receive notifications when changes occur in your Productboard workspace.
-
-Webhooks are registered via the API by creating a subscription with a notification URL and an event type. When creating a webhook subscription, Productboard sends a probe request to verify that the specified endpoint intends to receive webhook notifications and that the requests can reach the destination.
-
-### Feature Events
-
-Receive notifications when features are created, updated, or deleted in the workspace. This includes changes to feature attributes such as status, name, description, timeframes, and custom field values.
-
-### Note Events
-
-Receive notifications when notes (feedback/insights) are created in the workspace.
-
-### Component Events
-
-Receive notifications when components in the product hierarchy change.
-
-### Product Events
-
-Receive notifications when products are modified.
-
-### Plugin Integration Callbacks
-
-When using plugin integrations, receive callback notifications when users click push/unlink buttons in the Productboard UI, enabling two-way sync workflows with external tools.
+This refresh is grounded in official documentation and local build checks. Live provider requests, E2E tests, and model evals have not been run. It remains a partial refresh with a major provider migration limitation.

@@ -1,6 +1,6 @@
 # Grafbase
 
-Manage GraphQL federation infrastructure through the Grafbase Management API. Create and configure federated graphs, publish and compose subgraph schemas via the schema registry, run schema checks to detect breaking changes, and manage schema proposals for collaborative governance. Manage organizations, memberships, and access tokens programmatically. Access audit logs for compliance tracking and retrieve observability data including traces, metrics, and operation analytics for federated graphs.
+Manage Grafbase accounts, federated graphs, branches, and subgraph schemas through the Management API. Discover graph IDs, publish schemas, run schema checks, retrieve schema SDL, and execute custom GraphQL operations. Personal access tokens support Management API authentication, including self-hosted endpoints.
 
 ## License
 

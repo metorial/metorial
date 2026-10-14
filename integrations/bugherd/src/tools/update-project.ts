@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
@@ -16,19 +17,25 @@ export let updateProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the project to update'),
-      name: z.string().optional().describe('New project name'),
-      devurl: z.string().optional().describe('New website URL'),
+      projectId: positiveIntegerSchema.describe('ID of the project to update'),
+      name: z.string().min(1).optional().describe('New project name'),
+      devurl: z.string().url().optional().describe('New website URL'),
       isActive: z.boolean().optional().describe('Set active status'),
       isPublic: z.boolean().optional().describe('Set public feedback visibility'),
       permission: z
         .enum(['guests_see_guests', 'guests_see_self'])
         .optional()
         .describe('Guest visibility permission'),
-      addMemberIds: z.array(z.number()).optional().describe('User IDs to add as team members'),
-      addGuestId: z.number().optional().describe('User ID to add as a guest/client'),
+      addMemberIds: z
+        .array(positiveIntegerSchema)
+        .optional()
+        .describe('User IDs to add as team members'),
+      addGuestId: positiveIntegerSchema
+        .optional()
+        .describe('User ID to add as a guest/client'),
       addGuestEmail: z
         .string()
+        .email()
         .optional()
         .describe('Email address to add as a guest/client (invites if not existing)')
     })
@@ -46,6 +53,17 @@ export let updateProject = SlateTool.create(spec, {
     let { projectId, addMemberIds, addGuestId, addGuestEmail, ...updateFields } = ctx.input;
 
     let hasUpdateFields = Object.values(updateFields).some(v => v !== undefined);
+
+    if (
+      !hasUpdateFields &&
+      !addMemberIds?.length &&
+      addGuestId === undefined &&
+      addGuestEmail === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide a project field to update or a member or guest to add.'
+      );
+    }
 
     if (hasUpdateFields) {
       await client.updateProject(projectId, {

@@ -1,6 +1,6 @@
-# <img src="logo.png" height="20"> Time Camp
+# <img src="logo.png" height="20"> TimeCamp
 
-Track and manage time entries for tasks and projects. Start, stop, and check real-time timers. Create and organize projects and tasks in hierarchical structures. Manage users, groups, and team membership. Retrieve attendance and away time records for workforce management. Create and send invoices from billable time entries. Set billing rates for users, groups, and projects. Approve employee timesheets. Track project budgets against actual time spent. Assign tags to categorize time entries. Monitor computer activity and application usage. Manage client records associated with projects and invoices.
+Track time with entries and live timers. Create and organize projects and tasks, discover users and groups, review attendance, and manage tags within tag lists. Retrieve the authenticated user's profile and permissions. Existing client and invoice tools are also included; their routes are not described in the current public API reference.
 
 ## License
 

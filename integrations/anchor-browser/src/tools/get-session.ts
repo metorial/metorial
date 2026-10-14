@@ -24,7 +24,11 @@ export let getSession = SlateTool.create(spec, {
       duration: z.number(),
       creditsUsed: z.number(),
       proxyBytes: z.number(),
-      tokens: z.number(),
+      tokens: z.number().optional(),
+      tokenUsage: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider token usage details when returned as an object'),
       steps: z.number(),
       tags: z.array(z.string()),
       createdAt: z.string(),
@@ -43,7 +47,11 @@ export let getSession = SlateTool.create(spec, {
         duration: result.duration ?? 0,
         creditsUsed: result.credits_used ?? 0,
         proxyBytes: result.proxy_bytes ?? 0,
-        tokens: result.tokens ?? 0,
+        tokens: typeof result.tokens === 'number' ? result.tokens : undefined,
+        tokenUsage:
+          typeof result.tokens === 'object' && result.tokens !== null
+            ? result.tokens
+            : undefined,
         steps: result.steps ?? 0,
         tags: result.tags ?? [],
         createdAt: result.created_at ?? '',

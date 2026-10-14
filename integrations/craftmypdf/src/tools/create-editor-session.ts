@@ -44,7 +44,8 @@ Configure permissions to control what the user can do in the embedded editor (sa
         .describe(
           'Unique token for this editor session. Can be used to deactivate the session.'
         ),
-      status: z.string().describe('Status of the session creation.')
+      status: z.string().describe('Status of the session creation.'),
+      expiresAt: z.string().optional().describe('Session expiration timestamp when provided.')
     })
   )
   .handleInvocation(async ctx => {
@@ -80,7 +81,8 @@ Configure permissions to control what the user can do in the embedded editor (sa
       output: {
         editorUrl: result.url,
         sessionToken: result.token_uuid,
-        status: result.status
+        status: result.status,
+        expiresAt: result.expire_after
       },
       message: `Editor session created for template ${ctx.input.templateId}. [Open Editor](${result.url})`
     };

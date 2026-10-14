@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDatabase = SlateTool.create(spec, {
   name: 'Manage Database',
   key: 'manage_database',
-  description: `List, create, or delete databases. List databases across an organization or on a specific server with search and pagination. Create new databases with user credentials, or delete existing ones.`,
+  description: `List, create, or delete databases. List databases across an organization or on a specific server with search and pagination. Create new databases with user credentials, or delete existing ones.
+${organizationScopeGuidance}`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,7 +16,7 @@ export let manageDatabase = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       action: z.enum(['list', 'create', 'destroy']).describe('Action to perform'),
       serverId: z
         .string()
@@ -55,7 +57,8 @@ export let manageDatabase = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { action } = ctx.input;
 
@@ -76,11 +79,22 @@ export let manageDatabase = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.serverId) throw new Error('serverId is required for create action');
+      if (!ctx.input.serverId)
+        throw createApiServiceError('serverId is required for create action');
       if (!ctx.input.databaseName)
-        throw new Error('databaseName is required for create action');
-      if (!ctx.input.username) throw new Error('username is required for create action');
-      if (!ctx.input.password) throw new Error('password is required for create action');
+        throw createApiServiceError('databaseName is required for create action');
+      if (!ctx.input.username)
+        throw createApiServiceError('username is required for create action');
+      if (!ctx.input.password)
+        throw createApiServiceError('password is required for create action');
+      if (
+        ctx.input.connectionPreference === 'specific_ip_addresses' &&
+        !ctx.input.allowedIps?.length
+      ) {
+        throw createApiServiceError(
+          'allowedIps is required for specific_ip_addresses connection preference.'
+        );
+      }
 
       let result = await client.createDatabase(orgId, ctx.input.serverId, {
         name: ctx.input.databaseName,
@@ -101,8 +115,10 @@ export let manageDatabase = SlateTool.create(spec, {
     }
 
     if (action === 'destroy') {
-      if (!ctx.input.serverId) throw new Error('serverId is required for destroy action');
-      if (!ctx.input.databaseId) throw new Error('databaseId is required for destroy action');
+      if (!ctx.input.serverId)
+        throw createApiServiceError('serverId is required for destroy action');
+      if (!ctx.input.databaseId)
+        throw createApiServiceError('databaseId is required for destroy action');
 
       let result = await client.destroyDatabase(
         orgId,
@@ -120,6 +136,6 @@ export let manageDatabase = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

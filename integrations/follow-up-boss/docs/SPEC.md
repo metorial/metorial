@@ -1,6 +1,4 @@
-Let me get more details on the full list of webhook events and API resources available.Now I have comprehensive information. Let me also check the OAuth flow details.Now I have all the information needed. Let me compile the specification.
-
-# Slates Specification for Follow Up Boss
+# Follow Up Boss Integration Specification
 
 ## Overview
 
@@ -40,7 +38,7 @@ Every request to the API should include the registered 'X-System' and 'X-System-
 
 ### Contact (People) Management
 
-Create, read, update, and delete contacts in the CRM. Follow Up Boss will automatically search for an existing contact and update it to avoid duplicates. Supports managing contact details including name, emails, phones, addresses, tags, stages, and custom fields. Contacts can be assigned to agents or lenders, and collaborators can be added. Supports checking for duplicates, claiming unclaimed leads, and managing file attachments on contacts.
+Create, read, update, and delete contacts in the CRM. Contact creation uses the deduplicate option to return an existing contact unchanged when the same email or phone is found. Lead events use the provider's lead deduplication and automation flow. Supports managing contact details including name, emails, phones, addresses, tags, stages, and custom fields. Contacts can be assigned to agents or lenders, and collaborators can be added. Supports checking for duplicates, claiming unclaimed leads, and managing file attachments on contacts.
 
 ### Lead & Event Ingestion
 
@@ -60,7 +58,7 @@ Create and manage tasks assigned to users for contact follow-up. Create and mana
 
 ### Communication Tracking
 
-Log and retrieve calls, text messages, and emails associated with contacts. Supports creating call logs, sending text messages, and tracking email interactions.
+Log and retrieve calls, text messages, and emails associated with contacts. Supports creating call logs and recording externally sent or received text messages. The text-message API logs records only and does not send SMS.
 
 ### Notes & Collaboration
 
@@ -80,7 +78,7 @@ Create and manage email templates and text message templates. Supports merge fie
 
 ### Team & User Management
 
-Retrieve users and their roles (Agent, Broker/Admin, Owner). Manage teams, groups (for round-robin lead distribution), and ponds (shared lead pools). View team inboxes.
+Retrieve users and their roles (Agent, Broker/Admin, Owner), including the current authenticated user with `who_am_i`. Manage teams, groups (for round-robin lead distribution), and ponds (shared lead pools). View team inboxes.
 
 ### Smart Lists
 

@@ -50,13 +50,7 @@ export let updateBusiness = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let data = await client.updateBusiness(ctx.input);
-
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to update business: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
+    await client.updateBusiness(ctx.input);
 
     return {
       output: { success: true },

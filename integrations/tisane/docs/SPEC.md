@@ -1,4 +1,4 @@
-Now let me check if there's a translation endpoint and look at the Language Model Direct Access feature:# Slates Specification for Tisane
+# Tisane Specification
 
 ## Overview
 

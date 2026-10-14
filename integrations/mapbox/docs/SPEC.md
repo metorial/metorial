@@ -1,6 +1,4 @@
-Now let me get more details on the Mapbox data/account APIs and confirm there are no webhook capabilities:I now have enough information to write the specification. Let me compile it.
-
-# Slates Specification for Mapbox
+# Mapbox Integration Specification
 
 ## Overview
 
@@ -10,13 +8,13 @@ Mapbox is a location data platform that provides APIs and SDKs for maps, navigat
 
 Mapbox uses **access tokens** for API authentication. To access the Mapbox API endpoints, you need a valid access token, which will connect API requests to your account. You must supply a valid access token by using the `access_token` query parameter in every request.
 
-There are two types of tokens:
+There are three types of tokens:
 
 - **Public tokens** (`pk.*`): Public tokens are designed to be used in client-side applications. They typically have limited permissions to access resources like tilesets, styles, datasets, and geocoding services. Public tokens restrict users from changing, deleting, or creating resources, granting only read access.
 
 - **Secret tokens** (`sk.*`): These tokens often have broader permissions, allowing full access to Mapbox resources, including creating, modifying, and deleting resources such as tilesets, styles, datasets, etc. Since they provide elevated access, private tokens should never be exposed in client-side code. They are intended for environments where their confidentiality can be guaranteed, such as on a server or in an API.
 
-- **Temporary tokens** (`tk.*`): With the Mapbox Tokens API you can create, list, update, and delete your access tokens. The Tokens API enables you to create public `pk` and secret `sk` tokens as well as temporary `tk` tokens, which can support an expiration parameter up to 1 hour in the future.
+- **Temporary tokens** (`tk.*`): Expire at a specified time, at most one hour after creation. Temporary tokens cannot be updated or revoked and must be replaced after expiry.
 
 **Token Scopes**: The actions allowed by a token are based on scopes. A scope is a string that often is a resource type and action separated by a colon. For example, the `styles:read` scope allows read access to styles. Common scopes include `styles:read`, `fonts:read`, `uploads:read`, `uploads:write`, `datasets:read`, `datasets:write`, `tokens:read`, `tokens:write`, and `downloads:read`.
 
@@ -32,7 +30,7 @@ The Mapbox Vector Tiles API serves vector tiles generated from Mapbox Studio sty
 
 ### Static Map Images
 
-The Mapbox Static Images API returns static images generated from vector map styles. Allows generating PNG or JPEG map images with custom dimensions, markers, overlays, and viewport settings without requiring a browser or WebGL.
+The Mapbox Static Images API returns downloadable map images with custom dimensions, markers, overlays, and viewport settings. The static_image tool supports optional PNG, JPEG, and WebP formats. Mapbox Standard and Standard Satellite styles, including custom styles importing them, are not supported. The existing imageUrl output is retained and includes the connected access token.
 
 ### Map Styles Management
 
@@ -40,7 +38,11 @@ The Mapbox Styles API lets you read and change map styles, fonts, and images. Us
 
 ### Geocoding
 
-The Geocoding API performs two main tasks: forward search and reverse geocoding. Forward search converts text into geographic coordinates. Reverse geocoding converts geographic coordinates into a text description. Supports filtering by country, language, feature type, and proximity biasing. Batch geocoding is available for multiple queries in a single request. You may only use responses from the Geocoding API in conjunction with a Mapbox map.
+The geocode tool retains Geocoding v5 forward and reverse requests for compatibility. The geocode_v6 tool adds current v6 text, structured address, and reverse searches with address match information. Points of interest are no longer provided by v5 and are not supported by these tools. Geocoding results are temporary; permanent storage is not enabled by the current tools.
+
+### Connected Account
+
+The who_am_i tool returns the token owner's username, token type, and authorization identifier when available. Temporary-token scopes and expiry are included when returned by Mapbox. Connection profiles use the owner username from the token validation response.
 
 ### Search Box
 

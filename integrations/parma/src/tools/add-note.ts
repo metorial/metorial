@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ParmaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,12 @@ export let addNote = SlateTool.create(spec, {
         .string()
         .describe(
           'Content of the note (meeting notes, interaction details, follow-up items, etc.)'
+        ),
+      datetime: z
+        .string()
+        .optional()
+        .describe(
+          'Optional interaction date and time in ISO 8601 format; defaults to the current time'
         )
     })
   )
@@ -34,17 +40,28 @@ export let addNote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let relationshipId = Number(ctx.input.relationshipId);
+    if (
+      !/^\d+$/.test(ctx.input.relationshipId) ||
+      !Number.isSafeInteger(relationshipId) ||
+      relationshipId <= 0
+    ) {
+      throw createApiServiceError(
+        'Provide a numeric relationship ID from search_relationships.'
+      );
+    }
     let client = new ParmaClient(ctx.auth.token);
 
     let result = await client.createNote(ctx.input.relationshipId, {
-      content: ctx.input.content
+      content: ctx.input.content,
+      datetime: ctx.input.datetime
     });
 
     return {
       output: {
         noteId: String(result.id),
         relationshipId: ctx.input.relationshipId,
-        content: result.content ?? ctx.input.content,
+        content: result.body,
         createdAt: result.created_at
       },
       message: `Added note to relationship **${ctx.input.relationshipId}**.`

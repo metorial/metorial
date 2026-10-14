@@ -75,7 +75,10 @@ export let getEventTool = SlateTool.create(spec, {
       bufferAfter: z.number().optional().describe('Buffer after in minutes'),
       payment: z
         .object({
-          amountTotal: z.number().optional(),
+          amountTotal: z
+            .number()
+            .optional()
+            .describe('Total amount in cents; absent until the payment amount is known'),
           state: z.string().optional(),
           url: z.string().nullable().optional()
         })
@@ -157,7 +160,7 @@ export let getEventTool = SlateTool.create(spec, {
         bufferAfter: e.buffer_after,
         payment: e.payment
           ? {
-              amountTotal: e.payment.amount_total,
+              amountTotal: e.payment.amount_total ?? undefined,
               state: e.payment.state,
               url: e.payment.url
             }

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCachedDatasets = SlateTool.create(spec, {
@@ -25,6 +25,14 @@ export let manageCachedDatasets = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Name of the dataset. Required for all actions except "list".'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of datasets per list page, from 1 to 100 (default 10)'),
+      afterName: z
+        .string()
+        .optional()
+        .describe('For list pagination, the final dataset name from the previous page'),
       datasetDefinition: z
         .object({
           displayName: z.string().optional().describe('Display name for the dataset'),
@@ -60,7 +68,7 @@ export let manageCachedDatasets = SlateTool.create(spec, {
           indexBy: z
             .string()
             .optional()
-            .describe('Property to index results by (must be in group_by)')
+            .describe('Property to index results by; must not also appear in groupBy')
         })
         .optional()
         .describe('Dataset configuration. Required for "create" action.'),
@@ -92,14 +100,20 @@ export let manageCachedDatasets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     switch (ctx.input.action) {
       case 'list': {
-        let datasets = await client.listDatasets();
+        if (
+          ctx.input.limit !== undefined &&
+          (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 100)
+        ) {
+          throw createApiServiceError('limit must be a whole number from 1 to 100.');
+        }
+        let datasets = await client.listDatasets({
+          limit: ctx.input.limit,
+          after_name: ctx.input.afterName
+        });
         return {
           output: { datasets, success: true },
           message: `Listed cached datasets.`
@@ -108,7 +122,7 @@ export let manageCachedDatasets = SlateTool.create(spec, {
 
       case 'get': {
         if (!ctx.input.datasetName)
-          throw new Error('datasetName is required for "get" action');
+          throw createApiServiceError('datasetName is required for "get" action');
         let dataset = await client.getDataset(ctx.input.datasetName);
         return {
           output: { dataset, success: true },
@@ -118,17 +132,27 @@ export let manageCachedDatasets = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.datasetName)
-          throw new Error('datasetName is required for "create" action');
+          throw createApiServiceError('datasetName is required for "create" action');
         if (!ctx.input.datasetDefinition?.query)
-          throw new Error('datasetDefinition with query is required for "create" action');
+          throw createApiServiceError(
+            'datasetDefinition with query is required for "create" action'
+          );
         if (!ctx.input.datasetDefinition.indexBy)
-          throw new Error('datasetDefinition.indexBy is required for "create" action');
+          throw createApiServiceError(
+            'datasetDefinition.indexBy is required for "create" action'
+          );
 
         let q = ctx.input.datasetDefinition.query;
+        let groupBy = typeof q.groupBy === 'string' ? [q.groupBy] : q.groupBy;
+        if (groupBy?.includes(ctx.input.datasetDefinition.indexBy)) {
+          throw createApiServiceError(
+            'The dataset indexBy property must not also appear in groupBy.'
+          );
+        }
         let def: Record<string, any> = {
           display_name: ctx.input.datasetDefinition.displayName || ctx.input.datasetName,
           query: {
-            project_id: q.projectId || ctx.config.projectId,
+            project_id: q.projectId || client.projectId,
             analysis_type: q.analysisType,
             event_collection: q.collectionName,
             timeframe: q.timeframe,
@@ -156,7 +180,7 @@ export let manageCachedDatasets = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.datasetName)
-          throw new Error('datasetName is required for "delete" action');
+          throw createApiServiceError('datasetName is required for "delete" action');
         await client.deleteDataset(ctx.input.datasetName);
         return {
           output: { success: true },
@@ -166,9 +190,9 @@ export let manageCachedDatasets = SlateTool.create(spec, {
 
       case 'get_results': {
         if (!ctx.input.datasetName)
-          throw new Error('datasetName is required for "get_results" action');
+          throw createApiServiceError('datasetName is required for "get_results" action');
         if (!ctx.input.resultParams)
-          throw new Error('resultParams is required for "get_results" action');
+          throw createApiServiceError('resultParams is required for "get_results" action');
         let results = await client.getDatasetResults(
           ctx.input.datasetName,
           ctx.input.resultParams.indexBy,

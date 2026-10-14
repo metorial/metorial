@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     subdomain: z
       .string()
+      .optional()
       .describe(
-        'Your Sendloop account subdomain (e.g., "yourcompany" from yourcompany.sendloop.com)'
+        'Account subdomain for older connections; new connections resolve this from your API key'
       )
   })
 );

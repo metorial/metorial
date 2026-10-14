@@ -70,8 +70,20 @@ export let manageSegment = SlateTool.create(spec, {
         output: {
           segmentKey: segment.key,
           name: segment.name,
-          includedCount: (segment.included ?? []).length,
-          excludedCount: (segment.excluded ?? []).length
+          includedCount:
+            segment._unboundedMetadata?.includedCount ??
+            (segment.included ?? []).length +
+              (segment.includedContexts ?? []).reduce(
+                (count: number, targets: any) => count + (targets.values ?? []).length,
+                0
+              ),
+          excludedCount:
+            segment._unboundedMetadata?.excludedCount ??
+            (segment.excluded ?? []).length +
+              (segment.excludedContexts ?? []).reduce(
+                (count: number, targets: any) => count + (targets.values ?? []).length,
+                0
+              )
         },
         message: `Created segment **${segment.name}** (\`${segment.key}\`) in \`${envKey}\`.`
       };
@@ -95,8 +107,20 @@ export let manageSegment = SlateTool.create(spec, {
         output: {
           segmentKey: segment.key,
           name: segment.name,
-          includedCount: (segment.included ?? []).length,
-          excludedCount: (segment.excluded ?? []).length
+          includedCount:
+            segment._unboundedMetadata?.includedCount ??
+            (segment.included ?? []).length +
+              (segment.includedContexts ?? []).reduce(
+                (count: number, targets: any) => count + (targets.values ?? []).length,
+                0
+              ),
+          excludedCount:
+            segment._unboundedMetadata?.excludedCount ??
+            (segment.excluded ?? []).length +
+              (segment.excludedContexts ?? []).reduce(
+                (count: number, targets: any) => count + (targets.values ?? []).length,
+                0
+              )
         },
         message: `Updated segment **${segment.name}** (\`${segment.key}\`) in \`${envKey}\`.`
       };

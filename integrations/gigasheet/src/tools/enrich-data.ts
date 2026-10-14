@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,19 +51,21 @@ export let enrichData = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'email':
         if (!ctx.input.columnName)
-          throw new Error('columnName is required for email enrichment');
+          throw createApiServiceError('columnName is required for email enrichment');
         result = await client.enrichEmail(ctx.input.sheetHandle, ctx.input.columnName);
         break;
 
       case 'geo':
         if (!ctx.input.columnName)
-          throw new Error('columnName is required for geo enrichment');
+          throw createApiServiceError('columnName is required for geo enrichment');
         result = await client.enrichGeo(ctx.input.sheetHandle, ctx.input.columnName);
         break;
 
       case 'custom_http_apply':
         if (!ctx.input.enrichmentConfig)
-          throw new Error('enrichmentConfig is required for custom HTTP enrichment');
+          throw createApiServiceError(
+            'enrichmentConfig is required for custom HTTP enrichment'
+          );
         result = await client.applyHttpEnrichment(
           ctx.input.sheetHandle,
           ctx.input.enrichmentConfig
@@ -72,7 +74,7 @@ export let enrichData = SlateTool.create(spec, {
 
       case 'custom_http_preview':
         if (!ctx.input.enrichmentConfig)
-          throw new Error('enrichmentConfig is required for custom HTTP preview');
+          throw createApiServiceError('enrichmentConfig is required for custom HTTP preview');
         result = await client.previewHttpEnrichment(
           ctx.input.sheetHandle,
           ctx.input.enrichmentConfig
@@ -84,12 +86,14 @@ export let enrichData = SlateTool.create(spec, {
         break;
 
       case 'task_status':
-        if (!ctx.input.taskHandle) throw new Error('taskHandle is required for task_status');
+        if (!ctx.input.taskHandle)
+          throw createApiServiceError('taskHandle is required for task_status');
         result = await client.getEnrichmentTaskStatus(ctx.input.taskHandle);
         break;
 
       case 'cancel_task':
-        if (!ctx.input.taskHandle) throw new Error('taskHandle is required for cancel_task');
+        if (!ctx.input.taskHandle)
+          throw createApiServiceError('taskHandle is required for cancel_task');
         await client.cancelEnrichmentTask(ctx.input.taskHandle);
         result = { cancelled: true };
         break;

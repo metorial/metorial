@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Add a message or comment to a ticket. Supports agent replies, internal notes, and customer comments. Can include file attachments.`,
+  description: `Add a message or comment to a ticket. Supports teammate replies and internal notes. Can include file attachments.`,
   instructions: [
     'Set isNote to true to create an internal note visible only to agents.',
-    'Provide sessionId to post as a specific customer/contact.'
+    'Messages are attributed to the authenticated teammate. The provider accepts sessionId for compatibility but ignores it when creating messages.'
   ],
   tags: {
     destructive: false
@@ -26,7 +26,7 @@ export let sendMessage = SlateTool.create(spec, {
       sessionId: z
         .string()
         .optional()
-        .describe('Session ID to post the message as a specific customer'),
+        .describe('Legacy session ID; the provider ignores this when creating messages'),
       attachments: z
         .array(
           z.object({
@@ -47,14 +47,13 @@ export let sendMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let result = await client.createMessage({
       ticket: ctx.input.ticketId,
-      comment: {
-        text: ctx.input.text
-      },
+      comment: ctx.input.text,
       isNote: ctx.input.isNote,
       session: ctx.input.sessionId,
       attachments: ctx.input.attachments

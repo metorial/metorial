@@ -151,3 +151,18 @@ Triggered when a user is created, updated, or deleted.
 Task updates preserve lowercase tool input statuses and send Capsule's uppercase model values. Creating tasks requires `dueOn` and allows at most one related record. Notes require exactly one related record. Lost reason names resolve to existing account definitions before opportunity updates.
 
 Official references: [User](https://developer.capsulecrm.com/v2/operations/User), [Opportunity](https://developer.capsulecrm.com/v2/operations/Opportunity), [Project](https://developer.capsulecrm.com/v2/operations/Project), [Task model](https://developer.capsulecrm.com/v2/models/task), [Entry](https://developer.capsulecrm.com/v2/operations/Entry), [Lost Reason](https://developer.capsulecrm.com/v2/operations/Lost_Reason), and [Authentication](https://developer.capsulecrm.com/v2/overview/authentication).
+
+
+## Refresh additions
+
+- `get_task`: GET `/tasks/{id}`, returning task state, recurrence, and related records.
+- `search_opportunities`: GET `/opportunities/search`, with text query, pagination, and supported embeds.
+- `list_teams`: GET `/teams`, with optional memberships for team discovery.
+
+Contact, opportunity, and project create/update tools accept custom field values by existing definition ID. Values use the provider's string, number, or boolean representation. Contact website inputs distinguish `service` (for example `URL` or `TWITTER`) from the optional Home/Work label. New websites default to the URL service. Legacy service names in the website type input remain accepted.
+
+Project create/update tools also support `startOn`, `stageId`, and linking an opportunity. Tag updates add or remove specified tags and leave unspecified tags unchanged. `manage_tags` supports paginated listing. `list_pipelines` supports pagination and archived pipelines and reads every milestone page; milestone outputs include `complete` to identify closing stages. Task updates also accept the pending status.
+
+Provider null values in existing optional scalar outputs are omitted so the original output types remain valid. `list_opportunities` and `list_projects` reject simultaneous party and modification-date filters, since the party-specific endpoints do not support the latter.
+
+Official references: [Team](https://developer.capsulecrm.com/v2/operations/Team), [Party](https://developer.capsulecrm.com/v2/operations/Party), [Website model](https://developer.capsulecrm.com/v2/models/website), [Field Value model](https://developer.capsulecrm.com/v2/models/field_value), [Pipeline](https://developer.capsulecrm.com/v2/operations/Pipeline), [Milestone](https://developer.capsulecrm.com/v2/operations/Milestone), and [Tag](https://developer.capsulecrm.com/v2/operations/Tag).

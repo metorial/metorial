@@ -39,7 +39,7 @@ export let getAccountInfo = SlateTool.create(spec, {
         project: result?.project,
         subscription: result?.subscription
       },
-      message: `Retrieved account info. Project: **${result?.project?.name ?? 'unknown'}**. Subscription: ${result?.subscription?.name ?? 'unknown'}.`
+      message: `Retrieved account info. Project: **${result?.project?.name ?? 'unknown'}**. Subscription: ${result?.subscription?.plan_name ?? result?.subscription?.name ?? 'unknown'}.`
     };
   })
   .build();

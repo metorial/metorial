@@ -56,11 +56,11 @@ export let getMessages = SlateTool.create(spec, {
     });
 
     let messages = (result?.message_list || []).map((m: any) => ({
-      messageId: m.id,
-      conversationId: m.conversation_id,
-      ticketId: m.ticket_id,
-      eventType: m.event_type,
-      created: m.created
+      messageId: m.id ?? undefined,
+      conversationId: m.conversation_id ?? undefined,
+      ticketId: m.ticket_id ?? undefined,
+      eventType: m.event_type ?? undefined,
+      created: m.created ?? undefined
     }));
 
     return {

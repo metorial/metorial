@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let createUser = SlateTool.create(spec, {
   constraints: [
     'Maximum 25 users per request',
     'Phone number must be unique and in E.164 format (e.g. +12124567890)',
-    'Email is required for admin-type users'
+    'New users are created as employees; use update_users to invite them as admins'
   ],
   tags: {
     destructive: false
@@ -30,7 +30,9 @@ export let createUser = SlateTool.create(spec, {
             userType: z
               .enum(['user', 'admin'])
               .optional()
-              .describe('User role. Defaults to "user".'),
+              .describe(
+                'Use "user". To invite an admin, create the employee then call update_users.'
+              ),
             isArchived: z.boolean().optional().describe('Whether to create as archived'),
             customFields: z
               .array(
@@ -56,11 +58,17 @@ export let createUser = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
-    let result = await client.createUsers(ctx.input.users, ctx.input.sendActivation);
+    if (ctx.input.users.some(user => user.userType === 'admin')) {
+      throw createApiServiceError(
+        'Create users with userType "user", then call update_users with promote_to_admin.'
+      );
+    }
+    let users = ctx.input.users.map(user => ({ ...user, userType: user.userType ?? 'user' }));
+    let result = await client.createUsers(users, ctx.input.sendActivation);
 
     return {
       output: { result },

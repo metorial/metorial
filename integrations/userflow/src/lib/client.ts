@@ -1,6 +1,7 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   UserflowAccount,
+  UserflowAttributeDefinition,
   UserflowContent,
   UserflowContentSession,
   UserflowContentVersion,
@@ -21,10 +22,15 @@ export interface ClientConfig {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Userflow',
+          reason: 'userflow_api_error'
+        }),
       baseURL: 'https://api.userflow.com',
       headers: {
         Authorization: `Bearer ${config.token}`,
@@ -58,9 +64,9 @@ export class Client {
   }
 
   async getUser(userId: string, expand?: string[]): Promise<UserflowUser> {
-    let params: Record<string, string> = {};
-    if (expand && expand.length > 0) params.expand = expand.join(',');
-    let response = await this.http.get(`/users/${userId}`, { params });
+    let params: Record<string, unknown> = {};
+    if (expand && expand.length > 0) params.expand = expand;
+    let response = await this.http.get(`/users/${encodeURIComponent(userId)}`, { params });
     return response.data;
   }
 
@@ -69,31 +75,60 @@ export class Client {
     startingAfter?: string;
     orderBy?: string;
     expand?: string[];
+    email?: string;
+    groupId?: string;
+    condition?: Record<string, unknown>;
   }): Promise<UserflowListResponse<UserflowUser>> {
     let query: Record<string, unknown> = {};
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
     if (params?.orderBy) query.order_by = params.orderBy;
-    if (params?.expand && params.expand.length > 0) query.expand = params.expand.join(',');
+    if (params?.expand && params.expand.length > 0) query.expand = params.expand;
+    if (params?.email) query.email = params.email;
+    if (params?.groupId) query.group_id = params.groupId;
+    if (params?.condition) query.condition = JSON.stringify(params.condition);
     let response = await this.http.get('/users', { params: query });
     return response.data;
   }
 
   async findUser(params: {
     userId?: string;
-    email?: string;
+    email: string;
     groupId?: string;
+    expand?: string[];
   }): Promise<UserflowUser> {
-    let query: Record<string, string> = {};
-    if (params.userId) query.id = params.userId;
-    if (params.email) query.email = params.email;
-    if (params.groupId) query.group_id = params.groupId;
-    let response = await this.http.get('/users/find', { params: query });
-    return response.data;
+    let startingAfter: string | undefined;
+    do {
+      let result = await this.listUsers({
+        email: params.email,
+        groupId: params.groupId,
+        expand: params.expand,
+        limit: params.userId ? 100 : 2,
+        startingAfter
+      });
+      if (params.userId) {
+        let user = result.data.find(user => user.id === params.userId);
+        if (user) return user;
+      } else {
+        if (result.data.length > 1 || result.has_more) {
+          throw createApiServiceError(
+            'Multiple users match this email. Use list_users to identify the user, then provide userId.'
+          );
+        }
+        if (result.data[0]) return result.data[0];
+      }
+      if (!result.has_more) break;
+      let nextCursor = result.data.at(-1)?.id;
+      if (!nextCursor || nextCursor === startingAfter) {
+        throw createApiServiceError('Userflow returned an incomplete pagination response.');
+      }
+      startingAfter = nextCursor;
+    } while (params.userId);
+    throw createApiServiceError('No user matches the supplied email and filters.');
   }
 
   async deleteUser(userId: string): Promise<UserflowDeleteResponse> {
-    let response = await this.http.delete(`/users/${userId}`);
+    let response = await this.http.delete(`/users/${encodeURIComponent(userId)}`);
     return response.data;
   }
 
@@ -110,9 +145,9 @@ export class Client {
   }
 
   async getGroup(groupId: string, expand?: string[]): Promise<UserflowGroup> {
-    let params: Record<string, string> = {};
-    if (expand && expand.length > 0) params.expand = expand.join(',');
-    let response = await this.http.get(`/groups/${groupId}`, { params });
+    let params: Record<string, unknown> = {};
+    if (expand && expand.length > 0) params.expand = expand;
+    let response = await this.http.get(`/groups/${encodeURIComponent(groupId)}`, { params });
     return response.data;
   }
 
@@ -121,18 +156,22 @@ export class Client {
     startingAfter?: string;
     orderBy?: string;
     expand?: string[];
+    userId?: string;
+    condition?: Record<string, unknown>;
   }): Promise<UserflowListResponse<UserflowGroup>> {
     let query: Record<string, unknown> = {};
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
     if (params?.orderBy) query.order_by = params.orderBy;
-    if (params?.expand && params.expand.length > 0) query.expand = params.expand.join(',');
+    if (params?.expand && params.expand.length > 0) query.expand = params.expand;
+    if (params?.userId) query.user_id = params.userId;
+    if (params?.condition) query.condition = JSON.stringify(params.condition);
     let response = await this.http.get('/groups', { params: query });
     return response.data;
   }
 
   async deleteGroup(groupId: string): Promise<UserflowDeleteResponse> {
-    let response = await this.http.delete(`/groups/${groupId}`);
+    let response = await this.http.delete(`/groups/${encodeURIComponent(groupId)}`);
     return response.data;
   }
 
@@ -153,11 +192,13 @@ export class Client {
     userId?: string;
     groupId?: string;
     attributes?: Record<string, unknown>;
+    time?: string;
   }): Promise<UserflowEvent> {
     let body: Record<string, unknown> = { name: params.name };
     if (params.userId) body.user_id = params.userId;
     if (params.groupId) body.group_id = params.groupId;
     if (params.attributes) body.attributes = params.attributes;
+    if (params.time) body.time = params.time;
     let response = await this.http.post('/events', body);
     return response.data;
   }
@@ -178,9 +219,11 @@ export class Client {
   // ── Content ────────────────────────────────────────────────────────
 
   async getContent(contentId: string, expand?: string[]): Promise<UserflowContent> {
-    let params: Record<string, string> = {};
-    if (expand && expand.length > 0) params.expand = expand.join(',');
-    let response = await this.http.get(`/content/${contentId}`, { params });
+    let params: Record<string, unknown> = {};
+    if (expand && expand.length > 0) params.expand = expand;
+    let response = await this.http.get(`/content/${encodeURIComponent(contentId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -192,7 +235,7 @@ export class Client {
     let query: Record<string, unknown> = {};
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
-    if (params?.expand && params.expand.length > 0) query.expand = params.expand.join(',');
+    if (params?.expand && params.expand.length > 0) query.expand = params.expand;
     let response = await this.http.get('/content', { params: query });
     return response.data;
   }
@@ -207,7 +250,7 @@ export class Client {
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
     if (params?.contentId) query.content_id = params.contentId;
-    if (params?.expand && params.expand.length > 0) query.expand = params.expand.join(',');
+    if (params?.expand && params.expand.length > 0) query.expand = params.expand;
     let response = await this.http.get('/content_versions', { params: query });
     return response.data;
   }
@@ -218,14 +261,33 @@ export class Client {
     contentId?: string;
     userId?: string;
     expand?: string[];
+    orderBy?: string;
   }): Promise<UserflowListResponse<UserflowContentSession>> {
     let query: Record<string, unknown> = {};
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
     if (params?.contentId) query.content_id = params.contentId;
     if (params?.userId) query.user_id = params.userId;
-    if (params?.expand && params.expand.length > 0) query.expand = params.expand.join(',');
+    if (params?.expand && params.expand.length > 0) query.expand = params.expand;
+    if (params?.orderBy) query.order_by = params.orderBy;
     let response = await this.http.get('/content_sessions', { params: query });
+    return response.data;
+  }
+
+  async listAttributeDefinitions(params?: {
+    limit?: number;
+    startingAfter?: string;
+    orderBy?: string;
+    scope?: 'event' | 'group' | 'group_membership' | 'user';
+    eventNames?: string[];
+  }): Promise<UserflowListResponse<UserflowAttributeDefinition>> {
+    let query: Record<string, unknown> = {};
+    if (params?.limit) query.limit = params.limit;
+    if (params?.startingAfter) query.starting_after = params.startingAfter;
+    if (params?.orderBy) query.order_by = params.orderBy;
+    if (params?.scope) query.scope = params.scope;
+    if (params?.eventNames?.length) query.event_name = params.eventNames;
+    let response = await this.http.get('/attribute_definitions', { params: query });
     return response.data;
   }
 
@@ -246,7 +308,9 @@ export class Client {
   }
 
   async getWebhookSubscription(subscriptionId: string): Promise<UserflowWebhookSubscription> {
-    let response = await this.http.get(`/webhook_subscriptions/${subscriptionId}`);
+    let response = await this.http.get(
+      `/webhook_subscriptions/${encodeURIComponent(subscriptionId)}`
+    );
     return response.data;
   }
 
@@ -262,7 +326,9 @@ export class Client {
   }
 
   async deleteWebhookSubscription(subscriptionId: string): Promise<UserflowDeleteResponse> {
-    let response = await this.http.delete(`/webhook_subscriptions/${subscriptionId}`);
+    let response = await this.http.delete(
+      `/webhook_subscriptions/${encodeURIComponent(subscriptionId)}`
+    );
     return response.data;
   }
 
@@ -274,9 +340,11 @@ export class Client {
   }
 
   async getAccount(accountId: string, expand?: string[]): Promise<UserflowAccount> {
-    let params: Record<string, string> = {};
-    if (expand && expand.length > 0) params.expand = expand.join(',');
-    let response = await this.http.get(`/accounts/${accountId}`, { params });
+    let params: Record<string, unknown> = {};
+    if (expand && expand.length > 0) params.expand = expand;
+    let response = await this.http.get(`/accounts/${encodeURIComponent(accountId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -290,12 +358,16 @@ export class Client {
     let query: Record<string, unknown> = {};
     if (params?.limit) query.limit = params.limit;
     if (params?.startingAfter) query.starting_after = params.startingAfter;
-    let response = await this.http.get(`/accounts/${accountId}/members`, { params: query });
+    let response = await this.http.get(`/accounts/${encodeURIComponent(accountId)}/members`, {
+      params: query
+    });
     return response.data;
   }
 
   async deleteMember(accountId: string, memberId: string): Promise<UserflowDeleteResponse> {
-    let response = await this.http.delete(`/accounts/${accountId}/members/${memberId}`);
+    let response = await this.http.delete(
+      `/accounts/${encodeURIComponent(accountId)}/members/${encodeURIComponent(memberId)}`
+    );
     return response.data;
   }
 
@@ -306,12 +378,17 @@ export class Client {
       permissions?: Array<{ action: string; subject: string; subject_id: string }>;
     }
   ): Promise<UserflowInvite> {
-    let response = await this.http.post(`/accounts/${accountId}/invites`, params);
+    let response = await this.http.post(
+      `/accounts/${encodeURIComponent(accountId)}/invites`,
+      params
+    );
     return response.data;
   }
 
   async deleteInvite(accountId: string, inviteId: string): Promise<UserflowDeleteResponse> {
-    let response = await this.http.delete(`/accounts/${accountId}/invites/${inviteId}`);
+    let response = await this.http.delete(
+      `/accounts/${encodeURIComponent(accountId)}/invites/${encodeURIComponent(inviteId)}`
+    );
     return response.data;
   }
 }

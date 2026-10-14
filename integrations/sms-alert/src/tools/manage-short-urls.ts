@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SmsAlertClient } from '../lib/client';
+import { SmsAlertClient, type SmsAlertResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageShortUrls = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let manageShortUrls = SlateTool.create(spec, {
   key: 'manage_short_urls',
   description: `Create or delete shortened URLs. Useful for including trackable links in SMS messages to stay within character limits.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -34,38 +34,40 @@ export let manageShortUrls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
-    let result: any;
+    let result: SmsAlertResponse;
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.longUrl) throw new Error('Long URL is required to create a short URL.');
+      if (!ctx.input.longUrl)
+        throw createApiServiceError('Long URL is required to create a short URL.');
 
       ctx.info(`Creating short URL for: ${ctx.input.longUrl}`);
       result = await client.createShortUrl({ longUrl: ctx.input.longUrl });
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Short URL created for **${ctx.input.longUrl}**`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.shortUrlId) throw new Error('Short URL ID is required to delete.');
+      if (!ctx.input.shortUrlId)
+        throw createApiServiceError('Short URL ID is required to delete.');
 
       ctx.info(`Deleting short URL: ${ctx.input.shortUrlId}`);
       result = await client.deleteShortUrl({ shortUrlId: ctx.input.shortUrlId });
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Short URL **${ctx.input.shortUrlId}** deleted`
       };
     }
 
-    throw new Error(`Invalid action: ${ctx.input.action}`);
+    throw createApiServiceError(`Invalid action: ${ctx.input.action}`);
   })
   .build();

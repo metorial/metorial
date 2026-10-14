@@ -1,67 +1,27 @@
-Let me get more details from the VerifiedEmail API documentation.Now let me get the actual API documentation from VerifiedEmail's developer site.Now I have sufficient information to compile the specification. Let me summarize what I've found about VerifiedEmail (verified.email):
+# VerifiedEmail API coverage
 
-# Slates Specification for Verifiedemail
-
-## Overview
-
-VerifiedEmail is a real-time email verification and bulk email list cleaning service. It was developed as an internal email validation tool and successfully verifies millions of emails per day in real time. It offers single email verification, bulk list cleaning, continuous list maintenance, a website widget with reCAPTCHA, and integrations via API and webhooks.
+Official reference: https://developer.verified.email/ and its embedded OpenAPI contract at https://developer.verified.email/swagger-ui-init.js.
 
 ## Authentication
 
-VerifiedEmail uses **API key** authentication. On the API Keys page, you can create and manage API keys for use with VerifiedEmail's API. You can create as many or as few API keys as needed. You can customize the access allowed for each by explicitly permitting or blocking the key's access to each API function.
+Bearer API key generated at https://app.verified.email/apikeys. API key permissions govern individual endpoint access. No OAuth or account identity endpoint is documented.
 
-To authenticate:
+## Supported documented operations
 
-1. Create an account at app.verified.email.
-2. Navigate to the API Keys page in the dashboard and click "Create."
-3. Give the key a name and configure permissions by selecting which API functions the key is allowed to access (e.g., verification, webhooks, etc.).
-4. Copy the value shown in the API Key field of the new card and store it securely. This is the key you will pass when making API requests to VerifiedEmail.
+- `verify_email`: `GET /v1/verifications?email=...`, unwrapping `verifications`. The provider returns `result`, `score`, nullable flags, role/alias/canonical information, and timestamps. Compatibility names `status`, `subStatus`, and `deliverabilityScore` reflect the documented result and score.
+- `check_credits`: `GET /v1/entitlements`, unwrapping `entitlements.payAsYouGo` and optional `autoVerify`. No total credits-used or account-wide refill status is documented.
+- `list_email_lists`: `GET /v1/lists`, unwrapping `lists` and `metadata.count`. Paging translates to zero-based `offset`; the documented limit is 1–10. Sorting options remain provider field names.
+- `get_email_list`: `GET /v1/lists/{id}` for asynchronous progress and statistics.
+- `create_email_list`: `POST /v1/lists/` with an empty ID, documented emails and the legacy name. The path allows an empty ID; list-name acceptance is not established by the request schema.
+- `verify_email_list`: `POST /v1/lists/{id}` with `{ status: "progress" }`. Returned list statistics map total, deliverable, undeliverable, unknown, and duplicate counts where present; the provider does not report a separate risky count.
+- `delete_email_list`: `DELETE /v1/lists/{id}`.
+- `request_results_download`: `POST /v1/downloads/` with listId and optional documented include categories.
+- `get_results_download`: `GET /v1/downloads/{id}`. A completed request's direct secure URL delivers the file. Structured output contains request metadata, without file content or download credentials.
 
-Each API key can have granular permissions. In the Permissions section of the dialog, select the checkbox next to each API function that will be allowed when the request is made using the new API key you are creating. For example, if you need to create an API key that will be used exclusively to create, list, modify, and disable webhooks, you could clear all checkboxes except the Webhooks checkbox.
+## Compatibility and verification limits
 
-API keys can also be configured with an auto-refill credits option. Select or clear the Automatically Refill Credits checkbox. When this checkbox is selected, API actions that would cause your balance to drop below ten available credits will automatically trigger the purchase of sufficient credits to complete the action, using your saved payment method.
+All existing tool keys are retained. Legacy verification/list/credit fields unavailable in the documented provider response are optional, with their existing primitive types preserved. Native list statistics and verification fields provide the available detail without invented scores, timestamps, MX records, or account settings.
 
-Disabling an API key is permanent and cannot be undone.
+`get_list_results`, `list_webhooks`, `manage_webhook`, and `delete_webhook` retain their existing requests. Webhooks are mentioned by the provider's API-key permission schema and product pages, but endpoint methods, payloads, event names, and response envelopes are absent from the public reference. The public contract describes downloadable results rather than the legacy inline-results route. These operations remain unverified, rather than declared unsupported solely due to omission.
 
-The full API documentation is available at https://developer.verified.email/.
-
-## Features
-
-### Real-Time Single Email Verification
-
-Verify individual email addresses instantly at the point of capture. Embed the Website Widget into your landing page or use the real-time API for custom integrations. VerifiedEmail verifies email addresses instantly at the point of capture. Verification checks include domain type and health, mail server validation, subdomain and misspelled domain detection, role/alias identification (e.g., "sales@", "support@"), deliverability assessment, and a proprietary deliverability score.
-
-### Bulk Email List Cleaning
-
-Upload and clean email lists of any size. VerifiedEmail eliminates undeliverable emails with 99% precision and provides scoring data for questionable emails to help you determine the best sending policies based on your use case. Lists can be uploaded via the dashboard or through the API. Results can be downloaded with filters applied.
-
-### Continuous List Maintenance
-
-VerifiedEmail's Continuous Cleanup monitors and optimizes email list quality on an ongoing basis. It's cheap and automatically handles temporarily unreachable recipients like those with full mailboxes. Lists can be connected to email providers or in-house CRMs for automatic syncing, cleaning, and verification.
-
-### Website Widget
-
-An embeddable verification widget for landing pages and registration forms that verifies emails in real time at the point of entry. Integrated reCAPTCHA ensures you only pay to verify emails from real visitors.
-
-### Third-Party Integrations
-
-VerifiedEmail provides pre-built integrations including Zapier and HubSpot, allowing email verification to be added to existing workflows without custom development.
-
-### Credit Balance Management
-
-The API allows checking available credit balance. Credits operate on a pay-as-you-go model, and API keys can be configured to auto-refill credits when the balance runs low.
-
-## Events
-
-Originally designed as an internal validation system, VerifiedEmail now instantly verifies millions of addresses every day. Through a quick, adaptable API and webhooks, it combines continuous re-verification, bulk list cleaning, and real-time verification.
-
-VerifiedEmail supports webhooks that can be managed (created, listed, modified, and disabled) through the API. Based on the available information:
-
-### Verification Completion Events
-
-Webhooks can be used to receive notifications when asynchronous verification operations complete, such as bulk list verification jobs finishing. This avoids the need to poll for results on long-running list cleaning operations.
-
-- Webhook endpoints can be configured and managed via the API.
-- API key permissions can be scoped specifically to webhook management functions.
-
-_Note: The detailed webhook event types and payload formats are documented at https://developer.verified.email/, which was not fully accessible during research. The above is based on publicly available information from the help documentation and services pages._
+Download authentication and expiration are not specified beyond a direct URL; the implementation forwards the provider URL without adding API-key headers or inventing an expiry. Actual download delivery and empty-ID create routes require live verification.

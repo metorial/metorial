@@ -39,6 +39,27 @@ export let updateApplication = SlateTool.create(spec, {
         .optional()
         .describe('Whether to show notifications in random order.'),
       closable: z.boolean().optional().describe('Whether visitors can close the widget.'),
+      displayPeriod: z
+        .number()
+        .optional()
+        .describe('Age-limit unit: 1 for seconds, 2 for minutes, 3 for hours, 4 for days.'),
+      displayThreshold: z
+        .number()
+        .optional()
+        .describe('Maximum notification age, measured in displayPeriod units.'),
+      timeAgoPeriod: z
+        .number()
+        .optional()
+        .describe('Timestamp unit: 1 for seconds, 2 for minutes, 3 for hours, 4 for days.'),
+      timeAgoThreshold: z
+        .number()
+        .optional()
+        .describe('Timestamp threshold, measured in timeAgoPeriod units.'),
+      hideMobile: z.boolean().optional().describe('Hide notifications on mobile devices.'),
+      loopNotification: z
+        .boolean()
+        .optional()
+        .describe('Repeat notifications after all events have been displayed.'),
       position: z
         .enum(['bottom_left', 'bottom_right', 'top_left', 'top_right'])
         .optional()

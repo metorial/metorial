@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListItems } from '../lib/client';
 import { spec } from '../spec';
 
 export let listClients = SlateTool.create(spec, {
@@ -34,7 +34,7 @@ export let listClients = SlateTool.create(spec, {
       length: ctx.input.length
     });
 
-    let clients = Array.isArray(result) ? result : (result?.data ?? [result]);
+    let clients = getListItems(result);
 
     return {
       output: { clients },
@@ -104,11 +104,14 @@ export let deleteClient = SlateTool.create(spec, {
       authScheme: ctx.auth.authScheme
     });
 
-    await apiClient.deleteClient(ctx.input.clientIdentifier);
+    let result = await apiClient.deleteClient(ctx.input.clientIdentifier);
+    let success = result !== false;
 
     return {
-      output: { success: true },
-      message: `Deleted client \`${ctx.input.clientIdentifier}\` and all associated data.`
+      output: { success },
+      message: success
+        ? `Deleted client \`${ctx.input.clientIdentifier}\` and all associated data.`
+        : `Coassemble did not delete client \`${ctx.input.clientIdentifier}\`.`
     };
   })
   .build();

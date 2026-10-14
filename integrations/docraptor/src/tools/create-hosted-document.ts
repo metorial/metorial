@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { baseDocumentInputSchema } from '../lib/schemas';
+import { Client, getDocumentMimeType } from '../lib/client';
+import { hostedDocumentInputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createHostedDocument = SlateTool.create(spec, {
@@ -18,20 +18,7 @@ export let createHostedDocument = SlateTool.create(spec, {
     readOnly: false
   }
 })
-  .input(
-    baseDocumentInputSchema.extend({
-      hostedDownloadLimit: z
-        .number()
-        .optional()
-        .describe('Maximum number of times the hosted document can be downloaded.'),
-      hostedExpiresAt: z
-        .string()
-        .optional()
-        .describe(
-          'ISO 8601 datetime (UTC) when the hosted document should expire and become inaccessible.'
-        )
-    })
-  )
+  .input(hostedDocumentInputSchema)
   .output(
     z.object({
       downloadId: z
@@ -57,6 +44,12 @@ export let createHostedDocument = SlateTool.create(spec, {
       ...ctx.input,
       test: testMode,
       princeOptions: ctx.input.princeOptions ?? undefined
+    });
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.downloadUrl,
+      mimeType: getDocumentMimeType(ctx.input.documentType)
     });
 
     let message = `Hosted ${ctx.input.documentType.toUpperCase()} document created${ctx.input.name ? ` ("${ctx.input.name}")` : ''}. Download URL: ${result.downloadUrl}`;

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/gatherup",
-  "description": "Manage customer feedback and online reviews across multiple platforms. Create and manage business locations, customers, and feedback requests via email or SMS. Retrieve and respond to first-party feedback and third-party reviews from Google, Facebook, and other sources. Send NPS surveys, collect star ratings, and retrieve aggregated survey results. Manage review site links, embed review widgets, and access Google Q&A data. Create and manage users, agency clients, and notification settings. Supports bulk customer creation for CRM/POS syncing and automatic feedback request sequences.",
+  "description": "Manage business locations, customer contacts, feedback requests, reviews, and survey results in GatherUp. Discover business types and agency clients, import customer batches, read feedback conversation history, respond to first-party feedback and eligible Google reviews, and retrieve downloadable review widget HTML.",
   "categories": ["crm-and-sales-tools"],
   "skills": [
     "manage business locations",

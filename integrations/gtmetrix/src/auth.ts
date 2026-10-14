@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,21 +28,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://gtmetrix.com/api/2.0',
-        auth: {
-          username: ctx.output.token,
-          password: ''
-        }
-      });
-
-      let response = await client.get('/status');
-      let attrs = response.data.data.attributes;
+      let status = await new Client({ token: ctx.output.token }).getAccountStatus();
 
       return {
         profile: {
-          id: response.data.data.id,
-          name: `${attrs.account_type} Account`,
+          id: status.userId,
+          name: `${status.accountType} Account`,
           email: undefined
         }
       };

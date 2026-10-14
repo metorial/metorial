@@ -20,15 +20,12 @@ export let generateCourse = SlateTool.create(spec, {
       audience: z
         .string()
         .optional()
-        .describe('Target audience for the course (e.g. "new employees", "sales team")'),
+        .describe('Target audience (default: "general audience"; e.g. "new employees")'),
       familiarity: z
         .string()
         .optional()
-        .describe('Learner familiarity level (e.g. "beginner", "intermediate", "advanced")'),
-      tone: z
-        .string()
-        .optional()
-        .describe('Content tone (e.g. "professional", "casual", "educational")'),
+        .describe('Learner familiarity level (default: "beginner")'),
+      tone: z.string().optional().describe('Content tone (default: "professional")'),
       screenCount: z.number().optional().describe('Number of screens to generate (default: 6)')
     })
   )

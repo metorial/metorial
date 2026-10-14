@@ -6,7 +6,10 @@ import { spec } from '../spec';
 let locationSchema = z
   .object({
     locationNo: z.string().optional().describe('Existing location identifier'),
-    address: z.string().optional().describe('Address to geocode if no coordinates provided'),
+    address: z
+      .string()
+      .optional()
+      .describe('Address to geocode, or a display address when coordinates are provided'),
     latitude: z.number().optional().describe('GPS latitude'),
     longitude: z.number().optional().describe('GPS longitude'),
     locationName: z.string().optional().describe('Display name for the location'),
@@ -29,7 +32,7 @@ export let createOrder = SlateTool.create(spec, {
   key: 'create_order',
   description: `Create a single order (delivery, pickup, or task) in OptimoRoute. Supports address geocoding for resolving addresses to coordinates. Use this for creating individual orders with full location validation. For bulk operations, use the **Bulk Create/Update Orders** tool instead.`,
   constraints: [
-    'Only one of address or latitude/longitude should be provided for location',
+    'Provide an existing locationNo, an address, or both latitude and longitude. An address can accompany coordinates.',
     'Address geocoding is only available on single order creation'
   ],
   tags: {
@@ -123,13 +126,13 @@ export let createOrder = SlateTool.create(spec, {
     if (ctx.input.skills) body.skills = ctx.input.skills;
     if (ctx.input.vehicleFeatures) body.vehicleFeatures = ctx.input.vehicleFeatures;
     if (ctx.input.assignedTo) body.assignedTo = ctx.input.assignedTo;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.email !== undefined) body.email = ctx.input.email;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
     if (ctx.input.notificationPreference)
       body.notificationPreference = ctx.input.notificationPreference;
     if (ctx.input.customFields) body.customFields = ctx.input.customFields;
-    if (ctx.input.relatedOrderNo) body.relatedOrderNo = ctx.input.relatedOrderNo;
+    if (ctx.input.relatedOrderNo !== undefined) body.relatedOrderNo = ctx.input.relatedOrderNo;
     if (ctx.input.allowedWeekdays) body.allowedWeekdays = ctx.input.allowedWeekdays;
 
     let result = await client.createOrder(body);

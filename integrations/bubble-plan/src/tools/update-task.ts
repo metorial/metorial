@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ export let updateTask = SlateTool.create(spec, {
   description: `Update an existing task in Project Bubble. Modify the name, description, dates, progress, billing, or assignments. Also supports completing or resuming a task. Only provided fields will be updated.`,
   instructions: [
     'To complete a task, set the "completed" field to true. Completing a task also completes all subtasks.',
-    'To resume a completed task, set the "resume" field to true. Resuming a task does not change the status of subtasks.'
+    'To resume a completed task, set the "resume" field to true. Resuming a task does not change the status of subtasks.',
+    'Complete or resume in a separate call from other updates; the provider ignores other fields during these operations.'
   ]
 })
   .input(
@@ -46,8 +47,21 @@ export let updateTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
+
+    if (ctx.input.completed || ctx.input.resume) {
+      let otherFields = Object.entries(ctx.input).filter(
+        ([key, value]) =>
+          !['taskId', 'subtaskId', 'completed', 'resume'].includes(key) && value !== undefined
+      );
+      if ((ctx.input.completed && ctx.input.resume) || otherFields.length > 0) {
+        throw createApiServiceError(
+          'Choose either completion or resumption without other updates. Update other fields in a separate call.',
+          { reason: 'incompatible_lifecycle_update' }
+        );
+      }
+    }
 
     let result: any;
 

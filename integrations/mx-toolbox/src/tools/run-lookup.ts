@@ -1,38 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { lookupCommands, lookupResultEntrySchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let lookupResultEntrySchema = z.object({
-  id: z.number().describe('Entry identifier'),
-  name: z.string().describe('Name of the check or record'),
-  info: z.string().describe('Detailed information about the result'),
-  url: z.string().describe('URL for more details')
-});
-
-let lookupCommands = [
-  'a',
-  'mx',
-  'dns',
-  'spf',
-  'dkim',
-  'dmarc',
-  'txt',
-  'ptr',
-  'bimi',
-  'mta-sts',
-  'aa'
-] as const;
 
 export let runLookup = SlateTool.create(spec, {
   name: 'Run Lookup',
   key: 'run_lookup',
-  description: `Run a DNS or email authentication lookup using the MXToolbox SuperTool engine. Supports lookups for A, MX, DNS, SPF, DKIM, DMARC, TXT, PTR, BIMI, MTA-STS, and AA (IPv6) records. Returns categorized results including passed checks, failures, warnings, and timeouts.
-
-For DKIM lookups, provide the selector (e.g. "google") to query a specific DKIM record.`,
+  description: `Run DNS, email authentication, blacklist, or network diagnostics using the MXToolbox SuperTool engine. Returns categorized results including passed checks, failures, warnings, and timeouts. Supports IPv4 and IPv6 DNS records, email authentication, blacklist checks, SMTP, HTTP, HTTPS, ping, and TCP.`,
   instructions: [
-    'For DKIM lookups, use the "selector" parameter to specify the DKIM selector (e.g., "google", "default", "selector1").',
-    'Free accounts can only perform lookups against "example.com".'
+    'For DKIM, specify selector or provide hostname in domain:selector format. Both domain and selector are required.',
+    'For TCP, specify port. The legacy aa command is accepted as an alias for aaaa.',
+    'The example.com domain is available for testing; other targets and network lookups depend on your API plan.'
   ],
   constraints: ['Rate limits apply based on your MXToolbox subscription tier.'],
   tags: {
@@ -44,13 +23,19 @@ For DKIM lookups, provide the selector (e.g. "google") to query a specific DKIM 
       command: z
         .enum(lookupCommands)
         .describe('The type of lookup to perform (e.g., "mx", "spf", "dkim", "dmarc")'),
-      hostname: z.string().describe('The domain name or IP address to look up'),
+      hostname: z
+        .string()
+        .describe('The domain name, IP address, or HTTP/HTTPS target URL to look up'),
       selector: z
         .string()
         .optional()
         .describe(
           'DKIM selector, only used when command is "dkim" (e.g., "google", "default")'
-        )
+        ),
+      port: z
+        .string()
+        .optional()
+        .describe('Port number from 1 to 65535. Required for tcp lookups.')
     })
   )
   .output(
@@ -61,6 +46,7 @@ For DKIM lookups, provide the selector (e.g. "google") to query a specific DKIM 
       timeRecorded: z.string().describe('Timestamp when the lookup was recorded'),
       reportingNameServer: z.string().describe('The nameserver that provided the results'),
       timeToComplete: z.string().describe('Duration of the lookup'),
+      isEndpoint: z.boolean().describe('Whether this lookup result is a terminal endpoint'),
       hasSubscriptions: z
         .boolean()
         .describe('Whether the queried domain has active monitor subscriptions'),
@@ -87,11 +73,15 @@ For DKIM lookups, provide the selector (e.g. "google") to query a specific DKIM 
     let argument = ctx.input.hostname;
     let command = ctx.input.command;
 
-    if (command === 'dkim' && ctx.input.selector) {
-      argument = `${ctx.input.hostname}:${ctx.input.selector}`;
+    if (ctx.input.selector !== undefined) {
+      if (command !== 'dkim')
+        throw createApiServiceError('Selector is only supported for DKIM lookups.');
+      let selector = ctx.input.selector.trim();
+      if (!selector) throw createApiServiceError('DKIM selector must not be empty.');
+      argument = `${ctx.input.hostname.trim()}:${selector}`;
     }
 
-    let result = await client.lookup(command, argument);
+    let result = await client.lookup(command, argument, ctx.input.port);
 
     let failedCount = result.failed.length;
     let warningCount = result.warnings.length;

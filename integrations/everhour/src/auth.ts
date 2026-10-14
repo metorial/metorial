@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { EverhourClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,24 +29,13 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let client = createAxios({
-        baseURL: 'https://api.everhour.com'
-      });
-
-      let response = await client.get('/users/me', {
-        headers: {
-          'X-Api-Key': ctx.output.token
-        }
-      });
-
-      let user = response.data;
-
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let user = await new EverhourClient(ctx.output.token).getCurrentUser();
       return {
         profile: {
           id: String(user.id),
           name: user.name,
-          imageUrl: user.avatarUrl
+          imageUrl: user.avatarUrl ?? undefined
         }
       };
     }

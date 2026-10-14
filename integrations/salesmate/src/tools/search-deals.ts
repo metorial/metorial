@@ -44,8 +44,13 @@ export let searchDeals = SlateTool.create(spec, {
         .describe('Logical operator between filter rules. Defaults to AND.'),
       sortBy: z.string().optional().describe('Field name to sort by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      page: z.number().optional().describe('Page number (1-based). Defaults to 1.'),
-      pageSize: z.number().optional().describe('Records per page (max 100). Defaults to 25.')
+      page: z.number().positive().optional().describe('Page number (1-based). Defaults to 1.'),
+      pageSize: z
+        .number()
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Records per page (max 250). Defaults to 25.')
     })
   )
   .output(

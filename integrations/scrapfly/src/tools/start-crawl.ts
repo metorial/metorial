@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let startCrawl = SlateTool.create(spec, {
     'Use the Get Crawl Status tool to monitor progress after starting a crawl.'
   ],
   constraints: [
-    'The Crawler API is in early access and features may change.',
+    'Crawl size and concurrency depend on the subscription limits.',
     'Maximum crawl duration is 10800 seconds (3 hours).',
     'Maximum 100 exclude/include path rules.'
   ],
@@ -100,6 +100,11 @@ export let startCrawl = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.excludePaths?.length && ctx.input.includeOnlyPaths?.length) {
+      throw createApiServiceError(
+        'Choose either excludePaths or includeOnlyPaths; they cannot be combined.'
+      );
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.createCrawl({

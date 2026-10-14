@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groupIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createPoll = SlateTool.create(spec, {
@@ -8,9 +9,10 @@ export let createPoll = SlateTool.create(spec, {
   key: 'create_poll',
   description: `Create a new poll or proposal in Loomio. Supports multiple voting methods: proposals (show of thumbs), multiple choice, score voting, ranked choice, dot voting, and meeting/time polls. Configure options, closing time, anonymous voting, result visibility, and recipient notifications.`,
   instructions: [
-    'For **proposal** type, default options are agree/disagree/abstain/block.',
-    'For **meeting** type, options should be ISO 8601 datetime strings.',
-    'For other poll types, provide arbitrary string options.'
+    'For **proposal** type, options must be agree, disagree, abstain, or block.',
+    'For **meeting** type, options should be ISO 8601 dates or datetime strings.',
+    'For other poll types, provide arbitrary string options.',
+    'Omitting closingAt creates a work-in-progress poll with voting disabled.'
   ],
   tags: {
     destructive: false,
@@ -31,14 +33,19 @@ export let createPoll = SlateTool.create(spec, {
         .enum(['md', 'html'])
         .default('md')
         .describe('Format of the details content'),
-      closingAt: z.string().optional().describe('ISO 8601 datetime when the poll closes'),
+      closingAt: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 closing time. Omit to create a work-in-progress poll with voting disabled.'
+        ),
       options: z
         .array(z.string())
         .optional()
         .describe(
           'Poll option names. For proposals: agree/disagree/abstain/block. For meetings: ISO 8601 datetimes. For others: arbitrary strings.'
         ),
-      groupId: z.number().optional().describe('ID of the group to create the poll in'),
+      groupId: groupIdSchema.optional(),
       discussionId: z
         .number()
         .optional()
@@ -73,7 +80,15 @@ export let createPoll = SlateTool.create(spec, {
       notifyRecipients: z
         .boolean()
         .optional()
-        .describe('Whether to send notification emails to recipients')
+        .describe('Whether to send notification emails to recipients'),
+      recipientMessage: z
+        .string()
+        .optional()
+        .describe('Message to include in invitation emails'),
+      notifyOnClosingSoon: z
+        .enum(['nobody', 'author', 'undecided_voters', 'voters'])
+        .optional()
+        .describe('Who receives a reminder when the poll is closing soon')
     })
   )
   .output(
@@ -91,7 +106,7 @@ export let createPoll = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.createPoll({
+    let poll = await client.createPoll({
       title: ctx.input.title,
       pollType: ctx.input.pollType,
       details: ctx.input.details,
@@ -107,10 +122,10 @@ export let createPoll = SlateTool.create(spec, {
       recipientUserIds: ctx.input.recipientUserIds,
       recipientEmails: ctx.input.recipientEmails,
       recipientAudience: ctx.input.recipientAudience,
-      notifyRecipients: ctx.input.notifyRecipients
+      recipientMessage: ctx.input.recipientMessage,
+      notifyRecipients: ctx.input.notifyRecipients,
+      notifyOnClosingSoon: ctx.input.notifyOnClosingSoon
     });
-
-    let poll = result.polls?.[0] || result;
 
     return {
       output: {
@@ -118,7 +133,7 @@ export let createPoll = SlateTool.create(spec, {
         pollKey: poll.key,
         title: poll.title,
         pollType: poll.poll_type,
-        closingAt: poll.closing_at
+        closingAt: poll.closing_at ?? undefined
       },
       message: `Created ${poll.poll_type} poll **"${poll.title}"** (ID: ${poll.id}).`
     };

@@ -13,8 +13,19 @@ export let listRegistries = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of items to return (max 64)')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(0)
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('Maximum number of items to return (max 64)')
     })
   )
   .output(
@@ -44,10 +55,10 @@ export let listRegistries = SlateTool.create(spec, {
 
     let registries = list.map((r: any) => ({
       registryId: r.id || '',
-      registryType: r.type,
-      policy: r.policy,
-      addOnly: r.addOnly,
-      createdAt: r.created || r.createdAt
+      registryType: r.registry?.type ?? r.registry_type ?? r.type,
+      policy: r.registry?.policy ?? r.policy_and_type?.policy ?? r.policy,
+      addOnly: r.registry?.addOnly ?? r.policy_and_type?.addOnly ?? r.addOnly,
+      createdAt: r.created_at ?? r.created ?? r.createdAt
     }));
 
     return {

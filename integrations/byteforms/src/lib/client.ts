@@ -1,11 +1,17 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface FormItem {
   id: number;
   public_id: string;
   name: string;
-  body: Record<string, any>[];
-  pages: any;
+  body: Record<string, unknown>[];
+  pages: unknown;
   is_custom: boolean;
   options: FormOptions;
   user_id: number;
@@ -35,8 +41,8 @@ export interface FormOptions {
 export interface FormResponseItem {
   id: number;
   form_id: number;
-  response: Record<string, any>;
-  options: Record<string, any>;
+  response: Record<string, unknown>;
+  options: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -73,43 +79,99 @@ export interface ListFormResponsesParams {
 }
 
 export class Client {
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('A ByteForms API key is required. Reconnect your account.');
+    }
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.forms.bytesuite.io/api',
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      authHeader: { value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ByteForms',
+          reason: 'byteforms_api_error'
+        })
     });
   }
 
+  private async get<T>(path: string, params?: ListFormResponsesParams): Promise<T> {
+    let response = await this.api.get<T>(path, { params });
+    let body = response.data;
+    if (!isApiErrorRecord(body)) {
+      throw createApiServiceError('ByteForms returned an invalid API response.', {
+        reason: 'byteforms_invalid_response',
+        upstreamStatus: response.status
+      });
+    }
+    if (body.status !== 'success') {
+      throw buildApiServiceError(
+        { response: { status: response.status, data: body } },
+        {
+          providerLabel: 'ByteForms',
+          reason: 'byteforms_api_error',
+          operation: 'request'
+        }
+      );
+    }
+    return body;
+  }
+
+  private formIdPath(formId: string): string {
+    if (!formId.trim()) {
+      throw createApiServiceError('A form ID is required. Call list_forms to find a form.');
+    }
+    return encodeURIComponent(formId);
+  }
+
   async listForms(): Promise<ListFormsResponse> {
-    let response = await this.api.get<ListFormsResponse>('/form');
-    return response.data;
+    let result = await this.get<ListFormsResponse>('/form');
+    if (!Array.isArray(result.data) || !result.data.every(isApiErrorRecord)) {
+      throw createApiServiceError('ByteForms did not return a list of forms.', {
+        reason: 'byteforms_invalid_response'
+      });
+    }
+    return result;
   }
 
   async getForm(formId: string): Promise<GetFormResponse> {
-    let response = await this.api.get<GetFormResponse>(`/form/${formId}`);
-    return response.data;
+    let result = await this.get<GetFormResponse>(`/form/${this.formIdPath(formId)}`);
+    if (!isApiErrorRecord(result.data)) {
+      throw createApiServiceError('ByteForms did not return the requested form.', {
+        reason: 'byteforms_invalid_response'
+      });
+    }
+    return result;
   }
 
   async listFormResponses(
     formId: string,
     params?: ListFormResponsesParams
   ): Promise<ListFormResponsesResponse> {
-    let queryParams: Record<string, any> = {};
-
-    if (params?.limit !== undefined) queryParams.limit = params.limit;
-    if (params?.order) queryParams.order = params.order;
-    if (params?.query) queryParams.query = params.query;
-    if (params?.after) queryParams.after = params.after;
-    if (params?.before) queryParams.before = params.before;
-
-    let response = await this.api.get<ListFormResponsesResponse>(`/form/responses/${formId}`, {
-      params: queryParams
-    });
-    return response.data;
+    if (
+      params?.limit !== undefined &&
+      (!Number.isSafeInteger(params.limit) || params.limit < 1)
+    ) {
+      throw createApiServiceError('Submission limit must be a positive whole number.');
+    }
+    let result = await this.get<ListFormResponsesResponse>(
+      `/form/responses/${this.formIdPath(formId)}`,
+      pickDefined(params ?? {})
+    );
+    if (
+      !Array.isArray(result.data) ||
+      !result.data.every(isApiErrorRecord) ||
+      typeof result.count !== 'number' ||
+      !isApiErrorRecord(result.cursor) ||
+      (result.cursor.after !== null && typeof result.cursor.after !== 'string') ||
+      (result.cursor.before !== null && typeof result.cursor.before !== 'string')
+    ) {
+      throw createApiServiceError('ByteForms returned an invalid submissions response.', {
+        reason: 'byteforms_invalid_response'
+      });
+    }
+    return result;
   }
 }

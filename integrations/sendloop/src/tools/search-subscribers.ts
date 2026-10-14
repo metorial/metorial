@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,7 +31,7 @@ export let searchSubscribers = SlateTool.create(spec, {
       startIndex: z
         .number()
         .optional()
-        .describe('Pagination start index (returns 100 subscribers per call)')
+        .describe('Zero-based page index (returns 100 subscribers per call)')
     })
   )
   .output(
@@ -44,13 +44,34 @@ export let searchSubscribers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
+    if (
+      ctx.input.startIndex !== undefined &&
+      (!Number.isInteger(ctx.input.startIndex) || ctx.input.startIndex < 0)
+    ) {
+      throw createApiServiceError('startIndex must be a non-negative page index.');
+    }
     if (ctx.input.emailAddress && !ctx.input.listId) {
       let result = await client.searchSubscribers(ctx.input.emailAddress);
-      let subscribers = result.Subscribers || result.Data || [];
-      if (!Array.isArray(subscribers)) subscribers = [subscribers];
+      let subscribers: Record<string, any>[] = [];
+      if (Array.isArray(result.SearchResults)) {
+        for (let list of result.SearchResults) {
+          for (let [subscriberId, emailAddress] of Object.entries(list.Subscribers ?? {})) {
+            subscribers.push({
+              ...(list.SubscriberDetails?.[subscriberId] ?? {}),
+              SubscriberID: subscriberId,
+              EmailAddress: emailAddress,
+              ListID: list.ListID,
+              ListName: list.ListName
+            });
+          }
+        }
+      } else {
+        let records = result.Subscribers || result.Data || [];
+        subscribers = Array.isArray(records) ? records : [records];
+      }
 
       return {
         output: { subscribers },
@@ -86,6 +107,6 @@ export let searchSubscribers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either emailAddress or listId must be provided');
+    throw createApiServiceError('Either emailAddress or listId must be provided');
   })
   .build();

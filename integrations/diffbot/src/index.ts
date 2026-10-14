@@ -4,9 +4,11 @@ import {
   analyzeText,
   enhanceEntity,
   extractPage,
+  getAccount,
   manageBulkJob,
   manageCrawl,
-  searchKnowledgeGraph
+  searchKnowledgeGraph,
+  webSearch
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -16,7 +18,9 @@ export let provider = Slate.create({
     enhanceEntity,
     analyzeText,
     manageCrawl,
-    manageBulkJob
+    manageBulkJob,
+    getAccount,
+    webSearch
   ],
   triggers: []
 });

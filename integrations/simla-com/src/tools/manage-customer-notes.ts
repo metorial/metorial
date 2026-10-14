@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -120,10 +120,10 @@ export let manageCustomerNotes = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.text) {
-        throw new Error('Note text is required for create action.');
+        throw createApiServiceError('Note text is required for create action.');
       }
       if (!ctx.input.customerId && !ctx.input.customerExternalId) {
-        throw new Error(
+        throw createApiServiceError(
           'Either customerId or customerExternalId is required for create action.'
         );
       }
@@ -149,7 +149,7 @@ export let manageCustomerNotes = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.noteId) {
-        throw new Error('noteId is required for delete action.');
+        throw createApiServiceError('noteId is required for delete action.');
       }
       await client.deleteCustomerNote(ctx.input.noteId);
 
@@ -161,6 +161,6 @@ export let manageCustomerNotes = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

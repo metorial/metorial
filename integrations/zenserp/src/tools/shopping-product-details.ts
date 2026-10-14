@@ -29,6 +29,12 @@ export let shoppingProductDetails = SlateTool.create(spec, {
   .input(
     z.object({
       productId: z.string().describe('Product ID obtained from a shopping search result'),
+      productClusterId: z
+        .string()
+        .optional()
+        .describe(
+          'Optional gpc_id from the same shopping_search result as productId; returns the full product cluster across merchants'
+        ),
       location: z.string().optional().describe('Location for geotargeted pricing'),
       language: z.string().optional().describe('Language code (hl), e.g. "en"'),
       country: z.string().optional().describe('Country code (gl), e.g. "us"')
@@ -40,6 +46,7 @@ export let shoppingProductDetails = SlateTool.create(spec, {
 
     let results = await client.getShoppingDetails({
       productId: ctx.input.productId,
+      productClusterId: ctx.input.productClusterId,
       location: ctx.input.location,
       hl: ctx.input.language,
       gl: ctx.input.country

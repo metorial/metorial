@@ -30,7 +30,7 @@ export let listTicketsTool = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
     let tickets = result.results ?? result.tickets ?? (Array.isArray(result) ? result : []);
-    let count = result.count ?? tickets.length;
+    let count = result.total ?? result.count ?? tickets.length;
 
     return {
       output: { tickets, count },

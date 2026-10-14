@@ -1,6 +1,6 @@
-# Abuse Ipdb
+# AbuseIPDB
 
-Check IP address reputation and abuse confidence scores. Report malicious IP addresses with categorized abuse types. Retrieve detailed abuse reports for IPs and subnets. Download blacklists of known malicious IPs for firewall import. Bulk-report abusive IPs via CSV upload. Clear your own submitted reports for an IP address.
+Check IP address reputation and abuse confidence scores. Report malicious IP addresses with categorized abuse types. Retrieve detailed abuse reports for IPs and subnets. Retrieve structured blacklists or export a plaintext IP list for firewall import. Bulk-report abusive IPs via CSV upload. Clear your own submitted reports for an IP address.
 
 ## License
 

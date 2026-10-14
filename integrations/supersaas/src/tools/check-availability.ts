@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scheduleIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let checkAvailabilityTool = SlateTool.create(spec, {
   name: 'Check Availability',
   key: 'check_availability',
-  description: `Query available time slots on a schedule. Returns free slots that can be booked. Optionally filter by resource, date range, or appointment length.`,
+  description: `Query available time slots on a schedule. Returns free slots that can be booked. Optionally filter by resource, start time, or appointment length. Service schedules are not supported.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      scheduleId: z.string().describe('Schedule ID to check availability for'),
+      scheduleId: scheduleIdSchema,
       from: z
         .string()
         .optional()
@@ -21,11 +22,16 @@ export let checkAvailabilityTool = SlateTool.create(spec, {
           'Start date to check from (ISO format YYYY-MM-DD HH:MM:SS). Defaults to current time.'
         ),
       length: z.number().optional().describe('Desired appointment length in minutes'),
-      resource: z.string().optional().describe('Resource name or ID to filter availability'),
+      resource: z
+        .string()
+        .optional()
+        .describe('Resource name to filter availability (resource schedules only)'),
       full: z
         .boolean()
         .optional()
-        .describe('If true, returns full slot details including description and location'),
+        .describe(
+          'If true, includes full slots with no remaining availability (capacity schedules only)'
+        ),
       limit: z.number().optional().describe('Maximum number of available slots to return')
     })
   )

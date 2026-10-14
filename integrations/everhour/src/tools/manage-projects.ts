@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,11 +43,11 @@ export let listProjects = SlateTool.create(spec, {
     let mapped = projects.map((p: any) => ({
       projectId: p.id,
       name: p.name,
-      type: p.type,
-      favorite: p.favorite,
-      users: p.users,
-      clientId: p.client,
-      workspaceName: p.workspaceName,
+      type: p.type ?? undefined,
+      favorite: p.favorite ?? undefined,
+      users: p.users ?? undefined,
+      clientId: p.client ?? undefined,
+      workspaceName: p.workspaceName ?? undefined,
       billing: p.billing,
       rate: p.rate,
       budget: p.budget
@@ -77,11 +77,11 @@ export let getProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        type: p.type,
-        favorite: p.favorite,
-        users: p.users,
-        clientId: p.client,
-        workspaceName: p.workspaceName,
+        type: p.type ?? undefined,
+        favorite: p.favorite ?? undefined,
+        users: p.users ?? undefined,
+        clientId: p.client ?? undefined,
+        workspaceName: p.workspaceName ?? undefined,
         billing: p.billing,
         rate: p.rate,
         budget: p.budget
@@ -111,11 +111,11 @@ export let createProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        type: p.type,
-        favorite: p.favorite,
-        users: p.users,
-        clientId: p.client,
-        workspaceName: p.workspaceName,
+        type: p.type ?? undefined,
+        favorite: p.favorite ?? undefined,
+        users: p.users ?? undefined,
+        clientId: p.client ?? undefined,
+        workspaceName: p.workspaceName ?? undefined,
         billing: p.billing,
         rate: p.rate,
         budget: p.budget
@@ -171,6 +171,7 @@ export let updateProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new EverhourClient(ctx.auth.token);
     let { projectId, archived, billing, budget, rate, ...updateData } = ctx.input;
+    updateData = pickDefined(updateData);
 
     if (Object.keys(updateData).length > 0) {
       await client.updateProject(projectId, updateData);
@@ -183,7 +184,7 @@ export let updateProject = SlateTool.create(spec, {
     if (billing || budget || rate) {
       let billingData: any = {};
       if (billing) billingData.billing = billing;
-      if (budget) billingData.budget = budget;
+      if (budget) billingData.budget = { ...budget, period: budget.period ?? 'general' };
       if (rate) billingData.rate = rate;
       await client.setProjectBilling(projectId, billingData);
     }
@@ -193,11 +194,11 @@ export let updateProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        type: p.type,
-        favorite: p.favorite,
-        users: p.users,
-        clientId: p.client,
-        workspaceName: p.workspaceName,
+        type: p.type ?? undefined,
+        favorite: p.favorite ?? undefined,
+        users: p.users ?? undefined,
+        clientId: p.client ?? undefined,
+        workspaceName: p.workspaceName ?? undefined,
         billing: p.billing,
         rate: p.rate,
         budget: p.budget
@@ -228,5 +229,42 @@ export let deleteProject = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted project ${ctx.input.projectId}.`
+    };
+  });
+
+export let syncProject = SlateTool.create(spec, {
+  name: 'Sync Project',
+  key: 'sync_project',
+  description:
+    'Sync a project from a connected external project management integration into Everhour immediately. Safe to call again for a project already synced. Use the external platform code and project ID, such as as:1234567890 for Asana.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      projectId: z
+        .string()
+        .min(1)
+        .describe(
+          'External project ID in platform:ID format. Supported platform codes: as, b2, b3, bb, cl, gh, gl, in, li, mo, no, td, tw, tr, wr.'
+        )
+    })
+  )
+  .output(projectSchema)
+  .handleInvocation(async ctx => {
+    let p = await new EverhourClient(ctx.auth.token).syncProject(ctx.input.projectId);
+    return {
+      output: {
+        projectId: p.id,
+        name: p.name,
+        type: p.type ?? undefined,
+        favorite: p.favorite ?? undefined,
+        users: p.users ?? undefined,
+        clientId: p.client ?? undefined,
+        workspaceName: p.workspaceName ?? undefined,
+        billing: p.billing,
+        rate: p.rate,
+        budget: p.budget
+      },
+      message: `Synced project **${p.name}** (${p.id}).`
     };
   });

@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -18,13 +23,85 @@ export class ChameleonClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.chameleon.io/v3',
-      headers: {
-        'X-Account-Secret': token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-Account-Secret', value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Chameleon',
+          reason: 'chameleon_api_error'
+        })
     });
+  }
+
+  async getAccount() {
+    let response = await this.axios.get('https://api.chameleon.io');
+    return response.data;
+  }
+
+  async upsertProfile(data: {
+    profileId?: string;
+    uid?: string;
+    email?: string;
+    companyId?: string;
+    companyUid?: string;
+    properties?: Record<string, unknown>;
+  }) {
+    if (!data.profileId && !data.uid && !data.email) {
+      throw createApiServiceError(
+        'Provide uid to create a profile, or profileId, uid, or email to update one.'
+      );
+    }
+    for (let key of [
+      'id',
+      'uid',
+      'email',
+      'company_id',
+      'company_uid',
+      'account_secret',
+      'profiles'
+    ]) {
+      if (Object.hasOwn(data.properties ?? {}, key)) {
+        throw createApiServiceError(
+          `Do not include ${key} in properties. Use the dedicated input fields for identifiers.`
+        );
+      }
+    }
+    let response = await this.axios.post('/observe/hooks/profiles', {
+      ...data.properties,
+      ...pickDefined({
+        id: data.profileId,
+        uid: data.uid,
+        email: data.email,
+        company_id: data.companyId,
+        company_uid: data.companyUid
+      })
+    });
+    return response.data.profile;
+  }
+
+  async upsertCompany(data: {
+    companyId?: string;
+    uid?: string;
+    properties?: Record<string, unknown>;
+  }) {
+    if (!data.companyId && !data.uid) {
+      throw createApiServiceError(
+        'Provide uid to create a company, or companyId or uid to update one.'
+      );
+    }
+    for (let key of ['id', 'uid', 'account_secret', 'companies']) {
+      if (Object.hasOwn(data.properties ?? {}, key)) {
+        throw createApiServiceError(
+          `Do not include ${key} in properties. Use the dedicated input fields for identifiers.`
+        );
+      }
+    }
+    let response = await this.axios.post('/observe/hooks/companies', {
+      ...data.properties,
+      ...pickDefined({ id: data.companyId, uid: data.uid })
+    });
+    return response.data.company;
   }
 
   // ---- User Profiles ----
@@ -63,29 +140,50 @@ export class ChameleonClient {
   }
 
   async getProfile(params: { profileId?: string; uid?: string; email?: string }) {
+    if (!params.profileId && !params.uid && !params.email) {
+      throw createApiServiceError(
+        'Provide profileId, uid, or email to retrieve a user profile.'
+      );
+    }
     if (params.profileId) {
-      let response = await this.axios.get(`/analyze/profiles/${params.profileId}`);
-      return response.data;
+      let response = await this.axios.get(
+        `/analyze/profiles/${encodeURIComponent(params.profileId)}`
+      );
+      return response.data.profile;
     }
     let query: Record<string, string> = {};
     if (params.uid) query.uid = params.uid;
     if (params.email) query.email = params.email;
     let response = await this.axios.get('/analyze/profile', { params: query });
-    return response.data;
+    return response.data.profile;
   }
 
   async clearProfile(params: { profileId?: string; uid?: string }) {
+    if (!params.profileId && !params.uid) {
+      throw createApiServiceError(
+        'Provide profileId or uid to clear a user profile; email is only supported for forget mode.'
+      );
+    }
     if (params.profileId) {
-      let response = await this.axios.delete(`/edit/profiles/${params.profileId}`);
-      return response.data;
+      let response = await this.axios.delete(
+        `/edit/profiles/${encodeURIComponent(params.profileId)}`
+      );
+      return response.data.profile;
     }
     let response = await this.axios.delete('/edit/profiles', { params: { uid: params.uid } });
-    return response.data;
+    return response.data.profile;
   }
 
   async deleteProfile(params: { profileId?: string; uid?: string; email?: string }) {
+    if (!params.profileId && !params.uid && !params.email) {
+      throw createApiServiceError(
+        'Provide profileId, uid, or email to delete a user profile.'
+      );
+    }
     if (params.profileId) {
-      let response = await this.axios.delete(`/edit/profiles/${params.profileId}/forget`);
+      let response = await this.axios.delete(
+        `/edit/profiles/${encodeURIComponent(params.profileId)}/forget`
+      );
       return response.data;
     }
     let query: Record<string, string> = {};
@@ -100,28 +198,45 @@ export class ChameleonClient {
   async listCompanies(
     params: PaginationParams & {
       filters?: Record<string, unknown>[];
+      filtersOp?: 'and' | 'or';
+      sortBy?: string;
+      sortDir?: 'asc' | 'desc';
+      offset?: number;
       expand?: { company?: string };
     } = {}
   ) {
-    let { filters, expand, ...pagination } = params;
+    let { filters, filtersOp, sortBy, sortDir, expand, ...pagination } = params;
     let body: Record<string, unknown> = { ...pagination };
     if (filters) body.filters = filters;
+    if (filtersOp) body.filters_op = filtersOp;
+    if (sortBy) body.sort_by = sortBy;
+    if (sortDir) body.sort_dir = sortDir;
     if (expand) body.expand = expand;
     let response = await this.axios.post('/analyze/companies', body);
     return response.data;
   }
 
   async getCompany(params: { companyId?: string; uid?: string }) {
+    if (!params.companyId && !params.uid) {
+      throw createApiServiceError('Provide companyId or uid to retrieve a company.');
+    }
     if (params.companyId) {
-      let response = await this.axios.get(`/analyze/companies/${params.companyId}`);
-      return response.data;
+      let response = await this.axios.get(
+        `/analyze/companies/${encodeURIComponent(params.companyId)}`
+      );
+      return response.data.company;
     }
     let response = await this.axios.get('/analyze/company', { params: { uid: params.uid } });
-    return response.data;
+    return response.data.company;
   }
 
   async deleteCompany(params: { companyId?: string; uid?: string; cascade?: boolean }) {
-    let path = params.companyId ? `/edit/companies/${params.companyId}` : '/edit/company';
+    if (!params.companyId && !params.uid) {
+      throw createApiServiceError('Provide companyId or uid to delete a company.');
+    }
+    let path = params.companyId
+      ? `/edit/companies/${encodeURIComponent(params.companyId)}`
+      : '/edit/company';
     let query: Record<string, string> = {};
     if (!params.companyId && params.uid) query.uid = params.uid;
     if (params.cascade) query.cascade = 'profiles';
@@ -137,8 +252,8 @@ export class ChameleonClient {
   }
 
   async getTour(tourId: string) {
-    let response = await this.axios.get(`/edit/tours/${tourId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/tours/${encodeURIComponent(tourId)}`);
+    return response.data.tour;
   }
 
   async updateTour(
@@ -153,8 +268,8 @@ export class ChameleonClient {
     if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
     if (data.urlGroupId) body.url_group_id = data.urlGroupId;
     if (data.tagId) body.tag_id = data.tagId;
-    let response = await this.axios.patch(`/edit/tours/${tourId}`, body);
-    return response.data;
+    let response = await this.axios.patch(`/edit/tours/${encodeURIComponent(tourId)}`, body);
+    return response.data.tour;
   }
 
   // ---- Microsurveys ----
@@ -165,8 +280,8 @@ export class ChameleonClient {
   }
 
   async getSurvey(surveyId: string) {
-    let response = await this.axios.get(`/edit/surveys/${surveyId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/surveys/${encodeURIComponent(surveyId)}`);
+    return response.data.survey;
   }
 
   async updateSurvey(
@@ -181,8 +296,11 @@ export class ChameleonClient {
     if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
     if (data.urlGroupId) body.url_group_id = data.urlGroupId;
     if (data.tagId) body.tag_id = data.tagId;
-    let response = await this.axios.patch(`/edit/surveys/${surveyId}`, body);
-    return response.data;
+    let response = await this.axios.patch(
+      `/edit/surveys/${encodeURIComponent(surveyId)}`,
+      body
+    );
+    return response.data.survey;
   }
 
   // ---- Microsurvey Responses ----
@@ -202,7 +320,9 @@ export class ChameleonClient {
   }
 
   async deleteSurveyResponse(responseId: string) {
-    let response = await this.axios.delete(`/edit/responses/${responseId}`);
+    let response = await this.axios.delete(
+      `/edit/responses/${encodeURIComponent(responseId)}`
+    );
     return response.data;
   }
 
@@ -214,12 +334,14 @@ export class ChameleonClient {
   }
 
   async getSegment(segmentId: string) {
-    let response = await this.axios.get(`/edit/segments/${segmentId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/segments/${encodeURIComponent(segmentId)}`);
+    return response.data.segment;
   }
 
   async getSegmentExperiences(segmentId: string, kind: 'tour' | 'survey' | 'launcher') {
-    let response = await this.axios.get(`/edit/segments/${segmentId}/${kind}`);
+    let response = await this.axios.get(
+      `/edit/segments/${encodeURIComponent(segmentId)}/${kind}`
+    );
     return response.data;
   }
 
@@ -247,8 +369,8 @@ export class ChameleonClient {
   }
 
   async getTooltip(tooltipId: string) {
-    let response = await this.axios.get(`/edit/tooltips/${tooltipId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/tooltips/${encodeURIComponent(tooltipId)}`);
+    return response.data.tooltip;
   }
 
   async updateTooltip(
@@ -263,8 +385,11 @@ export class ChameleonClient {
     if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
     if (data.urlGroupId) body.url_group_id = data.urlGroupId;
     if (data.tagId) body.tag_id = data.tagId;
-    let response = await this.axios.patch(`/edit/tooltips/${tooltipId}`, body);
-    return response.data;
+    let response = await this.axios.patch(
+      `/edit/tooltips/${encodeURIComponent(tooltipId)}`,
+      body
+    );
+    return response.data.tooltip;
   }
 
   // ---- Launchers ----
@@ -275,8 +400,8 @@ export class ChameleonClient {
   }
 
   async getLauncher(launcherId: string) {
-    let response = await this.axios.get(`/edit/launchers/${launcherId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/launchers/${encodeURIComponent(launcherId)}`);
+    return response.data.launcher;
   }
 
   async updateLauncher(
@@ -291,8 +416,11 @@ export class ChameleonClient {
     if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
     if (data.urlGroupId) body.url_group_id = data.urlGroupId;
     if (data.tagId) body.tag_id = data.tagId;
-    let response = await this.axios.patch(`/edit/launchers/${launcherId}`, body);
-    return response.data;
+    let response = await this.axios.patch(
+      `/edit/launchers/${encodeURIComponent(launcherId)}`,
+      body
+    );
+    return response.data.launcher;
   }
 
   // ---- Deliveries ----
@@ -342,11 +470,13 @@ export class ChameleonClient {
     if (data.skipTriggers !== undefined) body.skip_triggers = data.skipTriggers;
     if (data.skipUrlMatch !== undefined) body.skip_url_match = data.skipUrlMatch;
     let response = await this.axios.post('/edit/deliveries', body);
-    return response.data;
+    return response.data.delivery;
   }
 
   async deleteDelivery(deliveryId: string) {
-    let response = await this.axios.delete(`/edit/deliveries/${deliveryId}`);
+    let response = await this.axios.delete(
+      `/edit/deliveries/${encodeURIComponent(deliveryId)}`
+    );
     return response.data;
   }
 
@@ -358,8 +488,8 @@ export class ChameleonClient {
   }
 
   async getTag(tagId: string) {
-    let response = await this.axios.get(`/edit/tags/${tagId}`);
-    return response.data;
+    let response = await this.axios.get(`/edit/tags/${encodeURIComponent(tagId)}`);
+    return response.data.tag;
   }
 
   // ---- Domains / URLs ----
@@ -369,25 +499,34 @@ export class ChameleonClient {
     return response.data;
   }
 
-  async createUrl(data: { host: string; enabled: boolean }) {
-    let response = await this.axios.post('/edit/urls', data);
-    return response.data;
+  async createUrl(data: {
+    host: string;
+    enabled: boolean;
+    enabledState?: 'on' | 'off' | 'subdomain';
+  }) {
+    let response = await this.axios.post('/edit/urls', {
+      host: data.host,
+      enabled: data.enabledState ?? (data.enabled ? 'on' : 'off')
+    });
+    return response.data.url;
   }
 
   async updateUrl(
     urlId: string,
     data: {
       enabled?: boolean;
+      enabledState?: 'on' | 'off' | 'subdomain';
       urlGroupId?: string;
       archivedAt?: string | null;
     }
   ) {
     let body: Record<string, unknown> = {};
-    if (data.enabled !== undefined) body.enabled = data.enabled;
+    if (data.enabledState !== undefined) body.enabled = data.enabledState;
+    else if (data.enabled !== undefined) body.enabled = data.enabled ? 'on' : 'off';
     if (data.urlGroupId) body.url_group_id = data.urlGroupId;
     if (data.archivedAt !== undefined) body.archived_at = data.archivedAt;
-    let response = await this.axios.patch(`/edit/urls/${urlId}`, body);
-    return response.data;
+    let response = await this.axios.patch(`/edit/urls/${encodeURIComponent(urlId)}`, body);
+    return response.data.url;
   }
 
   // ---- Environments / URL Groups ----
@@ -399,10 +538,10 @@ export class ChameleonClient {
 
   async createUrlGroup(data: { name: string; description?: string; shortName?: string }) {
     let body: Record<string, unknown> = { name: data.name };
-    if (data.description) body.description = data.description;
-    if (data.shortName) body.short_name = data.shortName;
+    if (data.description !== undefined) body.description = data.description;
+    if (data.shortName !== undefined) body.short_name = data.shortName;
     let response = await this.axios.post('/edit/url_groups', body);
-    return response.data;
+    return response.data.url_group;
   }
 
   async updateUrlGroup(
@@ -415,12 +554,15 @@ export class ChameleonClient {
     }
   ) {
     let body: Record<string, unknown> = {};
-    if (data.name) body.name = data.name;
-    if (data.description) body.description = data.description;
-    if (data.shortName) body.short_name = data.shortName;
+    if (data.name !== undefined) body.name = data.name;
+    if (data.description !== undefined) body.description = data.description;
+    if (data.shortName !== undefined) body.short_name = data.shortName;
     if (data.archivedAt !== undefined) body.archived_at = data.archivedAt;
-    let response = await this.axios.patch(`/edit/url_groups/${groupId}`, body);
-    return response.data;
+    let response = await this.axios.patch(
+      `/edit/url_groups/${encodeURIComponent(groupId)}`,
+      body
+    );
+    return response.data.url_group;
   }
 
   // ---- Webhooks ----
@@ -443,11 +585,11 @@ export class ChameleonClient {
     };
     if (data.experienceIds) body.experience_ids = data.experienceIds;
     let response = await this.axios.post('/edit/webhooks', body);
-    return response.data;
+    return response.data.webhook;
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await this.axios.delete(`/edit/webhooks/${webhookId}`);
+    let response = await this.axios.delete(`/edit/webhooks/${encodeURIComponent(webhookId)}`);
     return response.data;
   }
 }

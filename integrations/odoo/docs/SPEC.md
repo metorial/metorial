@@ -2,7 +2,7 @@
 
 ## Overview
 
-Odoo is a modular ERP platform whose installed applications expose business data through technical models such as `res.partner`, `crm.lead`, `sale.order`, `purchase.order`, and `account.move`. This integration supports model discovery, generic record operations, common workflow transitions, attachment downloads, and Odoo-originated change notifications.
+Odoo is a modular ERP platform whose installed applications expose business data through technical models such as `res.partner`, `crm.lead`, `sale.order`, `purchase.order`, and `account.move`. This integration supports model discovery, generic record operations, common workflow transitions, record archiving, and attachment downloads.
 
 The connection automatically selects the API transport:
 
@@ -13,7 +13,7 @@ Available models, fields, methods, and records always depend on the installed mo
 
 ## Authentication and configuration
 
-Every connection needs an absolute Odoo instance URL. The integration removes trailing slashes and rejects URLs containing credentials, query parameters, or fragments.
+The instance URL and database belong to authentication; no separate connection configuration is required. Existing connections created before this change retain their saved configuration as a fallback. Every connection needs an absolute Odoo instance URL. The integration removes trailing slashes and rejects URLs containing credentials, query parameters, or fragments.
 
 ### API key
 
@@ -55,8 +55,10 @@ Counts and record pages are independent requests. A count is not an atomic compa
 
 ### Record writes
 
+- `get_record_defaults` returns defaults for selected non-binary fields based on user, model, and context, plus fields without a default. Odoo 19 JSON-2 receives the named `fields` argument; legacy JSON-RPC receives the field list positionally.
 - `create_record` creates one record from JSON-compatible field values and returns the positive record ID.
 - `update_records` writes the same field values to up to 100 records and verifies the updated IDs.
+- `archive_records` archives or restores up to 100 records on models with an accessible `active` boolean field, verifies every target before and after the operation, and reports changed IDs separately from already-matching IDs. Custom archive field names are outside this tool's scope.
 - `delete_records` permanently deletes up to 100 records after Odoo accepts the `unlink` operation.
 
 Use `list_model_fields` before unfamiliar writes. Relationship values must use Odoo's expected command or identifier shapes. Deletion is permanent and can be rejected by permissions, record rules, or database constraints.
@@ -83,22 +85,12 @@ These tools perform mutating business actions. They can trigger Odoo automation,
 
 Private method names beginning with `_` are rejected. JSON-2 accepts named parameters through `kwargs`; non-empty positional `args` are supported only for legacy JSON-RPC. The method can modify data or trigger arbitrary Odoo business side effects, so callers should prefer the dedicated record and workflow tools.
 
-## Triggers
-
-### Odoo Webhook Notification
-
-`inbound_webhook` receives HTTP `POST` payloads sent by Odoo's **Send Webhook Notification** automation action. Configure the generated webhook URL as the destination in Odoo and choose the fields Odoo should send.
-
-Object payloads are passed through as record fields. When `_model` or `model` is present, the trigger exposes it as the model name; `_id` or `id` is exposed as the record ID. Non-object JSON is retained under `_value`, and non-JSON request bodies are returned as raw text for troubleshooting. Other HTTP methods receive `405 Method Not Allowed`.
-
-Odoo automation and webhook availability depends on the edition and installed applications. Odoo does not expose a core external API for this integration to create or manage those automation rules.
-
-### Record Changes
-
-`record_changes` polls `res.partner` contact records by `write_date` and emits `record.created` or `record.updated` events. The first poll establishes a baseline without replaying existing contacts. Later polls use a bounded timestamp-and-ID checkpoint, stable ordering, pagination, and deterministic event IDs to reduce gaps and duplicates at shared timestamp boundaries.
-
-This trigger currently monitors contacts only. It does not subscribe to a universal Odoo event stream, and it does not replace an Odoo automation webhook when immediate or model-specific delivery is required.
-
 ## Error behavior
 
 Validation, authentication, malformed provider responses, and upstream failures are returned as user-facing service errors with Odoo-specific operation context. The integration rejects invalid models, IDs, domains, JSON values, method names, incompatible JSON-2 arguments, unexpected workflow states, and missing downloadable content before reporting success.
+
+## API references
+
+- [Odoo 19 external JSON-2 API](https://www.odoo.com/documentation/19.0/developer/reference/external_api.html)
+- [Odoo 19 ORM reference](https://www.odoo.com/documentation/19.0/developer/reference/backend/orm.html)
+- [Odoo 19 ORM source: default_get and archive actions](https://github.com/odoo/odoo/blob/19.0/odoo/orm/models.py)

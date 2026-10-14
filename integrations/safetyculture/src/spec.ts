@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'safetyculture',
   name: 'Safety Culture',
   description:
-    'Workplace operations platform for inspections, issues, corrective actions, assets, training, and safety management.',
+    'Workplace operations platform for inspections, issues, corrective actions, assets, inspection schedules, and safety management.',
   metadata: {},
   config,
   auth

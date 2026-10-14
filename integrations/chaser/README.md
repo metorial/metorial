@@ -1,6 +1,6 @@
 # Chaser
 
-Automate accounts receivable and payment chasing. Create, retrieve, and update customers, invoices, credit notes, and overpayments. Manage contact persons per customer, upload invoice PDFs, and trigger organization data syncs. Track invoice statuses, monitor amounts due and paid, and manage customer payment records to improve cash flow and credit control.
+Automate accounts receivable and payment chasing. Create, retrieve, and update customers, invoices, credit notes, and overpayments. Manage contact persons per customer, provide invoice PDF source URLs, pause or resume payment reminders, and trigger organization data syncs. Track invoice statuses, monitor amounts due and paid, and manage customer payment records to improve cash flow and credit control.
 
 ## License
 

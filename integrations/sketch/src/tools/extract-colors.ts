@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { collectAllColors, type SketchDocumentJson, type SketchPage } from '../lib/client';
+import { collectAllColors } from '../lib/client';
+import { parseSketchDocument, parseSketchPages } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let extractColorsTool = SlateTool.create(spec, {
   name: 'Extract Colors',
   key: 'extract_colors',
-  description: `Extract all unique colors from a Sketch document. Collects colors from document color assets, shared layer styles, shared text styles, and individual layer fills and borders across all pages. Returns each color in both hex and rgba formats along with its source.
+  description: `Extract unique color entries from a Sketch document. Collects colors from document color assets, shared layer styles, shared text styles, shared swatches, and individual layer fills, borders, and text attributes across all pages. Returns each color in both hex and rgba formats along with its source.
 
 Use this to audit the color palette of a design, check for consistency, or export a design system's color tokens.`,
   instructions: [
@@ -41,7 +42,7 @@ Use this to audit the color palette of a design, check for consistency, or expor
             source: z
               .string()
               .describe(
-                'Where this color was found: colorAsset, documentColor, sharedLayerStyle, sharedTextStyle, or layer'
+                'Where this color was found: colorAsset, documentColor, sharedSwatch, sharedLayerStyle, sharedTextStyle, or layer'
               ),
             layerName: z
               .string()
@@ -53,8 +54,8 @@ Use this to audit the color palette of a design, check for consistency, or expor
     })
   )
   .handleInvocation(async ctx => {
-    let pages = ctx.input.pages as SketchPage[];
-    let documentJson = ctx.input.documentJson as SketchDocumentJson | undefined;
+    let pages = parseSketchPages(ctx.input.pages);
+    let documentJson = parseSketchDocument(ctx.input.documentJson);
 
     let colors = collectAllColors(pages, documentJson);
 

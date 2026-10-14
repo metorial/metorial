@@ -1,12 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageCommentsTool = SlateTool.create(spec, {
   name: 'Manage Comments',
   key: 'manage_comments',
-  description: `Create, list, update, resolve, and delete comments and comment threads on design files. Use **action** to specify the operation.`,
+  description: `Create, list, reply to, resolve, and delete comments and comment threads on design files. Use **action** to specify the operation.`,
+  constraints: [
+    'Some Penpot instances require fileId for thread listing even when teamId is supplied. If team-wide listing fails, discover files with list_files and list threads per file.'
+  ],
   instructions: [
     'To list comment threads on a file, use action "list_threads" with fileId.',
     'To list all comment threads in a team, use action "list_threads" with teamId.',
@@ -76,7 +79,7 @@ export let manageCommentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let {
       action,
       fileId,
@@ -93,6 +96,8 @@ export let manageCommentsTool = SlateTool.create(spec, {
 
     switch (action) {
       case 'list_threads': {
+        if (!fileId && !teamId)
+          throw createApiServiceError('Provide fileId or teamId for list_threads.');
         let threads = await client.getCommentThreads({ fileId, teamId });
         return {
           output: { threads },
@@ -100,7 +105,8 @@ export let manageCommentsTool = SlateTool.create(spec, {
         };
       }
       case 'get_comments': {
-        if (!threadId) throw new Error('threadId is required for get_comments action');
+        if (!threadId)
+          throw createApiServiceError('threadId is required for get_comments action');
         let comments = await client.getComments(threadId);
         return {
           output: { comments },
@@ -116,7 +122,7 @@ export let manageCommentsTool = SlateTool.create(spec, {
           positionY === undefined ||
           !frameId
         ) {
-          throw new Error(
+          throw createApiServiceError(
             'fileId, pageId, content, positionX, positionY, and frameId are required for create_thread action'
           );
         }
@@ -134,7 +140,7 @@ export let manageCommentsTool = SlateTool.create(spec, {
       }
       case 'reply': {
         if (!threadId || !content)
-          throw new Error('threadId and content are required for reply action');
+          throw createApiServiceError('threadId and content are required for reply action');
         let comment = await client.createComment(threadId, content);
         return {
           output: { comment },
@@ -143,7 +149,9 @@ export let manageCommentsTool = SlateTool.create(spec, {
       }
       case 'resolve': {
         if (!threadId || isResolved === undefined)
-          throw new Error('threadId and isResolved are required for resolve action');
+          throw createApiServiceError(
+            'threadId and isResolved are required for resolve action'
+          );
         await client.updateCommentThread(threadId, isResolved);
         return {
           output: {},
@@ -151,7 +159,8 @@ export let manageCommentsTool = SlateTool.create(spec, {
         };
       }
       case 'delete_comment': {
-        if (!commentId) throw new Error('commentId is required for delete_comment action');
+        if (!commentId)
+          throw createApiServiceError('commentId is required for delete_comment action');
         await client.deleteComment(commentId);
         return {
           output: {},
@@ -159,7 +168,8 @@ export let manageCommentsTool = SlateTool.create(spec, {
         };
       }
       case 'delete_thread': {
-        if (!threadId) throw new Error('threadId is required for delete_thread action');
+        if (!threadId)
+          throw createApiServiceError('threadId is required for delete_thread action');
         await client.deleteCommentThread(threadId);
         return {
           output: {},

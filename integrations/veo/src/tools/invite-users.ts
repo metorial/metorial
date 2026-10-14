@@ -13,7 +13,9 @@ export let inviteUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organisationId: z.string().describe('ID of the organisation to invite users to'),
+      organisationId: z
+        .string()
+        .describe('Organisation ID. Call list_organisations to discover your organisations.'),
       users: z
         .array(
           z.object({

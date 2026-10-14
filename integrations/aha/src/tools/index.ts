@@ -14,3 +14,4 @@ export * from './manage-idea';
 export * from './manage-initiative';
 export * from './manage-release';
 export * from './manage-todo';
+export * from './who-am-i';

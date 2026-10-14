@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, type ListParams } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
@@ -27,9 +28,21 @@ export let listTeamMembers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema.optional(),
       sortBy: z.string().optional().describe('Sort fields, e.g. "alias" or "-role"'),
-      limit: z.number().optional().describe('Maximum number of members to return'),
-      offset: z.number().optional().describe('Number of members to skip')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(1)
+        .max(10000)
+        .optional()
+        .describe('Maximum number of members to return'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(0)
+        .optional()
+        .describe('Number of members to skip')
     })
   )
   .output(
@@ -41,9 +54,10 @@ export let listTeamMembers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let params: ListParams = {};
+    if (ctx.input.teamId !== undefined) params.team_id = ctx.input.teamId;
     if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     let members = await client.listTeamMembers(params);
 

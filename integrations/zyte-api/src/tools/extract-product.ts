@@ -24,7 +24,7 @@ export let extractProduct = SlateTool.create(spec, {
 
 Supports custom attributes via natural language descriptions to extract additional fields beyond the default schema. Optionally include browser-rendered HTML or a screenshot alongside the extraction.`,
   instructions: [
-    'Use extractFrom to control extraction source: "browserHtml" (default, best quality), "browserHtmlOnly" (good for JS-heavy pages), or "httpResponseBody" (fastest/cheapest).',
+    'Use browserHtml for rendered extraction or httpResponseBody for HTTP extraction. The legacy browserHtmlOnly option is unsupported by the current API.',
     'Custom attributes use natural language descriptions to define what extra data to extract.'
   ],
   tags: {
@@ -39,7 +39,7 @@ Supports custom attributes via natural language descriptions to extract addition
         .enum(['httpResponseBody', 'browserHtml', 'browserHtmlOnly'])
         .optional()
         .describe(
-          'Extraction source. "browserHtml" uses rendered HTML + visual features (default), "browserHtmlOnly" uses only rendered HTML, "httpResponseBody" uses raw HTTP response (fastest).'
+          'Extraction source. Use browserHtml for rendered HTML or httpResponseBody for raw HTTP. The legacy browserHtmlOnly option is unsupported by the current API.'
         ),
       modelVersion: z
         .string()
@@ -80,7 +80,7 @@ Supports custom attributes via natural language descriptions to extract addition
       customAttributes: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Values of custom extracted attributes'),
+        .describe('Custom extraction response containing values and metadata'),
       browserHtml: z.string().optional().describe('Browser-rendered HTML if requested'),
       screenshot: z.string().optional().describe('Base64-encoded screenshot if requested')
     })
@@ -98,9 +98,7 @@ Supports custom attributes via natural language descriptions to extract addition
           }
         : undefined;
 
-    let customAttributes = ctx.input.customAttributes
-      ? { type: 'object' as const, properties: ctx.input.customAttributes }
-      : undefined;
+    let customAttributes = ctx.input.customAttributes;
 
     let response = await client.extract({
       url: ctx.input.url,
@@ -109,10 +107,30 @@ Supports custom attributes via natural language descriptions to extract addition
       customAttributes,
       browserHtml: ctx.input.includeBrowserHtml || undefined,
       screenshot: ctx.input.includeScreenshot || undefined,
+      screenshotOptions: ctx.input.includeScreenshot ? { format: 'jpeg' } : undefined,
       geolocation: ctx.input.geolocation,
       ipType: ctx.input.ipType,
       device: ctx.input.device
     });
+
+    if (response.browserHtml !== undefined) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(response.browserHtml, {
+          headers: { 'content-type': 'text/html; charset=utf-8' }
+        }),
+        filename: 'product.html'
+      });
+    }
+    if (response.screenshot) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Buffer.from(response.screenshot, 'base64'), {
+          headers: { 'content-type': 'image/jpeg' }
+        }),
+        filename: 'product.jpg'
+      });
+    }
 
     let productName = (response.product as Record<string, unknown> | undefined)?.name as
       | string

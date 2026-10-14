@@ -28,7 +28,10 @@ export let createTemplate = SlateTool.create(spec, {
   .output(
     z.object({
       templateId: z.string().describe('ID of the newly created template.'),
-      name: z.string().describe('Name of the newly created template.'),
+      name: z
+        .string()
+        .optional()
+        .describe('Name of the newly created template when provided.'),
       status: z.string().describe('Status of the creation request.')
     })
   )
@@ -50,10 +53,10 @@ export let createTemplate = SlateTool.create(spec, {
     return {
       output: {
         templateId: result.template_id,
-        name: result.name,
+        name: result.name ?? ctx.input.name,
         status: result.status
       },
-      message: `Created new template **"${result.name}"** (${result.template_id}) from source template ${ctx.input.sourceTemplateId}.`
+      message: `Created template **${result.template_id}** from source template ${ctx.input.sourceTemplateId}.`
     };
   })
   .build();

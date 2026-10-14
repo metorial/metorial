@@ -1,90 +1,35 @@
-Now I have comprehensive information. Let me compile the specification.
-
-# Slates Specification for Dovetail
-
-## Overview
-
-Dovetail is a customer insights and research platform that helps teams collect, organize, and analyze qualitative and quantitative user research data. It centralizes research artifacts like interview transcripts, notes, video/audio recordings, survey data, and feedback, and provides tools for tagging, analysis, and sharing insights across teams.
+# Dovetail Integration
 
 ## Authentication
 
-### Personal API Tokens
+Use a personal API token created in Settings → Account → Personal API keys. The token is sent as `Authorization: Bearer <token>` to `https://dovetail.com/api/v1`. The authorization guide documents a 30-day token lifetime; generate a new token when it expires. `get_token_info` verifies the token and reports its workspace subdomain. The provider's OAuth guide currently marks OAuth as coming soon.
 
-Dovetail uses personal API tokens for authentication. Tokens are generated from Settings → Account under "Personal API keys."
+## Research workflows
 
-**How to obtain a token:**
+- List, create, get, rename, and delete projects. Use `list_projects` to discover project IDs and `browse_folders` to discover folder IDs.
+- List and manage research data and legacy notes. Creating either requires a project. The data endpoints are the recommended resource name; note IDs refer to the same underlying research entries.
+- Read metadata with `get_data`, `get_note`, `get_doc`, or `get_insight`. Request `exportFormat` to receive full content as a downloadable HTML or Markdown file. Metadata endpoints do not include the content body.
+- Create, list, update metadata, and delete docs and retained legacy insights. Create a doc in either a project or a folder, never both. Initial content accepts HTML, Markdown, or plain text through `contentType`; existing content cannot be patched through these metadata APIs. Publishing and contributors are managed in the Dovetail app.
+- List and retrieve highlights and tags. Highlight tags include stable IDs. Counts and update timestamps absent from provider metadata remain optional.
+- List, create, and update research contacts. Creation requires both name and email. Contact email is returned from custom fields when available.
+- List and manage feedback channels and topics, and add feedback data points.
+- Browse folders and their immediate contents. Omit `parentFolderId` for all folders, or set it to null for root folders.
+- Import publicly downloadable files. Every import requires a title; notes and data also require a project. Audio/video processing happens asynchronously in Dovetail. `get_file` retrieves processing metadata.
+- Perform full-text keyword search across workspace content and generate AI summaries from selected source IDs.
 
-1. Navigate to your Dovetail account settings at `https://dovetail.com/settings/user/account`.
-2. Enter a label for the key and create it.
-3. Copy the token immediately — it is only displayed once.
+## Pagination and compatibility
 
-**Token format:** The token is an opaque string prefixed with `api.`, e.g., `api.wcFxxx...`.
+List tools expose the provider's `has_more` and `next_cursor` where available. Follow `nextCursor` until `hasMore` is false. Legacy personal docs/insights listings remain available and support pagination.
 
-**Token expiry:** The token is valid for 30 days; a new token must be generated after expiry. Tokens can also be manually revoked.
+`list_notes` title filtering uses the equivalent current data list API. Content filtering uses the documented notes filter in Magic Search and emits an opaque `notes-search:` cursor; omit `sort` for content search. Other note listings use provider cursors. String-valued custom-field outputs preserve compatibility by representing boolean, numeric, and array values as JSON strings.
 
-**Usage:** Include the token as a Bearer token in the `Authorization` header:
+Existing public keys, input scalar types, and operation enums are retained. The existing `exportedContent` fields retain the complete provider export response for compatibility when `exportFormat` is supplied. A downloadable HTML or Markdown file is also prepared independently. The new `get_data` tool exposes only metadata and downloadable exports.
 
-```
-Authorization: Bearer <DOVETAIL_API_TOKEN>
-```
+## Official references
 
-**Base URL:** `https://dovetail.com/api/v1/`
-
-### OAuth 2.0
-
-OAuth 2.0 authentication for third-party applications is listed in the documentation but is marked as "Coming Soon" and is not yet available.
-
-## Features
-
-### Project Management
-
-Create, list, and retrieve research projects. Projects serve as the primary organizational unit for grouping related research data, notes, and insights.
-
-### Notes
-
-Create, read, update, and delete notes within projects. Notes capture research observations, interview summaries, and other qualitative data. Supports importing files into notes and exporting notes.
-
-### Data Management
-
-Create, list, read, update, and delete data entries. Data can be imported from files and exported in various formats. This is used for storing structured research data like survey responses or feedback entries.
-
-### Insights
-
-Create, manage, and share insights derived from research. Insights can be listed globally or filtered by user. Supports file import and export. Insights represent the key findings and conclusions from research activities.
-
-### Highlights
-
-List and retrieve highlights — annotated excerpts from research data that represent noteworthy findings tied to specific tags or themes.
-
-### Tags
-
-List and retrieve tags used for qualitative coding and thematic analysis of research data. Tags represent themes, pain points, feature requests, or other categories applied to highlights.
-
-### Contacts
-
-Create, list, read, and update contacts (research participants/customers). Contacts represent the people involved in research activities.
-
-### Docs
-
-Create, list, read, update, and delete documents. Docs support file import and export, and can be listed per user. Useful for storing research reports or standalone documentation.
-
-### Channels and Topics
-
-Create, update, and delete channels for organizing feedback streams. Within channels, you can create and manage topics and add data points. Channels are used to aggregate feedback from different sources (e.g., support tickets, app reviews).
-
-### Folders
-
-List folders and retrieve folder contents to navigate the organizational hierarchy of a workspace.
-
-### Files
-
-Retrieve files by ID that are attached to various entities within Dovetail.
-
-### AI-Powered Search and Summarization
-
-- **Magic Search / Search V2:** Perform semantic searches across the workspace to find relevant research data and insights using natural language queries.
-- **Magic Summarize:** Generate AI-powered summaries of research data to quickly extract key themes and findings.
-
-## Events
-
-The provider does not support events. Dovetail's API does not currently offer webhooks or a purpose-built event subscription mechanism. OAuth 2.0, which could potentially enable event flows, is marked as coming soon but is not yet available.
+- [Authorization](https://developers.dovetail.com/docs/authorization)
+- [API introduction](https://developers.dovetail.com/docs/introduction)
+- [Endpoint index](https://developers.dovetail.com/llms.txt)
+- [Data](https://developers.dovetail.com/reference/get_v1-data)
+- [Docs](https://developers.dovetail.com/reference/get_v1-docs)
+- [Magic Search](https://developers.dovetail.com/reference/post_v1-search)

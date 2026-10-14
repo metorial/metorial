@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendbirdChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchMessages = SlateTool.create(spec, {
   name: 'Search Messages',
   key: 'search_messages',
-  description: `Search for messages across channels by keyword. Optionally narrow results to a specific channel, time range, or sender.`,
+  description: `Search messages in a group channel or in up to 100 group channels joined by a user. Provide exactly one of channelUrl or userId. Message search must be enabled for the application.`,
   tags: {
     readOnly: true
   }
@@ -15,16 +15,25 @@ export let searchMessages = SlateTool.create(spec, {
     z.object({
       query: z.string().describe('Search keyword'),
       channelUrl: z.string().optional().describe('Limit search to a specific channel URL'),
-      channelCustomType: z.string().optional().describe('Filter by channel custom type'),
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'Search group channels joined by this user; cannot be combined with channelUrl'
+        ),
+      channelCustomType: z
+        .string()
+        .optional()
+        .describe('Filter by channel custom type when searching by userId'),
       limit: z.number().optional().describe('Max results to return (default 20)'),
       beforeTimestamp: z
         .number()
         .optional()
-        .describe('Only include messages before this Unix timestamp'),
+        .describe('Include messages at or before this Unix timestamp in milliseconds'),
       afterTimestamp: z
         .number()
         .optional()
-        .describe('Only include messages after this Unix timestamp'),
+        .describe('Include messages at or after this Unix timestamp in milliseconds'),
       nextToken: z.string().optional().describe('Pagination token for fetching more results'),
       sortField: z
         .enum(['score', 'created_at'])
@@ -53,6 +62,42 @@ export let searchMessages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.channelUrl !== undefined && !ctx.input.channelUrl.trim()) ||
+      (ctx.input.userId !== undefined && !ctx.input.userId.trim())
+    ) {
+      throw createApiServiceError('channelUrl and userId must be non-empty when provided.');
+    }
+    if (!!ctx.input.channelUrl?.trim() === !!ctx.input.userId?.trim()) {
+      throw createApiServiceError(
+        'Provide exactly one of channelUrl or userId for message search.'
+      );
+    }
+    if (ctx.input.channelCustomType !== undefined && !ctx.input.userId) {
+      throw createApiServiceError('channelCustomType requires userId; omit channelUrl.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isSafeInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 99)
+    ) {
+      throw createApiServiceError('limit must be a whole number from 1 to 99.');
+    }
+    for (let timestamp of [ctx.input.beforeTimestamp, ctx.input.afterTimestamp]) {
+      if (timestamp !== undefined && (!Number.isSafeInteger(timestamp) || timestamp < 0)) {
+        throw createApiServiceError(
+          'Search timestamps must be non-negative whole numbers in milliseconds.'
+        );
+      }
+    }
+    if (
+      ctx.input.beforeTimestamp !== undefined &&
+      ctx.input.afterTimestamp !== undefined &&
+      ctx.input.afterTimestamp > ctx.input.beforeTimestamp
+    ) {
+      throw createApiServiceError(
+        'afterTimestamp must be less than or equal to beforeTimestamp.'
+      );
+    }
     let client = new SendbirdChatClient({
       applicationId: ctx.config.applicationId,
       token: ctx.auth.token
@@ -61,6 +106,7 @@ export let searchMessages = SlateTool.create(spec, {
     let result = await client.searchMessages({
       query: ctx.input.query,
       channelUrl: ctx.input.channelUrl,
+      userId: ctx.input.userId,
       channelCustomType: ctx.input.channelCustomType,
       limit: ctx.input.limit,
       beforeTimestamp: ctx.input.beforeTimestamp,
@@ -71,11 +117,11 @@ export let searchMessages = SlateTool.create(spec, {
 
     let results = (result.results ?? []).map((r: any) => ({
       messageId: r.message_id,
-      message: r.message,
+      message: r.message ?? undefined,
       messageType: r.type ?? '',
       channelUrl: r.channel_url ?? '',
-      senderId: r.user?.user_id,
-      senderNickname: r.user?.nickname,
+      senderId: r.user?.user_id ?? undefined,
+      senderNickname: r.user?.nickname ?? undefined,
       createdAt: r.created_at ?? 0
     }));
 
@@ -84,7 +130,7 @@ export let searchMessages = SlateTool.create(spec, {
         results,
         hasNext: result.has_next ?? false,
         nextToken: result.next || undefined,
-        totalCount: result.total_count
+        totalCount: result.total_count ?? undefined
       },
       message: `Found **${results.length}** message(s) matching "${ctx.input.query}".${result.has_next ? ' More results available.' : ''}`
     };

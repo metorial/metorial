@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CodemagicClient } from '../lib/client';
+import { CodemagicClient, getArtifactDownloadUrl } from '../lib/client';
 import { spec } from '../spec';
 
 export let createArtifactUrl = SlateTool.create(spec, {
@@ -37,6 +37,12 @@ export let createArtifactUrl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CodemagicClient({ token: ctx.auth.token });
     let result = await client.getPublicArtifactUrl(ctx.input.artifactUrl, ctx.input.expiresAt);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: getArtifactDownloadUrl(ctx.input.artifactUrl),
+      headers: { 'x-auth-token': ctx.auth.token }
+    });
 
     return {
       output: {

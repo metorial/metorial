@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,7 +29,15 @@ Provide a single contact or multiple contacts to trigger the automation in bulk.
 })
   .input(
     z.object({
-      automationId: z.string().describe('ID of the Spoki automation to start'),
+      automationId: z
+        .string()
+        .describe('Automation ID. Call list_automations to discover available automations.'),
+      webhookUuid: z
+        .string()
+        .optional()
+        .describe(
+          'API startup step UUID from list_automations. Required only when the automation has multiple active API startup steps.'
+        ),
       phone: z
         .string()
         .optional()
@@ -61,12 +69,16 @@ Provide a single contact or multiple contacts to trigger the automation in bulk.
     let result: any;
     let contactCount: number;
 
-    if (ctx.input.contacts && ctx.input.contacts.length > 0) {
+    if (ctx.input.contacts !== undefined) {
+      if (ctx.input.contacts.length === 0) {
+        throw createApiServiceError('Provide at least one contact for bulk automation.');
+      }
       ctx.info(
         `Starting automation ${ctx.input.automationId} for ${ctx.input.contacts.length} contacts`
       );
       result = await client.startAutomationForMany({
         automationId: ctx.input.automationId,
+        webhookUuid: ctx.input.webhookUuid,
         contacts: ctx.input.contacts
       });
       contactCount = ctx.input.contacts.length;
@@ -74,6 +86,7 @@ Provide a single contact or multiple contacts to trigger the automation in bulk.
       ctx.info(`Starting automation ${ctx.input.automationId} for ${ctx.input.phone}`);
       result = await client.startAutomation({
         automationId: ctx.input.automationId,
+        webhookUuid: ctx.input.webhookUuid,
         phone: ctx.input.phone,
         firstName: ctx.input.firstName,
         lastName: ctx.input.lastName,
@@ -83,7 +96,7 @@ Provide a single contact or multiple contacts to trigger the automation in bulk.
       });
       contactCount = 1;
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Either "phone" (for single contact) or "contacts" (for bulk) must be provided.'
       );
     }
@@ -96,7 +109,7 @@ Provide a single contact or multiple contacts to trigger the automation in bulk.
       },
       message:
         contactCount === 1
-          ? `Started automation **${ctx.input.automationId}** for **${ctx.input.phone}**`
+          ? `Started automation **${ctx.input.automationId}** for **${ctx.input.contacts?.[0]?.phone ?? ctx.input.phone}**`
           : `Started automation **${ctx.input.automationId}** for **${contactCount}** contacts`
     };
   })

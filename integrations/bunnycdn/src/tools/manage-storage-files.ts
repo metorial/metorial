@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StorageClient } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,7 @@ export let manageStorageFiles = SlateTool.create(spec, {
     'The storageZoneName must match an existing storage zone name.',
     'File paths should not include the storage zone name; they are relative to the zone root.',
     'Directories are auto-created when uploading files.',
-    'For upload, provide the file content as a string (base64 for binary content).'
+    'For upload, provide text content, or set contentEncoding to base64 for binary content.'
   ],
   constraints: [
     'Requires the Storage Zone Password to be configured.',
@@ -53,7 +53,11 @@ export let manageStorageFiles = SlateTool.create(spec, {
         .describe(
           'File or directory path relative to the zone root. For list, this is the directory path. For upload/download/delete, this is the full file path.'
         ),
-      content: z.string().optional().describe('File content to upload (upload action only)')
+      content: z.string().optional().describe('File content to upload (upload action only)'),
+      contentEncoding: z
+        .enum(['text', 'base64'])
+        .optional()
+        .describe('Encoding of upload content. Defaults to text; use base64 for binary files.')
     })
   )
   .output(
@@ -62,14 +66,22 @@ export let manageStorageFiles = SlateTool.create(spec, {
         .array(fileSchema)
         .optional()
         .describe('List of files/directories (list action)'),
-      fileContent: z.string().optional().describe('Downloaded file content (download action)'),
+      fileContent: z.string().optional().describe('Downloaded file text, when available'),
+      downloaded: z.boolean().optional().describe('Whether a downloadable file was prepared'),
+      filename: z.string().optional().describe('Downloaded filename'),
       uploaded: z.boolean().optional().describe('Whether the file was uploaded successfully'),
       deleted: z.boolean().optional().describe('Whether the file was deleted successfully')
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.storageZoneName.trim())
+      throw createApiServiceError('storageZoneName is required.');
+    if (ctx.input.action !== 'list' && !ctx.input.path?.replace(/\//g, '').trim())
+      throw createApiServiceError('A file or directory path is required for this action.');
+    if (ctx.input.action === 'upload' && ctx.input.content === undefined)
+      throw createApiServiceError('content is required to upload a file.');
     if (!ctx.auth.storageToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Storage Zone Password is required for file operations. Please configure it in the authentication settings.'
       );
     }
@@ -88,10 +100,21 @@ export let manageStorageFiles = SlateTool.create(spec, {
         };
       }
       case 'upload': {
+        if (
+          ctx.input.contentEncoding === 'base64' &&
+          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+            ctx.input.content!
+          )
+        )
+          throw createApiServiceError(
+            'content must be valid padded base64 when contentEncoding is base64.'
+          );
         await client.uploadFile(
           ctx.input.storageZoneName,
           ctx.input.path!,
-          ctx.input.content!
+          ctx.input.contentEncoding === 'base64'
+            ? Buffer.from(ctx.input.content!, 'base64')
+            : ctx.input.content!
         );
         return {
           output: { uploaded: true },
@@ -100,11 +123,20 @@ export let manageStorageFiles = SlateTool.create(spec, {
       }
       case 'download': {
         let content = await client.downloadFile(ctx.input.storageZoneName, ctx.input.path!);
+        let filename = ctx.input.path!.split('/').filter(Boolean).at(-1)!;
+        await ctx.addAttachment({
+          type: 'url',
+          url: client.getFileUrl(ctx.input.storageZoneName, ctx.input.path!),
+          headers: { AccessKey: ctx.auth.storageToken },
+          filename
+        });
         return {
           output: {
-            fileContent: typeof content === 'string' ? content : JSON.stringify(content)
+            fileContent: typeof content === 'string' ? content : JSON.stringify(content),
+            downloaded: true,
+            filename
           },
-          message: `Downloaded file from **${ctx.input.storageZoneName}${ctx.input.path}**.`
+          message: `Prepared **${filename}** for download.`
         };
       }
       case 'delete': {

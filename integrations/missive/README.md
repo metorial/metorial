@@ -20,6 +20,14 @@ Inject rich content into a conversation from external systems (e.g., GitHub comm
 
 Retrieve a single conversation by its ID, including messages, comments, and posts within it. Returns full conversation details plus optionally the latest messages, comments, or posts.
 
+### Get Task
+
+Get a task with its title, description, state, due date, assignees, and team. Use List Tasks to find task IDs.
+
+### List Conversation Drafts
+
+List unsent drafts in a conversation, including their IDs and previews for review.
+
 ### List Contact Books
 
 List contact books the authenticated user has access to. Contact book IDs are needed for listing and creating contacts.
@@ -30,7 +38,7 @@ List and search contacts in a contact book. Supports searching by name/email, in
 
 ### List Conversations
 
-Browse conversations across different mailboxes (Inbox, Closed, Snoozed, Starred, Trash, Spam, Drafts). Filter by team, shared label, organization, contact email, domain, or contact organization. Use cursor-based pagination with the \
+Browse conversations across different mailboxes (Inbox, Closed, Snoozed, Starred, Trash, Spam, Drafts). Filter by team, shared label, organization, contact email, domain, or contact organization. Use cursor-based pagination with the `until` parameter for subsequent pages.
 
 ### List Organizations and Users
 

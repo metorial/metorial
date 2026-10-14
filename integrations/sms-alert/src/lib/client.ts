@@ -1,30 +1,211 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  extractApiErrorMessage,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 export interface SmsAlertClientConfig {
   token: string;
+  authType?: 'api_key' | 'username_password';
+  username?: string;
+  password?: string;
 }
+
+export interface SmsAlertResponse {
+  status: string;
+  description: unknown;
+}
+
+export interface ListParams {
+  page?: number;
+  limit?: number;
+  order?: 'asc' | 'desc';
+  query?: string;
+}
+
+const discoveryPageSize = 10;
+const maxDiscoveryPages = 1000;
+const emptyListMessages: Record<string, string> = {
+  'grouplist.json': 'no groups available for your account',
+  'contactlist.json': 'no contacts in this group',
+  'templatelist.json': 'no template available for your account'
+};
 
 export class SmsAlertClient {
   private axios: ReturnType<typeof createAxios>;
   private authParams: Record<string, string>;
 
   constructor(config: SmsAlertClientConfig) {
-    this.axios = createAxios({
-      baseURL: 'https://www.smsalert.co.in/api/'
-    });
+    this.axios = createAxios({ baseURL: 'https://www.smsalert.co.in/api/' });
+    if (!config.token) throw createApiServiceError('Connect an SMS Alert account first.');
 
-    // Support both API key auth and username:password auth
-    if (config.token.includes(':')) {
-      let [user, pwd] = config.token.split(':');
-      this.authParams = { user: user!, pwd: pwd! };
+    if (config.authType === 'username_password') {
+      if (!config.username || !config.password) {
+        throw createApiServiceError('Reconnect SMS Alert with your username and password.');
+      }
+      this.authParams = { user: config.username, pwd: config.password };
+    } else if (!config.authType && config.token.includes(':')) {
+      // Preserve credentials saved before separate username/password fields were introduced.
+      let separator = config.token.indexOf(':');
+      this.authParams = {
+        user: config.token.slice(0, separator),
+        pwd: config.token.slice(separator + 1)
+      };
     } else {
       this.authParams = { apikey: config.token };
     }
   }
 
-  // ─── Send SMS ───────────────────────────────────────────────────────
+  private async request(
+    endpoint: string,
+    params: Record<string, unknown> = {},
+    method: 'GET' | 'POST' = 'POST'
+  ): Promise<SmsAlertResponse> {
+    let data = await requestAxiosData<unknown>(
+      endpoint,
+      () =>
+        this.axios.request({
+          url: endpoint,
+          method,
+          params: pickDefined({ ...this.authParams, ...params })
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'SMS Alert',
+          operation,
+          reason: 'sms_alert_api_error',
+          detailKeys: ['description', 'desc', 'message', 'error'],
+          nestedKeys: ['description']
+        })
+    );
+    if (
+      !isApiErrorRecord(data) ||
+      typeof data.status !== 'string' ||
+      !('description' in data)
+    ) {
+      throw createApiServiceError('SMS Alert returned an invalid response.');
+    }
+    if (data.status.toLowerCase() !== 'success') {
+      let detail = extractApiErrorMessage(
+        { response: { data } },
+        {
+          detailKeys: ['description', 'desc', 'message', 'error'],
+          nestedKeys: ['description']
+        }
+      );
+      if (detail.toLowerCase().replace(/\.$/, '') === emptyListMessages[endpoint]) {
+        return { status: 'success', description: [] };
+      }
+      throw createApiServiceError(`SMS Alert: ${detail}`, {
+        reason: 'sms_alert_api_error',
+        upstreamCode: data.status
+      });
+    }
+    return { status: data.status, description: data.description };
+  }
 
-  async sendSms(params: {
+  private list(
+    endpoint: string,
+    params: ListParams = {},
+    extra: Record<string, unknown> = {}
+  ) {
+    return this.request(
+      endpoint,
+      {
+        ...extra,
+        page: params.page,
+        limit: params.limit,
+        order: params.order,
+        q: params.query
+      },
+      'GET'
+    );
+  }
+
+  private async collectPages(endpoint: string, extra: Record<string, unknown> = {}) {
+    let records: unknown[] = [];
+    let previousPage: string | undefined;
+    for (let page = 1; page <= maxDiscoveryPages; page++) {
+      let result = await this.list(
+        endpoint,
+        { page, limit: discoveryPageSize, order: 'asc' },
+        extra
+      );
+      if (!Array.isArray(result.description)) {
+        throw createApiServiceError('SMS Alert returned an invalid list response.');
+      }
+      let fingerprint = JSON.stringify(result.description);
+      if (result.description.length > 0 && fingerprint === previousPage) {
+        throw createApiServiceError(
+          'SMS Alert repeated a results page. Use a resource ID instead.'
+        );
+      }
+      records.push(...result.description);
+      if (result.description.length < discoveryPageSize) return records;
+      previousPage = fingerprint;
+    }
+    throw createApiServiceError(
+      'SMS Alert discovery exceeded its page limit. Provide a resource ID.'
+    );
+  }
+
+  private resource(row: unknown, key: string) {
+    if (!isApiErrorRecord(row) || !isApiErrorRecord(row[key])) {
+      throw createApiServiceError(`SMS Alert returned an invalid ${key} record.`);
+    }
+    return row[key];
+  }
+
+  async resolveGroupId(groupName: string) {
+    let groups = (await this.collectPages('grouplist.json'))
+      .map(row => this.resource(row, 'Group'))
+      .filter(group => group.name === groupName);
+    if (groups.length !== 1 || !groups[0]?.id) {
+      throw createApiServiceError(
+        'Group name did not identify exactly one group. Use manage_groups with action list to find its ID.'
+      );
+    }
+    return String(groups[0].id);
+  }
+
+  private async resolveContact(params: {
+    groupId?: string;
+    groupName?: string;
+    contactId?: string;
+    mobileNo?: string;
+  }) {
+    let groupId =
+      params.groupId ??
+      (params.groupName ? await this.resolveGroupId(params.groupName) : undefined);
+    if (!groupId) {
+      throw createApiServiceError('Provide a group ID or group name to discover the contact.');
+    }
+    let normalizeNumber = (value: string) => {
+      let digits = value.replace(/\D/g, '');
+      return digits.length === 10 ? `91${digits}` : digits;
+    };
+    let contacts = (await this.collectPages('contactlist.json', { group_id: groupId }))
+      .map(row => this.resource(row, 'Groupmember'))
+      .filter(contact =>
+        params.contactId
+          ? String(contact.id) === params.contactId
+          : typeof contact.number === 'string' &&
+            params.mobileNo &&
+            normalizeNumber(contact.number) === normalizeNumber(params.mobileNo)
+      );
+    if (contacts.length !== 1 || !contacts[0]?.id) {
+      throw createApiServiceError(
+        'Contact did not identify exactly one record. Use manage_contacts with action list to find its ID.'
+      );
+    }
+    return contacts[0];
+  }
+
+  sendSms(params: {
     sender: string;
     mobileNo: string;
     text: string;
@@ -32,86 +213,82 @@ export class SmsAlertClient {
     dlrUrl?: string;
     reference?: string;
   }) {
-    let response = await this.axios.post('push.json', null, {
-      params: {
-        ...this.authParams,
-        sender: params.sender,
-        mobileno: params.mobileNo,
-        text: params.text,
-        ...(params.route ? { route: params.route } : {}),
-        ...(params.dlrUrl ? { dlrurl: params.dlrUrl } : {}),
-        ...(params.reference ? { reference: params.reference } : {})
+    let dlrUrl = params.dlrUrl;
+    if (dlrUrl && !/^https?:\/\//i.test(dlrUrl)) {
+      try {
+        dlrUrl = decodeURIComponent(dlrUrl);
+      } catch {
+        throw createApiServiceError('Provide a valid delivery callback URL.');
       }
+    }
+    if (dlrUrl && !/^https?:\/\/\S+$/i.test(dlrUrl)) {
+      throw createApiServiceError('The delivery callback URL must use HTTP or HTTPS.');
+    }
+    return this.request('push.json', {
+      sender: params.sender,
+      mobileno: params.mobileNo,
+      text: params.text,
+      route: params.route,
+      dlrurl: dlrUrl,
+      reference: params.reference
     });
-    return response.data;
   }
 
   async sendSmsToGroup(params: {
     sender: string;
-    groupName: string;
+    groupName?: string;
+    groupId?: string;
     text: string;
     route?: string;
+    dlrUrl?: string;
+    reference?: string;
   }) {
-    let response = await this.axios.post('push.json', null, {
-      params: {
-        ...this.authParams,
-        sender: params.sender,
-        group: params.groupName,
-        text: params.text,
-        ...(params.route ? { route: params.route } : {})
-      }
+    let id =
+      params.groupId ??
+      (params.groupName ? await this.resolveGroupId(params.groupName) : undefined);
+    if (!id) throw createApiServiceError('Provide a group ID or group name.');
+    if (params.dlrUrl || params.reference) {
+      throw createApiServiceError(
+        'Delivery callbacks and references are supported for mobile-number sends. Omit them for a group send.'
+      );
+    }
+    return this.request('grouppush.json', {
+      id,
+      sender: params.sender,
+      text: params.text,
+      route: params.route
     });
-    return response.data;
   }
 
-  // ─── Schedule SMS ──────────────────────────────────────────────────
-
-  async scheduleSms(params: {
+  scheduleSms(params: {
     sender: string;
     mobileNo: string;
     text: string;
     schedule: string;
     route?: string;
   }) {
-    let response = await this.axios.post('push.json', null, {
-      params: {
-        ...this.authParams,
-        sender: params.sender,
-        mobileno: params.mobileNo,
-        text: params.text,
-        schedule: params.schedule,
-        ...(params.route ? { route: params.route } : {})
-      }
+    return this.request('push.json', {
+      sender: params.sender,
+      mobileno: params.mobileNo,
+      text: params.text,
+      schedule: params.schedule,
+      route: params.route
     });
-    return response.data;
   }
 
-  async editSchedule(params: { scheduledId: string; newSchedule: string }) {
-    let response = await this.axios.post('schedule.json', null, {
-      params: {
-        ...this.authParams,
-        scheduleid: params.scheduledId,
-        schedule: params.newSchedule
-      }
+  editSchedule(params: { scheduledId: string; newSchedule: string }) {
+    return this.request('modifyschedule.json', {
+      batchid: params.scheduledId,
+      schedule: params.newSchedule
     });
-    return response.data;
   }
 
-  async cancelSchedule(params: { scheduledId: string }) {
-    let response = await this.axios.post('schedule.json', null, {
-      params: {
-        ...this.authParams,
-        scheduleid: params.scheduledId,
-        cancel: 'true'
-      }
-    });
-    return response.data;
+  cancelSchedule(params: { scheduledId: string }) {
+    return this.request('cancelschedule.json', { batchid: params.scheduledId });
   }
 
-  // ─── OTP ───────────────────────────────────────────────────────────
-
-  async generateOtp(params: {
-    sender: string;
+  generateOtp(params: {
+    sender?: string;
     mobileNo: string;
     text: string;
     otpLength?: number;
@@ -119,152 +296,146 @@ export class SmsAlertClient {
     otpValidity?: number;
     route?: string;
   }) {
-    let response = await this.axios.post('otp.json', null, {
-      params: {
-        ...this.authParams,
-        sender: params.sender,
-        mobileno: params.mobileNo,
-        text: params.text,
-        ...(params.otpLength ? { otp_length: params.otpLength } : {}),
-        ...(params.otpRetry ? { otp_retry: params.otpRetry } : {}),
-        ...(params.otpValidity ? { otp_validity: params.otpValidity } : {}),
-        ...(params.route ? { route: params.route } : {})
+    let template = params.text.replace(/\[otp(?:\s[^\]]*)?\]/gi, tag => {
+      tag = tag.replace(/^\[otp/i, '[otp');
+      for (let [attribute, value] of [
+        ['length', params.otpLength],
+        ['retry', params.otpRetry],
+        ['validity', params.otpValidity]
+      ] as const) {
+        if (value === undefined) continue;
+        tag = tag.replace(
+          new RegExp(`\\s${attribute}\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s\\]]+)`, 'gi'),
+          ''
+        );
+        tag = `${tag.slice(0, -1)} ${attribute}="${value}"]`;
       }
+      return tag;
     });
-    return response.data;
+    return this.request('mverify.json', {
+      sender: params.sender,
+      mobileno: params.mobileNo,
+      template,
+      route: params.route
+    });
   }
 
-  async validateOtp(params: { mobileNo: string; otp: string }) {
-    let response = await this.axios.post('otp.json', null, {
-      params: {
-        ...this.authParams,
-        mobileno: params.mobileNo,
-        otp: params.otp,
-        verify: 'true'
-      }
-    });
-    return response.data;
+  validateOtp(params: { mobileNo: string; otp: string }) {
+    return this.request('mverify.json', { mobileno: params.mobileNo, code: params.otp });
   }
 
-  // ─── Contacts ──────────────────────────────────────────────────────
-
-  async listContacts(params?: { groupName?: string }) {
-    let response = await this.axios.get('contactlist.json', {
-      params: {
-        ...this.authParams,
-        ...(params?.groupName ? { grp_name: params.groupName } : {})
+  async listContacts(params: ListParams & { groupName?: string; groupId?: string } = {}) {
+    let groupId =
+      params.groupId ??
+      (params.groupName ? await this.resolveGroupId(params.groupName) : undefined);
+    if (groupId) return this.list('contactlist.json', params, { group_id: groupId });
+    let groups = await this.collectPages('grouplist.json');
+    let records: unknown[] = [];
+    for (let row of groups) {
+      let group = this.resource(row, 'Group');
+      if (!group.id) throw createApiServiceError('SMS Alert returned a group without an ID.');
+      let contacts = await this.collectPages('contactlist.json', {
+        group_id: String(group.id)
+      });
+      records.push(
+        ...contacts.map(contact => ({
+          ...this.resource(contact, 'Groupmember'),
+          groupId: String(group.id),
+          groupName: group.name
+        }))
+      );
+      if (records.length > discoveryPageSize * maxDiscoveryPages) {
+        throw createApiServiceError(
+          'Contact discovery exceeded its record limit. Filter the list by groupId.'
+        );
       }
+    }
+    records.sort((left, right) => {
+      let first = isApiErrorRecord(left) ? String(left.creationdate ?? '') : '';
+      let second = isApiErrorRecord(right) ? String(right.creationdate ?? '') : '';
+      return (params.order === 'asc' ? 1 : -1) * first.localeCompare(second);
     });
-    return response.data;
+    let limit = params.limit ?? 10;
+    let start = ((params.page ?? 1) - 1) * limit;
+    return {
+      status: 'success',
+      description: records.slice(start, start + limit).map(Groupmember => ({ Groupmember }))
+    };
   }
 
-  async createContact(params: { groupName: string; name: string; mobileNo: string }) {
-    let response = await this.axios.post('contact.json', null, {
-      params: {
-        ...this.authParams,
-        grp_name: params.groupName,
-        name: params.name,
-        mobileno: params.mobileNo
-      }
+  createContact(params: { groupName: string; name: string; mobileNo: string }) {
+    return this.request('createcontact.json', {
+      grpname: params.groupName,
+      name: params.name,
+      number: params.mobileNo
     });
-    return response.data;
   }
 
   async editContact(params: {
-    groupName: string;
-    oldMobileNo: string;
+    groupName?: string;
+    groupId?: string;
+    contactId?: string;
+    oldMobileNo?: string;
     newMobileNo?: string;
     name?: string;
   }) {
-    let response = await this.axios.post('contact.json', null, {
-      params: {
-        ...this.authParams,
-        grp_name: params.groupName,
-        old_mobileno: params.oldMobileNo,
-        ...(params.newMobileNo ? { mobileno: params.newMobileNo } : {}),
-        ...(params.name ? { name: params.name } : {}),
-        edit: 'true'
-      }
-    });
-    return response.data;
+    let existing =
+      params.contactId && params.newMobileNo && params.name
+        ? { id: params.contactId, number: params.newMobileNo, name: params.name }
+        : await this.resolveContact({ ...params, mobileNo: params.oldMobileNo });
+    let name = params.name ?? existing.name;
+    let number = params.newMobileNo ?? existing.number;
+    if (typeof name !== 'string' || typeof number !== 'string') {
+      throw createApiServiceError(
+        'Provide both contact name and mobile number to update this contact.'
+      );
+    }
+    return this.request('updatecontact.json', { id: existing.id, name, number });
   }
 
-  async deleteContact(params: { groupName: string; mobileNo: string }) {
-    let response = await this.axios.post('contact.json', null, {
-      params: {
-        ...this.authParams,
-        grp_name: params.groupName,
-        mobileno: params.mobileNo,
-        delete: 'true'
-      }
-    });
-    return response.data;
+  async deleteContact(params: {
+    groupName?: string;
+    groupId?: string;
+    contactId?: string;
+    mobileNo?: string;
+  }) {
+    let id = params.contactId ?? (await this.resolveContact(params)).id;
+    return this.request('deletecontact.json', { id });
   }
 
-  // ─── Groups ────────────────────────────────────────────────────────
-
-  async listGroups() {
-    let response = await this.axios.get('grouplist.json', {
-      params: {
-        ...this.authParams
-      }
-    });
-    return response.data;
+  listGroups(params: ListParams = {}) {
+    return this.list('grouplist.json', params);
   }
 
-  async createGroup(params: { groupName: string }) {
-    let response = await this.axios.post('group.json', null, {
-      params: {
-        ...this.authParams,
-        grp_name: params.groupName
-      }
-    });
-    return response.data;
+  createGroup(params: { groupName: string }) {
+    return this.request('creategroup.json', { name: params.groupName });
   }
 
-  async editGroup(params: { oldGroupName: string; newGroupName: string }) {
-    let response = await this.axios.post('group.json', null, {
-      params: {
-        ...this.authParams,
-        old_grp_name: params.oldGroupName,
-        grp_name: params.newGroupName,
-        edit: 'true'
-      }
-    });
-    return response.data;
+  async editGroup(params: { oldGroupName?: string; groupId?: string; newGroupName: string }) {
+    let id =
+      params.groupId ??
+      (params.oldGroupName ? await this.resolveGroupId(params.oldGroupName) : undefined);
+    if (!id) throw createApiServiceError('Provide a group ID or the current group name.');
+    return this.request('updategroup.json', { id, name: params.newGroupName });
   }
 
-  async deleteGroup(params: { groupName: string }) {
-    let response = await this.axios.post('group.json', null, {
-      params: {
-        ...this.authParams,
-        grp_name: params.groupName,
-        delete: 'true'
-      }
-    });
-    return response.data;
+  async deleteGroup(params: { groupName?: string; groupId?: string }) {
+    let id =
+      params.groupId ??
+      (params.groupName ? await this.resolveGroupId(params.groupName) : undefined);
+    if (!id) throw createApiServiceError('Provide a group ID or group name.');
+    return this.request('deletegroup.json', { id });
   }
 
-  // ─── Templates ─────────────────────────────────────────────────────
-
-  async listTemplates() {
-    let response = await this.axios.get('templatelist.json', {
-      params: {
-        ...this.authParams
-      }
-    });
-    return response.data;
+  listTemplates(params: ListParams = {}) {
+    return this.list('templatelist.json', params);
   }
 
-  async createTemplate(params: { templateName: string; templateBody: string }) {
-    let response = await this.axios.post('template.json', null, {
-      params: {
-        ...this.authParams,
-        template_name: params.templateName,
-        template_body: params.templateBody
-      }
+  createTemplate(params: { templateName: string; templateBody: string }) {
+    return this.request('createtemplate.json', {
+      name: params.templateName,
+      text: params.templateBody
     });
-    return response.data;
   }
 
   async editTemplate(params: {
@@ -272,112 +443,83 @@ export class SmsAlertClient {
     templateName?: string;
     templateBody?: string;
   }) {
-    let response = await this.axios.post('template.json', null, {
-      params: {
-        ...this.authParams,
-        template_id: params.templateId,
-        ...(params.templateName ? { template_name: params.templateName } : {}),
-        ...(params.templateBody ? { template_body: params.templateBody } : {}),
-        edit: 'true'
-      }
-    });
-    return response.data;
+    let existing =
+      params.templateName && params.templateBody
+        ? { title: params.templateName, template: params.templateBody }
+        : (await this.collectPages('templatelist.json'))
+            .map(row => this.resource(row, 'Smstemplate'))
+            .find(template => String(template.id) === params.templateId);
+    let name = params.templateName ?? existing?.title;
+    let text = params.templateBody ?? existing?.template;
+    if (typeof name !== 'string' || typeof text !== 'string') {
+      throw createApiServiceError(
+        'Template not found. Provide both template name and body, or list templates to find its ID.'
+      );
+    }
+    return this.request('updatetemplate.json', { id: params.templateId, name, text });
   }
 
-  async deleteTemplate(params: { templateId: string }) {
-    let response = await this.axios.post('template.json', null, {
-      params: {
-        ...this.authParams,
-        template_id: params.templateId,
-        delete: 'true'
-      }
-    });
-    return response.data;
+  deleteTemplate(params: { templateId: string }) {
+    return this.request('deletetemplate.json', { id: params.templateId });
   }
 
-  // ─── Sender IDs ────────────────────────────────────────────────────
-
-  async listSenderIds() {
-    let response = await this.axios.get('senderidlist.json', {
-      params: {
-        ...this.authParams
-      }
-    });
-    return response.data;
+  listSenderIds() {
+    return this.request('senderlist.json', {}, 'GET');
   }
 
-  // ─── Reports ───────────────────────────────────────────────────────
-
-  async getSmsReport(params?: {
-    fromDate?: string;
-    toDate?: string;
-    mobileNo?: string;
-    sender?: string;
-  }) {
-    let response = await this.axios.post('msgreport.json', null, {
-      params: {
-        ...this.authParams,
-        ...(params?.fromDate ? { fromdate: params.fromDate } : {}),
-        ...(params?.toDate ? { todate: params.toDate } : {}),
-        ...(params?.mobileNo ? { mobileno: params.mobileNo } : {}),
-        ...(params?.sender ? { sender: params.sender } : {})
-      }
+  async getSmsReport(
+    params: ListParams & {
+      fromDate?: string;
+      toDate?: string;
+      mobileNo?: string;
+      sender?: string;
+      scheduledOnly?: boolean;
+    } = {}
+  ) {
+    if (params.mobileNo) {
+      throw createApiServiceError(
+        'Campaign logs do not support a recipient-number filter. Use get_delivery_status with a campaign batch ID to inspect recipients.'
+      );
+    }
+    let result = await this.request('smscampaignlog.json', {
+      page: params.page,
+      limit: params.limit,
+      q: params.query,
+      schedule: params.scheduledOnly === undefined ? undefined : Number(params.scheduledOnly)
     });
-    return response.data;
+    if (params.fromDate || params.toDate || params.sender) {
+      if (!Array.isArray(result.description))
+        throw createApiServiceError('SMS Alert returned an invalid campaign list.');
+      result.description = result.description.filter(row => {
+        let campaign = this.resource(row, 'Smscampaignlog');
+        let date = typeof campaign.datetime === 'string' ? campaign.datetime.slice(0, 10) : '';
+        return (
+          (!params.fromDate || date >= params.fromDate) &&
+          (!params.toDate || date <= params.toDate) &&
+          (!params.sender || campaign.senderid === params.sender)
+        );
+      });
+    }
+    return result;
   }
 
-  async getDeliveryReport(params: { batchId: string }) {
-    let response = await this.axios.post('pullreport.json', null, {
-      params: {
-        ...this.authParams,
-        id: params.batchId
-      }
-    });
-    return response.data;
+  getDeliveryReport(params: { batchId: string }) {
+    return this.request('pull.json', { batchid: params.batchId });
   }
 
-  // ─── Credit Balance ────────────────────────────────────────────────
-
-  async getCreditBalance() {
-    let response = await this.axios.get('creditstatus.json', {
-      params: {
-        ...this.authParams
-      }
-    });
-    return response.data;
+  getCreditBalance() {
+    return this.request('creditstatus.json', {}, 'GET');
   }
 
-  // ─── Short URL ─────────────────────────────────────────────────────
-
-  async createShortUrl(params: { longUrl: string }) {
-    let response = await this.axios.post('shorturl.json', null, {
-      params: {
-        ...this.authParams,
-        url: params.longUrl
-      }
-    });
-    return response.data;
+  createShortUrl(params: { longUrl: string }) {
+    return this.request('createshorturl.json', { url: params.longUrl });
   }
 
-  async deleteShortUrl(params: { shortUrlId: string }) {
-    let response = await this.axios.post('shorturl.json', null, {
-      params: {
-        ...this.authParams,
-        id: params.shortUrlId,
-        delete: 'true'
-      }
-    });
-    return response.data;
+  deleteShortUrl(params: { shortUrlId: string }) {
+    return this.request('deleteshorturl.json', { id: params.shortUrlId });
   }
 
-  // ─── Account ───────────────────────────────────────────────────────
-
-  async getProfile() {
-    let response = await this.axios.post('user.json', null, {
-      params: {
-        ...this.authParams
-      }
-    });
-    return response.data;
+  getProfile() {
+    return this.request('user.json');
   }
 }

@@ -1,6 +1,12 @@
-# <img src="logo.svg" height="20"> Servicem 8
+# <img src="logo.svg" height="20"> ServiceM8
 
-Manage field service operations for small businesses. Create, update, and track jobs with scheduling, staff allocation, and status tracking. Manage clients (companies) and contacts with full CRUD operations. Assign staff to jobs, schedule work periods, and manage allocation windows. Track materials, create invoices, record payments, and manage tax rates. Handle customer assets with configurable asset types. Create and manage custom forms, checklists, and form responses. Add notes and file attachments to jobs. Send emails and SMS messages on behalf of the account. Generate templated documents such as quotes and invoices. Manage inbox messages and convert them to jobs. Search across jobs, clients, and other objects. Add custom fields to standard objects.
+Manage ServiceM8 jobs, clients, contacts, staff scheduling, job materials, notes and payments. The integration includes 19 tools and supports OAuth 2.0 or a private application API key.
+
+Use `get_account` to identify the connected account and its currency and timezone. Discover clients with `list_clients`, contacts with `list_contacts`, staff with `list_staff`, and catalog materials with `list_materials` before creating or updating related records. List tools follow the provider's cursor pagination.
+
+Existing API-key connections are recognized from their token-only authentication output and use the required API-key header. OAuth connections need to authorize the current scope list to use contact management, payment recording, job notes and account discovery.
+
+`create_job` defaults an omitted status to Quote. Job due dates, contact job titles and separate job-material descriptions are not supported by the corresponding write endpoints. These retained input fields return a clear error when supplied. Use the job material name for invoice text. If `schedule_job` creates a booking but its separate staff allocation fails, the result includes the booking UUID and `allocationError`; inspect the booking before retrying.
 
 ## License
 

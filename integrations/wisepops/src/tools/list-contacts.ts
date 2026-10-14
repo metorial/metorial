@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,9 @@ export let listContacts = SlateTool.create(spec, {
 Supports filtering by collection date and by specific campaign. Each contact includes the collection timestamp, campaign ID, IP address, country code, and all collected form fields.`,
   constraints: [
     'Maximum page size is 1000 contacts per request.',
-    'Subject to API rate limits (1,500 calls per 30 days on standard plans).'
+    'API access is available on Custom plans.',
+    'Subject to API rate limits (1,500 calls per 30 days on standard limits).',
+    'If the contacts API omits the form-session identifier, use export_contacts to download the original contact records.'
   ],
   tags: {
     readOnly: true
@@ -27,7 +29,9 @@ Supports filtering by collection date and by specific campaign. Each contact inc
       wisepopId: z
         .number()
         .optional()
-        .describe('Campaign ID to retrieve contacts from a specific popup campaign only.'),
+        .describe(
+          'Campaign ID from list_campaigns to retrieve contacts from a specific popup campaign only.'
+        ),
       pageSize: z
         .number()
         .min(1)
@@ -71,14 +75,22 @@ Supports filtering by collection date and by specific campaign. Each contact inc
       pageSize: ctx.input.pageSize
     });
 
-    let mappedContacts = contacts.map(c => ({
-      collectedAt: c.collected_at,
-      wisepopId: c.wisepop_id,
-      formSession: c.form_session,
-      ip: c.ip,
-      countryCode: c.country_code,
-      fields: c.fields
-    }));
+    let mappedContacts = contacts.map(c => {
+      if (typeof c.form_session !== 'string') {
+        throw createApiServiceError(
+          'Wisepops did not return a form-session identifier required by list_contacts. Use export_contacts to download the original contact records.'
+        );
+      }
+
+      return {
+        collectedAt: c.collected_at,
+        wisepopId: c.wisepop_id,
+        formSession: c.form_session,
+        ip: c.ip,
+        countryCode: c.country_code,
+        fields: c.fields
+      };
+    });
 
     return {
       output: { contacts: mappedContacts },

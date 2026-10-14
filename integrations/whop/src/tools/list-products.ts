@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let productSchema = z.object({
@@ -25,10 +26,7 @@ export let listProducts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID. Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       visibilities: z
         .array(z.enum(['visible', 'hidden', 'archived', 'quick_link']))
         .optional()
@@ -52,8 +50,8 @@ export let listProducts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let companyId = ctx.input.companyId || ctx.config.companyId;
     if (!companyId) {
-      throw new Error(
-        'companyId is required. Provide it in the input or configure it globally.'
+      throw createApiServiceError(
+        'companyId is required. Call list_accounts and provide an account ID in the input, or configure companyId.'
       );
     }
 

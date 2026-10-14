@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createTeam = SlateTool.create(spec, {
   name: 'Create Team',
   key: 'create_team',
-  description: `Creates a new team in Pointagram. An icon is required and can be one of the built-in icons (e.g. Bears, Bulls, Sharks) or a custom icon previously uploaded through the Pointagram UI.`,
+  description: `Creates a new team in Pointagram. An icon is required and can be a built-in icon filename (e.g. Bears.png, Bulls.png, Sharks.png) or a custom icon previously uploaded through the Pointagram UI.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -18,7 +18,7 @@ export let createTeam = SlateTool.create(spec, {
       icon: z
         .string()
         .describe(
-          'Team icon name. Use built-in icons like "Bears", "Bulls", "Sharks", "Eagles", "Lions", "Tigers", "Wolves", "Panthers", "Hawks", "Falcons" or a custom-uploaded icon name'
+          'Icon filename: Bears.png, Bulls.png, Cobras.png, Lions.png, Raccons.png, Sharks.png, Tigers.png, or a previously uploaded custom icon. Built-in names without .png are also accepted.'
         ),
       filterIgnore: z
         .boolean()

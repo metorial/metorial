@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   SeqeraAction,
   SeqeraComputeEnv,
@@ -11,29 +11,36 @@ import type {
   SeqeraPipeline,
   SeqeraSecret,
   SeqeraTeam,
+  SeqeraUser,
   SeqeraWorkflow,
   SeqeraWorkflowTask,
   SeqeraWorkspace
 } from './types';
 
 export class SeqeraClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private workspaceId?: string;
 
-  constructor(config: { token: string; baseUrl: string; workspaceId?: string }) {
+  constructor(config: { token: string; baseUrl?: unknown; workspaceId?: string }) {
     this.workspaceId = config.workspaceId;
-    this.axios = createAxios({
-      baseURL: config.baseUrl,
+    this.axios = createAuthenticatedAxios({
+      baseURL:
+        typeof config.baseUrl === 'string' ? config.baseUrl : 'https://api.cloud.seqera.io',
+      timeout: 30000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Seqera',
+          reason: 'seqera_api_error'
+        }),
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json'
       }
     });
   }
 
-  private wsParams(extra?: Record<string, any>): Record<string, any> {
-    let params: Record<string, any> = {};
+  private wsParams(extra?: Record<string, unknown>): Record<string, unknown> {
+    let params: Record<string, unknown> = {};
     if (this.workspaceId) {
       params.workspaceId = this.workspaceId;
     }
@@ -45,9 +52,20 @@ export class SeqeraClient {
 
   // ─── User Info ──────────────────────────────────────────────────
 
-  async getUserInfo(): Promise<{ user: Record<string, any> }> {
+  async getUserInfo(): Promise<{
+    user: SeqeraUser & { id: number };
+    defaultWorkspaceId?: number | null;
+  }> {
     let response = await this.axios.get('/user-info');
-    return response.data as { user: Record<string, any> };
+    let data = response.data as { user?: SeqeraUser; defaultWorkspaceId?: number | null };
+    if (!data.user?.id)
+      throw createApiServiceError(
+        'Seqera returned no current user identity. Check the access token and API URL.'
+      );
+    return {
+      user: { ...data.user, id: data.user.id },
+      defaultWorkspaceId: data.defaultWorkspaceId
+    };
   }
 
   // ─── Pipelines ─────────────────────────────────────────────────
@@ -65,22 +83,55 @@ export class SeqeraClient {
     if (params?.search) query.search = params.search;
     if (params?.max) query.max = params.max;
     if (params?.offset) query.offset = params.offset;
-    if (params?.sortBy) query.sortBy = params.sortBy;
-    if (params?.sortDir) query.sortDir = params.sortDir;
+    if (params?.sortBy) {
+      let sortBy = params.sortBy.toUpperCase();
+      if (sortBy === 'LASTUPDATED') sortBy = 'MODIFIED';
+      if (!['NAME', 'CREATED', 'MODIFIED'].includes(sortBy)) {
+        throw createApiServiceError(
+          'Pipeline sortBy must be NAME, CREATED, MODIFIED, or lastUpdated.'
+        );
+      }
+      query.sortBy = sortBy;
+    }
+    if (params?.sortDir)
+      query.sortDir = params.sortDir.toLowerCase() === 'asc' ? 'ASCENDING' : 'DESCENDING';
     if (params?.visibility) query.visibility = params.visibility;
-    if (params?.attributes) query.attributes = params.attributes;
+    if (params?.attributes) query.attributes = params.attributes.join(',');
 
     let response = await this.axios.get('/pipelines', { params: query });
     let data = response.data as { pipelines?: SeqeraPipeline[]; totalSize?: number };
-    return { pipelines: data.pipelines || [], totalSize: data.totalSize };
+    return {
+      pipelines: (data.pipelines || []).map(pipeline => ({
+        ...pipeline,
+        computeEnvId: pipeline.computeEnv?.id ?? pipeline.computeEnvId
+      })),
+      totalSize: data.totalSize
+    };
   }
 
   async describePipeline(pipelineId: number): Promise<SeqeraPipeline> {
     let response = await this.axios.get(`/pipelines/${pipelineId}`, {
-      params: this.wsParams({ attributes: ['labels'] })
+      params: this.wsParams({ attributes: 'labels,computeEnv' })
     });
     let data = response.data as { pipeline?: SeqeraPipeline };
-    return data.pipeline || {};
+    if (!data.pipeline?.pipelineId)
+      throw createApiServiceError('Seqera returned no pipeline details.');
+    let launchResponse = await this.axios.get(`/pipelines/${pipelineId}/launch`, {
+      params: this.wsParams()
+    });
+    let { launch } = launchResponse.data as {
+      launch?: Omit<SeqeraPipeline, 'repository'> & {
+        pipeline?: string;
+        computeEnv?: { id?: string };
+      };
+    };
+    return {
+      ...data.pipeline,
+      ...launch,
+      repository: data.pipeline.repository ?? launch?.pipeline,
+      computeEnvId: launch?.computeEnv?.id ?? launch?.computeEnvId,
+      lastUpdated: data.pipeline.lastUpdated
+    };
   }
 
   async createPipeline(pipeline: {
@@ -120,7 +171,9 @@ export class SeqeraClient {
       params: this.wsParams()
     });
     let data = response.data as { pipeline?: SeqeraPipeline };
-    return data.pipeline || {};
+    if (!data.pipeline?.pipelineId)
+      throw createApiServiceError('Seqera did not return the created pipeline ID.');
+    return data.pipeline;
   }
 
   async updatePipeline(
@@ -142,10 +195,15 @@ export class SeqeraClient {
     }
   ): Promise<void> {
     let body: Record<string, any> = {};
-    if (updates.name) body.name = updates.name;
+    if (updates.name !== undefined) body.name = updates.name;
     if (updates.description !== undefined) body.description = updates.description;
-    if (updates.icon) body.icon = updates.icon;
-    if (updates.labelIds) body.labelIds = updates.labelIds;
+    if (updates.icon !== undefined) body.icon = updates.icon;
+    body.labelIds =
+      updates.labelIds ??
+      (await this.describePipeline(pipelineId)).labels?.flatMap(label =>
+        label.id === undefined ? [] : [label.id]
+      ) ??
+      [];
 
     let launch: Record<string, any> = {};
     if (updates.repository) launch.pipeline = updates.repository;
@@ -187,23 +245,37 @@ export class SeqeraClient {
     if (params?.search) query.search = params.search;
     if (params?.max) query.max = params.max;
     if (params?.offset) query.offset = params.offset;
-    if (params?.sortBy) query.sortBy = params.sortBy;
-    if (params?.sortDir) query.sortDir = params.sortDir;
-    if (params?.attributes) query.attributes = params.attributes;
+    if (params?.sortBy || params?.sortDir) {
+      throw createApiServiceError(
+        'Seqera workflow listing does not support sorting. Omit sortBy and sortDirection; use search to filter runs.'
+      );
+    }
+    if (params?.attributes) query.attributes = params.attributes.join(',');
+    query.includeTotalSize = true;
 
     let response = await this.axios.get('/workflow', { params: query });
-    let data = response.data as { workflows?: SeqeraWorkflow[]; totalSize?: number };
-    return { workflows: data.workflows || [], totalSize: data.totalSize };
+    let data = response.data as {
+      workflows?: Array<{ workflow?: SeqeraWorkflow }>;
+      totalSize?: number;
+    };
+    return {
+      workflows: (data.workflows || []).flatMap(entry =>
+        entry.workflow ? [entry.workflow] : []
+      ),
+      totalSize: data.totalSize
+    };
   }
 
   async describeWorkflow(
     workflowId: string
   ): Promise<{ workflow: SeqeraWorkflow; progress?: Record<string, any> }> {
-    let response = await this.axios.get(`/workflow/${workflowId}`, {
-      params: this.wsParams({ attributes: ['labels', 'optimized'] })
+    let response = await this.axios.get(`/workflow/${encodeURIComponent(workflowId)}`, {
+      params: this.wsParams({ attributes: 'labels,optimized' })
     });
     let data = response.data as { workflow?: SeqeraWorkflow; progress?: Record<string, any> };
-    return { workflow: data.workflow || {}, progress: data.progress };
+    if (!data.workflow?.id)
+      throw createApiServiceError('Seqera returned no workflow details.');
+    return { workflow: data.workflow, progress: data.progress };
   }
 
   async launchWorkflow(launch: SeqeraLaunchRequest): Promise<{ workflowId: string }> {
@@ -215,12 +287,14 @@ export class SeqeraClient {
       }
     );
     let data = response.data as { workflowId?: string };
-    return { workflowId: data.workflowId || '' };
+    if (!data.workflowId)
+      throw createApiServiceError('Seqera did not return the launched workflow ID.');
+    return { workflowId: data.workflowId };
   }
 
   async cancelWorkflow(workflowId: string): Promise<void> {
     await this.axios.post(
-      `/workflow/${workflowId}/cancel`,
+      `/workflow/${encodeURIComponent(workflowId)}/cancel`,
       {},
       {
         params: this.wsParams()
@@ -229,17 +303,23 @@ export class SeqeraClient {
   }
 
   async getWorkflowMetrics(workflowId: string): Promise<Record<string, any>[]> {
-    let response = await this.axios.get(`/workflow/${workflowId}/metrics`, {
-      params: this.wsParams()
-    });
+    let response = await this.axios.get(
+      `/workflow/${encodeURIComponent(workflowId)}/metrics`,
+      {
+        params: this.wsParams()
+      }
+    );
     let data = response.data as { metrics?: Record<string, any>[] };
     return data.metrics || [];
   }
 
   async getWorkflowProgress(workflowId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/workflow/${workflowId}/progress`, {
-      params: this.wsParams()
-    });
+    let response = await this.axios.get(
+      `/workflow/${encodeURIComponent(workflowId)}/progress`,
+      {
+        params: this.wsParams()
+      }
+    );
     return response.data as Record<string, any>;
   }
 
@@ -251,6 +331,7 @@ export class SeqeraClient {
       sortBy?: string;
       sortDir?: string;
       search?: string;
+      process?: string;
     }
   ): Promise<{ tasks: SeqeraWorkflowTask[]; total?: number }> {
     let query = this.wsParams();
@@ -259,8 +340,11 @@ export class SeqeraClient {
     if (params?.sortBy) query.sortBy = params.sortBy;
     if (params?.sortDir) query.sortDir = params.sortDir;
     if (params?.search) query.search = params.search;
+    if (params?.process) query.process = params.process;
 
-    let response = await this.axios.get(`/workflow/${workflowId}/tasks`, { params: query });
+    let response = await this.axios.get(`/workflow/${encodeURIComponent(workflowId)}/tasks`, {
+      params: query
+    });
     let data = response.data as {
       tasks?: Array<{ task?: SeqeraWorkflowTask }>;
       total?: number;
@@ -270,11 +354,11 @@ export class SeqeraClient {
   }
 
   async getWorkflowLog(workflowId: string): Promise<string> {
-    let response = await this.axios.get(`/workflow/${workflowId}/log`, {
+    let response = await this.axios.get(`/workflow/${encodeURIComponent(workflowId)}/log`, {
       params: this.wsParams()
     });
-    let data = response.data as { log?: string };
-    return data.log || '';
+    let data = response.data as { log?: { entries?: string[] } };
+    return (data.log?.entries || []).join('\n');
   }
 
   // ─── Compute Environments ─────────────────────────────────────
@@ -289,22 +373,27 @@ export class SeqeraClient {
   }
 
   async describeComputeEnv(computeEnvId: string): Promise<SeqeraComputeEnv> {
-    let response = await this.axios.get(`/compute-envs/${computeEnvId}`, {
+    let response = await this.axios.get(`/compute-envs/${encodeURIComponent(computeEnvId)}`, {
       params: this.wsParams()
     });
     let data = response.data as { computeEnv?: SeqeraComputeEnv };
-    return data.computeEnv || {};
+    if (!data.computeEnv?.id)
+      throw createApiServiceError('Seqera returned no compute environment details.');
+    return {
+      ...data.computeEnv,
+      workDir: data.computeEnv.config?.workDir ?? data.computeEnv.workDir
+    };
   }
 
   async deleteComputeEnv(computeEnvId: string): Promise<void> {
-    await this.axios.delete(`/compute-envs/${computeEnvId}`, {
+    await this.axios.delete(`/compute-envs/${encodeURIComponent(computeEnvId)}`, {
       params: this.wsParams()
     });
   }
 
   async setPrimaryComputeEnv(computeEnvId: string): Promise<void> {
     await this.axios.post(
-      `/compute-envs/${computeEnvId}/primary`,
+      `/compute-envs/${encodeURIComponent(computeEnvId)}/primary`,
       {},
       {
         params: this.wsParams()
@@ -330,11 +419,15 @@ export class SeqeraClient {
   }
 
   async describeDataset(datasetId: string): Promise<SeqeraDataset> {
-    let response = await this.axios.get(`/datasets/${datasetId}/metadata`, {
-      params: this.wsParams()
-    });
-    let data = response.data as SeqeraDataset;
-    return data || {};
+    let response = await this.axios.get(
+      `/datasets/${encodeURIComponent(datasetId)}/metadata`,
+      {
+        params: this.wsParams()
+      }
+    );
+    let data = response.data as { dataset?: SeqeraDataset };
+    if (!data.dataset?.id) throw createApiServiceError('Seqera returned no dataset metadata.');
+    return data.dataset;
   }
 
   async createDataset(dataset: {
@@ -345,7 +438,9 @@ export class SeqeraClient {
       params: this.wsParams()
     });
     let data = response.data as { dataset?: SeqeraDataset };
-    return data.dataset || {};
+    if (!data.dataset?.id)
+      throw createApiServiceError('Seqera did not return the created dataset ID.');
+    return data.dataset;
   }
 
   async updateDataset(
@@ -355,13 +450,13 @@ export class SeqeraClient {
       description?: string;
     }
   ): Promise<void> {
-    await this.axios.put(`/datasets/${datasetId}`, updates, {
+    await this.axios.put(`/datasets/${encodeURIComponent(datasetId)}`, updates, {
       params: this.wsParams()
     });
   }
 
   async deleteDataset(datasetId: string): Promise<void> {
-    await this.axios.delete(`/datasets/${datasetId}`, {
+    await this.axios.delete(`/datasets/${encodeURIComponent(datasetId)}`, {
       params: this.wsParams()
     });
   }
@@ -371,23 +466,25 @@ export class SeqeraClient {
     content: string,
     mediaType?: string
   ): Promise<void> {
-    let headers: Record<string, string> = {};
-    if (mediaType) {
-      headers['Content-Type'] = mediaType;
-    } else {
-      headers['Content-Type'] = 'text/csv';
-    }
-
-    await this.axios.post(`/datasets/${datasetId}/upload`, content, {
+    let form = new FormData();
+    form.append(
+      'file',
+      new Blob([content], { type: mediaType ?? 'text/csv' }),
+      mediaType === 'text/tab-separated-values' ? 'samplesheet.tsv' : 'samplesheet.csv'
+    );
+    await this.axios.post(`/datasets/${encodeURIComponent(datasetId)}/upload`, form, {
       params: this.wsParams(),
-      headers
+      headers: { 'Content-Type': undefined }
     });
   }
 
   async listDatasetVersions(datasetId: string): Promise<Record<string, any>[]> {
-    let response = await this.axios.get(`/datasets/${datasetId}/versions`, {
-      params: this.wsParams()
-    });
+    let response = await this.axios.get(
+      `/datasets/${encodeURIComponent(datasetId)}/versions`,
+      {
+        params: this.wsParams()
+      }
+    );
     let data = response.data as { versions?: Record<string, any>[] };
     return data.versions || [];
   }
@@ -404,7 +501,7 @@ export class SeqeraClient {
   }
 
   async describeCredentials(credentialsId: string): Promise<SeqeraCredentials> {
-    let response = await this.axios.get(`/credentials/${credentialsId}`, {
+    let response = await this.axios.get(`/credentials/${encodeURIComponent(credentialsId)}`, {
       params: this.wsParams()
     });
     let data = response.data as { credentials?: SeqeraCredentials };
@@ -412,7 +509,7 @@ export class SeqeraClient {
   }
 
   async deleteCredentials(credentialsId: string): Promise<void> {
-    await this.axios.delete(`/credentials/${credentialsId}`, {
+    await this.axios.delete(`/credentials/${encodeURIComponent(credentialsId)}`, {
       params: this.wsParams()
     });
   }
@@ -432,6 +529,8 @@ export class SeqeraClient {
       params: this.wsParams()
     });
     let data = response.data as { secretId?: number };
+    if (data.secretId === undefined)
+      throw createApiServiceError('Seqera did not return the created secret ID.');
     return { id: data.secretId, name: secret.name };
   }
 
@@ -439,9 +538,19 @@ export class SeqeraClient {
     secretId: number,
     updates: { name?: string; value?: string }
   ): Promise<void> {
-    await this.axios.put(`/pipeline-secrets/${secretId}`, updates, {
-      params: this.wsParams()
-    });
+    if (updates.name !== undefined)
+      throw createApiServiceError(
+        'Seqera does not support renaming pipeline secrets. Create a new secret with the desired name instead.'
+      );
+    if (updates.value === undefined)
+      throw createApiServiceError('value is required to update a pipeline secret.');
+    await this.axios.put(
+      `/pipeline-secrets/${secretId}`,
+      { value: updates.value },
+      {
+        params: this.wsParams()
+      }
+    );
   }
 
   async deleteSecret(secretId: number): Promise<void> {
@@ -497,11 +606,20 @@ export class SeqeraClient {
   }
 
   async describeAction(actionId: string): Promise<SeqeraAction> {
-    let response = await this.axios.get(`/actions/${actionId}`, {
+    let response = await this.axios.get(`/actions/${encodeURIComponent(actionId)}`, {
       params: this.wsParams()
     });
-    let data = response.data as { action?: SeqeraAction };
-    return data.action || {};
+    let data = response.data as {
+      action?: Omit<SeqeraAction, 'pipeline'> & {
+        launch?: { pipeline?: string };
+        hookUrl?: string;
+      };
+    };
+    return {
+      ...data.action,
+      pipeline: data.action?.launch?.pipeline,
+      endpoint: data.action?.hookUrl
+    };
   }
 
   async createAction(action: {
@@ -517,22 +635,30 @@ export class SeqeraClient {
   }
 
   async deleteAction(actionId: string): Promise<void> {
-    await this.axios.delete(`/actions/${actionId}`, {
+    await this.axios.delete(`/actions/${encodeURIComponent(actionId)}`, {
       params: this.wsParams()
     });
   }
 
   async triggerAction(actionId: string, params?: Record<string, any>): Promise<string> {
-    let response = await this.axios.post(`/actions/${actionId}/launch`, params || {}, {
-      params: this.wsParams()
-    });
+    let response = await this.axios.post(
+      `/actions/${encodeURIComponent(actionId)}/launch`,
+      { params: params || {} },
+      {
+        params: this.wsParams()
+      }
+    );
     let data = response.data as { workflowId?: string };
-    return data.workflowId || '';
+    if (!data.workflowId)
+      throw createApiServiceError(
+        'Seqera did not return the workflow ID after triggering the action.'
+      );
+    return data.workflowId;
   }
 
   async pauseAction(actionId: string): Promise<void> {
     await this.axios.post(
-      `/actions/${actionId}/pause`,
+      `/actions/${encodeURIComponent(actionId)}/pause`,
       {},
       {
         params: this.wsParams()
@@ -553,14 +679,20 @@ export class SeqeraClient {
   async createLabel(label: {
     name: string;
     value?: string;
-    resource?: string;
+    resource?: boolean;
     isDefault?: boolean;
   }): Promise<SeqeraLabel> {
-    let response = await this.axios.post('/labels', label, {
-      params: this.wsParams()
-    });
+    let response = await this.axios.post(
+      '/labels',
+      { ...label, resource: label.resource ?? label.value !== undefined },
+      {
+        params: this.wsParams()
+      }
+    );
     let data = response.data as SeqeraLabel;
-    return data || {};
+    if (data.id === undefined)
+      throw createApiServiceError('Seqera did not return the created label ID.');
+    return data;
   }
 
   async updateLabel(
@@ -580,12 +712,42 @@ export class SeqeraClient {
 
   // ─── Participants ─────────────────────────────────────────────
 
-  async listParticipants(): Promise<SeqeraParticipant[]> {
-    let response = await this.axios.get('/participants', {
-      params: this.wsParams()
-    });
-    let data = response.data as { participants?: SeqeraParticipant[] };
-    return data.participants || [];
+  async listParticipants(
+    orgId?: number,
+    params?: { max?: number; offset?: number; search?: string }
+  ): Promise<{ participants: SeqeraParticipant[]; totalSize?: number }> {
+    if (!this.workspaceId)
+      throw createApiServiceError(
+        'workspaceId is required to list participants. Call list_organizations and list_workspaces first.'
+      );
+    if (orgId === undefined) {
+      for (let organization of await this.listOrganizations()) {
+        if (organization.orgId === undefined) continue;
+        let workspaces = await this.listWorkspaces(organization.orgId);
+        if (workspaces.some(workspace => String(workspace.id) === this.workspaceId)) {
+          orgId = organization.orgId;
+          break;
+        }
+      }
+    }
+    if (orgId === undefined)
+      throw createApiServiceError(
+        'No organization was found for this workspace. Pass orgId from list_organizations and workspaceId from list_workspaces.'
+      );
+    let response = await this.axios.get(
+      `/orgs/${orgId}/workspaces/${encodeURIComponent(this.workspaceId)}/participants`,
+      {
+        params: { max: params?.max ?? 50, offset: params?.offset ?? 0, search: params?.search }
+      }
+    );
+    let data = response.data as { participants?: SeqeraParticipant[]; totalSize?: number };
+    return {
+      participants: (data.participants || []).map(participant => ({
+        ...participant,
+        role: participant.wspRole
+      })),
+      totalSize: data.totalSize
+    };
   }
 
   // ─── Tokens ───────────────────────────────────────────────────

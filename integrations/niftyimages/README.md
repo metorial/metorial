@@ -1,6 +1,8 @@
 # Niftyimages
 
-Create and manage dynamic, personalized images, countdown timers, and data-driven content for email marketing campaigns. Manage data stores by adding, retrieving, and deleting records to display real-time content. Update countdown timer target dates programmatically. Perform full CRUD operations on map locations for nearest-store detection. Retrieve image stats and impressions filtered by date range. Update Photoshop image layers with custom variables, fonts, and positioning. Manage widgets, list users, retrieve usage stats, and suspend users. Integrate dynamic image generation with ManyChat and ChatFuel chatbots.
+Manage dynamic email images, countdown timer deadlines, Data Store records, and map locations. Browse images and maps, retrieve impression statistics, update Photoshop layers, and inspect widget usage. List Bee Plugin users before suspending an identified user. Verify the connected account through the v2 developer API.
+
+Use the image or map URL returned by the list tools for legacy API operations; numeric image IDs can also be resolved through the v2 developer API. Data Store and timer updates require their separate resource API keys. Bee Plugin operations require the plugin key from your integration configuration. The v2 developer API requires enabled developer access, which NiftyImages provides on Enterprise and excludes from the standard trial. Numeric image-ID resolution requires an account-scoped key; a store-scoped key cannot access image resources.
 
 ## License
 

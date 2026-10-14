@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailsoftlyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,10 +9,10 @@ export let manageTags = SlateTool.create(spec, {
   description: `Retrieve all tags for the firm or assign tags to a contact.
 - Omit **contactId** to list all available tags.
 - Provide **contactId** with a single tag (**tagId** or **tagName**) to assign one tag.
-- Provide **contactId** with a **tags** array to assign multiple tags at once.`,
+- Provide **contactId** with a **tagsToAssign** array to assign multiple tags at once.`,
   instructions: [
     'When assigning a single tag, provide either tagId or tagName (not both).',
-    'When assigning multiple tags, use the tags array with tagName and optional tagColor.'
+    'When assigning multiple tags, use the tagsToAssign array with tagName and optional tagColor.'
   ],
   tags: {
     destructive: false,
@@ -33,6 +33,10 @@ export let manageTags = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Name of a single tag to assign or create (alternative to tagId).'),
+      tagColor: z
+        .string()
+        .optional()
+        .describe('Color for a tag selected by tagName, as hex or RGB.'),
       tagsToAssign: z
         .array(
           z.object({
@@ -40,6 +44,8 @@ export let manageTags = SlateTool.create(spec, {
             tagColor: z.string().optional().describe('Color of the tag (e.g., hex code).')
           })
         )
+        .min(1)
+        .max(100)
         .optional()
         .describe('Array of tags to assign to the contact in bulk.')
     })
@@ -52,6 +58,26 @@ export let manageTags = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailsoftlyClient({ token: ctx.auth.token });
+
+    let { contactId, tagId, tagName, tagsToAssign, tagColor } = ctx.input;
+    let single = tagId !== undefined || tagName !== undefined;
+    if (!contactId && (single || tagsToAssign !== undefined || tagColor !== undefined)) {
+      throw createApiServiceError('Provide contactId when assigning tags.');
+    }
+    if (tagId !== undefined && tagName !== undefined) {
+      throw createApiServiceError('Provide tagId or tagName, not both.');
+    }
+    if (tagsToAssign !== undefined && (single || tagColor !== undefined)) {
+      throw createApiServiceError('Provide tagsToAssign or a single tag, not both.');
+    }
+    if (tagColor !== undefined && tagName === undefined) {
+      throw createApiServiceError('tagColor requires tagName.');
+    }
+    if (contactId && !single && tagsToAssign === undefined) {
+      throw createApiServiceError(
+        'Provide tagId, tagName, or tagsToAssign to assign tags. Omit contactId to list tags.'
+      );
+    }
 
     if (!ctx.input.contactId) {
       let availableTags = await client.getTags();
@@ -75,7 +101,8 @@ export let manageTags = SlateTool.create(spec, {
     if (ctx.input.tagId || ctx.input.tagName) {
       let result = await client.assignTagToContact(ctx.input.contactId, {
         tagId: ctx.input.tagId,
-        tagName: ctx.input.tagName
+        tagName: ctx.input.tagName,
+        tagColor: ctx.input.tagColor
       });
       return {
         output: { result },
@@ -83,10 +110,6 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    let availableTags = await client.getTags();
-    return {
-      output: { availableTags },
-      message: `Retrieved **${availableTags.length}** tag(s).`
-    };
+    throw createApiServiceError('Provide a non-empty tagId or tagName.');
   })
   .build();

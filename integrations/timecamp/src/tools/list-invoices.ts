@@ -30,22 +30,14 @@ export let listInvoices = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let rawInvoices = await client.getInvoices();
-
-    let invoiceList: any[] = [];
-    if (Array.isArray(rawInvoices)) {
-      invoiceList = rawInvoices;
-    } else if (rawInvoices && typeof rawInvoices === 'object') {
-      invoiceList = Object.values(rawInvoices);
-    }
-
-    let mapped = invoiceList.map((inv: any) => ({
-      invoiceId: String(inv.invoiceId || inv.invoice_id || inv.id || ''),
-      clientId: String(inv.client_id || ''),
-      status: String(inv.status || ''),
-      amount: String(inv.amount || '0'),
-      currency: String(inv.currency || ''),
-      date: String(inv.date || '')
+    let invoices = await client.getInvoices();
+    let mapped = invoices.map(invoice => ({
+      invoiceId: String(invoice.invoiceId ?? invoice.invoice_id ?? invoice.id ?? ''),
+      clientId: String(invoice.client_id ?? ''),
+      status: String(invoice.status ?? ''),
+      amount: String(invoice.amount ?? '0'),
+      currency: String(invoice.currency ?? ''),
+      date: String(invoice.date ?? '')
     }));
 
     return {

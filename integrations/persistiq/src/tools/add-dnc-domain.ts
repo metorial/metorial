@@ -16,17 +16,19 @@ export let addDncDomain = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean().describe('Whether the domain was successfully added'),
-      domain: z.string().describe('The domain that was added')
+      domain: z.string().describe('The domain that was added'),
+      dncDomainId: z.string().optional().describe('ID of the added DNC domain')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.addDncDomain(ctx.input.domain);
+    let result = await client.addDncDomain(ctx.input.domain);
 
     return {
       output: {
         success: true,
-        domain: ctx.input.domain
+        domain: result.dnc_domain?.name || ctx.input.domain,
+        dncDomainId: result.dnc_domain?.id
       },
       message: `Added **${ctx.input.domain}** to the Do Not Contact list.`
     };

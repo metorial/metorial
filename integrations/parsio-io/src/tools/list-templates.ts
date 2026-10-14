@@ -6,14 +6,15 @@ import { spec } from '../spec';
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `List all parsing templates for a mailbox. Templates define the extraction rules used to parse documents in the mailbox.`,
+  description: `List one page of parsing templates for a mailbox. Templates define the extraction rules used to parse documents in the mailbox.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      mailboxId: z.string().describe('ID of the mailbox to list templates for')
+      mailboxId: z.string().describe('ID of the mailbox to list templates for'),
+      page: z.number().int().min(1).optional().describe('Page number, starting at 1')
     })
   )
   .output(
@@ -34,12 +35,12 @@ export let listTemplates = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let templates = await client.listTemplates(ctx.input.mailboxId);
+    let templates = await client.listTemplates(ctx.input.mailboxId, ctx.input.page);
 
     let mapped = (Array.isArray(templates) ? templates : []).map((tpl: any) => ({
       templateId: tpl._id || tpl.id,
-      name: tpl.name,
-      enabled: tpl.enabled
+      name: tpl.name ?? undefined,
+      enabled: tpl.enabled ?? undefined
     }));
 
     return {

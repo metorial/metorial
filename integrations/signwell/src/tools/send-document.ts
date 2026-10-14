@@ -15,7 +15,22 @@ export let sendDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      documentId: z.string().describe('ID of the draft document to send')
+      documentId: z.string().describe('ID of the draft document to send'),
+      name: z.string().optional().describe('Updated document name before sending'),
+      subject: z.string().optional().describe('Updated email subject before sending'),
+      message: z.string().optional().describe('Updated email message before sending'),
+      expiresIn: z
+        .number()
+        .optional()
+        .describe('Number of days before the signature request expires'),
+      reminders: z
+        .boolean()
+        .optional()
+        .describe('Enable or disable automatic signing reminders'),
+      metadata: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Updated document metadata before sending')
     })
   )
   .output(
@@ -39,17 +54,18 @@ export let sendDocument = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SignWellClient({ token: ctx.auth.token });
 
-    let result = await client.sendDocument(ctx.input.documentId);
+    let { documentId, ...settings } = ctx.input;
+    let result = await client.sendDocument(documentId, settings);
 
     let output = {
       documentId: result.id,
-      name: result.name,
-      status: result.status,
-      recipients: result.recipients?.map((r: any) => ({
-        recipientId: r.id,
-        name: r.name,
-        email: r.email,
-        status: r.status
+      name: result.name ?? undefined,
+      status: result.status ?? undefined,
+      recipients: result.recipients?.map(r => ({
+        recipientId: r.id ?? undefined,
+        name: r.name ?? undefined,
+        email: r.email ?? undefined,
+        status: r.status ?? undefined
       }))
     };
 

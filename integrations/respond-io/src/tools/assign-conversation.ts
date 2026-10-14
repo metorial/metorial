@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let assignConversation = SlateTool.create(spec, {
   name: 'Assign Conversation',
   key: 'assign_conversation',
-  description: `Assign or unassign a user (agent) to a contact's conversation. To unassign, omit the assigneeId. Use the List Workspace Users tool to find available user IDs.`,
+  description: `Assign or unassign a user (agent) to a contact's conversation. To unassign, omit the assigneeId. Use the List Workspace Resources tool with resourceType users to find available user IDs.`,
   tags: {
     destructive: false,
     readOnly: false

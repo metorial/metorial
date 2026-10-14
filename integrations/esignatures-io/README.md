@@ -1,6 +1,10 @@
-# E Signatures.io
+# eSignatures.io
 
-Create, send, and manage legally binding electronic signature contracts via templates. Define signers with configurable signing order, delivery methods (email/SMS), and multi-factor authentication (SMS, email, photo ID). Build and manage contract templates with dynamic placeholder fields, signer input fields (text, dropdowns, checkboxes, dates, file uploads), formatted text, tables, and images. Track contract and signer status in real time through webhooks for events like contract sent, signed, viewed, declined, and withdrawn. Generate PDF previews, download signed PDFs, embed signing pages in iframes, customize branding and email content, set contract expiration, and add CC recipients. Supports template collaboration, copying templates between accounts, and organizing contracts with labels and metadata.
+Create and send contracts from templates, save drafts for review, and send drafts when ready. Manage signers, signing order, email/SMS delivery, and multi-factor checks. Customize placeholder values, branding, email messages, labels, and metadata.
+
+Create templates from Markdown and read or edit contract and template content with precise find-and-replace operations, including dry-run previews. Manage template copies and collaborators. Retrieve contract status, signer values, signing URLs, and a downloadable signed PDF when available.
+
+PDF preview generation is asynchronous: the provider delivers its PDF URL through a configured webhook. Avoid frequent contract polling. Contract queries may return reduced information after two weeks.
 
 ## License
 

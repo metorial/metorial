@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,9 +18,11 @@ export let ipAsnWhoisLookup = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      ip: z.string().optional().describe('IPv4 or IPv6 address to look up'),
+      ip: z.string().trim().min(1).optional().describe('IPv4 or IPv6 address to look up'),
       asn: z
         .string()
+        .trim()
+        .min(1)
         .optional()
         .describe('Autonomous System Number to look up (e.g. "AS15169" or "15169")')
     })
@@ -33,6 +35,10 @@ export let ipAsnWhoisLookup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.ip !== undefined && ctx.input.asn !== undefined) {
+      throw createApiServiceError('Provide either ip or asn, not both.');
+    }
+
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (ctx.input.ip) {
@@ -51,6 +57,6 @@ export let ipAsnWhoisLookup = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either ip or asn must be provided.');
+    throw createApiServiceError('Either ip or asn must be provided.');
   })
   .build();

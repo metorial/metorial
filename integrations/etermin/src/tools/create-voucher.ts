@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
@@ -17,7 +18,7 @@ export let createVoucher = SlateTool.create(spec, {
       voucherCode: z
         .string()
         .optional()
-        .describe('Voucher code/ID. If omitted, one may be auto-generated.'),
+        .describe('Voucher code/ID. If omitted, a unique code is generated.'),
       value: z.number().optional().describe('Monetary value in cents (e.g. 5000 for 50.00)'),
       currency: z.string().optional().describe('Currency code (e.g. EUR, USD, CHF)'),
       contingent: z.number().optional().describe('Number of allowed uses for this voucher'),
@@ -41,10 +42,12 @@ export let createVoucher = SlateTool.create(spec, {
     });
 
     let result = await client.createVoucher({
-      voucherid: ctx.input.voucherCode,
-      value: ctx.input.value,
+      id: ctx.input.voucherCode ?? randomUUID(),
+      priceinclvat: ctx.input.value === undefined ? undefined : ctx.input.value / 100,
+      priceoriginal: ctx.input.value === undefined ? undefined : ctx.input.value / 100,
       currency: ctx.input.currency,
-      contingent: ctx.input.contingent,
+      contingentmax: ctx.input.contingent,
+      contingentcounter: 0,
       validuntil: ctx.input.validUntil
     });
 

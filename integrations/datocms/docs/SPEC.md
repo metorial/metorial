@@ -1,6 +1,4 @@
-Now let me get more details on the webhook entity types and their specific event types:Now I have all the information needed. Let me compose the specification.
-
-# Slates Specification for DatoCMS
+# DatoCMS API Reference
 
 ## Overview
 

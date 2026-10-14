@@ -7,6 +7,7 @@ import {
   deleteDocument,
   deleteTemplate,
   getCompletedPdf,
+  getCurrentUser,
   getDocument,
   getTemplate,
   sendDocument,
@@ -17,6 +18,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     createDocument,
     createDocumentFromTemplate,
     getDocument,

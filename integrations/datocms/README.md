@@ -1,12 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/datocms.png" height="20"> Datocms
 
-Create, update, publish, unpublish, and delete structured content records in a headless CMS. Manage content models, fields, and schemas programmatically. Upload, organize, and deliver media assets with optimization and tagging. Query content via a GraphQL Content Delivery API with support for drafts, localization, and real-time updates. Manage sandbox and primary environments, fork and promote environments for safe migrations. Configure build triggers to deploy to hosting providers like Vercel and Netlify. Manage roles, API tokens, collaborators, and permissions. Search published website content via built-in site search.
+Create, update, publish, unpublish, and delete content records. Manage content models, fields, media metadata, sandbox environments, and deployment build triggers. Inspect project configuration, browse record version history, search an indexed website, and check asynchronous operation results.
 
 ## Tools
 
 ### Create Record
 
-Create a new content record for a given model. Provide field values matching the model's schema. Localized fields should use an object with locale keys (e.g. \
+Create a new content record for a given model. Provide field values matching the model's schema. Localized fields use an object with locale codes as keys.
 
 ### Delete Record
 
@@ -58,11 +58,23 @@ Publish or unpublish a content record. Publishing makes the record available via
 
 ### Search Site
 
-Search the published website using DatoCMS built-in site search. Returns matching pages with titles, URLs, body excerpts, and relevance scores. Requires site search to be configured with a build trigger.
+Search the published website using DatoCMS built-in site search. Returns matching pages with titles, URLs, body excerpts, and relevance scores. Requires an enabled search index.
 
 ### Update Record
 
 Update an existing content record's field values. Only provide the fields you want to change; omitted fields remain untouched. For localized fields, you must provide all locale values (not just the changed ones).
+
+### List Fields
+
+Inspect a model's field IDs, API keys, types, validators, and editor settings.
+
+### List Record Versions
+
+Retrieve paginated record history, including version IDs and publication metadata.
+
+### Get Job Result
+
+Check an asynchronous operation using its returned job ID. Queued operations expose their job object; a missing job result may mean the job is still running or the ID is unavailable.
 
 ## License
 

@@ -1,22 +1,22 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { createChatworkAxios } from './lib/client';
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.chatwork.com/v2'
+let apiAxios = createChatworkAxios('https://api.chatwork.com/v2');
+
+let oauthAxios = createChatworkAxios('https://oauth.chatwork.com');
+
+let authOutputSchema = z.object({
+  token: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  authType: z.enum(['oauth', 'api_token']).optional()
 });
 
-let oauthAxios = createAxios({
-  baseURL: 'https://oauth.chatwork.com'
-});
+type ChatworkAuthOutput = z.infer<typeof authOutputSchema>;
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
-  )
+  .output(authOutputSchema)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
@@ -37,26 +37,6 @@ export let auth = SlateAuth.create()
         title: 'Read User Tasks',
         description: 'Read your assigned task list',
         scope: 'users.tasks.me:read'
-      },
-      {
-        title: 'All User Data (Read)',
-        description: 'Read all user data including profile, status, and tasks',
-        scope: 'users.all:read'
-      },
-      {
-        title: 'Rooms (Read & Write)',
-        description: 'Full read and write access to chat rooms',
-        scope: 'rooms.all:read_write'
-      },
-      {
-        title: 'Rooms (Read)',
-        description: 'Read room info, members, messages, tasks, and files',
-        scope: 'rooms.all:read'
-      },
-      {
-        title: 'Rooms (Write)',
-        description: 'Write room info, members, messages, tasks, and files',
-        scope: 'rooms.all:write'
       },
       {
         title: 'Create/Delete Rooms',
@@ -109,24 +89,9 @@ export let auth = SlateAuth.create()
         scope: 'rooms.files:read'
       },
       {
-        title: 'Files (Write)',
-        description: 'Upload files to chat rooms',
-        scope: 'rooms.files:write'
-      },
-      {
         title: 'Contacts (Read & Write)',
         description: 'Read and manage contacts and contact requests',
         scope: 'contacts.all:read_write'
-      },
-      {
-        title: 'Contacts (Read)',
-        description: 'Read contacts and incoming contact requests',
-        scope: 'contacts.all:read'
-      },
-      {
-        title: 'Contacts (Write)',
-        description: 'Approve or reject incoming contact requests',
-        scope: 'contacts.all:write'
       },
       {
         title: 'Offline Access',
@@ -167,21 +132,34 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Chatwork',
+        operation: 'token exchange'
+      });
+      if (!tokens.refreshToken) {
+        throw createApiServiceError(
+          'Chatwork did not return a refresh token. Reconnect your account.'
+        );
+      }
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...tokens,
+          expiresAt: tokens.expiresAt ?? new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          authType: 'oauth' as const
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: ChatworkAuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Chatwork refresh token is available. Reconnect your account.'
+        );
       }
 
       let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
@@ -200,19 +178,23 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Chatwork',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...tokens,
+          expiresAt: tokens.expiresAt ?? new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          authType: 'oauth' as const
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
+    getProfile: async (ctx: { output: ChatworkAuthOutput }) => {
       let response = await apiAxios.get('/me', {
         headers: {
           Authorization: `Bearer ${ctx.output.token}`
@@ -245,12 +227,13 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          authType: 'api_token' as const
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
+    getProfile: async (ctx: { output: ChatworkAuthOutput }) => {
       let response = await apiAxios.get('/me', {
         headers: {
           'X-ChatWorkToken': ctx.output.token

@@ -8,7 +8,8 @@ export let uploadSales = SlateTool.create(spec, {
   key: 'upload_sales',
   description: `Upload sale conversions to Dripcel in bulk. Each sale is associated with a campaign and a contact cell number. Duplicate sales (same cell, campaign, and date) are rejected.`,
   constraints: [
-    'Duplicate sales with the same cell, campaign_id, and soldAt date are rejected (HTTP 409).'
+    'Duplicate sales with the same cell, campaign_id, and soldAt date are rejected (HTTP 409).',
+    'For V2 campaigns, cell numbers must use international format.'
   ],
   tags: {
     destructive: false
@@ -20,7 +21,11 @@ export let uploadSales = SlateTool.create(spec, {
         .array(
           z.object({
             campaignId: z.string().describe('Campaign ID to associate the sale with'),
-            cell: z.string().describe('Contact cell number (local or international format)'),
+            cell: z
+              .string()
+              .describe(
+                'Contact cell number. V2 campaigns require international format; legacy campaigns also accept local numbers.'
+              ),
             sendId: z.string().optional().describe('Associated send ID'),
             clickId: z.string().optional().describe('Associated click ID'),
             soldAt: z

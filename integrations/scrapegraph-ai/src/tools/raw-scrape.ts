@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let rawScrape = SlateTool.create(spec, {
   name: 'Fetch Raw HTML',
   key: 'raw_scrape',
-  description: `Fetches and returns the raw HTML of a webpage with JavaScript rendering support. Useful when you need the complete page source rather than AI-processed output.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Fetches and returns the raw HTML of a webpage with JavaScript rendering support. Useful when you need the complete page source rather than AI-processed output.
 Optionally extracts branding information (colors, fonts, typography, UI styles, metadata).`,
   tags: {
     destructive: false,
@@ -38,7 +38,7 @@ Optionally extracts branding information (colors, fonts, typography, UI styles, 
     z.object({
       scrapeRequestId: z.string().describe('Unique identifier for this scrape request'),
       status: z.string().describe('Status of the request'),
-      html: z.string().describe('Raw HTML content of the webpage'),
+      html: z.string().nullable().optional().describe('Raw HTML content when available'),
       error: z.string().nullable().optional().describe('Error message if the request failed')
     })
   )

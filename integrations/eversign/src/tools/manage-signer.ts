@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSigner = SlateTool.create(spec, {
   name: 'Manage Signer',
   key: 'manage_signer',
-  description: `Send a signing reminder to a signer or reassign a document's signing responsibility to a different person. Email notifications are sent automatically for both actions.`,
+  description: `Send a signing reminder to a signer or reassign a document's signing responsibility to a different person. Email notifications are sent automatically for both actions. Call list_businesses to discover the businessId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageSigner = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       documentHash: z.string().describe('Unique hash identifier of the document'),
       signerId: z.number().describe('ID of the signer within the document'),
       action: z
@@ -35,13 +37,15 @@ export let manageSigner = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
 
     if (ctx.input.action === 'remind') {
       await client.sendReminder(ctx.input.documentHash, ctx.input.signerId);
     } else {
       if (!ctx.input.newSignerName || !ctx.input.newSignerEmail) {
-        throw new Error('newSignerName and newSignerEmail are required for reassignment');
+        throw createApiServiceError(
+          'newSignerName and newSignerEmail are required for reassignment'
+        );
       }
       await client.reassignSigner(
         ctx.input.documentHash,

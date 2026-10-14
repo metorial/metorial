@@ -21,8 +21,8 @@ let mapTemplate = (tpl: any) => ({
   language: tpl.language,
   status: tpl.status,
   content: tpl.content,
-  createdAt: tpl.created_at,
-  updatedAt: tpl.updated_at
+  createdAt: tpl.created_at ?? tpl.createdAt,
+  updatedAt: tpl.updated_at ?? tpl.updatedAt
 });
 
 export let listTemplates = SlateTool.create(spec, {
@@ -93,7 +93,7 @@ export let getTemplate = SlateTool.create(spec, {
 
     return {
       output: mapTemplate(result),
-      message: `Retrieved template **${result.name || result.id}** (language: ${result.language}).`
+      message: `Retrieved template **${result.name || result.id}**.`
     };
   })
   .build();

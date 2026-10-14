@@ -1,38 +1,59 @@
-/**
- * Parses Semrush's semicolon-delimited CSV response format.
- * The first line contains column headers, subsequent lines contain data.
- * Returns an array of objects with header keys mapped to values.
- */
+import { createApiServiceError } from 'slates';
+
+/** Parse Semrush's semicolon-delimited reports, including escaped and multiline fields. */
 export let parseCsvResponse = (data: string): Record<string, unknown>[] => {
-  if (!data || typeof data !== 'string') {
-    return [];
+  if (typeof data !== 'string') {
+    throw createApiServiceError('Semrush returned an invalid CSV report.');
   }
-
   let trimmed = data.trim();
-  if (!trimmed || trimmed.startsWith('ERROR')) {
-    throw new Error(`Semrush API error: ${trimmed}`);
+  if (!trimmed) return [];
+  let apiError = /^ERROR\s+(\d+)\s*::\s*([\s\S]*)$/.exec(trimmed);
+  if (trimmed.startsWith('ERROR')) {
+    throw createApiServiceError(`Semrush API error: ${apiError?.[2] || trimmed}`, {
+      reason: 'upstream_api_error',
+      upstreamCode: apiError?.[1]
+    });
   }
 
-  let lines = trimmed.split('\n').filter(line => line.trim() !== '');
-  if (lines.length < 2) {
-    return [];
-  }
-
-  let headers = lines[0]!.split(';').map(h => h.trim());
-  let results: Record<string, unknown>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    let values = lines[i]!.split(';');
-    let row: Record<string, unknown> = {};
-    for (let j = 0; j < headers.length; j++) {
-      let header = headers[j]!;
-      let value = values[j]?.trim() ?? '';
-      row[header] = parseValue(value);
+  let rows: string[][] = [];
+  let row: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < trimmed.length; i++) {
+    let char = trimmed[i]!;
+    if (char === '"') {
+      if (quoted && trimmed[i + 1] === '"') {
+        value += '"';
+        i++;
+      } else if (quoted || !value.trim()) {
+        quoted = !quoted;
+      } else {
+        value += char;
+      }
+    } else if (char === ';' && !quoted) {
+      row.push(value.trim());
+      value = '';
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      row.push(value.trim());
+      if (row.some(cell => cell !== '')) rows.push(row);
+      row = [];
+      value = '';
+      if (char === '\r' && trimmed[i + 1] === '\n') i++;
+    } else {
+      value += char;
     }
-    results.push(row);
   }
-
-  return results;
+  if (quoted)
+    throw createApiServiceError(
+      'Semrush returned a CSV report with an unclosed quoted field.'
+    );
+  row.push(value.trim());
+  if (row.some(cell => cell !== '')) rows.push(row);
+  let headers = rows.shift();
+  if (!headers) return [];
+  return rows.map(values =>
+    Object.fromEntries(headers.map((header, i) => [header, parseValue(values[i] ?? '')]))
+  );
 };
 
 let parseValue = (value: string): unknown => {

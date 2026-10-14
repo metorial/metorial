@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageBroadcast = SlateTool.create(spec, {
   name: 'Manage Broadcast',
   key: 'manage_broadcast',
   description: `Create, retrieve, update, delete, or list WhatsApp broadcasts. Broadcasts send WhatsApp template messages to segmented audiences. Supports targeting by segments, class participants, or retargeting previous broadcast recipients.
-Use the **get** action with a broadcast ID to also retrieve delivery statistics and logs.`,
+Use **get** for delivery statistics and **get_logs** for individual delivery logs.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -23,6 +23,35 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
         .optional()
         .describe('Broadcast ID (required for get, update, delete, get_logs)'),
       name: z.string().optional().describe('Broadcast name'),
+      type: z
+        .enum(['client', 'contact', 'class', 'retarget'])
+        .optional()
+        .describe('Audience type (required for create)'),
+      locationId: z
+        .string()
+        .optional()
+        .describe('Sending location ID from list_locations (required for create)'),
+      targetClassId: z.string().optional().describe('Class ID for a class broadcast'),
+      targetClassStatus: z
+        .enum([
+          'ALL',
+          'WAITLISTED',
+          'BOOKED',
+          'VISITED',
+          'RESCHEDULED',
+          'NO_SHOW',
+          'CANCELLED'
+        ])
+        .optional()
+        .describe('Class booking status to target'),
+      retargetBroadcastId: z
+        .string()
+        .optional()
+        .describe('Previous broadcast ID for retargeting'),
+      retargetEngagementType: z
+        .enum(['sent', 'delivered', 'read', 'replied', 'not-replied'])
+        .optional()
+        .describe('Engagement to target for retarget broadcasts'),
       templateName: z.string().optional().describe('WhatsApp template name'),
       templateLanguage: z.string().optional().describe('Template language code'),
       segmentIds: z.array(z.string()).optional().describe('Segment IDs to target'),
@@ -62,12 +91,31 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
     let { action } = ctx.input;
 
     if (action === 'create') {
-      let data: Record<string, any> = {};
+      let data: Record<string, any> = {
+        type: ctx.input.type,
+        locationId: ctx.input.locationId,
+        targetClassId: ctx.input.targetClassId,
+        targetClassStatus: ctx.input.targetClassStatus,
+        retargetBroadcastId: ctx.input.retargetBroadcastId,
+        retargetEngagementType: ctx.input.retargetEngagementType
+      };
       if (ctx.input.name) data.name = ctx.input.name;
       if (ctx.input.templateName) data.templateName = ctx.input.templateName;
       if (ctx.input.templateLanguage) data.templateLanguage = ctx.input.templateLanguage;
       if (ctx.input.segmentIds) data.segmentIds = ctx.input.segmentIds;
-      if (ctx.input.templateParameters) Object.assign(data, ctx.input.templateParameters);
+      if (ctx.input.templateParameters) {
+        for (let key of [
+          'headerMediaUrl',
+          'headerTextParameters',
+          'bodyTextParameters',
+          'buttonUrlParameters',
+          'locationParameters',
+          'flowParameters'
+        ]) {
+          if (ctx.input.templateParameters[key] !== undefined)
+            data[key] = ctx.input.templateParameters[key];
+        }
+      }
       if (ctx.input.mediaUrl) data.mediaUrl = ctx.input.mediaUrl;
       if (ctx.input.scheduleDateTime) data.scheduleDateTime = ctx.input.scheduleDateTime;
 
@@ -79,7 +127,8 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
     }
 
     if (action === 'get') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required for get');
+      if (!ctx.input.broadcastId)
+        throw createApiServiceError('broadcastId is required for get');
       let result = await client.getBroadcast(ctx.input.broadcastId);
       return {
         output: { success: true, broadcast: result },
@@ -88,13 +137,33 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
     }
 
     if (action === 'update') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required for update');
-      let data: Record<string, any> = {};
+      if (!ctx.input.broadcastId)
+        throw createApiServiceError('broadcastId is required for update');
+      let data: Record<string, any> = {
+        type: ctx.input.type,
+        locationId: ctx.input.locationId,
+        targetClassId: ctx.input.targetClassId,
+        targetClassStatus: ctx.input.targetClassStatus,
+        retargetBroadcastId: ctx.input.retargetBroadcastId,
+        retargetEngagementType: ctx.input.retargetEngagementType
+      };
       if (ctx.input.name) data.name = ctx.input.name;
       if (ctx.input.templateName) data.templateName = ctx.input.templateName;
       if (ctx.input.templateLanguage) data.templateLanguage = ctx.input.templateLanguage;
       if (ctx.input.segmentIds) data.segmentIds = ctx.input.segmentIds;
-      if (ctx.input.templateParameters) Object.assign(data, ctx.input.templateParameters);
+      if (ctx.input.templateParameters) {
+        for (let key of [
+          'headerMediaUrl',
+          'headerTextParameters',
+          'bodyTextParameters',
+          'buttonUrlParameters',
+          'locationParameters',
+          'flowParameters'
+        ]) {
+          if (ctx.input.templateParameters[key] !== undefined)
+            data[key] = ctx.input.templateParameters[key];
+        }
+      }
       if (ctx.input.mediaUrl) data.mediaUrl = ctx.input.mediaUrl;
       if (ctx.input.scheduleDateTime) data.scheduleDateTime = ctx.input.scheduleDateTime;
 
@@ -106,7 +175,8 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
     }
 
     if (action === 'delete') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required for delete');
+      if (!ctx.input.broadcastId)
+        throw createApiServiceError('broadcastId is required for delete');
       await client.deleteBroadcast(ctx.input.broadcastId);
       return {
         output: { success: true },
@@ -127,7 +197,8 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
     }
 
     if (action === 'get_logs') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required for get_logs');
+      if (!ctx.input.broadcastId)
+        throw createApiServiceError('broadcastId is required for get_logs');
       let result = await client.getBroadcastLogs(ctx.input.broadcastId, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize
@@ -139,6 +210,6 @@ Use the **get** action with a broadcast ID to also retrieve delivery statistics 
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,8 +1,8 @@
-# Slates Specification for Klazify
+# Klazify API Integration
 
 ## Overview
 
-Klazify is a Content Classification API that turns any website, domain, IP address, or email into a complete company profile. It provides categories, brand logos, social media links, and structured business data in real time. Its classification taxonomy covers 620+ categories based on the IAB Content Taxonomy v3.
+Klazify turns websites, domains, IP addresses, and emails into categories, logos, social profiles, and company data. Available fields depend on the domain and subscription plan. Lookups use cached results by default; supported endpoints can request fresh data with refresh. Klazify category entries can include IAB V1 and V3 labels.
 
 ## Authentication
 
@@ -36,13 +36,13 @@ Provides a full company profile from any URL or email, including revenue, employ
 
 ### Logo Retrieval
 
-Retrieves any company's up-to-date logo in real time, returning results even for the newest and most obscure brands with a single API call.
+Retrieves the company logo found for a URL or domain, with optional refresh on paid plans.
 
 - Returns a URL to the logo image.
 
 ### Social Media Links
 
-Retrieves the list of social media channel links for a domain, providing updated social media links in real time.
+Retrieves the list of social media channel links for a domain, with optional refresh on paid plans.
 
 - Supported platforms include Facebook, Twitter, Instagram, Medium, YouTube, Pinterest, LinkedIn, and GitHub.
 
@@ -66,9 +66,19 @@ Allows checking if a domain is actually parked and/or for sale. Some parked doma
 
 The API returns domain registration information including domain age, registration date, expiration date, and days until expiration.
 
-### Batch Enrichment via CSV
+### IAB Labels and Category Lists
 
-Users can upload a CSV file containing URLs or email addresses to be enriched with Klazify data, requiring no development skills — simply upload the file and select the endpoint to use.
+Retrieve the IAB V1/V3 taxonomy labels attached to category entries, or list the complete Klazify V1/V2 category paths. IAB identifiers are dynamic fields within each category entry.
+
+### Domain Discovery
+
+Search domains by category, headquarters country, technology, employee range, global traffic rank, text, or domain suffix. Results include pagination and company/traffic summaries. Counts are approximate, and suffix filtering may return a lower-bound total.
+
+### Cache Refresh and Output Compatibility
+
+Company, technology, logo, social, similar-domain, registration, and IAB lookups expose an optional refresh flag for paid plans. The all-in-one categorization endpoint does not support refresh. Company revenue ranges are returned as revenueRange; numeric revenue values remain in revenue. Domain day counts retain their text output contract. Logos remain available through their hosted URL and as downloadable images.
+
+API reference: https://www.klazify.com/api-docs
 
 ## Events
 

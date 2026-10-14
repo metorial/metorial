@@ -67,7 +67,7 @@ export let addVisitor = SlateTool.create(spec, {
       username: z
         .string()
         .optional()
-        .describe('Username for the visitor (auto-generated if omitted)'),
+        .describe('Username for the internal visitor; required by the provider'),
       password: z
         .string()
         .optional()

@@ -1,7 +1,34 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
 
-let axiosInstance = createAxios({
-  baseURL: 'https://api.scrapingant.com/v2'
+let headerSchema = z.object({ name: z.string(), value: z.string() });
+let markdownResponseSchema = z.object({ url: z.string(), markdown: z.string() });
+let usageResponseSchema = z.object({
+  plan_name: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  plan_total_credits: z.number(),
+  remained_credits: z.number()
+});
+let extendedResponseSchema = z.object({
+  html: z.string(),
+  text: z.string(),
+  cookies: z.string(),
+  status_code: z.number(),
+  headers: z.array(headerSchema),
+  xhrs: z
+    .array(
+      z.object({
+        url: z.string(),
+        status: z.number(),
+        method: z.string(),
+        headers: z.union([z.array(headerSchema), z.record(z.string(), z.string())]),
+        request_body: z.string().nullish(),
+        body: z.string().nullish()
+      })
+    )
+    .nullish(),
+  iframes: z.array(z.object({ src: z.string(), html: z.string() })).nullish()
 });
 
 export type ProxyType = 'datacenter' | 'residential';
@@ -66,15 +93,71 @@ export interface UsageResponse {
 }
 
 export class Client {
-  private token: string;
+  private axios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A ScrapingAnt API key is required. Reconnect your account.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.scrapingant.com/v2',
+      authHeader: { name: 'x-api-key', value: config.token },
+      contentType: false,
+      timeout: 120000,
+      errorMapping: {
+        mapAxiosError: error => {
+          let data: unknown = error.response?.data;
+          if (typeof data === 'string') {
+            try {
+              data = JSON.parse(data);
+            } catch {
+              return undefined;
+            }
+          }
+          if (data && typeof data === 'object' && 'detail' in data) {
+            return typeof data.detail === 'string' ? { message: data.detail } : undefined;
+          }
+          return undefined;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ScrapingAnt',
+          reason: 'scrapingant_api_error'
+        })
+    });
   }
 
   private buildParams(options: ScrapeOptions): Record<string, string> {
+    let url: URL;
+    try {
+      url = new URL(options.url);
+    } catch {
+      throw createApiServiceError('url must be a valid HTTP or HTTPS URL.');
+    }
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw createApiServiceError('url must use HTTP or HTTPS.');
+    }
+    if (
+      options.timeout !== undefined &&
+      (!Number.isFinite(options.timeout) || options.timeout < 5 || options.timeout > 60)
+    ) {
+      throw createApiServiceError('timeout must be between 5 and 60 seconds.');
+    }
+    if (
+      options.browser === false &&
+      (options.jsSnippet ||
+        options.waitForSelector ||
+        options.returnPageSource ||
+        options.blockResources?.length)
+    ) {
+      throw createApiServiceError(
+        'JavaScript execution, selector waits, resource blocking, and page-source mode require browser=true. Enable the browser or omit those options.'
+      );
+    }
     let params: Record<string, string> = {
-      'x-api-key': this.token,
       url: options.url
     };
 
@@ -137,7 +220,7 @@ export class Client {
 
     let queryString = new URLSearchParams(params).toString() + blockResourceQuery;
 
-    let response = await axiosInstance.get(`/general?${queryString}`, {
+    let response = await this.axios.get(`/general?${queryString}`, {
       headers,
       responseType: 'text'
     });
@@ -152,11 +235,17 @@ export class Client {
 
     let queryString = new URLSearchParams(params).toString() + blockResourceQuery;
 
-    let response = await axiosInstance.get(`/markdown?${queryString}`, {
+    let response = await this.axios.get(`/markdown?${queryString}`, {
       headers
     });
 
-    let data = response.data as { url: string; markdown: string };
+    let result = markdownResponseSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError('ScrapingAnt returned an invalid Markdown response.', {
+        reason: 'invalid_scrapingant_response'
+      });
+    }
+    let data = result.data;
 
     return {
       url: data.url,
@@ -171,26 +260,17 @@ export class Client {
 
     let queryString = new URLSearchParams(params).toString() + blockResourceQuery;
 
-    let response = await axiosInstance.get(`/extended?${queryString}`, {
+    let response = await this.axios.get(`/extended?${queryString}`, {
       headers
     });
 
-    let data = response.data as {
-      html: string;
-      text: string;
-      cookies: string;
-      status_code: number;
-      headers: Array<{ name: string; value: string }>;
-      xhrs: Array<{
-        url: string;
-        status: number;
-        method: string;
-        headers: Record<string, string>;
-        request_body: string;
-        body: string;
-      }>;
-      iframes: Array<{ src: string; html: string }>;
-    };
+    let result = extendedResponseSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError('ScrapingAnt returned an invalid extended response.', {
+        reason: 'invalid_scrapingant_response'
+      });
+    }
+    let data = result.data;
 
     return {
       html: data.html,
@@ -202,9 +282,11 @@ export class Client {
         url: xhr.url,
         status: xhr.status,
         method: xhr.method,
-        headers: xhr.headers,
-        requestBody: xhr.request_body,
-        body: xhr.body
+        headers: Array.isArray(xhr.headers)
+          ? Object.fromEntries(xhr.headers.map(header => [header.name, header.value]))
+          : xhr.headers,
+        requestBody: xhr.request_body ?? '',
+        body: xhr.body ?? ''
       })),
       iframes: data.iframes || []
     };
@@ -213,6 +295,9 @@ export class Client {
   async extractData(
     options: ScrapeOptions & { extractProperties: string }
   ): Promise<Record<string, unknown>> {
+    if (!options.extractProperties.trim()) {
+      throw createApiServiceError('extractProperties must describe at least one data field.');
+    }
     let params = this.buildParams(options);
     params.extract_properties = options.extractProperties;
     let blockResourceQuery = this.buildBlockResourceParams(options.blockResources);
@@ -220,27 +305,32 @@ export class Client {
 
     let queryString = new URLSearchParams(params).toString() + blockResourceQuery;
 
-    let response = await axiosInstance.get(`/extract?${queryString}`, {
+    let response = await this.axios.get(`/extract?${queryString}`, {
       headers
     });
 
-    return response.data as Record<string, unknown>;
+    let result = z.record(z.string(), z.unknown()).safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError(
+        'ScrapingAnt returned an invalid data extraction response.',
+        {
+          reason: 'invalid_scrapingant_response'
+        }
+      );
+    }
+    return result.data;
   }
 
   async getUsage(): Promise<UsageResponse> {
-    let response = await axiosInstance.get('/usage', {
-      params: {
-        'x-api-key': this.token
-      }
-    });
+    let response = await this.axios.get('/usage');
 
-    let data = response.data as {
-      plan_name: string;
-      start_date: string;
-      end_date: string;
-      plan_total_credits: number;
-      remained_credits: number;
-    };
+    let result = usageResponseSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError('ScrapingAnt returned an invalid usage response.', {
+        reason: 'invalid_scrapingant_response'
+      });
+    }
+    let data = result.data;
 
     return {
       planName: data.plan_name,

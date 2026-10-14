@@ -113,7 +113,7 @@ export let updatePrintJob = SlateTool.create(spec, {
     }
 
     if (ctx.input.removeLettersContaining) {
-      params.remove_letters = { containing: ctx.input.removeLettersContaining };
+      params.remove_letters = { with_phrase: ctx.input.removeLettersContaining };
     }
 
     let result = await client.updatePrintJob(ctx.input.printJobId, params);

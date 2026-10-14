@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getNotificationMessage } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageDocument = SlateTool.create(spec, {
@@ -40,7 +40,7 @@ export let manageDocument = SlateTool.create(spec, {
     switch (action) {
       case 'reprocess': {
         let result = await client.reprocessDocument(documentId);
-        resultMessage = result.message || 'Document queued for reprocessing';
+        resultMessage = getNotificationMessage(result, 'Document queued for reprocessing');
         break;
       }
       case 'skip': {
@@ -50,10 +50,13 @@ export let manageDocument = SlateTool.create(spec, {
       }
       case 'copy': {
         if (!targetMailboxId) {
-          throw new Error('targetMailboxId is required for copy action');
+          throw createApiServiceError('targetMailboxId is required for copy action');
         }
         let result = await client.copyDocument(documentId, targetMailboxId);
-        resultMessage = result.message || `Document copied to mailbox ${targetMailboxId}`;
+        resultMessage = getNotificationMessage(
+          result,
+          `Document copy queued for mailbox ${targetMailboxId}`
+        );
         break;
       }
       case 'delete': {

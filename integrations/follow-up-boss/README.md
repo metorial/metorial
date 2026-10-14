@@ -1,6 +1,6 @@
 # Follow up Boss
 
-Manage contacts, leads, deals, and communications in a real estate CRM. Create, update, and search contacts with automatic deduplication. Ingest leads and events from IDX websites and lead sources. Track calls, emails, and text messages associated with contacts. Manage deals and pipelines with customizable stages. Create and assign tasks and appointments for follow-up. Enroll contacts in action plans and automations. Add notes with reactions and threaded replies for team collaboration. Manage email and text message templates. Handle team, user, and group management including round-robin lead distribution and shared lead pools. Configure custom fields, stages, and pipelines. Build custom inbox app integrations.
+Manage and search real estate CRM contacts, record lead events, track deals and pipelines, create follow-up tasks and appointments, add contact notes, and enroll contacts in action plans. Log phone calls and externally sent or received text messages. The text-message API records activity only and does not send SMS. Discover account users and retrieve the currently authenticated user's identity with `who_am_i`. Contact creation checks for an existing email or phone and returns a matching contact unchanged; use `send_event` for lead routing and automations.
 
 ## License
 

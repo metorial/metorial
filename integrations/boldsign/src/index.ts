@@ -2,10 +2,12 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   downloadDocument,
+  extendDocumentExpiry,
   getDocument,
   getEmbeddedSignLink,
   getTemplate,
   listBrands,
+  listContacts,
   listDocuments,
   listTemplates,
   listUsers,
@@ -24,8 +26,10 @@ export let provider = Slate.create({
     listTemplates,
     getTemplate,
     downloadDocument,
+    extendDocumentExpiry,
     getEmbeddedSignLink,
     listUsers,
+    listContacts,
     listBrands
   ],
   triggers: []

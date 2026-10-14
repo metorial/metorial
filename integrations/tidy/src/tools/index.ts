@@ -5,3 +5,4 @@ export * from './manage-address';
 export * from './manage-guest-reservation';
 export * from './manage-issue';
 export * from './manage-job';
+export * from './message-tidy';

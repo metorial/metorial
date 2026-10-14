@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { HelloLeadsClient } from '../lib/client';
+import { HelloLeadsClient, readHelloLeadsString } from '../lib/client';
 import { spec } from '../spec';
 
 export let createLead = SlateTool.create(spec, {
@@ -91,8 +91,13 @@ export let createLead = SlateTool.create(spec, {
       listKey: ctx.input.listKey
     });
 
-    let lead = result?.data ?? result?.lead ?? result ?? {};
-    let leadId = String(lead.lead_id ?? lead.id ?? '');
+    let leadId = readHelloLeadsString(result.lead_id ?? result.id);
+    if (!leadId?.trim()) {
+      throw createApiServiceError(
+        'HelloLeads did not return the created lead identifier. Check the lead in HelloLeads before retrying to avoid duplicates.',
+        { reason: 'helloleads_invalid_response' }
+      );
+    }
 
     return {
       output: {

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteAsset = SlateTool.create(spec, {
   name: 'Delete Asset',
   key: 'delete_asset',
-  description: `Permanently deletes an asset from MaintainX. This action cannot be undone.`,
+  description: `Permanently deletes an asset from MaintainX. This action cannot be undone. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let deleteAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       assetId: z.number().describe('ID of the asset to delete')
     })
   )
@@ -24,10 +26,7 @@ export let deleteAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     await client.deleteAsset(ctx.input.assetId);
 

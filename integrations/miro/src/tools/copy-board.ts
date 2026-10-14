@@ -39,7 +39,7 @@ export let copyBoard = SlateTool.create(spec, {
       output: {
         boardId: board.id,
         name: board.name,
-        viewLink: board.viewLink
+        viewLink: board.viewLink ?? undefined
       },
       message: `Copied board to **${board.name}** (ID: ${board.id}).${board.viewLink ? ` [Open board](${board.viewLink})` : ''}`
     };

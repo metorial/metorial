@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let assignTag = SlateTool.create(spec, {
   key: 'assign_tag',
   description: `Assign a tag to a task or remove a tag assignment. Use to categorize tasks with context labels.`,
   instructions: [
-    'To remove a tag from a task, provide the assignmentId from a previous tag assignment listing.',
+    'To remove a tag from a task, provide the assignmentId from list_tag_assignments.',
     'To add a tag, provide both tagId and taskId.'
   ],
   tags: {
@@ -42,7 +42,7 @@ export let assignTag = SlateTool.create(spec, {
 
     if (ctx.input.action === 'assign') {
       if (!ctx.input.tagId || !ctx.input.taskId) {
-        throw new Error('tagId and taskId are required when assigning a tag');
+        throw createApiServiceError('tagId and taskId are required when assigning a tag');
       }
 
       let assignment = await client.createTagAssignment({
@@ -60,7 +60,7 @@ export let assignTag = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.assignmentId) {
-        throw new Error('assignmentId is required when unassigning a tag');
+        throw createApiServiceError('assignmentId is required when unassigning a tag');
       }
 
       await client.deleteTagAssignment(ctx.input.assignmentId);

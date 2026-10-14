@@ -46,7 +46,7 @@ export let geoSearch = SlateTool.create(spec, {
       lng: ctx.input.lng
     });
 
-    let output: Record<string, unknown> = {
+    let output: { success: boolean; results?: unknown[]; suggestions?: string[] } = {
       success: result.success,
       results: result.results ?? result.data
     };
@@ -57,7 +57,7 @@ export let geoSearch = SlateTool.create(spec, {
     }
 
     return {
-      output: output as any,
+      output,
       message: `Geo search for **"${ctx.input.search}"** completed.${ctx.input.includeSuggestions ? ' Suggestions included.' : ''}`
     };
   })

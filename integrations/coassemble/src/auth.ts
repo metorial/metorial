@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -6,9 +6,32 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       userId: z.string().optional(),
-      authScheme: z.enum(['bearer', 'coassemble'])
+      authScheme: z.enum(['bearer', 'coassemble', 'workspace'])
     })
   )
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Workspace API Key',
+    key: 'workspace_api_key',
+    inputSchema: z.object({
+      token: z.string().describe('Full workspace API key: COASSEMBLE:<workspaceId>:<secret>')
+    }),
+    getOutput: async ctx => {
+      if (!/^COASSEMBLE:[^:\s]+:[^\s]+$/.test(ctx.input.token)) {
+        throw createApiServiceError(
+          'Enter the full workspace API key from your Coassemble API settings, including the COASSEMBLE: prefix. Do not add a Bearer prefix.'
+        );
+      }
+
+      return {
+        output: {
+          token: ctx.input.token,
+          userId: undefined,
+          authScheme: 'workspace' as const
+        }
+      };
+    }
+  })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Bearer Token',

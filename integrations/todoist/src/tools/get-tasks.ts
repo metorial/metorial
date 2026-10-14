@@ -36,9 +36,11 @@ let taskSchema = z.object({
     .nullable()
     .describe('Estimated duration'),
   assigneeId: z.string().nullable().describe('Assigned collaborator ID'),
-  commentCount: z.number().describe('Number of comments'),
+  commentCount: z
+    .number()
+    .describe('Legacy comment count; current API returns 0 when unavailable'),
   isCompleted: z.boolean().describe('Whether task is completed'),
-  createdAt: z.string().describe('Creation timestamp'),
+  createdAt: z.string().describe('Creation timestamp, or an empty string when unavailable'),
   url: z.string().describe('Task URL')
 });
 

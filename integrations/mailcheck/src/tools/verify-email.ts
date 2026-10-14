@@ -43,14 +43,23 @@ Emails with a trust rate of **0–49%** are considered risky and most likely inv
       email: z.string().describe('The verified email address'),
       trustRate: z
         .number()
+        .optional()
         .describe('Trust score from 0 to 100. 50–100 is valid, 0–49 is risky/invalid'),
-      mxExists: z.boolean().describe('Whether MX records exist for the email domain'),
-      smtpExists: z.boolean().describe('Whether the SMTP server exists and responds'),
+      mxExists: z
+        .boolean()
+        .optional()
+        .describe('Whether MX records exist for the email domain'),
+      smtpExists: z
+        .boolean()
+        .optional()
+        .describe('Whether the SMTP server exists and responds'),
       isNotSmtpCatchAll: z
         .boolean()
+        .optional()
         .describe('Whether the email is NOT on a catch-all SMTP server'),
       isNotDisposable: z
         .boolean()
+        .optional()
         .describe('Whether the email is NOT from a disposable email provider'),
       gravatar: z
         .object({
@@ -66,7 +75,13 @@ Emails with a trust rate of **0–49%** are considered risky and most likely inv
     let client = new Client({ token: ctx.auth.token });
     let result = await client.verifySingleEmail(ctx.input.email);
 
-    let status = result.trustRate >= 50 ? 'valid' : 'risky/invalid';
+    let status =
+      result.trustRate === undefined
+        ? 'unavailable'
+        : result.trustRate >= 50
+          ? 'valid'
+          : 'risky/invalid';
+    let trustScore = result.trustRate === undefined ? 'unavailable' : `${result.trustRate}%`;
 
     return {
       output: {
@@ -80,7 +95,7 @@ Emails with a trust rate of **0–49%** are considered risky and most likely inv
         githubUsername: result.githubUsername,
         facebook: result.facebook
       },
-      message: `Verified **${result.email}** — trust score: **${result.trustRate}%** (${status}). MX exists: ${result.mxExists}, SMTP exists: ${result.smtpExists}, not disposable: ${result.isNotDisposable}.`
+      message: `Verified **${result.email}** — trust score: **${trustScore}** (${status}). MX exists: ${result.mxExists ?? 'unavailable'}, SMTP exists: ${result.smtpExists ?? 'unavailable'}, not disposable: ${result.isNotDisposable ?? 'unavailable'}.`
     };
   })
   .build();

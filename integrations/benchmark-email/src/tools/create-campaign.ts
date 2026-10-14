@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,9 @@ export let createCampaign = SlateTool.create(spec, {
       data.HasWebpageVersion = ctx.input.webpageVersion ? '1' : '0';
 
     let result = await client.createCampaign(data);
-    let campaignId = String(result?.Data ?? '');
+    let campaignId = String(result?.Data?.ID ?? '');
+    if (!campaignId)
+      throw createApiServiceError('Benchmark Email did not return the created record ID.');
 
     return {
       output: { campaignId },

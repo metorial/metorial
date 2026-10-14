@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteProject = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ export let deleteProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the project to delete')
+      projectId: positiveIntegerSchema.describe('ID of the project to delete')
     })
   )
   .output(

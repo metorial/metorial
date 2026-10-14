@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let carrierResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   carrierName: z.string().optional().describe('Name of the carrier'),
   carrierId: z.string().optional().describe('Carrier ID'),
@@ -19,6 +20,7 @@ let carrierResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   carrierName: raw.carrier_name,
   carrierId: raw.carrier_id,

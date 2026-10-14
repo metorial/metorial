@@ -94,6 +94,8 @@ export let splittingSchema = z.object({
   phrase: z.string().optional().describe('Phrase to split on (for split_on_phrase method)'),
   pages: z
     .number()
+    .refine(Number.isSafeInteger, 'Use a whole number of pages')
+    .min(1)
     .optional()
     .describe('Number of pages per split (for split_on_pages method)')
 });
@@ -103,6 +105,10 @@ export let printingSchema = z.object({
     .enum(['no', 'yes', 'mixed'])
     .optional()
     .describe('Double-sided printing option'),
+  doubleSidedSpecificPages: z
+    .array(z.number().refine(Number.isSafeInteger, 'Use whole-number page indexes').min(0))
+    .optional()
+    .describe('Zero-based page indexes to print double-sided when doubleSided is mixed'),
   premiumQuality: z.boolean().optional().describe('Premium quality printing'),
   blackAndWhite: z.boolean().optional().describe('Black and white printing (letters only)'),
   mattFinish: z.boolean().optional().describe('Matt finish (postcards only)')
@@ -122,7 +128,12 @@ export let postageSchema = z.object({
     ])
     .optional()
     .describe('Preferred envelope/postcard size'),
-  mailDate: z.number().optional().describe('UNIX timestamp for scheduled send date')
+  mailDate: z
+    .number()
+    .refine(Number.isSafeInteger, 'Use a whole-number UNIX timestamp')
+    .min(0)
+    .optional()
+    .describe('UNIX timestamp for scheduled send date')
 });
 
 export let backgroundRefSchema = z.object({

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,10 +49,10 @@ Line items reference products with quantity, pricing, and up to four levels of d
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating a line item');
+        throw createApiServiceError('Fields are required for creating a line item');
       }
       if (!ctx.input.fields.salesOrderId) {
-        throw new Error('salesOrderId is required for creating a line item');
+        throw createApiServiceError('salesOrderId is required for creating a line item');
       }
       let result = await client.createSalesOrderLine(ctx.input.fields);
       let lineId = result?.id;
@@ -65,7 +65,7 @@ Line items reference products with quantity, pricing, and up to four levels of d
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.lineId) {
-        throw new Error('lineId is required for updating a line item');
+        throw createApiServiceError('lineId is required for updating a line item');
       }
       await client.updateSalesOrderLine(ctx.input.lineId, ctx.input.fields || {});
       let line = await client.getSalesOrderLine(ctx.input.lineId);
@@ -77,7 +77,7 @@ Line items reference products with quantity, pricing, and up to four levels of d
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.lineId) {
-        throw new Error('lineId is required for deleting a line item');
+        throw createApiServiceError('lineId is required for deleting a line item');
       }
       await client.deleteSalesOrderLine(ctx.input.lineId);
       return {
@@ -86,6 +86,6 @@ Line items reference products with quantity, pricing, and up to four levels of d
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

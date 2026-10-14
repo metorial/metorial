@@ -45,7 +45,25 @@ let responseItemSchema = z.object({
       contactUuid: z.string().describe('UUID of the responding contact'),
       remoteId: z.string().nullable().describe('External user ID'),
       email: z.string().nullable().describe('Email address'),
-      displayName: z.string().nullable().describe('Display name')
+      displayName: z.string().nullable().describe('Display name'),
+      attributes: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Contact traits when includeAttributes is true'),
+      account: z
+        .object({
+          accountUuid: z.string().nullable().describe('UUID of the associated account'),
+          remoteId: z.string().nullable().describe('External account ID'),
+          displayName: z.string().nullable().describe('Account display name'),
+          domain: z.string().nullable().describe('Account domain'),
+          attributes: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('Account traits when includeAttributes is true')
+        })
+        .nullable()
+        .optional()
+        .describe('Account associated with the responding contact')
     })
     .describe('Contact who submitted the response')
 });
@@ -138,7 +156,25 @@ export let listResponses = SlateTool.create(spec, {
         contactUuid: item.contact?.uuid ?? '',
         remoteId: item.contact?.remote_id ?? null,
         email: item.contact?.email ?? null,
-        displayName: item.contact?.display_name ?? null
+        displayName: item.contact?.display_name ?? null,
+        attributes: ctx.input.includeAttributes
+          ? Array.isArray(item.contact?.attributes)
+            ? {}
+            : (item.contact?.attributes ?? {})
+          : undefined,
+        account: item.contact?.account
+          ? {
+              accountUuid: item.contact.account.uuid ?? null,
+              remoteId: item.contact.account.remote_id ?? null,
+              displayName: item.contact.account.display_name ?? null,
+              domain: item.contact.account.domain ?? null,
+              attributes: ctx.input.includeAttributes
+                ? Array.isArray(item.contact.account.attributes)
+                  ? {}
+                  : (item.contact.account.attributes ?? {})
+                : undefined
+            }
+          : null
       }
     }));
 

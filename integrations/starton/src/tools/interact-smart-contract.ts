@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StartonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,11 @@ export let interactSmartContract = SlateTool.create(spec, {
         .describe(
           'Return value for read operations or transaction details for write operations'
         ),
-      transactionHash: z.string().optional().describe('Transaction hash for write operations')
+      transactionHash: z.string().optional().describe('Transaction hash for write operations'),
+      transactionId: z
+        .string()
+        .optional()
+        .describe('Starton transaction ID for tracking write operations with get_transactions')
     })
   )
   .handleInvocation(async ctx => {
@@ -75,7 +79,7 @@ export let interactSmartContract = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.signerWallet) {
-        throw new Error('signerWallet is required for write operations');
+        throw createApiServiceError('signerWallet is required for write operations');
       }
       let result = await client.callSmartContract({
         network: ctx.input.network,
@@ -93,9 +97,10 @@ export let interactSmartContract = SlateTool.create(spec, {
       return {
         output: {
           response: result,
-          transactionHash: txHash
+          transactionHash: txHash,
+          transactionId: result.id ?? result.transaction?.id ?? undefined
         },
-        message: `Called \`${ctx.input.functionName}\` on \`${ctx.input.contractAddress}\` (${ctx.input.network}). Transaction: \`${txHash}\``
+        message: `Submitted \`${ctx.input.functionName}\` on \`${ctx.input.contractAddress}\` (${ctx.input.network}). Transaction: \`${result.id || result.transaction?.id || txHash || 'pending'}\`.`
       };
     }
   })

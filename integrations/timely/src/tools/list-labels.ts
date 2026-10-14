@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let labelSchema = z.object({
@@ -15,11 +16,12 @@ let labelSchema = z.object({
 export let listLabels = SlateTool.create(spec, {
   name: 'List Labels',
   key: 'list_labels',
-  description: `Retrieve labels (tags) from Timely. Labels support a hierarchical parent/child structure and are used to classify work on time entries.`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve labels (tags) from Timely. Labels support a hierarchical parent/child structure and are used to classify work on time entries.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       limit: z.number().optional().describe('Max labels to return'),
       offset: z.number().optional().describe('Offset for pagination')
     })
@@ -31,10 +33,7 @@ export let listLabels = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let labels = await client.listLabels({
       limit: ctx.input.limit,

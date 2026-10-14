@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface LeadInput {
   profileUrl: string;
@@ -60,15 +60,17 @@ export interface UpdateWebhookParams {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.heyreach.io/api/public',
-      headers: {
-        'X-API-KEY': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'HeyReach',
+          reason: 'heyreach_api_error'
+        })
     });
   }
 
@@ -76,16 +78,16 @@ export class Client {
 
   async checkApiKey(): Promise<boolean> {
     let response = await this.http.get('/auth/CheckApiKey');
-    return response.data === true || response.data?.data === true;
+    return response.status >= 200 && response.status < 300;
   }
 
   // ============ Campaigns ============
 
   async getAllCampaigns(params?: GetCampaignsParams): Promise<any> {
     let response = await this.http.post('/campaign/GetAll', {
-      keyword: params?.keyword,
-      statuses: params?.statuses,
-      accountIds: params?.accountIds,
+      keyword: params?.keyword ?? '',
+      statuses: params?.statuses ?? [],
+      accountIds: params?.accountIds ?? [],
       limit: params?.limit ?? 50,
       offset: params?.offset ?? 0
     });
@@ -118,21 +120,25 @@ export class Client {
   async addLeadsToCampaign(
     campaignId: number,
     leads: LeadInput[],
-    linkedInAccountId?: number
+    linkedInAccountId?: number,
+    resumeFinishedCampaign = true,
+    resumePausedCampaign = true
   ): Promise<any> {
-    let body: Record<string, unknown> = {
+    let body = {
       campaignId,
-      leads
+      accountLeadPairs: leads.map(lead => ({
+        lead,
+        ...(linkedInAccountId === undefined ? {} : { linkedInAccountId })
+      })),
+      resumeFinishedCampaign,
+      resumePausedCampaign
     };
-    if (linkedInAccountId !== undefined) {
-      body.linkedInAccountId = linkedInAccountId;
-    }
     let response = await this.http.post('/campaign/AddLeadsToCampaign', body);
     return response.data;
   }
 
   async addLeadsToList(listId: number, leads: LeadInput[]): Promise<any> {
-    let response = await this.http.post('/lead/AddLeadsToListV2', {
+    let response = await this.http.post('/list/AddLeadsToListV2', {
       listId,
       leads
     });
@@ -140,20 +146,37 @@ export class Client {
   }
 
   async getLeadDetails(profileUrl: string): Promise<any> {
-    let response = await this.http.get('/lead/GetLeadDetails', {
-      params: { profileUrl }
-    });
+    let response = await this.http.post('/lead/GetLead', { profileUrl });
     return response.data;
   }
 
   async getLeadsFromList(params: GetLeadsFromListParams): Promise<any> {
-    let response = await this.http.post('/lead/GetAll', {
+    let response = await this.http.post('/list/GetLeadsFromList', {
       listId: params.listId,
       limit: params.limit ?? 50,
       offset: params.offset ?? 0,
-      keyword: params.keyword,
+      keyword: params.keyword ?? '',
       createdFrom: params.createdFrom,
       createdTo: params.createdTo
+    });
+    return response.data;
+  }
+
+  async stopLeadInCampaign(
+    campaignId: number,
+    leadMemberId: string,
+    leadUrl: string
+  ): Promise<void> {
+    await this.http.post('/campaign/StopLeadInCampaign', {
+      campaignId,
+      leadMemberId,
+      leadUrl
+    });
+  }
+
+  async deleteLeadsFromList(listId: number, profileUrls: string[]): Promise<any> {
+    let response = await this.http.delete('/list/DeleteLeadsFromListByProfileUrl', {
+      data: { listId, profileUrls }
     });
     return response.data;
   }
@@ -179,7 +202,7 @@ export class Client {
   // ============ Conversations ============
 
   async getConversations(params?: GetConversationsParams): Promise<any> {
-    let response = await this.http.post('/conversation/GetConversationsV2', {
+    let response = await this.http.post('/inbox/GetConversationsV2', {
       limit: params?.limit ?? 50,
       offset: params?.offset ?? 0,
       filters: params?.filters ?? {}
@@ -190,14 +213,14 @@ export class Client {
   async sendMessage(
     conversationId: string,
     accountId: number,
-    senderId: string,
-    message: string
+    message: string,
+    subject = ''
   ): Promise<any> {
-    let response = await this.http.post('/conversation/SendMessage', {
+    let response = await this.http.post('/inbox/SendMessage', {
       conversationId,
-      accountId,
-      senderId,
-      message
+      linkedInAccountId: accountId,
+      message,
+      subject
     });
     return response.data;
   }
@@ -212,7 +235,7 @@ export class Client {
     let response = await this.http.post('/li_account/GetAll', {
       limit: limit ?? 50,
       offset: offset ?? 0,
-      keyword
+      keyword: keyword ?? ''
     });
     return response.data;
   }
@@ -228,10 +251,10 @@ export class Client {
 
   async getOverallStats(params?: GetStatsParams): Promise<any> {
     let response = await this.http.post('/stats/GetOverallStats', {
-      dateFrom: params?.dateFrom,
-      dateTo: params?.dateTo,
-      accountIds: params?.accountIds,
-      campaignIds: params?.campaignIds
+      startDate: params?.dateFrom,
+      endDate: params?.dateTo,
+      accountIds: params?.accountIds ?? [],
+      campaignIds: params?.campaignIds ?? []
     });
     return response.data;
   }

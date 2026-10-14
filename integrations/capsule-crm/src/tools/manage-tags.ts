@@ -20,7 +20,20 @@ export let manageTags = SlateTool.create(spec, {
         .describe('Entity type the tag applies to'),
       tagId: z.number().optional().describe('Tag ID (required for update and delete)'),
       name: z.string().optional().describe('Tag name (required for create and update)'),
-      dataTag: z.boolean().optional().describe('Whether this is a data tag (for create)')
+      dataTag: z.boolean().optional().describe('Whether this is a data tag (for create)'),
+      page: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Page number for list (default: 1)'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page for list (default: 50)')
     })
   )
   .output(
@@ -62,7 +75,10 @@ export let manageTags = SlateTool.create(spec, {
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.listTags(ctx.input.entityType);
+      let result = await client.listTags(ctx.input.entityType, {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage
+      });
       let tags = (result.tags || []).map((t: any) => ({
         tagId: t.id,
         name: t.name,

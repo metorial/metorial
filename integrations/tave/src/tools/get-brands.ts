@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TavePublicClient } from '../lib/client';
+import { TavePublicClient, textField } from '../lib/client';
 import { spec } from '../spec';
 
 let brandSchema = z.object({
@@ -25,17 +25,15 @@ export let getBrands = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TavePublicClient(ctx.auth.token);
+    let client = new TavePublicClient(ctx.auth);
 
     ctx.info('Fetching brands from Tave');
 
     let result = await client.listBrands();
 
-    let items = Array.isArray(result) ? result : (result?.data ?? result?.brands ?? []);
-
-    let brands = items.map((b: any) => ({
-      brandId: String(b.id ?? b.brand_id ?? ''),
-      name: b.name ?? b.title ?? '',
+    let brands = result.map(b => ({
+      brandId: String(b.id ?? ''),
+      name: textField(b, 'name', 'title') ?? '',
       raw: b
     }));
 

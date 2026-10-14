@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BackendlessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,18 @@ export let manageCache = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.operation === 'put' && ctx.input.cacheValue === undefined) {
+      throw createApiServiceError('Provide cacheValue for the put operation.');
+    }
+    if (
+      ctx.input.operation === 'put' &&
+      ctx.input.ttlSeconds !== undefined &&
+      (!Number.isInteger(ctx.input.ttlSeconds) ||
+        ctx.input.ttlSeconds < 1 ||
+        ctx.input.ttlSeconds > 7200)
+    ) {
+      throw createApiServiceError('ttlSeconds must be an integer from 1 to 7200.');
+    }
     let client = new BackendlessClient({
       applicationId: ctx.auth.applicationId,
       token: ctx.auth.token,

@@ -8,7 +8,7 @@ export let getSubmissions = SlateTool.create(spec, {
   key: 'get_submissions',
   description: `Retrieve and search through form submissions for a specific form. Supports pagination, keyword search filtering, timezone formatting, and optionally includes file attachment URLs.
 
-Returns submission data including block content, status, dates, and pagination metadata.`,
+Returns submission data including block content, status, dates, and pagination metadata. Use the string id field as the authoritative submission identifier; submissionId is only available for legacy numeric identifiers.`,
   constraints: [
     'Page size is limited to 1-100 results.',
     'Requires an API key for the new Forminit API (v2). Legacy API (v1) uses a form-specific token.'
@@ -58,11 +58,21 @@ Returns submission data including block content, status, dates, and pagination m
       submissions: z
         .array(
           z.object({
-            submissionId: z.number().describe('Numeric ID of the submission.'),
+            id: z
+              .string()
+              .describe('Authoritative submission identifier returned by the API.'),
+            submissionId: z
+              .number()
+              .optional()
+              .describe('Legacy numeric submission ID, when the API returns a number.'),
             submissionDate: z
               .string()
               .describe('Timestamp of when the submission was received.'),
             status: z.string().describe('Submission status (e.g., "active").'),
+            active: z
+              .boolean()
+              .optional()
+              .describe('Whether the submission is active, when provided by the API.'),
             submissionStatus: z.string().describe('Workflow status (e.g., "open").'),
             blocks: z
               .record(z.string(), z.unknown())

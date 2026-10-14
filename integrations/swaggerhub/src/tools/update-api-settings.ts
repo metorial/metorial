@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,9 +52,26 @@ export let updateApiSettings = SlateTool.create(spec, {
 
     let owner = ctx.input.owner || ctx.config.owner;
     if (!owner)
-      throw new Error(
+      throw createApiServiceError(
         'Owner is required. Provide it in the input or configure a default owner.'
       );
+
+    if (
+      (ctx.input.published !== undefined || ctx.input.isPrivate !== undefined) &&
+      !ctx.input.version
+    ) {
+      throw createApiServiceError(
+        'Version is required to change published status or visibility.'
+      );
+    }
+    if (
+      ctx.input.newName !== undefined &&
+      (ctx.input.newName.length < 3 || ctx.input.newName.length > 60)
+    ) {
+      throw createApiServiceError(
+        'The new API name must contain between 3 and 60 characters.'
+      );
+    }
 
     let updatedSettings: string[] = [];
     let apiName = ctx.input.apiName;
@@ -66,7 +83,7 @@ export let updateApiSettings = SlateTool.create(spec, {
 
     if (ctx.input.published !== undefined) {
       if (!ctx.input.version)
-        throw new Error('Version is required to change published status.');
+        throw createApiServiceError('Version is required to change published status.');
       await client.setApiVersionLifecycle(
         owner,
         apiName,
@@ -77,7 +94,8 @@ export let updateApiSettings = SlateTool.create(spec, {
     }
 
     if (ctx.input.isPrivate !== undefined) {
-      if (!ctx.input.version) throw new Error('Version is required to change visibility.');
+      if (!ctx.input.version)
+        throw createApiServiceError('Version is required to change visibility.');
       await client.setApiVersionVisibility(
         owner,
         apiName,

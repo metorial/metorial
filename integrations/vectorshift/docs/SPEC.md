@@ -1,4 +1,4 @@
-Now let me check for webhook/event support and the transformations feature:# Slates Specification for Vectorshift
+# VectorShift API Integration
 
 ## Overview
 
@@ -31,7 +31,7 @@ curl --request GET \
   --header 'Authorization: Bearer <your_api_key>'
 ```
 
-There are no OAuth flows, scopes, or additional credentials required. A single API key grants access to all API endpoints associated with the user's account.
+There are no OAuth flows, scopes, or additional credentials required. The API key is used for resources available to its owner.
 
 ## Features
 
@@ -40,7 +40,7 @@ There are no OAuth flows, scopes, or additional credentials required. A single A
 Pipelines are the heart of VectorShift. A pipeline is a visual workflow where you connect modular components (nodes) to process data and execute tasks. Through the API, you can:
 
 - **Run pipelines** individually or in bulk by providing input data as key-value pairs.
-- **Create, fetch, list, and delete** pipelines programmatically.
+- **Create, fetch, list, and delete** pipelines programmatically. Pipeline creation accepts a name and optional description and returns a pipeline ID.
 - **Control execution** by terminating, pausing, or resuming active pipeline runs.
 
 ### Knowledge Base Management
@@ -58,9 +58,9 @@ Knowledge bases allow AI workflows to leverage your data (e.g., files, documents
 You can prototype, customize, and deploy a customer-facing chatbot in minutes. Use cases include customer support, onboarding flows, lead collection, and advisory. Through the API, you can:
 
 - **Run chatbot conversations** programmatically without a UI.
-- **Upload files** to a chatbot session for context.
+- **Upload files** to a chatbot session for context using base64-encoded bytes. The result includes the conversation ID, knowledge base ID, uploaded file identifiers, and any per-file errors.
 - **Terminate** active chatbot sessions.
-- **Create, fetch, list, and delete** chatbots.
+- **Create, fetch, list, and delete** chatbots. The REST reference marks input and output specifications as required; provide them when creating a chatbot. The existing tool fields remain optional for compatibility. Deployment, access, Twilio, and Slack configuration objects can be provided as optional tool fields.
 
 ### Transformations
 
@@ -69,6 +69,12 @@ Transformations allow you to run arbitrary code in VectorShift's isolated execut
 - **Run transformations** with specified inputs and receive computed results.
 - **Create, fetch, list, and delete** transformations.
 
-## Events
+## REST API Reference
 
-The VectorShift API does not natively support webhooks or event subscription mechanisms. The platform's trigger and automation system (e.g., email triggers, Slack message triggers, scheduled runs) is configured through the no-code platform UI or SDK, but is not exposed as a webhook/event subscription API for external consumers to register callbacks against.
+- [API overview and API keys](https://docs.vectorshift.ai/api-reference/overview)
+- [Create a pipeline](https://docs.vectorshift.ai/api-reference/pipelines/create)
+- [Index knowledge-base data](https://docs.vectorshift.ai/api-reference/knowledge-bases)
+- [Create a chatbot](https://docs.vectorshift.ai/api-reference/chatbots/create)
+- [Upload chatbot files](https://docs.vectorshift.ai/api-reference/chatbots/upload)
+
+The official REST documentation labels the API as beta. Error responses and endpoint behavior may change. HTTP failures and provider responses with `status: failed` are reported as failures.

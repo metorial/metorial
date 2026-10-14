@@ -1,16 +1,38 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let axios = createAxios({
-  baseURL: 'https://api.miro.com'
+let axios = createAuthenticatedAxios({
+  baseURL: 'https://api.miro.com',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Miro',
+      reason: 'miro_oauth_error',
+      operation: 'OAuth request'
+    })
 });
+
+type MiroAuthOutput = {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  userId?: string;
+  teamId?: string;
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      userId: z.string().optional(),
+      teamId: z.string().optional()
     })
   )
   .addOauth({
@@ -40,36 +62,6 @@ export let auth = SlateAuth.create()
         title: 'Write Boards',
         description: 'Create, update, or delete boards, board members, or items',
         scope: 'boards:write'
-      },
-      {
-        title: 'Read Audit Logs',
-        description: 'Read audit logs (Enterprise only)',
-        scope: 'auditlogs:read'
-      },
-      {
-        title: 'Read Organizations',
-        description: 'Retrieve organization information (Enterprise only)',
-        scope: 'organizations:read'
-      },
-      {
-        title: 'Read Org Teams',
-        description: 'Retrieve team info for an organization (Enterprise only)',
-        scope: 'organizations:teams:read'
-      },
-      {
-        title: 'Write Org Teams',
-        description: 'Create and manage teams for an organization (Enterprise only)',
-        scope: 'organizations:teams:write'
-      },
-      {
-        title: 'Read Projects',
-        description: 'Retrieve project information',
-        scope: 'projects:read'
-      },
-      {
-        title: 'Write Projects',
-        description: 'Create or manage projects',
-        scope: 'projects:write'
       }
     ],
 
@@ -101,25 +93,28 @@ export let auth = SlateAuth.create()
       });
 
       let data = response.data;
-      let output: { token: string; refreshToken?: string; expiresAt?: string } = {
-        token: data.access_token
+      return {
+        output: {
+          ...normalizeOAuthTokenResponse(data, {
+            providerLabel: 'Miro',
+            operation: 'authorization'
+          }),
+          userId: data.user_id?.toString(),
+          teamId: data.team_id?.toString()
+        }
       };
-
-      if (data.refresh_token) {
-        output.refreshToken = data.refresh_token;
-      }
-
-      if (data.expires_in) {
-        let expiresAt = new Date(Date.now() + data.expires_in * 1000);
-        output.expiresAt = expiresAt.toISOString();
-      }
-
-      return { output };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: MiroAuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        if (!ctx.output.expiresAt) return { output: ctx.output };
+        throw createApiServiceError(
+          'The Miro connection has an expiring token but no refresh token. Reconnect your account.'
+        );
       }
 
       let response = await axios.post('/v1/oauth/token', null, {
@@ -132,25 +127,22 @@ export let auth = SlateAuth.create()
       });
 
       let data = response.data;
-      let output: { token: string; refreshToken?: string; expiresAt?: string } = {
-        token: data.access_token
+      return {
+        output: {
+          ...ctx.output,
+          ...normalizeOAuthTokenResponse(data, {
+            providerLabel: 'Miro',
+            operation: 'refresh',
+            previousRefreshToken: ctx.output.refreshToken,
+            required: Boolean(ctx.output.expiresAt)
+          }),
+          userId: data.user_id?.toString() ?? ctx.output.userId,
+          teamId: data.team_id?.toString() ?? ctx.output.teamId
+        }
       };
-
-      if (data.refresh_token) {
-        output.refreshToken = data.refresh_token;
-      }
-
-      if (data.expires_in) {
-        let expiresAt = new Date(Date.now() + data.expires_in * 1000);
-        output.expiresAt = expiresAt.toISOString();
-      }
-
-      return { output };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-    }) => {
+    getProfile: async (ctx: { output: MiroAuthOutput }) => {
       let response = await axios.get('/v1/oauth-token', {
         headers: {
           Authorization: `Bearer ${ctx.output.token}`
@@ -161,10 +153,10 @@ export let auth = SlateAuth.create()
       let user = data.user || {};
       return {
         profile: {
-          id: user.id?.toString(),
-          name: user.name,
-          teamId: data.team?.id?.toString(),
-          teamName: data.team?.name
+          id: user.id?.toString() ?? ctx.output.userId,
+          name: user.name ?? undefined,
+          teamId: data.team?.id?.toString() ?? ctx.output.teamId,
+          teamName: data.team?.name ?? undefined
         }
       };
     }

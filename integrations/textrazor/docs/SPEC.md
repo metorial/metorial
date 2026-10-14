@@ -1,4 +1,4 @@
-Now let me get more details on the specific features like custom entity dictionaries, classifiers, and the account management API.# Slates Specification for TextRazor
+# TextRazor API Specification
 
 ## Overview
 

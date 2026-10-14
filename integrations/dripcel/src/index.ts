@@ -3,11 +3,13 @@ import { spec } from './spec';
 import {
   bulkUpdateContacts,
   checkCompliance,
+  createExchangeTransactions,
   deleteContact,
   getContact,
   getCreditBalance,
   getDeliveries,
   listCampaigns,
+  listCampaignsV2,
   listEmailTemplates,
   manageExchangeTransactions,
   manageTags,
@@ -33,6 +35,7 @@ export let provider = Slate.create({
     sendBulkEmail,
     listEmailTemplates,
     listCampaigns,
+    listCampaignsV2,
     getDeliveries,
     searchSendLogs,
     searchReplies,
@@ -40,6 +43,7 @@ export let provider = Slate.create({
     manageTags,
     checkCompliance,
     manageExchangeTransactions,
+    createExchangeTransactions,
     getCreditBalance
   ],
   triggers: []

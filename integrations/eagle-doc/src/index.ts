@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   checkBatchTask,
   checkUsage,
+  classifyDocument,
+  deleteBatchTask,
   extractSignatures,
   processAnyDocument,
   processFinanceDocument,
@@ -14,6 +16,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    classifyDocument,
+    deleteBatchTask,
     processFinanceDocument,
     processAnyDocument,
     extractSignatures,

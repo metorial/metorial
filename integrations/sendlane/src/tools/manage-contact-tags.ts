@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendlaneClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageContactTags = SlateTool.create(spec, {
   description: `Add or remove tags from a contact. Tags are labels that help you segment contacts based on interests, activity, and behavior. Use the **add** action to assign tags and **remove** to unassign them.`,
   instructions: [
     'Use the "add" action to assign one or more tags to a contact.',
-    'Use the "remove" action to unassign a single tag from a contact.'
+    'Use the "remove" action to unassign all provided tags from a contact.'
   ]
 })
   .input(
@@ -18,7 +18,7 @@ export let manageContactTags = SlateTool.create(spec, {
       action: z.enum(['add', 'remove']).describe('Whether to add or remove tags'),
       tagIds: z
         .array(z.number())
-        .describe('Tag IDs to add or remove. When removing, only the first tag ID is used.')
+        .describe('Tag IDs to add or remove. Call list_tags to discover tag IDs.')
     })
   )
   .output(
@@ -35,6 +35,9 @@ export let manageContactTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.tagIds.length === 0) {
+      throw createApiServiceError('Provide at least one tag ID to add or remove.');
+    }
     let client = new SendlaneClient(ctx.auth.token);
 
     if (ctx.input.action === 'add') {

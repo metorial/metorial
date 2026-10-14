@@ -1,10 +1,10 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class XForceClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; password: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.xforce.ibmcloud.com',
       auth: {
         username: config.token,
@@ -12,7 +12,12 @@ export class XForceClient {
       },
       headers: {
         Accept: 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'IBM X-Force Exchange',
+          reason: 'ibm_x_force_exchange_api_error'
+        })
     });
   }
 
@@ -70,13 +75,21 @@ export class XForceClient {
   // ---- Vulnerabilities ----
 
   async getVulnerabilityByXfid(xfid: string): Promise<any> {
-    let res = await this.http.get(`/vulnerabilities/${encodeURIComponent(xfid)}`);
+    let path = /^\d+$/.test(xfid)
+      ? '/vulnerabilities/'
+      : /^MS\d{2}-\d+$/i.test(xfid)
+        ? '/vulnerabilities/msid/'
+        : '/vulnerabilities/search/';
+    let res = await this.http.get(`${path}${encodeURIComponent(xfid)}`);
     return res.data;
   }
 
-  async searchVulnerabilities(query: string): Promise<any> {
+  async searchVulnerabilities(
+    query: string,
+    options?: { startDate?: string; endDate?: string; bookmark?: string }
+  ): Promise<any> {
     let res = await this.http.get(`/vulnerabilities/fulltext`, {
-      params: { q: query }
+      params: { q: query, ...options }
     });
     return res.data;
   }
@@ -84,13 +97,15 @@ export class XForceClient {
   async getRecentVulnerabilities(
     startDate?: string,
     endDate?: string,
-    limit?: number
+    limit?: number,
+    skip?: number
   ): Promise<any> {
     let params: Record<string, string | number> = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     if (limit) params.limit = limit;
-    let res = await this.http.get(`/vulnerabilities`, { params });
+    if (skip !== undefined) params.skip = skip;
+    let res = await this.http.get(`/vulnerabilities/`, { params });
     return res.data;
   }
 
@@ -108,8 +123,11 @@ export class XForceClient {
 
   // ---- Collections (Case Files) ----
 
-  async searchCollections(query: string): Promise<any> {
-    let res = await this.http.get(`/casefiles/fulltext`, {
+  async searchCollections(
+    query: string,
+    scope: 'private' | 'public' = 'private'
+  ): Promise<any> {
+    let res = await this.http.get(`/casefiles/${scope}/fulltext`, {
       params: { q: query }
     });
     return res.data;
@@ -153,7 +171,7 @@ export class XForceClient {
   }
 
   async searchAppProfiles(query: string): Promise<any> {
-    let res = await this.http.get(`/app/fulltext`, {
+    let res = await this.http.get(`/apps/fulltext`, {
       params: { q: query }
     });
     return res.data;
@@ -166,25 +184,50 @@ export class XForceClient {
     startDate?: string;
     endDate?: string;
     limit?: number;
+    skip?: number;
   }): Promise<any> {
+    let typeAliases: Record<string, string> = {
+      threat_analysis: 'threatanalysis',
+      threatanalysis: 'threatanalysis',
+      osint: 'osintadvisory',
+      osintadvisory: 'osintadvisory',
+      malware: 'malware',
+      industry: 'industry',
+      threat_group: 'threatgroup',
+      threatgroup: 'threatgroup'
+    };
+    let requestedType = params?.type ?? 'threatanalysis';
+    let type = Object.hasOwn(typeAliases, requestedType)
+      ? typeAliases[requestedType]
+      : undefined;
+    if (!type) {
+      throw createApiServiceError(
+        'reportType must be threatanalysis, osintadvisory, malware, industry, or threatgroup.'
+      );
+    }
     let queryParams: Record<string, string | number> = {};
-    if (params?.type) queryParams.type = params.type;
-    if (params?.startDate) queryParams.startDate = params.startDate;
-    if (params?.endDate) queryParams.endDate = params.endDate;
+    if (params?.startDate) queryParams.added_after = params.startDate;
+    if (params?.endDate) queryParams.added_before = params.endDate;
     if (params?.limit) queryParams.limit = params.limit;
-    let res = await this.http.get(`/report`, { params: queryParams });
+    if (params?.skip !== undefined) queryParams.skip = params.skip;
+    let res = await this.http.get(`/reports/${type}`, { params: queryParams });
     return res.data;
   }
 
   async getThreatReport(reportId: string): Promise<any> {
-    let res = await this.http.get(`/report/${encodeURIComponent(reportId)}`);
+    let res = await this.http.get(`/report/details/${encodeURIComponent(reportId)}`);
     return res.data;
   }
 
   // ---- API Usage ----
 
   async getApiUsage(): Promise<any> {
-    let res = await this.http.get(`/api/usage`);
+    let res = await this.http.get(`/all-subscriptions/usage`);
+    return res.data;
+  }
+
+  async getUserProfile(): Promise<any> {
+    let res = await this.http.get('/user/profile');
     return res.data;
   }
 }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,11 +8,14 @@ export let manageTeamAgents = SlateTool.create(spec, {
   key: 'manage_team_agents',
   description: `List, assign, remove, or update agents within a team. Use the **action** parameter to specify the operation:
 - **list** — List all agents currently assigned to the team.
-- **assign** — Assign one or more agents to the team.
+- **assign** — Set the team's complete agent list; existing assignments not in agentIds are removed.
 - **remove** — Remove an agent from the team.
 - **update** — Update an agent's priority and lead cap within the team.`,
+  instructions: [
+    'Use list before assign to retain existing agents. The assign action replaces the team agent list.'
+  ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -67,8 +70,8 @@ export let manageTeamAgents = SlateTool.create(spec, {
       let agents = agentsArray.map((agent: any) => ({
         agentId: String(agent.id),
         name: agent.name ?? `${agent.fname ?? ''} ${agent.lname ?? ''}`.trim(),
-        priority: agent.priority,
-        cap: agent.cap
+        priority: agent.priority ?? undefined,
+        cap: agent.cap ?? undefined
       }));
 
       return {
@@ -78,6 +81,11 @@ export let manageTeamAgents = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'assign') {
+      if (!ctx.input.agentIds || ctx.input.agentIds.some(id => !id.trim())) {
+        throw createApiServiceError(
+          'Provide agentIds for the assign action. Use an empty array to clear the team.'
+        );
+      }
       await client.assignAgentsToTeam(ctx.input.teamId, ctx.input.agentIds!);
       return {
         output: { success: true },
@@ -85,6 +93,9 @@ export let manageTeamAgents = SlateTool.create(spec, {
       };
     }
 
+    if (!ctx.input.agentId?.trim()) {
+      throw createApiServiceError(`Provide agentId for the ${ctx.input.action} action.`);
+    }
     if (ctx.input.action === 'remove') {
       await client.removeAgentFromTeam(ctx.input.teamId, ctx.input.agentId!);
       return {

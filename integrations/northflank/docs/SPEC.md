@@ -1,6 +1,4 @@
-Now let me get more details on the API reference categories and webhook event types:Now I have enough information to write the specification.
-
-# Slates Specification for Northflank
+# Northflank API Specification
 
 ## Overview
 

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { TaskRunResult } from '../lib/client';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -66,7 +67,7 @@ Use the run ID returned by the **Deep Research** tool.`,
 
     let run = await client.getTaskRun(ctx.input.runId);
 
-    let result: any = null;
+    let result: TaskRunResult | null = null;
     if (ctx.input.includeResult && run.status === 'completed') {
       result = await client.getTaskRunResult(ctx.input.runId);
     } else if (ctx.input.includeResult && run.isActive) {

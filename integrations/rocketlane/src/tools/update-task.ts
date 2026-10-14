@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,12 @@ export let updateTask = SlateTool.create(spec, {
       effort: z.number().optional().describe('Estimated effort in minutes'),
       progress: z.number().optional().describe('Task progress percentage (0-100)'),
       description: z.string().optional().describe('New task description'),
-      status: z.string().optional().describe('New task status'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Numeric task status option ID as a string. Call list_custom_fields with entityType task for status options.'
+        ),
       priority: z.string().optional().describe('New task priority'),
       atRisk: z.boolean().optional().describe('Whether the task is at risk'),
       fields: z
@@ -57,6 +62,9 @@ export let updateTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.movePosition !== undefined && ctx.input.moveToPhaseId === undefined) {
+      throw createApiServiceError('Provide moveToPhaseId when specifying movePosition.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.updateTask(ctx.input.taskId, {
@@ -75,7 +83,7 @@ export let updateTask = SlateTool.create(spec, {
     });
 
     if (ctx.input.moveToPhaseId) {
-      await client.moveTask(ctx.input.taskId, {
+      result = await client.moveTask(ctx.input.taskId, {
         phaseId: ctx.input.moveToPhaseId,
         position: ctx.input.movePosition
       });

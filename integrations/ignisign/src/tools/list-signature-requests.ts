@@ -13,7 +13,7 @@ export let listSignatureRequests = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (0-based)')
+      page: z.number().optional().describe('Page number for pagination (1-based)')
     })
   )
   .output(
@@ -26,22 +26,22 @@ export let listSignatureRequests = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
-    let result = await client.listSignatureRequests(ctx.input.page);
+    let result = await client.listSignatureRequests(ctx.input.page ?? 1);
 
     let requests = Array.isArray(result)
       ? result
       : result.signatureRequests || result.items || [];
-    let totalCount = result.total || result.totalCount;
+    let totalCount = result.paginationData?.total ?? result.total ?? result.totalCount;
 
     return {
       output: {
         signatureRequests: requests,
         totalCount,
-        currentPage: ctx.input.page || 0
+        currentPage: result.paginationData?.page ?? ctx.input.page ?? 1
       },
       message: `Found **${requests.length}** signature request(s)${totalCount ? ` out of ${totalCount} total` : ''}.`
     };

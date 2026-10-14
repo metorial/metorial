@@ -15,7 +15,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'DNSFilter API token (JWT). Generate from DNSFilter Dashboard > Account Icon > API Keys.'
+          'DNSFilter API token (JWT). Generate from DNSFilter Dashboard > Account Settings > Security > API Keys.'
         )
     }),
     getOutput: async ctx => {

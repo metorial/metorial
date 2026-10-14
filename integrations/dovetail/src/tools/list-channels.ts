@@ -21,7 +21,12 @@ export let listChannels = SlateTool.create(spec, {
         ),
       folderId: z.string().optional().describe('Filter by folder ID'),
       sort: z.enum(['created_at:asc', 'created_at:desc']).optional().describe('Sort order'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor')
     })
   )

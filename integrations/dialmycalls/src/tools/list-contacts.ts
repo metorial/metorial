@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactOutputSchema, formatContact } from '../lib/contact';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -20,24 +21,7 @@ export let listContacts = SlateTool.create(spec, {
       range: z.string().optional().describe('Pagination range, e.g. "records=201-300"')
     })
   )
-  .output(
-    z.object({
-      contacts: z.array(
-        z.object({
-          contactId: z.string().optional(),
-          firstName: z.string().optional(),
-          lastName: z.string().optional(),
-          phone: z.string().optional(),
-          extension: z.string().optional(),
-          email: z.string().optional(),
-          extraData: z.string().optional(),
-          groups: z.string().optional(),
-          createdAt: z.string().optional(),
-          updatedAt: z.string().optional()
-        })
-      )
-    })
-  )
+  .output(z.object({ contacts: z.array(contactOutputSchema) }))
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -45,18 +29,7 @@ export let listContacts = SlateTool.create(spec, {
       ? await client.listContactsByGroup(ctx.input.groupId, ctx.input.range)
       : await client.listContacts(ctx.input.range);
 
-    let contacts = rawContacts.map(c => ({
-      contactId: c.id,
-      firstName: c.firstname,
-      lastName: c.lastname,
-      phone: c.phone,
-      extension: c.extension,
-      email: c.email,
-      extraData: c.extra1,
-      groups: c.groups,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
-    }));
+    let contacts = rawContacts.map(formatContact);
 
     return {
       output: { contacts },

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWebhooks = SlateTool.create(spec, {
@@ -17,7 +17,9 @@ export let listWebhooks = SlateTool.create(spec, {
       includeLogs: z
         .boolean()
         .optional()
-        .describe('Include delivery logs for the specified webhook')
+        .describe('Include delivery logs for the specified webhook'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      size: z.number().optional().describe('Items per page, from 1 to 100')
     })
   )
   .output(
@@ -48,21 +50,24 @@ export let listWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.webhookId) {
       let result = await client.getWebhook(ctx.input.webhookId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       let logs: any[] | undefined;
 
       if (ctx.input.includeLogs) {
-        let logsResult = await client.getWebhookLogs(ctx.input.webhookId);
-        logs = logsResult.data || logsResult;
+        let logsResult = await client.getWebhookLogs(ctx.input.webhookId, {
+          page: ctx.input.page,
+          size: ctx.input.size
+        });
+        logs = getListResult(logsResult).items;
       }
 
       return {
         output: {
           webhook: {
             webhookId: data.id,
-            name: data.name,
-            endpoint: data.endpoint,
-            enabled: data.enabled,
+            name: data.name ?? undefined,
+            endpoint: data.endpoint ?? undefined,
+            enabled: data.enabled ?? undefined,
             logs
           }
         },
@@ -70,16 +75,15 @@ export let listWebhooks = SlateTool.create(spec, {
       };
     }
 
-    let result = await client.listWebhooks();
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let result = await client.listWebhooks({ page: ctx.input.page, size: ctx.input.size });
+    let { items: list } = getListResult(result);
     return {
       output: {
         webhooks: list.map((w: any) => ({
           webhookId: w.id,
-          name: w.name,
-          endpoint: w.endpoint,
-          enabled: w.enabled
+          name: w.name ?? undefined,
+          endpoint: w.endpoint ?? undefined,
+          enabled: w.enabled ?? undefined
         }))
       },
       message: `Found **${list.length}** webhook(s).`

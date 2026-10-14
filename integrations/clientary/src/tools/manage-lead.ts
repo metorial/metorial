@@ -57,14 +57,14 @@ export let createLead = SlateTool.create(spec, {
       output: {
         leadId: l.id,
         name: l.name,
-        number: l.number,
-        address: l.address,
-        city: l.city,
-        state: l.state,
-        zip: l.zip,
-        country: l.country,
-        website: l.website,
-        description: l.description
+        number: l.number ?? undefined,
+        address: l.address ?? undefined,
+        city: l.city ?? undefined,
+        state: l.state ?? undefined,
+        zip: l.zip ?? undefined,
+        country: l.country ?? undefined,
+        website: l.website ?? undefined,
+        description: l.description ?? undefined
       },
       message: `Created lead **${l.name}** (ID: ${l.id}).`
     };
@@ -114,14 +114,14 @@ export let updateLead = SlateTool.create(spec, {
       output: {
         leadId: l.id,
         name: l.name,
-        number: l.number,
-        address: l.address,
-        city: l.city,
-        state: l.state,
-        zip: l.zip,
-        country: l.country,
-        website: l.website,
-        description: l.description
+        number: l.number ?? undefined,
+        address: l.address ?? undefined,
+        city: l.city ?? undefined,
+        state: l.state ?? undefined,
+        zip: l.zip ?? undefined,
+        country: l.country ?? undefined,
+        website: l.website ?? undefined,
+        description: l.description ?? undefined
       },
       message: `Updated lead **${l.name}** (ID: ${l.id}).`
     };
@@ -165,14 +165,14 @@ export let getLeads = SlateTool.create(spec, {
             {
               leadId: l.id,
               name: l.name,
-              number: l.number,
-              address: l.address,
-              city: l.city,
-              state: l.state,
-              zip: l.zip,
-              country: l.country,
-              website: l.website,
-              description: l.description
+              number: l.number ?? undefined,
+              address: l.address ?? undefined,
+              city: l.city ?? undefined,
+              state: l.state ?? undefined,
+              zip: l.zip ?? undefined,
+              country: l.country ?? undefined,
+              website: l.website ?? undefined,
+              description: l.description ?? undefined
             }
           ]
         },
@@ -188,21 +188,21 @@ export let getLeads = SlateTool.create(spec, {
     let leads = (result.leads || []).map((l: any) => ({
       leadId: l.id,
       name: l.name,
-      number: l.number,
-      address: l.address,
-      city: l.city,
-      state: l.state,
-      zip: l.zip,
-      country: l.country,
-      website: l.website,
-      description: l.description
+      number: l.number ?? undefined,
+      address: l.address ?? undefined,
+      city: l.city ?? undefined,
+      state: l.state ?? undefined,
+      zip: l.zip ?? undefined,
+      country: l.country ?? undefined,
+      website: l.website ?? undefined,
+      description: l.description ?? undefined
     }));
 
     return {
       output: {
         leads,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${leads.length} lead(s)${result.total_count ? ` (${result.total_count} total)` : ''}.`
     };

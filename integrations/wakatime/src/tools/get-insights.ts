@@ -8,7 +8,7 @@ export let getInsights = SlateTool.create(spec, {
   key: 'get_insights',
   description: `Access deeper analytics about coding activity for a given time range. Available insight types include weekday patterns, daily breakdowns, best day, daily average, and breakdowns by projects, languages, editors, categories, machines, and operating systems.`,
   instructions: [
-    'Valid insight types: "weekday", "days", "best_day", "daily_average", "projects", "languages", "editors", "categories", "machines", "operating_systems".',
+    'Valid insight types: "stats", "weekdays", "days", "ai_days", "best_day", "daily_average", "projects", "languages", "editors", "categories", "machines", "operating_systems". The legacy "weekday" spelling is also accepted.',
     'Valid ranges: "last_7_days", "last_30_days", "last_6_months", "last_year", "all_time", or a specific "YYYY" / "YYYY-MM".'
   ],
   tags: {
@@ -20,7 +20,7 @@ export let getInsights = SlateTool.create(spec, {
       insightType: z
         .string()
         .describe(
-          'Type of insight: "weekday", "days", "best_day", "daily_average", "projects", "languages", "editors", "categories", "machines", "operating_systems"'
+          'Type of insight: "stats", "weekdays", "days", "ai_days", "best_day", "daily_average", "projects", "languages", "editors", "categories", "machines", "operating_systems"'
         ),
       range: z.string().default('last_7_days').describe('Time range for insights'),
       timezone: z.string().optional().describe('Timezone for the insights'),
@@ -35,7 +35,7 @@ export let getInsights = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result = await client.getInsights(ctx.input.insightType, ctx.input.range, {
       timezone: ctx.input.timezone,

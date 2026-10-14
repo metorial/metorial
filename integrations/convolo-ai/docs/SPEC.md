@@ -1,6 +1,4 @@
-Now I have enough information to write the specification. Let me compile everything.
-
-# Slates Specification for Convolo AI
+# Convolo AI API Specification
 
 ## Overview
 
@@ -43,7 +41,23 @@ Calls and call statistics data can be retrieved from the Power Dialer product.
 
 - Filter by date range, call types (inbound, outbound, internal), call states (answered, unanswered, failed), agents, teams, projects, tags, outcomes, talk time, and answer time.
 - Response includes AI-generated call recording summaries and titles (if enabled).
+- The statistics API accepts `dateInterval`, which Brightcall marks required. Public documentation does not specify the accepted values; confirm them with Brightcall support. The input remains optional for compatibility with existing calls.
 - A separate statistics endpoint provides aggregated metrics broken down by call direction (all, inbound, outbound, internal) including success/fail counts, talk times, and AI talk time.
+
+### Discover Dialer Agents
+
+`get_dialer_agents` calls `GET /api/v1/agents` with the dialer API key. Supports page size, page, search text, and inclusion of deleted agents. Returns agent IDs, names, extensions, contact details, access levels, deletion status, and pagination.
+
+### Count Dialer Calls
+
+`get_dialer_calls_count` calls `POST /api/v3/stat/calls/count` with the same filters as call reports. Returns the matching total and pagination without retrieving call records.
+
+## Official API References
+
+- [Trigger Speed To Lead calls](https://brightcall.ai/help-center/making-calls-through-an-api-request)
+- [Speed To Lead call reports](https://help.brightcall.ai/en/articles/8613115-getting-calls-reports-via-api)
+- [Dialer reports, statistics, and pagination counts](https://help.brightcall.ai/en/articles/9867171-getting-dialer-calls-reports-via-api)
+- [Dialer agent discovery](https://help.brightcall.ai/en/articles/10009944-get-dialer-agents-by-api)
 
 ## Events
 

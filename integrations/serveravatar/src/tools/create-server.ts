@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createServer = SlateTool.create(spec, {
   name: 'Create Server',
   key: 'create_server',
   description: `Provision a new cloud server through a connected cloud provider (DigitalOcean, Vultr, Linode, AWS Lightsail, Hetzner). Requires a connected cloud provider account.
-Use **List Server Providers** to find your connected provider account ID, and review available regions and instance sizes before creating.`,
+Use **List Server Providers** to find your connected provider account ID, and review available regions and instance sizes before creating.
+${organizationScopeGuidance}`,
   instructions: [
     'The cloudServerProviderId must be the ID of a connected cloud provider account, not the provider name.',
     'Use the List Server Providers tool first to get available provider IDs, regions, and sizes.'
@@ -22,7 +24,7 @@ Use **List Server Providers** to find your connected provider account ID, and re
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       name: z.string().describe('Server name'),
       provider: z
         .enum(['digitalocean', 'vultr', 'linode', 'lightsail', 'hetzner'])
@@ -30,7 +32,9 @@ Use **List Server Providers** to find your connected provider account ID, and re
       cloudServerProviderId: z.number().describe('Connected cloud provider account ID'),
       version: z.enum(['20', '22', '24']).describe('Ubuntu version (20, 22, or 24)'),
       region: z.string().describe('Cloud region slug'),
-      sizeSlug: z.string().describe('Instance size slug'),
+      sizeSlug: z
+        .string()
+        .describe('Instance size slug; for Hetzner, a numeric server type ID as a string'),
       webServer: z
         .enum(['apache2', 'nginx', 'openlitespeed', 'mern'])
         .describe('Web server type'),
@@ -54,7 +58,8 @@ Use **List Server Providers** to find your connected provider account ID, and re
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let server = await client.createServer(orgId, {
       name: ctx.input.name,

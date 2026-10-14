@@ -1,8 +1,10 @@
-import { createAxios } from 'slates';
-
-let api = createAxios({
-  baseURL: 'https://api.campaigncleaner.com/v1'
-});
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  requestAxiosData
+} from 'slates';
 
 export interface SendCampaignParams {
   campaignHtml: string;
@@ -67,6 +69,9 @@ export interface LinkInfo {
   isImage: boolean;
   isBroken: boolean;
   protocol: string;
+  status?: string;
+  blacklistName?: string;
+  blacklistUrl?: string;
 }
 
 export interface ImageInfo {
@@ -77,6 +82,7 @@ export interface ImageInfo {
   renderedWidth: number;
   renderedHeight: number;
   imageType: string;
+  isBackground?: boolean;
 }
 
 export interface CampaignSummaryItem {
@@ -105,8 +111,10 @@ export interface CampaignResult {
   blacklistedLinksFound: number;
   blacklistedLinks: LinkInfo[];
   pdCdnsFound: number;
-  pdCdnList: any[];
+  pdCdnList: unknown[];
   domainsScanned: number;
+  domainList?: string[];
+  brokenLinkList?: LinkInfo[];
   imageCount: number;
   imageList: ImageInfo[];
   osImageList: ImageInfo[];
@@ -115,8 +123,8 @@ export interface CampaignResult {
 }
 
 // Maps camelCase params to snake_case API fields
-let toSendCampaignBody = (params: SendCampaignParams): Record<string, any> => {
-  let body: Record<string, any> = {
+let toSendCampaignBody = (params: SendCampaignParams): Record<string, unknown> => {
+  let body: Record<string, unknown> = {
     campaign_html: params.campaignHtml,
     campaign_name: params.campaignName
   };
@@ -165,7 +173,7 @@ let toSendCampaignBody = (params: SendCampaignParams): Record<string, any> => {
   if (params.minifyHtml !== undefined) body.minify_html = params.minifyHtml;
 
   if (params.surroundingDiv) {
-    let div: Record<string, any> = {};
+    let div: Record<string, unknown> = {};
     if (params.surroundingDiv.maxWidth !== undefined)
       div.max_width = params.surroundingDiv.maxWidth;
     if (params.surroundingDiv.textAlign !== undefined)
@@ -180,63 +188,135 @@ let toSendCampaignBody = (params: SendCampaignParams): Record<string, any> => {
   return body;
 };
 
-let mapLink = (link: any): LinkInfo => ({
-  url: link.url ?? '',
-  statusCode: link.status_code ?? 0,
-  redirectUrl: link.redirect_url ?? '',
-  isImage: link.is_image ?? false,
-  isBroken: link.is_broken ?? false,
-  protocol: link.protocol ?? ''
-});
+let numberValue = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return 0;
+};
 
-let mapImage = (img: any): ImageInfo => ({
-  url: img.url ?? '',
-  sizeKb: img.size_kb ?? img.size ?? 0,
-  width: img.width ?? 0,
-  height: img.height ?? 0,
-  renderedWidth: img.rendered_width ?? 0,
-  renderedHeight: img.rendered_height ?? 0,
-  imageType: img.image_type ?? ''
-});
+let stringValue = (value: unknown): string => (typeof value === 'string' ? value : '');
+let booleanValue = (value: unknown): boolean => value === true;
 
-let mapSummaryItem = (item: any): CampaignSummaryItem => ({
-  message: item.message ?? '',
-  count: item.count ?? 0,
-  htmlModified: item.html_modified ?? false
-});
+let mapLink = (value: unknown): LinkInfo => {
+  let link = isApiErrorRecord(value) ? value : {};
+  let url = stringValue(link.link_url ?? link.url);
+  let protocol = stringValue(link.protocol);
+  if (!protocol && url) {
+    try {
+      protocol = new URL(url).protocol.replace(/:$/, '');
+    } catch {
+      // The provider also reports invalid URLs in link diagnostics.
+    }
+  }
+  return {
+    url,
+    statusCode: numberValue(link.status_code ?? link.link_status),
+    redirectUrl: stringValue(link.link_redirected_url ?? link.redirect_url),
+    isImage: booleanValue(link.link_is_image ?? link.is_image),
+    isBroken: booleanValue(link.link_is_broken ?? link.is_broken),
+    protocol,
+    ...(link.link_status !== undefined ? { status: String(link.link_status) } : {}),
+    ...(typeof link.bl_name === 'string' ? { blacklistName: link.bl_name } : {}),
+    ...(typeof link.bl_url === 'string' ? { blacklistUrl: link.bl_url } : {})
+  };
+};
 
-let mapSpamKeyword = (kw: any): SpamKeyword => ({
-  keyword: kw.keyword ?? '',
-  count: kw.count ?? 0
-});
+let imageTypes: Record<number, string> = {
+  1: 'png',
+  2: 'jpeg',
+  3: 'gif',
+  4: 'bmp',
+  5: 'svg',
+  6: 'avif',
+  7: 'tif',
+  8: 'webp',
+  9: 'apng',
+  10: 'heic',
+  11: 'icon',
+  12: 'base64',
+  '-1': 'unknown'
+};
 
-export let mapCampaignResult = (data: any): CampaignResult => ({
-  campaignId: data.campaign_id ?? '',
-  campaignName: data.campaign_name ?? '',
-  customInfo: data.custom_info ?? '',
-  resultsTime: data.results_time ?? '',
-  campaignHtml: data.campaign_html ?? '',
-  totalWordCount: data.total_word_count ?? 0,
-  allCapitalizedWords: data.all_capitalized_words ?? 0,
-  allCapitalizedWordRatio: data.all_capitalized_word_ratio ?? 0,
-  spamWordsCount: data.spam_words_count ?? 0,
-  spamKeywordRatio: data.spam_keyword_ratio ?? 0,
+let mapImage = (value: unknown): ImageInfo => {
+  let img = isApiErrorRecord(value) ? value : {};
+  return {
+    url: stringValue(img.image_url ?? img.url),
+    sizeKb: numberValue(img.image_size ?? img.size_kb ?? img.size),
+    width: numberValue(img.image_width ?? img.width),
+    height: numberValue(img.image_height ?? img.height),
+    renderedWidth: numberValue(img.image_rendered_width ?? img.rendered_width),
+    renderedHeight: numberValue(img.image_rendered_height ?? img.rendered_height),
+    imageType:
+      typeof img.image_type === 'number'
+        ? (imageTypes[img.image_type] ?? 'unknown')
+        : stringValue(img.image_type),
+    ...(typeof img.image_background === 'boolean'
+      ? { isBackground: img.image_background }
+      : {})
+  };
+};
+
+let mapSummaryItem = (value: unknown): CampaignSummaryItem => {
+  let item = isApiErrorRecord(value) ? value : {};
+  return {
+    message: stringValue(item.message),
+    count: numberValue(item.count),
+    htmlModified: booleanValue(item.html_changed ?? item.html_modified)
+  };
+};
+
+let mapSpamKeyword = (value: unknown): SpamKeyword => {
+  let kw = isApiErrorRecord(value) ? value : {};
+  return { keyword: stringValue(kw.keyword), count: numberValue(kw.count) };
+};
+
+export let mapCampaignResult = (data: Record<string, unknown>): CampaignResult => ({
+  campaignId: stringValue(data.campaign_id),
+  campaignName: stringValue(data.campaign_name),
+  customInfo: stringValue(data.custom_info),
+  resultsTime: stringValue(data.results_time),
+  campaignHtml: stringValue(data.campaign_html),
+  totalWordCount: numberValue(data.total_word_count),
+  allCapitalizedWords: numberValue(data.all_capitalized_words),
+  allCapitalizedWordRatio: numberValue(data.all_capitalized_word_ratio),
+  spamWordsCount: numberValue(data.spam_words_count),
+  spamKeywordRatio: numberValue(data.spam_keyword_ratio),
   spamKeywordList: Array.isArray(data.spam_keyword_list)
     ? data.spam_keyword_list.map(mapSpamKeyword)
     : [],
-  textImageRatio: data.text_image_ratio ?? 0,
-  textLinkRatio: data.text_link_ratio ?? 0,
-  linksScanned: data.links_scanned ?? 0,
-  brokenLinks: data.broken_links ?? 0,
+  textImageRatio: numberValue(data.text_image_ratio),
+  textLinkRatio: numberValue(data.text_link_ratio),
+  linksScanned: numberValue(data.links_scanned),
+  brokenLinks:
+    typeof data.broken_links === 'number'
+      ? data.broken_links
+      : numberValue(
+          data.broken_links_found ??
+            (Array.isArray(data.broken_links) ? data.broken_links.length : 0)
+        ),
   allLinkList: Array.isArray(data.all_link_list) ? data.all_link_list.map(mapLink) : [],
-  blacklistedLinksFound: data.blacklisted_links_found ?? 0,
+  blacklistedLinksFound: numberValue(data.blacklisted_links_found),
   blacklistedLinks: Array.isArray(data.blacklisted_links)
     ? data.blacklisted_links.map(mapLink)
     : [],
-  pdCdnsFound: data.pd_cdns_found ?? 0,
+  pdCdnsFound: numberValue(data.pd_cdns_found),
   pdCdnList: Array.isArray(data.pd_cdn_list) ? data.pd_cdn_list : [],
-  domainsScanned: data.domains_scanned ?? 0,
-  imageCount: data.image_count ?? 0,
+  domainsScanned: Array.isArray(data.domains_scanned)
+    ? data.domains_scanned.length
+    : numberValue(data.domains_scanned),
+  ...(Array.isArray(data.domains_scanned)
+    ? {
+        domainList: data.domains_scanned.filter(
+          (domain): domain is string => typeof domain === 'string'
+        )
+      }
+    : {}),
+  ...(Array.isArray(data.broken_links)
+    ? { brokenLinkList: data.broken_links.map(mapLink) }
+    : {}),
+  imageCount: numberValue(data.image_count),
   imageList: Array.isArray(data.image_list) ? data.image_list.map(mapImage) : [],
   osImageList: Array.isArray(data.os_image_list) ? data.os_image_list.map(mapImage) : [],
   bgImageList: Array.isArray(data.bg_image_list) ? data.bg_image_list.map(mapImage) : [],
@@ -245,125 +325,265 @@ export let mapCampaignResult = (data: any): CampaignResult => ({
     : []
 });
 
-let mapCampaignStatus = (data: any): CampaignStatus => ({
-  id: data.id ?? '',
-  campaignName: data.campaign_name ?? '',
-  status: data.status ?? '',
-  dateAdded: data.date_added ?? ''
+let mapCampaignStatus = (data: Record<string, unknown>): CampaignStatus => ({
+  id: stringValue(data.id),
+  campaignName: stringValue(data.campaign_name),
+  status: stringValue(data.status),
+  dateAdded: stringValue(data.date_added)
 });
 
-let mapCampaignListItem = (data: any): CampaignListItem => ({
-  id: data.id ?? '',
-  campaignName: data.campaign_name ?? '',
-  status: data.status ?? '',
-  dateAdded: data.date_added ?? ''
-});
+let decodeBinaryBody = (value: unknown): unknown => {
+  if (!(value instanceof Uint8Array) && !(value instanceof ArrayBuffer)) return value;
+  let text = Buffer.from(
+    value instanceof ArrayBuffer ? new Uint8Array(value) : value
+  ).toString('utf8');
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+};
+
+let apiError = (error: unknown, operation: string) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Campaign Cleaner',
+    reason: 'campaign_cleaner_api_error',
+    operation,
+    nestedKeys: ['error', 'errors']
+  });
+
+let checkResponse = (data: unknown, operation: string): Record<string, unknown> => {
+  if (!isApiErrorRecord(data)) {
+    throw createApiServiceError(
+      `Campaign Cleaner returned an invalid response for ${operation}.`
+    );
+  }
+  if (data.error) {
+    throw apiError({ response: { data, status: 200 } }, operation);
+  }
+  return data;
+};
+
+let requireId = (value: unknown, operation: string): string => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw createApiServiceError(`Campaign Cleaner did not return an ID for ${operation}.`);
+  }
+  return value;
+};
+
+export interface InboxTest {
+  jobId: string;
+  testName: string;
+  mailtesterAddress: string;
+  instructions: string;
+  sendTo: string[];
+}
+
+export interface InboxTestResults {
+  jobId: string;
+  testName: string;
+  submittedDate: string;
+  submittedBy: string;
+  status: string;
+  summary: {
+    totalSeeds: number;
+    received: number;
+    inbox: number;
+    spam: number;
+    unknownPlacement: number;
+    pending: number;
+    inboxRate: number;
+    spamRate: number;
+  };
+  results: {
+    provider: string;
+    seedAddress: string;
+    emailFound: boolean;
+    placement: string;
+    spfStatus: string;
+    senderIp: string;
+    submissionResult: string;
+  }[];
+}
 
 export class Client {
-  private headers: Record<string, string>;
+  private api;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      'X-CC-API-Key': config.token,
-      'Content-Type': 'application/json'
-    };
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.campaigncleaner.com/v1',
+      authHeader: { name: 'X-CC-API-Key', value: config.token },
+      errorMapping: { extractResponseData: response => decodeBinaryBody(response.data) }
+    });
+  }
+
+  private async request(operation: string, path: string, body?: Record<string, unknown>) {
+    let data = await requestAxiosData<unknown>(
+      operation,
+      () => (body === undefined ? this.api.get(path) : this.api.post(path, body)),
+      apiError
+    );
+    return checkResponse(data, operation);
   }
 
   async sendCampaign(params: SendCampaignParams): Promise<{ campaignId: string }> {
-    let response = await api.post(
-      '/send_campaign',
-      {
-        send_campaign: toSendCampaignBody(params)
-      },
-      { headers: this.headers }
-    );
-
-    return {
-      campaignId: response.data.campaign?.id ?? ''
-    };
+    if (params.customInfo && params.customInfo.length > 500) {
+      throw createApiServiceError('Custom info must be no more than 500 characters.');
+    }
+    for (let [field, value] of [
+      ['minFontSizeAllowed', params.minFontSizeAllowed],
+      ['maxFontSizeAllowed', params.maxFontSizeAllowed]
+    ] as const) {
+      if (value !== undefined && (!Number.isInteger(value) || value <= 0 || value >= 100)) {
+        throw createApiServiceError(`${field} must be a positive whole number below 100.`);
+      }
+    }
+    if ((params.minFontSizeAllowed ?? 10) > (params.maxFontSizeAllowed ?? 32)) {
+      throw createApiServiceError('Minimum font size cannot exceed maximum font size.');
+    }
+    let data = await this.request('send campaign', '/send_campaign', {
+      send_campaign: toSendCampaignBody(params)
+    });
+    let campaign = isApiErrorRecord(data.campaign) ? data.campaign : {};
+    return { campaignId: requireId(campaign.id, 'send campaign') };
   }
 
   async getCampaign(campaignId: string, minifyHtml: boolean = true): Promise<CampaignResult> {
-    let response = await api.post(
-      '/get_campaign',
-      {
-        campaign: {
-          id: campaignId,
-          minimize_html: minifyHtml
-        }
-      },
-      { headers: this.headers }
-    );
-
-    return mapCampaignResult(response.data.campaign ?? response.data);
+    let data = await this.request('get campaign', '/get_campaign', {
+      campaign: { id: campaignId, minimize_html: minifyHtml }
+    });
+    let campaign = checkResponse(data.campaign ?? data, 'get campaign');
+    requireId(campaign.campaign_id, 'get campaign');
+    return mapCampaignResult(campaign);
   }
 
   async getCampaignStatus(campaignId: string): Promise<CampaignStatus> {
-    let response = await api.post(
-      '/get_campaign_status',
-      {
-        campaign: {
-          id: campaignId
-        }
-      },
-      { headers: this.headers }
-    );
-
-    return mapCampaignStatus(response.data.campaign_status ?? response.data);
+    let data = await this.request('get campaign status', '/get_campaign_status', {
+      campaign: { id: campaignId }
+    });
+    let campaign = checkResponse(data.campaign_status ?? data, 'get campaign status');
+    requireId(campaign.id, 'get campaign status');
+    return mapCampaignStatus(campaign);
   }
 
   async getCampaignList(): Promise<CampaignListItem[]> {
-    let response = await api.get('/get_campaign_list', {
-      headers: this.headers
+    let data = await this.request('list campaigns', '/get_campaign_list');
+    if (!Array.isArray(data.campaign_list)) {
+      throw createApiServiceError('Campaign Cleaner did not return a campaign list.');
+    }
+    return data.campaign_list.map(item => {
+      let campaign = checkResponse(item, 'list campaigns');
+      requireId(campaign.id, 'list campaigns');
+      return mapCampaignStatus(campaign);
     });
-
-    let list = response.data.campaign_list ?? [];
-    return Array.isArray(list) ? list.map(mapCampaignListItem) : [];
   }
 
   async deleteCampaign(campaignId: string): Promise<{ status: string }> {
-    let response = await api.post(
-      '/delete_campaign',
-      {
-        campaign: {
-          id: campaignId
-        }
-      },
-      { headers: this.headers }
-    );
-
-    return {
-      status: response.data.status ?? 'unknown'
-    };
+    let data = await this.request('delete campaign', '/delete_campaign', {
+      campaign: { id: campaignId }
+    });
+    if (data.status !== 'success') {
+      throw createApiServiceError(
+        'Campaign Cleaner could not delete this campaign. Check that the campaign ID exists and has not already been deleted.'
+      );
+    }
+    return { status: data.status };
   }
 
   async getCredits(): Promise<{ credits: number }> {
-    let response = await api.get('/get_credits', {
-      headers: this.headers
-    });
-
-    return {
-      credits: response.data.credits ?? 0
-    };
+    let data = await this.request('get credits', '/get_credits');
+    if (typeof data.credits !== 'number' || !Number.isFinite(data.credits)) {
+      throw createApiServiceError('Campaign Cleaner did not return a valid credit balance.');
+    }
+    return { credits: data.credits };
   }
 
   async getCampaignPdfAnalysis(campaignId: string): Promise<{ pdfBase64: string }> {
-    let response = await api.post(
-      '/get_campaign_pdf_analysis',
-      {
-        campaign: {
-          id: campaignId
-        }
-      },
-      {
-        headers: this.headers,
-        responseType: 'arraybuffer'
-      }
+    let data = await requestAxiosData<unknown>(
+      'get PDF report',
+      () =>
+        this.api.post(
+          '/get_campaign_pdf_analysis',
+          { campaign: { id: campaignId } },
+          { responseType: 'arraybuffer' }
+        ),
+      apiError
     );
+    if (!(data instanceof Uint8Array) && !(data instanceof ArrayBuffer)) {
+      checkResponse(data, 'get PDF report');
+      throw createApiServiceError('Campaign Cleaner did not return a PDF report.');
+    }
+    let buffer = Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
+    if (buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      let decoded = decodeBinaryBody(buffer);
+      if (isApiErrorRecord(decoded)) checkResponse(decoded, 'get PDF report');
+      throw createApiServiceError(
+        'Campaign Cleaner did not return a PDF report. Check that the campaign has completed processing.'
+      );
+    }
+    return { pdfBase64: buffer.toString('base64') };
+  }
 
-    let buffer = Buffer.from(response.data);
+  async createInboxTest(testName: string): Promise<InboxTest> {
+    let data = await this.request('create inbox test', '/create_inbox_test', {
+      test_name: testName
+    });
+    let jobId = requireId(data.job_id, 'create inbox test');
+    if (
+      !Array.isArray(data.send_to) ||
+      data.send_to.length === 0 ||
+      data.send_to.some(address => typeof address !== 'string')
+    ) {
+      throw createApiServiceError(
+        'Campaign Cleaner did not return valid seed email addresses for this inbox test.'
+      );
+    }
     return {
-      pdfBase64: buffer.toString('base64')
+      jobId,
+      testName: stringValue(data.test_name),
+      mailtesterAddress: stringValue(data.mailtester_address),
+      instructions: stringValue(data.instructions),
+      sendTo: data.send_to as string[]
+    };
+  }
+
+  async getInboxTestResults(jobId: string): Promise<InboxTestResults> {
+    let data = await this.request('get inbox test results', '/get_inbox_test_results', {
+      job_id: jobId
+    });
+    requireId(data.job_id, 'get inbox test results');
+    let summary = checkResponse(data.summary, 'get inbox test results summary');
+    if (!Array.isArray(data.results)) {
+      throw createApiServiceError('Campaign Cleaner did not return inbox test results.');
+    }
+    return {
+      jobId: stringValue(data.job_id),
+      testName: stringValue(data.test_name),
+      submittedDate: stringValue(data.submitted_date),
+      submittedBy: stringValue(data.submitted_by),
+      status: stringValue(data.status),
+      summary: {
+        totalSeeds: numberValue(summary.total_seeds),
+        received: numberValue(summary.received),
+        inbox: numberValue(summary.inbox),
+        spam: numberValue(summary.spam),
+        unknownPlacement: numberValue(summary.unknown_placement),
+        pending: numberValue(summary.pending),
+        inboxRate: numberValue(summary.inbox_rate),
+        spamRate: numberValue(summary.spam_rate)
+      },
+      results: data.results.map(value => {
+        let result = checkResponse(value, 'get inbox test seed result');
+        return {
+          provider: stringValue(result.provider),
+          seedAddress: stringValue(result.seed_address),
+          emailFound: booleanValue(result.email_found),
+          placement: stringValue(result.placement),
+          spfStatus: stringValue(result.spf_status),
+          senderIp: stringValue(result.sender_ip),
+          submissionResult: stringValue(result.submission_result)
+        };
+      })
     };
   }
 }

@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> 2 Chat
 
-Send and receive WhatsApp messages (text, images, audio, video, PDFs) to individuals and groups. Manage WhatsApp contacts, groups, catalogs, and connected numbers. Verify WhatsApp phone numbers, set profile status and pictures, and generate QR codes for white-label WhatsApp connections. Manage virtual phone numbers and voice calls across 90+ countries.
+Send text and media messages to WhatsApp contacts and groups, retrieve conversations and messages, manage group membership, verify WhatsApp numbers, and create or browse contacts. Inspect account information and connected number status. Message submissions are queued by 2Chat; acceptance does not prove delivery.
 
 ## License
 

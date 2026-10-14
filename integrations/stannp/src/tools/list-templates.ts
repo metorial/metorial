@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
@@ -28,15 +28,18 @@ export let listTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listTemplates();
     let templates = Array.isArray(result)
       ? result.map((t: any) => ({
           templateId: String(t.id),
-          name: t.name,
-          size: t.size,
-          duplex: t.duplex
+          name: t.name ?? undefined,
+          size: t.size ?? undefined,
+          duplex:
+            t.duplex == null
+              ? undefined
+              : t.duplex === true || t.duplex === 1 || t.duplex === '1'
         }))
       : [];
 

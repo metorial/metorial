@@ -1,6 +1,4 @@
-Now I have enough information to compile the specification.
-
-# Slates Specification for Scrapingant
+# ScrapingAnt API Specification
 
 ## Overview
 
@@ -8,19 +6,20 @@ ScrapingAnt is a web scraping API that extracts data from websites using a clust
 
 ## Authentication
 
-All requests to the ScrapingAnt API are authenticated using an API key, passed as the `x-api-key` query parameter.
+All requests to the ScrapingAnt API are authenticated using an API key, passed as the `x-api-key` header or query parameter. The integration sends it as a header.
 
 The API key can be found on the dashboard page in the user's admin panel after registering at [app.scrapingant.com](https://app.scrapingant.com).
 
-**Method:** API Key (query parameter)
+**Method:** API Key
 
-- **Parameter name:** `x-api-key`
-- **Passed as:** Query string parameter on every request
+- **Header name:** `x-api-key`
+- **Passed as:** HTTP header on every request
 
 Example:
 
 ```
-GET https://api.scrapingant.com/v2/general?url=https://example.com&x-api-key=<YOUR_API_KEY>
+GET https://api.scrapingant.com/v2/general?url=https://example.com
+x-api-key: <YOUR_API_KEY>
 ```
 
 ScrapingAnt also supports a Proxy Mode, which is a simple HTTP/HTTPS proxy that allows using the API via a proxy port. It can be used with any HTTP client that supports proxy configuration. In proxy mode, the username is `scrapingant` and the password is your API key.
@@ -50,6 +49,8 @@ An endpoint that extracts data from websites and automatically converts the HTML
 
 - Available at `/v2/markdown`.
 - Supports the same parameters as the general scraping endpoint (browser rendering, proxy settings, etc.).
+- `download_markdown` saves the converted text as a downloadable `.md` file.
+- The endpoint returns a JSON object containing `url` and `markdown`; it does not expose the target page status. Conversion can succeed for an error page.
 
 ### AI Data Extraction
 
@@ -65,6 +66,8 @@ The AI extractor uses free-form described parameters for JSON structure names an
 An extended JSON output endpoint provides additional data like cookies, headers, XHRs, etc.
 
 - Available at `/v2/extended`.
+- XHR headers are supplied as name/value arrays and normalized to a header map for callers. Missing XHR request or response bodies are exposed as empty strings.
+- `status_code` is the target page status, separate from the API's outer HTTP status.
 
 ### Custom Browser Interaction
 
@@ -75,6 +78,8 @@ Control browser behavior during scraping:
 - **Resource blocking:** Use `block_resource` to prevent the browser from loading specific resource types (images, stylesheets, scripts, fonts, etc.).
 - **Custom cookies and headers:** Pass custom cookies and HTTP headers with scraping requests.
 
+JavaScript execution, selector waits, resource blocking, and original page-source mode require `browser=true`. Existing timeout inputs remain numbers in the range 5–60 seconds.
+
 ### Proxy Mode (Proxy Port)
 
 ScrapingAnt Proxy Mode is a simple HTTP/HTTPS proxy that allows using the API via proxy port. It can be used with any HTTP client that supports proxy configuration and has all the same functionality and performance as the API endpoint.
@@ -82,6 +87,15 @@ ScrapingAnt Proxy Mode is a simple HTTP/HTTPS proxy that allows using the API vi
 ### Subscription Status
 
 A dedicated endpoint allows checking current API credit usage and subscription status.
+
+## API References
+
+- [Request parameters and authentication](https://docs.scrapingant.com/request-response-format)
+- [API errors and header authentication](https://docs.scrapingant.com/errors)
+- [Extended response format](https://docs.scrapingant.com/json-response)
+- [Markdown conversion](https://docs.scrapingant.com/llm-markdown)
+- [Usage status](https://docs.scrapingant.com/api-credits-usage)
+- [Custom headers](https://docs.scrapingant.com/custom-headers)
 
 ## Events
 

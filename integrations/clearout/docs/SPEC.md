@@ -1,4 +1,4 @@
-Now let me get more details on the webhook event types:# Slates Specification for Clearout
+# Clearout Specification
 
 ## Overview
 
@@ -16,7 +16,7 @@ Once signed up and logged in, click on the Developer tab available on top-right 
 The API token is passed via the `Authorization` header in all requests:
 
 ```
-Authorization: YOUR_API_TOKEN
+Authorization: Bearer YOUR_API_TOKEN
 ```
 
 Clearout does not support API requests directly from web browsers or client-side apps. APIs are allowed to be used only on server-side applications.

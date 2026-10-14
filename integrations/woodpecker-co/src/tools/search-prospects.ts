@@ -99,26 +99,32 @@ export let searchProspects = SlateTool.create(spec, {
     let data = await client.searchProspects(params);
     let prospects = Array.isArray(data) ? data : [];
 
-    let mapped = prospects.map((p: any) => ({
-      prospectId: p.id,
-      email: p.email ?? '',
-      firstName: p.first_name,
-      lastName: p.last_name,
-      company: p.company,
-      title: p.title,
-      phone: p.phone,
-      website: p.website,
-      industry: p.industry,
-      city: p.city,
-      state: p.state,
-      country: p.country,
-      status: p.status,
-      tags: p.tags,
-      lastContacted: p.last_contacted,
-      lastReplied: p.last_replied,
-      updated: p.updated,
-      campaignDetails: p.campaigns_details
-    }));
+    let mapped = prospects.map((row: any) => {
+      let p = row.prospect ?? row;
+      return {
+        prospectId: p.id,
+        email: p.email ?? '',
+        firstName: p.first_name ?? undefined,
+        lastName: p.last_name ?? undefined,
+        company: p.company ?? undefined,
+        title: p.title ?? undefined,
+        phone: p.phone ?? undefined,
+        website: p.website ?? undefined,
+        industry: p.industry ?? undefined,
+        city: p.city ?? undefined,
+        state: p.state ?? undefined,
+        country: p.country ?? undefined,
+        status: p.status ?? undefined,
+        tags: p.tags ?? undefined,
+        lastContacted: p.last_contacted == null ? undefined : String(p.last_contacted),
+        lastReplied:
+          (p.last_replied ?? p['last replied']) == null
+            ? undefined
+            : String(p.last_replied ?? p['last replied']),
+        updated: p.updated == null ? undefined : String(p.updated),
+        campaignDetails: p.campaigns_details ?? row.campaigns_details ?? undefined
+      };
+    });
 
     return {
       output: { prospects: mapped, count: mapped.length },

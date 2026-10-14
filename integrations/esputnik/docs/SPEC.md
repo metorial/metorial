@@ -1,98 +1,28 @@
-Now let me get more details on the webhook statuses and the full API feature set:Now I have comprehensive information to write the specification.
+# eSputnik API capabilities
 
-# Slates Specification for Esputnik
+Authentication uses Basic HTTP authentication with any username and an API key as the password. The integration uses the documented base URL `https://esputnik.com/api`. API keys can restrict permitted resources; account profile lookup uses `/v1/account/info`.
 
-## Overview
+| Workflow | Tools | API |
+| --- | --- | --- |
+| Contact lifecycle | `upsert_contact`, `search_contacts`, `get_contact`, `delete_contact` | `/v1/contact`, `/v1/contacts`, `/v1/contact/{id}` |
+| Bulk imports | `bulk_upsert_contacts`, `get_contact_import_status` | `/v1/contacts`, `/v1/importstatus/{sessionId}` |
+| Custom field discovery | `get_additional_fields` | `/v1/additionalfields` |
+| Segment discovery and membership | `list_segments`, `get_segment_contacts`, `update_segment_membership` | `/v1/groups`, `/v1/group/{id}/contacts`, `/attach`, `/detach` |
+| Email suppression | `manage_unsubscribes` | `/v1/emails/unsubscribed/add`, `/v1/emails/unsubscribed/delete` |
+| One-off messages | `send_email`, `send_sms` | `/v1/message/email`, `/v1/message/sms` |
+| Prepared messages and delivery | `send_prepared_message`, `get_message_status` | `/v1/message/{id}/smartsend`, `/v1/message/status` |
+| Workflow events | `generate_event` | `/v3/event` |
+| Order lifecycle | `add_orders`, `delete_orders` | `/v1/orders` |
+| Account identity and balance | `get_account_info` | `/v1/account/info`, `/v1/balance` |
 
-eSputnik (also known as Yespo) is a marketing automation platform that provides omnichannel messaging across Email, SMS, Viber, Web Push, Mobile Push, App Inbox, Telegram, and In-App channels. It offers contact management, audience segmentation, workflow automation, product recommendations, and campaign analytics for e-commerce and marketing use cases.
+Contact groups are sent as objects containing `name`, and returned group objects are exposed as names. Bulk imports accept up to 3,000 contacts. `contactFields` selects ordinary fields to update; omitting it can clear unspecified fields. `customFieldsIDs` selects custom fields to update, and selected fields missing from a contact are cleared. Mobile push updates can include device metadata, including `os`.
 
-## Authentication
+Segment reads return pages of at most 500 records and provide `nextStartIndex` when a page is full. Static membership changes accept internal or external contact IDs. Mixed identifiers are partitioned into separate requests; entries without an identifier are rejected before any request, avoiding the provider's detach-all behavior.
 
-The eSputnik API supports Basic HTTP Access Authentication method with the API key used as the password.
+Email sends translate the single `to` address to the provider's `emails` array. Plain-text-only content is escaped into an HTML alternative. The existing `replyTo` field is forwarded for compatibility, although it is absent from the current outgoing-email reference and its effect is unverified. Direct SMS sends translate `phoneNumber` to `phoneNumbers`; a `templateId` invokes the prepared-message endpoint. Providing contact identifiers for direct SMS first upserts the SMS channel on that contact.
 
-To authenticate:
+Prepared sends retain each recipient's channel and sender options by grouping matching options into requests with top-level `email` and `fromName`. Results expose queue outcomes and request IDs; delivery must be checked separately. Order submission exposes provider validation failures even on HTTP 200. Order deletion uses one query request per external order ID and runs asynchronously. Events accept nested JSON, have a default 20 KB limit, and repeated requests are processed separately.
 
-- In the Username field, enter any value. In the Password field, enter your API key.
-- All API requests to eSputnik are sent to `https://esputnik.com/api/`, where you should input one of our methods' addresses after the last slash.
+Existing tool keys and field types are retained. Balance amounts and message delivery flags stay strings in existing public outputs. No file-output tools or triggers are registered.
 
-To generate an API key:
-
-- Go to your profile → Settings → API. Click New key. In Description, enter the name of an application or a site where you want to use the key. Open the dropdown menu and select the access rights for the API key.
-
-Access rights can be configured per key:
-
-- You can give full access to all eSputnik API resources and methods by choosing Full access to API.
-- To set up several integrations, create a key for each. You can create several keys with different access rights for the same account.
-
-**Important:** If you don't use a key for 90 days, it is disabled automatically.
-
-**Example (HTTP Basic Auth header):**
-
-```
-Authorization: Basic base64(anyvalue:YOUR_API_KEY)
-```
-
-## Features
-
-### Contact Management
-
-Add, update, delete, and search for contacts. It allows adding/updating one contact or a bulk of contacts, as well as moving contacts from one segment to another. Supports subscription management with double opt-in flows, managing unsubscribe lists per email address, and updating contact custom fields. You can add/update contacts from an external file — upload a file with contacts to your server and launch import from this file.
-
-### Segmentation
-
-Create and manage dynamic and static contact segments. Contacts can be assigned to segments, removed from them, and retrieved by segment. Segmentation can be based on web tracking events, user events, campaign activity, and contact profile data.
-
-### Omnichannel Messaging
-
-Create, manage, and send messages across multiple channels: Email, SMS, Viber, Web Push, Mobile Push, App Inbox, Telegram, and In-App. Messages can be sent as bulk broadcasts to segments or as individual triggered messages with dynamic content populated via Velocity templates. This method allows for generating different content for each recipient. Message delivery statuses can be tracked per recipient.
-
-### Event Generation and Workflow Triggering
-
-Triggered campaigns can be launched using the Generate event API method. This method is suitable for creating custom events. Events carry a type key, a key value (e.g., email address), and arbitrary parameters. Any type of event can be associated with a workflow launched when the event is generated. This is used for abandoned cart reminders, transactional emails, password recovery, and other triggered scenarios.
-
-### Order Management
-
-The Generate event method can also be used to transfer orders. Orders can also be added and deleted via dedicated API methods. Order data powers automated workflows like abandoned cart and post-purchase follow-ups.
-
-### Product Recommendations
-
-Personalized recommendations based on browsing history, orders, user demographics, and product reviews. Recommendation types include bestsellers, personal recommendations, similar products, and frequently bought together. Requires uploading a product feed and configuring data sources in the eSputnik dashboard.
-
-### Broadcast Management
-
-Create, schedule, retrieve, and cancel bulk message campaigns (broadcasts) to specific segments. Supports Email, SMS, and Viber channels.
-
-### Account and Billing
-
-Retrieve account information, organization balance, and billing history.
-
-### Promotional Codes
-
-Upload, retrieve, and count available promotional codes for use in campaigns.
-
-### Product Feed Configuration
-
-Configure and retrieve product feed settings for importing product catalogs used in recommendations and product blocks.
-
-### Web Tracking and Site Management
-
-Manage domains and web push domains, retrieve tracking scripts, and transfer website behavior data via REST API for use in segmentation and triggered campaigns.
-
-## Events
-
-eSputnik supports webhooks for tracking contact activity in real time. You configure a webhook URL in your account settings under Data Export, and eSputnik sends POST requests with JSON payloads whenever tracked events occur.
-
-### Message Activity Events
-
-Tracks the lifecycle of messages sent across all channels (Email, SMS, Viber, Web Push, Mobile Push, App Inbox, Widget, In-App, Telegram). The following activity statuses are available:
-
-- **Sent** — message sent to the contact (Mobile Push only).
-- **Delivered** — message was delivered.
-- **Undelivered** — message could not be delivered (includes reason description; for Email, distinguishes hard vs. soft bounce).
-- **Read** — contact opened the message.
-- **Unsubscribed** — contact unsubscribed from the campaign.
-- **Clicked** — contact clicked a link in the message (a separate event per link click).
-- **Spam** — message was marked as spam.
-- **Subscription Changed** — contact changed their subscription category.
-
-You can select which statuses to track per webhook. Each webhook payload includes details such as contact ID, external customer ID, channel type, message ID, broadcast or workflow context, and timestamp. Optional basic authentication and custom headers (up to 5) can be configured for the webhook endpoint.
+See the [official API reference](https://docs.esputnik.com/reference) and [contact API guide](https://docs.esputnik.com/docs/api-methods-for-add-contacts).

@@ -71,7 +71,7 @@ export let analyzeText = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      content: z.string().describe('Raw text content to analyze'),
+      content: z.string().min(1).max(100_000).describe('Raw text content to analyze'),
       language: z
         .string()
         .optional()
@@ -104,7 +104,7 @@ export let analyzeText = SlateTool.create(spec, {
       output: {
         entities,
         facts,
-        language: result.lang || ctx.input.language,
+        language: result.language || result.lang || ctx.input.language,
         textSentiment: result.sentiment
       },
       message: `Analyzed text and found **${entities.length}** entities and **${facts.length}** facts.`

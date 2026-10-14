@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { eventIdSchema, overrideLocationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getOrder = SlateTool.create(spec, {
   name: 'Get Order',
   key: 'get_order',
-  description: `Retrieve detailed information about a specific order for a Humanitix event. Returns full buyer details, payment information, order status, and financial breakdown.`,
+  description: `Retrieve buyer details, payment information, status, and financial breakdown for a Humanitix order. Call list_events to discover event IDs, then list_orders to discover internal order IDs.`,
   instructions: [
-    'The internal order ID is different from the buyer-facing "Order ID" (e.g., "7QVD6HEL"). Use the internal ID from the Humanitix console URL.'
+    'The internal order ID is different from the buyer-facing "Order ID" (e.g., "7QVD6HEL"). Use orderId from list_orders or the Humanitix console URL.'
   ],
   tags: {
     readOnly: true
@@ -16,8 +17,13 @@ export let getOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      eventId: z.string().describe('The event ID the order belongs to'),
-      orderId: z.string().describe('The internal order ID to retrieve')
+      eventId: eventIdSchema,
+      orderId: z
+        .string()
+        .describe(
+          'The internal order ID to retrieve. Call list_orders to discover order IDs.'
+        ),
+      overrideLocation: overrideLocationSchema
     })
   )
   .output(
@@ -41,7 +47,16 @@ export let getOrder = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether this was a manually created order'),
-      businessPurpose: z.string().optional().describe('Business purpose for the order'),
+      businessPurpose: z
+        .string()
+        .optional()
+        .describe(
+          'Business purpose for the order; boolean values are represented as true or false text.'
+        ),
+      isBusinessPurpose: z
+        .boolean()
+        .optional()
+        .describe('Whether this order was purchased for a business purpose.'),
       createdAt: z.string().optional().describe('When the order was created'),
       completedAt: z.string().optional().describe('When the order was completed'),
       incompleteAt: z.string().optional().describe('When the order was marked incomplete'),
@@ -51,7 +66,9 @@ export let getOrder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let order = await client.getOrder(ctx.input.eventId, ctx.input.orderId);
+    let order = await client.getOrder(ctx.input.eventId, ctx.input.orderId, {
+      overrideLocation: ctx.input.overrideLocation
+    });
 
     return {
       output: {
@@ -71,7 +88,12 @@ export let getOrder = SlateTool.create(spec, {
         eventId: order.eventId,
         eventDateId: order.eventDateId,
         manualOrder: order.manualOrder,
-        businessPurpose: order.businessPurpose,
+        businessPurpose:
+          typeof order.businessPurpose === 'boolean'
+            ? String(order.businessPurpose)
+            : order.businessPurpose,
+        isBusinessPurpose:
+          typeof order.businessPurpose === 'boolean' ? order.businessPurpose : undefined,
         createdAt: order.createdAt,
         completedAt: order.completedAt,
         incompleteAt: order.incompleteAt,

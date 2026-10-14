@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,7 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!tagId) throw new Error('tagId is required for get action');
+      if (!tagId) throw createApiServiceError('tagId is required for get action');
       let tag = await client.getTag(tagId);
       return {
         output: { tag, success: true },
@@ -49,7 +49,7 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!tagId) throw new Error('tagId is required for update action');
+      if (!tagId) throw createApiServiceError('tagId is required for update action');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (color !== undefined) updateData.color = color;
@@ -61,7 +61,7 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!tagId) throw new Error('tagId is required for delete action');
+      if (!tagId) throw createApiServiceError('tagId is required for delete action');
       await client.deleteTag(tagId);
       return {
         output: { success: true },
@@ -69,6 +69,6 @@ export let manageTag = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

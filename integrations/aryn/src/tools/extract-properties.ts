@@ -26,7 +26,11 @@ Define the properties to extract including name, type, description, and optional
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to extract properties from'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet to extract properties from. Call list_docsets to discover DocSet IDs.'
+        ),
       properties: z
         .array(
           z.object({
@@ -93,7 +97,11 @@ export let deleteProperties = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to delete properties from'),
+      docsetId: z
+        .string()
+        .describe(
+          'ID of the DocSet to delete properties from. Call list_docsets to discover DocSet IDs.'
+        ),
       propertyNames: z.array(z.string()).describe('Names of the properties to delete')
     })
   )
@@ -128,7 +136,9 @@ export let suggestProperties = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to analyze')
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to analyze. Call list_docsets to discover DocSet IDs.')
     })
   )
   .output(

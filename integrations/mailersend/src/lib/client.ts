@@ -1,22 +1,29 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue
+} from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.mailersend.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'MailerSend',
+          reason: 'mailersend_api_error'
+        })
     });
   }
 
   // ---- Email ----
 
   async sendEmail(params: {
-    from: { email: string; name?: string };
+    from?: { email: string; name?: string };
     to: Array<{ email: string; name?: string }>;
     subject?: string;
     text?: string;
@@ -90,16 +97,17 @@ export class Client {
       body.headers = params.headers;
     }
 
-    let response = await this.axios.post('/email', body, {
-      validateStatus: () => true
-    });
-
-    let messageId = response.headers?.['x-message-id'] as string | undefined;
+    let response = await this.axios.post<{ warnings?: Record<string, unknown>[] }>(
+      '/email',
+      body
+    );
+    let messageId = getResponseHeaderValue(response.headers, 'x-message-id');
 
     return {
       statusCode: response.status as number,
       messageId: messageId || null,
-      warnings: response.data || null
+      warnings: response.data?.warnings ?? [],
+      paused: getResponseHeaderValue(response.headers, 'x-send-paused') === 'true'
     };
   }
 
@@ -121,15 +129,13 @@ export class Client {
     text: string;
     personalization?: Array<{ phone_number: string; data: Record<string, unknown> }>;
   }) {
-    let response = await this.axios.post('/sms', params, {
-      validateStatus: () => true
-    });
-
-    let smsMessageId = response.headers?.['x-sms-message-id'] as string | undefined;
+    let response = await this.axios.post('/sms', params);
+    let smsMessageId = getResponseHeaderValue(response.headers, 'x-sms-message-id');
 
     return {
       statusCode: response.status as number,
-      smsMessageId: smsMessageId || null
+      smsMessageId: smsMessageId || null,
+      paused: getResponseHeaderValue(response.headers, 'x-sms-send-paused') === 'true'
     };
   }
 
@@ -146,16 +152,17 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
   async getTemplate(templateId: string) {
-    let response = await this.axios.get(`/templates/${templateId}`);
+    let response = await this.axios.get(`/templates/${encodeURIComponent(templateId)}`);
     return response.data as { data: Record<string, unknown> };
   }
 
   async deleteTemplate(templateId: string) {
-    await this.axios.delete(`/templates/${templateId}`);
+    await this.axios.delete(`/templates/${encodeURIComponent(templateId)}`);
   }
 
   // ---- Domains ----
@@ -171,11 +178,12 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
   async getDomain(domainId: string) {
-    let response = await this.axios.get(`/domains/${domainId}`);
+    let response = await this.axios.get(`/domains/${encodeURIComponent(domainId)}`);
     return response.data as { data: Record<string, unknown> };
   }
 
@@ -195,21 +203,26 @@ export class Client {
   }
 
   async deleteDomain(domainId: string) {
-    await this.axios.delete(`/domains/${domainId}`);
+    await this.axios.delete(`/domains/${encodeURIComponent(domainId)}`);
   }
 
   async getDomainDnsRecords(domainId: string) {
-    let response = await this.axios.get(`/domains/${domainId}/dns-records`);
-    return response.data as { data: Record<string, unknown>[] };
+    let response = await this.axios.get(
+      `/domains/${encodeURIComponent(domainId)}/dns-records`
+    );
+    return response.data as { data: Record<string, unknown> };
   }
 
   async verifyDomain(domainId: string) {
-    let response = await this.axios.get(`/domains/${domainId}/verify`);
+    let response = await this.axios.get(`/domains/${encodeURIComponent(domainId)}/verify`);
     return response.data as { data: Record<string, unknown> };
   }
 
   async updateDomainSettings(domainId: string, settings: Record<string, unknown>) {
-    let response = await this.axios.put(`/domains/${domainId}/settings`, settings);
+    let response = await this.axios.put(
+      `/domains/${encodeURIComponent(domainId)}/settings`,
+      settings
+    );
     return response.data as { data: Record<string, unknown> };
   }
 
@@ -226,11 +239,12 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
   async getIdentity(identityId: string) {
-    let response = await this.axios.get(`/identities/${identityId}`);
+    let response = await this.axios.get(`/identities/${encodeURIComponent(identityId)}`);
     return response.data as { data: Record<string, unknown> };
   }
 
@@ -242,7 +256,7 @@ export class Client {
   async createIdentity(params: {
     domainId: string;
     email: string;
-    name: string;
+    name?: string;
     replyToEmail?: string;
     replyToName?: string;
     addNote?: boolean;
@@ -277,25 +291,26 @@ export class Client {
     if (params.addNote !== undefined) body.add_note = params.addNote;
     if (params.personalNote !== undefined) body.personal_note = params.personalNote;
 
-    let response = await this.axios.put(`/identities/${identityId}`, body);
+    let response = await this.axios.put(`/identities/${encodeURIComponent(identityId)}`, body);
     return response.data as { data: Record<string, unknown> };
   }
 
   async deleteIdentity(identityId: string) {
-    await this.axios.delete(`/identities/${identityId}`);
+    await this.axios.delete(`/identities/${encodeURIComponent(identityId)}`);
   }
 
   // ---- Email Verification ----
 
   async verifySingleEmail(email: string) {
     let response = await this.axios.post('/email-verification/verify', { email });
-    return response.data as { data: Record<string, unknown> };
+    return response.data as Record<string, unknown>;
   }
 
-  async createVerificationList(params: { name: string; emails: string[] }) {
+  async createVerificationList(params: { name: string; emails: string[]; verify?: boolean }) {
     let response = await this.axios.post('/email-verification', {
       name: params.name,
-      emails: params.emails
+      emails: params.emails,
+      verify: params.verify
     });
     return response.data as { data: Record<string, unknown> };
   }
@@ -310,16 +325,19 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
   async getVerificationList(listId: string) {
-    let response = await this.axios.get(`/email-verification/${listId}`);
+    let response = await this.axios.get(`/email-verification/${encodeURIComponent(listId)}`);
     return response.data as { data: Record<string, unknown> };
   }
 
   async startVerificationList(listId: string) {
-    let response = await this.axios.get(`/email-verification/${listId}/verify`);
+    let response = await this.axios.get(
+      `/email-verification/${encodeURIComponent(listId)}/verify`
+    );
     return response.data as { data: Record<string, unknown> };
   }
 
@@ -327,16 +345,20 @@ export class Client {
     listId: string,
     params?: { page?: number; limit?: number; results?: string[] }
   ) {
-    let response = await this.axios.get(`/email-verification/${listId}/results`, {
-      params: {
-        page: params?.page,
-        limit: params?.limit,
-        'results[]': params?.results
+    let response = await this.axios.get(
+      `/email-verification/${encodeURIComponent(listId)}/results`,
+      {
+        params: {
+          page: params?.page,
+          limit: params?.limit,
+          results: params?.results
+        }
       }
-    });
+    );
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
@@ -363,12 +385,13 @@ export class Client {
       queryParams['event[]'] = params.events;
     }
 
-    let response = await this.axios.get(`/activity/${domainId}`, {
+    let response = await this.axios.get(`/activity/${encodeURIComponent(domainId)}`, {
       params: queryParams
     });
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
@@ -385,16 +408,17 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 
   async getRecipient(recipientId: string) {
-    let response = await this.axios.get(`/recipients/${recipientId}`);
+    let response = await this.axios.get(`/recipients/${encodeURIComponent(recipientId)}`);
     return response.data as { data: Record<string, unknown> };
   }
 
   async deleteRecipient(recipientId: string) {
-    await this.axios.delete(`/recipients/${recipientId}`);
+    await this.axios.delete(`/recipients/${encodeURIComponent(recipientId)}`);
   }
 
   // ---- Suppressions ----
@@ -417,6 +441,7 @@ export class Client {
     return response.data as {
       data: Record<string, unknown>[];
       meta: Record<string, unknown>;
+      links?: Record<string, unknown>;
     };
   }
 

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { parseAddressNumber } from '../lib/address-fields';
 import { AddressZenClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -30,12 +31,12 @@ let verifiedAddressSchema = z.object({
 export let verifyAddress = SlateTool.create(spec, {
   name: 'Verify Address',
   key: 'verify_address',
-  description: `Verify and standardize a US address against USPS CASS-certified postal data. Takes a complete or partial address and returns a standardized, deliverable address with validation indicators.
+  description: `Verify and standardize an address. US addresses use USPS CASS-certified postal data; other licensed countries can be selected with context. Takes a complete or partial address and returns a standardized address with validation indicators when matched.
 Useful for cleaning address databases, validating form submissions, verifying shipping addresses before fulfillment, and CRM data quality.
 Supports flexible input: a full address string, or an address with separate city, state, and ZIP code components.`,
   constraints: [
-    'Currently focused on US address verification only.',
-    'Each verification consumes a lookup from your balance.'
+    'International verification requires a key licensed for the selected country.',
+    'A matching verification consumes a lookup from your balance.'
   ],
   tags: {
     readOnly: true
@@ -64,19 +65,24 @@ Supports flexible input: a full address string, or an address with separate city
       tags: z
         .string()
         .optional()
-        .describe('Metadata tag to annotate this lookup for tracking purposes')
+        .describe('Metadata tag to annotate this lookup for tracking purposes'),
+      context: z
+        .string()
+        .optional()
+        .describe('ISO alpha-3 country code, such as USA, GBR, or FRA; defaults to USA')
     })
   )
   .output(verifiedAddressSchema)
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     let result = await client.verifyAddress({
       query: ctx.input.query,
       zipCode: ctx.input.zipCode,
       city: ctx.input.city,
       state: ctx.input.state,
-      tags: ctx.input.tags
+      tags: ctx.input.tags,
+      context: ctx.input.context
     });
 
     let r = result.result || {};
@@ -89,18 +95,19 @@ Supports flexible input: a full address string, or an address with separate city
       state: r.state || undefined,
       zipCode: r.zip_code || undefined,
       countryIso2: r.country_iso_2 || undefined,
-      confidence: r.confidence || undefined,
+      confidence:
+        r.confidence === null || r.confidence === undefined ? undefined : String(r.confidence),
       matchInformation: r.match_information || undefined,
-      fit: r.fit !== undefined ? Number(r.fit) : undefined,
-      latitude: match.latitude !== undefined ? Number(match.latitude) : undefined,
-      longitude: match.longitude !== undefined ? Number(match.longitude) : undefined,
+      fit: parseAddressNumber(r.fit),
+      latitude: parseAddressNumber(match.latitude),
+      longitude: parseAddressNumber(match.longitude),
       carrierRoute: match.carrier_route || undefined,
       congressionalDistrict: match.congressional_district || undefined,
       countyName: match.county || undefined,
       timeZone: match.time_zone || undefined,
-      dpvConfirmation: match.dpv_confirmation || undefined,
-      isCommercial: match.commercial !== undefined ? Boolean(match.commercial) : undefined,
-      count: r.count !== undefined ? Number(r.count) : undefined
+      dpvConfirmation: match.dpv_confirmation || match.dpv || undefined,
+      isCommercial: typeof match.commercial === 'boolean' ? match.commercial : undefined,
+      count: parseAddressNumber(r.count)
     };
 
     let addressLine = [output.addressLineOne, output.city, output.state, output.zipCode]
@@ -110,7 +117,10 @@ Supports flexible input: a full address string, or an address with separate city
 
     return {
       output,
-      message: `Verified address: **${addressLine || ctx.input.query}**${confidenceMsg}`
+      message:
+        output.count === 0
+          ? `No matching address found for **${ctx.input.query}**.`
+          : `Verified address: **${addressLine || ctx.input.query}**${confidenceMsg}`
     };
   })
   .build();

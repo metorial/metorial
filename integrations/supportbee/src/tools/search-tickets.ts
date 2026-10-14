@@ -18,8 +18,10 @@ export let searchTickets = SlateTool.create(spec, {
       perPage: z
         .number()
         .optional()
-        .describe('Number of results per page (max 100, default 15)'),
-      page: z.number().optional().describe('Page number (default 1)')
+        .describe('Number of results per page (1 to 99, default 15)'),
+      page: z.number().optional().describe('Page number (default 1)'),
+      spam: z.boolean().optional().describe('Include tickets marked as spam'),
+      trash: z.boolean().optional().describe('Include trashed tickets')
     })
   )
   .output(
@@ -36,7 +38,9 @@ export let searchTickets = SlateTool.create(spec, {
 
     let result = await client.searchTickets(ctx.input.query, {
       perPage: ctx.input.perPage,
-      page: ctx.input.page
+      page: ctx.input.page,
+      spam: ctx.input.spam,
+      trash: ctx.input.trash
     });
 
     return {

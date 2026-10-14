@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,14 +24,25 @@ export let deleteContactTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.deleteContact(ctx.input.contactId);
+    let result = await client.deleteContact(ctx.input.contactId);
+    let deleted =
+      Array.isArray(result.deletedIds) && result.deletedIds.includes(ctx.input.contactId);
+    let notFound =
+      Array.isArray(result.notFoundIds) && result.notFoundIds.includes(ctx.input.contactId);
+    if (!deleted && !notFound) {
+      throw createApiServiceError('Heyy did not confirm whether the contact was deleted.', {
+        reason: 'heyy_unconfirmed_deletion'
+      });
+    }
 
     return {
       output: {
         contactId: ctx.input.contactId,
-        deleted: true
+        deleted
       },
-      message: `Deleted contact **${ctx.input.contactId}**.`
+      message: deleted
+        ? `Deleted contact **${ctx.input.contactId}**.`
+        : `Contact **${ctx.input.contactId}** was not found and was not deleted.`
     };
   })
   .build();

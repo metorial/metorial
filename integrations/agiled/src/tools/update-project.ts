@@ -12,6 +12,7 @@ export let updateProject = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       projectId: z.string().describe('ID of the project to update'),

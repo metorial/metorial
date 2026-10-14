@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getTaskRelationships } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchTasks = SlateTool.create(spec, {
@@ -62,11 +62,7 @@ export let searchTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let params: Record<string, any> = {};
     if (ctx.input.search !== undefined) params.search = ctx.input.search;
@@ -85,18 +81,22 @@ export let searchTasks = SlateTool.create(spec, {
     let items = Array.isArray(result)
       ? result
       : (result.data ?? result.tasks ?? result.items ?? []);
-    let total = typeof result.total === 'number' ? result.total : items.length;
+    let total = result.total ?? result.totalCount ?? items.length;
 
     let tasks = items.map((t: any) => ({
-      taskId: t.taskId ?? t.id ?? '',
+      taskId: String(t.taskId ?? t.id ?? ''),
       title: t.title ?? t.name ?? '',
-      type: t.type ?? '',
-      status: t.status ?? '',
-      assignee: t.assignee ?? t.assignedTo ?? undefined,
+      type: t.type === 'todo' ? 'to-do' : String(t.type ?? t.taskType ?? ''),
+      status:
+        typeof t.status === 'number'
+          ? t.status === 1
+            ? 'completed'
+            : 'open'
+          : (t.status ?? ''),
+      assignee: t.assignee ?? t.assignees ?? t.assignedTo ?? undefined,
       dueDate: t.dueDate ?? t.due_date ?? undefined,
-      leadId: t.leadId ?? t.lead_id ?? undefined,
-      customerId: t.customerId ?? t.customer_id ?? undefined,
-      createdAt: t.createdAt ?? t.created_at ?? undefined
+      ...getTaskRelationships(t),
+      createdAt: t.createdAt ?? t.created_at ?? t.createDate
     }));
 
     return {

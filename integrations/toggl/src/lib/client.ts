@@ -1,28 +1,69 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord
+} from 'slates';
 
 export class TogglClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   private authHeader: string;
 
-  constructor(token: string) {
-    this.authHeader = `Basic ${btoa(`${token}:api_token`)}`;
-    this.http = createAxios({
+  constructor(
+    token: string,
+    private defaultWorkspaceId?: number
+  ) {
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'A Toggl Track API token is required. Reconnect with a valid token.'
+      );
+    }
+    this.authHeader = `Basic ${Buffer.from(`${token}:api_token`, 'utf8').toString('base64')}`;
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.track.toggl.com/api/v9',
-      headers: {
-        Authorization: this.authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: this.authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Toggl Track',
+          reason: 'api_request_failed'
+        })
     });
   }
 
   private createReportsHttp() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: 'https://api.track.toggl.com/reports/api/v3',
-      headers: {
-        Authorization: this.authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: this.authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Toggl Track Reports',
+          reason: 'report_request_failed'
+        })
     });
+  }
+
+  async resolveWorkspaceId(workspaceId?: string, legacyConfig?: unknown) {
+    let legacyId =
+      isApiErrorRecord(legacyConfig) && typeof legacyConfig.workspaceId === 'string'
+        ? legacyConfig.workspaceId
+        : undefined;
+    let resolved = workspaceId ?? legacyId ?? this.defaultWorkspaceId;
+    if (resolved === undefined) {
+      let me = await this.getMe();
+      resolved = me.default_workspace_id ?? me.default_wid;
+    }
+    if (
+      resolved === undefined ||
+      !/^\d+$/.test(String(resolved)) ||
+      !Number.isSafeInteger(Number(resolved)) ||
+      Number(resolved) <= 0
+    ) {
+      throw createApiServiceError(
+        'Provide a valid workspaceId. Call get_workspace without an ID to discover available workspaces.'
+      );
+    }
+    return String(resolved);
   }
 
   // ─── Me ──────────────────────────────────────────────────────────
@@ -49,10 +90,8 @@ export class TogglClient {
 
   // ─── Time Entries ────────────────────────────────────────────────
 
-  async getTimeEntry(workspaceId: string, timeEntryId: string) {
-    let response = await this.http.get(
-      `/workspaces/${workspaceId}/time_entries/${timeEntryId}`
-    );
+  async getTimeEntry(timeEntryId: string) {
+    let response = await this.http.get(`/me/time_entries/${encodeURIComponent(timeEntryId)}`);
     return response.data;
   }
 
@@ -383,7 +422,7 @@ export class TogglClient {
   // ─── Workspaces ──────────────────────────────────────────────────
 
   async listWorkspaces() {
-    let response = await this.http.get('/workspaces');
+    let response = await this.http.get('/me/workspaces');
     return response.data;
   }
 
@@ -417,7 +456,7 @@ export class TogglClient {
   // ─── Workspace Users ─────────────────────────────────────────────
 
   async listWorkspaceUsers(workspaceId: string) {
-    let response = await this.http.get(`/workspaces/${workspaceId}/workspace_users`);
+    let response = await this.http.get(`/workspaces/${workspaceId}/users`);
     return response.data;
   }
 
@@ -481,6 +520,8 @@ export class TogglClient {
       userIds?: number[];
       billable?: boolean;
       firstRowNumber?: number;
+      firstId?: number;
+      firstTimestamp?: number;
       pageSize?: number;
     }
   ) {
@@ -496,12 +537,18 @@ export class TogglClient {
     if (data.userIds) body.user_ids = data.userIds;
     if (data.billable !== undefined) body.billable = data.billable;
     if (data.firstRowNumber !== undefined) body.first_row_number = data.firstRowNumber;
+    if (data.firstId !== undefined) body.first_id = data.firstId;
+    if (data.firstTimestamp !== undefined) body.first_timestamp = data.firstTimestamp;
     if (data.pageSize !== undefined) body.page_size = data.pageSize;
 
     let response = await reportsHttp.post(
       `/workspace/${workspaceId}/search/time_entries`,
       body
     );
-    return response.data;
+    return {
+      report: response.data,
+      nextId: getResponseHeaderValue(response.headers, 'X-Next-ID') ?? null,
+      nextRowNumber: getResponseHeaderValue(response.headers, 'X-Next-Row-Number') ?? null
+    };
   }
 }

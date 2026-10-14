@@ -42,6 +42,11 @@ export interface BonsaiTask {
   recurring?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  url?: string;
+  assigneeMemberId?: string;
+  taskStatusId?: string;
+  completedAt?: string;
+  archivedAt?: string;
 }
 
 export interface BonsaiDeal {
@@ -59,4 +64,22 @@ export interface BonsaiDeal {
 export interface BonsaiTaskTemplate {
   id: string;
   name: string;
+}
+
+export interface BonsaiTeamMember {
+  memberId: string;
+  userId?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  permissionProfile?: string;
+  status: string;
+}
+
+export interface BonsaiTaskStatus {
+  id: string;
+  name: string;
+  state: string;
+  color?: string;
+  position?: number;
 }

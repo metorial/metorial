@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,16 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Basin account API key. Found under "My Account" → "Basin API" tab. Provides access to all forms, submissions, domains, and projects in your account.'
+          'Your Basin Account API Key from Account Settings → API Settings. Provides access to authorized forms, submissions, domains, and projects. REST API access requires a Growth, Pro, or Agency plan.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Provide your Basin Account API Key from API Settings.');
+      }
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

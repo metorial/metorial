@@ -32,7 +32,8 @@ export let mapsSearch = SlateTool.create(spec, {
   description: `Search Google Maps / local business listings for a given query and location. Returns business names, addresses, ratings, reviews, phone numbers, and Google Place IDs. Supports geotargeting by location name or precise lat/lng coordinates.`,
   instructions: [
     'For precise geotargeting, provide `latitude` and `longitude` coordinates instead of a location name.',
-    'Each result includes a `placeId` for further lookups.'
+    'Coordinate searches use Google Maps at zoom level 15. Provider place_id fields are preserved in each result for further lookups.',
+    'Zenserp currently does not support start pagination for Maps searches; omit start or use 0.'
   ],
   tags: {
     readOnly: true
@@ -69,7 +70,7 @@ export let mapsSearch = SlateTool.create(spec, {
       start: ctx.input.start
     });
 
-    let localResults = results.local_results ?? [];
+    let localResults = results.local_results ?? results.maps_results ?? [];
 
     return {
       output: {

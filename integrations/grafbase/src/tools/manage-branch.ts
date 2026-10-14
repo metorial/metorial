@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createBranch = SlateTool.create(spec, {
   name: 'Create Branch',
   key: 'create_branch',
-  description: `Creates a new branch on a federated graph. Branches enable different environments (e.g., staging, development) with independent schema registries and configurations.`,
+  description: `Creates a new branch on a federated graph. Branches enable different environments with independent schema registries and configurations. Grafbase requires a self-hosted graph for branch creation.`,
   instructions: [
     'Use "Get Graph" first to obtain the graph ID.',
     'The production branch (typically "main") is created automatically with the graph.'
@@ -17,7 +17,7 @@ export let createBranch = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the graph to create the branch on'),
+      graphId: z.string().describe('Graph ID. Call list_graphs to discover graph IDs.'),
       branchName: z.string().describe('Name for the new branch')
     })
   )
@@ -30,7 +30,7 @@ export let createBranch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let branch = await client.createBranch({
@@ -76,7 +76,7 @@ export let getBranch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let branch = await client.getBranch(
@@ -86,7 +86,7 @@ export let getBranch = SlateTool.create(spec, {
     );
 
     if (!branch) {
-      throw new Error('Branch not found.');
+      throw createApiServiceError('Branch not found.');
     }
 
     return {
@@ -123,7 +123,7 @@ export let deleteBranch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     await client.deleteBranch(

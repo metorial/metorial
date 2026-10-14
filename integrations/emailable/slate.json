@@ -1,6 +1,6 @@
 {
   "name": "@metorial/emailable",
-  "description": "Verify email addresses for deliverability, validity, and safety. Perform single real-time email verification or batch verify up to 50,000 emails at once. Retrieve detailed metadata including deliverability state, risk score, disposable/free/role-based detection, SMTP provider info, suggested spelling corrections, and name/gender inference. Check account credit balance and monitor batch verification status with callback support.",
+  "description": "Verify email addresses for deliverability, validity, and safety. Perform single real-time email verification or batch verify up to 50,000 emails at once. Retrieve detailed metadata including deliverability state, risk score, disposable/free/role-based detection, SMTP provider info, suggested spelling corrections, and name/gender inference. Check account credit balance, monitor batch verification status with callback support, and download completed results.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "verify single email address",
@@ -11,6 +11,7 @@
     "detect role-based addresses",
     "retrieve account credits",
     "monitor batch verification status",
+    "download batch verification results",
     "infer name and gender"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/emailable.png"

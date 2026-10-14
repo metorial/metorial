@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let reversePhoneResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   firstName: z.string().optional().describe('First name associated with the phone'),
   lastName: z.string().optional().describe('Last name associated with the phone'),
@@ -22,6 +23,7 @@ let reversePhoneResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   firstName: raw.firstname,
   lastName: raw.lastname,

@@ -1,14 +1,14 @@
 {
   "name": "@metorial/heyy",
-  "description": "Send messages to contacts across WhatsApp, Instagram, Facebook Messenger, and website live chat from a unified inbox. Create and update contacts, upload files for conversations, retrieve business account information, and run marketing campaigns. Supports AI-powered customer support, lead qualification, and automated conversation workflows.",
+  "description": "Manage Heyy contacts, chats, WhatsApp messages, broadcasts, and automation workflows. Inspect your current workspace and retrieve detailed contacts and chats through API v3. Legacy API v2 tools require migration before Heyy's announced November 1, 2026 sunset.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "send WhatsApp messages",
     "manage contacts",
-    "upload conversation files",
+    "retrieve contact and chat details",
     "retrieve business information",
     "run marketing campaigns",
-    "multi-channel messaging",
-    "AI-powered customer support"
+    "inspect connected messaging channels",
+    "trigger automation workflows"
   ]
 }

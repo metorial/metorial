@@ -16,7 +16,7 @@ export let createContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to add the contact to'),
+      listId: z.string().describe('List ID. Call list_lists to discover available lists.'),
       email: z.string().describe('Email address of the contact (required)'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),

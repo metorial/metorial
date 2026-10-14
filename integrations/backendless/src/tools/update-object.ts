@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BackendlessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,6 +39,11 @@ export let updateObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.objectId) === Boolean(ctx.input.where?.trim())) {
+      throw createApiServiceError(
+        'Provide either objectId or a non-empty where clause, but not both.'
+      );
+    }
     let client = new BackendlessClient({
       applicationId: ctx.auth.applicationId,
       token: ctx.auth.token,
@@ -74,10 +79,6 @@ export let updateObject = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: {},
-      message:
-        'No objectId or where clause provided. Please specify either `objectId` for a single update or `where` for a bulk update.'
-    };
+    throw createApiServiceError('Provide objectId or where to update an object.');
   })
   .build();

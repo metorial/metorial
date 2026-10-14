@@ -1,7 +1,7 @@
 import { createHmac } from 'crypto';
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios, requestAxiosData } from 'slates';
 
-let API_VERSION = '2.0.0';
+let API_VERSION = '2.5.0';
 
 export interface MopinionClientConfig {
   publicKey: string;
@@ -107,53 +107,51 @@ export class MopinionClient {
     return Buffer.from(tokenString).toString('base64');
   }
 
-  private async get(endpoint: string, params?: Record<string, any>): Promise<any> {
-    let authToken = this.buildAuthToken(endpoint);
-    let response = await this.axios.get(endpoint, {
-      headers: {
-        'X-Auth-Token': authToken,
-        version: API_VERSION
-      },
-      params
-    });
-    return response.data;
+  private async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    data?: unknown,
+    params?: Record<string, unknown>
+  ): Promise<any> {
+    let body = data === undefined ? '' : JSON.stringify(data);
+    return requestAxiosData(
+      `${method} ${endpoint}`,
+      () =>
+        this.axios.request({
+          method,
+          url: endpoint,
+          data: data === undefined ? undefined : body,
+          params,
+          headers: {
+            'X-Auth-Token': this.buildAuthToken(endpoint, body),
+            version: method === 'GET' ? API_VERSION : '2.0.0',
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Mopinion',
+          reason: 'mopinion_api_error',
+          operation
+        })
+    );
   }
 
-  private async post(endpoint: string, data: any): Promise<any> {
-    let body = JSON.stringify(data);
-    let authToken = this.buildAuthToken(endpoint, body);
-    let response = await this.axios.post(endpoint, data, {
-      headers: {
-        'X-Auth-Token': authToken,
-        version: API_VERSION,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
+  private get(endpoint: string, params?: Record<string, unknown>): Promise<any> {
+    return this.request('GET', endpoint, undefined, params);
   }
 
-  private async put(endpoint: string, data: any): Promise<any> {
-    let body = JSON.stringify(data);
-    let authToken = this.buildAuthToken(endpoint, body);
-    let response = await this.axios.put(endpoint, data, {
-      headers: {
-        'X-Auth-Token': authToken,
-        version: API_VERSION,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
+  private post(endpoint: string, data: unknown): Promise<any> {
+    return this.request('POST', endpoint, data);
   }
 
-  private async delete(endpoint: string): Promise<any> {
-    let authToken = this.buildAuthToken(endpoint);
-    let response = await this.axios.delete(endpoint, {
-      headers: {
-        'X-Auth-Token': authToken,
-        version: API_VERSION
-      }
-    });
-    return response.data;
+  private put(endpoint: string, data: unknown): Promise<any> {
+    return this.request('PUT', endpoint, data);
+  }
+
+  private delete(endpoint: string): Promise<any> {
+    return this.request('DELETE', endpoint);
   }
 
   // Build query params for feedback filtering
@@ -166,13 +164,12 @@ export class MopinionClient {
     if (pagination?.page) params.page = pagination.page;
     if (pagination?.limit) params.limit = pagination.limit;
 
-    if (filters?.date) params['filter[date]'] = filters.date;
-    if (filters?.rating) params['filter[rating]'] = filters.rating;
-    if (filters?.nps) params['filter[nps]'] = filters.nps;
-    if (filters?.ces) params['filter[ces]'] = filters.ces;
-    if (filters?.cesInverse) params['filter[ces_inverse]'] = filters.cesInverse;
-    if (filters?.gcr) params['filter[gcr]'] = filters.gcr;
-    if (filters?.tags) params['filter[tags]'] = filters.tags;
+    for (let [key, value] of Object.entries(filters ?? {})) {
+      if (value === undefined || value === '') continue;
+      let filterKey = key === 'cesInverse' ? 'ces_inverse' : key;
+      let modifier = value.match(/^(<<|>>|!|<|>)/)?.[0] ?? '';
+      params[`filter[${modifier}${filterKey}]`] = value.slice(modifier.length);
+    }
 
     return params;
   }
@@ -184,7 +181,8 @@ export class MopinionClient {
 
   // Reports
   async getReports(): Promise<any> {
-    return this.get('/reports');
+    let account = await this.getAccount();
+    return account.data?.reports ?? account.reports ?? [];
   }
 
   async getReport(reportId: number): Promise<any> {
@@ -241,7 +239,7 @@ export class MopinionClient {
   }
 
   async getDeployment(deploymentKey: string): Promise<any> {
-    return this.get(`/deployments/${deploymentKey}`);
+    return this.get(`/deployments/${encodeURIComponent(deploymentKey)}`);
   }
 
   async addDeployment(data: { key: string; name: string }): Promise<any> {
@@ -249,7 +247,7 @@ export class MopinionClient {
   }
 
   async deleteDeployment(deploymentKey: string): Promise<any> {
-    return this.delete(`/deployments/${deploymentKey}`);
+    return this.delete(`/deployments/${encodeURIComponent(deploymentKey)}`);
   }
 
   // Fields
@@ -265,18 +263,26 @@ export class MopinionClient {
   async getReportFeedback(
     reportId: number,
     pagination?: PaginationOptions,
-    filters?: FeedbackFilters
+    filters?: FeedbackFilters,
+    feedbackId?: string
   ): Promise<any> {
     let params = this.buildFeedbackParams(pagination, filters);
-    return this.get(`/reports/${reportId}/feedback`, params);
+    return this.get(
+      `/reports/${reportId}/feedback${feedbackId ? `/${encodeURIComponent(feedbackId)}` : ''}`,
+      params
+    );
   }
 
   async getDatasetFeedback(
     datasetId: number,
     pagination?: PaginationOptions,
-    filters?: FeedbackFilters
+    filters?: FeedbackFilters,
+    feedbackId?: string
   ): Promise<any> {
     let params = this.buildFeedbackParams(pagination, filters);
-    return this.get(`/datasets/${datasetId}/feedback`, params);
+    return this.get(
+      `/datasets/${datasetId}/feedback${feedbackId ? `/${encodeURIComponent(feedbackId)}` : ''}`,
+      params
+    );
   }
 }

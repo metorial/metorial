@@ -58,7 +58,7 @@ export let listDevices = SlateTool.create(spec, {
       resolverUid: d.resolvers?.uid || '',
       name: d.name,
       description: d.desc || '',
-      icon: d.icon,
+      icon: d.icon || '',
       status: d.status,
       profileName: d.profile?.name || '',
       profileId: d.profile?.PK || '',

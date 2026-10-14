@@ -27,11 +27,13 @@ import {
   listProjects,
   listSections,
   listTasks,
+  listTimeOffTypes,
   listTimeRecords,
   listUsers,
   logTime,
   startTimer,
   stopTimer,
+  syncProject,
   updateAssignment,
   updateClient,
   updateExpense,
@@ -75,6 +77,7 @@ export let provider = Slate.create({
     updateInvoice,
     deleteInvoice,
     listAssignments,
+    listTimeOffTypes,
     createAssignment,
     updateAssignment,
     deleteAssignment,
@@ -82,7 +85,8 @@ export let provider = Slate.create({
     createSection,
     updateSection,
     deleteSection,
-    getReport
+    getReport,
+    syncProject
   ].map(action => action.build()) as any,
   triggers: []
 });

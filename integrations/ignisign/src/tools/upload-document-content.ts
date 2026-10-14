@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IgnisignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,13 +48,13 @@ export let uploadDocumentContent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     if (ctx.input.uploadType === 'file') {
       if (!ctx.input.fileContentBase64 || !ctx.input.fileName || !ctx.input.contentType) {
-        throw new Error(
+        throw createApiServiceError(
           'fileContentBase64, fileName, and contentType are required for file upload'
         );
       }
@@ -75,7 +75,7 @@ export let uploadDocumentContent = SlateTool.create(spec, {
     }
 
     if (!ctx.input.jsonContent) {
-      throw new Error('jsonContent is required for data_json upload');
+      throw createApiServiceError('jsonContent is required for data_json upload');
     }
     let result = await client.uploadDocumentDataJson(
       ctx.input.documentId,

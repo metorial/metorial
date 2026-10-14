@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let sendTemplate = SlateTool.create(spec, {
   name: 'Send Template',
   key: 'send_template',
-  description: `Sends a pre-approved WhatsApp template message to a contact. Templates must be created via the Spoki platform UI and approved by Meta before use.
+  description: `Sends a pre-approved WhatsApp template message to a contact. Templates must be approved by Meta before use.
 Can be used outside the 24-hour conversation window.`,
   instructions: [
-    'Templates cannot be created via API; create them in the Spoki platform first.',
+    'Use an approved template. Call list_templates to discover template IDs and available languages.',
     'Contact details provided will automatically create or update the contact.'
   ],
   tags: {
@@ -19,7 +19,9 @@ Can be used outside the 24-hour conversation window.`,
 })
   .input(
     z.object({
-      templateId: z.string().describe('ID of the Spoki template to send'),
+      templateId: z
+        .string()
+        .describe('Template ID. Call list_templates to discover approved templates.'),
       phone: z
         .string()
         .describe('Recipient phone number in E.164 format (e.g., +393331234567)'),
@@ -64,7 +66,7 @@ Can be used outside the 24-hour conversation window.`,
           : result?.message_id
             ? String(result.message_id)
             : undefined,
-        status: result?.status,
+        status: result?.status ?? undefined,
         raw: result
       },
       message: `Sent template **${ctx.input.templateId}** to **${ctx.input.phone}**`

@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   getBilling,
   getStatistics,
+  getStorageStatistics,
+  listDnsRecords,
   manageCollection,
   manageDnsRecord,
   manageDnsZone,
@@ -26,6 +28,8 @@ export let provider = Slate.create({
     manageVideo,
     manageCollection,
     getStatistics,
+    getStorageStatistics,
+    listDnsRecords,
     getBilling
   ],
   triggers: []

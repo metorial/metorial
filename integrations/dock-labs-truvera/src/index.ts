@@ -5,8 +5,11 @@ import {
   createProofRequest,
   deleteCredential,
   getCredentials,
+  getCurrentUser,
   getJobStatus,
+  getMessages,
   getProofRequests,
+  getTemplates,
   issueCredential,
   manageAnchor,
   manageDid,
@@ -19,6 +22,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getTemplates,
+    getMessages,
     manageDid,
     issueCredential,
     getCredentials,

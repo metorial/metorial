@@ -1,8 +1,31 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let http = createAxios({
   baseURL: 'https://api.neverbounce.com/v4.2'
 });
+
+http.interceptors.response.use(
+  response => {
+    if (response.data?.status !== 'success') {
+      let status = response.data?.status;
+      throw createApiServiceError(
+        `NeverBounce API request failed: ${response.data?.message || status || 'Invalid response from the provider'}`,
+        {
+          reason: 'neverbounce_api_error',
+          upstreamStatus: response.status,
+          upstreamCode: typeof status === 'string' ? status : undefined
+        }
+      );
+    }
+    return response;
+  },
+  error => {
+    throw buildApiServiceError(error, {
+      providerLabel: 'NeverBounce',
+      reason: 'neverbounce_api_error'
+    });
+  }
+);
 
 export interface SingleCheckParams {
   email: string;
@@ -58,6 +81,7 @@ export interface JobStatusResult {
   status: string;
   jobId: number;
   jobStatus: string;
+  failureReason?: string;
   filename: string;
   createdAt: string;
   startedAt: string;
@@ -195,6 +219,11 @@ export class Client {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token) {
+      throw createApiServiceError(
+        'A NeverBounce API key is required. Reconnect your account.'
+      );
+    }
     this.token = config.token;
   }
 
@@ -319,6 +348,7 @@ export class Client {
       status: data.status,
       jobId: data.id,
       jobStatus: data.job_status,
+      failureReason: data.failure_reason ?? undefined,
       filename: data.filename,
       createdAt: data.created_at,
       startedAt: data.started_at,

@@ -9,6 +9,7 @@ import {
   listLeadDuplicates,
   listLeads,
   listPipelinesSteps,
+  listPostSalesProcesses,
   listUnassignedLeads,
   listUsers,
   manageClientFolders,
@@ -16,11 +17,13 @@ import {
   manageProspecting,
   manageTeams,
   sendLeadEmail,
-  updateLead
+  updateLead,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
     createLead,
     getLead,
     listLeads,
@@ -36,6 +39,7 @@ export let provider = Slate.create({
     listUsers,
     manageTeams,
     manageProspecting,
+    listPostSalesProcesses,
     listPipelinesSteps
   ],
   triggers: []

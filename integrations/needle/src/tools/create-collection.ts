@@ -10,7 +10,17 @@ export let createCollection = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().min(1).describe('Name for the new collection')
+      name: z.string().min(1).describe('Name for the new collection'),
+      fileIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Optional existing file IDs from your uploads to include in the new collection'
+        ),
+      model: z
+        .enum(['basilikum-minima', 'mate-meta', 'tortellini-maxima'])
+        .optional()
+        .describe('Optional retrieval model; Needle uses its default when omitted')
     })
   )
   .output(
@@ -22,7 +32,10 @@ export let createCollection = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new NeedleClient(ctx.auth.token);
-    let result = await client.createCollection(ctx.input.name);
+    let result = await client.createCollection(ctx.input.name, {
+      fileIds: ctx.input.fileIds,
+      model: ctx.input.model
+    });
 
     return {
       output: {

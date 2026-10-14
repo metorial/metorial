@@ -33,9 +33,9 @@ export let getReport = SlateTool.create(spec, {
     return {
       output: {
         reportData: result,
-        ready: true
+        ready: result?.status === 'READY'
       },
-      message: `Report data retrieved successfully.`
+      message: `Report status: ${result?.status ?? 'unknown'}.`
     };
   })
   .build();

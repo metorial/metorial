@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getResponseHeaderValue, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/client';
+import { createClient, parseCost } from '../lib/client';
 import { spec } from '../spec';
 
 export let textToSpeech = SlateTool.create(spec, {
@@ -90,30 +90,54 @@ export let textToSpeech = SlateTool.create(spec, {
       voiceSettings: ctx.input.voiceSettings
     });
 
-    let data = response.data;
     let headers = response.headers;
-
+    let responseContentType = getResponseHeaderValue(headers, 'content-type') ?? '';
+    let bytes = Buffer.from(response.data);
     let audioUrl: string | undefined;
     let contentType: string | undefined;
     let textCharacters: number | undefined;
     let cost: number | undefined;
     let latencyMs: number | undefined;
 
-    if (data?.audio) {
-      audioUrl = data.audio.url;
-      contentType = data.audio.content_type;
-      textCharacters = data.usage?.text_characters;
-      cost = data.usage?.cost;
-      latencyMs = data.usage?.latency_ms;
-    } else if (headers?.['x-audio-details']) {
+    if (responseContentType.includes('json') || bytes.subarray(0, 1).toString() === '{') {
+      let data: {
+        audio?: { url?: string; content_type?: string };
+        usage?: { text_characters?: number; cost?: number | string; latency_ms?: number };
+      };
       try {
-        let details = JSON.parse(headers['x-audio-details']);
-        cost = details.cost;
-        latencyMs = details.latencyMs;
-        textCharacters = details.promptChar;
+        data = JSON.parse(bytes.toString('utf8'));
       } catch {
-        // Header parsing failed, continue without metadata
+        throw createApiServiceError('APIpie AI returned invalid speech response JSON.');
       }
+      audioUrl = data?.audio?.url;
+      if (typeof audioUrl !== 'string' || !audioUrl) {
+        throw createApiServiceError('APIpie AI returned no generated audio URL.');
+      }
+      contentType = data.audio?.content_type;
+      textCharacters = data.usage?.text_characters;
+      cost = parseCost(data.usage?.cost);
+      latencyMs = data.usage?.latency_ms;
+      await ctx.addAttachment({ type: 'url', url: audioUrl, mimeType: contentType });
+    } else if (responseContentType.startsWith('audio/') && bytes.byteLength > 0) {
+      contentType = responseContentType;
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(bytes, { headers: { 'Content-Type': contentType } }),
+        filename: `generated-speech.${ctx.input.responseFormat ?? 'mp3'}`
+      });
+      let audioDetails = getResponseHeaderValue(headers, 'x-audio-details');
+      if (audioDetails) {
+        try {
+          let details = JSON.parse(audioDetails);
+          cost = parseCost(details.cost);
+          latencyMs = details.latencyMs;
+          textCharacters = details.promptChar;
+        } catch {
+          // Audio remains usable when optional usage metadata cannot be read.
+        }
+      }
+    } else {
+      throw createApiServiceError('APIpie AI returned no usable generated audio.');
     }
 
     return {
@@ -124,7 +148,7 @@ export let textToSpeech = SlateTool.create(spec, {
         cost,
         latencyMs
       },
-      message: `Generated speech using **${ctx.input.model}** with voice **${ctx.input.voice}**. ${textCharacters ? `${textCharacters} characters processed` : `${ctx.input.input.length} characters submitted`}${cost ? ` ($${cost.toFixed(6)})` : ''}.${audioUrl ? `\n\n[Listen to audio](${audioUrl})` : ''}`
+      message: `Generated speech using **${ctx.input.model}** with voice **${ctx.input.voice}**. ${textCharacters ? `${textCharacters} characters processed` : `${ctx.input.input.length} characters submitted`}${cost !== undefined ? ` ($${cost.toFixed(6)})` : ''}.${audioUrl ? `\n\n[Listen to audio](${audioUrl})` : ''}`
     };
   })
   .build();

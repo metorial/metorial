@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageSuppressionList = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     if (ctx.input.action === 'list') {
@@ -52,7 +52,8 @@ export let manageSuppressionList = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.emailAddress) throw new Error('Email address is required for add action');
+      if (!ctx.input.emailAddress)
+        throw createApiServiceError('Email address is required for add action');
       await client.addToSuppressionList(ctx.input.emailAddress);
 
       return {
@@ -61,6 +62,6 @@ export let manageSuppressionList = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,86 +1,64 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export class Client {
-  private token: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Hyperise API token is required. Reconnect your account.');
+    }
 
-  private get axios() {
-    return createAxios({
-      baseURL: 'https://app.hyperise.io/api/v1/regular'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://app.hyperise.io/api/v1/regular',
+      params: { api_token: config.token },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Hyperise',
+          reason: 'hyperise_api_error'
+        })
     });
   }
-
-  private authParams(extra?: Record<string, string | undefined>) {
-    let params: Record<string, string> = { api_token: this.token };
-    if (extra) {
-      for (let [key, value] of Object.entries(extra)) {
-        if (value !== undefined) {
-          params[key] = value;
-        }
-      }
-    }
-    return params;
-  }
-
-  // ── User ──────────────────────────────────────────────────────
 
   async getCurrentUser() {
-    let response = await this.axios.get('/users/current', {
-      params: this.authParams()
-    });
+    let response = await this.axios.get('/users/current');
     return response.data;
   }
-
-  // ── Image Templates ───────────────────────────────────────────
 
   async listTemplates() {
-    let response = await this.axios.get('/image-templates', {
-      params: this.authParams()
-    });
+    let response = await this.axios.get('/image-templates');
     return response.data;
   }
 
-  // ── Prospect / Business Data ──────────────────────────────────
-
   async listProspects() {
-    let response = await this.axios.get('/businesses', {
-      params: this.authParams()
-    });
+    let response = await this.axios.get('/businesses');
     return response.data;
   }
 
   async getProspect(prospectId: string) {
-    let response = await this.axios.get(`/businesses/${prospectId}`, {
-      params: this.authParams()
-    });
+    let response = await this.axios.get(`/businesses/${encodeURIComponent(prospectId)}`);
     return response.data;
   }
 
   async createProspect(data: Record<string, unknown>) {
-    let response = await this.axios.post('/businesses', data, {
-      params: this.authParams()
-    });
+    let response = await this.axios.post('/businesses', data);
     return response.data;
   }
 
   async updateProspect(prospectId: string, data: Record<string, unknown>) {
-    let response = await this.axios.put(`/businesses/${prospectId}`, data, {
-      params: this.authParams()
-    });
+    let response = await this.axios.put(`/businesses/${encodeURIComponent(prospectId)}`, data);
     return response.data;
   }
 
   async deleteProspect(prospectId: string) {
-    let response = await this.axios.delete(`/businesses/${prospectId}`, {
-      params: this.authParams()
-    });
+    let response = await this.axios.delete(`/businesses/${encodeURIComponent(prospectId)}`);
     return response.data;
   }
-
-  // ── Personalised Short Links ──────────────────────────────────
 
   async createShortLink(data: {
     image_hash: string;
@@ -89,44 +67,31 @@ export class Client {
     desc: string;
     query_params?: Record<string, string>;
   }) {
-    let response = await this.axios.post('/short-links', data, {
-      params: this.authParams()
-    });
+    let response = await this.axios.post('/short-links', data);
     return response.data;
   }
-
-  // ── Data Enrichment ───────────────────────────────────────────
 
   async enrichData(email: string, imageHash?: string) {
-    let params: Record<string, string | undefined> = {
-      email,
-      image_hash: imageHash
-    };
     let response = await this.axios.get('/data-enrichment', {
-      params: this.authParams(params)
+      params: pickDefined({ email, image_hash: imageHash })
     });
     return response.data;
   }
-
-  // ── Image Impressions ─────────────────────────────────────────
 
   async listImageImpressions(imageHash: string, dateFrom?: string) {
-    let params: Record<string, string | undefined> = {
-      image_hash: imageHash,
-      date_from: dateFrom
-    };
     let response = await this.axios.get('/image-impressions', {
-      params: this.authParams(params)
+      params: pickDefined({ image_hash: imageHash, date_from: dateFrom })
     });
     return response.data;
   }
 
-  // ── Client Accounts (Agency) ──────────────────────────────────
-
   async createClientAccount(data: { business_id: string; name: string; email: string }) {
-    let response = await this.axios.post('/clients', data, {
-      params: this.authParams()
-    });
+    let response = await this.axios.post('/clients', data);
+    return response.data;
+  }
+
+  async createClientOrganization(data: { name: string; email: string; seats: number }) {
+    let response = await this.axios.post('/organizations', data);
     return response.data;
   }
 }

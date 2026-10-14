@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,26 +25,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.northflank.com/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
+      let identity = await new Client({ token: ctx.output.token }).getAuthInfo();
+      return {
+        profile: {
+          id: identity.id,
+          name: identity.name ?? identity.entityId,
+          email: identity.creatorEmail
         }
-      });
-      try {
-        let response = await axios.get('/me');
-        let user = response.data?.data?.user;
-        return {
-          profile: {
-            id: user?.id,
-            name: user?.name,
-            email: user?.email
-          }
-        };
-      } catch {
-        return {
-          profile: {}
-        };
-      }
+      };
     }
   });

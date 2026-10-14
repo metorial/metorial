@@ -5,12 +5,15 @@ import {
   createOrder,
   deleteOrders,
   getCompletionDetails,
+  getDispatchStatus,
+  getFileUrl,
   getOrders,
   getPlanningStatus,
   getRoutes,
   getSchedulingInfo,
   optimizeRoutes,
   searchOrders,
+  sendRoutes,
   updateCompletionDetails,
   updateDriverParameters,
   updateDriverPositions
@@ -26,11 +29,14 @@ export let provider = Slate.create({
     optimizeRoutes,
     getPlanningStatus,
     getRoutes,
+    sendRoutes,
+    getDispatchStatus,
     getSchedulingInfo,
     updateDriverParameters,
     updateDriverPositions,
     getCompletionDetails,
-    updateCompletionDetails
+    updateCompletionDetails,
+    getFileUrl
   ],
   triggers: []
 });

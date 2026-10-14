@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let webSearch = SlateTool.create(spec, {
   name: 'Web Search',
   key: 'web_search',
-  description: `Performs AI-powered web searches using a natural language prompt and aggregates structured results from multiple web sources with source attribution.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Performs AI-powered web searches using a natural language prompt and aggregates structured results from multiple web sources with source attribution.
 Two modes: **AI Extraction** (structured data, higher cost) and **Markdown Mode** (raw content, lower cost). Supports geo-targeted search and time range filtering.`,
   instructions: [
     'Set extractionMode to false for cheaper markdown-only results without AI processing.',

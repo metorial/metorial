@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -25,22 +25,29 @@ let contactOutputSchema = z.object({
   channelType: z.string().optional().describe('Channel type.')
 });
 
-let mapContact = (c: any) => ({
-  contactId: c.id,
-  waId: c.wa_id,
-  name: c.name,
-  phone: c.phone,
-  photo: c.photo,
-  created: c.created,
-  lastUpdated: c.last_updated,
-  contactStatus: c.contact_status,
-  optedIn: c.opted_in,
-  allowBroadcast: c.allow_broadcast,
-  teams: c.teams,
-  segments: c.segments,
-  customParams: c.custom_params,
-  channelType: c.channel_type
-});
+let mapContact = (c: any) => {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) {
+    throw createApiServiceError(
+      'Wati returned no contact details. Retrieve the contact to confirm its current state.'
+    );
+  }
+  return {
+    contactId: c.id ?? undefined,
+    waId: c.wa_id ?? undefined,
+    name: c.name ?? undefined,
+    phone: c.phone ?? undefined,
+    photo: c.photo ?? undefined,
+    created: c.created ?? undefined,
+    lastUpdated: c.last_updated ?? undefined,
+    contactStatus: c.contact_status ?? undefined,
+    optedIn: c.opted_in ?? undefined,
+    allowBroadcast: c.allow_broadcast ?? undefined,
+    teams: c.teams ?? undefined,
+    segments: c.segments ?? undefined,
+    customParams: c.custom_params ?? undefined,
+    channelType: c.channel_type ?? undefined
+  };
+};
 
 export let manageContact = SlateTool.create(spec, {
   name: 'Manage Contact',
@@ -93,7 +100,9 @@ Use action "create" to add a new contact, "update" to modify custom parameters, 
 
     if (action === 'create') {
       if (!whatsappNumber || !contactName) {
-        throw new Error('whatsappNumber and contactName are required for creating a contact.');
+        throw createApiServiceError(
+          'whatsappNumber and contactName are required for creating a contact.'
+        );
       }
       let result = await client.createContact({
         whatsappNumber,
@@ -108,19 +117,24 @@ Use action "create" to add a new contact, "update" to modify custom parameters, 
 
     if (action === 'update') {
       if (!target) {
-        throw new Error('target is required for updating a contact.');
+        throw createApiServiceError('target is required for updating a contact.');
       }
       let result = await client.updateContacts([{ target, customParams }]);
       let updatedContact = result?.contact_list?.[0];
+      if (!updatedContact) {
+        throw createApiServiceError(
+          'Wati returned no updated contact. Retrieve the contact to confirm its current attributes.'
+        );
+      }
       return {
-        output: updatedContact ? mapContact(updatedContact) : { contactId: target },
+        output: mapContact(updatedContact),
         message: `Contact **${target}** updated.`
       };
     }
 
     if (action === 'get') {
       if (!target) {
-        throw new Error('target is required for getting a contact.');
+        throw createApiServiceError('target is required for getting a contact.');
       }
       let result = await client.getContact(target);
       return {
@@ -129,6 +143,6 @@ Use action "create" to add a new contact, "update" to modify custom parameters, 
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

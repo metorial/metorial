@@ -25,12 +25,12 @@ let trendsResultSchema = z
 export let googleTrends = SlateTool.create(spec, {
   name: 'Google Trends',
   key: 'google_trends',
-  description: `Retrieve Google Trends data for one or more keywords. Returns search popularity over time, geographic popularity breakdown, related search phrases, and related topics. Supports timeframe filtering and category selection.`,
+  description: `Find current Google trending searches matching one or more keywords. Zenserp now returns Trending now data for the past seven days, with search volume, related queries, categories, and provider notices. Historical keyword interest reports are unavailable.`,
   instructions: [
-    'Provide one or more keywords to compare their search popularity.',
-    'Use `timeframe` to specify a time range, e.g. "today 12-m" for past 12 months, "today 3-m" for past 3 months, "now 7-d" for past 7 days.',
+    'Provide keywords to match current trending search queries and their related queries. A keyword that is not trending can return no rows.',
+    'Use `timeframe` for a supported recent window: "now 1-H", "now 4-H", "now 1-d", or "now 7-d". Historical windows are unavailable.',
     'Use `category` for category-specific trends (Google Trends category ID).',
-    'The `trendsType` parameter controls what data is returned: "interest_over_time", "interest_by_region", "related_queries", or "related_topics".'
+    'Omit `trendsType`; the current Trends endpoint cannot return its legacy report types. Use trending_searches to retrieve current trends without keyword filtering.'
   ],
   tags: {
     readOnly: true
@@ -45,7 +45,9 @@ export let googleTrends = SlateTool.create(spec, {
       timeframe: z
         .string()
         .optional()
-        .describe('Time range, e.g. "today 12-m", "today 3-m", "now 7-d"'),
+        .describe(
+          'Recent time window: "now 1-H", "now 4-H", "now 1-d", or "now 7-d". Historical windows are unavailable on the current Trends endpoint; omit for the provider default.'
+        ),
       category: z.string().optional().describe('Google Trends category ID'),
       trendsType: z
         .enum([
@@ -55,9 +57,14 @@ export let googleTrends = SlateTool.create(spec, {
           'related_topics'
         ])
         .optional()
-        .describe('Type of trends data to return'),
+        .describe(
+          'Legacy report selector retained for compatibility. Omit this field: the current Trends endpoint cannot return these report types and any supplied value is rejected.'
+        ),
       language: z.string().optional().describe('Language code (hl), e.g. "en"'),
-      country: z.string().optional().describe('Country code (gl), e.g. "us"')
+      country: z
+        .string()
+        .optional()
+        .describe('Country code sent as the provider geo parameter, e.g. "US"')
     })
   )
   .output(trendsResultSchema)

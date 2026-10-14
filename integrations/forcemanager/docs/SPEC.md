@@ -1,83 +1,30 @@
-Let me fetch the entity types page to get a complete list of available entities/features.Now I have a comprehensive understanding of ForceManager's API. Let me compile the specification.
+# ForceManager integration
 
-# Slates Specification for Forcemanager
-
-## Overview
-
-ForceManager (now branded as Sage Sales Management) is a mobile-first CRM platform designed for field sales teams. It provides tools for managing accounts, contacts, opportunities, activities, sales orders, products, and calendars, along with sales performance tracking and reporting.
+ForceManager (Sage Sales Management) is a CRM for field sales teams. This integration uses the public v4 API at `https://api.forcemanager.com/api/v4`.
 
 ## Authentication
 
-ForceManager supports two authentication methods:
+Both API Key and Session Key connections accept the public and private API keys. The keys are exchanged through `POST /login` with `username` and `password`. The returned `token` is sent as `X-Session-Key` on subsequent requests. Existing API Key connections with no stored token perform the exchange before their first request.
 
-### 1. API Key Authentication (HMAC Signature)
+API keys are available to administrators under Settings > Integrations > API key management. The public v4 reference does not document a current-user or connection-account identity endpoint. User discovery is available through `get_user`, but a user list does not identify the authenticated principal.
 
-Authentication is performed using an API Public Key and a computed message signature. Each request requires three custom HTTP headers:
+## Capabilities
 
-- **`X-FM-PublicKey`**: Your API Public Key, sent in plain text.
-- **`X-FM-UnixTimestamp`**: A Unix timestamp for the current time in UTC+1.
-- **`X-FM-Signature`**: A SHA1 hash computed by concatenating the Unix Timestamp, the Public Key, and the Private Key: `sha1(UnixTimestamp + APIPublicKey + APIPrivateKey)`.
+- Create, retrieve, search, update, and delete accounts, contacts, activities, opportunities, products, calendar entries, and sales orders.
+- Create, retrieve, list, update, and delete sales-order lines. `get_sales_order` can include all lines of one order; `get_sales_order_line` supports paginated line discovery.
+- Retrieve users and discover branches with stable IDs and localized names.
+- Retrieve built-in lookup resources and discover custom value lists. Omit `resourceName` from `get_values` to list custom tables, then pass a table's `databaseName` to retrieve its values.
+- Find an entity by its external ID using the entity's documented `extId` filter.
 
-You will need both a **Public API key** and a **Private API key**. Admins can find API keys under **Settings > Integrations > API key** in the Sage Sales Management web app, or in the **Password** section of the ForceAdmin tool.
+## Requests and pagination
 
-You should also include the **`X-FM-API-Version`** header to specify which API version to use (e.g., `X-FM-API-Version: 4`).
+Resource routes use `/accounts`, `/contacts`, `/activities`, `/opportunities`, `/products`, `/calendar`, `/salesorders`, and `/salesordersLines`. The documented sales-order-line creation path is `/salesOrdersLines`.
 
-Base URL: `https://api.forcemanager.com/api/v4/`
+Advanced filters use the `where` query parameter. Existing tool `query` inputs are passed through as the filter expression, and individual search fields are combined with it. Pagination uses the zero-based `page` query parameter. The API documents an empty array as the end of pagination; continue requesting `nextPage` until it is null. `totalCount` is the number of records in the returned page, rather than a collection total.
 
-### 2. OAuth 2.0 / Session Key Authentication
+Existing activity inputs map to v4 fields: `activityDateTime` to `date`, `activityTypeId` to `typeId`, `isCheckin` to `checkin`, and check-in coordinates to `latitude`/`longitude`. Calendar owner, type, task, and reminder inputs map to `salesRepId`, `typeId`, `task`, and `reminder`. Opportunity probabilities accept percentages in increments of 10 and map to the provider's integer scale from 0 to 10.
 
-ForceManager also supports OAuth authentication. After completing the OAuth flow, the resulting access token is passed as an `X-Session-Key` header on API requests. This is the method used by third-party integration platforms.
+## Official reference
 
-## Features
-
-### Account (Company) Management
-
-Create, read, update, and delete company/account records. Accounts include fields for name, address, geolocation, contact details, VAT number, account type, status, segment, branch assignment, and multiple sales representative assignments. Entities support custom extra fields (prefixed with `z_`) that are maintained by the customer.
-
-### Contact Management
-
-Manage contacts associated with accounts. Contacts include personal details, multiple email addresses, phone numbers, social profiles (LinkedIn, Skype), and can be linked to accounts and assigned to sales reps.
-
-### Activity Tracking
-
-Record and manage sales activities such as visits, calls, and meetings. Activities can have related documents attached to them. Activities support check-in/check-out with geolocation data and can be linked to accounts, contacts, and opportunities.
-
-### Opportunity Management
-
-Track sales opportunities through their lifecycle. Opportunities include amount, probability, expected and actual closing dates, won/lost dates, status tracking, and geographic information. Opportunities can be associated with multiple accounts (useful for construction industry workflows) and linked to a branch and currency.
-
-### Product Catalog
-
-Manage a product catalog with model names, descriptions, pricing, cost, category and family classification, maximum discount percentages, and availability status.
-
-### Sales Orders
-
-Create and manage sales orders and their line items. Sales orders can be linked to accounts, contacts, opportunities, and branches. Order lines reference products with quantity, pricing, and up to four levels of discounts. Sales orders support rate-based pricing and expected/actual closing dates.
-
-### Calendar & Task Management
-
-Manage calendar events and tasks. Calendar entries support start/end dates, all-day events, notification settings, and can be linked to accounts, contacts, and opportunities. Entries can be marked as tasks or events and tracked for completion.
-
-### User Management
-
-Read-only access to user records including their details, branch assignments, permission levels, user types, and last known geolocation data.
-
-### Views & Filters
-
-Create and manage saved view filters that can be applied to entities. Views can be public or restricted to specific users, and can have active date ranges.
-
-### List of Values
-
-Manage dynamic lookup lists used across entities (e.g., account types, account statuses, activity types, opportunity statuses, contact types, branches, segments, countries, currencies).
-
-### Search & Querying
-
-Search records by important fields (entity-specific searchable fields) that are joined with AND operators in a LIKE fashion. An advanced search/query language is also available for more complex filtering.
-
-### External ID Mapping
-
-Look up ForceManager internal IDs using external system IDs, enabling synchronization with external ERPs, CRMs, or accounting systems.
-
-## Events
-
-The provider does not natively support webhooks or event subscription mechanisms through its API. There is no documented webhook or callback registration endpoint in the ForceManager API. Third-party integration platforms that offer ForceManager "triggers" implement these via polling mechanisms rather than native push-based events from ForceManager.
+- [API reference](https://developer.forcemanager.com/)
+- [OpenAPI document](https://developer.forcemanager.com/openapi.json)

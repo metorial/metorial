@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let apiClient = createAxios({
-  baseURL: 'https://app.fullenrich.com/api/v1'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,15 +25,11 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await apiClient.get('/account/keys/verify', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let result = await new Client({ token: ctx.output.token }).verifyApiKey();
       return {
         profile: {
-          id: response.data.workspace_id,
-          name: `Workspace ${response.data.workspace_id}`
+          id: result.workspaceId,
+          name: `Workspace ${result.workspaceId}`
         }
       };
     }

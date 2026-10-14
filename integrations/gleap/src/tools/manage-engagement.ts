@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,7 @@ export let manageEngagement = SlateTool.create(spec, {
   key: 'manage_engagement',
   description: `Create, update, or delete engagement campaigns in Gleap. Supports banners, chat messages, emails, surveys, product tours, tooltips, checklists, news, modals, WhatsApp messages, cobrowse sessions, and push notifications.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -67,17 +67,18 @@ export let manageEngagement = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let apiPath = engagementTypeMap[ctx.input.engagementType];
     if (!apiPath) {
-      throw new Error(`Unknown engagement type: ${ctx.input.engagementType}`);
+      throw createApiServiceError(`Unknown engagement type: ${ctx.input.engagementType}`);
     }
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.engagementData) {
-        throw new Error('engagementData is required when creating an engagement');
+        throw createApiServiceError('engagementData is required when creating an engagement');
       }
       let engagement = await client.createEngagement(apiPath, ctx.input.engagementData);
       return {
@@ -88,7 +89,7 @@ export let manageEngagement = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.engagementId) {
-        throw new Error('engagementId is required when updating an engagement');
+        throw createApiServiceError('engagementId is required when updating an engagement');
       }
       let engagement = await client.updateEngagement(
         apiPath,
@@ -103,7 +104,7 @@ export let manageEngagement = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.engagementId) {
-        throw new Error('engagementId is required when deleting an engagement');
+        throw createApiServiceError('engagementId is required when deleting an engagement');
       }
       await client.deleteEngagement(apiPath, ctx.input.engagementId);
       return {
@@ -112,6 +113,6 @@ export let manageEngagement = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

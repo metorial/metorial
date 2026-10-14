@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let pageInfoSchema = z.object({
@@ -46,13 +46,13 @@ export let getFileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { fileId, includeData } = ctx.input;
 
     let file = await client.getFile(fileId);
 
-    let pagesOrder: string[] = file.data?.['pages-index'] ?? file.data?.pagesIndex ?? [];
-    let pagesMap = file.data?.pages ?? {};
+    let pagesOrder: string[] = file.data?.pages ?? [];
+    let pagesMap = file.data?.['pages-index'] ?? file.data?.pagesIndex ?? {};
 
     let pages: Array<{ pageId: string; name: string }> = [];
     if (Array.isArray(pagesOrder)) {

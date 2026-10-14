@@ -6,6 +6,8 @@ import {
   addressVerificationTool,
   locationMetadataTool,
   locationSearchTool,
+  poiAutocompleteTool,
+  poiMetadataTool,
   reverseGeocodeTool,
   verifyEmailTool,
   verifyPhoneTool
@@ -19,6 +21,8 @@ export let provider = Slate.create({
     addressVerificationTool,
     locationSearchTool,
     locationMetadataTool,
+    poiAutocompleteTool,
+    poiMetadataTool,
     reverseGeocodeTool,
     verifyEmailTool,
     verifyPhoneTool

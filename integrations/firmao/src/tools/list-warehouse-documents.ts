@@ -60,12 +60,15 @@ export let listWarehouseDocuments = SlateTool.create(spec, {
 
     let warehouseDocuments = result.data.map((d: any) => ({
       warehouseDocumentId: d.id,
-      number: d.number,
-      type: d.type,
-      customerId: typeof d.customer === 'object' ? d.customer?.id : d.customer,
-      customerName: typeof d.customer === 'object' ? d.customer?.name : undefined,
-      warehouseName: d.warehouse?.name,
-      creationDate: d.creationDate
+      number: d.storageDocNumber ?? d.number ?? undefined,
+      type: d.type ?? undefined,
+      customerId: (typeof d.customer === 'object' ? d.customer?.id : d.customer) ?? undefined,
+      customerName:
+        (typeof d.customer === 'object'
+          ? (d.customer?.name ?? d.customer?.label)
+          : undefined) ?? undefined,
+      warehouseName: d.warehouse?.name ?? undefined,
+      creationDate: d.creationDate ?? undefined
     }));
 
     return {

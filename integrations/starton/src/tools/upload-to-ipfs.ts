@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let uploadToIpfs = SlateTool.create(spec, {
   name: 'Upload to IPFS',
   key: 'upload_to_ipfs',
-  description: `Upload content to IPFS through Starton's pinning service. Supports uploading JSON metadata (commonly used for NFT metadata) or listing/managing existing pins. Content stored on IPFS is immutable and always accessible via its CID.`,
+  description: `Upload JSON content to IPFS through Starton's pinning service, commonly for NFT metadata. Returns the pin identifier and CID when available; pinning may continue asynchronously.`,
   instructions: [
     'Use JSON upload for NFT metadata or structured data.',
     'The returned CID can be used as an IPFS URI: ipfs://ipfs/{cid}'
@@ -31,6 +31,10 @@ export let uploadToIpfs = SlateTool.create(spec, {
       pinId: z.string().describe('Starton pin identifier'),
       cid: z.string().describe('IPFS content identifier (CID)'),
       ipfsUri: z.string().describe('Full IPFS URI for the content'),
+      status: z
+        .string()
+        .optional()
+        .describe('Pin status, such as queued, pinning, pinned, or failed'),
       name: z.string().describe('Name of the pinned content')
     })
   )
@@ -50,9 +54,10 @@ export let uploadToIpfs = SlateTool.create(spec, {
         pinId: result.id || '',
         cid: cid,
         ipfsUri: `ipfs://ipfs/${cid}`,
+        status: result.status ?? undefined,
         name: ctx.input.name
       },
-      message: `Uploaded **${ctx.input.name}** to IPFS. CID: \`${cid}\`\nURI: \`ipfs://ipfs/${cid}\``
+      message: `Submitted **${ctx.input.name}** to IPFS.${cid ? ` CID: \`${cid}\`.` : ' CID is pending.'}${result.status ? ` Pin status: ${result.status}.` : ''}`
     };
   })
   .build();

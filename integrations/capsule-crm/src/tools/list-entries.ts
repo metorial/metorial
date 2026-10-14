@@ -35,8 +35,19 @@ export let listEntries = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('ID of the entity to list entries for (required if entityType is set)'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (default: 50)'),
       embed: z
         .array(z.enum(['party', 'kase', 'opportunity', 'creator', 'activityType']))
         .optional()
@@ -89,11 +100,11 @@ export let listEntries = SlateTool.create(spec, {
 
     let entries = (result.entries || []).map((e: any) => ({
       entryId: e.id,
-      type: e.type,
-      content: e.content,
-      createdAt: e.createdAt,
-      updatedAt: e.updatedAt,
-      entryDate: e.entryAt,
+      type: e.type ?? undefined,
+      content: e.content ?? undefined,
+      createdAt: e.createdAt ?? undefined,
+      updatedAt: e.updatedAt ?? undefined,
+      entryDate: e.entryAt ?? undefined,
       creator: e.creator,
       party: e.party,
       opportunity: e.opportunity,

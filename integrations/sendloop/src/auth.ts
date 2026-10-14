@@ -1,46 +1,44 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SendloopClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('Sendloop API key')
+      token: z.string().describe('Sendloop API key'),
+      subdomain: z.string().optional().describe('Account subdomain resolved from Sendloop')
     })
   )
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
       apiKey: z.string().describe('Your Sendloop API key from Settings > API Settings')
     }),
-
     getOutput: async ctx => {
+      let result = await new SendloopClient({ token: ctx.input.apiKey }).getAccountInfo();
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          subdomain: result.AccountInfo?.Subdomain || undefined
         }
       };
     },
-
-    getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios();
-
-      let response = await axios.post(
-        `https://app.sendloop.com/api/v3/Account.Info.Get/json`,
-        new URLSearchParams({ APIKey: ctx.output.token }).toString(),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        }
-      );
-
-      let data = response.data;
-
+    getProfile: async (ctx: { output: { token: string; subdomain?: string } }) => {
+      let result = await new SendloopClient({
+        token: ctx.output.token,
+        subdomain: ctx.output.subdomain
+      }).getAccountInfo();
+      let account = result.AccountInfo || result;
       return {
         profile: {
-          name: data.AccountName || data.CompanyName || undefined,
-          email: data.EmailAddress || undefined
+          name:
+            account.CompanyName ||
+            [account.FirstName, account.LastName].filter(Boolean).join(' ') ||
+            account.Username ||
+            undefined,
+          email: account.Email || account.EmailAddress || undefined
         }
       };
     }

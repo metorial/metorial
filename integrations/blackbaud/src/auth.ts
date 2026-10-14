@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -53,13 +59,21 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `https://oauth2.sky.blackbaud.com/authorization?${params.toString()}`,
+        url: `https://app.blackbaud.com/oauth/authorize?${params.toString()}`,
         input: ctx.input
       };
     },
 
     handleCallback: async ctx => {
-      let http = createAxios({});
+      let http = createAuthenticatedAxios({
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Blackbaud',
+            reason: 'oauth_token_exchange',
+            operation: 'token exchange'
+          })
+      });
 
       let response = await http.post(
         'https://oauth2.sky.blackbaud.com/token',
@@ -77,30 +91,47 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Blackbaud',
+        operation: 'token exchange'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           subscriptionKey: ctx.input.subscriptionKey
         },
         input: ctx.input
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        subscriptionKey: string;
+      };
+      input: { subscriptionKey: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Blackbaud refresh token is available. Reconnect your account.',
+          { reason: 'missing_refresh_token' }
+        );
       }
 
-      let http = createAxios({});
+      let http = createAuthenticatedAxios({
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Blackbaud',
+            reason: 'oauth_token_refresh',
+            operation: 'token refresh'
+          })
+      });
 
       let response = await http.post(
         'https://oauth2.sky.blackbaud.com/token',
@@ -117,18 +148,16 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Blackbaud',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
+          ...tokens,
           subscriptionKey: ctx.output.subscriptionKey
         },
         input: ctx.input

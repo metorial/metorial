@@ -30,8 +30,19 @@ export let listComments = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Sort fields, e.g. "-created_at" for newest first'),
-      limit: z.number().optional().describe('Maximum number of comments to return'),
-      offset: z.number().optional().describe('Number of comments to skip')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(1)
+        .max(10000)
+        .optional()
+        .describe('Maximum number of comments to return'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(0)
+        .optional()
+        .describe('Number of comments to skip')
     })
   )
   .output(
@@ -46,8 +57,8 @@ export let listComments = SlateTool.create(spec, {
       task_id: ctx.input.taskId
     };
     if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     let comments = await client.listComments(params);
 

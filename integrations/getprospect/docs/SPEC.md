@@ -1,84 +1,26 @@
-Let me get more details from the official API docs and the Make.com documentation.Now let me check the Zapier triggers to understand what webhook events GetProspect supports:Now I have enough information to compile the specification.
+# GetProspect API contract
 
-# Slates Specification for Getprospect
+## Authentication and routing
 
-## Overview
+Connect with an API key from [account settings](https://app.getprospect.com/settings/api).
+The current [API v2 authentication contract](https://getprospect.com/api-docs/authentication) uses `https://api.getprospect.com/v2` and an `x-api-key` header. The email tools and account tools use this contract. Blank keys and empty email lookup identifiers produce actionable validation errors. HTTP and v2 envelope failures are reported as service errors.
 
-GetProspect is a B2B lead generation platform that provides email finding and verification services from a database of over 200 million business contacts. It offers a built-in CRM for managing leads, companies, and outreach sequences, along with a LinkedIn extension for extracting prospect data.
+Legacy lead, company, sequence, step, tag, note, and domain tools retain `https://api.getprospect.com/public/v1`, the `apiKey` header, their existing payloads, tool keys, and output fields. The current public v2 documentation does not document those legacy management endpoints. Their continuing provider support has not been verified, and this refresh does not map legacy CRUD semantics onto search or save endpoints.
 
-## Authentication
+## Email tools
 
-GetProspect uses API key authentication.
+- `find_email`: [POST /v2/email/find](https://getprospect.com/api-docs/email-finder), with `data.domain`, `data.first_name`, and `data.last_name`. A 200 response with `success: false` and `NOT_FOUND` is a normal lookup miss. A nullable email is omitted from the optional email output; status and domain health remain available.
+- `verify_email`: [POST /v2/email/verify](https://getprospect.com/api-docs/email-verifier), with `data.email`. Returns mailbox status, domain health, mail provider, and whether the email uses a free provider. A 200 envelope containing `VERIFICATION_ERROR` is a service failure with the provider's retry guidance. Syntactically invalid addresses are sent to the provider for its documented free `invalid` verdict.
 
-**Obtaining the API Key:**
+Both tools retain their existing input names and field types. Their output health fields are additive. The optional `confidence` field on `find_email` remains for compatibility, but API v2 does not document a confidence score. Both clients allow 100 seconds for a request: the provider recommends at least 95 seconds for find and 80 seconds for verify. The client does not automatically retry credit-spending operations.
 
-1. Click the Settings icon in the top right corner of your GetProspect account.
-2. Navigate to the **Integrations** section.
-3. Copy the API key displayed on the screen.
+## Account tools
 
-**Using the API Key:**
-Include the API key in the `apiKey` header of every request. The base URL for the API is `https://api.getprospect.com/public/v1/`.
+- `get_current_user`: [GET /v2/me](https://getprospect.com/api-docs/me), returning user ID, email, names, timezone, account creation time, workspace ID/name/role, authentication channel, and API key ID. No secret key is returned. This operation spends no credits.
+- `get_credit_balances`: [GET /v2/credits](https://getprospect.com/api-docs/credits), returning available, allowance, additional, and permanent balances for email search, email verification, and phone search, plus the next reset time. This operation spends no credits.
 
-Example:
+## Practical coverage and limits
 
-```
-GET https://api.getprospect.com/public/v1/email/verify?email=example@company.com
-Headers:
-  apiKey: your_api_key_here
-```
+The [current API index](https://getprospect.com/api-docs) additionally documents structured people/company search, enrichment, saves, blocklists, jobs, and webhooks. Those features require separate contracts and are outside this targeted refresh. No triggers or downloadable-file tools were added.
 
-No OAuth or additional scopes are required.
-
-## Features
-
-### Lead Management
-
-Create, retrieve, update, and delete leads (contacts) in your GetProspect account. Lead records include fields such as email, first name, last name, company name, company URL, job title, phone, LinkedIn URL, Twitter handle, and notes. Leads can be filtered, sorted, and searched.
-
-### Company Management
-
-Create, retrieve, update, and delete company records. Companies can be associated with leads and managed independently.
-
-### Email Finder
-
-Find a prospect's most likely business email address given a domain name, first name, and last name. Each successful lookup consumes account credits.
-
-### Email Verification
-
-Verify the deliverability of a given email address. Useful for cleaning and validating contact lists before outreach.
-
-### Sequence Management
-
-Create and manage email outreach sequences, including creating, updating, and deleting sequences. Sequences contain steps that can also be individually managed (create, update, delete).
-
-### Tags
-
-Create, update, and delete tags for organizing and categorizing leads and other records.
-
-### Notes
-
-Create, retrieve, update, and delete notes that can be attached to leads or other records.
-
-### Domain Management
-
-Create, retrieve, update, and delete domain records used in email finding and prospecting.
-
-### Job Titles
-
-Create, update, and delete job title records, which can be associated with tags for categorization.
-
-## Events
-
-GetProspect supports webhooks that can be configured via the API. When configuring a webhook, you specify a `webhook_url`, a description, custom request headers, and the events to subscribe to.
-
-### New Contact Saved
-
-Triggers when a new contact is saved via a LinkedIn plugin, bulk import, database search, or programmatic creation. Does not trigger when a lead is added manually. Fires after the email contact search has completed.
-
-### Corporate Email Found
-
-Triggers when a verified corporate email address is successfully found for a new contact. Does not trigger for manually added leads.
-
-### Valid Email Found
-
-Triggers when any valid email address is successfully found for a new contact. Does not trigger for manually added leads.
+This refresh was verified locally by building the integration; no authenticated provider calls, live E2E suites, or tool-use evals were run.

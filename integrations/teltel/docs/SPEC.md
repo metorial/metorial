@@ -1,4 +1,4 @@
-# Slates Specification for Teltel
+# TelTel API Specification
 
 ## Overview
 
@@ -84,3 +84,32 @@ For DID numbers with SMS IN capability, you can configure forwarding of inbound 
 ### WebSocket Events
 
 To receive live call notifications, you can also use WebSocket. Connect via `wss://events.teltel.io` and authenticate with SIP device credentials to receive real-time call events.
+
+
+## Implemented API contracts
+
+| Tool | Current documented endpoint |
+| --- | --- |
+| `initiate_call` | `POST /calls` with a `data` object |
+| `send_sms` | `POST /sms/text` or `POST /sms/bulk/text` |
+| `list_sms` | `GET /sms/reports` and `GET /sms/inbox/reports` |
+| `list_calls` | `GET /calls` with a `filter` expression for dates |
+| `hlr_lookup` | `GET /numbers/lookup/{numbers}` |
+| `list_users` | `GET /users`, reading the `data` array |
+| `list_campaigns` | `GET /autodialers` or `GET /autodialers/{id}` |
+| `manage_campaign` | `POST /autodialers`, `PATCH /autodialers/{id}`, or `DELETE /autodialers/{id}` |
+| `manage_campaign_contacts` | `GET/POST /autodialers/{id}/contacts` or `DELETE /autodialers/{id}/contacts/{contactId}` |
+| `get_account_balance` | `GET /account/balance` |
+| `list_user_caller_id_groups` | `GET /users/{id}/cidgroups` |
+| `get_campaign_stats` | `GET /autodialers/{id}/livestats` |
+
+Create campaign and contact requests use the documented `data` envelope; campaign PATCH accepts the partial property object directly. Campaign creation needs `name`, `campaign_type`, and a `caller_id` array. The optional `callerIds` input supplies that array, and `settings` supplies additional provider property names. SMS input `text` maps to `message`; sending requires `senderId`. Bulk sending creates one message object per recipient, with at most 1000 recipients per call.
+
+Contact input `phone` maps to `phone_number` and `param1` through `param5` map to `custom_field_1` through `custom_field_5`. Import responses preserve the provider counts, and rejected contacts cause `success` to be false. Call user filtering and contact status filtering operate within the requested page. SMS history merges sent and received reports by timestamp by default; use `direction` to select one stream. For merged history, offset plus limit cannot exceed 5000.
+
+The existing campaign `callflowId`, `callerIdGroupId`, and `status` fields and contact `name` field are preserved as legacy pass-through properties. Their write behavior is absent from the current public specification and remains unverified; omission is not treated as proof that the provider removed them. Configure campaign lifecycle operations in TelTel when relying on unsupported status updates. No profile/self endpoint is documented: connection profile metadata is populated only when a returned user's documented `api_key` matches the connection key.
+
+Source: [Official OpenAPI documentation](https://apidoc.teltel.io/).
+
+
+Bulk SMS responses can contain both accepted message IDs and recipient errors. `send_sms` preserves the complete provider response, reports `success: false` for partial acceptance, and adds optional `acceptedCount`, `rejectedCount`, and `failedRecipients` with request indexes and phone numbers. Retry only rejected recipients after fixing their errors; accepted messages should not be resent.

@@ -18,7 +18,21 @@ export let exportJobResult = SlateTool.create(spec, {
         .enum(['result', 'logs'])
         .optional()
         .describe('Type of data to export. Defaults to "result".'),
-      collection: z.number().optional().describe('Collection index to export.'),
+      collection: z
+        .number()
+        .min(1)
+        .refine(Number.isInteger, 'Use a whole-number collection index.')
+        .optional()
+        .describe('Collection index to export.'),
+      modified: z
+        .number()
+        .min(0)
+        .max(1)
+        .refine(Number.isInteger, 'Use 0 or 1.')
+        .optional()
+        .describe(
+          'Use 1 for post-processed results when available, or 0 for original results.'
+        ),
       filename: z.string().optional().describe('Custom filename for the exported file.')
     })
   )
@@ -35,15 +49,27 @@ export let exportJobResult = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.exportJobResult(ctx.input.jobId, {
+    let download = await client.getExportDownload(ctx.input.jobId, {
       type: ctx.input.type,
       collection: ctx.input.collection,
+      modified: ctx.input.modified,
       filename: ctx.input.filename
     });
 
+    // Export links are signed, but Agenty does not document their TTL.
+    // Renew on every later download rather than assuming an expiry duration.
+    await ctx.addAttachment({
+      type: 'url',
+      url: download.url,
+      mimeType: 'text/csv',
+      refreshReference: { ...ctx.input },
+      refreshAt: new Date().toISOString()
+    });
+    let result = download.result;
+
     return {
       output: {
-        downloadLink: result.download_link || result.downloadlink || result.url,
+        downloadLink: download.url,
         exportData: result
       },
       message: `Export generated for job **${ctx.input.jobId}** (${ctx.input.type || 'result'}).${result.download_link || result.downloadlink ? ` Download link available.` : ''}`

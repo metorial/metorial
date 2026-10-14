@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, subscriberDetails } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSubscriber = SlateTool.create(spec, {
@@ -21,13 +21,24 @@ export let getSubscriber = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      subscriberId: z.number().describe('Unique ID of the subscriber'),
+      subscriberId: z
+        .number()
+        .optional()
+        .describe('Legacy numeric subscriber ID, when returned by Sender'),
+      subscriberKey: z
+        .string()
+        .describe(
+          'Subscriber ID. Pass this value to get_subscriber or update_subscriber as identifier'
+        ),
       email: z.string().describe('Email address'),
       firstname: z.string().nullable().describe('First name'),
       lastname: z.string().nullable().describe('Last name'),
       phone: z.string().nullable().describe('Phone number'),
       subscriberStatus: z.string().describe('Email subscription status'),
-      smsStatus: z.string().describe('SMS subscription status'),
+      smsStatus: z
+        .string()
+        .optional()
+        .describe('SMS subscription status, when returned by Sender'),
       transactionalEmailStatus: z.string().describe('Transactional email status'),
       groups: z
         .array(
@@ -49,22 +60,22 @@ export let getSubscriber = SlateTool.create(spec, {
 
     return {
       output: {
-        subscriberId: subscriber.id,
-        email: subscriber.email,
-        firstname: subscriber.firstname,
-        lastname: subscriber.lastname,
-        phone: subscriber.phone,
-        subscriberStatus: subscriber.subscriber_status,
-        smsStatus: subscriber.sms_status,
-        transactionalEmailStatus: subscriber.transactional_email_status,
+        ...subscriberDetails(subscriber),
         groups: (subscriber.subscriber_tags || []).map(tag => ({
           groupId: tag.id,
           title: tag.title
         })),
-        customFields: subscriber.columns || {},
+        customFields: Array.isArray(subscriber.columns)
+          ? Object.fromEntries(
+              subscriber.columns.map(field => [
+                field.field_name ?? field.id,
+                String(field.value ?? '')
+              ])
+            )
+          : (subscriber.columns ?? {}),
         createdAt: subscriber.created
       },
-      message: `Retrieved subscriber **${subscriber.email}** (ID: \`${subscriber.id}\`, status: ${subscriber.subscriber_status}).`
+      message: `Retrieved subscriber **${subscriber.email}** (ID: \`${subscriber.id}\`, status: ${subscriberDetails(subscriber).subscriberStatus}).`
     };
   })
   .build();

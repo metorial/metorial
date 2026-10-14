@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -25,7 +25,12 @@ let contactFields = z
     birthday: z.string().optional().describe('Birthday (ISO 8601 format)'),
     linkedin: z.string().optional().describe('LinkedIn profile URL'),
     skype: z.string().optional().describe('Skype username'),
-    gender: z.string().optional().describe('Gender'),
+    gender: z.string().optional().describe('Gender: male, female, 0, or 1'),
+    genderId: z
+      .number()
+      .int()
+      .optional()
+      .describe('Numeric gender value used by the provider. Overrides gender when supplied.'),
     useCompanyAddress: z
       .boolean()
       .optional()
@@ -69,7 +74,7 @@ Contacts are associated with accounts and include personal details, phone number
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating a contact');
+        throw createApiServiceError('Fields are required for creating a contact');
       }
       let result = await client.createContact(ctx.input.fields);
       let contactId = result?.id;
@@ -82,7 +87,7 @@ Contacts are associated with accounts and include personal details, phone number
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.contactId) {
-        throw new Error('contactId is required for updating a contact');
+        throw createApiServiceError('contactId is required for updating a contact');
       }
       await client.updateContact(ctx.input.contactId, ctx.input.fields || {});
       let contact = await client.getContact(ctx.input.contactId);
@@ -98,7 +103,7 @@ Contacts are associated with accounts and include personal details, phone number
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.contactId) {
-        throw new Error('contactId is required for deleting a contact');
+        throw createApiServiceError('contactId is required for deleting a contact');
       }
       await client.deleteContact(ctx.input.contactId);
       return {
@@ -107,6 +112,6 @@ Contacts are associated with accounts and include personal details, phone number
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

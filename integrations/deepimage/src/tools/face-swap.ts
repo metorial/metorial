@@ -64,11 +64,15 @@ Can also generate AI avatars and business photos from a face image with creative
           adapterType: 'face',
           ipImage2: ctx.input.sourceFaceUrl,
           strength: ctx.input.strength,
-          avatarGenerationType: ctx.input.avatarGenerationType,
+          avatarGenerationType: ctx.input.avatarGenerationType ?? 'creative_img2img',
           description: ctx.input.description
         }
       }
     });
+
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
 
     let message =
       result.status === 'complete'

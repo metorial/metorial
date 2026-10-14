@@ -1,4 +1,4 @@
-# Slates Specification for Userflow
+# Userflow Integration Specification
 
 ## Overview
 
@@ -6,7 +6,7 @@ Userflow is a user onboarding platform that enables teams to build in-app produc
 
 ## Authentication
 
-Userflow uses API key-based authentication. There are two separate types of API keys for two distinct APIs:
+Userflow uses API key-based authentication. These tools use an environment API key for the Users API:
 
 ### Users API Key
 
@@ -14,12 +14,6 @@ Userflow uses API key-based authentication. There are two separate types of API 
 - Used for managing users, groups, events, content, and webhook subscriptions.
 - Include the key in the `Authorization` header as a Bearer token: `Authorization: Bearer <api-key>`
 - All requests default to the latest API version unless you explicitly override it with the `Userflow-Version` header (e.g., `2020-01-03`). It is strongly recommended to specify a version.
-
-### Personal API Key (Accounts API)
-
-- Personal API keys are used for the Accounts API. These keys are tied to your individual member profile and grant access across accounts you belong to based on your roles and permissions. You can view and create personal API keys under My Account -> Personal API Keys.
-- Used for managing account settings, team members, and invites.
-- Also passed via `Authorization: Bearer <personal-api-key>` header.
 
 All API requests must be made over HTTPS. Calls made over plain HTTP will fail. API requests without authentication will also fail.
 
@@ -55,15 +49,16 @@ All API requests must be made over HTTPS. Calls made over plain HTTP will fail. 
 
 - List event definitions configured in your account, which describe the types of events tracked (e.g., "Flow Started", "Checklist Task Completed").
 
-### Account Management (Accounts API)
+### Attribute Definitions and Content Sessions
 
-- Manage your Userflow account, including team members, invites, and account settings. Designed for automating team management and account-level operations.
-- Retrieve account details, list and remove members, and create/manage invitations with configurable roles and permissions.
+- Discover known attribute names, types, and scopes, optionally filtered by event names.
+- List content sessions by user or content, including completion state, progress, timestamps, and expanded survey answers.
+- List results expose pagination metadata.
 
 ### Webhook Subscription Management
 
 - Create webhook subscriptions to be notified when certain events happen. When a user is created or a user event is tracked, Userflow will send a POST request to a URL of your choosing.
-- Create, retrieve, list, update, and delete webhook subscriptions via the API.
+- Create, retrieve, list, and delete webhook subscriptions.
 - Each subscription is configured with a target URL and a list of topics.
 - Userflow includes a `Userflow-Signature` header for verifying that webhook notifications are authentic, including a timestamp to mitigate replay attacks.
 

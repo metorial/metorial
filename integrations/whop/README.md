@@ -1,6 +1,16 @@
 # Whop
 
-Sell digital products, memberships, and subscriptions on the Whop platform. Create and manage products and pricing plans, accept payments via checkout links or embedded checkouts, and issue refunds. Manage memberships including canceling, pausing, resuming, and attaching metadata or software license keys. Create and manage promo codes with percentage or fixed-amount discounts. Automate payouts to users from ledger accounts. Handle payment disputes and resolution cases. Manage chat channels, DMs, forums, and notifications for community engagement. Create and manage courses, chapters, and lessons with student tracking. Manage leads, waitlist entries, and shipments. Access customer reviews. Build and distribute Whop apps across companies.
+Manage Whop products, pricing plans, memberships, members, payments, refunds,
+promo codes, checkout configurations, invoices, and user profiles. Discover
+business accounts with `list_accounts`, inspect the signed-in OAuth identity
+with `get_current_user`, and retrieve existing checkout links with `get_checkout`.
+
+Use a company/account or app API key with the permissions required by each
+operation. OAuth supports sign-in with PKCE and token refresh; its identity
+scopes support `get_current_user`, while commerce endpoints require additional
+permissions granted by Whop. Pass an account ID returned by `list_accounts` as
+`companyId`, or set an optional company ID default in the connection.
+
 
 ## License
 

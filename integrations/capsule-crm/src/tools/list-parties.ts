@@ -41,8 +41,19 @@ export let listParties = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 date to filter parties modified after this date'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page, 1-100 (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page, 1-100 (default: 50)'),
       embed: z
         .array(z.enum(['tags', 'fields', 'organisation', 'missingImportantFields']))
         .optional()
@@ -67,15 +78,15 @@ export let listParties = SlateTool.create(spec, {
     let parties = (result.parties || []).map((p: any) => ({
       partyId: p.id,
       type: p.type,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      name: p.name,
-      title: p.title,
-      jobTitle: p.jobTitle,
-      about: p.about,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      lastContactedAt: p.lastContactedAt,
+      firstName: p.firstName ?? undefined,
+      lastName: p.lastName ?? undefined,
+      name: p.name ?? undefined,
+      title: p.title ?? undefined,
+      jobTitle: p.jobTitle ?? undefined,
+      about: p.about ?? undefined,
+      createdAt: p.createdAt ?? undefined,
+      updatedAt: p.updatedAt ?? undefined,
+      lastContactedAt: p.lastContactedAt ?? undefined,
       organisation: p.organisation,
       owner: p.owner,
       team: p.team,
@@ -85,7 +96,7 @@ export let listParties = SlateTool.create(spec, {
       websites: p.websites,
       tags: p.tags,
       fields: p.fields,
-      pictureURL: p.pictureURL
+      pictureURL: p.pictureURL ?? undefined
     }));
 
     return {

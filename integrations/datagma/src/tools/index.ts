@@ -4,6 +4,7 @@ export * from './enrich-person';
 export * from './enrich-twitter';
 export * from './find-email';
 export * from './find-people';
+export * from './find-verified-email';
 export * from './get-credit-balance';
 export * from './reverse-lookup';
 export * from './search-phone';

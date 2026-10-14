@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let uploadTrainingData = SlateTool.create(spec, {
@@ -15,7 +16,8 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
   instructions: [
     'For file uploads, provide a publicly accessible file URL',
     'For bulk URL uploads, provide an array of URLs the bot should learn from',
-    'A unique upload ID is required for file and text uploads - use a UUID'
+    'A unique upload ID is required for file and text uploads - use a UUID',
+    'URL uploads target the bot selected by botId for account connections, or the bot owning a bot API token'
   ],
   tags: {
     destructive: false
@@ -23,7 +25,13 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
 })
   .input(
     z.object({
-      botId: z.string().describe('The bot ID to upload training data to'),
+      botId: z
+        .string()
+        .min(1)
+        .describe(
+          'Bot ID from list_bots. For a bot API token connection, use the bot that owns the token.'
+        ),
+      workspaceId: workspaceIdSchema,
       uploadType: z
         .enum(['file', 'text', 'urls'])
         .describe('The type of training data to upload'),
@@ -58,15 +66,33 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
   .output(
     z.object({
       success: z.boolean().describe('Whether the upload was accepted'),
-      uploadType: z.string().describe('The type of upload that was performed')
+      uploadType: z.string().describe('The type of upload that was performed'),
+      botId: z.string().describe('Bot ID supplied for the upload'),
+      uploadId: z
+        .string()
+        .optional()
+        .describe(
+          'Submitted data ID for file and text uploads; use list_training_data to check processing'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     if (ctx.input.uploadType === 'file') {
-      if (!ctx.input.fileUrl) throw new Error('fileUrl is required for file uploads');
-      if (!ctx.input.uploadId) throw new Error('uploadId is required for file uploads');
+      if (!ctx.input.fileUrl)
+        throw createApiServiceError('fileUrl is required for file uploads', {
+          reason: 'missing_file_url'
+        });
+      if (!ctx.input.uploadId)
+        throw createApiServiceError('uploadId is required for file uploads', {
+          reason: 'missing_upload_id'
+        });
       await client.uploadFile({
         id: ctx.input.uploadId,
         botId: ctx.input.botId,
@@ -74,8 +100,14 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
         fileName: ctx.input.fileName
       });
     } else if (ctx.input.uploadType === 'text') {
-      if (!ctx.input.text) throw new Error('text is required for text uploads');
-      if (!ctx.input.uploadId) throw new Error('uploadId is required for text uploads');
+      if (!ctx.input.text)
+        throw createApiServiceError('text is required for text uploads', {
+          reason: 'missing_text'
+        });
+      if (!ctx.input.uploadId)
+        throw createApiServiceError('uploadId is required for text uploads', {
+          reason: 'missing_upload_id'
+        });
       await client.uploadText({
         id: ctx.input.uploadId,
         botId: ctx.input.botId,
@@ -84,7 +116,9 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
       });
     } else if (ctx.input.uploadType === 'urls') {
       if (!ctx.input.urls || ctx.input.urls.length === 0)
-        throw new Error('urls array is required for URL uploads');
+        throw createApiServiceError('urls array is required for URL uploads', {
+          reason: 'missing_urls'
+        });
       await client.bulkUploadUrls({
         urls: ctx.input.urls,
         isSitemap: ctx.input.isSitemap,
@@ -95,9 +129,11 @@ The uploaded data will be processed asynchronously. Use the "List Training Data"
     return {
       output: {
         success: true,
-        uploadType: ctx.input.uploadType
+        uploadType: ctx.input.uploadType,
+        botId: ctx.input.botId,
+        uploadId: ctx.input.uploadType === 'urls' ? undefined : ctx.input.uploadId
       },
-      message: `Successfully uploaded ${ctx.input.uploadType} training data to bot **${ctx.input.botId}**.${ctx.input.uploadType === 'urls' ? ` ${ctx.input.urls?.length || 0} URLs submitted.` : ''}`
+      message: `Submitted ${ctx.input.uploadType} training data to bot **${ctx.input.botId}**.${ctx.input.uploadType === 'urls' ? ` ${ctx.input.urls?.length || 0} URLs submitted.` : ''}`
     };
   })
   .build();

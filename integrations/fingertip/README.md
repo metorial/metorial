@@ -1,6 +1,8 @@
 # Fingertip
 
-Create, manage, and customize business websites with pages, themes, and content blocks. Manage bookings and event types including creating, rescheduling, and cancelling appointments. Process orders, create and manage invoices, and handle site contacts and client relationships. Collect form submissions, publish blog posts, and retrieve site analytics. Control site memberships, workspace collaboration, and register webhooks for real-time event notifications on bookings, orders, forms, and contacts.
+Create and manage business websites, pages, and content blocks. List bookings and event types, accept or decline appointments, and complete, reschedule, or cancel bookings. List orders and invoices, create and search site contacts, read blog posts and form submissions, retrieve site analytics, and discover workspaces.
+
+Fingertip's [official closure notice](https://fingertip.com/) is dated 1 May 2026 and states that Fingertip has closed and joined Linktree. These tools retain the existing Fingertip API contract; current API availability and new API key creation are unverified.
 
 ## License
 

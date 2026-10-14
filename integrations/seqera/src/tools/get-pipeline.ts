@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPipeline = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getPipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       pipelineId: z.number().describe('The numeric ID of the pipeline')
     })
   )
@@ -46,32 +48,32 @@ export let getPipeline = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let pipeline = await client.describePipeline(ctx.input.pipelineId);
 
     return {
       output: {
-        pipelineId: pipeline.pipelineId,
-        name: pipeline.name,
-        description: pipeline.description,
-        repository: pipeline.repository,
-        computeEnvId: pipeline.computeEnvId,
-        workDir: pipeline.workDir,
-        revision: pipeline.revision,
-        configProfiles: pipeline.configProfiles,
-        paramsText: pipeline.paramsText,
-        configText: pipeline.configText,
-        preRunScript: pipeline.preRunScript,
-        postRunScript: pipeline.postRunScript,
+        pipelineId: pipeline.pipelineId ?? undefined,
+        name: pipeline.name ?? undefined,
+        description: pipeline.description ?? undefined,
+        repository: pipeline.repository ?? undefined,
+        computeEnvId: pipeline.computeEnvId ?? undefined,
+        workDir: pipeline.workDir ?? undefined,
+        revision: pipeline.revision ?? undefined,
+        configProfiles: pipeline.configProfiles ?? undefined,
+        paramsText: pipeline.paramsText ?? undefined,
+        configText: pipeline.configText ?? undefined,
+        preRunScript: pipeline.preRunScript ?? undefined,
+        postRunScript: pipeline.postRunScript ?? undefined,
         labels: pipeline.labels?.map(l => ({
-          labelId: l.id,
-          name: l.name,
-          value: l.value
+          labelId: l.id ?? undefined,
+          name: l.name ?? undefined,
+          value: l.value ?? undefined
         })),
-        lastUpdated: pipeline.lastUpdated
+        lastUpdated: pipeline.lastUpdated ?? undefined
       },
       message: `Pipeline **${pipeline.name || ctx.input.pipelineId}** retrieved successfully.`
     };

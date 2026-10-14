@@ -5,6 +5,7 @@ export { deleteAgent } from './delete-agent';
 export { getAccountInfo } from './get-account-info';
 export { getAgent } from './get-agent';
 export { getCitation } from './get-citation';
+export { getMessage } from './get-message';
 export { getMessages } from './get-messages';
 export { getReports } from './get-reports';
 export { listAgents } from './list-agents';

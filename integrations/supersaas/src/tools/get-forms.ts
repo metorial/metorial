@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -108,10 +108,10 @@ export let getFormEntriesTool = SlateTool.create(spec, {
     }
 
     if (!ctx.input.formTemplateId) {
-      return {
-        output: { formEntries: [] },
-        message: 'No formTemplateId or formEntryId provided. Please specify one.'
-      };
+      throw createApiServiceError(
+        'Provide formTemplateId or formEntryId. Call list_form_templates to discover template IDs.',
+        { reason: 'SUPERSAAS_FORM_INPUT_INVALID' }
+      );
     }
 
     let data = await client.getFormEntries(ctx.input.formTemplateId, {
@@ -136,7 +136,9 @@ let mapFormEntry = (data: any): any => {
     formEntryId: data.id != null ? String(data.id) : undefined,
     formTemplateId: data.super_form_id != null ? String(data.super_form_id) : undefined,
     appointmentId:
-      data.reservation_process_id != null ? String(data.reservation_process_id) : undefined,
+      data.reservation_process_id != null && Number(data.reservation_process_id) !== 0
+        ? String(data.reservation_process_id)
+        : undefined,
     userId: data.user_id != null ? String(data.user_id) : undefined,
     content: data.content ?? undefined,
     deleted: data.deleted ?? undefined,

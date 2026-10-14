@@ -6,6 +6,7 @@ import {
   scrapeOptionsSchema,
   sessionOptionsSchema
 } from '../lib/schemas';
+import { getScreenshotFile } from '../lib/screenshot';
 import { spec } from '../spec';
 
 export let scrapeWebpage = SlateTool.create(spec, {
@@ -51,10 +52,14 @@ Supports configurable session options like proxy, stealth mode, and CAPTCHA solv
     ctx.progress('Waiting for scrape job to complete...');
     let result = await client.pollForCompletion(
       () => client.getScrapeJobStatus(jobId),
-      () => client.getScrapeJobResult(jobId)
+      () => client.getScrapeJobResult(jobId),
+      { jobId }
     );
 
     let data = result.data as Record<string, unknown> | undefined;
+    if (typeof data?.screenshot === 'string' && data.screenshot) {
+      await ctx.addAttachment(getScreenshotFile(data.screenshot));
+    }
 
     return {
       output: {

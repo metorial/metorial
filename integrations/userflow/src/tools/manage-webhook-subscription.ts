@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,11 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Operation to perform'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum subscriptions to return for list (1–100).'),
+      startingAfter: z.string().optional().describe('Pagination cursor for list.'),
       subscriptionId: z
         .string()
         .optional()
@@ -56,6 +61,11 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of webhook subscriptions (for list)'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether more subscriptions are available for list'),
+      nextPageUrl: z.string().nullable().optional().describe('URL for the next list page'),
       deleted: z.boolean().optional().describe('Whether deletion was successful (for delete)')
     })
   )
@@ -66,8 +76,10 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.url || !ctx.input.topics) {
-        throw new Error('url and topics are required for creating a webhook subscription');
+      if (!ctx.input.url || !ctx.input.topics?.length) {
+        throw createApiServiceError(
+          'url and topics are required for creating a webhook subscription'
+        );
       }
       let sub = await client.createWebhookSubscription({
         url: ctx.input.url,
@@ -90,7 +102,9 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.subscriptionId) {
-        throw new Error('subscriptionId is required for getting a webhook subscription');
+        throw createApiServiceError(
+          'subscriptionId is required for getting a webhook subscription'
+        );
       }
       let sub = await client.getWebhookSubscription(ctx.input.subscriptionId);
       return {
@@ -108,7 +122,10 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list') {
-      let result = await client.listWebhookSubscriptions();
+      let result = await client.listWebhookSubscriptions({
+        limit: ctx.input.limit,
+        startingAfter: ctx.input.startingAfter
+      });
       let subscriptions = result.data.map(s => ({
         subscriptionId: s.id,
         url: s.url,
@@ -117,7 +134,9 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
       }));
       return {
         output: {
-          subscriptions
+          subscriptions,
+          hasMore: result.has_more,
+          nextPageUrl: result.next_page_url
         },
         message: `Retrieved **${subscriptions.length}** webhook subscription(s).`
       };
@@ -125,7 +144,9 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.subscriptionId) {
-        throw new Error('subscriptionId is required for deleting a webhook subscription');
+        throw createApiServiceError(
+          'subscriptionId is required for deleting a webhook subscription'
+        );
       }
       let result = await client.deleteWebhookSubscription(ctx.input.subscriptionId);
       return {
@@ -136,6 +157,6 @@ export let manageWebhookSubscription = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

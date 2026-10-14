@@ -3,12 +3,15 @@ import { spec } from './spec';
 import {
   categorizeDomain,
   checkParkedDomain,
+  discoverDomains,
   findSimilarDomains,
   getCompanyData,
   getDomainLogo,
   getDomainRegistration,
+  getIabCategories,
   getSocialMediaLinks,
-  getTechStack
+  getTechStack,
+  listCategories
 } from './tools';
 
 export let provider = Slate.create({
@@ -21,7 +24,10 @@ export let provider = Slate.create({
     getTechStack,
     findSimilarDomains,
     checkParkedDomain,
-    getDomainRegistration
+    getDomainRegistration,
+    getIabCategories,
+    listCategories,
+    discoverDomains
   ],
   triggers: []
 });

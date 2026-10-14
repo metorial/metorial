@@ -53,7 +53,7 @@ Use **forget** mode to permanently remove all user data with no recovery (backup
       email: ctx.input.email
     });
     return {
-      output: { profileId: result.profile_id || result.id, deletionId: result.deletion?.id },
+      output: { profileId: result.profile?.id, deletionId: result.deletion?.id },
       message: `Profile **${ctx.input.profileId || ctx.input.uid || ctx.input.email}** has been permanently deleted.`
     };
   })

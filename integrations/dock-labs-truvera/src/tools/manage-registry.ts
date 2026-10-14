@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,7 +64,7 @@ Also supports revoking and unrevoking credentials within a registry.`,
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.policyDids || ctx.input.policyDids.length === 0) {
-          throw new Error('policyDids is required for create action');
+          throw createApiServiceError('policyDids is required for create action');
         }
         let result = await client.createRegistry({
           addOnly: ctx.input.addOnly,
@@ -80,7 +80,8 @@ Also supports revoking and unrevoking credentials within a registry.`,
         };
       }
       case 'get': {
-        if (!ctx.input.registryId) throw new Error('registryId is required for get action');
+        if (!ctx.input.registryId)
+          throw createApiServiceError('registryId is required for get action');
         let result = await client.getRegistry(ctx.input.registryId);
         return {
           output: { registry: result },
@@ -98,7 +99,8 @@ Also supports revoking and unrevoking credentials within a registry.`,
         };
       }
       case 'delete': {
-        if (!ctx.input.registryId) throw new Error('registryId is required for delete action');
+        if (!ctx.input.registryId)
+          throw createApiServiceError('registryId is required for delete action');
         let result = await client.deleteRegistry(ctx.input.registryId);
         return {
           output: {
@@ -109,9 +111,10 @@ Also supports revoking and unrevoking credentials within a registry.`,
         };
       }
       case 'revoke': {
-        if (!ctx.input.registryId) throw new Error('registryId is required for revoke action');
+        if (!ctx.input.registryId)
+          throw createApiServiceError('registryId is required for revoke action');
         if (!ctx.input.credentialIds || ctx.input.credentialIds.length === 0) {
-          throw new Error('credentialIds is required for revoke action');
+          throw createApiServiceError('credentialIds is required for revoke action');
         }
         let result = await client.revokeCredential(
           ctx.input.registryId,
@@ -127,9 +130,9 @@ Also supports revoking and unrevoking credentials within a registry.`,
       }
       case 'unrevoke': {
         if (!ctx.input.registryId)
-          throw new Error('registryId is required for unrevoke action');
+          throw createApiServiceError('registryId is required for unrevoke action');
         if (!ctx.input.credentialIds || ctx.input.credentialIds.length === 0) {
-          throw new Error('credentialIds is required for unrevoke action');
+          throw createApiServiceError('credentialIds is required for unrevoke action');
         }
         let result = await client.unrevokeCredential(
           ctx.input.registryId,

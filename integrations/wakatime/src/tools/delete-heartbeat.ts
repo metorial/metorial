@@ -13,7 +13,13 @@ export let deleteHeartbeat = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      heartbeatId: z.string().describe('ID of the heartbeat to delete')
+      heartbeatId: z.string().describe('ID of the heartbeat to delete'),
+      date: z
+        .string()
+        .optional()
+        .describe(
+          "Heartbeat date in YYYY-MM-DD format. Provide this to use WakaTime's documented date-scoped deletion endpoint."
+        )
     })
   )
   .output(
@@ -22,9 +28,9 @@ export let deleteHeartbeat = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
-    await client.deleteHeartbeat(ctx.input.heartbeatId);
+    await client.deleteHeartbeat(ctx.input.heartbeatId, ctx.input.date);
 
     return {
       output: {

@@ -47,8 +47,14 @@ export let listLists = SlateTool.create(spec, {
           listId: l.id,
           name: l.name,
           subscribedContactsCount: l.subscribed_contacts_count,
-          averageEmailOpenPercent: l.average_email_open_percent,
-          averageEmailClickPercent: l.average_email_click_percent,
+          averageEmailOpenPercent:
+            l.average_email_open_percent == null
+              ? undefined
+              : String(l.average_email_open_percent),
+          averageEmailClickPercent:
+            l.average_email_click_percent == null
+              ? undefined
+              : String(l.average_email_click_percent),
           createdAt: l.created_at
         })),
         currentPage: result.current_page,

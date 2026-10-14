@@ -12,6 +12,7 @@ export let createProject = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       name: z.string().describe('Project name'),

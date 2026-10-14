@@ -13,11 +13,8 @@ export let listAppointments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      startDate: z
-        .string()
-        .optional()
-        .describe('Start date filter in yyyy-mm-dd HH:MM format'),
-      endDate: z.string().optional().describe('End date filter in yyyy-mm-dd HH:MM format'),
+      startDate: z.string().optional().describe('Start date filter in yyyy-mm-dd format'),
+      endDate: z.string().optional().describe('End date filter in yyyy-mm-dd format'),
       calendarId: z.string().optional().describe('Filter by calendar ID'),
       email: z.string().optional().describe('Filter by customer email address'),
       contactId: z.string().optional().describe('Filter by customer/contact ID'),

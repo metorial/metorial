@@ -1,15 +1,18 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.app.shortcut.com/api/v3',
-      headers: {
-        'Shortcut-Token': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'Shortcut-Token', value: config.token },
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Shortcut',
+          reason: 'shortcut_api_error'
+        })
     });
   }
 
@@ -35,7 +38,30 @@ export class Client {
 
   async searchStories(query: string, pageSize?: number, next?: string) {
     let params: Record<string, any> = { query };
-    if (pageSize) params.page_size = pageSize;
+    if (pageSize !== undefined) params.page_size = pageSize;
+    if (next && (next.startsWith('/') || /^https?:\/\//i.test(next))) {
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(next, 'https://api.app.shortcut.com');
+      } catch {
+        throw createApiServiceError(
+          'Invalid search page URL. Use nextCursor from search_stories.'
+        );
+      }
+      if (
+        nextUrl.origin !== 'https://api.app.shortcut.com' ||
+        nextUrl.pathname !== '/api/v3/search/stories' ||
+        nextUrl.username ||
+        nextUrl.password ||
+        nextUrl.hash
+      ) {
+        throw createApiServiceError(
+          'Invalid search page URL. Use nextCursor from search_stories for the Shortcut API.'
+        );
+      }
+      let response = await this.http.get(nextUrl.toString());
+      return response.data;
+    }
     if (next) params.next = next;
     let response = await this.http.get('/search/stories', { params });
     return response.data;
@@ -248,13 +274,15 @@ export class Client {
     return response.data;
   }
 
-  async getDocument(documentId: number) {
-    let response = await this.http.get(`/documents/${documentId}`);
+  async getDocument(documentId: string | number, contentFormat?: 'markdown' | 'html') {
+    let response = await this.http.get(`/documents/${encodeURIComponent(documentId)}`, {
+      params: { content_format: contentFormat }
+    });
     return response.data;
   }
 
-  async updateDocument(documentId: number, params: Record<string, any>) {
-    let response = await this.http.put(`/documents/${documentId}`, params);
+  async updateDocument(documentId: string | number, params: Record<string, any>) {
+    let response = await this.http.put(`/documents/${encodeURIComponent(documentId)}`, params);
     return response.data;
   }
 

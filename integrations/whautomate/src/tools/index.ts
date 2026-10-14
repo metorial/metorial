@@ -1,5 +1,6 @@
 export * from './get-appointment-slots';
 export * from './get-messages';
+export * from './get-tag';
 export * from './list-locations';
 export * from './manage-appointment';
 export * from './manage-broadcast';

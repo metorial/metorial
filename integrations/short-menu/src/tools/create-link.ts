@@ -64,7 +64,7 @@ export let createLink = SlateTool.create(spec, {
       tags: z
         .array(
           z.object({
-            tagId: z.string().describe('Identifier of the tag.'),
+            tagId: z.string().optional().describe('Identifier of the tag, when returned.'),
             tagName: z.string().describe('Name of the tag.')
           })
         )

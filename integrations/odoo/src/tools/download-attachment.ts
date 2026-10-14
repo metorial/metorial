@@ -7,6 +7,7 @@ import {
   SlateTool
 } from 'slates';
 import { z } from 'zod';
+import { normalizeOdooInstanceUrl } from '../lib/client';
 import { createClient, type OdooContext } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -30,7 +31,7 @@ let isRecord = (value: unknown): value is Record<string, unknown> =>
 let attachmentRecordUrl = (ctx: OdooContext, attachmentId: number) => {
   let hasBoundAuthState = ctx.auth.transport !== undefined;
   let instanceUrl = hasBoundAuthState ? ctx.auth.instanceUrl : ctx.config.instanceUrl;
-  let baseUrl = (instanceUrl ?? ctx.config.instanceUrl).replace(/\/+$/, '');
+  let baseUrl = normalizeOdooInstanceUrl(instanceUrl);
   return `${baseUrl}/web#id=${attachmentId}&model=ir.attachment&view_type=form`;
 };
 

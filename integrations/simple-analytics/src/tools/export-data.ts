@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { exportDataPoints } from '../lib/export';
+import { exportDataPoints, getExportDownloadDetails } from '../lib/export';
 import { spec } from '../spec';
 
 export let exportDataTool = SlateTool.create(spec, {
   name: 'Export Raw Data',
   key: 'export_raw_data',
-  description: `Export raw, unsampled analytics data points from Simple Analytics. Data points include both page views and events. Define a date range and select the fields you need. Requires both API key and User-Id authentication.`,
+  description: `Export raw, unsampled analytics data points from Simple Analytics as records and a downloadable JSON file. Data points include both page views and events. Define a date range and select the fields you need. Requires both API key and User-Id authentication.`,
   instructions: [
     'Select only the fields you need to minimize response size — data is streamed directly from the database.',
     'Use the "type" parameter to limit results to only page views or only events.',
@@ -25,12 +25,12 @@ export let exportDataTool = SlateTool.create(spec, {
       start: z
         .string()
         .describe(
-          'Start date in YYYY-MM-DD format. For hourly export use YYYY-MM-DDTHH format.'
+          'Start date string, such as YYYY-MM-DD or an API placeholder like today-30d. For absolute hourly export use YYYY-MM-DDTHH.'
         ),
       end: z
         .string()
         .describe(
-          'End date in YYYY-MM-DD format. For hourly export use YYYY-MM-DDTHH format (same day only).'
+          'End date string, such as YYYY-MM-DD or an API placeholder like today or yesterday. For absolute hourly export use YYYY-MM-DDTHH (same day only).'
         ),
       fields: z
         .array(
@@ -66,6 +66,12 @@ export let exportDataTool = SlateTool.create(spec, {
           ])
         )
         .describe('Fields to include in the export. Only selected fields are returned.'),
+      additionalFields: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Additional export fields, including custom metadata such as metadata.project_text or scrolled_percentage.'
+        ),
       type: z
         .enum(['pageviews', 'events'])
         .optional()
@@ -89,25 +95,22 @@ export let exportDataTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let data = await exportDataPoints(
-      { token: ctx.auth.token, userId: ctx.auth.userId },
-      {
-        hostname: ctx.config.hostname,
-        start: ctx.input.start,
-        end: ctx.input.end,
-        fields: ctx.input.fields,
-        type: ctx.input.type,
-        timezone: ctx.input.timezone,
-        robots: ctx.input.includeRobots
-      }
-    );
-
-    let dataPoints: Record<string, unknown>[] = [];
-    if (Array.isArray(data)) {
-      dataPoints = data;
-    } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
-      dataPoints = data.data;
-    }
+    let config = { token: ctx.auth.token, userId: ctx.auth.userId };
+    let params = {
+      hostname: ctx.config.hostname,
+      start: ctx.input.start,
+      end: ctx.input.end,
+      fields: [...ctx.input.fields, ...(ctx.input.additionalFields ?? [])],
+      type: ctx.input.type,
+      timezone: ctx.input.timezone,
+      robots: ctx.input.includeRobots
+    };
+    let dataPoints = await exportDataPoints(config, params);
+    await ctx.addAttachment({
+      type: 'url',
+      ...getExportDownloadDetails(config, params),
+      mimeType: 'application/json'
+    });
 
     return {
       output: {

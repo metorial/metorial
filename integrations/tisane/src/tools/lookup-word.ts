@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,7 +39,7 @@ Useful for linguistic research, understanding word senses, and exploring semanti
       includeInflections: z
         .boolean()
         .optional()
-        .describe('Include inflected forms for the given family/lexeme'),
+        .describe('Include inflected forms. Requires both familyId and lexemeId.'),
       maxHypernymLevel: z
         .number()
         .optional()
@@ -65,6 +65,50 @@ Useful for linguistic research, understanding word senses, and exploring semanti
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.language.trim()) {
+      throw createApiServiceError('Provide a language code for the word lookup.');
+    }
+    if (ctx.input.word !== undefined && !ctx.input.word.trim()) {
+      throw createApiServiceError('Provide a non-empty word to look up.');
+    }
+    for (let [name, value] of [
+      ['familyId', ctx.input.familyId],
+      ['lexemeId', ctx.input.lexemeId]
+    ] as const) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {
+        throw createApiServiceError(`${name} must be a positive integer.`);
+      }
+    }
+    if (
+      ctx.input.maxHypernymLevel !== undefined &&
+      (!Number.isSafeInteger(ctx.input.maxHypernymLevel) || ctx.input.maxHypernymLevel < 0)
+    ) {
+      throw createApiServiceError('maxHypernymLevel must be a non-negative integer.');
+    }
+    if (
+      (ctx.input.includeHypernyms || ctx.input.includeHyponyms) &&
+      ctx.input.familyId === undefined
+    ) {
+      throw createApiServiceError('Provide familyId to retrieve hypernyms or hyponyms.');
+    }
+    if (
+      ctx.input.includeInflections &&
+      (ctx.input.familyId === undefined || ctx.input.lexemeId === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide both familyId and lexemeId to retrieve inflected forms. Use analyze_text with words enabled to discover these IDs.'
+      );
+    }
+    if (ctx.input.maxHypernymLevel !== undefined && !ctx.input.includeHypernyms) {
+      throw createApiServiceError('Enable includeHypernyms when setting maxHypernymLevel.');
+    }
+    if (
+      ctx.input.word === undefined &&
+      ctx.input.familyId === undefined &&
+      !ctx.input.includeInflections
+    ) {
+      throw createApiServiceError('Provide word or familyId, or request inflected forms.');
+    }
     let client = new Client(ctx.auth.token);
     let output: Record<string, any> = {};
     let parts: string[] = [];
@@ -96,10 +140,7 @@ Useful for linguistic research, understanding word senses, and exploring semanti
       }
     }
 
-    if (
-      ctx.input.includeInflections &&
-      (ctx.input.familyId !== undefined || ctx.input.lexemeId !== undefined)
-    ) {
+    if (ctx.input.includeInflections) {
       let inflections = await client.getInflections(
         ctx.input.language,
         ctx.input.lexemeId,
@@ -111,7 +152,7 @@ Useful for linguistic research, understanding word senses, and exploring semanti
 
     return {
       output,
-      message: parts.length > 0 ? parts.join('\n') : 'No lookup criteria provided.'
+      message: parts.join('\n')
     };
   })
   .build();

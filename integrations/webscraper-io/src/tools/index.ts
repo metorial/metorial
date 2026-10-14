@@ -1,3 +1,4 @@
+export * from './continue-scraping-job';
 export * from './create-scraping-job';
 export * from './create-sitemap';
 export * from './delete-scraping-job';
@@ -11,4 +12,5 @@ export * from './get-sitemap';
 export * from './list-scraping-jobs';
 export * from './list-sitemaps';
 export * from './manage-scheduler';
+export * from './stop-scraping-job';
 export * from './update-sitemap';

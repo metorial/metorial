@@ -44,12 +44,12 @@ export let listAgents = SlateTool.create(spec, {
 
     let agents = agentsArray.map((agent: any) => ({
       agentId: String(agent.id),
-      firstName: agent.fname,
-      lastName: agent.lname,
-      phoneNumber: agent.phone_number,
-      timezone: agent.timezone,
-      isAvailable: agent.is_available,
-      priority: agent.priority
+      firstName: agent.fname ?? undefined,
+      lastName: agent.lname ?? undefined,
+      phoneNumber: agent.phone_number ?? undefined,
+      timezone: agent.timezone ?? undefined,
+      isAvailable: agent.is_available ?? undefined,
+      priority: agent.priority ?? undefined
     }));
 
     return {

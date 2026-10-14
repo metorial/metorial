@@ -12,6 +12,7 @@ export let createExpense = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       itemName: z.string().describe('Name or description of the expense'),

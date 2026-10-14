@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphHopperClient } from '../lib/client';
 import { spec } from '../spec';
@@ -176,6 +176,10 @@ Handles pickup-and-delivery problems, multiple vehicles, multiple depots, and va
   )
   .output(
     z.object({
+      jobId: z
+        .string()
+        .optional()
+        .describe('Optimization job ID for retrieving the solution later'),
       costs: z.number().optional().describe('Total cost of the solution'),
       totalDistance: z
         .number()
@@ -289,46 +293,34 @@ Handles pickup-and-delivery problems, multiple vehicles, multiple depots, and va
       value: o.value
     }));
 
-    let configuration = ctx.input.calcRoutePoints
-      ? { routing: { calc_points: true } }
-      : undefined;
+    let configuration =
+      ctx.input.calcRoutePoints !== undefined
+        ? { routing: { calc_points: ctx.input.calcRoutePoints } }
+        : undefined;
 
     ctx.progress('Submitting route optimization problem...');
 
-    let result: Record<string, unknown>;
-    try {
-      result = await client.optimizeRoute({
-        vehicles,
-        vehicleTypes,
-        services,
-        shipments,
-        objectives,
-        configuration
-      });
-    } catch {
-      ctx.info('Using async optimization for larger problem...');
-      let asyncResult = await client.optimizeRouteAsync({
-        vehicles,
-        vehicleTypes,
-        services,
-        shipments,
-        objectives,
-        configuration
-      });
-      let jobId = asyncResult.job_id as string;
-      ctx.progress(`Optimization job submitted (${jobId}). Polling for results...`);
-      result = await client.pollOptimizationSolution(jobId);
+    let asyncResult = await client.optimizeRouteAsync({
+      vehicles,
+      vehicleTypes,
+      services,
+      shipments,
+      objectives,
+      configuration
+    });
+    let jobId = asyncResult.job_id;
+    if (typeof jobId !== 'string' || !jobId.trim()) {
+      throw createApiServiceError('GraphHopper did not return an optimization job ID.');
     }
+    ctx.progress(`Optimization job submitted (${jobId}). Polling for results...`);
+    let result = await client.pollOptimizationSolution(jobId);
 
     let solution = result.solution as Record<string, unknown> | undefined;
     if (!solution) {
-      return {
-        output: {
-          routes: [],
-          processingTimeMs: result.processing_time as number | undefined
-        },
-        message: 'Optimization completed but no solution was found.'
-      };
+      throw createApiServiceError(
+        `GraphHopper finished optimization job ${jobId} without returning a solution.`,
+        { upstreamStatus: typeof result.status === 'string' ? result.status : undefined }
+      );
     }
 
     let routes = ((solution.routes || []) as Record<string, unknown>[]).map(r => ({
@@ -371,6 +363,7 @@ Handles pickup-and-delivery problems, multiple vehicles, multiple depots, and va
 
     return {
       output: {
+        jobId,
         costs: solution.costs as number | undefined,
         totalDistance: solution.distance as number | undefined,
         totalTransportTime: solution.transport_time as number | undefined,

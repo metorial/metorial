@@ -36,7 +36,7 @@ export let getScrapingJob = SlateTool.create(spec, {
       storedRecordCount: z.number().describe('Total number of data records stored'),
       requestInterval: z.number().describe('Delay between requests in milliseconds'),
       pageLoadDelay: z.number().describe('Page load delay in milliseconds'),
-      driver: z.string().describe('Driver used: fast or fulljs'),
+      driver: z.string().optional().describe('Driver used: fast or fulljs, when reported'),
       timeCreated: z.number().describe('Unix timestamp when the job was created'),
       scrapingDuration: z.number().optional().describe('Duration of scraping in seconds')
     })
@@ -61,9 +61,15 @@ export let getScrapingJob = SlateTool.create(spec, {
         storedRecordCount: job.stored_record_count,
         requestInterval: job.request_interval,
         pageLoadDelay: job.page_load_delay,
-        driver: job.driver,
+        driver:
+          job.driver ??
+          (typeof job.render_js === 'boolean'
+            ? job.render_js
+              ? 'fulljs'
+              : 'fast'
+            : undefined),
         timeCreated: job.time_created,
-        scrapingDuration: job.scraping_duration
+        scrapingDuration: job.scraping_duration ?? undefined
       },
       message: `Scraping job \`${job.id}\` is **${job.status}** — ${job.stored_record_count} records stored, ${job.jobs_executed}/${job.jobs_scheduled} pages executed.`
     };

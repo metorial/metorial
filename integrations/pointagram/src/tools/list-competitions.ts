@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { PointagramClient } from '../lib/client';
+import { getPointagramList, PointagramClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCompetitions = SlateTool.create(spec, {
@@ -51,21 +51,24 @@ export let listCompetitions = SlateTool.create(spec, {
       playerExternalId: ctx.input.playerExternalId
     });
 
-    let competitions = Array.isArray(compResult)
-      ? compResult
-      : (compResult?.competitions ?? [compResult]);
+    let competitions = getPointagramList(compResult, 'competitions');
 
     let competitionPlayers: unknown[] | undefined;
     if (ctx.input.includePlayers) {
-      let playersResult = await client.listCompetitionPlayers({
-        competitionId: ctx.input.competitionId,
-        playerEmail: ctx.input.playerEmail,
-        playerName: ctx.input.playerName,
-        playerExternalId: ctx.input.playerExternalId
+      competitionPlayers = [];
+      let competitionIds = competitions.map(competition => {
+        let id = isApiErrorRecord(competition) ? competition.id : undefined;
+        if (typeof id !== 'string' && typeof id !== 'number') {
+          throw createApiServiceError(
+            'Pointagram did not return an ID for a selected competition. Cannot retrieve its participants.'
+          );
+        }
+        return String(id);
       });
-      competitionPlayers = Array.isArray(playersResult)
-        ? playersResult
-        : (playersResult?.players ?? [playersResult]);
+      for (let competitionId of new Set(competitionIds)) {
+        let playersResult = await client.listCompetitionPlayers(competitionId);
+        competitionPlayers.push(...getPointagramList(playersResult, 'players'));
+      }
     }
 
     let message = `Found **${competitions.length}** competition(s).`;

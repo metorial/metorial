@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailtrapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,18 +46,17 @@ export let manageSendingDomain = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let { action, domainId, domainName } = ctx.input;
 
     if (action === 'list') {
       let result = await client.listSendingDomains();
-      let domains = (Array.isArray(result) ? result : []).map((d: any) => ({
+      let domains = (Array.isArray(result) ? result : (result.data ?? [])).map((d: any) => ({
         domainId: d.id,
         domainName: d.name || d.domain_name || '',
-        status: d.status
+        status: d.compliance_status ?? d.status
       }));
       return {
         output: { domains },
@@ -66,35 +65,38 @@ export let manageSendingDomain = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!domainName) throw new Error('domainName is required for creating a sending domain');
+      if (!domainName)
+        throw createApiServiceError('domainName is required for creating a sending domain');
       let result = await client.createSendingDomain(domainName);
       return {
         output: {
           domainId: result.id,
           domainName: result.name || result.domain_name || domainName,
-          status: result.status,
-          dnsRecords: result.dns
+          status: result.compliance_status ?? result.status,
+          dnsRecords: result.dns_records ?? result.dns
         },
         message: `Sending domain **${domainName}** created (ID: ${result.id}). Complete DNS verification to start sending.`
       };
     }
 
     if (action === 'get') {
-      if (!domainId) throw new Error('domainId is required for getting a sending domain');
+      if (!domainId)
+        throw createApiServiceError('domainId is required for getting a sending domain');
       let result = await client.getSendingDomain(domainId);
       return {
         output: {
           domainId: result.id,
           domainName: result.name || result.domain_name || '',
-          status: result.status,
-          dnsRecords: result.dns
+          status: result.compliance_status ?? result.status,
+          dnsRecords: result.dns_records ?? result.dns
         },
-        message: `Domain **${result.name || result.domain_name}** — Status: ${result.status}.`
+        message: `Domain **${result.name || result.domain_name}** — Status: ${result.compliance_status ?? result.status}.`
       };
     }
 
     if (action === 'delete') {
-      if (!domainId) throw new Error('domainId is required for deleting a sending domain');
+      if (!domainId)
+        throw createApiServiceError('domainId is required for deleting a sending domain');
       await client.deleteSendingDomain(domainId);
       return {
         output: { domainId, deleted: true },
@@ -102,6 +104,6 @@ export let manageSendingDomain = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -58,11 +58,7 @@ export let searchCustomers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let params: Record<string, any> = {};
     if (ctx.input.search !== undefined) params.search = ctx.input.search;
@@ -75,14 +71,14 @@ export let searchCustomers = SlateTool.create(spec, {
     let result = await client.searchCustomers(params);
 
     let customers = (result.customers || result.data || result || []).map((c: any) => ({
-      customerId: c.customerId || c.id || '',
-      firstName: c.firstName || '',
-      lastName: c.lastName || '',
-      companyName: c.companyName,
+      customerId: String(c.customerId ?? c.id ?? ''),
+      firstName: c.firstName ?? c.firstname ?? '',
+      lastName: c.lastName ?? c.lastname ?? '',
+      companyName: c.companyName ?? c.businessName,
       email: c.email,
       phone: c.phone,
-      type: c.type,
-      createdAt: c.createdAt
+      type: c.type ?? ([1, '1', true].includes(c.bizCustomer) ? 'commercial' : 'personal'),
+      createdAt: c.createdAt ?? c.createDate
     }));
 
     let total = result.total ?? result.totalCount ?? customers.length;

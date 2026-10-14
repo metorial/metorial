@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PointagramClient } from '../lib/client';
+import { getPointagramList, PointagramClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listScoreSeries = SlateTool.create(spec, {
@@ -38,14 +38,12 @@ export let listScoreSeries = SlateTool.create(spec, {
     });
 
     let seriesResult = await client.listScoreSeries();
-    let scoreSeries = Array.isArray(seriesResult)
-      ? seriesResult
-      : (seriesResult?.scoreseries ?? [seriesResult]);
+    let scoreSeries = getPointagramList(seriesResult, 'scoreseries');
 
     let pointTypes: unknown[] | undefined;
     if (ctx.input.scoreseriesId) {
       let ptResult = await client.listScoreSeriesPointTypes(ctx.input.scoreseriesId);
-      pointTypes = Array.isArray(ptResult) ? ptResult : (ptResult?.pointtypes ?? [ptResult]);
+      pointTypes = getPointagramList(ptResult, 'pointtypes');
     }
 
     let message = `Found **${scoreSeries.length}** score series.`;

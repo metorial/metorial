@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUsageStats = SlateTool.create(spec, {
   name: 'Get Usage Statistics',
   key: 'get_usage_stats',
-  description: `Retrieve usage statistics and lookup history for an API key. Get daily lookup counts over a date range, or export detailed lookup logs. Useful for monitoring API consumption and auditing lookup history.`,
+  description: `Retrieve usage statistics and lookup history for an API key. Get daily lookup counts over a date range, or download detailed lookup logs as CSV. Requires the account Management Key on the connection. The maximum date range is 90 days.`,
   tags: {
     readOnly: true
   }
@@ -22,7 +22,12 @@ export let getUsageStats = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('End date for the usage period (ISO 8601 format, e.g., "2024-01-31")'),
-      tags: z.string().optional().describe('Filter usage by metadata tag'),
+      tags: z
+        .string()
+        .optional()
+        .describe(
+          'Filter usage statistics by up to three comma-separated metadata tags; CSV logs are not filtered by tags'
+        ),
       includeLookupLogs: z
         .boolean()
         .default(false)
@@ -37,7 +42,7 @@ export let getUsageStats = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     let usageResult = await client.getKeyUsage(ctx.input.apiKey, {
       startDate: ctx.input.startDate,
@@ -56,6 +61,15 @@ export let getUsageStats = SlateTool.create(spec, {
         typeof logsResult === 'string'
           ? logsResult
           : logsResult.result || JSON.stringify(logsResult);
+      let download = client.getKeyLookupsDownload(ctx.input.apiKey, {
+        startDate: ctx.input.startDate,
+        endDate: ctx.input.endDate
+      });
+      await ctx.addAttachment({
+        type: 'url',
+        ...download,
+        mimeType: 'text/csv'
+      });
     }
 
     return {
@@ -64,7 +78,7 @@ export let getUsageStats = SlateTool.create(spec, {
         lookupLogs,
         code: usageResult.code
       },
-      message: `Retrieved usage statistics for API key.${ctx.input.startDate ? ` Period: ${ctx.input.startDate} to ${ctx.input.endDate || 'now'}.` : ''}${lookupLogs ? ' Lookup logs included.' : ''}`
+      message: `Retrieved usage statistics for API key.${ctx.input.startDate ? ` Period: ${ctx.input.startDate} to ${ctx.input.endDate || 'now'}.` : ''}${ctx.input.includeLookupLogs ? ' Lookup logs are available as a CSV download.' : ''}`
     };
   })
   .build();

@@ -16,11 +16,29 @@ export let listUsersAndGroups = SlateTool.create(spec, {
       groupId: z
         .string()
         .optional()
-        .describe('If provided, fetch the members of this group. Otherwise, list all groups.')
+        .describe(
+          'If provided, fetch members of this group or organization. Call get_connections to discover IDs. Otherwise, list all groups.'
+        ),
+      limit: z.number().int().positive().optional().describe('Maximum members per page.'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Member offset for pagination.'),
+      status: z
+        .array(z.enum(['active', 'inactive']))
+        .optional()
+        .describe('Filter members by status.')
     })
   )
   .output(
     z.object({
+      total: z
+        .number()
+        .optional()
+        .describe('Total members in the selected group or organization.'),
+      nextOffset: z.number().optional().describe('Offset for the next page of members.'),
       groups: z
         .array(
           z.object({
@@ -47,16 +65,25 @@ export let listUsersAndGroups = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.groupId) {
-      let users = await client.listGroupUsers(ctx.input.groupId);
-      let mapped = users.map((u: any) => ({
+      let result = await client.listGroupUsers(ctx.input.groupId, ctx.input);
+      let mapped = result.users.map((u: any) => ({
         userId: u.user_id || u.id,
-        email: u.email,
-        firstName: u.firstname || u.first_name,
-        lastName: u.lastname || u.last_name
+        email: u.email ?? undefined,
+        firstName: u.firstname || u.first_name || undefined,
+        lastName: u.lastname || u.last_name || undefined
       }));
 
       return {
-        output: { users: mapped },
+        output: {
+          users: mapped,
+          total: result.total ?? undefined,
+          nextOffset:
+            result.total !== undefined &&
+            (result.offset ?? ctx.input.offset ?? 0) + mapped.length < result.total &&
+            mapped.length > 0
+              ? (result.offset ?? ctx.input.offset ?? 0) + mapped.length
+              : undefined
+        },
         message: `Found **${mapped.length}** users in group ${ctx.input.groupId}.`
       };
     }
@@ -64,7 +91,7 @@ export let listUsersAndGroups = SlateTool.create(spec, {
     let groups = await client.listGroups();
     let mapped = groups.map((g: any) => ({
       groupId: g.id || g.group_id,
-      name: g.name
+      name: g.name ?? undefined
     }));
 
     return {

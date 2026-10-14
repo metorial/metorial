@@ -9,7 +9,7 @@ export let uploadTemplate = SlateTool.create(spec, {
   description: `Upload a document template to Carbone for later use in document generation. The template must be provided as a **base64-encoded** string of a supported file type (DOCX, XLSX, PPTX, ODT, ODS, ODG, ODP, XHTML, IDML, HTML, XML). Optionally enable versioning, assign metadata (name, tags, category, comment), set a deployment timestamp, or configure expiration.`,
   instructions: [
     'The template content must be base64-encoded.',
-    'When versioning is enabled, provide a templateId to group versions together.',
+    'Provide a templateId to add a version to an existing template. Omit it when creating a new template.',
     'Templates uploaded with a test API key are deleted after 30 days.'
   ],
   tags: {
@@ -30,7 +30,7 @@ export let uploadTemplate = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Template ID to associate this upload with (for versioning). Only used when versioning is enabled.'
+          'Template ID to associate this upload with. Providing it adds a version to the existing template; version IDs are not accepted here.'
         ),
       name: z.string().optional().describe('Name for the template.'),
       comment: z.string().optional().describe('Comment or description for the template.'),

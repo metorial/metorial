@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { customerInputSchema } from '../lib/schemas';
+import { customerInputSchema, omittedEntrySchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let bulkUpsertCustomers = SlateTool.create(spec, {
@@ -26,6 +26,11 @@ export let bulkUpsertCustomers = SlateTool.create(spec, {
   .output(
     z.object({
       modifiedCount: z.number().describe('Number of customers updated'),
+      omittedCount: z.number().optional().describe('Number of records omitted by Chaser'),
+      omittedEntries: z
+        .array(omittedEntrySchema)
+        .optional()
+        .describe('Omitted records and reasons'),
       insertedCount: z.number().describe('Number of customers created'),
       insertedIds: z
         .array(
@@ -46,12 +51,14 @@ export let bulkUpsertCustomers = SlateTool.create(spec, {
       output: {
         modifiedCount: result.modifiedCount,
         insertedCount: result.insertedCount,
+        omittedCount: result.omittedCount,
+        omittedEntries: result.omittedEntries,
         insertedIds: (result.insertedIds || []).map((item: any) => ({
           index: item.index,
           insertedId: item.id
         }))
       },
-      message: `Bulk upsert complete: **${result.insertedCount}** created, **${result.modifiedCount}** updated.`
+      message: `Bulk upsert complete: **${result.insertedCount}** created, **${result.modifiedCount}** updated.${result.omittedCount ? ` ${result.omittedCount} omitted; inspect omittedEntries for details.` : ''}`
     };
   })
   .build();

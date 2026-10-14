@@ -1,50 +1,32 @@
-Now let me check the output types and scrapers docs for completeness:Now let me check the Code Mode page:I now have enough information to write the specification.
+# Parsera Specification
 
-# Slates Specification for Parsera
+Parsera extracts structured data from URLs and supplied HTML or text. Requests use an API key in the `X-API-KEY` header at `https://api.parsera.org/v1`. No account or identity endpoint is documented for this API.
 
-## Overview
+## Extraction
 
-Parsera is an AI-powered web scraping service that extracts structured data from web pages using natural-language descriptions of the desired data fields. It offers both LLM-based one-time extraction and reusable code-generated scrapers that can be run across multiple URLs.
+- `extract_data` and `parse_content` accept a prompt or named attributes and return the provider’s extracted records. Attributes support `any`, `string`, `integer`, `number`, `bool`, and `list` output types.
+- `extract_markdown` returns the original Markdown string and provides the same text as a downloadable `page.md` file.
+- Extraction requests use the canonical `/extractor/extract`, `/extractor/parse`, and `/extractor/extract_markdown` endpoints. The provider also documents the old extraction paths as supported aliases.
+- Existing `precision` inputs remain available for compatibility; the current extractor reference lists only `standard`. Current precision behavior requires provider verification.
 
-## Authentication
+## Reusable scrapers
 
-Parsera uses API key authentication. The API key can be found on the API tab of the Parsera web page and is passed as the value of the `X-API-KEY` header in all requests.
+- `list_scrapers` returns existing scraper IDs and names, plus type, nullable state, URL, and creation time when supplied by Parsera.
+- `get_scraper` uses the typed extractor or agent endpoint and preserves scraper details, including agentic build state and `parameters_schema`.
+- `run_scraper` sends `template_id` to the unified execution endpoint and retains its array-of-records output. A provider `202 Accepted` handoff reports the run ID and directs callers to `get_scraper_run`, rather than returning a false empty success.
+- `run_scraper_async` starts a run and returns the provider’s `run_id` and status. It accepts optional URLs, named agentic parameters, and a callback URL.
+- `get_scraper_run` preserves the provider’s progress, credit usage, per-URL data, and failure details. Callers can poll while work is queued or running.
+- Extractor scrapers accept up to 100 URLs per run. Agentic scrapers accept one URL per run. Proxy routing and cookies are ignored for agentic scrapers.
+- `create_scraper` and `delete_scraper` retain their existing public keys and legacy scraper routes. The March 2026 changelog confirms legacy CRUD endpoints remain functional but deprecated. The current references omit the existing `/scrapers/generate` contract; its established payload and real confirmation message remain unchanged rather than being replaced with speculative generation behavior. A failure after creation can leave a scraper behind; the invocation progress records its ID for inspection or deletion.
 
-- **Header:** `X-API-KEY: <YOUR_API_KEY>`
-- **Base URL:** `https://api.parsera.org/v1/`
+## Official references
 
-No OAuth or additional authentication mechanisms are supported. A Parsera account is required to obtain an API key.
+- [Extractor API](https://parsera.org/docs/api/extractor)
+- [Extractor scraper management](https://parsera.org/docs/api/extractor-scrapers)
+- [Agentic scraper management](https://parsera.org/docs/api/agent-scrapers)
+- [Scraper execution and polling](https://parsera.org/docs/api/scrapers)
+- [Output types](https://parsera.org/docs/api/output-types)
+- [March 2026 migration and compatibility](https://parsera.org/docs/api/changelog-march-2026)
+- [Cookies](https://parsera.org/docs/api/cookies)
 
-## Features
-
-### LLM-Powered Data Extraction
-
-Extract structured data from any web page by providing a URL and either a natural-language prompt or a list of named attributes describing the data to extract. Each attribute has a `name` and `description`, and optionally a `type` (string, integer, number, bool, list).
-
-- **Proxy support:** A `proxy_country` parameter can be set to access pages from specific geographic locations, since a page could be unavailable from some locations.
-- **Precision mode:** If some data is missing, a `precision` mode can be used, which looks into data hidden in HTML tags.
-- **Cookies:** Custom cookies can be passed to handle authenticated or session-based pages.
-
-### Content Parsing
-
-A parse capability allows extracting data from raw HTML or text content provided directly, rather than fetching from a URL. Supports the same attribute definitions and extraction modes as URL-based extraction.
-
-### Markdown Extraction
-
-Convert any web page into markdown format by providing a URL. Supports proxy and cookie configuration.
-
-### Reusable Scrapers
-
-Scrapers are reusable custom extractors that can be generated once and run on multiple URLs. This is ideal for scenarios where the same type of data needs to be extracted from multiple pages or websites.
-
-- **Create** a scraper, **generate** extraction code by providing a sample URL and desired attributes, then **run** the scraper on any number of URLs.
-- Scrapers can be run on up to 100 URLs at once.
-- Scrapers can be listed and deleted via the API.
-
-### Code Mode
-
-Generate custom Python scraping code for a scraper instead of relying on LLM-based extraction at runtime. Code mode provides faster, more deterministic, and more cost-effective extraction. The scraper must be switched to code mode in the Parsera UI after code generation.
-
-## Events
-
-The provider does not support events.
+This refresh is verified statically. It does not establish live API acceptance, legacy generation availability, or successful deployed file delivery.

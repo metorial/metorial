@@ -1,10 +1,17 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      apiKey: z.string().optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -27,112 +34,61 @@ export let auth = SlateAuth.create()
     ],
 
     scopes: [
-      { title: 'Read Jobs', description: 'Read-only access to jobs', scope: 'read_jobs' },
-      { title: 'Create Jobs', description: 'Create new jobs', scope: 'create_jobs' },
+      {
+        title: 'Create Jobs',
+        description:
+          'Create jobs on behalf of the account; creating jobs may incur account charges',
+        scope: 'create_jobs'
+      },
       {
         title: 'Manage Jobs',
-        description: 'Full access to jobs (read, create, update, delete)',
+        description: 'Read, update and delete jobs',
         scope: 'manage_jobs'
       },
       {
-        title: 'Read Customers',
-        description: 'Read-only access to clients/companies',
-        scope: 'read_customers'
-      },
-      {
-        title: 'Create Customers',
-        description: 'Create new clients/companies',
-        scope: 'create_customers'
-      },
-      {
         title: 'Manage Customers',
-        description: 'Full access to clients/companies',
+        description: 'Read, create and update clients',
         scope: 'manage_customers'
       },
       {
+        title: 'Manage Customer Contacts',
+        description: 'Read, create and update client contacts',
+        scope: 'manage_customer_contacts'
+      },
+      {
         title: 'Read Staff',
-        description: 'Read-only access to staff members',
+        description: 'Discover staff for scheduling',
         scope: 'read_staff'
       },
       {
-        title: 'Manage Staff',
-        description: 'Full access to staff members',
-        scope: 'manage_staff'
-      },
-      {
-        title: 'Read Schedule',
-        description: 'Read-only access to scheduling and job activities',
-        scope: 'read_schedule'
-      },
-      {
         title: 'Manage Schedule',
-        description: 'Full access to scheduling and job activities',
+        description: 'Read and create scheduled bookings and staff allocations',
         scope: 'manage_schedule'
       },
       {
-        title: 'Read Locations',
-        description: 'Read-only access to locations',
-        scope: 'read_locations'
-      },
-      {
-        title: 'Manage Locations',
-        description: 'Full access to locations',
-        scope: 'manage_locations'
-      },
-      {
-        title: 'Read Assets',
-        description: 'Read-only access to customer assets',
-        scope: 'read_assets'
-      },
-      {
-        title: 'Manage Assets',
-        description: 'Full access to customer assets',
-        scope: 'manage_assets'
-      },
-      {
-        title: 'Read Job Materials',
-        description: 'Read-only access to job materials/line items',
-        scope: 'read_job_materials'
-      },
-      {
         title: 'Manage Job Materials',
-        description: 'Full access to job materials/line items',
+        description: 'Read and manage job line items',
         scope: 'manage_job_materials'
       },
       {
-        title: 'Read Job Contacts',
-        description: 'Read-only access to job contacts',
-        scope: 'read_job_contacts'
+        title: 'Manage Job Payments',
+        description: 'Record job payments',
+        scope: 'manage_job_payments'
+      },
+      {
+        title: 'Publish Job Notes',
+        description: 'Add notes to jobs',
+        scope: 'publish_job_notes'
       },
       {
         title: 'Read Inventory',
-        description: 'Read-only access to materials catalog',
+        description: 'Discover materials in the catalog',
         scope: 'read_inventory'
       },
       {
-        title: 'Manage Inventory',
-        description: 'Full access to materials catalog',
-        scope: 'manage_inventory'
-      },
-      {
-        title: 'Publish SMS',
-        description: 'Send SMS messages on behalf of the account',
-        scope: 'publish_sms'
-      },
-      {
-        title: 'Publish Email',
-        description: 'Send emails on behalf of the account',
-        scope: 'publish_email'
-      },
-      {
-        title: 'Staff Locations',
-        description: 'Access staff location tracking',
-        scope: 'staff_locations'
-      },
-      {
-        title: 'Staff Activity',
-        description: 'Access staff activity tracking',
-        scope: 'staff_activity'
+        title: 'Account Information',
+        description: 'Read the connected account identity',
+        scope: 'vendor'
       }
     ],
 
@@ -151,7 +107,12 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let http = createAxios({
+      let http = createAuthenticatedAxios({
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'ServiceM8',
+            reason: 'servicem8_oauth_error'
+          }),
         baseURL: 'https://go.servicem8.com'
       });
 
@@ -171,20 +132,28 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'ServiceM8',
+          required: true
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
-      let http = createAxios({
+    handleTokenRefresh: async (ctx: {
+      output: { refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError('Reconnect ServiceM8 to obtain an OAuth refresh token.');
+      }
+      let http = createAuthenticatedAxios({
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'ServiceM8',
+            reason: 'servicem8_oauth_error'
+          }),
         baseURL: 'https://go.servicem8.com'
       });
 
@@ -194,7 +163,7 @@ export let auth = SlateAuth.create()
           grant_type: 'refresh_token',
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || ''
+          refresh_token: ctx.output.refreshToken
         }).toString(),
         {
           headers: {
@@ -203,15 +172,13 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'ServiceM8',
+          required: true,
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     }
   })
@@ -227,7 +194,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          apiKey: ctx.input.apiKey
         }
       };
     }

@@ -1,74 +1,38 @@
-The webhook search didn't return Hiver-specific results. Let me search more specifically for Hiver's webhook and API details.Let me try to access the actual API documentation to get details on endpoints and webhooks.Now I have enough information to compile the specification. Let me synthesize what I've found.
+# Hiver API integration
 
-# Slates Specification for Hiver
-
-## Overview
-
-Hiver is an AI-powered customer service platform that integrates with Gmail and Outlook, enabling teams to manage shared inboxes, assign and track email conversations, and collaborate on customer support. It is a collaborative customer support solution that seamlessly integrates with Gmail, enabling teams to manage shared inboxes, assign emails, track conversations, and collaborate on responses. It provides REST APIs to access Hiver data programmatically and build custom integrations.
+Manage shared inboxes, discover their members and tags, and read or update existing conversations.
 
 ## Authentication
 
-Hiver supports two authentication methods:
+Use an API key created by an administrator under Developer settings in the Hiver admin panel. The API key is sent as a bearer token to `https://api2.hiverhq.com/v1`. The public reference documents API key authentication; no OAuth flow is configured here.
 
-### API Key
+## Supported workflows
 
-Developers or admins must generate an API key from the developer section in Hiver's admin panel. The API key is passed in the request header with each API call. To obtain a key, log in to Hiver as an admin, navigate to the Developer section in the Admin Panel, and generate a new API key.
+- Discover all shared inboxes, including their display names, email addresses, and channel types.
+- Retrieve an inbox and optionally include its members and tags. Discovery follows the provider's pagination tokens.
+- Search inbox members by name or email. The integration filters the complete member list because the provider's search endpoint only supports exact email searches.
+- Search inbox tags by name, or list all tags.
+- Create an inbox tag with an optional hex color and description.
+- List conversations one page at a time, returning `nextPage` when available.
+- Retrieve a conversation by its Hiver conversation ID or Gmail thread ID, including assignee, tag identifiers, and available conversation links. Supply `userEmail` when using a Gmail thread ID from an individual inbox member's mailbox.
+- Update status, assignee, or tags. Status uses `open`, `close`, or `pending`; `closed` remains accepted as an alias for `close`. An assignee ID is resolved to the member's email, or callers may pass `assigneeEmail` directly. The `tags` input replaces the current tag set and accepts tag IDs or unique names discovered from the inbox. Updates are followed by a read because the provider returns no response body on success.
 
-### OAuth 2.0
+## Limits
 
-You can also authenticate using OAuth 2.0. This enables delegated access for third-party applications to interact with Hiver data on behalf of users. Specific OAuth endpoints and scopes are not publicly documented in detail beyond the developer portal.
+The documented API limit is one request per second and 5,000 requests per day per account. Calls within a multi-request operation are spaced one second apart. Other callers using the same account can still exhaust its limits. No automatic retry is performed after an upstream failure.
 
-**Base URL:** `https://api.hiverhq.com` (accessed via the developer documentation at `developer.hiverhq.com`)
+The public reference does not expose a current-user or account identity endpoint. The integration does not create email conversations, send messages, or expose webhook operations as tools.
 
-## Features
+## Official references
 
-### Inbox Management
-
-Retrieve and browse shared inboxes configured in your Hiver account. You can list all inboxes, get a specific inbox by ID, get all users in an inbox, search users in an inbox, get tags in an inbox, and search tags in an inbox. This is useful for understanding which shared mailboxes exist and who has access to them.
-
-### Conversation Management
-
-Access and manage email conversations within shared inboxes. You can get conversations in an inbox, get a specific conversation in an inbox, and update a conversation in an inbox. Updates to conversations allow modifying properties such as status, assignee, and tags — the core attributes used for workflow management.
-
-- Conversations can be filtered and retrieved by inbox.
-- The API currently focuses on reading and updating existing conversations rather than creating new ones.
-
-### User and Tag Discovery
-
-Search and retrieve users and tags associated with specific inboxes. This enables integrations to look up team members for assignment purposes and discover available tags for categorization.
-
-- Users can be searched within a specific inbox context.
-- Tags can be listed and searched per inbox.
-
-### Limitations
-
-- The public API surface is relatively narrow, focused primarily on inbox and conversation read/update operations.
-- The API does not appear to expose features like analytics, automation rules, notes, templates, or knowledge base content.
-
-## Events
-
-Hiver provides webhooks as a mechanism for sending real-time notifications to external applications, ensuring that developers can stay up-to-date with changes in Hiver data. Based on available integration trigger data, the following event categories are supported:
-
-### Conversation Updates
-
-Triggers when a conversation's status, assignee, contact, or tags are modified. This covers any change to the core properties of an existing conversation within a shared inbox.
-
-### New Email Activity
-
-Triggers when an email is sent from or received into a shared mailbox. This covers both inbound and outbound email activity on shared inboxes.
-
-### New Inbound Conversation
-
-Triggers when a new conversation is received into a shared mailbox. This specifically fires for new incoming conversations, distinct from ongoing email threads.
-
-### New Outbound Conversation
-
-Triggers when a new conversation is sent from a shared mailbox. This fires when a new outbound email thread originates from a shared inbox.
-
-### New Note
-
-Triggers when a new note is created in a shared conversation. This covers internal team notes added to conversations.
-
-### CSAT Rating Received
-
-Triggers when a CSAT rating is received for a conversation. This fires when a customer submits a satisfaction rating for a resolved conversation.
+- [API overview, authentication, pagination, errors, and limits](https://developer.hiverhq.com/hiver-api)
+- [List inboxes](https://developer.hiverhq.com/hiver-api/inbox/list-all-the-inboxes)
+- [Get inbox](https://developer.hiverhq.com/hiver-api/inbox/get-an-inbox-by-id)
+- [Inbox members](https://developer.hiverhq.com/hiver-api/inbox/get-all-users-in-the-inbox)
+- [Search inbox members](https://developer.hiverhq.com/hiver-api/inbox/search-users-in-the-inbox)
+- [Inbox tags](https://developer.hiverhq.com/hiver-api/inbox/get-tags-in-the-inbox)
+- [Search inbox tags](https://developer.hiverhq.com/hiver-api/inbox/search-tags-in-the-inbox)
+- [Create inbox tag](https://developer.hiverhq.com/hiver-api/inbox/create-tags-in-the-inbox)
+- [List conversations](https://developer.hiverhq.com/hiver-api/conversations/get-conversations-in-the-inbox)
+- [Get conversation](https://developer.hiverhq.com/hiver-api/conversations/get-a-conversation-in-the-inbox)
+- [Update conversation](https://developer.hiverhq.com/hiver-api/conversations/update-conversation-in-the-inbox)

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlexisignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ export let sendDocument = SlateTool.create(spec, {
       templateFields: z
         .record(z.string(), z.unknown())
         .describe(
-          'Key-value pairs matching the template body structure. Includes recipient details (names, emails), document message, and other fields defined by the template.'
+          'Key-value pairs matching the template body structure, such as recipient_0_email, recipient_0_name, en_message, and expiresIn. The templateId field must match the selected template if included.'
         )
     })
   )
@@ -36,11 +36,24 @@ export let sendDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.templateId.trim()) {
+      throw createApiServiceError('Provide a template ID from list_templates.');
+    }
+
+    if (
+      ctx.input.templateFields.templateId !== undefined &&
+      ctx.input.templateFields.templateId !== ctx.input.templateId
+    ) {
+      throw createApiServiceError(
+        'templateFields.templateId must match templateId. Remove it from templateFields or use the same template ID.'
+      );
+    }
+
     let client = new FlexisignClient({ token: ctx.auth.token });
 
     let body: Record<string, unknown> = {
-      templateId: ctx.input.templateId,
-      ...ctx.input.templateFields
+      ...ctx.input.templateFields,
+      templateId: ctx.input.templateId
     };
 
     let response = await client.sendDocumentFromTemplate(body);

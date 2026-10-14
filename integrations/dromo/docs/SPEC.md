@@ -1,4 +1,4 @@
-# Slates Specification for Dromo
+# Dromo Integration Specification
 
 ## Overview
 
@@ -20,7 +20,7 @@ Both keys can be found in the Dromo dashboard. No OAuth flow is required.
 
 The headless API allows running imports entirely via backend calls with no user interface — you programmatically send a file or data payload, specify which schema to apply, and Dromo returns cleaned data via API if everything is valid. If there are issues (e.g., unmapped columns or validation errors), Dromo provides a special review URL where a user can manually resolve the problems.
 
-- Requires specifying a `schema_id` and `original_filename` when creating the import.
+- The create tool uses a saved `schemaId` and exactly one of `originalFilename` or `initialData`. JSON records are limited to 15 MB. Optional settings, serialized hooks, and import metadata are accepted.
 - Files can be fed from anywhere — an SFTP server, an internal data pipeline, AWS S3, etc.
 - The Headless API is a premium add-on.
 
@@ -28,8 +28,8 @@ The headless API allows running imports entirely via backend calls with no user 
 
 Dromo's APIs provide programmatic access to uploads and schemas, enabling automated workflows. You can:
 
-- List all completed imports (uploads).
-- Retrieve the cleaned result data for a specific import by its ID.
+- List completed imports (uploads) with `start`/`end` indices and headless imports with `offset`/`limit` pagination.
+- Download processed JSON results with `download_upload` or `download_headless_import`. Successful detail lookups also provide a downloadable result when data is available.
 - Retrieve import metadata (filename, user info, timestamps, row counts, download URLs).
 
 ### Schema Management
@@ -37,7 +37,7 @@ Dromo's APIs provide programmatic access to uploads and schemas, enabling automa
 To use Dromo, you define a schema — a list of fields to import. These fields are matched to columns during the import process. You can add validation rules and data transformation hooks to match your data requirements.
 
 - Schemas can be created via code (SDK) or using the no-code Schema Studio in the dashboard.
-- Supported field types include percentage, currency, phone number, URL, and advanced text fields with automatic type detection.
+- Schema tools default omitted field types to `string`, translate `required: true` to Dromo's required validator, and accept serialized schema hooks. Updates replace the complete schema; omitted settings reset to an empty object.
 
 ### Data Validation and Transformation
 
@@ -49,7 +49,7 @@ Dromo provides hooks (custom functions) to run custom validations or transformat
 
 ### Data Export
 
-Dromo supports exporting data as CSV, Excel, JSON, and more, with automated scheduled exports and custom reusable export templates.
+The REST download tools retrieve processed results as JSON. Dromo issues temporary signed download URLs; the integration renews them when required.
 
 ### Third-Party Integrations
 

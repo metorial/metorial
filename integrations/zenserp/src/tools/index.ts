@@ -6,4 +6,6 @@ export * from './news-search';
 export * from './reverse-image-search';
 export * from './shopping-product-details';
 export * from './shopping-search';
+export * from './trending-searches';
 export * from './web-search';
+export * from './youtube-search';

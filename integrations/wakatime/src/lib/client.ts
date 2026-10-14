@@ -1,32 +1,86 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let api = createAxios({
-  baseURL: 'https://api.wakatime.com/api/v1'
-});
+export type DataExport = {
+  id: string;
+  type?: string | null;
+  status?: string | null;
+  percent_complete?: number | null;
+  download_url?: string | null;
+  created_at?: string | null;
+  expires?: string | null;
+  is_processing?: boolean;
+  is_stuck?: boolean;
+  has_failed?: boolean;
+};
+
+export type ExternalDuration = {
+  id: string;
+  external_id: string;
+  entity: string;
+  type: string;
+  provider: string;
+  start_time: number;
+  end_time: number;
+  project?: string | null;
+  branch?: string | null;
+  language?: string | null;
+  category?: string | null;
+  meta?: string | null;
+};
 
 export class WakaTimeClient {
+  private api: ReturnType<typeof createAuthenticatedAxios>;
   private headers: Record<string, string>;
+  private isApiKey: boolean;
 
-  constructor(config: { token: string }) {
-    // Try to detect if token looks like an API key (no dots/dashes typical of OAuth tokens)
-    // WakaTime API keys are UUIDs; OAuth tokens are longer strings
-    // For API key auth, use Basic auth; for OAuth, use Bearer
-    let isApiKey = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      config.token
-    );
-
-    if (isApiKey) {
-      let encoded = Buffer.from(config.token).toString('base64');
-      this.headers = { Authorization: `Basic ${encoded}` };
-    } else {
-      this.headers = { Authorization: `Bearer ${config.token}` };
+  constructor(config: { token: string; authType?: 'oauth' | 'api_key' }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A WakaTime credential is required. Reconnect your account.'
+      );
     }
+
+    // Connections saved before authType was added retain the previous UUID detection.
+    this.isApiKey = config.authType
+      ? config.authType === 'api_key'
+      : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.token);
+    this.headers = {
+      Authorization: this.isApiKey
+        ? `Basic ${Buffer.from(config.token).toString('base64')}`
+        : `Bearer ${config.token}`
+    };
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://wakatime.com/api/v1',
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'WakaTime',
+          reason: 'wakatime_request_failed'
+        })
+    });
+    this.api.interceptors.request.use(request => {
+      if (
+        this.isApiKey &&
+        request.url !== '/leaders' &&
+        !(
+          request.method === 'post' &&
+          ['/users/current/heartbeats', '/users/current/heartbeats.bulk'].includes(
+            request.url ?? ''
+          )
+        )
+      ) {
+        throw createApiServiceError(
+          'WakaTime API keys can only send heartbeats. Connect with OAuth to use this tool.'
+        );
+      }
+      return request;
+    });
   }
 
   // ─── User ───────────────────────────────────────────────
 
   async getCurrentUser() {
-    let response = await api.get('/users/current', { headers: this.headers });
+    let response = await this.api.get('/users/current', { headers: this.headers });
     return response.data.data;
   }
 
@@ -39,7 +93,7 @@ export class WakaTimeClient {
     branches?: string;
     timezone?: string;
   }) {
-    let response = await api.get('/users/current/summaries', {
+    let response = await this.api.get('/users/current/summaries', {
       headers: this.headers,
       params: {
         start: params.start,
@@ -61,7 +115,7 @@ export class WakaTimeClient {
       timezone?: string;
     }
   ) {
-    let response = await api.get(`/users/current/stats/${range}`, {
+    let response = await this.api.get(`/users/current/stats/${encodeURIComponent(range)}`, {
       headers: this.headers,
       params
     });
@@ -77,7 +131,7 @@ export class WakaTimeClient {
     timezone?: string;
     sliceBy?: string;
   }) {
-    let response = await api.get('/users/current/durations', {
+    let response = await this.api.get('/users/current/durations', {
       headers: this.headers,
       params: {
         date: params.date,
@@ -93,7 +147,7 @@ export class WakaTimeClient {
   // ─── Heartbeats ─────────────────────────────────────────
 
   async getHeartbeats(date: string) {
-    let response = await api.get('/users/current/heartbeats', {
+    let response = await this.api.get('/users/current/heartbeats', {
       headers: this.headers,
       params: { date }
     });
@@ -114,7 +168,7 @@ export class WakaTimeClient {
     isWrite?: boolean;
     category?: string;
   }) {
-    let response = await api.post(
+    let response = await this.api.post(
       '/users/current/heartbeats',
       {
         entity: heartbeat.entity,
@@ -123,7 +177,7 @@ export class WakaTimeClient {
         project: heartbeat.project,
         branch: heartbeat.branch,
         language: heartbeat.language,
-        dependencies: heartbeat.dependencies,
+        dependencies: heartbeat.dependencies?.join(','),
         lines: heartbeat.lines,
         lineno: heartbeat.lineNo,
         cursorpos: heartbeat.cursorPos,
@@ -158,7 +212,7 @@ export class WakaTimeClient {
       project: h.project,
       branch: h.branch,
       language: h.language,
-      dependencies: h.dependencies,
+      dependencies: h.dependencies?.join(','),
       lines: h.lines,
       lineno: h.lineNo,
       cursorpos: h.cursorPos,
@@ -166,23 +220,33 @@ export class WakaTimeClient {
       category: h.category
     }));
 
-    let response = await api.post('/users/current/heartbeats.bulk', mapped, {
+    let response = await this.api.post('/users/current/heartbeats.bulk', mapped, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async deleteHeartbeat(heartbeatId: string) {
-    let response = await api.delete(`/users/current/heartbeats/${heartbeatId}`, {
-      headers: this.headers
-    });
+  async deleteHeartbeat(heartbeatId: string, date?: string) {
+    if (date) {
+      let response = await this.api.delete('/users/current/heartbeats.bulk', {
+        headers: this.headers,
+        data: { date, ids: [heartbeatId] }
+      });
+      return response.data;
+    }
+    let response = await this.api.delete(
+      `/users/current/heartbeats/${encodeURIComponent(heartbeatId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   // ─── Projects ───────────────────────────────────────────
 
   async getProjects(params?: { query?: string }) {
-    let response = await api.get('/users/current/projects', {
+    let response = await this.api.get('/users/current/projects', {
       headers: this.headers,
       params: params?.query ? { q: params.query } : undefined
     });
@@ -197,17 +261,28 @@ export class WakaTimeClient {
       page?: number;
     }
   ) {
-    let response = await api.get(`/users/current/projects/${projectId}/commits`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/users/current/projects/${encodeURIComponent(projectId)}/commits`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
+    return response.data;
+  }
+
+  async getCommit(projectId: string, commitHash: string, branch?: string) {
+    let response = await this.api.get(
+      `/users/current/projects/${encodeURIComponent(projectId)}/commits/${encodeURIComponent(commitHash)}`,
+      { headers: this.headers, params: { branch } }
+    );
     return response.data;
   }
 
   // ─── Goals ──────────────────────────────────────────────
 
   async getGoals() {
-    let response = await api.get('/users/current/goals', {
+    let response = await this.api.get('/users/current/goals', {
       headers: this.headers
     });
     return response.data.data;
@@ -215,8 +290,18 @@ export class WakaTimeClient {
 
   // ─── External Durations ─────────────────────────────────
 
-  async getExternalDurations(params: { date: string; project?: string; timezone?: string }) {
-    let response = await api.get('/users/current/external_durations', {
+  async getExternalDurations(params: {
+    date: string;
+    project?: string;
+    branches?: string;
+    timezone?: string;
+  }) {
+    let response = await this.api.get<{
+      data: ExternalDuration[];
+      start?: string;
+      end?: string;
+      timezone?: string;
+    }>('/users/current/external_durations', {
       headers: this.headers,
       params
     });
@@ -233,8 +318,9 @@ export class WakaTimeClient {
     branch?: string;
     language?: string;
     category?: string;
+    meta?: string;
   }) {
-    let response = await api.post(
+    let response = await this.api.post(
       '/users/current/external_durations',
       {
         external_id: duration.externalId,
@@ -245,7 +331,8 @@ export class WakaTimeClient {
         project: duration.project,
         branch: duration.branch,
         language: duration.language,
-        category: duration.category
+        category: duration.category,
+        meta: duration.meta
       },
       { headers: this.headers }
     );
@@ -263,6 +350,7 @@ export class WakaTimeClient {
       branch?: string;
       language?: string;
       category?: string;
+      meta?: string;
     }>
   ) {
     let mapped = durations.map(d => ({
@@ -274,10 +362,11 @@ export class WakaTimeClient {
       project: d.project,
       branch: d.branch,
       language: d.language,
-      category: d.category
+      category: d.category,
+      meta: d.meta
     }));
 
-    let response = await api.post('/users/current/external_durations.bulk', mapped, {
+    let response = await this.api.post('/users/current/external_durations.bulk', mapped, {
       headers: this.headers
     });
     return response.data;
@@ -291,20 +380,20 @@ export class WakaTimeClient {
     page?: number;
     hireable?: boolean;
   }) {
-    let response = await api.get('/leaders', {
-      headers: this.headers,
+    let response = await this.api.get('/leaders', {
+      headers: this.isApiKey ? {} : this.headers,
       params: {
         language: params?.language,
         country_code: params?.country,
         page: params?.page,
-        hireable: params?.hireable
+        is_hireable: params?.hireable
       }
     });
     return response.data;
   }
 
   async getPrivateLeaderboards() {
-    let response = await api.get('/users/current/leaderboards', {
+    let response = await this.api.get('/users/current/leaderboards', {
       headers: this.headers
     });
     return response.data.data;
@@ -317,10 +406,13 @@ export class WakaTimeClient {
       page?: number;
     }
   ) {
-    let response = await api.get(`/users/current/leaderboards/${leaderboardId}`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/users/current/leaderboards/${encodeURIComponent(leaderboardId)}`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
     return response.data;
   }
 
@@ -334,32 +426,38 @@ export class WakaTimeClient {
       weekday?: number;
     }
   ) {
-    let response = await api.get(`/users/current/insights/${insightType}/${range}`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/users/current/insights/${encodeURIComponent(insightType === 'weekday' ? 'weekdays' : insightType)}/${encodeURIComponent(range)}`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
     return response.data;
   }
 
   // ─── Organizations ─────────────────────────────────────
 
   async getOrganizations() {
-    let response = await api.get('/users/current/orgs', {
+    let response = await this.api.get('/users/current/orgs', {
       headers: this.headers
     });
     return response.data.data;
   }
 
   async getOrganizationDashboards(orgId: string) {
-    let response = await api.get(`/users/current/orgs/${orgId}/dashboards`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(
+      `/users/current/orgs/${encodeURIComponent(orgId)}/dashboards`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data.data;
   }
 
   async getOrganizationDashboardMembers(orgId: string, dashboardId: string) {
-    let response = await api.get(
-      `/users/current/orgs/${orgId}/dashboards/${dashboardId}/members`,
+    let response = await this.api.get(
+      `/users/current/orgs/${encodeURIComponent(orgId)}/dashboards/${encodeURIComponent(dashboardId)}/members`,
       {
         headers: this.headers
       }
@@ -376,8 +474,8 @@ export class WakaTimeClient {
       project?: string;
     }
   ) {
-    let response = await api.get(
-      `/users/current/orgs/${orgId}/dashboards/${dashboardId}/summaries`,
+    let response = await this.api.get(
+      `/users/current/orgs/${encodeURIComponent(orgId)}/dashboards/${encodeURIComponent(dashboardId)}/summaries`,
       {
         headers: this.headers,
         params
@@ -389,7 +487,7 @@ export class WakaTimeClient {
   // ─── Machines ───────────────────────────────────────────
 
   async getMachines() {
-    let response = await api.get('/users/current/machine_names', {
+    let response = await this.api.get('/users/current/machine_names', {
       headers: this.headers
     });
     return response.data.data;
@@ -398,17 +496,18 @@ export class WakaTimeClient {
   // ─── Data Exports ──────────────────────────────────────
 
   async getDataExports() {
-    let response = await api.get('/users/current/data_dumps', {
+    let response = await this.api.get<{ data: DataExport[] }>('/users/current/data_dumps', {
       headers: this.headers
     });
     return response.data.data;
   }
 
-  async requestDataExport(exportType?: string) {
-    let response = await api.post(
+  async requestDataExport(exportType?: string, emailWhenFinished?: boolean) {
+    let response = await this.api.post<{ data: DataExport }>(
       '/users/current/data_dumps',
       {
-        type: exportType || 'daily'
+        type: exportType || 'daily',
+        email_when_finished: emailWhenFinished
       },
       { headers: this.headers }
     );
@@ -418,7 +517,7 @@ export class WakaTimeClient {
   // ─── All Time Since Today ──────────────────────────────
 
   async getAllTimeSinceToday(project?: string) {
-    let response = await api.get('/users/current/all_time_since_today', {
+    let response = await this.api.get('/users/current/all_time_since_today', {
       headers: this.headers,
       params: project ? { project } : undefined
     });

@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Agiled
 
-Manage business operations including CRM, projects, finances, and HR in one platform. Create, update, and retrieve contacts, leads, accounts, and deals with custom pipeline stages. Create and manage projects, tasks, and time entries. Generate and send invoices, estimates, and track expenses. Create contracts, collect e-signatures, and manage proposals. Handle employee records, departments, attendance, and leave tracking. Create and manage support tickets. Track products and packages.
+Manage contacts, projects, tasks, invoices, estimates, contracts, employees, support tickets, products, deals, expenses, and time records in Agiled.
+
+Choose **API Key & Brand** for the existing API tools. Choose **Public API Key** for `get_current_user`, `get_accounts`, and `get_time_entries`; this connection uses the public API key and API base URL shown in Settings → API. The two connection methods expose their corresponding tools.
+
+Public API tools provide token and workspace context, filtered CRM account discovery, and time reporting. The existing tools retain their original request and output contracts. See [the API specification](docs/SPEC.md) for endpoint coverage and verification limits.
 
 ## License
 

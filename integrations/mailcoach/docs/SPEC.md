@@ -1,8 +1,8 @@
-Now let me check the webhooks page for more detail on event types:# Slates Specification for Mailcoach
+# Mailcoach Integration Specification
 
 ## Overview
 
-Mailcoach is an email marketing platform built by Spatie that allows sending email campaigns, managing subscriber lists, setting up email automations, and sending transactional emails. It talks to an external outgoing mail provider to send out email campaigns reliably while keeping costs low. Both self-hosted (v6 and up) and hosted Mailcoach (aka Mailcoach Cloud) are supported.
+Mailcoach is an email marketing platform built by Spatie that allows sending email campaigns, managing subscriber lists, setting up email automations, and sending transactional emails. It talks to an external outgoing mail provider to send out email campaigns reliably while keeping costs low. This integration connects to hosted Mailcoach accounts through their mailcoach.app subdomain.
 
 ## Authentication
 
@@ -24,7 +24,7 @@ curl https://<your-domain>.mailcoach.app/api/user \
   -H 'Content-Type: application/json'
 ```
 
-There are no OAuth flows or scopes — it is a simple API token-based authentication scheme.
+There are no OAuth flows or scopes — it is a simple API token-based authentication scheme. Use get_current_user to inspect the account that owns the token.
 
 ## Features
 
@@ -38,11 +38,11 @@ Manage subscribers within email lists — list, add, update, delete, confirm, un
 
 ### Subscriber Imports
 
-Bulk import subscribers into email lists. This allows uploading subscriber data rather than adding them one by one via the API.
+Bulk import subscribers into email lists. This allows uploading subscriber data rather than adding them one by one via the API. Imports default to preserving existing unsubscribed addresses, addresses absent from the CSV, and existing tags. Call get_subscriber_import with the returned UUID to monitor asynchronous completion.
 
 ### Campaign Management
 
-Create, update, delete, schedule, send, and retrieve campaigns. Campaigns can be built with raw HTML or Markdown (when using a template). Campaigns can be filtered by status: draft, scheduled, or sent. You can send test emails for a campaign before sending it to the full list. After sending, you can retrieve campaign analytics including opens, clicks, unsubscribes, and bounces.
+Create, update, delete, schedule, send, and retrieve campaigns. Campaigns can be built with raw HTML or Markdown (when using a template). Campaigns can be filtered by status: draft, scheduled, or sent. Schedule timestamps use YYYY-MM-DD HH:mm:ss, as required by the API. You can send test emails for a campaign before sending it to the full list. After sending, you can retrieve campaign analytics including opens, clicks, unsubscribes, and bounces.
 
 ### Templates
 
@@ -50,7 +50,7 @@ Manage reusable email templates that can be used when creating campaigns. Templa
 
 ### Transactional Emails
 
-Send transactional emails via the API. You can reference a pre-built transactional email template by name, or provide custom HTML. Transactional emails support parameters like subject, from, to, cc, bcc, replacements (for placeholder values), and can optionally be stored in the log or faked for testing.
+Send transactional emails via the API. You can reference a pre-built transactional email template by name, or provide custom HTML. Call list_transactional_templates to discover names for send_transactional_email. Transactional emails support parameters like subject, from, to, cc, bcc, replacements (for placeholder values), and can optionally be stored in the log or faked for testing.
 
 ### Tags and Segments
 
@@ -99,3 +99,11 @@ Mailcoach supports the following webhook event types:
 ### Bounce Events
 
 - **Email Bounced / Soft Bounced**: Triggered when an email bounces or soft bounces.
+
+## API References
+
+- [Authentication and current user](https://www.mailcoach.app/api-documentation/introduction/authentication/)
+- [Subscribers](https://www.mailcoach.app/api-documentation/endpoints/subscribers/)
+- [Subscriber imports](https://www.mailcoach.app/api-documentation/endpoints/subscriber-imports/)
+- [Transactional emails and templates](https://www.mailcoach.app/api-documentation/endpoints/transactional-mails/)
+- [Campaigns](https://www.mailcoach.app/api-documentation/endpoints/campaigns/)

@@ -2,6 +2,7 @@ export * from './account';
 export * from './author-finder';
 export * from './domain-intelligence';
 export * from './domain-search';
+export * from './email-data';
 export * from './email-finder';
 export * from './email-verifier';
 export * from './enrich';

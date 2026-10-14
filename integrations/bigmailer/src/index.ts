@@ -6,13 +6,16 @@ import {
   createOrUpdateBrand,
   deleteContact,
   getBrand,
+  getBulkCampaign,
   getContact,
+  getIdentity,
   listBrands,
   listBulkCampaigns,
   listContacts,
   listFields,
   listLists,
   listSenders,
+  listTransactionalCampaigns,
   manageList,
   manageSender,
   sendTransactionalEmail,
@@ -21,6 +24,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getIdentity,
     listBrands,
     getBrand,
     createOrUpdateBrand,
@@ -36,7 +40,9 @@ export let provider = Slate.create({
     manageSender,
     sendTransactionalEmail,
     createBulkCampaign,
-    listBulkCampaigns
+    listBulkCampaigns,
+    getBulkCampaign,
+    listTransactionalCampaigns
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let parseDocument = SlateTool.create(spec, {
 
 Provide a document via URL and configure parsing options including text extraction mode, table extraction, image summarization, OCR language, output format, and chunking.
 
-Returns structured elements with labeled bounding boxes for titles, tables, images, and text. Output can be JSON (array of elements), Markdown, or HTML.`,
+Returns structured elements with labeled bounding boxes for titles, tables, images, and text, plus a downloadable JSON, Markdown, or HTML file. Parsing may also store the document in a DocSet.`,
   instructions: [
     'Provide the document as a URL using fileUrl.',
     'Use outputFormat "json" for structured element data, "markdown" for readable text, or "html" for HTML output.',
@@ -22,7 +22,7 @@ Returns structured elements with labeled bounding boxes for titles, tables, imag
     'Large documents may take several minutes to process.'
   ],
   tags: {
-    readOnly: true,
+    readOnly: false,
     destructive: false
   }
 })
@@ -163,7 +163,7 @@ Returns structured elements with labeled bounding boxes for titles, tables, imag
       let chunking: Record<string, any> = {};
       if (ctx.input.chunkingOptions.strategy)
         chunking.strategy = ctx.input.chunkingOptions.strategy;
-      if (ctx.input.chunkingOptions.maxTokens)
+      if (ctx.input.chunkingOptions.maxTokens !== undefined)
         chunking.max_tokens = ctx.input.chunkingOptions.maxTokens;
       if (ctx.input.chunkingOptions.tokenizer)
         chunking.tokenizer = ctx.input.chunkingOptions.tokenizer;
@@ -173,27 +173,69 @@ Returns structured elements with labeled bounding boxes for titles, tables, imag
     }
 
     if (ctx.input.propertyExtraction) {
+      if (
+        !!ctx.input.propertyExtraction.schema ===
+        (ctx.input.propertyExtraction.suggestProperties === true)
+      ) {
+        throw createApiServiceError(
+          'Provide either a propertyExtraction schema or set suggestProperties to true, but not both.'
+        );
+      }
       let pe: Record<string, any> = {};
       if (ctx.input.propertyExtraction.schema) {
-        pe.schema = {
-          properties: ctx.input.propertyExtraction.schema.properties.map(p => ({
-            name: p.name,
-            field_type: p.fieldType,
+        pe.schema = ctx.input.propertyExtraction.schema.properties.map(p => ({
+          name: p.name,
+          type: {
+            type:
+              (
+                { String: 'string', Number: 'float', Boolean: 'bool' } as Record<
+                  string,
+                  string
+                >
+              )[p.fieldType] ?? p.fieldType.toLowerCase(),
             description: p.description,
             default: p.defaultValue,
             examples: p.examples
-          }))
-        };
+          }
+        }));
       }
-      if (ctx.input.propertyExtraction.suggestProperties !== undefined)
-        pe.suggest_properties = ctx.input.propertyExtraction.suggestProperties;
+      if (ctx.input.propertyExtraction.suggestProperties === true)
+        pe.suggest_properties = true;
       if (ctx.input.propertyExtraction.suggestPropertiesInstructions)
         pe.suggest_properties_instructions =
           ctx.input.propertyExtraction.suggestPropertiesInstructions;
-      options.property_extraction = pe;
+      options.property_extraction_options = pe;
     }
 
-    ctx.info(`Parsing document from URL: ${ctx.input.fileUrl}`);
+    if (
+      typeof ctx.input.threshold === 'number' &&
+      (ctx.input.threshold < 0 || ctx.input.threshold > 1)
+    ) {
+      throw createApiServiceError('The parsing threshold must be between 0 and 1, or auto.');
+    }
+    if (
+      ctx.input.chunkingOptions?.maxTokens !== undefined &&
+      (!Number.isInteger(ctx.input.chunkingOptions.maxTokens) ||
+        ctx.input.chunkingOptions.maxTokens <= 0)
+    ) {
+      throw createApiServiceError('maxTokens must be a positive whole number.');
+    }
+    for (let page of ctx.input.selectedPages ?? []) {
+      let pages = Array.isArray(page) ? page : [page];
+      if (
+        (Array.isArray(page) && page.length !== 2) ||
+        pages.some(p => !Number.isInteger(p) || p < 1) ||
+        (Array.isArray(page) &&
+          page[0] !== undefined &&
+          page[1] !== undefined &&
+          page[0] > page[1])
+      ) {
+        throw createApiServiceError(
+          'selectedPages must contain positive whole page numbers or two-number ranges in ascending order.'
+        );
+      }
+    }
+    ctx.info('Parsing document from the supplied URL.');
 
     let result = await client.partitionDocumentFromUrl(
       ctx.input.fileUrl,
@@ -201,15 +243,53 @@ Returns structured elements with labeled bounding boxes for titles, tables, imag
     );
 
     let elementCount = result?.elements?.length ?? 0;
+    let format = ctx.input.outputFormat ?? 'json';
+    let text =
+      format === 'markdown' ? result?.markdown : format === 'html' ? result?.html : undefined;
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(typeof text === 'string' ? text : JSON.stringify(result), {
+        headers: {
+          'content-type':
+            typeof text === 'string'
+              ? format === 'html'
+                ? 'text/html; charset=utf-8'
+                : 'text/markdown; charset=utf-8'
+              : 'application/json'
+        }
+      }),
+      filename:
+        typeof text === 'string'
+          ? `document.${format === 'markdown' ? 'md' : 'html'}`
+          : 'document.json'
+    });
+    if (ctx.input.extractImages) {
+      for (let [index, element] of (result?.elements ?? []).entries()) {
+        if (
+          element?.type?.toLowerCase() === 'image' &&
+          typeof element.binary_representation === 'string'
+        ) {
+          await ctx.addAttachment({
+            type: 'content',
+            content: new Response(Buffer.from(element.binary_representation, 'base64'), {
+              headers: { 'content-type': 'image/x-portable-pixmap' }
+            }),
+            filename: `image-${index + 1}.ppm`
+          });
+        }
+      }
+    }
 
     return {
       output: {
-        status: result?.status,
-        elements: result?.elements,
-        markdown: result?.markdown,
-        html: result?.html,
-        suggestedSchema: result?.suggested_schema,
-        extractedProperties: result?.extracted_properties
+        status:
+          result?.status_code ??
+          (typeof result?.status === 'number' ? result.status : undefined),
+        elements: result?.elements ?? undefined,
+        markdown: result?.markdown ?? undefined,
+        html: result?.html ?? undefined,
+        suggestedSchema: result?.suggested_schema ?? result?.schema,
+        extractedProperties: result?.extracted_properties ?? result?.properties
       },
       message: `Successfully parsed document. ${elementCount > 0 ? `Extracted **${elementCount} elements**.` : `Output format: **${ctx.input.outputFormat}**.`}`
     };

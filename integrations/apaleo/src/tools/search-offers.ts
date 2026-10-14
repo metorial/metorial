@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApaleoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let searchOffers = SlateTool.create(spec, {
       propertyId: z
         .string()
         .optional()
-        .describe('Property ID to search (uses default from config if not set)'),
+        .describe('Property ID from list_properties; uses the configured default if omitted.'),
       arrival: z.string().describe('Arrival date (YYYY-MM-DD)'),
       departure: z.string().describe('Departure date (YYYY-MM-DD)'),
       adults: z.number().describe('Number of adult guests'),
@@ -54,6 +54,10 @@ export let searchOffers = SlateTool.create(spec, {
                 })
                 .optional(),
               availableUnits: z.number().optional().describe('Number of available rooms'),
+              timeSlices: z
+                .array(z.record(z.string(), z.unknown()))
+                .optional()
+                .describe('Offer pricing and availability for each time slice.'),
               isSoldOut: z.boolean().optional()
             })
             .passthrough()
@@ -65,7 +69,9 @@ export let searchOffers = SlateTool.create(spec, {
     let client = new ApaleoClient(ctx.auth.token);
     let propertyId = ctx.input.propertyId || ctx.config.propertyId;
     if (!propertyId)
-      throw new Error('propertyId is required — set it in config or provide it as input');
+      throw createApiServiceError(
+        'propertyId is required — set it in config or provide it as input'
+      );
 
     let result = await client.getOffers({
       propertyId,
@@ -80,25 +86,28 @@ export let searchOffers = SlateTool.create(spec, {
     });
 
     let offers = (result.offers || []).map((o: any) => ({
-      unitGroup: o.unitGroup
-        ? {
-            unitGroupId: o.unitGroup.id,
-            name: o.unitGroup.name,
-            description: o.unitGroup.description,
-            maxPersons: o.unitGroup.maxPersons
-          }
-        : undefined,
-      ratePlan: o.ratePlan
-        ? {
-            ratePlanId: o.ratePlan.id,
-            name: o.ratePlan.name,
-            description: o.ratePlan.description,
-            channelCode: o.ratePlan.channelCode
-          }
-        : undefined,
-      totalGrossAmount: o.totalGrossAmount,
-      availableUnits: o.availableUnits,
-      isSoldOut: o.isSoldOut
+      unitGroup:
+        (o.unitGroup ?? undefined)
+          ? {
+              unitGroupId: o.unitGroup.id ?? undefined,
+              name: o.unitGroup.name ?? undefined,
+              description: o.unitGroup.description ?? undefined,
+              maxPersons: o.unitGroup.maxPersons ?? undefined
+            }
+          : undefined,
+      ratePlan:
+        (o.ratePlan ?? undefined)
+          ? {
+              ratePlanId: o.ratePlan.id ?? undefined,
+              name: o.ratePlan.name ?? undefined,
+              description: o.ratePlan.description ?? undefined,
+              channelCode: o.ratePlan.channelCode ?? undefined
+            }
+          : undefined,
+      totalGrossAmount: o.totalGrossAmount ?? undefined,
+      timeSlices: o.timeSlices ?? undefined,
+      availableUnits: o.availableUnits ?? undefined,
+      isSoldOut: o.isSoldOut ?? o.availableUnits <= 0
     }));
 
     let available = offers.filter((o: any) => !o.isSoldOut);

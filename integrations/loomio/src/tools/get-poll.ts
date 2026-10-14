@@ -25,6 +25,7 @@ export let getPoll = SlateTool.create(spec, {
       pollKey: z.string().describe('Key of the poll'),
       title: z.string().describe('Title of the poll'),
       pollType: z.string().describe('Type of the poll'),
+      options: z.array(z.string()).optional().describe('Poll option names'),
       details: z.string().optional().describe('Description of the poll'),
       detailsFormat: z.string().optional().describe('Format of the details'),
       groupId: z.number().optional().describe('ID of the group'),
@@ -44,8 +45,7 @@ export let getPoll = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.getPoll(ctx.input.pollId);
-    let poll = result.polls?.[0] || result;
+    let poll = await client.getPoll(ctx.input.pollId);
 
     return {
       output: {
@@ -53,17 +53,18 @@ export let getPoll = SlateTool.create(spec, {
         pollKey: poll.key,
         title: poll.title,
         pollType: poll.poll_type,
-        details: poll.details,
-        detailsFormat: poll.details_format,
-        groupId: poll.group_id,
-        discussionId: poll.discussion_id,
-        authorId: poll.author_id,
-        closingAt: poll.closing_at,
-        closedAt: poll.closed_at,
-        createdAt: poll.created_at,
-        anonymous: poll.anonymous,
-        votersCount: poll.voters_count,
-        undecidedCount: poll.undecided_count
+        options: poll.poll_option_names ?? undefined,
+        details: poll.details ?? undefined,
+        detailsFormat: poll.details_format ?? undefined,
+        groupId: poll.group_id ?? undefined,
+        discussionId: poll.discussion_id ?? undefined,
+        authorId: poll.author_id ?? undefined,
+        closingAt: poll.closing_at ?? undefined,
+        closedAt: poll.closed_at ?? undefined,
+        createdAt: poll.created_at ?? undefined,
+        anonymous: poll.anonymous ?? undefined,
+        votersCount: poll.voters_count ?? undefined,
+        undecidedCount: poll.undecided_voters_count ?? poll.undecided_count ?? undefined
       },
       message: `Retrieved ${poll.poll_type} poll **"${poll.title}"** (ID: ${poll.id}).`
     };

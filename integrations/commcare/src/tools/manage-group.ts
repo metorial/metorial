@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -75,7 +75,7 @@ To create, provide a name. To update, provide the groupId along with the fields 
       };
     } else {
       if (!ctx.input.name) {
-        throw new Error('Name is required to create a new group.');
+        throw createApiServiceError('Name is required to create a new group.');
       }
 
       let result = await client.createGroup({

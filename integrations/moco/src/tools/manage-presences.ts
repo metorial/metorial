@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let presenceOutputSchema = z.object({
@@ -17,8 +18,8 @@ let presenceOutputSchema = z.object({
 let mapPresence = (p: any) => ({
   presenceId: p.id,
   date: p.date,
-  from: p.from,
-  to: p.to,
+  from: p.from ?? undefined,
+  to: p.to ?? undefined,
   isHomeOffice: p.is_home_office,
   user: p.user,
   createdAt: p.created_at,
@@ -35,6 +36,7 @@ export let listPresences = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       from: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       to: z.string().optional().describe('End date (YYYY-MM-DD)'),
       userId: z.number().optional().describe('Filter by user ID'),
@@ -50,6 +52,8 @@ export let listPresences = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.from) params.from = ctx.input.from;
     if (ctx.input.to) params.to = ctx.input.to;
     if (ctx.input.userId) params.user_id = ctx.input.userId;

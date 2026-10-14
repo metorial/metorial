@@ -45,11 +45,11 @@ Use this to discover available consortia, their current state, and associated me
     let mapped = consortia.map((c: any) => ({
       consortiumId: c._id,
       name: c.name,
-      description: c.description || undefined,
-      mode: c.mode || undefined,
-      state: c.state || undefined,
-      createdAt: c.created_at || undefined,
-      owner: c.owner || undefined
+      description: c.description ?? undefined,
+      mode: c.mode ?? undefined,
+      state: c.state ?? undefined,
+      createdAt: c.created_at ?? undefined,
+      owner: c.owner ?? undefined
     }));
 
     return {

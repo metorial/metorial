@@ -1,5 +1,7 @@
+export * from './close-conversations';
 export * from './delete-conversation';
 export * from './get-conversation';
+export * from './get-current-user';
 export * from './list-contacts';
 export * from './list-conversations';
 export * from './list-mailboxes';
@@ -7,6 +9,7 @@ export * from './list-messages';
 export * from './list-teams';
 export * from './list-users';
 export * from './manage-contact';
+export * from './manage-conversation-tags';
 export * from './manage-mailbox';
 export * from './manage-note';
 export * from './manage-tag';

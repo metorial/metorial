@@ -41,12 +41,13 @@ export let updateTask = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.status) body.status = ctx.input.status;
-    if (ctx.input.priority) body.priority = ctx.input.priority;
-    if (ctx.input.plannedStartDate) body.plannedStartDate = ctx.input.plannedStartDate;
-    if (ctx.input.plannedEndDate) body.plannedEndDate = ctx.input.plannedEndDate;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.status !== undefined) body.status = ctx.input.status;
+    if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
+    if (ctx.input.plannedStartDate !== undefined)
+      body.plannedStartDate = ctx.input.plannedStartDate;
+    if (ctx.input.plannedEndDate !== undefined) body.plannedEndDate = ctx.input.plannedEndDate;
     if (ctx.input.estimatedHours !== undefined) body.estimatedHours = ctx.input.estimatedHours;
     if (ctx.input.responsibleUserIds)
       body.responsibleUsers = ctx.input.responsibleUserIds.map(id => ({ id }));

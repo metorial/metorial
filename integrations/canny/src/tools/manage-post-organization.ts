@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
   key: 'manage_post_organization',
   description: `Move a post to a different board, change its category, add/remove tags, or merge posts together. Use the \`action\` field to specify the operation.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -45,7 +45,8 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
 
     switch (action) {
       case 'move_board':
-        if (!ctx.input.boardId) throw new Error('boardId is required for move_board action');
+        if (!ctx.input.boardId)
+          throw createApiServiceError('boardId is required for move_board action');
         await client.changePostBoard(postId, ctx.input.boardId);
         return {
           output: { success: true },
@@ -62,7 +63,8 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
         };
 
       case 'add_tag':
-        if (!ctx.input.tagId) throw new Error('tagId is required for add_tag action');
+        if (!ctx.input.tagId)
+          throw createApiServiceError('tagId is required for add_tag action');
         await client.addTagToPost(postId, ctx.input.tagId);
         return {
           output: { success: true },
@@ -70,7 +72,8 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
         };
 
       case 'remove_tag':
-        if (!ctx.input.tagId) throw new Error('tagId is required for remove_tag action');
+        if (!ctx.input.tagId)
+          throw createApiServiceError('tagId is required for remove_tag action');
         await client.removeTagFromPost(postId, ctx.input.tagId);
         return {
           output: { success: true },
@@ -79,8 +82,9 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
 
       case 'merge':
         if (!ctx.input.mergeIntoPostId)
-          throw new Error('mergeIntoPostId is required for merge action');
-        if (!ctx.input.mergerId) throw new Error('mergerId is required for merge action');
+          throw createApiServiceError('mergeIntoPostId is required for merge action');
+        if (!ctx.input.mergerId)
+          throw createApiServiceError('mergerId is required for merge action');
         await client.mergePosts({
           mergePostID: postId,
           intoPostID: ctx.input.mergeIntoPostId,
@@ -92,7 +96,7 @@ export let managePostOrganizationTool = SlateTool.create(spec, {
         };
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

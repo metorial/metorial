@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,6 +17,10 @@ export let manageServiceCategory = SlateTool.create(spec, {
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Action to perform'),
       categoryId: z.string().optional().describe('Category ID (required for get and delete)'),
       name: z.string().optional().describe('Category name (for create)'),
+      locationId: z
+        .string()
+        .optional()
+        .describe('Location ID from list_locations (required for create)'),
       description: z.string().optional().describe('Category description (for create)'),
       page: z.number().optional().describe('Page number (for list)'),
       pageSize: z.number().optional().describe('Results per page (for list)')
@@ -41,7 +45,7 @@ export let manageServiceCategory = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      let data: Record<string, any> = {};
+      let data: Record<string, any> = { locationId: ctx.input.locationId };
       if (ctx.input.name) data.name = ctx.input.name;
       if (ctx.input.description) data.description = ctx.input.description;
 
@@ -53,7 +57,7 @@ export let manageServiceCategory = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for get');
+      if (!ctx.input.categoryId) throw createApiServiceError('categoryId is required for get');
       let result = await client.getServiceCategory(ctx.input.categoryId);
       return {
         output: { success: true, category: result },
@@ -76,7 +80,8 @@ export let manageServiceCategory = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for delete');
+      if (!ctx.input.categoryId)
+        throw createApiServiceError('categoryId is required for delete');
       await client.deleteServiceCategory(ctx.input.categoryId);
       return {
         output: { success: true },
@@ -84,6 +89,6 @@ export let manageServiceCategory = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,7 +17,11 @@ export let createTextBroadcast = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Name for the text broadcast.'),
-      keywordId: z.string().describe('Keyword ID associated with this broadcast.'),
+      keywordId: z
+        .string()
+        .describe(
+          'Keyword ID associated with this broadcast. Use list_keywords to find keyword IDs.'
+        ),
       messages: z.array(z.string()).min(1).max(10).describe('Messages to send (up to 10).'),
       contacts: z
         .array(
@@ -35,7 +39,10 @@ export let createTextBroadcast = SlateTool.create(spec, {
         .optional()
         .describe('Schedule time in ISO format, e.g. "2024-07-25T12:00:00+0000".'),
       sendEmail: z.boolean().optional().describe('Also send an email to contacts.'),
-      shortcodeId: z.string().optional().describe('Shortcode ID to send from.'),
+      shortcodeId: z
+        .string()
+        .optional()
+        .describe('Shortcode ID to send from. Use list_shortcodes to find shortcode IDs.'),
       concatenateSms: z
         .boolean()
         .optional()
@@ -68,6 +75,10 @@ export let createTextBroadcast = SlateTool.create(spec, {
       concatenateSms,
       accessAccountId
     } = ctx.input;
+
+    if (contacts.length === 0) {
+      throw createApiServiceError('Provide at least one contact for the text broadcast.');
+    }
 
     let result = await client.createText({
       name,

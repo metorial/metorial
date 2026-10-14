@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createSource = SlateTool.create(spec, {
   name: 'Create Source',
   key: 'create_source',
-  description: `Add a new training source to a bot. Supports URL, sitemap, YouTube, RSS, Q&A pairs, and file-based sources. For file uploads, first use the **Get Upload URL** tool to obtain a presigned URL, upload the file, then pass the returned file path here.`,
+  description: `Add a new training source to a bot. Supports URL, sitemap, YouTube, RSS, Q&A pairs, and file-based sources. For file uploads, first use the **Get Upload URL** tool to obtain a presigned URL, upload the file, then pass the returned file path here. Call list_teams to discover accessible team IDs.`,
   instructions: [
     'For "url", "sitemap", "youtube", and "rss" types, provide the url field.',
     'For "document", "urls", "csv", and "wp" types, provide the file field (cloud storage path from Get Upload URL).',
@@ -16,6 +17,7 @@ export let createSource = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to add source to'),
       type: z
         .enum(['url', 'document', 'sitemap', 'wp', 'urls', 'csv', 'rss', 'qa', 'youtube'])
@@ -30,6 +32,12 @@ export let createSource = SlateTool.create(spec, {
         .optional()
         .describe(
           'Cloud storage path from Get Upload URL (required for document, urls, csv, wp types)'
+        ),
+      fileDir: z
+        .string()
+        .optional()
+        .describe(
+          'Uploaded directory prefix ending in / for a multi-file document source; mutually exclusive with file'
         ),
       faqs: z
         .array(
@@ -57,24 +65,63 @@ export let createSource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.file !== undefined && ctx.input.fileDir !== undefined) {
+      throw createApiServiceError('Provide either file or fileDir, not both.');
+    }
+    if (
+      ctx.input.fileDir !== undefined &&
+      (ctx.input.type !== 'document' || !ctx.input.fileDir.endsWith('/'))
+    ) {
+      throw createApiServiceError(
+        'Use fileDir only for document sources, with a directory prefix ending in /.'
+      );
+    }
+    if (
+      ['url', 'sitemap', 'youtube', 'rss'].includes(ctx.input.type) &&
+      !ctx.input.url?.trim()
+    ) {
+      throw createApiServiceError(`Provide url for a ${ctx.input.type} source.`);
+    }
+    if (
+      ['document', 'urls', 'csv', 'wp'].includes(ctx.input.type) &&
+      !ctx.input.file?.trim() &&
+      !ctx.input.fileDir?.trim()
+    ) {
+      throw createApiServiceError(
+        `Upload the source file with get_upload_url and provide file${ctx.input.type === 'document' ? ' or fileDir' : ''}.`
+      );
+    }
+    if (ctx.input.type === 'document' && !ctx.input.title?.trim()) {
+      throw createApiServiceError('Provide title for a document source.');
+    }
+    if (ctx.input.type === 'qa' && !ctx.input.faqs?.length) {
+      throw createApiServiceError(
+        'Provide at least one question and answer pair in faqs for a qa source.'
+      );
+    }
     let client = new DocsBotAdminClient(ctx.auth.token);
 
-    let source = await client.createSource(ctx.config.teamId, ctx.input.botId, {
-      type: ctx.input.type,
-      title: ctx.input.title,
-      url: ctx.input.url,
-      file: ctx.input.file,
-      faqs: ctx.input.faqs,
-      scheduleInterval: ctx.input.scheduleInterval
-    });
+    let source = await client.createSource(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId,
+      {
+        type: ctx.input.type,
+        title: ctx.input.title,
+        url: ctx.input.url,
+        file: ctx.input.file,
+        fileDir: ctx.input.fileDir,
+        faqs: ctx.input.faqs,
+        scheduleInterval: ctx.input.scheduleInterval
+      }
+    );
 
     return {
       output: {
         sourceId: source.id,
         type: source.type,
         status: source.status,
-        title: source.title,
-        url: source.url,
+        title: source.title ?? undefined,
+        url: source.url ?? undefined,
         createdAt: source.createdAt
       },
       message: `Created **${source.type}** source (ID: \`${source.id}\`, status: ${source.status})`

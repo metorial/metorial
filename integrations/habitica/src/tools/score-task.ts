@@ -41,7 +41,9 @@ Scoring affects the user's stats (HP, XP, Gold, Mana) based on task value and di
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let result = await client.scoreTask(ctx.input.taskId, ctx.input.direction);

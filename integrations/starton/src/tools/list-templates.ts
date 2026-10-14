@@ -14,8 +14,8 @@ export let listTemplates = SlateTool.create(spec, {
   .input(
     z.object({
       templateId: z.string().optional().describe('Specific template ID to get full details'),
-      limit: z.number().default(20).describe('Number of templates to return'),
-      page: z.number().default(0).describe('Page number for pagination')
+      limit: z.number().min(1).max(2500).default(20).describe('Number of templates to return'),
+      page: z.number().min(0).default(0).describe('Page number for pagination')
     })
   )
   .output(
@@ -49,7 +49,7 @@ export let listTemplates = SlateTool.create(spec, {
             {
               templateId: template.id || ctx.input.templateId,
               name: template.name || '',
-              description: template.description,
+              description: template.description ?? undefined,
               category: template.category,
               blockchains: template.blockchains
             }
@@ -65,18 +65,18 @@ export let listTemplates = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         templates: items.map((t: any) => ({
           templateId: t.id || '',
           name: t.name || '',
-          description: t.description,
+          description: t.description ?? undefined,
           category: t.category,
           blockchains: t.blockchains
         })),
-        totalCount: result.meta?.totalCount || items.length
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length
       },
       message: `Found **${items.length}** contract templates.`
     };

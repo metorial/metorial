@@ -37,9 +37,9 @@ export let listProjects = SlateTool.create(spec, {
       query: ctx.input.query
     });
 
-    let items = Array.isArray(data) ? data : (data?.items ?? data?.projects ?? []);
+    let items = data;
 
-    let projects = items.map((p: any) => ({
+    let projects = items.map(p => ({
       projectId: p.id,
       name: p.name ?? '',
       createdAt: p.created_at ?? '',

@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   directionsTool,
   geocodeTool,
+  geocodeV6Tool,
   isochroneTool,
   listFontsTool,
   manageDatasetFeaturesTool,
@@ -15,13 +16,16 @@ import {
   matrixTool,
   optimizeRouteTool,
   staticImageTool,
-  tilequeryTool
+  tilequeryTool,
+  whoAmITool
 } from './tools';
 
 export let provider = Slate.create({
   spec,
   tools: [
     geocodeTool.build(),
+    geocodeV6Tool.build(),
+    whoAmITool.build(),
     directionsTool.build(),
     manageStylesTool.build(),
     manageDatasetsTool.build(),

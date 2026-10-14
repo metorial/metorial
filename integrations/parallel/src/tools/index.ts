@@ -1,10 +1,13 @@
+export { cancelFindall } from './cancel-findall';
 export { chatCompletion } from './chat-completion';
 export { createMonitor } from './create-monitor';
 export { deepResearch } from './deep-research';
 export { enrichFindall } from './enrich-findall';
+export { extendFindall } from './extend-findall';
 export { extractContent } from './extract-content';
 export { findEntities } from './find-entities';
 export { getFindallResults } from './get-findall-results';
+export { getFindallSchema } from './get-findall-schema';
 export { getTaskRun } from './get-task-run';
 export { ingestFindall } from './ingest-findall';
 export { manageMonitor } from './manage-monitor';

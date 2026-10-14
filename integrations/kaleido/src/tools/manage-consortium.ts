@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -29,7 +29,7 @@ Use this to set up new business networks, update consortium details, or remove c
       mode: z
         .enum(['single-org', 'decentralized'])
         .optional()
-        .describe('Consortium governance mode (only for create)')
+        .describe('Legacy governance mode field; omit this field for platform API creation')
     })
   )
   .output(
@@ -41,7 +41,11 @@ Use this to set up new business networks, update consortium details, or remove c
       state: z.string().optional().describe('Consortium state'),
       createdAt: z.string().optional().describe('Creation timestamp'),
       owner: z.string().optional().describe('Owning organization ID'),
-      deleted: z.boolean().optional().describe('Whether the consortium was deleted')
+      deleted: z.boolean().optional().describe('Whether the consortium was deleted'),
+      deletionRequested: z
+        .boolean()
+        .optional()
+        .describe('Whether Kaleido accepted the deletion request')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,42 +55,52 @@ Use this to set up new business networks, update consortium details, or remove c
     });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a consortium');
+      if (ctx.input.mode !== undefined) {
+        throw createApiServiceError(
+          'The platform consortium create API does not accept mode. Omit mode and configure governance in Kaleido.',
+          { reason: 'unsupported_mode' }
+        );
+      }
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a consortium', {
+          reason: 'invalid_input'
+        });
 
       let result = await client.createConsortium({
         name: ctx.input.name,
-        description: ctx.input.description,
-        mode: ctx.input.mode
+        description: ctx.input.description
       });
 
       return {
         output: {
           consortiumId: result._id,
-          name: result.name,
-          description: result.description,
-          mode: result.mode,
-          state: result.state,
-          createdAt: result.created_at,
-          owner: result.owner
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          mode: result.mode ?? undefined,
+          state: result.state ?? undefined,
+          createdAt: result.created_at ?? undefined,
+          owner: result.owner ?? undefined
         },
         message: `Created consortium **${result.name}** (\`${result._id}\`).`
       };
     }
 
     if (!ctx.input.consortiumId)
-      throw new Error('Consortium ID is required for get, update, and delete');
+      throw createApiServiceError('Consortium ID is required for get, update, and delete', {
+        reason: 'invalid_input'
+      });
 
     if (ctx.input.action === 'get') {
       let result = await client.getConsortium(ctx.input.consortiumId);
       return {
         output: {
           consortiumId: result._id,
-          name: result.name,
-          description: result.description,
-          mode: result.mode,
-          state: result.state,
-          createdAt: result.created_at,
-          owner: result.owner
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          mode: result.mode ?? undefined,
+          state: result.state ?? undefined,
+          createdAt: result.created_at ?? undefined,
+          owner: result.owner ?? undefined
         },
         message: `Retrieved consortium **${result.name}** — state: ${result.state || 'unknown'}.`
       };
@@ -102,25 +116,27 @@ Use this to set up new business networks, update consortium details, or remove c
       return {
         output: {
           consortiumId: result._id,
-          name: result.name,
-          description: result.description,
-          mode: result.mode,
-          state: result.state,
-          createdAt: result.created_at,
-          owner: result.owner
+          name: result.name ?? undefined,
+          description: result.description ?? undefined,
+          mode: result.mode ?? undefined,
+          state: result.state ?? undefined,
+          createdAt: result.created_at ?? undefined,
+          owner: result.owner ?? undefined
         },
         message: `Updated consortium **${result.name}**.`
       };
     }
 
     // delete
-    await client.deleteConsortium(ctx.input.consortiumId);
+    let result = await client.deleteConsortium(ctx.input.consortiumId);
     return {
       output: {
         consortiumId: ctx.input.consortiumId,
-        deleted: true
+        deleted: result?.state === 'deleted',
+        deletionRequested: true,
+        state: result?.state ?? undefined
       },
-      message: `Deleted consortium \`${ctx.input.consortiumId}\`.`
+      message: `Kaleido accepted the deletion request for consortium \`${ctx.input.consortiumId}\`.`
     };
   })
   .build();

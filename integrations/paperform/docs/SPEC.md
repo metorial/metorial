@@ -1,6 +1,4 @@
-Now let me get more details on the webhook configuration and Papersign webhooks:Now let me check the webhook trigger types and Papersign webhook events:Let me get the specific Papersign webhook trigger events:Now I have all the information needed to write the specification.
-
-# Slates Specification for Paperform
+# Paperform API Specification
 
 ## Overview
 

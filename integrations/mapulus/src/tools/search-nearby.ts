@@ -13,17 +13,24 @@ let locationSchema = z
     address: z.string().optional().describe('Street address'),
     externalId: z.string().optional().describe('External reference ID'),
     layerId: z.string().optional().describe('Layer the location belongs to'),
-    customAttributes: z.record(z.string(), z.any()).optional().describe('Custom attributes')
+    customAttributes: z.record(z.string(), z.any()).optional().describe('Custom attributes'),
+    nearestMeta: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Provider distance and duration details; these may be absent for unroutable sources'
+      )
   })
   .passthrough();
 
 export let searchNearby = SlateTool.create(spec, {
   name: 'Search Nearby Locations',
   key: 'search_nearby',
-  description: `Find locations near a given point within a map. Provide either coordinates (latitude/longitude) or an address to search around. Optionally specify a search radius and unit to control the search area.`,
+  description: `Find locations near a given point within a map. Provide either coordinates (latitude/longitude) or an address to search around. Returns up to 24 nearest locations. A radius filters these results by the direct geographic distance, so it may not include every location within the radius.`,
   instructions: [
     'Provide either an address or latitude/longitude coordinates as the center point.',
-    'A mapId is required to scope the search to a specific map.'
+    'A mapId is required to scope the search to a specific map.',
+    'A radius requires latitude and longitude. It filters the returned nearest candidates; it does not search beyond the first 24.'
   ],
   tags: {
     destructive: false,
@@ -40,7 +47,23 @@ export let searchNearby = SlateTool.create(spec, {
         .optional()
         .describe('Address to search near (geocoded automatically)'),
       radius: z.number().optional().describe('Search radius'),
-      unit: z.string().optional().describe('Unit for radius, e.g. "km", "miles"')
+      unit: z.string().optional().describe('Unit for radius, e.g. "km", "miles"'),
+      profile: z
+        .enum(['driving', 'cycling', 'walking'])
+        .optional()
+        .describe('Travel profile used to rank locations'),
+      sortBy: z
+        .enum(['distance', 'time'])
+        .optional()
+        .describe('Sort nearby results by travel distance or duration'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of nearest results to request, from 1 to 24'),
+      liveTraffic: z
+        .boolean()
+        .optional()
+        .describe('Include live traffic in routing calculations')
     })
   )
   .output(
@@ -62,7 +85,8 @@ export let searchNearby = SlateTool.create(spec, {
         address: loc.address,
         externalId: loc.external_id,
         layerId: loc.layer_id,
-        customAttributes: loc.custom_attributes
+        customAttributes: loc.custom_attributes,
+        nearestMeta: loc.nearest_meta
       })
     );
 

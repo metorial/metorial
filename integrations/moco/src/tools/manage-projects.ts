@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectOutputSchema = z.object({
@@ -33,6 +34,7 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       includeArchived: z.boolean().optional().describe('Include archived projects'),
       companyId: z.number().optional().describe('Filter by customer company ID'),
       leaderId: z.number().optional().describe('Filter by project leader user ID'),
@@ -62,7 +64,10 @@ export let listProjects = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
-    if (ctx.input.includeArchived) params.include_archived = ctx.input.includeArchived;
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
+    if (ctx.input.includeArchived !== undefined)
+      params.include_archived = ctx.input.includeArchived;
     if (ctx.input.companyId) params.company_id = ctx.input.companyId;
     if (ctx.input.leaderId) params.leader_id = ctx.input.leaderId;
     if (ctx.input.tags) params.tags = ctx.input.tags;
@@ -77,16 +82,16 @@ export let listProjects = SlateTool.create(spec, {
     let projects = (data as any[]).map((p: any) => ({
       projectId: p.id,
       name: p.name,
-      identifier: p.identifier,
+      identifier: p.identifier ?? undefined,
       active: p.active,
       billable: p.billable,
       fixedPrice: p.fixed_price,
       retainer: p.retainer,
-      startDate: p.start_date,
-      finishDate: p.finish_date,
+      startDate: p.start_date ?? undefined,
+      finishDate: p.finish_date ?? undefined,
       currency: p.currency,
-      budgetTotal: p.budget,
-      budgetMonthly: p.budget_monthly,
+      budgetTotal: p.budget ?? undefined,
+      budgetMonthly: p.budget_monthly ?? undefined,
       tags: p.tags,
       leader: p.leader,
       customer: p.customer,
@@ -123,16 +128,16 @@ export let getProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        identifier: p.identifier,
+        identifier: p.identifier ?? undefined,
         active: p.active,
         billable: p.billable,
         fixedPrice: p.fixed_price,
         retainer: p.retainer,
-        startDate: p.start_date,
-        finishDate: p.finish_date,
+        startDate: p.start_date ?? undefined,
+        finishDate: p.finish_date ?? undefined,
         currency: p.currency,
-        budgetTotal: p.budget,
-        budgetMonthly: p.budget_monthly,
+        budgetTotal: p.budget ?? undefined,
+        budgetMonthly: p.budget_monthly ?? undefined,
         tags: p.tags,
         leader: p.leader,
         customer: p.customer,
@@ -200,16 +205,16 @@ export let createProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        identifier: p.identifier,
+        identifier: p.identifier ?? undefined,
         active: p.active,
         billable: p.billable,
         fixedPrice: p.fixed_price,
         retainer: p.retainer,
-        startDate: p.start_date,
-        finishDate: p.finish_date,
+        startDate: p.start_date ?? undefined,
+        finishDate: p.finish_date ?? undefined,
         currency: p.currency,
-        budgetTotal: p.budget,
-        budgetMonthly: p.budget_monthly,
+        budgetTotal: p.budget ?? undefined,
+        budgetMonthly: p.budget_monthly ?? undefined,
         tags: p.tags,
         leader: p.leader,
         customer: p.customer,
@@ -293,16 +298,16 @@ export let updateProject = SlateTool.create(spec, {
       output: {
         projectId: p.id,
         name: p.name,
-        identifier: p.identifier,
+        identifier: p.identifier ?? undefined,
         active: p.active,
         billable: p.billable,
         fixedPrice: p.fixed_price,
         retainer: p.retainer,
-        startDate: p.start_date,
-        finishDate: p.finish_date,
+        startDate: p.start_date ?? undefined,
+        finishDate: p.finish_date ?? undefined,
         currency: p.currency,
-        budgetTotal: p.budget,
-        budgetMonthly: p.budget_monthly,
+        budgetTotal: p.budget ?? undefined,
+        budgetMonthly: p.budget_monthly ?? undefined,
         tags: p.tags,
         leader: p.leader,
         customer: p.customer,
@@ -378,7 +383,8 @@ export let getProjectReport = SlateTool.create(spec, {
         projectId: ctx.input.projectId,
         name: report.name,
         budgetTotal: report.budget_total,
-        budgetProgress: report.budget_progress_percentage,
+        budgetProgress:
+          report.budget_progress_in_percentage ?? report.budget_progress_percentage,
         hoursTotal: report.hours_total,
         costTotal: report.cost_total,
         invoicedTotal: report.invoiced_total,

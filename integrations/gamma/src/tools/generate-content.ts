@@ -9,15 +9,13 @@ let headerFooterPositionSchema = z
     value: z
       .string()
       .optional()
-      .describe(
-        'Text value (for type "text") or image URL (for type "image" with custom source)'
-      ),
+      .describe('Required text value when type is "text". Use src for custom images.'),
     source: z
       .string()
       .optional()
       .describe('Image source, e.g. "themeLogo" or "custom" (for type "image")'),
     src: z.string().optional().describe('Image URL when source is "custom"'),
-    size: z.string().optional().describe('Size of the element')
+    size: z.string().optional().describe('Image size: sm, md, lg, or xl')
   })
   .describe('Header/footer position configuration');
 
@@ -71,12 +69,12 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
     'Use textMode "generate" for short prompts that need expansion, "condense" for long text that needs summarizing, and "preserve" to keep input text as-is.',
     'Use "\\n---\\n" in inputText to create explicit card breaks when cardSplit is set to "inputTextBreaks".',
     'Retrieve themeId using the List Themes tool and folderIds using the List Folders tool before generating.',
-    'Export links are temporary - download PDF/PPTX files promptly after generation completes.'
+    'Export links are temporary - download PDF, PPTX, or PNG ZIP files promptly after generation completes.'
   ],
   constraints: [
-    'Pro users: 1-60 cards. Ultra users: 1-75 cards.',
+    'Pro, Ultra, Teams, Business, and Enterprise plans: 1-75 cards.',
     'inputText limit: ~100,000 tokens (~400,000 characters).',
-    'additionalInstructions limit: 2,000 characters.',
+    'additionalInstructions limit: 5,000 characters.',
     'tone and audience limit: 500 characters each.'
   ],
   tags: {
@@ -88,14 +86,23 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
     z.object({
       inputText: z
         .string()
+        .min(1)
+        .max(400000)
         .describe(
           'Text content or prompt to generate from. Can include image URLs. Use "\\n---\\n" for explicit card breaks.'
         ),
       textMode: z
         .enum(['generate', 'condense', 'preserve'])
+        .optional()
         .describe(
           'How input text is handled: generate (expand/rewrite), condense (summarize), or preserve (keep as-is)'
         ),
+      title: z
+        .string()
+        .min(1)
+        .max(500)
+        .optional()
+        .describe('Custom title for the generated Gamma (1-500 characters)'),
       format: z
         .enum(['presentation', 'document', 'webpage', 'social'])
         .optional()
@@ -106,9 +113,12 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
         .describe('Theme ID to apply. Use List Themes tool to find available themes.'),
       numCards: z
         .number()
+        .refine(Number.isSafeInteger, 'Card count must be a whole number.')
+        .min(1)
+        .max(75)
         .optional()
         .describe(
-          'Number of cards/slides to generate (1-60 for Pro, 1-75 for Ultra). Defaults to 10.'
+          'Number of cards/slides to generate (1-75 for supported plans). Defaults to 10.'
         ),
       cardSplit: z
         .enum(['auto', 'inputTextBreaks'])
@@ -118,27 +128,40 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
         ),
       additionalInstructions: z
         .string()
+        .max(5000)
         .optional()
-        .describe('Extra instructions for AI (max 2000 chars), e.g. "Make the titles catchy"'),
+        .describe('Extra instructions for AI (max 5000 chars), e.g. "Make the titles catchy"'),
+      folderId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Folder ID from list_folders. Takes precedence over folderIds.'),
       folderIds: z
         .array(z.string())
         .optional()
         .describe(
-          'Folder IDs to organize content into. Use List Folders tool to find available folders.'
+          'Legacy array accepting at most one folder ID from list_folders. Ignored when folderId is provided.'
         ),
       exportAs: z
-        .enum(['pdf', 'pptx'])
+        .enum(['pdf', 'pptx', 'png'])
         .optional()
-        .describe('Export format in addition to the Gamma web URL'),
+        .describe(
+          'Optional downloadable export: PDF, PPTX, or a ZIP containing one PNG per card'
+        ),
       textOptions: z
         .object({
           amount: z
             .enum(['brief', 'medium', 'detailed', 'extensive'])
             .optional()
             .describe('Text volume per card. Defaults to "medium".'),
-          tone: z.string().optional().describe('Tone/voice for the content (max 500 chars)'),
+          tone: z
+            .string()
+            .max(500)
+            .optional()
+            .describe('Tone/voice for the content (max 500 chars)'),
           audience: z
             .string()
+            .max(500)
             .optional()
             .describe('Target audience description (max 500 chars)'),
           language: z
@@ -159,6 +182,7 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
               'webAllImages',
               'webFreeToUse',
               'webFreeToUseCommercially',
+              'themeAccent',
               'placeholder',
               'noImages'
             ])
@@ -168,13 +192,14 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
             .string()
             .optional()
             .describe(
-              'AI image model (e.g. "imagen-4-pro", "flux-1-pro", "dall-e-3"). Only used when source is "aiGenerated".'
+              'AI image model (e.g. "gpt-image-2", "flux-1-pro", "dall-e-3"). Only used when source is "aiGenerated".'
             ),
           style: z
             .string()
+            .max(5000)
             .optional()
             .describe(
-              'Artistic style for images (max 500 chars), e.g. "photorealistic", "minimal line art"'
+              'Artistic style for images (max 5000 chars), e.g. "photorealistic", "minimal line art"'
             )
         })
         .optional()
@@ -200,7 +225,11 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
         .string()
         .describe(
           'Unique ID for tracking the generation. Use Get Generation Status tool to check progress.'
-        )
+        ),
+      warnings: z
+        .string()
+        .optional()
+        .describe('Provider warnings about ignored or adjusted options')
     })
   )
   .handleInvocation(async ctx => {
@@ -209,11 +238,13 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
     let result = await client.generate({
       inputText: ctx.input.inputText,
       textMode: ctx.input.textMode,
+      title: ctx.input.title,
       format: ctx.input.format,
       themeId: ctx.input.themeId,
       numCards: ctx.input.numCards,
       cardSplit: ctx.input.cardSplit,
       additionalInstructions: ctx.input.additionalInstructions,
+      folderId: ctx.input.folderId,
       folderIds: ctx.input.folderIds,
       exportAs: ctx.input.exportAs,
       textOptions: ctx.input.textOptions,
@@ -226,7 +257,8 @@ Optionally configure tone, audience, language, number of cards, image sourcing, 
 
     return {
       output: {
-        generationId: result.generationId
+        generationId: result.generationId,
+        warnings: result.warnings ?? undefined
       },
       message: `Content generation started. Generation ID: **${result.generationId}**. Use the Get Generation Status tool to check progress and retrieve the result URL.`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CertSpotterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -49,15 +49,30 @@ Supports two modes: upload a PEM-encoded CSR (DNS names are extracted automatica
 
     if (ctx.input.method === 'csr') {
       if (!ctx.input.pemCSR) {
-        throw new Error('pemCSR is required when method is "csr"');
+        throw createApiServiceError('pemCSR is required when method is "csr".');
+      }
+      if (ctx.input.pubkeySha256 !== undefined || ctx.input.dnsNames !== undefined) {
+        throw createApiServiceError('Use pubkeySha256 and dnsNames only with method "hash".');
       }
       await client.authorizePublicKeyByCSR(ctx.input.pemCSR);
     } else {
       if (!ctx.input.pubkeySha256) {
-        throw new Error('pubkeySha256 is required when method is "hash"');
+        throw createApiServiceError('pubkeySha256 is required when method is "hash".');
       }
-      if (!ctx.input.dnsNames || ctx.input.dnsNames.length === 0) {
-        throw new Error('dnsNames is required and must not be empty when method is "hash"');
+      if (!/^[0-9a-f]{64}$/.test(ctx.input.pubkeySha256)) {
+        throw createApiServiceError(
+          'pubkeySha256 must be a lowercase 64-character SHA-256 hash.'
+        );
+      }
+      if (
+        !ctx.input.dnsNames ||
+        ctx.input.dnsNames.length === 0 ||
+        ctx.input.dnsNames.some(name => !name.trim())
+      ) {
+        throw createApiServiceError('Provide non-empty dnsNames when method is "hash".');
+      }
+      if (ctx.input.pemCSR !== undefined) {
+        throw createApiServiceError('Use pemCSR only with method "csr".');
       }
       await client.authorizePublicKeyByHash(ctx.input.pubkeySha256, ctx.input.dnsNames);
     }

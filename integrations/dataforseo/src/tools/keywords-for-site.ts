@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { dataForSEOServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let optionalNumber = (value: unknown) => (typeof value === 'number' ? value : undefined);
@@ -11,6 +12,7 @@ let siteKeywordSchema = z
     searchVolume: z.number().optional().describe('Average monthly search volume'),
     cpc: z.number().optional().describe('Cost per click in USD'),
     competition: z.number().optional().describe('Competition level (0-1)'),
+    competitionIndex: z.number().optional().describe('Google Ads competition index (0-100)'),
     competitionLevel: z.string().optional().describe('Competition level label'),
     lowTopOfPageBid: z.number().optional().describe('Low range of top-of-page bid'),
     highTopOfPageBid: z.number().optional().describe('High range of top-of-page bid')
@@ -20,7 +22,7 @@ let siteKeywordSchema = z
 export let keywordsForSite = SlateTool.create(spec, {
   name: 'Keywords for Site',
   key: 'keywords_for_site',
-  description: `Discover keywords relevant to a specific website or domain. Combines Google Ads data with DataForSEO's SERP database to find the most relevant keywords a domain ranks for or is associated with. Returns search volume, CPC, and competition metrics for each keyword. Ideal for competitor keyword analysis and content gap discovery.`,
+  description: `Discover keywords relevant to a website or webpage using Google Ads keyword data. Returns search volume, CPC, and competition metrics. Use Ranked Keywords to find keywords a domain ranks for in organic search.`,
   instructions: [
     'Provide a domain or URL to discover relevant keywords.',
     'Results include search volume, CPC, and competition data for each keyword.'
@@ -37,8 +39,33 @@ export let keywordsForSite = SlateTool.create(spec, {
       locationCode: z.number().optional().describe('DataForSEO location code'),
       languageName: z.string().optional().describe('Language name (e.g., "English")'),
       languageCode: z.string().optional().describe('Language code (e.g., "en")'),
-      limit: z.number().optional().describe('Maximum number of keywords to return'),
-      offset: z.number().optional().describe('Pagination offset')
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum keywords returned from the fetched suggestions; must be a positive whole number'
+        ),
+      offset: z
+        .number()
+        .optional()
+        .describe('Whole-number offset within the fetched suggestions'),
+      targetType: z
+        .enum(['site', 'page'])
+        .optional()
+        .describe(
+          'Analyze the entire site or only the target webpage; provider default is page'
+        ),
+      searchPartners: z.boolean().optional().describe('Include Google search partners data'),
+      sortBy: z
+        .enum([
+          'relevance',
+          'search_volume',
+          'competition_index',
+          'low_top_of_page_bid',
+          'high_top_of_page_bid'
+        ])
+        .optional()
+        .describe('Provider sorting in descending order; defaults to relevance')
     })
   )
   .output(
@@ -52,22 +79,44 @@ export let keywordsForSite = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      (ctx.input.limit !== undefined &&
+        (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1)) ||
+      (ctx.input.offset !== undefined &&
+        (!Number.isInteger(ctx.input.offset) || ctx.input.offset < 0))
+    ) {
+      throw dataForSEOServiceError(
+        'limit must be a positive whole number and offset must be a non-negative whole number.'
+      );
+    }
+
     let response = await client.keywordsForSiteLive({
       target: ctx.input.target,
       locationName: ctx.input.locationName,
       locationCode: ctx.input.locationCode,
       languageName: ctx.input.languageName,
       languageCode: ctx.input.languageCode,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
+      targetType: ctx.input.targetType,
+      searchPartners: ctx.input.searchPartners,
+      sortBy: ctx.input.sortBy
     });
 
     let results = client.extractResults(response);
-    let keywords = results.map((item: any) => ({
+    let offset = ctx.input.offset ?? 0;
+    let page = results.slice(
+      offset,
+      ctx.input.limit === undefined ? undefined : offset + ctx.input.limit
+    );
+    let keywords = page.map((item: any) => ({
       keyword: item.keyword,
       searchVolume: optionalNumber(item.search_volume),
       cpc: optionalNumber(item.cpc),
-      competition: optionalNumber(item.competition),
+      competition:
+        optionalNumber(item.competition) ??
+        (typeof item.competition_index === 'number'
+          ? item.competition_index / 100
+          : undefined),
+      competitionIndex: optionalNumber(item.competition_index),
       competitionLevel:
         item.competition_level ??
         (typeof item.competition === 'string' ? item.competition : undefined),
@@ -75,12 +124,10 @@ export let keywordsForSite = SlateTool.create(spec, {
       highTopOfPageBid: optionalNumber(item.high_top_of_page_bid)
     }));
 
-    let result = response.tasks?.[0];
-
     return {
       output: {
         target: ctx.input.target,
-        totalCount: result?.result_count,
+        totalCount: results.length,
         keywords,
         cost: response.cost
       },

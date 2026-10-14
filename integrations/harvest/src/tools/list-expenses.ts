@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listExpenses = SlateTool.create(spec, {
   name: 'List Expenses',
   key: 'list_expenses',
-  description: `Retrieve expenses with optional filtering by user, client, project, billing status, and date range.`,
+  description: `Retrieve expenses with optional filtering by user, client, project, billing status, and date range. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       userId: z.number().optional().describe('Filter by user ID'),
       clientId: z.number().optional().describe('Filter by client ID'),
       projectId: z.number().optional().describe('Filter by project ID'),
@@ -49,7 +51,7 @@ export let listExpenses = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let result = await client.listExpenses({

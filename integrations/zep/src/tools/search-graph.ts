@@ -113,7 +113,7 @@ export let searchGraph = SlateTool.create(spec, {
       searchFilters
     });
 
-    let nodes = (result.nodes || []).map((n: any) => ({
+    let nodes = (result.nodes || []).map(n => ({
       uuid: n.uuid,
       name: n.name,
       summary: n.summary,
@@ -121,7 +121,7 @@ export let searchGraph = SlateTool.create(spec, {
       score: n.score
     }));
 
-    let edges = (result.edges || []).map((e: any) => ({
+    let edges = (result.edges || []).map(e => ({
       uuid: e.uuid,
       fact: e.fact,
       name: e.name,
@@ -129,7 +129,7 @@ export let searchGraph = SlateTool.create(spec, {
       targetNodeUuid: e.target_node_uuid
     }));
 
-    let episodes = (result.episodes || []).map((ep: any) => ({
+    let episodes = (result.episodes || []).map(ep => ({
       content: ep.content,
       uuid: ep.uuid
     }));

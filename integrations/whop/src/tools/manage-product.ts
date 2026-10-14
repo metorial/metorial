@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let productOutputSchema = z.object({
@@ -36,10 +37,7 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
         .string()
         .optional()
         .describe('Product ID (required for get, update, delete)'),
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID (required for create). Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       title: z.string().optional().describe('Product title (max 40 chars)'),
       description: z.string().optional().describe('Product description'),
       headline: z.string().optional().describe('Short product headline'),
@@ -67,7 +65,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (!ctx.input.productId) throw new Error('productId is required for get action');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required for get action');
       let p = await client.getProduct(ctx.input.productId);
       return {
         output: {
@@ -89,8 +88,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
 
     if (action === 'create') {
       let companyId = ctx.input.companyId || ctx.config.companyId;
-      if (!companyId) throw new Error('companyId is required for create action');
-      if (!ctx.input.title) throw new Error('title is required for create action');
+      if (!companyId) throw createApiServiceError('companyId is required for create action');
+      if (!ctx.input.title) throw createApiServiceError('title is required for create action');
 
       let p = await client.createProduct({
         companyId,
@@ -123,7 +122,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     }
 
     if (action === 'update') {
-      if (!ctx.input.productId) throw new Error('productId is required for update action');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required for update action');
 
       let p = await client.updateProduct(ctx.input.productId, {
         title: ctx.input.title,
@@ -155,7 +155,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     }
 
     if (action === 'delete') {
-      if (!ctx.input.productId) throw new Error('productId is required for delete action');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required for delete action');
       let result = await client.deleteProduct(ctx.input.productId);
       return {
         output: {
@@ -166,6 +167,6 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

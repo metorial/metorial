@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,9 @@ export let updateJob = SlateTool.create(spec, {
       statusId: z
         .number()
         .optional()
-        .describe('New job status ID. Use the search tool to find available statuses.')
+        .describe(
+          'New job status ID. 1 = In Play, 2 = Done, 3 = Deleted, 4 = Archived, 5 = Paused.'
+        )
     })
   )
   .output(
@@ -39,18 +41,22 @@ export let updateJob = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StreamtimeClient({ token: ctx.auth.token });
 
-    if (ctx.input.statusId !== undefined) {
-      await client.updateJobStatus(ctx.input.jobId, {
-        id: ctx.input.statusId
-      });
-    }
-
     let body: Record<string, any> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.companyId !== undefined) body.company = { id: ctx.input.companyId };
     if (ctx.input.contactId !== undefined) body.contact = { id: ctx.input.contactId };
     if (ctx.input.jobLeadUserId !== undefined) body.jobLeadUserId = ctx.input.jobLeadUserId;
-    if (ctx.input.budget !== undefined) body.budget = ctx.input.budget;
+    if (ctx.input.budget !== undefined) {
+      let budget = Number(ctx.input.budget);
+      if (!ctx.input.budget.trim() || !Number.isFinite(budget)) {
+        throw createApiServiceError('budget must be a valid numeric amount, such as 5000.00.');
+      }
+      body.budget = budget;
+    }
+
+    if (ctx.input.statusId !== undefined) {
+      await client.updateJobStatus(ctx.input.jobId, ctx.input.statusId);
+    }
 
     let result: any;
     if (Object.keys(body).length > 0) {

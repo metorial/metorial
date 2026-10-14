@@ -1,6 +1,13 @@
-# <img src="logo.svg" height="20"> Productlane
+# <img src="logo.jpg" height="20"> Productlane
 
-Manage customer feedback, support insights, and public roadmaps. Create and list companies, contacts, and segments. Create, retrieve, and update feedback threads/insights. Access portal projects and issues, manage upvotes, and submit feedback. Retrieve changelogs and workspace information. Useful for consolidating customer feedback into actionable product work.
+Manage customer feedback, support conversations, companies, contacts, portal
+projects and issues, upvotes, and changelogs. Submit portal feedback and read
+workspace information and members.
+
+This integration uses the legacy v1 API with existing v1 API keys. Productlane
+now creates v2 keys (`pl_v2_`) and has announced v1 sunset on 20 November 2026.
+See the [API guide](https://productlane.com/docs/integrations/api) and the
+[integration reference](docs/SPEC.md) for supported workflows and limitations.
 
 ## License
 

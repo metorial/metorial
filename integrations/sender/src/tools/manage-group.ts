@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,7 +39,7 @@ export let manageGroup = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title) {
-        throw new Error('Title is required when creating a group');
+        throw createApiServiceError('Title is required when creating a group');
       }
       let result = await client.createGroup(ctx.input.title);
       let group = result.data;
@@ -59,7 +59,7 @@ export let manageGroup = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.groupId) {
-        throw new Error('Group ID is required when getting a group');
+        throw createApiServiceError('Group ID is required when getting a group');
       }
       let result = await client.getGroup(ctx.input.groupId);
       let group = result.data;
@@ -79,7 +79,7 @@ export let manageGroup = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.groupId) {
-      throw new Error('Group ID is required when deleting a group');
+      throw createApiServiceError('Group ID is required when deleting a group');
     }
     await client.deleteGroup(ctx.input.groupId);
     return {

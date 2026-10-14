@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppDragClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,8 +57,10 @@ export let manageFiles = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'write':
-        if (!ctx.input.content) {
-          throw new Error('Content is required for the write action.');
+        if (ctx.input.content === undefined) {
+          throw createApiServiceError('Content is required for the write action.', {
+            reason: 'missing_content'
+          });
         }
         result = await client.fileTextWrite(ctx.input.filePath, ctx.input.content);
         break;
@@ -69,21 +71,30 @@ export let manageFiles = SlateTool.create(spec, {
 
       case 'rename':
         if (!ctx.input.destinationPath) {
-          throw new Error('Destination path is required for the rename action.');
+          throw createApiServiceError('Destination path is required for the rename action.', {
+            reason: 'missing_destination'
+          });
         }
         result = await client.fileRename(ctx.input.filePath, ctx.input.destinationPath);
         break;
 
       case 'copy':
         if (!ctx.input.destinationPath) {
-          throw new Error('Destination path is required for the copy action.');
+          throw createApiServiceError('Destination path is required for the copy action.', {
+            reason: 'missing_destination'
+          });
         }
         result = await client.fileCopy(ctx.input.filePath, ctx.input.destinationPath);
         break;
 
       case 'download_remote':
         if (!ctx.input.remoteUrl) {
-          throw new Error('Remote URL is required for the download_remote action.');
+          throw createApiServiceError(
+            'Remote URL is required for the download_remote action.',
+            {
+              reason: 'missing_remote_url'
+            }
+          );
         }
         result = await client.downloadRemoteFile(
           ctx.input.remoteUrl,

@@ -1,121 +1,29 @@
-Let me get more details on the API reference to understand the full feature set and webhook events.Now I have comprehensive information about UniOne's API. Let me compile the specification.
+# UniOne Integration
 
-# Slates Specification for Unione
-
-## Overview
-
-UniOne (unione.io) is a transactional email service that provides an API for sending transactional and marketing emails. It offers email delivery with tracking, template management, domain verification, suppression list management, and real-time event notifications via webhooks.
+UniOne provides transactional email sending, reusable templates, sender domain verification, suppression lists, email validation, historical event exports, and isolated projects.
 
 ## Authentication
 
-UniOne uses **API key** authentication. Every API method call requires an API key provided in one of two ways:
+Connect with a user or project API key. Requests use the `X-API-KEY` header. The automatic endpoint is preferred; European and US endpoints can be selected in the datacenter setting. Project management and confirmed-email operations require a main account key. Projects must first be enabled by UniOne support.
 
-- **`X-API-KEY` HTTP header** (recommended)
-- **`api_key` JSON field** in the request body
+## Email and sender workflows
 
-There are two types of API keys:
+`send_email` accepts up to 500 recipients with personalization, HTML/plaintext/AMP bodies, stored templates, base64 file inputs, tracking, and scheduled delivery. `idempotenceKey` prevents duplicate sends within one minute. ISO 8601 times are converted to the UTC format expected by UniOne. Support approval is needed for some unsubscribe, tracking, and suppression bypass options.
 
-1. **User API key**: Obtained from the [account settings page](https://cp.unione.io/en/user/info/api). Grants access to all account-level operations including project management.
-2. **Project API key**: Obtained from the [Projects page](https://cp.unione.io/en/user/project) or via the project API methods. Scopes access to a specific project's data only (domains, templates, suppressions, webhooks). Cannot be used for `project/*` methods.
+`get_domain_dns_records` registers a missing sender domain and generates its keys, or retrieves the existing keys. Publish the returned verification value unchanged as a root TXT record, and publish `k=rsa; p=<returned raw DKIM key>` at `us._domainkey.<domain>`. Add `include:spf.unione.io` to the existing SPF record; if none exists, UniOne recommends a root TXT value of `v=spf1 include:spf.unione.io ~all`. SPF is setup guidance rather than an API-returned value. Then use `validate_domain` and `list_domains` to check status. Domain listings support filtering and pagination. Only confirmed domains with active DKIM are ready for sending.
 
-The API base URL depends on the datacenter where the user is registered:
+`create_confirmed_email`, `list_confirmed_emails`, and `delete_confirmed_email` manage addresses eligible for sandbox-domain sending. Registration requests a confirmation link and does not itself prove the recipient completed confirmation.
 
-- `https://api.unione.io/en/transactional/api/v1` (auto-routing, preferred)
-- `https://eu1.unione.io/en/transactional/api/v1` (European instance)
-- `https://us1.unione.io/en/transactional/api/v1` (US instance)
+## Data and account workflows
 
-All requests must use HTTPS and are HTTP POST with JSON bodies.
+Templates, suppression entries, tags, and projects have listing and management tools. `get_system_info` identifies the connected account or project and returns available accounting details. `validate_email` exposes the textual validation result and numerical validity score.
 
-## Features
+Template creation requires a name and sender email. Template updates retrieve omitted name and sender values from the existing template in one lookup. Project updates retrieve the existing project name when omitted. If required values cannot be resolved, the tool reports which value to supply or which identifier to verify.
 
-### Email Sending
+`create_event_dump` starts an asynchronous CSV export. Pass its `dumpReference` to `get_event_dump` or `delete_event_dump`. The legacy numeric `dumpId` field remains supported where available. `get_event_dump` provides downloadable files and preserves download URLs; completed files can be downloaded while other files are still processing. UniOne automatically removes export files after eight hours. The legacy `allEvents` parameter is retained, but current documentation does not describe its upstream `all_events` flag; use documented status filters for event selection.
 
-Send transactional or marketing emails to up to 500 recipients per request. Supports HTML, plaintext, and AMP email bodies. Emails can include per-recipient substitutions (merge tags), metadata, attachments, and inline attachments. Scheduling is supported up to 24 hours in advance via the `send_at` option. Template engines available: `simple`, `velocity`, `liquid`, or `none`. Link click tracking and read tracking are enabled by default. An idempotence key can be provided to prevent duplicate sends within a one-minute window.
+## Official references
 
-- Unsubscribe links are appended by default; skipping them requires support approval.
-- Bypass options exist to override global/account-level unavailability, unsubscribe, and complaint lists (requires `bypass_global=1`).
-
-### Email Subscription Management
-
-Send a re-subscribe email to recipients who previously unsubscribed or were blocked due to complaints. The recipient receives an email with a link to restore their subscription.
-
-- Limited to once per day per recipient by default.
-
-### Email Validation
-
-Validate individual email addresses to check if they are valid, invalid, suspicious, or unknown. Returns a validity score (0–100), cause details (e.g., disposable, spamtrap, mailbox not found, possible typo), and a suggested correction for typos.
-
-- Intended for single real-time checks (e.g., form validation), not bulk validation.
-
-### Template Management
-
-Create, update, retrieve, list, and delete reusable email templates stored on UniOne's side. Templates support all the same properties as direct email sends (body, subject, sender, headers, attachments, substitutions, metadata). When sending, you reference a template by ID, and any fields omitted in the send call are filled from the template.
-
-- Supports `simple`, `velocity`, and `liquid` template engines.
-- Up to 10,000 templates per project.
-
-### Suppression List Management
-
-Manage suppression lists to control which email addresses are blocked from receiving emails. You can add, query, list, and delete suppressed addresses. Suppression causes include: `unsubscribed`, `temporary_unavailable`, `permanent_unavailable`, `complained`, and `blocked`. Each suppression record indicates its source (user, system, or subscriber) and whether it is deletable.
-
-- Filtering by cause, source, and date is supported when listing.
-
-### Domain Management
-
-Register, verify, and manage sender domains programmatically. The workflow involves: retrieving required DNS records (verification TXT record, DKIM key, SPF include), adding them to your DNS, then triggering validation. Domain status can be checked to confirm verification and DKIM activation before sending.
-
-- Domains require both a confirmed verification record and an active DKIM record to be used as sender domains.
-
-### Event Dumps
-
-Request historical event data exports for a given time period in CSV or gzipped CSV format. Events can be filtered by job ID, email status, delivery status, recipient email, sender email, domain, or campaign ID. Aggregated daily statistics are also available.
-
-- Data is stored for up to 45 days depending on the tariff.
-- Up to 10 dump files can exist at a time; each is kept for 8 hours.
-
-### Tag Management
-
-List and delete user-defined tags used to categorize outgoing emails. Tags are assigned when sending emails (up to 4 per email) and can be used to filter and analyze delivery statistics.
-
-- Up to 10,000 tags per project.
-
-### Project Management
-
-Create, update, list, and delete projects to isolate domains, templates, webhooks, suppression lists, and sending data for different clients or use cases. Each project gets its own API key. Projects support per-project sending limits, country-based data handling (e.g., GDPR), and custom unsubscribe settings.
-
-- Project functionality is disabled by default and must be enabled by support.
-
-### System Information
-
-Retrieve account or project information including user ID, email, accounting period details, and email counters.
-
-## Events
-
-UniOne supports **webhooks** for real-time event notifications. You register a webhook URL and configure which event types to listen for. UniOne will POST JSON payloads (or gzipped JSON) to your URL when events occur. Multiple events can be batched into a single request.
-
-### Email Status Events (`transactional_email_status`)
-
-Notifies when the delivery status of a sent email changes. You can subscribe to specific statuses:
-
-- **delivered** – Email was delivered to the recipient's mail server.
-- **opened** – Email was opened/read by the recipient.
-- **clicked** – A link in the email was clicked.
-- **unsubscribed** – Recipient unsubscribed after reading the email.
-- **subscribed** – Recipient re-subscribed after previously unsubscribing.
-- **soft_bounced** – Temporary delivery failure; retries will occur for up to 48 hours.
-- **hard_bounced** – Permanent delivery failure; no further attempts.
-- **spam** – Recipient reported the email as spam (via FBL from supported providers).
-
-Each event includes job ID, recipient email, event timestamp, and any metadata passed at send time. Optionally, detailed delivery info can be included (SMTP response, user agent, IP address, clicked URL).
-
-### Spam Block Events (`transactional_spam_block`)
-
-Notifies when sending is blocked or unblocked by a recipient domain's SMTP server. Includes the domain name, block type (single or multiple SMTP), count of blocked SMTPs, and whether it is a block or unblock event.
-
-**Webhook configuration options:**
-
-- `event_format`: JSON or gzipped JSON.
-- `delivery_info`: Whether to include detailed SMTP response and user agent data.
-- `single_event`: Whether to send one event per request or batch multiple events.
-- `max_parallel`: Maximum number of concurrent webhook calls to your server (5–100).
-- Webhook integrity can be verified via an MD5 auth hash included in each payload.
+- [Web API reference](https://docs.unione.io/en/web-api-ref/)
+- [API changelog](https://docs.unione.io/en/api-changelog/)
+- [Machine-readable API specification](https://docs.unione.io/openapi/unione-web-api-latest.json)

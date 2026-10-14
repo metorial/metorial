@@ -71,12 +71,12 @@ export let listDomains = SlateTool.create(spec, {
         type: v.type,
         status: v.status,
         dateCreated: v.date_created,
-        expiresAt: v.expires_at
+        expiresAt: v.validated_until ?? v.expires_at ?? undefined
       })),
       dcvStatus: d.dcv_status
     }));
 
-    let totalCount = result.page?.total || domains.length;
+    let totalCount = result.page?.total ?? domains.length;
 
     return {
       output: { domains, totalCount },

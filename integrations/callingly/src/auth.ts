@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,23 +26,13 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.callingly.com/v1'
-      });
-
-      let response = await axios.get('/clients', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let client = new Client({ token: ctx.output.token });
+      await client.listTeams();
 
       return {
         profile: {
-          id: response.data?.[0]?.id?.toString(),
-          name: response.data?.[0]?.name,
-          email: response.data?.[0]?.email
+          name: 'Callingly account'
         }
       };
     }

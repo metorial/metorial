@@ -20,8 +20,18 @@ Use theme IDs when generating content to control colors, fonts, and overall visu
 })
   .input(
     z.object({
+      type: z
+        .enum(['standard', 'custom'])
+        .optional()
+        .describe('Filter theme type; keep this value consistent while paginating'),
       query: z.string().optional().describe('Search themes by name (case-insensitive)'),
-      limit: z.number().optional().describe('Number of themes per page (max 50)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page size must be a whole number.')
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Number of themes per page (max 50)'),
       after: z.string().optional().describe('Cursor token for fetching the next page')
     })
   )
@@ -55,6 +65,7 @@ Use theme IDs when generating content to control colors, fonts, and overall visu
 
     let result = await client.listThemes({
       query: ctx.input.query,
+      type: ctx.input.type,
       limit: ctx.input.limit,
       after: ctx.input.after
     });
@@ -77,7 +88,7 @@ Use theme IDs when generating content to control colors, fonts, and overall visu
       output: {
         themes,
         hasMore: result.hasMore,
-        nextCursor: result.nextCursor
+        nextCursor: result.nextCursor ?? undefined
       },
       message
     };

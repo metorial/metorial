@@ -1,4 +1,4 @@
-# Slates Specification for Gleap
+# Gleap Integration Specification
 
 ## Overview
 
@@ -22,9 +22,9 @@ Project: YOUR_PROJECT_ID
 Content-Type: application/json
 ```
 
-**Base URL:** `https://api.gleap.io/v3`
+**Base URL:** `https://api.gleap.io/v3` (EU, default) or `https://api.us.gleap.ai/v3` (US). The optional auth `region` field selects the project data region and is stored with the connection. Old connections without a region continue to use EU.
 
-There is no OAuth2 flow; authentication is solely API key-based. The API key should be kept secure and never exposed in client-side code.
+This integration connects using the admin REST API key. The API key should be kept secure and never exposed in client-side code.
 
 ## Features
 
@@ -38,15 +38,15 @@ Allows creating and managing user sessions that represent contacts or end-users.
 
 ### Messaging and Comments
 
-Allows adding messages/comments to tickets. Comments support plain text, rich formatted content (structured document format), and file attachments. Messages can be posted as agent replies, internal notes (using `isNote: true`), or customer comments (by specifying the session ID).
+Allows adding messages/comments to tickets. Comments support plain text, rich formatted content (structured document format), and file attachments. Messages can be posted as teammate replies or internal notes (using `isNote: true`). The admin API always attributes a new message to the authenticated teammate; its legacy `session` property is accepted but ignored. Plain message text is sent as the documented string `comment`.
 
 ### Help Center Management
 
-Provides management of help center content including collections (categories) and individual articles. Also supports configuring help center settings and redirects.
+Provides management of help center content including collections (categories) and individual articles. The read-only `get_article` tool retrieves full stored article content and can include HTML or Markdown. Published-article search uses the help center hostname in `helpCenterDomain`, an optional password for protected help centers, and the requested language. Calls without a hostname retain the legacy project search route, whose availability has not been verified.
 
-### Message Templates
+### Assignment And Identity Discovery
 
-Allows managing reusable message templates for consistent communication.
+`get_current_user` returns the authenticated identity without credential fields. `list_project_users` returns project and organization teammates with assignment IDs and roles.
 
 ### Engagement Campaigns
 
@@ -102,3 +102,15 @@ Triggers when feedback is updated. Fires when an existing ticket/feedback item i
 ### Feedback Deleted
 
 Triggers when feedback is deleted. Fires when a ticket/feedback item is removed from the project.
+
+
+## Refresh Sources
+
+- [Current official OpenAPI](https://api.gleap.io/api-docs.json), API version 14.0.0, retrieved 2026-10-13.
+- [API overview and regions](https://docs.gleap.ai/documentation/server/api-overview).
+- [Message creation](https://docs.gleap.ai/api-reference/messages/create-a-new-message).
+- [Get current user](https://docs.gleap.ai/api-reference/user/get-current-user).
+- [Project members](https://docs.gleap.ai/api-reference/project/get-all-users-for-a-project).
+- [Article retrieval](https://docs.gleap.ai/api-reference/help-center-articles/get-an-article).
+
+Existing tool keys and input types are preserved. The package now also exposes `get_current_user`, `list_project_users`, and `get_article`. Provider failures and invalid action combinations return structured service errors. No live-provider verification accompanied this refresh.

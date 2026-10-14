@@ -25,7 +25,7 @@ export let searchContacts = SlateTool.create(spec, {
   description: `Search and list contacts in Salesmate using filters. Supports pagination and sorting. Use filter rules to narrow results by any contact field.`,
   instructions: [
     'Common filter conditions: EQUALS, NOT_EQUALS, CONTAINS, DOES_NOT_CONTAINS, STARTS_WITH, ENDS_WITH, EMPTY, NOT_EMPTY, GREATER_THAN, LESS_THAN.',
-    'Common fields to filter: firstName, lastName, email, company, owner, source, tags, createdAt, modifiedAt.'
+    'Common fields to filter: firstName, lastName, email, company, owner, source, tags, createdAt, lastModifiedAt.'
   ],
   tags: {
     readOnly: true
@@ -45,11 +45,13 @@ export let searchContacts = SlateTool.create(spec, {
         .describe('Logical operator between filter rules. Defaults to AND.'),
       sortBy: z.string().optional().describe('Field name to sort by (e.g., "createdAt")'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      page: z.number().optional().describe('Page number (1-based). Defaults to 1.'),
+      page: z.number().positive().optional().describe('Page number (1-based). Defaults to 1.'),
       pageSize: z
         .number()
+        .min(1)
+        .max(250)
         .optional()
-        .describe('Number of records per page (max 100). Defaults to 25.')
+        .describe('Number of records per page (max 250). Defaults to 25.')
     })
   )
   .output(

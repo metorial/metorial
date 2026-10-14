@@ -1,19 +1,52 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class DockClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; environment: string }) {
     let baseURL =
-      config.environment === 'testnet' ? 'https://api-testnet.dock.io' : 'https://api.dock.io';
+      config.environment === 'testnet'
+        ? 'https://api-testnet.truvera.io'
+        : 'https://api.truvera.io';
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        'DOCK-API-TOKEN': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Truvera',
+          reason: 'truvera_api_error',
+          extractResponse: (failure, helpers) => {
+            let response = helpers.getResponse(failure);
+            if (helpers.isRecord(failure) && helpers.isRecord(failure.data)) {
+              let baggage = failure.data.baggage;
+              if (helpers.isRecord(baggage) && baggage.response !== undefined) {
+                return { ...response, data: baggage.response };
+              }
+            }
+            return response;
+          }
+        })
     });
+  }
+
+  private validatePagination(
+    params: { offset?: number; limit?: number } | undefined,
+    maximum = 64
+  ) {
+    if (
+      params?.offset !== undefined &&
+      (!Number.isInteger(params.offset) || params.offset < 0)
+    ) {
+      throw createApiServiceError('offset must be a non-negative whole number.');
+    }
+    if (
+      params?.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > maximum)
+    ) {
+      throw createApiServiceError(`limit must be a whole number between 1 and ${maximum}.`);
+    }
   }
 
   // ---- DIDs ----
@@ -41,6 +74,7 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
@@ -82,6 +116,7 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
@@ -98,10 +133,10 @@ export class DockClient {
       logo?: string;
     }
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.patch(
-      `/profiles/${encodeURIComponent(profileId)}`,
-      params
-    );
+    let response = await this.axios.patch(`/profiles/${encodeURIComponent(profileId)}`, {
+      ...params,
+      did: profileId
+    });
     return response.data;
   }
 
@@ -116,16 +151,18 @@ export class DockClient {
     persist?: boolean;
     distribute?: boolean;
     recipientEmail?: string;
-    schema?: string;
+    algorithm?: string;
+    revocable?: boolean;
     template?: string;
     credential: {
       type?: string[];
+      schema?: string;
       subject: Record<string, unknown> | Record<string, unknown>[];
       issuer: string | Record<string, unknown>;
       issuanceDate?: string;
       expirationDate?: string;
       context?: string[];
-      status?: Record<string, unknown>;
+      status?: string | Record<string, unknown>;
       name?: string;
       description?: string;
     };
@@ -153,11 +190,16 @@ export class DockClient {
   async listCredentials(params?: {
     offset?: number;
     limit?: number;
+    filter?: string;
+    subjectId?: string;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params, 100);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
 
+    if (params?.filter !== undefined) queryParams.filter = params.filter;
+    if (params?.subjectId !== undefined) queryParams.subjectId = params.subjectId;
     let response = await this.axios.get('/credentials', { params: queryParams });
     return response.data;
   }
@@ -210,6 +252,7 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
@@ -238,6 +281,7 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
@@ -320,7 +364,7 @@ export class DockClient {
 
   async createProofRequest(params: {
     name?: string;
-    purpose?: string;
+    did?: string;
     request: Record<string, unknown>;
     nonce?: string;
   }): Promise<Record<string, unknown>> {
@@ -339,6 +383,7 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
@@ -350,7 +395,7 @@ export class DockClient {
   // ---- Certificate Design Templates ----
 
   async getTemplate(templateId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/designs/${encodeURIComponent(templateId)}`);
+    let response = await this.axios.get(`/templates/${encodeURIComponent(templateId)}`);
     return response.data;
   }
 
@@ -358,11 +403,12 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
 
-    let response = await this.axios.get('/designs', { params: queryParams });
+    let response = await this.axios.get('/templates', { params: queryParams });
     return response.data;
   }
 
@@ -370,7 +416,6 @@ export class DockClient {
 
   async sendMessage(params: {
     to: string;
-    from: string;
     message: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
     let response = await this.axios.post('/messaging/send', params);
@@ -378,7 +423,7 @@ export class DockClient {
   }
 
   async encryptMessage(params: {
-    type: string;
+    type?: string;
     payload: Record<string, unknown>;
     senderDid: string;
     recipientDids: string[];
@@ -394,15 +439,38 @@ export class DockClient {
     return response.data;
   }
 
+  async getCurrentUser(): Promise<Record<string, unknown>> {
+    let response = await this.axios.get('/data/profile');
+    return response.data;
+  }
+
+  async getMessage(messageId: string): Promise<Record<string, unknown>> {
+    let response = await this.axios.get(
+      `/messaging/messages/${encodeURIComponent(messageId)}`
+    );
+    return response.data;
+  }
+
+  async listMessages(params: {
+    offset?: number;
+    limit?: number;
+    to?: string;
+    messageType?: string;
+  }): Promise<Record<string, unknown>> {
+    this.validatePagination(params);
+    let response = await this.axios.get('/messaging/messages', { params });
+    return response.data;
+  }
+
   // ---- Sub-Accounts ----
 
   async createSubAccount(params: { name: string }): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/sub-accounts', params);
+    let response = await this.axios.post('/subaccounts', params);
     return response.data;
   }
 
   async getSubAccount(subAccountId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/sub-accounts/${encodeURIComponent(subAccountId)}`);
+    let response = await this.axios.get(`/subaccounts/${encodeURIComponent(subAccountId)}`);
     return response.data;
   }
 
@@ -410,11 +478,12 @@ export class DockClient {
     offset?: number;
     limit?: number;
   }): Promise<Record<string, unknown>[]> {
+    this.validatePagination(params);
     let queryParams: Record<string, string> = {};
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
 
-    let response = await this.axios.get('/sub-accounts', { params: queryParams });
+    let response = await this.axios.get('/subaccounts', { params: queryParams });
     return response.data;
   }
 }

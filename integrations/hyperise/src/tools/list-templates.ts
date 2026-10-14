@@ -38,7 +38,7 @@ export let listTemplates = SlateTool.create(spec, {
     let mapped = templates.map((t: any) => ({
       templateHash: t.image_hash || t.hash || t.id?.toString(),
       name: t.name || t.image_name || 'Unnamed',
-      previewUrl: t.preview_url || t.image_url,
+      previewUrl: t.preview_url || t.preview_image || t.image_url,
       ...t
     }));
 

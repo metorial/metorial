@@ -38,12 +38,12 @@ export let getTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        templateId: result.template_id,
+        templateId: result.template_id ?? ctx.input.templateId,
         name: result.name,
         groupName: result.group_name || '',
         sampleJson: result.json || ''
       },
-      message: `Retrieved template **"${result.name}"** (${result.template_id}).`
+      message: `Retrieved template **"${result.name}"** (${ctx.input.templateId}).`
     };
   })
   .build();

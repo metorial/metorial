@@ -1,4 +1,4 @@
-# <img src="logo.png" height="20"> Chatfai
+# <img src="logo.png" height="20"> ChatFAI
 
 Search and discover AI-powered characters from a catalog spanning movies, TV shows, books, history, anime, games, and more. Generate AI message replies in a character's unique style by sending conversation context to a chosen character. Supports multi-turn conversations, custom character name and bio overrides, and internal response optimizations.
 

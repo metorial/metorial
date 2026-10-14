@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -78,7 +78,8 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.serviceId) throw new Error('serviceId is required for update');
+      if (!ctx.input.serviceId)
+        throw createApiServiceError('serviceId is required for update');
       let data: Record<string, any> = {};
       if (ctx.input.name) data.name = ctx.input.name;
       if (ctx.input.description) data.description = ctx.input.description;
@@ -104,7 +105,7 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.serviceId) throw new Error('serviceId is required for get');
+      if (!ctx.input.serviceId) throw createApiServiceError('serviceId is required for get');
       let result = await client.getService(ctx.input.serviceId);
       return {
         output: { success: true, service: result },
@@ -124,6 +125,6 @@ export let manageService = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

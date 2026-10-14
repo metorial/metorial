@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,9 +14,11 @@ let signerDetailsSchema = z.object({
     .optional()
     .describe('Delivery methods for signature request'),
   signedDocumentDeliveryMethod: z
-    .enum(['email', 'no_delivery'])
+    .enum(['email', 'no_delivery', 'sms', ''])
     .optional()
-    .describe('Delivery method for final signed document'),
+    .describe(
+      'Final document delivery: email, sms, or an empty string; no_delivery is also accepted'
+    ),
   multiFactorAuthentications: z
     .array(z.enum(['sms_verification_code', 'email_verification_code', 'photo_id']))
     .optional()
@@ -35,7 +37,7 @@ export let manageSigners = SlateTool.create(spec, {
     'For "send", provide the signerId to send or resend the contract to that signer.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -57,7 +59,12 @@ export let manageSigners = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Status of the operation'),
-      signerId: z.string().optional().describe('ID of the signer (for add operations)'),
+      signerId: z
+        .string()
+        .optional()
+        .describe(
+          'ID of the signer when provided; use query_contract to discover newly added signers'
+        ),
       signPageUrl: z.string().optional().describe('Sign page URL for the signer')
     })
   )
@@ -65,13 +72,13 @@ export let manageSigners = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { contractId, action, signerId, signer } = ctx.input;
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['addSigner']>>;
     let message: string;
 
     switch (action) {
       case 'add': {
         if (!signer?.name) {
-          throw new Error('Signer name is required when adding a signer');
+          throw createApiServiceError('Signer name is required when adding a signer');
         }
         ctx.progress('Adding signer to contract...');
         result = await client.addSigner(contractId, {
@@ -90,16 +97,19 @@ export let manageSigners = SlateTool.create(spec, {
       }
       case 'update': {
         if (!signerId) {
-          throw new Error('signerId is required for update action');
+          throw createApiServiceError('signerId is required for update action');
+        }
+        if (!signer || !Object.values(signer).some(value => value !== undefined)) {
+          throw createApiServiceError('Provide signer fields to update.');
         }
         ctx.progress('Updating signer details...');
-        result = await client.updateSigner(contractId, signerId, signer || {});
+        result = await client.updateSigner(contractId, signerId, signer);
         message = `Signer **${signerId}** updated on contract **${contractId}**.`;
         break;
       }
       case 'delete': {
         if (!signerId) {
-          throw new Error('signerId is required for delete action');
+          throw createApiServiceError('signerId is required for delete action');
         }
         ctx.progress('Removing signer from contract...');
         result = await client.deleteSigner(contractId, signerId);
@@ -108,7 +118,7 @@ export let manageSigners = SlateTool.create(spec, {
       }
       case 'send': {
         if (!signerId) {
-          throw new Error('signerId is required for send action');
+          throw createApiServiceError('signerId is required for send action');
         }
         ctx.progress('Sending contract to signer...');
         result = await client.sendContract(contractId, signerId);
@@ -117,11 +127,11 @@ export let manageSigners = SlateTool.create(spec, {
       }
     }
 
-    let signerData = result?.data?.signer || result?.signer;
+    let signerData = result.data?.signer;
 
     return {
       output: {
-        status: result?.status || 'queued',
+        status: result.status,
         signerId: signerData?.id,
         signPageUrl: signerData?.signPageUrl
       },

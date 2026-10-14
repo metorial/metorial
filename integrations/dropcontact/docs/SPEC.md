@@ -1,4 +1,4 @@
-# Slates Specification for Dropcontact
+# Dropcontact Integration Specification
 
 ## Overview
 
@@ -22,7 +22,7 @@ No OAuth flow or additional scopes are required. Simply pass the access token in
 The core feature of the API. You can find and enrich all your B2B contacts. If there is no email address specified for your contact, it adds the business email address based on its name, surname and company. Otherwise, it verifies and qualifies any email address, and finds business email addresses.
 
 - **Input options:** You can provide combinations of email, first name, last name, full name, company, website, LinkedIn URL, phone, job title, SIREN/SIRET numbers, and country code.
-- **Minimum required input:** One of: (first_name + last_name + company), (full_name + company), a LinkedIn URL, or an email address.
+- **Minimum required input:** One of: (first_name + last_name + company), (full_name + company), an email address, or contact identifiers with company context such as company, website, company LinkedIn URL, SIREN, or SIRET.
 - **Language:** Results can be returned in English or French (default) via the `language` parameter.
 - **SIREN enrichment:** Set `siren: true` to receive French company registration data (SIREN, SIRET, NAF code, VAT number, company address, leader info).
 - **Custom fields:** You can pass custom key-value pairs that will be preserved in the response without modification.
@@ -36,11 +36,14 @@ For each email address, the API qualifies the local part and the domain to form 
 The API can return: civility, first name, last name, full name, qualified email addresses, phone number, mobile phone, company name, website, personal LinkedIn URL, company LinkedIn URL, SIREN, SIRET, SIRET address/zip/city, VAT number, number of employees, NAF code and description, country, company turnover, company results, job title, job level, and job function.
 
 - The information returned depends on the information provided as input.
-- If no email address can be found or verified for the provided input, Dropcontact returns the original input data without modification.
+- If no email address can be found or verified, or forced retrieval includes unprocessed contacts, Dropcontact may return unchanged input. Original email strings are exposed as `inputEmail`; qualified results appear in `emails`.
+- Per-contact provider errors and warnings are returned with submission diagnostics and result contacts.
+- Forced results may be incomplete and may affect credit refunds. Check results without forcing to confirm completion.
+- Industry and employee count are returned when available for the account plan.
 
 ### Credits Management
 
-You can check your remaining credits by sending a POST request with an empty data object. 1 credit = 1 email found or verified. If Dropcontact doesn't find an email, you get your credit back.
+You can check your remaining credits by sending a POST request with `data: [{}]`. Email finding consumes one credit when successful; unsuccessful searches are refunded. Submitting an existing email for verification consumes one credit.
 
 ## Events
 

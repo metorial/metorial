@@ -25,6 +25,11 @@ export let getGroup = SlateTool.create(spec, {
       groupId: z.string().describe('ID of the group'),
       attributes: z.record(z.string(), z.unknown()).describe('Group attributes'),
       createdAt: z.string().describe('Timestamp when the group was created'),
+      users: z
+        .array(z.record(z.string(), z.unknown()))
+        .nullable()
+        .optional()
+        .describe('Users when expanded'),
       memberships: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -45,7 +50,8 @@ export let getGroup = SlateTool.create(spec, {
         groupId: group.id,
         attributes: group.attributes,
         createdAt: group.created_at,
-        memberships: group.memberships as unknown as Record<string, unknown>[] | null
+        memberships: group.memberships,
+        users: group.users
       },
       message: `Retrieved group **${group.id}**${group.attributes.name ? ` (${group.attributes.name})` : ''}.`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EagleDocClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,7 +31,11 @@ export let splitDocument = SlateTool.create(spec, {
     z.object({
       segments: z
         .array(z.array(z.number()).describe('[startPage, endPage] range'))
-        .describe('Page ranges for each detected document segment')
+        .describe('Page ranges for each detected document segment'),
+      emptyPages: z
+        .array(z.number())
+        .optional()
+        .describe('Blank page numbers included in the preceding segment')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,11 +51,14 @@ export let splitDocument = SlateTool.create(spec, {
       fileName: ctx.input.fileName
     });
 
-    let segments = Array.isArray(result) ? result : [];
+    let segments = Array.isArray(result) ? result : result?.splits;
+    if (!Array.isArray(segments)) {
+      throw createApiServiceError('Eagle Doc returned no document split ranges.');
+    }
     let segmentDescriptions = segments.map((seg: number[]) => `pages ${seg[0]}-${seg[1]}`);
 
     return {
-      output: { segments },
+      output: { segments, emptyPages: result?.meta?.emptyPages },
       message: `Document split into **${segments.length}** segment(s): ${segmentDescriptions.join(', ')}.`
     };
   })

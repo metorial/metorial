@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface FiberyCommand {
   command: string;
@@ -12,21 +17,21 @@ export interface FiberyCommandResult {
 }
 
 export class Client {
-  private baseUrl: string;
-  private token: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { accountName: string; token: string }) {
-    this.baseUrl = `https://${config.accountName}.fibery.io`;
-    this.token = config.token;
-  }
-
-  private get axios() {
-    return createAxios({
-      baseURL: this.baseUrl,
-      headers: {
-        Authorization: `Token ${this.token}`,
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://${config.accountName}.fibery.io`,
+      authHeader: { value: `Token ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fibery',
+          reason: 'fibery_api',
+          extractUpstreamCode: (_error, response) =>
+            isApiErrorRecord(response?.data) && typeof response.data.name === 'string'
+              ? response.data.name
+              : undefined
+        })
     });
   }
 
@@ -34,17 +39,35 @@ export class Client {
 
   async executeCommands(commands: FiberyCommand[]): Promise<FiberyCommandResult[]> {
     let response = await this.axios.post('/api/commands', commands);
-    return response.data;
+    if (!Array.isArray(response.data) || response.data.length !== commands.length) {
+      throw createApiServiceError('Fibery returned an invalid command response.');
+    }
+    return response.data.map((result: FiberyCommandResult, index: number) => {
+      if (!result || typeof result.success !== 'boolean') {
+        throw createApiServiceError('Fibery returned an invalid command result.');
+      }
+      if (!result.success) {
+        let error = result.result ?? result.error;
+        throw createApiServiceError(
+          `Fibery command ${commands[index]?.command} failed: ${isApiErrorRecord(error) && typeof error.message === 'string' ? error.message : 'The provider rejected the command.'}`,
+          {
+            reason: 'fibery_command',
+            upstreamCode:
+              isApiErrorRecord(error) && typeof error.name === 'string'
+                ? error.name
+                : undefined
+          }
+        );
+      }
+      return result;
+    });
   }
 
   async executeCommand(command: FiberyCommand): Promise<FiberyCommandResult> {
     let results = await this.executeCommands([command]);
     let result = results[0];
     if (!result) {
-      throw new Error('No result returned from Fibery command');
-    }
-    if (!result.success) {
-      throw new Error(`Fibery command failed: ${JSON.stringify(result.error)}`);
+      throw createApiServiceError('No result returned from Fibery command.');
     }
     return result;
   }
@@ -139,8 +162,7 @@ export class Client {
       args: {
         type: params.typeName,
         field: params.field,
-        entity: { 'fibery/id': params.entityId },
-        items: params.itemIds.map(id => ({ 'fibery/id': id }))
+        entity: { [params.entityId]: params.itemIds }
       }
     });
     return result.result;
@@ -157,9 +179,37 @@ export class Client {
       args: {
         type: params.typeName,
         field: params.field,
-        entity: { 'fibery/id': params.entityId },
-        items: params.itemIds.map(id => ({ 'fibery/id': id }))
+        entity: { [params.entityId]: params.itemIds }
       }
+    });
+    return result.result;
+  }
+
+  async setCollectionItems(params: {
+    typeName: string;
+    field: string;
+    entityId: string;
+    itemIds: string[];
+  }): Promise<any> {
+    let result = await this.executeCommand({
+      command: 'fibery.entity/set-collection-items',
+      args: {
+        type: params.typeName,
+        field: params.field,
+        entity: { [params.entityId]: params.itemIds }
+      }
+    });
+    return result.result;
+  }
+
+  async resetCollectionItems(params: {
+    typeName: string;
+    field: string;
+    entityId: string;
+  }): Promise<any> {
+    let result = await this.executeCommand({
+      command: 'fibery.entity/reset-collection-items',
+      args: { type: params.typeName, field: params.field, entity: params.entityId }
     });
     return result.result;
   }
@@ -170,9 +220,12 @@ export class Client {
     documentSecret: string,
     format: 'md' | 'html' | 'json' | 'plain-text' = 'md'
   ): Promise<{ secret: string; content: string }> {
-    let response = await this.axios.get(`/api/documents/${documentSecret}`, {
-      params: { format }
-    });
+    let response = await this.axios.get(
+      `/api/documents/${encodeURIComponent(documentSecret)}`,
+      {
+        params: { format }
+      }
+    );
     return response.data;
   }
 
@@ -205,7 +258,7 @@ export class Client {
   }
 
   async getFileSignedUrls(secrets: string[]): Promise<any> {
-    let response = await this.axios.post('/api/files/sign-urls', secrets);
+    let response = await this.axios.post('/api/files/sign-urls', { secrets });
     return response.data;
   }
 
@@ -248,7 +301,10 @@ export class Client {
   }): Promise<any> {
     let args: Record<string, any> = {
       type: params.typeName,
-      entities: params.entities
+      entities: params.entities.map(entity => ({
+        ...entity,
+        'fibery/id': entity['fibery/id'] ?? crypto.randomUUID()
+      }))
     };
     if (params.conflictField) {
       args['conflict-field'] = params.conflictField;
@@ -260,6 +316,9 @@ export class Client {
       command: 'fibery.entity.batch/create-or-update',
       args
     });
+    if (!Array.isArray(result.result)) {
+      throw createApiServiceError('Fibery returned an invalid batch upsert response.');
+    }
     return result.result;
   }
 }

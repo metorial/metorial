@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,7 @@ export let manageTasks = SlateTool.create(spec, {
             .describe('Task status'),
           userIds: z.array(z.number()).optional().describe('Assigned user IDs'),
           labels: z.array(z.any()).optional().describe('Task labels'),
+          labelIds: z.array(z.string()).optional().describe('IDs from the list_labels action'),
           attachments: z.array(z.any()).optional().describe('Task attachments')
         })
         .optional()
@@ -64,11 +65,44 @@ export let manageTasks = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action, taskBoardId, taskId, subTaskId } = ctx.input;
+    let taskBody: Record<string, unknown> | undefined;
+    if (action === 'create_task' || action === 'update_task') {
+      let input = ctx.input.taskBody;
+      if (!input?.title || input.status === undefined || input.userIds === undefined) {
+        throw createApiServiceError(
+          'taskBody.title, taskBody.status, and taskBody.userIds are required for task creation and updates.'
+        );
+      }
+      if (input.userIds.length === 0 && input.status !== 'draft') {
+        throw createApiServiceError('Tasks without assigned users must have draft status.');
+      }
+      let { description, attachments, labels, labelIds, ...fields } = input;
+      let legacyLabelIds = labels?.map(label =>
+        typeof label === 'string' ? label : label?.id
+      );
+      if (legacyLabelIds?.some(id => typeof id !== 'string')) {
+        throw createApiServiceError(
+          'Use labelIds, or labels containing string IDs or objects with a string id.'
+        );
+      }
+      if (attachments?.some(attachment => typeof attachment?.fileId !== 'string')) {
+        throw createApiServiceError(
+          'Each task attachment must contain a pre-uploaded fileId.'
+        );
+      }
+      taskBody = {
+        ...fields,
+        ...(labelIds || legacyLabelIds ? { labelIds: labelIds ?? legacyLabelIds } : {}),
+        ...(description !== undefined || attachments !== undefined
+          ? { description: { content: description ?? '', attachments } }
+          : {})
+      };
+    }
 
     if (action === 'list_task_boards') {
       let result = await client.getTaskBoards();
@@ -78,7 +112,7 @@ export let manageTasks = SlateTool.create(spec, {
       };
     }
 
-    if (!taskBoardId) throw new Error('taskBoardId is required for this action.');
+    if (!taskBoardId) throw createApiServiceError('taskBoardId is required for this action.');
 
     if (action === 'list_tasks') {
       let result = await client.getTasks(taskBoardId, {
@@ -92,7 +126,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'create_task') {
-      let result = await client.createTask(taskBoardId, ctx.input.taskBody);
+      let result = await client.createTask(taskBoardId, taskBody);
       return {
         output: { result },
         message: `Created task on board **${taskBoardId}**.`
@@ -100,8 +134,8 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'update_task') {
-      if (!taskId) throw new Error('taskId is required.');
-      let result = await client.updateTask(taskBoardId, taskId, ctx.input.taskBody);
+      if (!taskId) throw createApiServiceError('taskId is required.');
+      let result = await client.updateTask(taskBoardId, taskId, taskBody);
       return {
         output: { result },
         message: `Updated task **${taskId}** on board **${taskBoardId}**.`
@@ -109,7 +143,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'delete_task') {
-      if (!taskId) throw new Error('taskId is required.');
+      if (!taskId) throw createApiServiceError('taskId is required.');
       let result = await client.deleteTask(taskBoardId, taskId);
       return {
         output: { result },
@@ -126,7 +160,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'list_sub_tasks') {
-      if (!taskId) throw new Error('taskId is required.');
+      if (!taskId) throw createApiServiceError('taskId is required.');
       let result = await client.getSubTasks(taskBoardId, taskId, {
         limit: ctx.input.limit,
         offset: ctx.input.offset
@@ -138,7 +172,10 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'create_sub_task') {
-      if (!taskId) throw new Error('taskId is required.');
+      if (!taskId) throw createApiServiceError('taskId is required.');
+      if (typeof ctx.input.subTaskBody?.title !== 'string' || !ctx.input.subTaskBody.title) {
+        throw createApiServiceError('subTaskBody.title is required for create_sub_task.');
+      }
       let result = await client.createSubTask(taskBoardId, taskId, ctx.input.subTaskBody);
       return {
         output: { result },
@@ -147,8 +184,15 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'update_sub_task') {
-      if (!taskId) throw new Error('taskId is required.');
-      if (!subTaskId) throw new Error('subTaskId is required.');
+      if (!taskId) throw createApiServiceError('taskId is required.');
+      if (!subTaskId) throw createApiServiceError('subTaskId is required.');
+      if (
+        !ctx.input.subTaskBody ||
+        typeof ctx.input.subTaskBody !== 'object' ||
+        Array.isArray(ctx.input.subTaskBody)
+      ) {
+        throw createApiServiceError('Provide a subTaskBody object for update_sub_task.');
+      }
       let result = await client.updateSubTask(
         taskBoardId,
         taskId,
@@ -162,8 +206,8 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'delete_sub_task') {
-      if (!taskId) throw new Error('taskId is required.');
-      if (!subTaskId) throw new Error('subTaskId is required.');
+      if (!taskId) throw createApiServiceError('taskId is required.');
+      if (!subTaskId) throw createApiServiceError('subTaskId is required.');
       let result = await client.deleteSubTask(taskBoardId, taskId, subTaskId);
       return {
         output: { result },
@@ -171,6 +215,6 @@ export let manageTasks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

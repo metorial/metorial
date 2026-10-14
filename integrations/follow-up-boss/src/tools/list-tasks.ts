@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ export let listTasks = SlateTool.create(spec, {
       personId: z.number().optional().describe('Filter by contact ID'),
       assignedTo: z.number().optional().describe('Filter by assigned user ID'),
       completed: z.boolean().optional().describe('Filter by completion status'),
-      dueDate: z.string().optional().describe('Filter by due date'),
+      dueDate: z.string().optional().describe('Filter by a UTC due date in YYYY-MM-DD format'),
       sort: z.string().optional().describe('Sort field'),
       limit: z.number().optional().describe('Number of results (default 25, max 100)'),
       offset: z.number().optional().describe('Offset for pagination')
@@ -43,9 +43,18 @@ export let listTasks = SlateTool.create(spec, {
 
     let params: Record<string, any> = {};
     if (ctx.input.personId) params.personId = ctx.input.personId;
-    if (ctx.input.assignedTo) params.assignedTo = ctx.input.assignedTo;
-    if (ctx.input.completed !== undefined) params.completed = ctx.input.completed;
-    if (ctx.input.dueDate) params.dueDate = ctx.input.dueDate;
+    if (ctx.input.assignedTo) params.assignedUserId = ctx.input.assignedTo;
+    if (ctx.input.completed !== undefined) params.isCompleted = ctx.input.completed;
+    if (ctx.input.dueDate !== undefined) {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(ctx.input.dueDate) ||
+        !Number.isFinite(Date.parse(ctx.input.dueDate))
+      ) {
+        throw createApiServiceError('Provide dueDate in YYYY-MM-DD format.');
+      }
+      params.dueStart = `${ctx.input.dueDate}T00:00:00Z`;
+      params.dueEnd = `${ctx.input.dueDate}T23:59:59Z`;
+    }
     if (ctx.input.sort) params.sort = ctx.input.sort;
     if (ctx.input.limit) params.limit = ctx.input.limit;
     if (ctx.input.offset) params.offset = ctx.input.offset;
@@ -58,10 +67,13 @@ export let listTasks = SlateTool.create(spec, {
         tasks: tasks.map((t: any) => ({
           taskId: t.id,
           personId: t.personId,
-          assignedTo: t.assignedTo,
+          assignedTo: t.assignedUserId,
           name: t.name,
           dueDate: t.dueDate,
-          completed: t.completed,
+          completed:
+            t.isCompleted === undefined || t.isCompleted === null
+              ? undefined
+              : t.isCompleted === true || t.isCompleted === 1,
           created: t.created
         })),
         total: result._metadata?.total

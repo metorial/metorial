@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTimeEntry = SlateTool.create(spec, {
   name: 'Create Time Entry',
   key: 'create_time_entry',
-  description: `Log a new time entry in Timely. Specify duration via hours/minutes or a from/to time range. Optionally assign to a project, add notes, labels, and set an hourly rate.`,
+  description: `Call list_accounts to choose a workspace when needed. Log a new time entry in Timely. Specify duration via hours/minutes or a from/to time range. Provide a project ID; optionally add notes, labels, and set an hourly rate.`,
   instructions: [
     'Either provide hours/minutes or from/to for the time range — not both.',
     'If userId is provided, the entry is created for that user (requires permission).'
@@ -15,12 +16,18 @@ export let createTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       day: z.string().describe('Date for the time entry (YYYY-MM-DD)'),
       hours: z.number().optional().describe('Number of hours to log'),
       minutes: z.number().optional().describe('Number of minutes to log'),
-      from: z.string().optional().describe('Start time (ISO 8601 datetime)'),
-      to: z.string().optional().describe('End time (ISO 8601 datetime)'),
-      projectId: z.string().optional().describe('Project ID to log time against'),
+      from: z.string().optional().describe('Start time (HH:MM, 24-hour format, e.g. 09:00)'),
+      to: z.string().optional().describe('End time (HH:MM, 24-hour format, e.g. 17:30)'),
+      projectId: z
+        .string()
+        .optional()
+        .describe(
+          'Project ID to log time against. Required by Timely; call list_projects to discover IDs'
+        ),
       note: z.string().optional().describe('Notes/description for the entry'),
       labelIds: z.array(z.number()).optional().describe('Label IDs to attach'),
       hourRate: z.number().optional().describe('Custom hourly rate for this entry'),
@@ -43,10 +50,7 @@ export let createTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let event = await client.createEvent({
       day: ctx.input.day,

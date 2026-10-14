@@ -43,7 +43,7 @@ export let listTimeEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
 
     let entries = await client.getMyTimeEntries({
       startDate: ctx.input.startDate,

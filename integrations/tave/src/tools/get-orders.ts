@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TavePublicClient } from '../lib/client';
+import { numberField, TavePublicClient, textField } from '../lib/client';
 import { spec } from '../spec';
 
 let orderSchema = z.object({
   orderId: z.string().describe('ID of the order'),
+  jobId: z.string().optional().describe('ID of the job associated with the order'),
   jobType: z.string().optional().describe('Type of job associated with the order'),
   brand: z.string().optional().describe('Brand associated with the order'),
   amount: z.number().optional().describe('Order amount'),
@@ -24,10 +25,21 @@ export let getOrders = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      brand: z.string().optional().describe('Filter orders by brand name'),
-      jobType: z.string().optional().describe('Filter orders by job type'),
+      brand: z
+        .string()
+        .optional()
+        .describe('Filter orders by exact brand name or ID from get_brands'),
+      jobType: z
+        .string()
+        .optional()
+        .describe('Filter orders by exact job type name or ID from get_job_types'),
       page: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Number of results per page')
+      perPage: z
+        .number()
+        .optional()
+        .describe(
+          'Results per page: 10–100 for an unfiltered list, or 1–100 for filtered results'
+        )
     })
   )
   .output(
@@ -37,7 +49,7 @@ export let getOrders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TavePublicClient(ctx.auth.token);
+    let client = new TavePublicClient(ctx.auth);
 
     ctx.info('Fetching orders from Tave');
 
@@ -48,19 +60,18 @@ export let getOrders = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let items = Array.isArray(result) ? result : (result?.data ?? result?.orders ?? []);
-
-    let orders = items.map((o: any) => ({
-      orderId: String(o.id ?? o.order_id ?? ''),
-      jobType: o.job_type ?? undefined,
-      brand: o.brand ?? undefined,
-      amount: o.amount ?? o.total ?? undefined,
-      status: o.status ?? undefined,
-      createdAt: o.created_at ?? o.created ?? undefined,
+    let orders = result.items.map(o => ({
+      orderId: String(o.id ?? ''),
+      jobId: textField(o, 'jobId'),
+      jobType: textField(o, 'jobTypeName', 'job_type'),
+      brand: textField(o, 'brandName', 'brand'),
+      amount: numberField(o, 'amount', 'total'),
+      status: textField(o, 'status'),
+      createdAt: textField(o, 'created', 'created_at'),
       raw: o
     }));
 
-    let totalCount = result?.total ?? result?.meta?.total ?? orders.length;
+    let totalCount = result.meta.totalItems;
 
     return {
       output: {

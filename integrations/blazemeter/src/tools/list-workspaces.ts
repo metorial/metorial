@@ -47,7 +47,8 @@ export let listWorkspaces = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.accountId) {
@@ -75,24 +76,16 @@ export let listWorkspaces = SlateTool.create(spec, {
     let result: any[] = [];
 
     for (let account of accounts) {
-      try {
-        let workspaces = await client.listWorkspaces(account.id);
-        result.push({
-          accountId: account.id,
-          name: account.name,
-          workspaces: workspaces.map((w: any) => ({
-            workspaceId: w.id,
-            name: w.name,
-            enabled: w.enabled
-          }))
-        });
-      } catch {
-        result.push({
-          accountId: account.id,
-          name: account.name,
-          workspaces: []
-        });
-      }
+      let workspaces = await client.listWorkspaces(account.id);
+      result.push({
+        accountId: account.id,
+        name: account.name,
+        workspaces: workspaces.map((w: any) => ({
+          workspaceId: w.id,
+          name: w.name,
+          enabled: w.enabled
+        }))
+      });
     }
 
     let totalWorkspaces = result.reduce((sum, a) => sum + (a.workspaces?.length || 0), 0);

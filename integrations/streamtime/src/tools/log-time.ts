@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
+import { buildTimeEntryBody } from '../lib/time-entries';
 import { spec } from '../spec';
 
 export let logTime = SlateTool.create(spec, {
@@ -20,7 +21,16 @@ export let logTime = SlateTool.create(spec, {
             jobItemId: z
               .number()
               .optional()
-              .describe('ID of the job item this time is logged against'),
+              .describe(
+                'ID of the job item this time is logged against. Its matching user assignment is resolved using userId; otherwise the item must have exactly one assignment.'
+              ),
+            jobId: z.number().optional().describe('Job ID to associate with the entry'),
+            jobItemUserId: z
+              .number()
+              .optional()
+              .describe(
+                'User assignment ID. Call get_job_item with includeUsers to discover IDs. Alternative to jobItemId.'
+              ),
             userId: z.number().optional().describe('ID of the user who logged the time'),
             minutes: z.number().optional().describe('Number of minutes logged'),
             hours: z
@@ -45,34 +55,15 @@ export let logTime = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StreamtimeClient({ token: ctx.auth.token });
 
-    let results: any[];
-
-    if (ctx.input.entries.length === 1) {
-      let entry = ctx.input.entries[0]!;
-      let body: Record<string, any> = {};
-      if (entry.jobItemId !== undefined) body.jobItemId = entry.jobItemId;
-      if (entry.userId !== undefined) body.userId = entry.userId;
-      if (entry.minutes !== undefined) body.minutes = entry.minutes;
-      if (entry.hours !== undefined) body.hours = entry.hours;
-      if (entry.date !== undefined) body.date = entry.date;
-      if (entry.notes !== undefined) body.notes = entry.notes;
-
-      let result = await client.createLoggedTime(body);
-      results = [result];
-    } else {
-      let bodies = ctx.input.entries.map(entry => {
-        let body: Record<string, any> = {};
-        if (entry.jobItemId !== undefined) body.jobItemId = entry.jobItemId;
-        if (entry.userId !== undefined) body.userId = entry.userId;
-        if (entry.minutes !== undefined) body.minutes = entry.minutes;
-        if (entry.hours !== undefined) body.hours = entry.hours;
-        if (entry.date !== undefined) body.date = entry.date;
-        if (entry.notes !== undefined) body.notes = entry.notes;
-        return body;
-      });
-      let result = await client.createLoggedTimesBulk(bodies);
-      results = Array.isArray(result) ? result : [result];
+    // Resolve every entry before creating any, so invalid inputs cannot cause partial writes.
+    let bodies: Record<string, unknown>[] = [];
+    for (let entry of ctx.input.entries) {
+      bodies.push(await buildTimeEntryBody(client, entry));
     }
+    let results =
+      bodies.length === 1
+        ? [await client.createLoggedTime(bodies[0]!)]
+        : await client.createLoggedTimesBulk(bodies);
 
     return {
       output: {

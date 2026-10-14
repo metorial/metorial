@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,7 +51,17 @@ export let updateStormSection = SlateTool.create(spec, {
 
     if (mode === 'section') {
       if (!sectionChar) {
-        throw new Error('sectionChar is required for updating a section');
+        throw createApiServiceError('sectionChar is required for updating a section', {
+          reason: 'stormboard_invalid_input'
+        });
+      }
+      if (title === undefined && description === undefined && newChar === undefined) {
+        throw createApiServiceError(
+          'Provide title, description, or newChar to update a section.',
+          {
+            reason: 'stormboard_invalid_input'
+          }
+        );
       }
       let result = await client.updateSection(stormId, sectionChar, {
         title,
@@ -66,7 +76,10 @@ export let updateStormSection = SlateTool.create(spec, {
 
     if (mode === 'legend') {
       if (!legendColour || !legendName) {
-        throw new Error('legendColour and legendName are required for updating the legend');
+        throw createApiServiceError(
+          'legendColour and legendName are required for updating the legend',
+          { reason: 'stormboard_invalid_input' }
+        );
       }
       let result = await client.updateLegend(stormId, {
         colour: legendColour,

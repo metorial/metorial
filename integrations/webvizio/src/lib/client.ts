@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://app.webvizio.com';
 let VERSION_PATH = '/api/v1';
@@ -56,7 +61,7 @@ export interface TaskCreateInput {
   tags?: string[];
   files?: { fileName: string; fileUrl: string }[];
   assignees?: string[];
-  timeLogs?: { user: string; date: string; time: number }[];
+  timeLogs?: { id?: number; user: string; date: string; time: number }[];
 }
 
 export interface TaskUpdateInput {
@@ -71,7 +76,7 @@ export interface TaskUpdateInput {
   tags?: string[];
   files?: { fileName: string; fileUrl: string }[];
   assignees?: string[];
-  timeLogs?: { user: string; date: string; time: number }[];
+  timeLogs?: { id?: number; user: string; date: string; time: number }[];
 }
 
 export interface TaskFindInput {
@@ -150,58 +155,76 @@ export interface WebhookSubscribeResponse {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a Webvizio personal access token.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: `${BASE_URL}${VERSION_PATH}`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Webvizio',
+          reason: 'webvizio_api_error'
+        })
     });
   }
 
   // --- Projects ---
 
   async createProject(input: ProjectCreateInput): Promise<ProjectResponse> {
-    let response = await this.axios.post('/webhook/create-project', {
-      url: input.url,
-      name: input.name,
-      screenshot: input.screenshot,
-      externalId: input.externalId
-    });
+    if (!input.url.trim()) {
+      throw createApiServiceError('Provide the website URL for the project.');
+    }
+    let response = await this.axios.post(
+      '/webhook/create-project',
+      pickDefined({
+        url: input.url,
+        name: input.name,
+        screenshot: input.screenshot,
+        externalId: input.externalId
+      })
+    );
     return response.data;
   }
 
   async findProject(input: ProjectFindInput): Promise<ProjectResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.projectId) body.id = input.projectId;
-    if (input.externalId) body.externalId = input.externalId;
-    if (input.uuid) body.uuid = input.uuid;
-    if (input.name) body.name = input.name;
+    this.validateLocator(input, ['projectId', 'externalId', 'uuid', 'name']);
+    let body = pickDefined({
+      id: input.projectId,
+      externalId: input.externalId,
+      uuid: input.uuid,
+      name: input.name
+    });
 
     let response = await this.axios.post('/webhook/find-project', body);
     return response.data;
   }
 
   async updateProject(input: ProjectUpdateInput): Promise<ProjectResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.projectId) body.id = input.projectId;
-    if (input.externalId) body.externalId = input.externalId;
-    if (input.uuid) body.uuid = input.uuid;
-    if (input.name !== undefined) body.name = input.name;
-    if (input.screenshot !== undefined) body.screenshot = input.screenshot;
+    this.validateLocator(input, ['projectId', 'externalId', 'uuid']);
+    let body = pickDefined({
+      id: input.projectId,
+      externalId: input.externalId,
+      uuid: input.uuid,
+      name: input.name,
+      screenshot: input.screenshot
+    });
 
     let response = await this.axios.post('/webhook/update-project', body);
     return response.data;
   }
 
   async deleteProject(input: ProjectDeleteInput): Promise<void> {
-    let params: Record<string, unknown> = {};
-    if (input.projectId) params.id = input.projectId;
-    if (input.externalId) params.externalId = input.externalId;
-    if (input.uuid) params.uuid = input.uuid;
+    this.validateLocator(input, ['projectId', 'externalId', 'uuid']);
+    let params = pickDefined({
+      id: input.projectId,
+      externalId: input.externalId,
+      uuid: input.uuid
+    });
 
     await this.axios.delete('/webhook/delete-project', { data: params });
   }
@@ -209,59 +232,38 @@ export class Client {
   // --- Tasks ---
 
   async createTask(input: TaskCreateInput): Promise<TaskResponse> {
-    let body: Record<string, unknown> = {
-      name: input.name
-    };
-    if (input.projectId) body.projectId = input.projectId;
-    if (input.projectUuid) body.projectUuid = input.projectUuid;
-    if (input.projectExternalId) body.projectExternalId = input.projectExternalId;
-    if (input.externalId) body.externalId = input.externalId;
-    if (input.author) body.author = input.author;
-    if (input.description) body.description = input.description;
-    if (input.status) body.status = input.status;
-    if (input.priority) body.priority = input.priority;
-    if (input.executeAt) body.executeAt = input.executeAt;
-    if (input.tags) body.tags = input.tags;
-    if (input.files) body.files = input.files;
-    if (input.assignees) body.assignees = input.assignees;
-    if (input.timeLogs) body.timeLogs = input.timeLogs;
+    this.validateLocator(input, ['projectId', 'projectUuid', 'projectExternalId']);
+    if (!input.name.trim()) {
+      throw createApiServiceError('Provide a name for the task.');
+    }
+    this.validateTimeLogs(input.timeLogs);
+    let body = pickDefined(input);
 
     let response = await this.axios.post('/webhook/create-task', body);
     return response.data;
   }
 
   async findTask(input: TaskFindInput): Promise<TaskResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.taskId) body.id = input.taskId;
-    if (input.externalId) body.externalId = input.externalId;
+    this.validateLocator(input, ['taskId', 'externalId']);
+    let body = pickDefined({ id: input.taskId, externalId: input.externalId });
 
     let response = await this.axios.post('/webhook/find-task', body);
     return response.data;
   }
 
   async updateTask(input: TaskUpdateInput): Promise<TaskResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.taskId) body.id = input.taskId;
-    if (input.externalId) body.externalId = input.externalId;
-    if (input.name !== undefined) body.name = input.name;
-    if (input.author !== undefined) body.author = input.author;
-    if (input.description !== undefined) body.description = input.description;
-    if (input.status !== undefined) body.status = input.status;
-    if (input.priority !== undefined) body.priority = input.priority;
-    if (input.executeAt !== undefined) body.executeAt = input.executeAt;
-    if (input.tags) body.tags = input.tags;
-    if (input.files) body.files = input.files;
-    if (input.assignees) body.assignees = input.assignees;
-    if (input.timeLogs) body.timeLogs = input.timeLogs;
+    this.validateLocator(input, ['taskId', 'externalId']);
+    this.validateTimeLogs(input.timeLogs);
+    let { taskId, ...fields } = input;
+    let body = pickDefined({ id: taskId, ...fields });
 
     let response = await this.axios.post('/webhook/update-task', body);
     return response.data;
   }
 
   async deleteTask(input: TaskDeleteInput): Promise<void> {
-    let params: Record<string, unknown> = {};
-    if (input.taskId) params.id = input.taskId;
-    if (input.externalId) params.externalId = input.externalId;
+    this.validateLocator(input, ['taskId', 'externalId']);
+    let params = pickDefined({ id: input.taskId, externalId: input.externalId });
 
     await this.axios.delete('/webhook/delete-task', { data: params });
   }
@@ -269,30 +271,24 @@ export class Client {
   // --- Comments ---
 
   async createComment(input: CommentCreateInput): Promise<CommentResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.taskId) body.taskId = input.taskId;
-    if (input.taskExternalId) body.taskExternalId = input.taskExternalId;
-    if (input.externalId) body.externalId = input.externalId;
-    if (input.author) body.author = input.author;
-    if (input.body) body.body = input.body;
+    this.validateLocator(input, ['taskId', 'taskExternalId']);
+    let body = pickDefined(input);
 
     let response = await this.axios.post('/webhook/create-comment', body);
     return response.data;
   }
 
   async findComment(input: CommentFindInput): Promise<CommentResponse> {
-    let body: Record<string, unknown> = {};
-    if (input.commentId) body.id = input.commentId;
-    if (input.externalId) body.externalId = input.externalId;
+    this.validateLocator(input, ['commentId', 'externalId']);
+    let body = pickDefined({ id: input.commentId, externalId: input.externalId });
 
     let response = await this.axios.post('/webhook/find-comment', body);
     return response.data;
   }
 
   async deleteComment(input: CommentDeleteInput): Promise<void> {
-    let params: Record<string, unknown> = {};
-    if (input.commentId) params.id = input.commentId;
-    if (input.externalId) params.externalId = input.externalId;
+    this.validateLocator(input, ['commentId', 'externalId']);
+    let params = pickDefined({ id: input.commentId, externalId: input.externalId });
 
     await this.axios.delete('/webhook/delete-comment', { data: params });
   }
@@ -309,5 +305,33 @@ export class Client {
 
   async unsubscribeWebhook(webhookId: number): Promise<void> {
     await this.axios.delete(`/webhook/${webhookId}`);
+  }
+
+  private validateLocator<T extends object>(input: T, fields: (keyof T)[]): void {
+    if (!fields.some(field => input[field] !== undefined)) {
+      throw createApiServiceError(`Provide at least one of: ${fields.join(', ')}.`);
+    }
+    for (let field of fields) {
+      let value = input[field];
+      if (typeof value === 'number' && (!Number.isSafeInteger(value) || value <= 0)) {
+        throw createApiServiceError(`${String(field)} must be a positive whole-number ID.`);
+      }
+      if (typeof value === 'string' && !value.trim()) {
+        throw createApiServiceError(`${String(field)} must not be empty.`);
+      }
+    }
+  }
+
+  private validateTimeLogs(timeLogs: TaskCreateInput['timeLogs']): void {
+    for (let entry of timeLogs ?? []) {
+      if (entry.id !== undefined && (!Number.isSafeInteger(entry.id) || entry.id <= 0)) {
+        throw createApiServiceError('Each time log id must be a positive whole-number ID.');
+      }
+      if (!Number.isSafeInteger(entry.time) || entry.time < 0) {
+        throw createApiServiceError(
+          'Each time log time must be a nonnegative whole number of minutes.'
+        );
+      }
+    }
   }
 }

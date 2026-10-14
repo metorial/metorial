@@ -4,6 +4,7 @@ export * from './create-contact';
 export * from './create-deal';
 export * from './create-note';
 export * from './create-product';
+export * from './create-product-variant';
 export * from './create-ticket';
 export * from './delete-activity';
 export * from './delete-company';

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   WrikeApproval,
   WrikeAttachment,
@@ -16,15 +16,37 @@ import type {
 } from './types';
 
 export class WrikeClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; host: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${config.host}/api/v4`,
-      headers: {
-        Authorization: `bearer ${config.token}`
-      }
+      authHeader: { value: `bearer ${config.token}` },
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Wrike',
+          reason: 'wrike_api_error',
+          detailKeys: ['errorDescription', 'error', 'message', 'error_description']
+        })
     });
+  }
+
+  private async write<T>(method: 'post' | 'put', url: string, data: Record<string, unknown>) {
+    let params: Record<string, string> = {};
+    for (let [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        params[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      }
+    }
+    let response = await this.axios.request<WrikeResponse<T>>({ method, url, params });
+    let entity = response.data.data[0];
+    if (!entity) {
+      throw createApiServiceError('Wrike returned no resource for the requested operation.', {
+        reason: 'empty_api_response'
+      });
+    }
+    return entity;
   }
 
   // ============ Tasks ============
@@ -46,6 +68,11 @@ export class WrikeClient {
     sortOrder?: string;
     customStatuses?: string[];
   }): Promise<WrikeResponse<WrikeTask>> {
+    if (params?.folderId && params.taskIds?.length) {
+      throw createApiServiceError('Use folderId or taskIds, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/tasks';
     if (params?.folderId) {
       url = `/folders/${params.folderId}/tasks`;
@@ -56,9 +83,15 @@ export class WrikeClient {
     let queryParams: Record<string, string> = {};
 
     if (params?.title) queryParams.title = params.title;
-    if (params?.status) queryParams.status = params.status;
+    if (params?.status) queryParams.status = JSON.stringify([params.status]);
     if (params?.importance) queryParams.importance = params.importance;
-    if (params?.fields) queryParams.fields = JSON.stringify(params.fields);
+    if (params?.taskIds?.length) {
+      if (params.fields) queryParams.fields = JSON.stringify(params.fields);
+    } else {
+      queryParams.fields = JSON.stringify([
+        ...new Set(['parentIds', ...(params?.fields ?? [])])
+      ]);
+    }
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.pageSize) queryParams.pageSize = String(params.pageSize);
     if (params?.nextPageToken) queryParams.nextPageToken = params.nextPageToken;
@@ -99,8 +132,8 @@ export class WrikeClient {
       customStatus?: string;
     }
   ): Promise<WrikeTask> {
-    let response = await this.axios.post(`/folders/${folderId}/tasks`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeTask>('post', `/folders/${folderId}/tasks`, data);
+    return response;
   }
 
   async updateTask(
@@ -133,8 +166,8 @@ export class WrikeClient {
       restore?: boolean;
     }
   ): Promise<WrikeTask> {
-    let response = await this.axios.put(`/tasks/${taskId}`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeTask>('put', `/tasks/${taskId}`, data);
+    return response;
   }
 
   async deleteTask(taskId: string): Promise<void> {
@@ -146,19 +179,29 @@ export class WrikeClient {
   async getFolders(params?: {
     folderId?: string;
     folderIds?: string[];
+    spaceId?: string;
     fields?: string[];
     project?: boolean;
   }): Promise<WrikeResponse<WrikeFolder>> {
+    if (
+      [params?.folderId, params?.spaceId, params?.folderIds?.length].filter(Boolean).length > 1
+    ) {
+      throw createApiServiceError('Use only one of parentFolderId, spaceId, or folderIds.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/folders';
     if (params?.folderId) {
       url = `/folders/${params.folderId}/folders`;
+    } else if (params?.spaceId) {
+      url = `/spaces/${params.spaceId}/folders`;
     } else if (params?.folderIds && params.folderIds.length > 0) {
       url = `/folders/${params.folderIds.join(',')}`;
     }
 
     let queryParams: Record<string, string> = {};
     if (params?.fields) queryParams.fields = JSON.stringify(params.fields);
-    if (params?.project !== undefined) queryParams.project = String(params.project);
+    if (params?.project === true) queryParams.project = 'true';
 
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
@@ -196,8 +239,12 @@ export class WrikeClient {
       };
     }
   ): Promise<WrikeFolder> {
-    let response = await this.axios.post(`/folders/${parentFolderId}/folders`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeFolder>(
+      'post',
+      `/folders/${parentFolderId}/folders`,
+      data
+    );
+    return response;
   }
 
   async updateFolder(
@@ -221,8 +268,8 @@ export class WrikeClient {
       };
     }
   ): Promise<WrikeFolder> {
-    let response = await this.axios.put(`/folders/${folderId}`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeFolder>('put', `/folders/${folderId}`, data);
+    return response;
   }
 
   async deleteFolder(folderId: string): Promise<void> {
@@ -247,6 +294,11 @@ export class WrikeClient {
     limit?: number;
     plainText?: boolean;
   }): Promise<WrikeResponse<WrikeComment>> {
+    if (params?.taskId && params?.folderId) {
+      throw createApiServiceError('Use taskId or folderId, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/comments';
     if (params?.taskId) {
       url = `/tasks/${params.taskId}/comments`;
@@ -256,7 +308,7 @@ export class WrikeClient {
 
     let queryParams: Record<string, string> = {};
     if (params?.limit) queryParams.limit = String(params.limit);
-    if (params?.plainText) queryParams.plainText = String(params.plainText);
+    if (params?.plainText !== undefined) queryParams.plainText = String(params.plainText);
 
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
@@ -268,20 +320,35 @@ export class WrikeClient {
     text: string;
     plainText?: boolean;
   }): Promise<WrikeComment> {
+    if (params.taskId && params.folderId) {
+      throw createApiServiceError('Use taskId or folderId, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url: string;
     if (params.taskId) {
       url = `/tasks/${params.taskId}/comments`;
     } else if (params.folderId) {
       url = `/folders/${params.folderId}/comments`;
     } else {
-      throw new Error('Either taskId or folderId must be provided');
+      throw createApiServiceError('Provide either taskId or folderId.', {
+        reason: 'invalid_resource_scope'
+      });
     }
 
-    let response = await this.axios.post(url, {
+    let response = await this.write<WrikeComment>('post', url, {
       text: params.text,
       plainText: params.plainText
     });
-    return response.data.data[0];
+    return response;
+  }
+
+  async updateComment(
+    commentId: string,
+    data: { text: string; plainText?: boolean }
+  ): Promise<WrikeComment> {
+    let response = await this.write<WrikeComment>('put', `/comments/${commentId}`, data);
+    return response;
   }
 
   async deleteComment(commentId: string): Promise<void> {
@@ -294,6 +361,11 @@ export class WrikeClient {
     taskId?: string;
     folderId?: string;
   }): Promise<WrikeResponse<WrikeAttachment>> {
+    if (params?.taskId && params?.folderId) {
+      throw createApiServiceError('Use taskId or folderId, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/attachments';
     if (params?.taskId) {
       url = `/tasks/${params.taskId}/attachments`;
@@ -324,6 +396,11 @@ export class WrikeClient {
     trackedDate?: { start?: string; end?: string };
     fields?: string[];
   }): Promise<WrikeResponse<WrikeTimelog>> {
+    if ([params?.taskId, params?.contactId, params?.folderId].filter(Boolean).length > 1) {
+      throw createApiServiceError('Use only one of taskId, contactId, or folderId.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/timelogs';
     if (params?.taskId) {
       url = `/tasks/${params.taskId}/timelogs`;
@@ -351,8 +428,11 @@ export class WrikeClient {
       categoryId?: string;
     }
   ): Promise<WrikeTimelog> {
-    let response = await this.axios.post(`/tasks/${taskId}/timelogs`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeTimelog>('post', `/tasks/${taskId}/timelogs`, {
+      ...data,
+      comment: data.comment ?? ''
+    });
+    return response;
   }
 
   async updateTimelog(
@@ -364,8 +444,8 @@ export class WrikeClient {
       categoryId?: string;
     }
   ): Promise<WrikeTimelog> {
-    let response = await this.axios.put(`/timelogs/${timelogId}`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeTimelog>('put', `/timelogs/${timelogId}`, data);
+    return response;
   }
 
   async deleteTimelog(timelogId: string): Promise<void> {
@@ -379,6 +459,11 @@ export class WrikeClient {
     me?: boolean;
     fields?: string[];
   }): Promise<WrikeResponse<WrikeContact>> {
+    if (params?.me && params.contactIds?.length) {
+      throw createApiServiceError('Use currentUserOnly or contactIds, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url = '/contacts';
     if (params?.contactIds && params.contactIds.length > 0) {
       url = `/contacts/${params.contactIds.join(',')}`;
@@ -413,8 +498,11 @@ export class WrikeClient {
     settings?: Record<string, unknown>;
     spaceId?: string;
   }): Promise<WrikeCustomField> {
-    let response = await this.axios.post('/customfields', data);
-    return response.data.data[0];
+    let response = await this.write<WrikeCustomField>('post', '/customfields', {
+      ...data,
+      type: data.type === 'MultiSelect' ? 'Multiple' : data.type
+    });
+    return response;
   }
 
   async updateCustomField(
@@ -426,8 +514,12 @@ export class WrikeClient {
       settings?: Record<string, unknown>;
     }
   ): Promise<WrikeCustomField> {
-    let response = await this.axios.put(`/customfields/${customFieldId}`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeCustomField>(
+      'put',
+      `/customfields/${customFieldId}`,
+      data
+    );
+    return response;
   }
 
   // ============ Workflows ============
@@ -438,8 +530,8 @@ export class WrikeClient {
   }
 
   async createWorkflow(data: { name: string }): Promise<WrikeWorkflow> {
-    let response = await this.axios.post('/workflows', data);
-    return response.data.data[0];
+    let response = await this.write<WrikeWorkflow>('post', '/workflows', data);
+    return response;
   }
 
   async updateWorkflow(
@@ -455,8 +547,8 @@ export class WrikeClient {
       };
     }
   ): Promise<WrikeWorkflow> {
-    let response = await this.axios.put(`/workflows/${workflowId}`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeWorkflow>('put', `/workflows/${workflowId}`, data);
+    return response;
   }
 
   // ============ Dependencies ============
@@ -465,6 +557,17 @@ export class WrikeClient {
     taskId?: string;
     dependencyIds?: string[];
   }): Promise<WrikeResponse<WrikeDependency>> {
+    if (params?.taskId && params.dependencyIds?.length) {
+      throw createApiServiceError('Use taskId or dependencyIds, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
+    if (!params?.taskId && !params?.dependencyIds?.length) {
+      throw createApiServiceError(
+        'Provide taskId or dependencyIds. Call list_tasks to discover task IDs.',
+        { reason: 'invalid_resource_scope' }
+      );
+    }
     let url = '/dependencies';
     if (params?.taskId) {
       url = `/tasks/${params.taskId}/dependencies`;
@@ -483,8 +586,12 @@ export class WrikeClient {
       relationType: string;
     }
   ): Promise<WrikeDependency> {
-    let response = await this.axios.post(`/tasks/${taskId}/dependencies`, data);
-    return response.data.data[0];
+    let response = await this.write<WrikeDependency>(
+      'post',
+      `/tasks/${taskId}/dependencies`,
+      data
+    );
+    return response;
   }
 
   async deleteDependency(dependencyId: string): Promise<void> {
@@ -515,21 +622,28 @@ export class WrikeClient {
     dueDate?: string;
     approvers?: string[];
   }): Promise<WrikeApproval> {
+    if (params.taskId && params.folderId) {
+      throw createApiServiceError('Use taskId or folderId, not both.', {
+        reason: 'invalid_resource_scope'
+      });
+    }
     let url: string;
     if (params.taskId) {
       url = `/tasks/${params.taskId}/approvals`;
     } else if (params.folderId) {
       url = `/folders/${params.folderId}/approvals`;
     } else {
-      throw new Error('Either taskId or folderId must be provided');
+      throw createApiServiceError('Provide either taskId or folderId.', {
+        reason: 'invalid_resource_scope'
+      });
     }
 
-    let response = await this.axios.post(url, {
+    let response = await this.write<WrikeApproval>('post', url, {
       description: params.description,
       dueDate: params.dueDate,
       approvers: params.approvers
     });
-    return response.data.data[0];
+    return response;
   }
 
   // ============ Webhooks ============

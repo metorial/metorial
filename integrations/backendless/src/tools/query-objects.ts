@@ -9,7 +9,7 @@ export let queryObjects = SlateTool.create(spec, {
   description: `Retrieves objects from a Backendless database table with powerful SQL-like filtering, sorting, pagination, and relation loading. Can also fetch a single object by its ID or return the count of matching objects.`,
   instructions: [
     "Use the `where` parameter for SQL-like filtering, e.g. `age > 21 AND name LIKE 'John%'`.",
-    'Use `sortBy` with a prefix of `-` for descending order, e.g. `["-created"]`.',
+    'Use `sortBy` with DESC for descending order, e.g. `["created DESC"]`. The shorthand `["-created"]` is also supported.',
     'Set `countOnly` to true to get just the count of matching objects without fetching them.'
   ],
   tags: {
@@ -36,7 +36,7 @@ export let queryObjects = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Properties to sort by. Prefix with "-" for descending, e.g. ["-created", "name"]'
+          'Properties to sort by, e.g. ["created DESC", "name ASC"]. A leading "-" also selects descending order.'
         ),
       props: z
         .array(z.string())
@@ -51,11 +51,17 @@ export let queryObjects = SlateTool.create(spec, {
         .optional()
         .describe('Related object properties to load'),
       relationsDepth: z.number().optional().describe('Depth of nested relations to load'),
-      pageSize: z.number().optional().describe('Number of objects per page (default: 100)'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of objects per page (1-100, default: 10)'),
       offset: z.number().optional().describe('Zero-based starting index for pagination'),
       groupBy: z.array(z.string()).optional().describe('Columns to group results by'),
       having: z.string().optional().describe('Filter condition for grouped results'),
-      distinct: z.string().optional().describe('Column to return unique values for'),
+      distinct: z
+        .string()
+        .optional()
+        .describe('Column to return unique values for. Overrides props.'),
       countOnly: z
         .boolean()
         .optional()

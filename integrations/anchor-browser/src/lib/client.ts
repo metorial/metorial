@@ -1,17 +1,24 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue
+} from 'slates';
 
 let BASE_URL = 'https://api.anchorbrowser.io';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'anchor-api-key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'anchor-api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Anchor Browser',
+          reason: 'anchor_browser_api_error'
+        })
     });
   }
 
@@ -30,7 +37,7 @@ export class Client {
   }
 
   async getSession(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}`);
+    let response = await this.axios.get(`/v1/sessions/${encodeURIComponent(sessionId)}`);
     return response.data?.data as SessionDetails;
   }
 
@@ -55,7 +62,7 @@ export class Client {
   }
 
   async endSession(sessionId: string) {
-    let response = await this.axios.delete(`/v1/sessions/${sessionId}`);
+    let response = await this.axios.delete(`/v1/sessions/${encodeURIComponent(sessionId)}`);
     return response.data;
   }
 
@@ -65,12 +72,17 @@ export class Client {
   }
 
   async getSessionPages(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}/pages`);
-    return response.data?.data ?? response.data;
+    let response = await this.axios.get(`/v1/sessions/${encodeURIComponent(sessionId)}/pages`);
+    return response.data?.data as {
+      count: number;
+      items: Array<{ id: string; title: string; url: string; frontend_url: string }>;
+    };
   }
 
   async getSessionDownloads(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}/downloads`);
+    let response = await this.axios.get(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/downloads`
+    );
     return response.data?.data as { count: number; items: Record<string, unknown>[] };
   }
 
@@ -80,7 +92,7 @@ export class Client {
 
   async createProfile(params: ProfileCreateParams) {
     let response = await this.axios.post('/v1/profiles', params);
-    return response.data?.data as ProfileResponse;
+    return response.data?.data as { status: string };
   }
 
   async listProfiles() {
@@ -110,7 +122,9 @@ export class Client {
   }
 
   async getWebTaskStatus(workflowId: string) {
-    let response = await this.axios.get(`/v1/tools/perform-web-task/${workflowId}/status`);
+    let response = await this.axios.get(
+      `/v1/tools/perform-web-task/${encodeURIComponent(workflowId)}/status`
+    );
     return response.data?.data as { status: string; result?: unknown; error?: string };
   }
 
@@ -127,9 +141,19 @@ export class Client {
 
   async screenshotWebpage(params: ScreenshotParams, sessionId?: string) {
     let response = await this.axios.post('/v1/tools/screenshot', params, {
-      params: sessionId ? { sessionId } : undefined
+      params: sessionId ? { sessionId } : undefined,
+      responseType: 'arraybuffer'
     });
-    return response.data?.data as { image: string };
+    let bytes = new Uint8Array(response.data);
+    let mimeType = getResponseHeaderValue(response.headers, 'content-type')?.split(';')[0];
+    if (
+      mimeType !== 'image/png' ||
+      bytes.length < 8 ||
+      ![137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => bytes[index] === byte)
+    ) {
+      throw createApiServiceError('Anchor Browser did not return a valid PNG screenshot.');
+    }
+    return new Response(bytes, { headers: { 'Content-Type': 'image/png' } });
   }
 
   async pageToPdf(params: PdfParams, sessionId?: string) {
@@ -137,7 +161,15 @@ export class Client {
       params: sessionId ? { sessionId } : undefined,
       responseType: 'arraybuffer'
     });
-    return response.data;
+    let bytes = new Uint8Array(response.data);
+    let mimeType = getResponseHeaderValue(response.headers, 'content-type')?.split(';')[0];
+    if (
+      mimeType !== 'application/pdf' ||
+      new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-'
+    ) {
+      throw createApiServiceError('Anchor Browser did not return a valid PDF.');
+    }
+    return new Response(bytes, { headers: { 'Content-Type': 'application/pdf' } });
   }
 
   // =====================
@@ -155,9 +187,10 @@ export class Client {
       index?: number;
     }
   ) {
-    let response = await this.axios.post('/v1/tools/mouse-click', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/mouse/click`,
+      params
+    );
     return response.data;
   }
 
@@ -165,9 +198,10 @@ export class Client {
     sessionId: string,
     params: { x?: number; y?: number; button?: string }
   ) {
-    let response = await this.axios.post('/v1/tools/mouse-double-click', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/mouse/doubleClick`,
+      params
+    );
     return response.data;
   }
 
@@ -175,9 +209,10 @@ export class Client {
     sessionId: string,
     params: { startX: number; startY: number; endX: number; endY: number; button?: string }
   ) {
-    let response = await this.axios.post('/v1/tools/drag-drop', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/drag-and-drop`,
+      params
+    );
     return response.data;
   }
 
@@ -192,49 +227,59 @@ export class Client {
       useOs?: boolean;
     }
   ) {
-    let response = await this.axios.post('/v1/tools/scroll', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/scroll`,
+      params
+    );
     return response.data;
   }
 
   async typeText(sessionId: string, params: { text: string; delay?: number }) {
-    let response = await this.axios.post('/v1/tools/type-text', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/keyboard/type`,
+      params
+    );
     return response.data;
   }
 
   async keyboardShortcut(sessionId: string, params: { keys: string[]; holdTime?: number }) {
-    let response = await this.axios.post('/v1/tools/keyboard-shortcut', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/keyboard/shortcut`,
+      params
+    );
     return response.data;
   }
 
   async navigate(sessionId: string, params: { url: string }) {
-    let response = await this.axios.post('/v1/tools/navigate', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/goto`,
+      params
+    );
     return response.data;
   }
 
   async setClipboard(sessionId: string, params: { text: string }) {
-    let response = await this.axios.post('/v1/tools/clipboard', params, {
-      params: { sessionId }
-    });
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/clipboard`,
+      params
+    );
     return response.data;
   }
 
   async getClipboard(sessionId: string) {
-    let response = await this.axios.get('/v1/tools/clipboard', { params: { sessionId } });
-    return response.data;
+    let response = await this.axios.get(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/clipboard`
+    );
+    return response.data?.data as { text: string };
   }
 
   async takeScreenshot(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}/screenshot`, {
-      responseType: 'arraybuffer'
-    });
+    let response = await this.axios.get(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/screenshot`,
+      {
+        responseType: 'arraybuffer'
+      }
+    );
     return response.data;
   }
 
@@ -248,12 +293,14 @@ export class Client {
   }
 
   async getExtension(extensionId: string) {
-    let response = await this.axios.get(`/v1/extensions/${extensionId}`);
+    let response = await this.axios.get(`/v1/extensions/${encodeURIComponent(extensionId)}`);
     return response.data?.data as ExtensionResponse;
   }
 
   async deleteExtension(extensionId: string) {
-    let response = await this.axios.delete(`/v1/extensions/${extensionId}`);
+    let response = await this.axios.delete(
+      `/v1/extensions/${encodeURIComponent(extensionId)}`
+    );
     return response.data;
   }
 
@@ -284,19 +331,24 @@ export class Client {
   }
 
   async getBatch(batchId: string) {
-    let response = await this.axios.get(`/v1/batch-sessions/${batchId}`);
+    let response = await this.axios.get(`/v1/batch-sessions/${encodeURIComponent(batchId)}`);
     return response.data as BatchStatusResponse;
   }
 
   async cancelBatch(batchId: string) {
-    let response = await this.axios.patch(`/v1/batch-sessions/${batchId}`, {
-      status: 'cancelled'
-    });
+    let response = await this.axios.patch(
+      `/v1/batch-sessions/${encodeURIComponent(batchId)}`,
+      {
+        status: 'cancelled'
+      }
+    );
     return response.data;
   }
 
   async deleteBatch(batchId: string) {
-    let response = await this.axios.delete(`/v1/batch-sessions/${batchId}`);
+    let response = await this.axios.delete(
+      `/v1/batch-sessions/${encodeURIComponent(batchId)}`
+    );
     return response.data;
   }
 
@@ -304,10 +356,13 @@ export class Client {
     batchId: string,
     params?: { retryFailedOnly?: boolean; maxRetries?: number }
   ) {
-    let response = await this.axios.post(`/v1/batch-sessions/${batchId}/retry`, {
-      retry_failed_only: params?.retryFailedOnly ?? true,
-      max_retries: params?.maxRetries ?? 1
-    });
+    let response = await this.axios.post(
+      `/v1/batch-sessions/${encodeURIComponent(batchId)}/retry`,
+      {
+        retry_failed_only: params?.retryFailedOnly ?? true,
+        max_retries: params?.maxRetries ?? 1
+      }
+    );
     return response.data;
   }
 
@@ -340,17 +395,23 @@ export class Client {
   // =====================
 
   async listRecordings(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}/recordings`);
+    let response = await this.axios.get(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/recordings`
+    );
     return response.data?.data as { count: number; items: RecordingItem[] };
   }
 
   async pauseRecording(sessionId: string) {
-    let response = await this.axios.post(`/v1/sessions/${sessionId}/recordings/pause`);
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/recordings/pause`
+    );
     return response.data?.data as { status: string };
   }
 
   async resumeRecording(sessionId: string) {
-    let response = await this.axios.post(`/v1/sessions/${sessionId}/recordings/resume`);
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/recordings/resume`
+    );
     return response.data?.data as { status: string };
   }
 
@@ -369,29 +430,40 @@ export class Client {
   }
 
   async getApplication(applicationId: string) {
-    let response = await this.axios.get(`/v1/applications/${applicationId}`);
+    let response = await this.axios.get(
+      `/v1/applications/${encodeURIComponent(applicationId)}`
+    );
     return response.data;
   }
 
   async updateApplication(applicationId: string, params: { allowedDomains?: string[] }) {
-    let response = await this.axios.patch(`/v1/applications/${applicationId}`, {
-      allowed_domains: params.allowedDomains
-    });
+    let response = await this.axios.patch(
+      `/v1/applications/${encodeURIComponent(applicationId)}`,
+      {
+        allowed_domains: params.allowedDomains
+      }
+    );
     return response.data;
   }
 
   async deleteApplication(applicationId: string) {
-    let response = await this.axios.delete(`/v1/applications/${applicationId}`);
+    let response = await this.axios.delete(
+      `/v1/applications/${encodeURIComponent(applicationId)}`
+    );
     return response.data;
   }
 
   async listApplicationIdentities(applicationId: string) {
-    let response = await this.axios.get(`/v1/applications/${applicationId}/identities`);
+    let response = await this.axios.get(
+      `/v1/applications/${encodeURIComponent(applicationId)}/identities`
+    );
     return response.data;
   }
 
   async listAuthFlows(applicationId: string) {
-    let response = await this.axios.get(`/v1/applications/${applicationId}/auth-flows`);
+    let response = await this.axios.get(
+      `/v1/applications/${encodeURIComponent(applicationId)}/auth-flows`
+    );
     return response.data;
   }
 
@@ -405,19 +477,22 @@ export class Client {
       customFields?: Record<string, unknown>[];
     }
   ) {
-    let response = await this.axios.post(`/v1/applications/${applicationId}/auth-flows`, {
-      name: params.name,
-      description: params.description,
-      is_recommended: params.isRecommended,
-      methods: params.methods,
-      custom_fields: params.customFields
-    });
+    let response = await this.axios.post(
+      `/v1/applications/${encodeURIComponent(applicationId)}/auth-flows`,
+      {
+        name: params.name,
+        description: params.description,
+        is_recommended: params.isRecommended,
+        methods: params.methods,
+        custom_fields: params.customFields
+      }
+    );
     return response.data;
   }
 
   async deleteAuthFlow(applicationId: string, authFlowId: string) {
     let response = await this.axios.delete(
-      `/v1/applications/${applicationId}/auth-flows/${authFlowId}`
+      `/v1/applications/${encodeURIComponent(applicationId)}/auth-flows/${encodeURIComponent(authFlowId)}`
     );
     return response.data;
   }
@@ -437,7 +512,7 @@ export class Client {
   }
 
   async getIdentity(identityId: string) {
-    let response = await this.axios.get(`/v1/identities/${identityId}`);
+    let response = await this.axios.get(`/v1/identities/${encodeURIComponent(identityId)}`);
     return response.data;
   }
 
@@ -449,17 +524,22 @@ export class Client {
       credentials?: Record<string, unknown>[];
     }
   ) {
-    let response = await this.axios.patch(`/v1/identities/${identityId}`, params);
+    let response = await this.axios.put(
+      `/v1/identities/${encodeURIComponent(identityId)}`,
+      params
+    );
     return response.data;
   }
 
   async deleteIdentity(identityId: string) {
-    let response = await this.axios.delete(`/v1/identities/${identityId}`);
+    let response = await this.axios.delete(`/v1/identities/${encodeURIComponent(identityId)}`);
     return response.data;
   }
 
   async getIdentityCredentials(identityId: string) {
-    let response = await this.axios.get(`/v1/identities/${identityId}/credentials`);
+    let response = await this.axios.get(
+      `/v1/identities/${encodeURIComponent(identityId)}/credentials`
+    );
     return response.data;
   }
 
@@ -482,7 +562,9 @@ export class Client {
   }
 
   async deleteIntegration(integrationId: string) {
-    let response = await this.axios.delete(`/v1/integrations/${integrationId}`);
+    let response = await this.axios.delete(
+      `/v1/integrations/${encodeURIComponent(integrationId)}`
+    );
     return response.data;
   }
 
@@ -491,19 +573,25 @@ export class Client {
   // =====================
 
   async listAgentFiles(sessionId: string) {
-    let response = await this.axios.get(`/v1/sessions/${sessionId}/agent/files`);
+    let response = await this.axios.get(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/agent/files`
+    );
     return response.data?.data as {
       files: Array<{ name: string; size: number; type: string; lastModified: string }>;
     };
   }
 
   async pauseAgent(sessionId: string) {
-    let response = await this.axios.post(`/v1/sessions/${sessionId}/agent/pause`);
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/agent/pause`
+    );
     return response.data;
   }
 
   async resumeAgent(sessionId: string) {
-    let response = await this.axios.post(`/v1/sessions/${sessionId}/agent/resume`);
+    let response = await this.axios.post(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/agent/resume`
+    );
     return response.data;
   }
 }
@@ -586,7 +674,7 @@ export interface SessionDetails {
   credits_used: number;
   configuration: Record<string, unknown>;
   proxy_bytes: number;
-  tokens: number;
+  tokens: number | Record<string, unknown>;
   steps: number;
   tags: string[];
   created_at: string;

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let requestBackgroundCheck = SlateTool.create(spec, {
   name: 'Request Background Check',
   key: 'request_background_check',
-  description: `Initiates a US criminal background check for an individual. The check searches criminal records databases and returns results asynchronously. This is an additional check type available for individuals located in the United States.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Initiates a US criminal background check for an individual. The check searches criminal records databases and returns results asynchronously. This is an additional check type available for individuals located in the United States.`,
   instructions: [
     'This check is only available for US-based individuals.',
     'Provide accurate name and date of birth for reliable matching.'
@@ -45,7 +45,7 @@ export let requestBackgroundCheck = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createBackgroundCheck({
       email: ctx.input.email,

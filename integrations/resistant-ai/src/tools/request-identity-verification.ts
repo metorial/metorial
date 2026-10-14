@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let requestIdentityVerification = SlateTool.create(spec, {
   name: 'Request Identity Verification',
   key: 'request_identity_verification',
-  description: `Sends a KYC identity verification request to an individual via email. The recipient receives a unique URL to complete the verification by photographing their government-issued ID and taking a selfie. Supports biometric (document + selfie) or document-only verification modes. Results are delivered asynchronously via webhook once the individual completes the process.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Sends a KYC identity verification request to an individual via email. The recipient receives a unique URL to complete the verification by photographing their government-issued ID and taking a selfie. Supports biometric (document + selfie) or document-only verification modes. Results are delivered asynchronously via webhook once the individual completes the process.`,
   instructions: [
     'Provide the email address of the individual to verify. First and last name are optional but recommended for matching.',
     'Use "biometric" verification type for highest assurance (document + selfie). Use "document_only" for document-based verification without selfie.',
@@ -52,7 +52,7 @@ export let requestIdentityVerification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createVerification({
       email: ctx.input.email,

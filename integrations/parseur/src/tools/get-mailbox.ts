@@ -62,7 +62,7 @@ export let getMailbox = SlateTool.create(spec, {
       schema = await client.getMailboxSchema(ctx.input.mailboxId);
     }
 
-    let emailDomain = 'parseur.com';
+    let emailDomain = 'in.parseur.com';
 
     return {
       output: {

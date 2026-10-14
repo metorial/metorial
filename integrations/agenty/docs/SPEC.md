@@ -1,4 +1,4 @@
-Now let me get more details on the webhook integration and change detection features.# Slates Specification for Agenty
+# Agenty Integration Specification
 
 ## Overview
 
@@ -70,3 +70,17 @@ When an agent job completes, Agenty sends an HTTP POST request to the configured
 - The webhook URL is configured per agent through the integrations/plugins settings.
 - Multiple integrations (including webhook) can be attached to each agent.
 - Integrations can be enabled or disabled without removing them.
+
+## Registered tool additions
+
+`list_list_rows` retrieves paginated list rows and their `_id` identifiers.
+`manage_list_row` retrieves, updates, or deletes one list row. Existing
+`manage_list` remains responsible for list discovery, list metadata, and bulk inserts.
+
+Screenshot, PDF, HTML, and job export tools prepare downloadable files. Their
+existing response fields remain available for compatibility. Signed job exports
+are renewed on every later download because the provider does not document a TTL.
+
+The integration retains the documented v2 API and browser.agenty.com API.
+Agenty's newer AI documentation uses a different browser base URL and UNIX CRON;
+confirm the target account's API generation before changing those connection details.

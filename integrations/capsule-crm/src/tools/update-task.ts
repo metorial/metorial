@@ -15,7 +15,7 @@ export let updateTask = SlateTool.create(spec, {
       detail: z.string().optional().describe('Updated details'),
       dueOn: z.string().optional().describe('Updated due date (YYYY-MM-DD)'),
       dueTime: z.string().optional().describe('Updated due time (HH:MM:SS)'),
-      status: z.enum(['open', 'completed']).optional().describe('Updated status'),
+      status: z.enum(['open', 'completed', 'pending']).optional().describe('Updated status'),
       ownerId: z.number().optional().describe('New owner user ID')
     })
   )
@@ -43,8 +43,8 @@ export let updateTask = SlateTool.create(spec, {
     return {
       output: {
         taskId: result.id,
-        description: result.description,
-        updatedAt: result.updatedAt
+        description: result.description ?? undefined,
+        updatedAt: result.updatedAt ?? undefined
       },
       message: `Updated task **"${result.description ?? `#${result.id}`}"**.`
     };

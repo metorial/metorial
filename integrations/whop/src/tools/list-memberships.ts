@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let membershipSchema = z.object({
@@ -30,10 +31,7 @@ export let listMemberships = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID. Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       productIds: z.array(z.string()).optional().describe('Filter by product IDs'),
       statuses: z
         .array(

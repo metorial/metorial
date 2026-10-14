@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let teamMemberSchema = z.object({
@@ -19,11 +20,12 @@ let teamSchema = z.object({
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `Retrieve teams from Timely, including their members and lead assignments.`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve teams from Timely, including their members and lead assignments.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       limit: z.number().optional().describe('Max teams to return'),
       offset: z.number().optional().describe('Offset for pagination'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order')
@@ -36,10 +38,7 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let teams = await client.listTeams({
       limit: ctx.input.limit,

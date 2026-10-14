@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MockServiceClient } from '../lib/mock-client';
 import { spec } from '../spec';
@@ -60,7 +60,8 @@ export let manageMockTransaction = SlateTool.create(spec, {
     let client = new MockServiceClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.action === 'list') {
@@ -82,7 +83,7 @@ export let manageMockTransaction = SlateTool.create(spec, {
         !ctx.input.requestUrl ||
         ctx.input.responseStatusCode === undefined
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'name, requestMethod, requestUrl, and responseStatusCode are required to create a transaction'
         );
       }
@@ -108,7 +109,7 @@ export let manageMockTransaction = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.transactionId)
-        throw new Error('transactionId is required for deleting a transaction');
+        throw createApiServiceError('transactionId is required for deleting a transaction');
       await client.deleteTransaction(ctx.input.serviceId, ctx.input.transactionId);
       return {
         output: { transactionId: ctx.input.transactionId, deleted: true },
@@ -116,6 +117,6 @@ export let manageMockTransaction = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

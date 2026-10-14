@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,14 +9,17 @@ let DNS_RECORD_TYPES: Record<string, number> = {
   CNAME: 2,
   TXT: 3,
   MX: 4,
-  Redirect: 5,
-  Flatten: 6,
-  PullZone: 7,
+  REDIRECT: 5,
+  FLATTEN: 6,
+  PULLZONE: 7,
   SRV: 8,
   CAA: 9,
   PTR: 10,
-  Script: 11,
-  NS: 12
+  SCRIPT: 11,
+  NS: 12,
+  SVCB: 13,
+  HTTPS: 14,
+  TLSA: 15
 };
 
 export let manageDnsRecord = SlateTool.create(spec, {
@@ -44,7 +47,7 @@ export let manageDnsRecord = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Record type name: A, AAAA, CNAME, TXT, MX, SRV, CAA, NS, PTR, Redirect, Flatten, PullZone, Script. Required for add.'
+          'Record type name: A, AAAA, CNAME, TXT, MX, SRV, CAA, NS, PTR, Redirect, Flatten, PullZone, Script, SVCB, HTTPS, TLSA, or numeric code 0-15. Required for add.'
         ),
       name: z.string().optional().describe('Record name / subdomain (add/update)'),
       value: z.string().optional().describe('Record value (add/update)'),
@@ -69,14 +72,33 @@ export let manageDnsRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!Number.isInteger(ctx.input.dnsZoneId) || ctx.input.dnsZoneId <= 0)
+      throw createApiServiceError('dnsZoneId must be a positive integer.');
+    if (
+      ['update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.recordId === undefined ||
+        ctx.input.recordId <= 0 ||
+        !Number.isInteger(ctx.input.recordId))
+    )
+      throw createApiServiceError('A positive recordId is required for this action.');
+    if (ctx.input.action === 'add' && !ctx.input.recordType)
+      throw createApiServiceError('recordType is required when adding a DNS record.');
+    let typeCode =
+      ctx.input.recordType === undefined
+        ? undefined
+        : (DNS_RECORD_TYPES[ctx.input.recordType.toUpperCase()] ??
+          (/^\d+$/.test(ctx.input.recordType) ? Number(ctx.input.recordType) : undefined));
+    if (
+      ctx.input.recordType !== undefined &&
+      (typeCode === undefined || typeCode < 0 || typeCode > 15)
+    )
+      throw createApiServiceError(
+        'Use a supported DNS record type name or its numeric code (0-15).'
+      );
     let client = new CoreClient({ token: ctx.auth.token });
 
     switch (ctx.input.action) {
       case 'add': {
-        let typeCode = ctx.input.recordType
-          ? (DNS_RECORD_TYPES[ctx.input.recordType] ??
-            Number.parseInt(ctx.input.recordType, 10))
-          : 0;
         let data: Record<string, any> = {
           Type: typeCode,
           Name: ctx.input.name || '',
@@ -96,7 +118,8 @@ export let manageDnsRecord = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        let data: Record<string, any> = {};
+        let data: Record<string, any> = { Id: ctx.input.recordId };
+        if (typeCode !== undefined) data.Type = typeCode;
         if (ctx.input.name !== undefined) data.Name = ctx.input.name;
         if (ctx.input.value !== undefined) data.Value = ctx.input.value;
         if (ctx.input.ttl !== undefined) data.Ttl = ctx.input.ttl;

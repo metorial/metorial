@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseRecords, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
@@ -78,7 +78,7 @@ export let listMembers = SlateTool.create(spec, {
       count: ctx.input.count
     });
 
-    let members = ((result.members as Record<string, unknown>[]) || []).map(m => ({
+    let members = getResponseRecords(result.members, 'member list').map(m => ({
       memberId: m.id as string,
       displayName: m.displayName as string | undefined,
       firstName: m.firstName as string | undefined,

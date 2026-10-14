@@ -29,12 +29,6 @@ export let deleteCustomer = SlateTool.create(spec, {
     let client = createClient(ctx);
     let data = await client.deleteCustomer(ctx.input.customerId);
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to delete customer: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
-
     return {
       output: {
         success: true,

@@ -1,4 +1,4 @@
-# Slates Specification for Digicert
+# DigiCert API Specification
 
 ## Overview
 

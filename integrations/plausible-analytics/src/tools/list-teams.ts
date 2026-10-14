@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `List teams associated with your Plausible Analytics account and check whether API access is available for each team. Requires a Sites API key (Enterprise plan).`,
+  description: `List teams accessible to your Plausible Analytics API key and check whether API access is available for each team. Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }

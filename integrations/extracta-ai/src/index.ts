@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   createClassificationTool,
   createExtractionTool,
+  deleteClassificationBatchTool,
+  deleteClassificationFilesTool,
   deleteClassificationTool,
   deleteExtractionTool,
   getClassificationResultsTool,
@@ -28,6 +30,8 @@ export let provider = Slate.create({
     viewClassificationTool,
     updateClassificationTool,
     deleteClassificationTool,
+    deleteClassificationBatchTool,
+    deleteClassificationFilesTool,
     uploadClassificationFilesTool,
     getClassificationResultsTool,
     getCreditsTool

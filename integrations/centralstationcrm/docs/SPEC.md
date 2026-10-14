@@ -1,6 +1,4 @@
-Now let me get the Swagger UI documentation to understand the available endpoints and webhook details:Now let me look for more details on the webhook event types and the CRM's features available via API:Now I have enough information. Let me compile the specification.
-
-# Slates Specification for CentralStationCRM
+# CentralStationCRM API Specification
 
 ## Overview
 

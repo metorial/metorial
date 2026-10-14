@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   addWebsiteTool,
   exportDataTool,
+  exportFileTool,
   getEventsTool,
   getStatisticsTool,
   listWebsitesTool
@@ -10,6 +11,13 @@ import {
 
 export let provider = Slate.create({
   spec,
-  tools: [getStatisticsTool, getEventsTool, exportDataTool, listWebsitesTool, addWebsiteTool],
+  tools: [
+    getStatisticsTool,
+    getEventsTool,
+    exportDataTool,
+    exportFileTool,
+    listWebsitesTool,
+    addWebsiteTool
+  ],
   triggers: []
 });

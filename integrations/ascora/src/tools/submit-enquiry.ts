@@ -35,6 +35,7 @@ Supports contact details, address information, a description of the enquiry, and
         .string()
         .optional()
         .describe('Description of the enquiry or service request'),
+      leadSource: z.string().optional().describe('Lead source name configured in Ascora'),
       customFields: z
         .array(
           z.object({
@@ -49,11 +50,12 @@ Supports contact details, address information, a description of the enquiry, and
   .output(
     z.object({
       success: z.boolean().describe('Whether the enquiry was submitted successfully'),
-      response: z.any().optional().describe('Response data from the API')
+      response: z.any().optional().describe('Response data from the API'),
+      enquiryId: z.string().optional().describe('Identifier of the newly created enquiry')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AscoraClient({ token: ctx.auth.token });
+    let client = new AscoraClient(ctx.auth);
 
     let result = await client.submitEnquiry({
       companyName: ctx.input.companyName,
@@ -69,6 +71,7 @@ Supports contact details, address information, a description of the enquiry, and
       addressPostcode: ctx.input.addressPostcode,
       addressCountry: ctx.input.addressCountry,
       enquiryDescription: ctx.input.enquiryDescription,
+      leadSource: ctx.input.leadSource,
       customFields: ctx.input.customFields
     });
 
@@ -80,7 +83,8 @@ Supports contact details, address information, a description of the enquiry, and
     return {
       output: {
         success: true,
-        response: result
+        response: result,
+        enquiryId: result?.entityId
       },
       message: `Successfully submitted enquiry for **${contactName}**${ctx.input.enquiryDescription ? `: "${ctx.input.enquiryDescription.substring(0, 100)}${ctx.input.enquiryDescription.length > 100 ? '...' : ''}"` : ''}.`
     };

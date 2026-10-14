@@ -6,20 +6,28 @@ import { spec } from '../spec';
 export let getTemplateRespondents = SlateTool.create(spec, {
   name: 'Get Template Respondents',
   key: 'get_template_respondents',
-  description: `Retrieve respondent information for a specific template-based document. Returns signer details, statuses, and signing progress. Can fetch all respondents for a template or a specific respondent by document ID.`,
+  description: `Retrieve signer details, statuses, and signing progress for a PDF template or a specific respondent document. Provide templateId, respondentDocumentId, or both.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      templateId: z.string().describe('ID of the template to retrieve respondents for'),
+      templateId: z.string().optional().describe('Template UUID to retrieve respondents for'),
       respondentDocumentId: z
         .string()
         .optional()
-        .describe('Specific respondent document ID to retrieve a single respondent'),
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      limit: z.number().optional().describe('Number of results per page (default: 10)')
+        .describe(
+          'Respondent Mongo ObjectId; use createdDocumentId returned by send_template'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe('Whole-number page between 1 and 10000 (default: 1)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Whole-number page size between 1 and 100 (default: 10)')
     })
   )
   .output(
@@ -30,7 +38,10 @@ export let getTemplateRespondents = SlateTool.create(spec, {
       pagination: z
         .object({
           currentPage: z.number().optional(),
-          totalPages: z.number().optional()
+          totalPages: z.number().optional(),
+          totalDocuments: z.number().optional(),
+          hasNextPage: z.boolean().optional(),
+          hasPreviousPage: z.boolean().optional()
         })
         .optional()
         .describe('Pagination metadata')
@@ -46,7 +57,8 @@ export let getTemplateRespondents = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let respondents = result.respondents ?? result.data ?? [];
+    let respondents =
+      result.respondents ?? result.data ?? (ctx.input.respondentDocumentId ? result : []);
     if (!Array.isArray(respondents)) {
       respondents = [respondents];
     }
@@ -54,9 +66,9 @@ export let getTemplateRespondents = SlateTool.create(spec, {
     return {
       output: {
         respondents,
-        pagination: result.pagination
+        pagination: result.pagination ?? undefined
       },
-      message: `Retrieved **${respondents.length}** respondent(s) for template \`${ctx.input.templateId}\`.`
+      message: `Retrieved **${respondents.length}** respondent document(s).`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getMailercloudCount, getMailercloudItems } from '../lib/responses';
 import { spec } from '../spec';
 
 export let searchLists = SlateTool.create(spec, {
@@ -15,8 +16,19 @@ export let searchLists = SlateTool.create(spec, {
   .input(
     z.object({
       search: z.string().optional().describe('Search keyword to filter lists by name'),
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      limit: z.number().optional().describe('Number of lists per page (default: 20)')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(1)
+        .optional()
+        .describe('Page number for pagination (default: 1)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(10)
+        .max(100)
+        .optional()
+        .describe('Number of lists per page (default: 20)')
     })
   )
   .output(
@@ -39,8 +51,8 @@ export let searchLists = SlateTool.create(spec, {
     });
 
     let data = result?.data ?? result;
-    let lists = Array.isArray(data) ? data : (data?.lists ?? data?.data ?? []);
-    let totalCount = result?.count ?? result?.total ?? lists.length;
+    let lists = getMailercloudItems(data?.lists ?? data?.data ?? data);
+    let totalCount = getMailercloudCount(result?.count ?? result?.total, lists.length);
 
     return {
       output: {

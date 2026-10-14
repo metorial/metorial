@@ -8,13 +8,26 @@ let variableSchema = z.object({
   label: z.string().describe('Human-readable label'),
   concept: z.string().optional().describe('Concept or table the variable belongs to'),
   predicateType: z.string().optional().describe('Data type (int, float, string)'),
-  group: z.string().optional().describe('Variable group identifier')
+  group: z.string().optional().describe('Variable group identifier'),
+  required: z.string().optional().describe('Provider requirement metadata for this variable'),
+  predicateOnly: z
+    .boolean()
+    .optional()
+    .describe('Whether this variable is only usable as a predicate filter'),
+  attributes: z
+    .string()
+    .optional()
+    .describe('Related annotation, margin-of-error, or label variables')
 });
 
 let groupSchema = z.object({
   groupId: z.string().describe('Group identifier (e.g., "B01001")'),
   groupName: z.string().describe('Human-readable group name'),
-  variableCount: z.number().optional().describe('Number of variables in the group')
+  variableCount: z.number().optional().describe('Number of variables in the group'),
+  variablesUrl: z
+    .string()
+    .optional()
+    .describe('Provider URL for the complete group variable metadata')
 });
 
 export let lookupVariables = SlateTool.create(spec, {
@@ -51,7 +64,13 @@ Use this to find the correct variable names before querying census data. You can
         .optional()
         .describe(
           'Set to true to list available variable groups/tables instead of individual variables'
-        )
+        ),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of matching results to skip; use nextOffset for the next page')
     })
   )
   .output(
@@ -61,11 +80,16 @@ Use this to find the correct variable names before querying census data. You can
         .array(groupSchema)
         .optional()
         .describe('List of variable groups (when listGroups is true)'),
-      totalFound: z.number().describe('Total number of results found')
+      totalFound: z.number().describe('Total number of results found'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset for the next page, when more results exist')
     })
   )
   .handleInvocation(async ctx => {
     let client = new CensusDataClient(ctx.auth.token);
+    let offset = ctx.input.offset ?? 0;
 
     if (ctx.input.listGroups) {
       let groups = await client.getDatasetGroups({
@@ -73,12 +97,15 @@ Use this to find the correct variable names before querying census data. You can
         vintage: ctx.input.vintage
       });
 
-      let mapped: Array<{ groupId: string; groupName: string; variableCount?: number }> =
-        groups.map((g: any) => ({
-          groupId: g.name || '',
-          groupName: g.description || '',
-          variableCount: g.variables ? Object.keys(g.variables).length : undefined
-        }));
+      let mapped = groups.map(g => ({
+        groupId: g.name || '',
+        groupName: g.description || '',
+        variableCount:
+          g.variables && typeof g.variables !== 'string'
+            ? Object.keys(g.variables).length
+            : undefined,
+        variablesUrl: typeof g.variables === 'string' ? g.variables : undefined
+      }));
 
       if (ctx.input.keyword) {
         let keyword = ctx.input.keyword.toLowerCase();
@@ -91,14 +118,15 @@ Use this to find the correct variable names before querying census data. You can
 
       return {
         output: {
-          groups: mapped.slice(0, 200),
-          totalFound: mapped.length
+          groups: mapped.slice(offset, offset + 200),
+          totalFound: mapped.length,
+          nextOffset: offset + 200 < mapped.length ? offset + 200 : undefined
         },
         message: `Found **${mapped.length}** variable groups for ${ctx.input.dataset}${ctx.input.vintage ? ` (${ctx.input.vintage})` : ''}. Showing up to 200.`
       };
     }
 
-    let variables: Record<string, any>;
+    let variables: Awaited<ReturnType<CensusDataClient['getDatasetVariables']>>;
 
     if (ctx.input.groupId) {
       variables = await client.getGroupVariables({
@@ -113,12 +141,15 @@ Use this to find the correct variable names before querying census data. You can
       });
     }
 
-    let mapped = Object.entries(variables).map(([name, meta]: [string, any]) => ({
+    let mapped = Object.entries(variables).map(([name, meta]) => ({
       name,
       label: meta.label || '',
       concept: meta.concept || undefined,
       predicateType: meta.predicateType || undefined,
-      group: meta.group || undefined
+      group: meta.group || undefined,
+      required: meta.required,
+      predicateOnly: meta.predicateOnly,
+      attributes: meta.attributes
     }));
 
     if (ctx.input.keyword) {
@@ -133,8 +164,9 @@ Use this to find the correct variable names before querying census data. You can
 
     return {
       output: {
-        variables: mapped.slice(0, 200),
-        totalFound: mapped.length
+        variables: mapped.slice(offset, offset + 200),
+        totalFound: mapped.length,
+        nextOffset: offset + 200 < mapped.length ? offset + 200 : undefined
       },
       message: `Found **${mapped.length}** variables for ${ctx.input.dataset}${ctx.input.vintage ? ` (${ctx.input.vintage})` : ''}${ctx.input.groupId ? ` in group ${ctx.input.groupId}` : ''}${ctx.input.keyword ? ` matching "${ctx.input.keyword}"` : ''}. Showing up to 200.`
     };

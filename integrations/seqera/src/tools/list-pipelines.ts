@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPipelines = SlateTool.create(spec, {
@@ -13,10 +14,16 @@ export let listPipelines = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       search: z.string().optional().describe('Search filter for pipeline name'),
       max: z.number().optional().describe('Maximum number of results to return (default 50)'),
       offset: z.number().optional().describe('Offset for pagination'),
-      sortBy: z.string().optional().describe('Field to sort by, e.g. "name", "lastUpdated"'),
+      sortBy: z
+        .string()
+        .optional()
+        .describe(
+          'Sort field: NAME, CREATED, or MODIFIED; name and lastUpdated are also accepted'
+        ),
       sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
   )
@@ -41,8 +48,8 @@ export let listPipelines = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listPipelines({
@@ -51,17 +58,17 @@ export let listPipelines = SlateTool.create(spec, {
       offset: ctx.input.offset,
       sortBy: ctx.input.sortBy,
       sortDir: ctx.input.sortDirection,
-      attributes: ['labels']
+      attributes: ['labels', 'computeEnv']
     });
 
     let pipelines = result.pipelines.map(p => ({
-      pipelineId: p.pipelineId,
-      name: p.name,
-      description: p.description,
-      repository: p.repository,
-      computeEnvId: p.computeEnvId,
-      revision: p.revision,
-      lastUpdated: p.lastUpdated
+      pipelineId: p.pipelineId ?? undefined,
+      name: p.name ?? undefined,
+      description: p.description ?? undefined,
+      repository: p.repository ?? undefined,
+      computeEnvId: p.computeEnvId ?? undefined,
+      revision: p.revision ?? undefined,
+      lastUpdated: p.lastUpdated ?? undefined
     }));
 
     return {

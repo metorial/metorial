@@ -15,7 +15,7 @@ export let deleteImage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      imageId: z.string().describe('The ID of the image to delete.')
+      imageId: z.string().describe('Numeric image ID or image URL returned by List Images.')
     })
   )
   .output(

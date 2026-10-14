@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -114,6 +114,11 @@ export let calculateRoute = SlateTool.create(spec, {
 
     let feature = data.features?.[0];
     let props = feature?.properties || {};
+    if (!feature || typeof props.distance !== 'number' || typeof props.time !== 'number') {
+      throw createApiServiceError(
+        'Geoapify did not return a route with distance and travel time.'
+      );
+    }
 
     let legs = (props.legs || []).map((leg: any) => ({
       distance: leg.distance,

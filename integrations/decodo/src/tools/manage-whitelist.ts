@@ -26,7 +26,7 @@ export let listWhitelistedIps = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let whitelistedIps = await client.listWhitelistedIps();
 
     return {
@@ -57,7 +57,7 @@ export let addWhitelistedIps = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     await client.addWhitelistedIps(ctx.input.ips);
 
     return {
@@ -93,7 +93,7 @@ export let removeWhitelistedIp = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     await client.deleteWhitelistedIp(ctx.input.whitelistId);
 
     return {

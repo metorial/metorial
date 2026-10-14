@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate an image from a design template with optional element customizations. Provide a template ID and override specific elements such as text content, colors, or image sources to produce a customized PNG image. Returns the generated image URL along with dimensions and credit usage.`,
+  description: `Generate an image from a design template with optional element customizations. Provide a template ID and override specific elements such as text content, colors, or image sources to produce a downloadable PNG image. Returns the generated image URL along with dimensions and credit usage.`,
   constraints: ['Each image generation consumes 1 account credit.'],
   tags: {
     destructive: false,
@@ -15,7 +15,11 @@ export let generateImage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateId: z.string().describe('The ID of the design template to use for generation'),
+      templateId: z
+        .string()
+        .describe(
+          'The ID of the design template to use. Call list_templates to discover template IDs.'
+        ),
       elements: z
         .record(z.string(), z.any())
         .optional()
@@ -39,6 +43,12 @@ export let generateImage = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.generateImage(ctx.input.templateId, ctx.input.elements);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.imageURL,
+      mimeType: result.details?.format === 'png' ? 'image/png' : undefined
+    });
 
     return {
       output: {

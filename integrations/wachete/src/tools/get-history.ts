@@ -77,19 +77,19 @@ Supports date range filtering and pagination for large datasets.`,
 
     let entries = (response.data ?? []).map(d => ({
       lastCheckTimestamp: d.lastCheckTimestamp,
-      valueChangedTimestamp: d.valueChangedTimestamp,
-      raw: d.raw,
-      error: d.error,
+      valueChangedTimestamp: d.valueChangedTimestamp ?? undefined,
+      raw: d.raw ?? undefined,
+      error: d.error ?? undefined,
       diff: d.diff?.map(de => ({
-        operation: de.operation,
-        text: de.text
+        operation: de.operation ?? undefined,
+        text: de.text ?? undefined
       }))
     }));
 
     return {
       output: {
         entries,
-        continuationToken: response.continuationToken
+        continuationToken: response.continuationToken ?? undefined
       },
       message: `Retrieved **${entries.length}** history entries for monitor \`${ctx.input.wachetId}\`.${response.continuationToken ? ' More results available.' : ''}`
     };

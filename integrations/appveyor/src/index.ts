@@ -5,6 +5,7 @@ import {
   getBuildHistory,
   getBuildLogAndArtifacts,
   getProject,
+  getProjectDeployments,
   getProjectSettings,
   listProjects,
   manageBuild,
@@ -21,6 +22,7 @@ export let provider = Slate.create({
   tools: [
     listProjects,
     getProject,
+    getProjectDeployments,
     manageProject,
     getProjectSettings,
     getBuildHistory,

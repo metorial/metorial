@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { RefinerClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +16,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your Refiner API key. Found in the Refiner dashboard under Integrations > REST API.'
+          'Your Refiner API key. Found in the Refiner dashboard under Environment Settings > API Keys.'
         )
     }),
     getOutput: async ctx => {
@@ -25,20 +26,12 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: any) => {
-      let axios = createAxios({
-        baseURL: 'https://api.refiner.io/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/account');
-      let account = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let project = await new RefinerClient({ token: ctx.output.token }).getCurrentProject();
 
       return {
         profile: {
-          name: account.subscription?.plan ?? 'Refiner Account'
+          name: project.project_name
         }
       };
     }

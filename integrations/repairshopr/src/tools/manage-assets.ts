@@ -16,13 +16,13 @@ let assetSchema = z.object({
 
 let mapAsset = (a: any) => ({
   assetId: a.id,
-  name: a.name,
-  customerId: a.customer_id,
-  assetType: a.asset_type,
-  assetSerial: a.asset_serial,
-  properties: a.properties,
-  createdAt: a.created_at,
-  updatedAt: a.updated_at
+  name: a.name ?? undefined,
+  customerId: a.customer_id ?? undefined,
+  assetType: a.asset_type ?? undefined,
+  assetSerial: a.asset_serial ?? undefined,
+  properties: a.properties ?? undefined,
+  createdAt: a.created_at ?? undefined,
+  updatedAt: a.updated_at ?? undefined
 });
 
 export let searchAssets = SlateTool.create(spec, {

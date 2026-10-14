@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -22,6 +22,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || !ctx.input.applicationToken.trim()) {
+        throw createApiServiceError('Enter both your Spondyr API key and application token.', {
+          reason: 'spondyr_missing_credentials'
+        });
+      }
       return {
         output: {
           token: ctx.input.apiKey,

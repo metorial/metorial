@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Waboxapp
 
-Send WhatsApp messages, images, links, and files programmatically through a linked WhatsApp account. Track message delivery and read status via acknowledgement events. Check linked account status including connectivity and device information.
+Submit WhatsApp text, images, links, and files through a linked WhatsApp account. Include a unique message tracking ID and check the linked account's device information. Waboxapp accepting a message does not confirm delivery or reading; delivery acknowledgements are available through the provider's separately configured webhooks.
 
 ## License
 

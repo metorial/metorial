@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,8 @@ Use **action** to specify whether to create, update, or delete a list.`,
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.title) throw new Error('Title is required when creating a list');
+      if (!ctx.input.title)
+        throw createApiServiceError('Title is required when creating a list');
       let result = await client.createList({
         title: ctx.input.title,
         before_subscribe_url: ctx.input.beforeSubscribeUrl,
@@ -61,8 +62,10 @@ Use **action** to specify whether to create, update, or delete a list.`,
     }
 
     if (action === 'update') {
-      if (!ctx.input.listId) throw new Error('listId is required when updating a list');
-      if (!ctx.input.title) throw new Error('Title is required when updating a list');
+      if (!ctx.input.listId)
+        throw createApiServiceError('listId is required when updating a list');
+      if (!ctx.input.title)
+        throw createApiServiceError('Title is required when updating a list');
       await client.updateList({
         list_id: ctx.input.listId,
         title: ctx.input.title,
@@ -76,7 +79,8 @@ Use **action** to specify whether to create, update, or delete a list.`,
     }
 
     if (action === 'delete') {
-      if (!ctx.input.listId) throw new Error('listId is required when deleting a list');
+      if (!ctx.input.listId)
+        throw createApiServiceError('listId is required when deleting a list');
       await client.deleteList(ctx.input.listId);
       return {
         output: { listId: ctx.input.listId, success: true },
@@ -84,6 +88,6 @@ Use **action** to specify whether to create, update, or delete a list.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,3 +1,5 @@
+export * from './get-campaign';
+export * from './get-contact-count';
 export * from './get-messages';
 export * from './list-campaigns';
 export * from './list-channels';

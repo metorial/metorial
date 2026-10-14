@@ -1,4 +1,4 @@
-# Slates Specification for Signpath
+# SignPath Specification
 
 ## Overview
 
@@ -23,15 +23,16 @@ SignPath uses bearer authentication. You need to provide these values for every 
 **Required inputs for authentication:**
 
 - `API_TOKEN`: A bearer token generated per user or CI user account.
-- `ORGANIZATION_ID`: Your SignPath organization identifier, included in all API URL paths.
+- `ORGANIZATION_ID`: Your SignPath organization identifier, included in all API URL paths. Find it on your organization page or signing policy API example.
+- The API token, organization ID, and optional instance base URL are supplied together when authenticating. Previously stored organization and instance configuration remains supported for existing connections.
 
 ## Features
 
 ### Signing Request Submission
 
-Submit artifacts for code signing via the REST API. You provide the project slug, signing policy slug, artifact configuration slug, the artifact file, and an optional description. For hash data, fast signing requests are recommended. These requests are performed immediately without queuing, and the API immediately returns the signed artifact. Provide the additional field `IsFastSigningRequest` with the value `true`.
+Submit artifacts for code signing via the REST API. You provide the project slug, signing policy slug, artifact configuration slug, the artifact file, and an optional description. Provide `artifactBase64` and `artifactFilename` for artifact signing. For immediate hash signing, set `isFastSigningRequest` to true and provide `hashSigningData`; the integration uses the current JSON `SignHash` endpoint and provides a downloadable signature result.
 
-- Key parameters: `ProjectSlug`, `SigningPolicySlug`, `ArtifactConfigurationSlug`, `Artifact` (file), `Description`, `IsFastSigningRequest`, and user-defined `Parameters.*` fields.
+- Key parameters: `projectSlug`, `signingPolicySlug`, `artifactConfigurationSlug`, `artifact` (file), `description`, and user-defined `parameters.*` multipart fields. Hash signing uses a JSON request.
 - Supports automatic handling of complex formats (e.g., EXEs in MSIs, macros in DOCMs, DLLs in ZIPs).
 
 ### Signing Request Status & Artifact Retrieval
@@ -44,7 +45,7 @@ You can resubmit an existing signing request and specify a different signing pol
 
 ### Signing Request Approval & Denial
 
-A release management or workflow system might be used to submit the re-signing request and/or provide the approval using SignPath REST APIs. The API supports approve/deny operations on signing requests.
+A release management or workflow system might be used to submit the re-signing request and/or provide the approval using SignPath REST APIs. Resubmission uses a JSON body on the current API. The API supports approve/deny operations on signing requests.
 
 - You can specify that one or more approvals are required before a signing request is processed. This is typically used for release-signing.
 
@@ -64,7 +65,7 @@ You can retrieve information about a signing policy, including the X.509 certifi
 
 ### User Information
 
-The API includes a route for retrieving the current interactive user's information (`/InteractiveUsers/Me`).
+The API includes an organization-scoped route for retrieving the current CI or interactive user (`/Users/Me`).
 
 ### Audit Log
 
@@ -81,3 +82,10 @@ You can add a Webhook notification in your project's Integration section to reac
 - The webhook URL is configured per project.
 - Webhooks will send the Authentication header exactly as specified in the project configuration, allowing you to secure the receiving endpoint.
 - A handler for this Webhook can use the Web API for further activities, such as pushing the signed artifact to a repository. Use the Web API to get signing request data including build information.
+
+## API references
+
+- [Current OpenAPI reference](https://app.signpath.io/Api/swagger/v1/swagger.json)
+- [Build system integration and artifact API](https://docs.signpath.io/build-system-integration)
+- [Hash signing and signing-policy details](https://docs.signpath.io/crypto-providers/rest-api)
+- [API tokens and users](https://docs.signpath.io/users/)

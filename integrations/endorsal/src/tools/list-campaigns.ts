@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listCampaigns = SlateTool.create(spec, {
   name: 'List Campaigns',
   key: 'list_campaigns',
-  description: `Retrieve AutoRequest campaigns from your Endorsal account. AutoRequests are automated testimonial generation campaigns that send customers review requests via email and SMS. Returns campaign details including delivery stats and configuration.`,
+  description: `Retrieve AutoRequest campaigns from your Endorsal account. AutoRequests are automated testimonial generation campaigns that send customers review requests via email and SMS. Returns campaign state, targeting rules, and timestamps when available.`,
   tags: {
     readOnly: true
   }
@@ -18,7 +18,12 @@ export let listCampaigns = SlateTool.create(spec, {
         .optional()
         .describe('Fetch a specific campaign by ID. If omitted, returns all campaigns.'),
       limit: z.number().optional().describe('Maximum number of campaigns to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Positive whole-number page, starting at 1. Pagination is applied to the complete API response.'
+        )
     })
   )
   .output(
@@ -61,7 +66,7 @@ export let listCampaigns = SlateTool.create(spec, {
             }
           ]
         },
-        message: `Retrieved campaign **${campaign.name || campaign._id}**${campaign.enabled ? ' (active)' : ' (inactive)'}.`
+        message: `Retrieved campaign **${campaign.name || campaign._id}**${campaign.enabled === undefined ? '' : campaign.enabled ? ' (active)' : ' (inactive)'}.`
       };
     }
 

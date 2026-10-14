@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let submitDocument = SlateTool.create(spec, {
   name: 'Submit Document',
   key: 'submit_document',
-  description: `Submit HTML or text content to a mailbox for parsing. Optionally include email metadata (from, to, subject). If both HTML and text are provided, HTML takes priority. You can also attach custom metadata for linking with external systems.`,
+  description: `Submit HTML or text to a template-based or GPT-powered mailbox for asynchronous parsing. Optionally include email metadata. HTML takes priority over text. Use get_document to retrieve the result.`,
   instructions: [
     'Provide either **html** or **text** content (or both, where HTML takes priority).',
     'Use the **meta** field to attach custom metadata that will appear as `__meta__` in parsed output.'
@@ -47,8 +47,9 @@ export let submitDocument = SlateTool.create(spec, {
 
     return {
       output: {
-        documentId: result?._id || result?.id,
-        status: result?.status
+        documentId:
+          typeof result === 'string' ? result : result?.doc_id || result?._id || result?.id,
+        status: result?.status ?? undefined
       },
       message: `Submitted document to mailbox **${ctx.input.mailboxId}**.`
     };

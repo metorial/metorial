@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
   name: 'Manage User',
   key: 'manage_user',
-  description: `Create, update, or delete a user in Harvest. Users can be administrators, managers, or regular members. Supports setting roles, rates, and project access.`,
+  description: `Create, update, or delete a user in Harvest. Users can be administrators, managers, or regular members. Supports setting roles, rates, and project access. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       userId: z.number().optional().describe('User ID (required for update/delete)'),
       firstName: z.string().optional().describe('First name (required for create)'),
@@ -51,11 +53,11 @@ export let manageUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.userId) throw new Error('userId is required for delete');
+      if (!ctx.input.userId) throw createApiServiceError('userId is required for delete');
       await client.deleteUser(ctx.input.userId);
       return {
         output: { userId: ctx.input.userId, deleted: true },
@@ -65,7 +67,7 @@ export let manageUser = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.firstName || !ctx.input.lastName || !ctx.input.email) {
-        throw new Error('firstName, lastName, and email are required for create');
+        throw createApiServiceError('firstName, lastName, and email are required for create');
       }
       let u = await client.createUser({
         firstName: ctx.input.firstName,
@@ -88,7 +90,7 @@ export let manageUser = SlateTool.create(spec, {
           lastName: u.last_name,
           email: u.email,
           isActive: u.is_active,
-          isAdmin: u.is_admin,
+          isAdmin: u.is_admin ?? u.access_roles?.includes('administrator') ?? false,
           timezone: u.timezone
         },
         message: `Created user **${u.first_name} ${u.last_name}** (#${u.id}).`
@@ -96,7 +98,7 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.userId) throw new Error('userId is required for update');
+    if (!ctx.input.userId) throw createApiServiceError('userId is required for update');
     let u = await client.updateUser(ctx.input.userId, {
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
@@ -118,7 +120,7 @@ export let manageUser = SlateTool.create(spec, {
         lastName: u.last_name,
         email: u.email,
         isActive: u.is_active,
-        isAdmin: u.is_admin,
+        isAdmin: u.is_admin ?? u.access_roles?.includes('administrator') ?? false,
         timezone: u.timezone
       },
       message: `Updated user **${u.first_name} ${u.last_name}** (#${u.id}).`

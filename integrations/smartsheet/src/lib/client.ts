@@ -1,15 +1,17 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class SmartsheetClient {
   private api;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.smartsheet.com/2.0',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Smartsheet',
+          reason: 'smartsheet_api_error'
+        })
     });
   }
 
@@ -176,7 +178,7 @@ export class SmartsheetClient {
   async getRow(
     sheetId: string,
     rowId: string,
-    params?: { include?: string; exclude?: string }
+    params?: { include?: string; exclude?: string; level?: number }
   ) {
     let response = await this.api.get(`/sheets/${sheetId}/rows/${rowId}`, { params });
     return response.data;
@@ -315,50 +317,54 @@ export class SmartsheetClient {
 
   // ── Sharing ───────────────────────────────────────────────
 
-  async listSheetShares(
-    sheetId: string,
-    params?: { page?: number; pageSize?: number; includeAll?: boolean }
+  async listResourceShares(
+    assetType: 'sheet' | 'workspace',
+    assetId: string,
+    params?: { maxItems?: number; lastKey?: string; sharingInclude?: string }
   ) {
-    let response = await this.api.get(`/sheets/${sheetId}/shares`, { params });
+    let response = await this.api.get('/shares', {
+      params: { assetType, assetId, ...params }
+    });
     return response.data;
   }
 
-  async shareSheet(
-    sheetId: string,
+  async shareResource(
+    assetType: 'sheet' | 'workspace',
+    assetId: string,
     shares: Array<{
-      email: string;
+      email?: string;
+      groupId?: number;
       accessLevel: string;
       subject?: string;
       message?: string;
     }>,
     params?: { sendEmail?: boolean }
   ) {
-    let response = await this.api.post(`/sheets/${sheetId}/shares`, shares, { params });
+    let response = await this.api.post('/shares', shares, {
+      params: { assetType, assetId, ...params }
+    });
     return response.data;
   }
 
-  async updateSheetShare(sheetId: string, shareId: string, body: { accessLevel: string }) {
-    let response = await this.api.put(`/sheets/${sheetId}/shares/${shareId}`, body);
-    return response.data;
-  }
-
-  async deleteSheetShare(sheetId: string, shareId: string) {
-    let response = await this.api.delete(`/sheets/${sheetId}/shares/${shareId}`);
-    return response.data;
-  }
-
-  async shareWorkspace(
-    workspaceId: string,
-    shares: Array<{
-      email: string;
-      accessLevel: string;
-      subject?: string;
-      message?: string;
-    }>,
-    params?: { sendEmail?: boolean }
+  async updateResourceShare(
+    assetType: 'sheet' | 'workspace',
+    assetId: string,
+    shareId: string,
+    body: { accessLevel: string }
   ) {
-    let response = await this.api.post(`/workspaces/${workspaceId}/shares`, shares, {
-      params
+    let response = await this.api.patch(`/shares/${encodeURIComponent(shareId)}`, body, {
+      params: { assetType, assetId }
+    });
+    return response.data;
+  }
+
+  async deleteResourceShare(
+    assetType: 'sheet' | 'workspace',
+    assetId: string,
+    shareId: string
+  ) {
+    let response = await this.api.delete(`/shares/${encodeURIComponent(shareId)}`, {
+      params: { assetType, assetId }
     });
     return response.data;
   }

@@ -80,8 +80,8 @@ export let createInvoice = SlateTool.create(spec, {
       due_date: ctx.input.dueDate,
       currency_code: ctx.input.currencyCode
     };
-    if (ctx.input.poNumber) data.po_number = ctx.input.poNumber;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
+    if (ctx.input.poNumber !== undefined) data.po = ctx.input.poNumber;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
@@ -92,9 +92,9 @@ export let createInvoice = SlateTool.create(spec, {
         title: item.title,
         quantity: item.quantity,
         price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        taxable: item.taxable ?? undefined,
+        taxable2: item.taxable2 ?? undefined,
+        taxable3: item.taxable3 ?? undefined
       }));
     }
 
@@ -156,8 +156,8 @@ export let updateInvoice = SlateTool.create(spec, {
     if (ctx.input.date !== undefined) data.date = ctx.input.date;
     if (ctx.input.dueDate !== undefined) data.due_date = ctx.input.dueDate;
     if (ctx.input.currencyCode !== undefined) data.currency_code = ctx.input.currencyCode;
-    if (ctx.input.poNumber !== undefined) data.po_number = ctx.input.poNumber;
-    if (ctx.input.notes !== undefined) data.notes = ctx.input.notes;
+    if (ctx.input.poNumber !== undefined) data.po = ctx.input.poNumber;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
@@ -236,8 +236,8 @@ export let getInvoices = SlateTool.create(spec, {
     return {
       output: {
         invoices,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${invoices.length} invoice(s)${result.total_count ? ` (${result.total_count} total)` : ''}.`
     };
@@ -318,30 +318,30 @@ export let sendInvoice = SlateTool.create(spec, {
 
 let mapInvoice = (inv: any) => ({
   invoiceId: inv.id,
-  clientId: inv.client_id,
-  number: inv.number,
-  date: inv.date,
-  dueDate: inv.due_date,
-  currencyCode: inv.currency_code,
-  status: inv.status,
-  subtotal: inv.subtotal,
-  total: inv.total,
-  balance: inv.balance,
-  tax: inv.tax,
-  tax2: inv.tax2,
-  tax3: inv.tax3,
-  taxAmount: inv.tax_amount,
-  notes: inv.notes,
-  poNumber: inv.po_number,
+  clientId: inv.client_id ?? undefined,
+  number: inv.number ?? undefined,
+  date: inv.date ?? undefined,
+  dueDate: inv.due_date ?? undefined,
+  currencyCode: inv.currency_code ?? undefined,
+  status: inv.status ?? undefined,
+  subtotal: inv.subtotal ?? undefined,
+  total: inv.total ?? inv.total_cost ?? undefined,
+  balance: inv.balance ?? undefined,
+  tax: inv.tax ?? undefined,
+  tax2: inv.tax2 ?? undefined,
+  tax3: inv.tax3 ?? undefined,
+  taxAmount: inv.tax_amount ?? undefined,
+  notes: inv.notes ?? inv.note ?? undefined,
+  poNumber: inv.po_number ?? inv.po ?? undefined,
   items: inv.invoice_items
     ? inv.invoice_items.map((item: any) => ({
-        invoiceItemId: item.id,
+        invoiceItemId: item.id ?? undefined,
         title: item.title,
         quantity: item.quantity,
         price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        taxable: item.taxable ?? undefined,
+        taxable2: item.taxable2 ?? undefined,
+        taxable3: item.taxable3 ?? undefined
       }))
     : undefined
 });

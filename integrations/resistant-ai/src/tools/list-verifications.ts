@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listVerifications = SlateTool.create(spec, {
   name: 'List Verifications',
   key: 'list_verifications',
-  description: `Lists identity verification requests with optional filtering by status and date range. Returns a paginated list of verifications and their current statuses. Useful for monitoring verification pipelines and auditing completed checks.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Lists identity verification requests with optional filtering by status and date range. Returns a paginated list of verifications and their current statuses. Useful for monitoring verification pipelines and auditing completed checks.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -61,7 +61,7 @@ export let listVerifications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.listVerifications({
       page: ctx.input.page,
@@ -86,8 +86,8 @@ export let listVerifications = SlateTool.create(spec, {
     return {
       output: {
         verifications,
-        totalCount: result.total_count || result.total,
-        currentPage: result.page || result.current_page,
+        totalCount: result.total_count ?? result.total,
+        currentPage: result.page ?? result.current_page,
         totalPages: result.total_pages
       },
       message: `Found **${verifications.length}** verification(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`

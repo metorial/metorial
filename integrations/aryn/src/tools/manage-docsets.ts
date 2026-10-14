@@ -23,9 +23,9 @@ let mapDocset = (d: any) => ({
   name: d.name,
   createdAt: d.created_at,
   isReadonly: d.readonly,
-  documentCount: d.size,
-  properties: d.properties,
-  schema: d.schema
+  documentCount: d.size ?? undefined,
+  properties: d.properties ?? undefined,
+  schema: d.schema ?? undefined
 });
 
 export let listDocsets = SlateTool.create(spec, {
@@ -46,7 +46,8 @@ export let listDocsets = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      docsets: z.array(docsetSchema).describe('List of DocSets')
+      docsets: z.array(docsetSchema).describe('List of DocSets'),
+      nextPageToken: z.string().optional().describe('Token for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,10 +62,17 @@ export let listDocsets = SlateTool.create(spec, {
       nameEq: ctx.input.nameFilter
     });
 
-    let docsets = (Array.isArray(result) ? result : []).map(mapDocset);
+    let docsets = (
+      Array.isArray(result) ? result : (result.items ?? result.docsets ?? [])
+    ).map(mapDocset);
 
     return {
-      output: { docsets },
+      output: {
+        docsets,
+        nextPageToken: Array.isArray(result)
+          ? undefined
+          : (result.next_page_token ?? undefined)
+      },
       message: `Found **${docsets.length}** DocSet(s).`
     };
   })
@@ -81,7 +89,9 @@ export let getDocset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to retrieve')
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to retrieve. Call list_docsets to discover DocSet IDs.')
     })
   )
   .output(docsetSchema)
@@ -175,7 +185,9 @@ export let updateDocset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to update'),
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to update. Call list_docsets to discover DocSet IDs.'),
       name: z.string().optional().describe('New name for the DocSet'),
       properties: z
         .record(z.string(), z.any())
@@ -213,7 +225,9 @@ export let deleteDocset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      docsetId: z.string().describe('ID of the DocSet to delete')
+      docsetId: z
+        .string()
+        .describe('ID of the DocSet to delete. Call list_docsets to discover DocSet IDs.')
     })
   )
   .output(docsetSchema)

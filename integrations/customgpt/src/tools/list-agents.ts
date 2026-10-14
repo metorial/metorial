@@ -13,7 +13,14 @@ export let listAgents = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve (default: 1)'),
+      page: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Page number to retrieve (default: 1)'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       orderBy: z.enum(['id', 'created_at']).optional().describe('Field to sort by'),
       name: z.string().optional().describe('Filter agents by name')

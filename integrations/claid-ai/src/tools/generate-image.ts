@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addResultFiles, validateWholeNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 export let generateImage = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ Adjust the guidance scale to control how closely the output matches the prompt â
   constraints: [
     'Prompt must be 3â€“1024 characters.',
     'Can generate 1â€“4 images per request.',
-    'Guidance scale range: 1â€“50 (default: 5).'
+    'Guidance scale must be at least 1 and less than 50 (default: 5).'
   ],
   tags: {
     destructive: false,
@@ -37,7 +38,7 @@ Adjust the guidance scale to control how closely the output matches the prompt â
         .min(1)
         .max(50)
         .optional()
-        .describe('Prompt adherence strength (1â€“50, default: 5)'),
+        .describe('Prompt adherence strength (at least 1 and less than 50, default: 5)'),
       outputDestination: z
         .string()
         .optional()
@@ -70,8 +71,12 @@ Adjust the guidance scale to control how closely the output matches the prompt â
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    validateWholeNumber(ctx.input.numberOfImages, 'numberOfImages');
+    if (ctx.input.guidanceScale === 50) {
+      throw createApiServiceError('guidanceScale must be less than 50 for image generation.');
+    }
 
-    let options: Record<string, unknown> = {};
+    let options: { number_of_images?: number; guidance_scale?: number } = {};
     if (ctx.input.numberOfImages !== undefined)
       options.number_of_images = ctx.input.numberOfImages;
     if (ctx.input.guidanceScale !== undefined)
@@ -80,14 +85,15 @@ Adjust the guidance scale to control how closely the output matches the prompt â
     ctx.info('Generating image from prompt');
     let result = await client.generateImage({
       input: ctx.input.prompt,
-      options: Object.keys(options).length > 0 ? (options as any) : undefined,
+      options: Object.keys(options).length > 0 ? options : undefined,
       output: ctx.input.outputDestination
     });
 
     let data = result.data;
     let outputs = Array.isArray(data.output) ? data.output : [data.output];
+    await addResultFiles(ctx, outputs);
 
-    let images = outputs.map((img: any) => ({
+    let images = outputs.map(img => ({
       format: img.format,
       width: img.width,
       height: img.height,

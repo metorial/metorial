@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,17 +42,27 @@ export let manageScheduler = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Cron day-of-week expression (required when enabling)'),
-      cronTimezone: z.string().optional().describe('Timezone string, e.g. "America/New_York"'),
+      cronTimezone: z
+        .string()
+        .optional()
+        .describe('Timezone string, e.g. "America/New_York"; defaults to UTC when enabling'),
       driver: z
         .enum(['fast', 'fulljs'])
         .optional()
         .describe('Scraping driver for scheduled jobs'),
-      proxy: z.string().optional().describe('Proxy for scheduled jobs'),
+      proxy: z
+        .string()
+        .optional()
+        .describe('Proxy for scheduled jobs; required when enabling'),
       requestInterval: z
         .number()
         .optional()
-        .describe('Delay between requests in milliseconds'),
-      pageLoadDelay: z.number().optional().describe('Page load delay in milliseconds')
+        .describe('Non-negative whole milliseconds between requests; required when enabling'),
+      pageLoadDelay: z
+        .number()
+        .optional()
+        .describe('Non-negative whole milliseconds after page load; required when enabling'),
+      priority: z.number().optional().describe('Scheduled job priority from 1 to 5')
     })
   )
   .output(
@@ -89,7 +99,7 @@ export let manageScheduler = SlateTool.create(spec, {
         !ctx.input.cronMonth ||
         !ctx.input.cronWeekday
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'All cron fields (cronMinute, cronHour, cronDay, cronMonth, cronWeekday) are required when enabling the scheduler.'
         );
       }
@@ -104,7 +114,8 @@ export let manageScheduler = SlateTool.create(spec, {
         driver: ctx.input.driver,
         proxy: ctx.input.proxy,
         requestInterval: ctx.input.requestInterval,
-        pageLoadDelay: ctx.input.pageLoadDelay
+        pageLoadDelay: ctx.input.pageLoadDelay,
+        priority: ctx.input.priority
       });
 
       // Fetch the updated scheduler state
@@ -119,7 +130,13 @@ export let manageScheduler = SlateTool.create(spec, {
           cronMonth: scheduler.cron_month,
           cronWeekday: scheduler.cron_weekday,
           cronTimezone: scheduler.cron_timezone,
-          driver: scheduler.driver,
+          driver:
+            scheduler.driver ??
+            (scheduler.render_js === undefined
+              ? undefined
+              : scheduler.render_js
+                ? 'fulljs'
+                : 'fast'),
           proxy: scheduler.proxy,
           requestInterval: scheduler.request_interval,
           pageLoadDelay: scheduler.page_load_delay
@@ -140,7 +157,13 @@ export let manageScheduler = SlateTool.create(spec, {
         cronMonth: scheduler.cron_month,
         cronWeekday: scheduler.cron_weekday,
         cronTimezone: scheduler.cron_timezone,
-        driver: scheduler.driver,
+        driver:
+          scheduler.driver ??
+          (scheduler.render_js === undefined
+            ? undefined
+            : scheduler.render_js
+              ? 'fulljs'
+              : 'fast'),
         proxy: scheduler.proxy,
         requestInterval: scheduler.request_interval,
         pageLoadDelay: scheduler.page_load_delay

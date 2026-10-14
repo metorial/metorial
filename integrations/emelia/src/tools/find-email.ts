@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,11 +15,14 @@ export let findEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      firstName: z.string().describe('First name of the person'),
-      lastName: z.string().describe('Last name of the person'),
-      companyName: z.string().describe('Company name'),
+      firstName: z.string().optional().describe('First name of the person'),
+      lastName: z.string().optional().describe('Last name of the person'),
+      companyName: z.string().optional().describe('Company name'),
       website: z.string().optional().describe('Company website URL'),
-      country: z.string().optional().describe('Country of the person'),
+      country: z
+        .string()
+        .optional()
+        .describe('ISO country code required when submitting a new search, for example US'),
       submitOnly: z
         .boolean()
         .optional()
@@ -60,6 +63,10 @@ export let findEmail = SlateTool.create(spec, {
       };
     }
 
+    if (!firstName || !lastName || !companyName || !country)
+      throw createApiServiceError(
+        'First name, last name, company name and country code are required to submit an email search.'
+      );
     let job = await client.findEmail({ firstName, lastName, companyName, website, country });
     let submittedJobId = job?.jobId || job?._id || job?.id;
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -62,7 +62,7 @@ Calendar entries can be events or tasks, support all-day scheduling, notificatio
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating a calendar entry');
+        throw createApiServiceError('Fields are required for creating a calendar entry');
       }
       let result = await client.createCalendarEntry(ctx.input.fields);
       let entryId = result?.id;
@@ -75,7 +75,7 @@ Calendar entries can be events or tasks, support all-day scheduling, notificatio
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.entryId) {
-        throw new Error('entryId is required for updating a calendar entry');
+        throw createApiServiceError('entryId is required for updating a calendar entry');
       }
       await client.updateCalendarEntry(ctx.input.entryId, ctx.input.fields || {});
       let entry = await client.getCalendarEntry(ctx.input.entryId);
@@ -91,7 +91,7 @@ Calendar entries can be events or tasks, support all-day scheduling, notificatio
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.entryId) {
-        throw new Error('entryId is required for deleting a calendar entry');
+        throw createApiServiceError('entryId is required for deleting a calendar entry');
       }
       await client.deleteCalendarEntry(ctx.input.entryId);
       return {
@@ -100,6 +100,6 @@ Calendar entries can be events or tasks, support all-day scheduling, notificatio
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageInvitation = SlateTool.create(spec, {
@@ -15,7 +16,7 @@ When an invitation is accepted, a new membership is created for the invited orga
   .input(
     z.object({
       action: z.enum(['create', 'list', 'delete']).describe('Action to perform'),
-      consortiumId: z.string().describe('Consortium ID'),
+      consortiumId,
       invitationId: z.string().optional().describe('Invitation ID (required for delete)'),
       orgName: z
         .string()
@@ -58,10 +59,10 @@ When an invitation is accepted, a new membership is created for the invited orga
       let invitations = await client.listInvitations(ctx.input.consortiumId);
       let mapped = invitations.map((i: any) => ({
         invitationId: i._id,
-        orgName: i.org_name || undefined,
-        email: i.email || undefined,
-        state: i.state || undefined,
-        createdAt: i.created_at || undefined
+        orgName: i.org_name ?? undefined,
+        email: i.email ?? undefined,
+        state: i.state ?? undefined,
+        createdAt: i.created_at ?? undefined
       }));
 
       return {
@@ -71,8 +72,12 @@ When an invitation is accepted, a new membership is created for the invited orga
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.orgName) throw new Error('Organization name is required');
-      if (!ctx.input.email) throw new Error('Email address is required');
+      if (!ctx.input.orgName)
+        throw createApiServiceError('Organization name is required', {
+          reason: 'invalid_input'
+        });
+      if (!ctx.input.email)
+        throw createApiServiceError('Email address is required', { reason: 'invalid_input' });
 
       let result = await client.createInvitation(ctx.input.consortiumId, {
         org_name: ctx.input.orgName,
@@ -82,16 +87,17 @@ When an invitation is accepted, a new membership is created for the invited orga
       return {
         output: {
           invitationId: result._id,
-          orgName: result.org_name,
-          email: result.email,
-          state: result.state
+          orgName: result.org_name ?? undefined,
+          email: result.email ?? undefined,
+          state: result.state ?? undefined
         },
         message: `Sent invitation to **${result.org_name}** (${result.email}).`
       };
     }
 
     // delete
-    if (!ctx.input.invitationId) throw new Error('Invitation ID is required');
+    if (!ctx.input.invitationId)
+      throw createApiServiceError('Invitation ID is required', { reason: 'invalid_input' });
     await client.deleteInvitation(ctx.input.consortiumId, ctx.input.invitationId);
     return {
       output: {

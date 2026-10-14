@@ -1,10 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  addDocument,
   createDocset,
   deleteDocset,
   deleteDocument,
   deleteProperties,
+  downloadDocument,
+  executeQueryPlan,
   extractProperties,
   generateQueryPlan,
   getDocset,
@@ -22,6 +25,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    addDocument,
+    downloadDocument,
+    executeQueryPlan,
     parseDocument,
     listDocsets,
     getDocset,

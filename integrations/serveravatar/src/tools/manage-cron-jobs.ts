@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageCronJobs = SlateTool.create(spec, {
   name: 'Manage Cron Jobs',
   key: 'manage_cron_jobs',
-  description: `List, create, or delete cron jobs on a server. Cron jobs run commands on a schedule for tasks like backups, cache clearing, or maintenance scripts.`,
+  description: `List, create, or delete cron jobs on a server. Cron jobs run commands on a schedule for tasks like backups, cache clearing, or maintenance scripts.
+${organizationScopeGuidance}`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,7 +16,7 @@ export let manageCronJobs = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       action: z.enum(['list', 'create', 'destroy']).describe('Action to perform'),
       cronJobId: z.string().optional().describe('Cron job ID (for destroy)'),
@@ -25,8 +27,18 @@ export let manageCronJobs = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('System user to run the command as (for create)'),
-      schedule: z.string().optional().describe('Predefined schedule (for create)'),
-      customScheduling: z.string().optional().describe('Custom cron expression (for create)')
+      schedule: z
+        .string()
+        .optional()
+        .describe(
+          'Predefined schedule such as everyDay; use custom with customScheduling (for create)'
+        ),
+      customScheduling: z
+        .string()
+        .optional()
+        .describe(
+          'Five-field cron expression: minute hour day-of-month month day-of-week (for create)'
+        )
     })
   )
   .output(
@@ -42,7 +54,8 @@ export let manageCronJobs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, action } = ctx.input;
 
@@ -59,9 +72,11 @@ export let manageCronJobs = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.command) throw new Error('command is required for create action');
-      if (!ctx.input.systemUser) throw new Error('systemUser is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+      if (!ctx.input.command)
+        throw createApiServiceError('command is required for create action');
+      if (!ctx.input.systemUser)
+        throw createApiServiceError('systemUser is required for create action');
 
       let result = await client.createCronJob(orgId, serverId, {
         name: ctx.input.name,
@@ -82,7 +97,8 @@ export let manageCronJobs = SlateTool.create(spec, {
     }
 
     if (action === 'destroy') {
-      if (!ctx.input.cronJobId) throw new Error('cronJobId is required for destroy action');
+      if (!ctx.input.cronJobId)
+        throw createApiServiceError('cronJobId is required for destroy action');
 
       let result = await client.destroyCronJob(orgId, serverId, ctx.input.cronJobId);
       return {
@@ -96,6 +112,6 @@ export let manageCronJobs = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

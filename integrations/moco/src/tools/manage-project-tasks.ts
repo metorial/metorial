@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let taskOutputSchema = z.object({
@@ -22,9 +23,9 @@ let mapTask = (t: any, projectId: number) => ({
   name: t.name,
   billable: t.billable,
   active: t.active,
-  budget: t.budget,
+  budget: t.budget ?? undefined,
   hourlyRate: t.hourly_rate,
-  description: t.description,
+  description: t.description ?? undefined,
   createdAt: t.created_at,
   updatedAt: t.updated_at
 });
@@ -32,13 +33,14 @@ let mapTask = (t: any, projectId: number) => ({
 export let listProjectTasks = SlateTool.create(spec, {
   name: 'List Project Tasks',
   key: 'list_project_tasks',
-  description: `Retrieve all tasks for a specific project. Tasks represent the work categories that time can be logged against.`,
+  description: `Retrieve a page of tasks for a specific project. Tasks represent the work categories that time can be logged against.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      ...paginationFields,
       projectId: z.number().describe('The project ID to list tasks for')
     })
   )
@@ -49,7 +51,10 @@ export let listProjectTasks = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
-    let data = await client.listProjectTasks(ctx.input.projectId);
+    let data = await client.listProjectTasks(ctx.input.projectId, {
+      page: ctx.input.page,
+      per_page: ctx.input.perPage
+    });
     let tasks = (data as any[]).map(t => mapTask(t, ctx.input.projectId));
 
     return {

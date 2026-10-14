@@ -14,12 +14,14 @@ let caseEntrySchema = z.object({
   externalId: z
     .string()
     .optional()
-    .describe('External system identifier for upsert operations'),
+    .describe(
+      'External system identifier saved on new cases; this tool creates when caseId is omitted.'
+    ),
   close: z.boolean().optional().describe('Set to true to close the case'),
   properties: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Custom case properties as key-value pairs'),
+    .describe('Custom case properties as key-value pairs; CommCare requires string values'),
   indices: z
     .record(
       z.string(),
@@ -42,7 +44,7 @@ export let bulkCases = SlateTool.create(spec, {
 Supports up to 100 cases per request. Useful for batch imports, migrations, or synchronized updates.`,
   constraints: [
     'Maximum 100 cases per request.',
-    'Uses the Case API v2 (v0.6) bulk endpoint.'
+    'Uses Case API v2; new cases require caseType, caseName, and ownerId.'
   ],
   tags: {
     destructive: false
@@ -61,7 +63,9 @@ Supports up to 100 cases per request. Useful for batch imports, migrations, or s
     z.object({
       success: z.boolean(),
       createdCount: z.number(),
-      updatedCount: z.number()
+      updatedCount: z.number(),
+      caseIds: z.array(z.string()).optional(),
+      formId: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -105,13 +109,15 @@ Supports up to 100 cases per request. Useful for batch imports, migrations, or s
     let createdCount = payload.filter(c => !c.case_id).length;
     let updatedCount = payload.filter(c => !!c.case_id).length;
 
-    await client.bulkCreateOrUpdateCases(payload);
+    let result = await client.bulkCreateOrUpdateCases(payload);
 
     return {
       output: {
         success: true,
         createdCount,
-        updatedCount
+        updatedCount,
+        caseIds: result.cases.map(entry => entry.case_id),
+        formId: result.form_id ?? result.xform_id
       },
       message: `Bulk operation completed: **${createdCount}** cases created, **${updatedCount}** cases updated.`
     };

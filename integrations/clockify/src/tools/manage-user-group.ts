@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userGroupOutputSchema = z.object({
@@ -12,21 +13,18 @@ let userGroupOutputSchema = z.object({
 export let createUserGroup = SlateTool.create(spec, {
   name: 'Create User Group',
   key: 'create_user_group',
-  description: `Create a new user group in the Clockify workspace. Groups can be used for project membership and scheduling.`,
+  description: `Create a new user group in the Clockify workspace. Groups can be used for project membership and scheduling. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name of the user group')
     })
   )
   .output(userGroupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let group = await client.createUserGroup({ name: ctx.input.name });
 
@@ -44,14 +42,25 @@ export let createUserGroup = SlateTool.create(spec, {
 export let getUserGroups = SlateTool.create(spec, {
   name: 'Get User Groups',
   key: 'get_user_groups',
-  description: `List user groups in the Clockify workspace. Filter by name.`,
+  description: `List user groups in the Clockify workspace. Filter by name. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().optional().describe('Filter by group name'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -61,11 +70,7 @@ export let getUserGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let groups = await client.getUserGroups({
       name: ctx.input.name,
@@ -89,11 +94,12 @@ export let getUserGroups = SlateTool.create(spec, {
 export let updateUserGroup = SlateTool.create(spec, {
   name: 'Update User Group',
   key: 'update_user_group',
-  description: `Update a user group name, or add/remove users from the group.`,
+  description: `Update a user group name, or add/remove users from the group. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       groupId: z.string().describe('ID of the user group'),
       name: z.string().optional().describe('Updated group name'),
       addUserIds: z.array(z.string()).optional().describe('User IDs to add to the group'),
@@ -105,11 +111,7 @@ export let updateUserGroup = SlateTool.create(spec, {
   )
   .output(userGroupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     if (ctx.input.name) {
       await client.updateUserGroup(ctx.input.groupId, { name: ctx.input.name });
@@ -145,11 +147,12 @@ export let updateUserGroup = SlateTool.create(spec, {
 export let deleteUserGroup = SlateTool.create(spec, {
   name: 'Delete User Group',
   key: 'delete_user_group',
-  description: `Delete a user group from the Clockify workspace.`,
+  description: `Delete a user group from the Clockify workspace. Call get_workspaces to discover the workspace ID.`,
   tags: { destructive: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       groupId: z.string().describe('ID of the user group to delete')
     })
   )
@@ -159,11 +162,7 @@ export let deleteUserGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteUserGroup(ctx.input.groupId);
 

@@ -1,6 +1,10 @@
 # Lob
 
-Send and track physical mail pieces including postcards, letters, self-mailers, checks, snap packs, and booklets programmatically. Verify and standardize US and international addresses across 240+ countries. Manage reusable address books and HTML templates with merge variables for dynamic personalization. Create direct mail campaigns with audience uploads and creative templates. Embed trackable QR codes and short links on mail pieces. Validate identity associations between names and addresses. Send checks from verified bank accounts.
+Send and track postcards, letters, self-mailers, and checks. Verify US and international addresses, look up US ZIP codes, manage address books and reusable templates, and create and send campaigns with designs and audiences configured in Lob.
+
+Download PDF previews of supported mail pieces. Previews still rendering report their availability so you can request them again. Bank-account verification supports either two micro-deposit amounts or the statement descriptor code, depending on the account's verification method.
+
+Connect with a test or live Lob secret API key from Dashboard → Settings → API Keys. Test mode does not print or mail pieces. Publishable keys support only address verification and autocomplete operations.
 
 ## License
 

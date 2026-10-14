@@ -1,19 +1,41 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export class HabiticaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: {
     userId: string;
     token: string;
-    xClient: string;
+    xClient?: string;
   }) {
-    this.axios = createAxios({
+    if (!config.userId.trim() || !config.token.trim()) {
+      throw createApiServiceError(
+        'Habitica User ID and API Token are required. Reconnect with your API credentials.'
+      );
+    }
+    let xClient = config.xClient?.trim();
+    if (!xClient) {
+      throw createApiServiceError(
+        "The Habitica application identifier is missing. Reconnect and provide the tool creator's User ID and app name as CreatorUserID-AppName."
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://habitica.com/api/v3',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Habitica',
+          reason: 'habitica_api_error'
+        }),
       headers: {
-        'x-api-user': config.userId,
-        'x-api-key': config.token,
-        'x-client': config.xClient,
+        'x-api-user': config.userId.trim(),
+        'x-api-key': config.token.trim(),
+        'x-client': xClient,
         'Content-Type': 'application/json'
       }
     });
@@ -59,15 +81,16 @@ export class HabiticaClient {
 
   // ---- Tasks ----
 
-  async getUserTasks(taskType?: string): Promise<Record<string, any>[]> {
+  async getUserTasks(taskType?: string, dueDate?: string): Promise<Record<string, any>[]> {
     let params: Record<string, string> = {};
     if (taskType) params.type = taskType;
+    if (dueDate) params.dueDate = dueDate;
     let response = await this.axios.get('/tasks/user', { params });
     return response.data.data;
   }
 
   async getTask(taskId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/tasks/${taskId}`);
+    let response = await this.axios.get(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data.data;
   }
 
@@ -80,55 +103,76 @@ export class HabiticaClient {
     taskId: string,
     taskData: Record<string, any>
   ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/tasks/${taskId}`, taskData);
+    let response = await this.axios.put(`/tasks/${encodeURIComponent(taskId)}`, taskData);
     return response.data.data;
   }
 
   async deleteTask(taskId: string): Promise<Record<string, any>> {
-    let response = await this.axios.delete(`/tasks/${taskId}`);
+    let response = await this.axios.delete(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data.data;
   }
 
   async scoreTask(taskId: string, direction: 'up' | 'down'): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/tasks/${taskId}/score/${direction}`);
+    let response = await this.axios.post(
+      `/tasks/${encodeURIComponent(taskId)}/score/${direction}`
+    );
     return response.data.data;
   }
 
   // ---- Task Checklists ----
 
-  async addChecklistItem(taskId: string, text: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/tasks/${taskId}/checklist`, { text });
+  async addChecklistItem(
+    taskId: string,
+    text: string,
+    completed?: boolean
+  ): Promise<Record<string, any>> {
+    let response = await this.axios.post(
+      `/tasks/${encodeURIComponent(taskId)}/checklist`,
+      pickDefined({ text, completed })
+    );
     return response.data.data;
   }
 
   async updateChecklistItem(
     taskId: string,
     itemId: string,
-    text: string
+    text: string,
+    completed?: boolean
   ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/tasks/${taskId}/checklist/${itemId}`, { text });
+    let response = await this.axios.put(
+      `/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`,
+      pickDefined({ text, completed })
+    );
     return response.data.data;
   }
 
   async deleteChecklistItem(taskId: string, itemId: string): Promise<Record<string, any>> {
-    let response = await this.axios.delete(`/tasks/${taskId}/checklist/${itemId}`);
+    let response = await this.axios.delete(
+      `/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}`
+    );
     return response.data.data;
   }
 
   async scoreChecklistItem(taskId: string, itemId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/tasks/${taskId}/checklist/${itemId}/score`);
+    let response = await this.axios.post(
+      `/tasks/${encodeURIComponent(taskId)}/checklist/${encodeURIComponent(itemId)}/score`
+    );
     return response.data.data;
   }
 
   // ---- Task Tags ----
 
   async addTagToTask(taskId: string, tagId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/tasks/${taskId}/tags/${tagId}`);
+    let response = await this.axios.post(
+      `/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`
+    );
     return response.data.data;
   }
 
   async removeTagFromTask(taskId: string, tagId: string): Promise<Record<string, any>> {
-    let response = await this.axios.delete(`/tasks/${taskId}/tags/${tagId}`);
+    let response = await this.axios.delete(
+      `/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}`
+    );
     return response.data.data;
   }
 
@@ -145,17 +189,17 @@ export class HabiticaClient {
   }
 
   async getTag(tagId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/tags/${tagId}`);
+    let response = await this.axios.get(`/tags/${encodeURIComponent(tagId)}`);
     return response.data.data;
   }
 
   async updateTag(tagId: string, name: string): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/tags/${tagId}`, { name });
+    let response = await this.axios.put(`/tags/${encodeURIComponent(tagId)}`, { name });
     return response.data.data;
   }
 
   async deleteTag(tagId: string): Promise<void> {
-    await this.axios.delete(`/tags/${tagId}`);
+    await this.axios.delete(`/tags/${encodeURIComponent(tagId)}`);
   }
 
   async reorderTags(tagIds: string[]): Promise<void> {
@@ -167,7 +211,11 @@ export class HabiticaClient {
   async castSkill(spellId: string, targetId?: string): Promise<Record<string, any>> {
     let params: Record<string, string> = {};
     if (targetId) params.targetId = targetId;
-    let response = await this.axios.post(`/user/class/cast/${spellId}`, undefined, { params });
+    let response = await this.axios.post(
+      `/user/class/cast/${encodeURIComponent(spellId)}`,
+      undefined,
+      { params }
+    );
     return response.data.data;
   }
 
@@ -179,7 +227,7 @@ export class HabiticaClient {
   }
 
   async getGroup(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/groups/${groupId}`);
+    let response = await this.axios.get(`/groups/${encodeURIComponent(groupId)}`);
     return response.data.data;
   }
 
@@ -192,34 +240,39 @@ export class HabiticaClient {
     groupId: string,
     groupData: Record<string, any>
   ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/groups/${groupId}`, groupData);
+    let response = await this.axios.put(`/groups/${encodeURIComponent(groupId)}`, groupData);
     return response.data.data;
   }
 
   async joinGroup(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/join`);
+    let response = await this.axios.post(`/groups/${encodeURIComponent(groupId)}/join`);
     return response.data.data;
   }
 
   async leaveGroup(groupId: string, keep?: string): Promise<void> {
-    await this.axios.post(`/groups/${groupId}/leave`, undefined, {
+    await this.axios.post(`/groups/${encodeURIComponent(groupId)}/leave`, undefined, {
       params: keep ? { keep } : undefined
     });
   }
 
   async rejectGroupInvite(groupId: string): Promise<void> {
-    await this.axios.post(`/groups/${groupId}/reject-invite`);
+    await this.axios.post(`/groups/${encodeURIComponent(groupId)}/reject-invite`);
   }
 
   async removeMemberFromGroup(groupId: string, memberId: string): Promise<void> {
-    await this.axios.post(`/groups/${groupId}/removeMember/${memberId}`);
+    await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/removeMember/${encodeURIComponent(memberId)}`
+    );
   }
 
   async inviteToGroup(
     groupId: string,
     inviteData: Record<string, any>
   ): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/invite`, inviteData);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/invite`,
+      inviteData
+    );
     return response.data.data;
   }
 
@@ -230,24 +283,28 @@ export class HabiticaClient {
     let queryParams: Record<string, string> = {};
     if (params?.lastId) queryParams.lastId = params.lastId;
     if (params?.limit) queryParams.limit = String(params.limit);
-    let response = await this.axios.get(`/groups/${groupId}/members`, { params: queryParams });
+    let response = await this.axios.get(`/groups/${encodeURIComponent(groupId)}/members`, {
+      params: queryParams
+    });
     return response.data.data;
   }
 
   // ---- Group Chat ----
 
   async getGroupChat(groupId: string): Promise<Record<string, any>[]> {
-    let response = await this.axios.get(`/groups/${groupId}/chat`);
+    let response = await this.axios.get(`/groups/${encodeURIComponent(groupId)}/chat`);
     return response.data.data;
   }
 
   async postGroupChatMessage(groupId: string, message: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/chat`, { message });
+    let response = await this.axios.post(`/groups/${encodeURIComponent(groupId)}/chat`, {
+      message
+    });
     return response.data.data;
   }
 
   async markGroupChatRead(groupId: string): Promise<void> {
-    await this.axios.post(`/groups/${groupId}/chat/seen`);
+    await this.axios.post(`/groups/${encodeURIComponent(groupId)}/chat/seen`);
   }
 
   // ---- Private Messages ----
@@ -267,32 +324,44 @@ export class HabiticaClient {
   // ---- Quests ----
 
   async inviteToQuest(groupId: string, questKey: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/invite/${questKey}`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/invite/${encodeURIComponent(questKey)}`
+    );
     return response.data.data;
   }
 
   async acceptQuest(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/accept`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/accept`
+    );
     return response.data.data;
   }
 
   async rejectQuest(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/reject`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/reject`
+    );
     return response.data.data;
   }
 
   async forceStartQuest(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/force-start`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/force-start`
+    );
     return response.data.data;
   }
 
   async cancelQuest(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/cancel`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/cancel`
+    );
     return response.data.data;
   }
 
   async abortQuest(groupId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/groups/${groupId}/quests/abort`);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupId)}/quests/abort`
+    );
     return response.data.data;
   }
 
@@ -302,20 +371,19 @@ export class HabiticaClient {
     page?: number;
     memberOnly?: boolean;
   }): Promise<Record<string, any>[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.page !== undefined) queryParams.page = String(params.page);
-    if (params?.memberOnly !== undefined) queryParams.member = String(params.memberOnly);
+    let queryParams: Record<string, string> = { page: String(params?.page ?? 0) };
+    if (params?.memberOnly === true) queryParams.member = 'true';
     let response = await this.axios.get('/challenges/user', { params: queryParams });
     return response.data.data;
   }
 
   async getGroupChallenges(groupId: string): Promise<Record<string, any>[]> {
-    let response = await this.axios.get(`/challenges/groups/${groupId}`);
+    let response = await this.axios.get(`/challenges/groups/${encodeURIComponent(groupId)}`);
     return response.data.data;
   }
 
   async getChallenge(challengeId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/challenges/${challengeId}`);
+    let response = await this.axios.get(`/challenges/${encodeURIComponent(challengeId)}`);
     return response.data.data;
   }
 
@@ -328,21 +396,29 @@ export class HabiticaClient {
     challengeId: string,
     challengeData: Record<string, any>
   ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/challenges/${challengeId}`, challengeData);
+    let response = await this.axios.put(
+      `/challenges/${encodeURIComponent(challengeId)}`,
+      challengeData
+    );
     return response.data.data;
   }
 
   async deleteChallenge(challengeId: string): Promise<void> {
-    await this.axios.delete(`/challenges/${challengeId}`);
+    await this.axios.delete(`/challenges/${encodeURIComponent(challengeId)}`);
   }
 
   async joinChallenge(challengeId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/challenges/${challengeId}/join`);
+    let response = await this.axios.post(
+      `/challenges/${encodeURIComponent(challengeId)}/join`
+    );
     return response.data.data;
   }
 
   async leaveChallenge(challengeId: string, keep?: string): Promise<void> {
-    await this.axios.post(`/challenges/${challengeId}/leave`, keep ? { keep } : undefined);
+    await this.axios.post(
+      `/challenges/${encodeURIComponent(challengeId)}/leave`,
+      keep ? { keep } : undefined
+    );
   }
 
   // ---- Content ----
@@ -357,32 +433,42 @@ export class HabiticaClient {
   // ---- Inventory / Equipment ----
 
   async buyGear(key: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/buy-gear/${key}`);
+    let response = await this.axios.post(`/user/buy-gear/${encodeURIComponent(key)}`);
     return response.data.data;
   }
 
   async equipItem(type: string, key: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/equip/${type}/${key}`);
+    let response = await this.axios.post(
+      `/user/equip/${encodeURIComponent(type)}/${encodeURIComponent(key)}`
+    );
     return response.data.data;
   }
 
   async hatchPet(egg: string, hatchingPotion: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/hatch/${egg}/${hatchingPotion}`);
+    let response = await this.axios.post(
+      `/user/hatch/${encodeURIComponent(egg)}/${encodeURIComponent(hatchingPotion)}`
+    );
     return response.data.data;
   }
 
-  async feedPet(pet: string, food: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/feed/${pet}/${food}`);
-    return response.data.data;
+  async feedPet(pet: string, food: string): Promise<{ value: number; message?: string }> {
+    let response = await this.axios.post(
+      `/user/feed/${encodeURIComponent(pet)}/${encodeURIComponent(food)}`
+    );
+    return { value: response.data.data, message: response.data.message };
   }
 
   async sellItem(type: string, key: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/sell/${type}/${key}`);
+    let response = await this.axios.post(
+      `/user/sell/${encodeURIComponent(type)}/${encodeURIComponent(key)}`
+    );
     return response.data.data;
   }
 
   async purchaseItem(type: string, key: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/user/purchase/${type}/${key}`);
+    let response = await this.axios.post(
+      `/user/purchase/${encodeURIComponent(type)}/${encodeURIComponent(key)}`
+    );
     return response.data.data;
   }
 
@@ -419,7 +505,7 @@ export class HabiticaClient {
   // ---- Members ----
 
   async getMember(memberId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/members/${memberId}`);
+    let response = await this.axios.get(`/members/${encodeURIComponent(memberId)}`);
     return response.data.data;
   }
 

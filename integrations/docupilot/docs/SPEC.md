@@ -1,4 +1,4 @@
-Now let me check the V2 swagger docs to understand the full API feature set:# Slates Specification for Docupilot
+# Docupilot Specification
 
 ## Overview
 
@@ -32,7 +32,9 @@ Docupilot supports API Key + Secret authentication for its V2 API.
 - **API Secret**: Provided once at key creation time
 - **Workspace ID**: Found on the Workspace details page in dashboard Settings
 
-**Base URL:** `https://api.docupilot.app`
+**Base URL:** `https://api.docupilot.app` for existing workspace operations. Current-user requests use `https://api-us1.docupilot.app/accounts/user/me/`, as documented by the current public API overview.
+
+Detailed V2 workspace request/response schemas are available from your organization at `https://<YOUR_SUBDOMAIN>.docupilot.app/~/dashboard/api-docs/swagger-ui/`. This refresh preserves existing workspace routes and payloads because that reference requires a tenant session.
 
 ## Features
 
@@ -51,7 +53,7 @@ Allows creating a new document from a template by merging data into it. The body
 
 - Data is submitted as JSON, with keys matching the template's merge field tokens.
 - Supports nested data structures and arrays (e.g., line items in invoices).
-- The secure download URL is valid for 24 hours by default, customizable under Data Retention Preferences.
+- The secure download URL is valid for 24 hours by default, customizable under Data Retention Preferences. Document generation downloads the returned file immediately and provides it as a downloadable result. The existing `fileUrl` and `fileName` metadata outputs remain available. A renewal API is not documented publicly, so downloading an expired provider URL requires generating the document again.
 - Options to receive the generated document as a file in the response or as a URL.
 
 ### Folder Management
@@ -95,3 +97,13 @@ A webhook delivery is configured per template from the Deliveries tab. Configura
 - The webhook is sent as an HTTP POST with `multipart/form-data` containing the file and file name.
 - This is an outbound delivery mechanism (Docupilot pushes the generated document to your URL), not a subscription-based event system.
 - There is no general-purpose webhook subscription API for listening to arbitrary events (e.g., template changes, envelope status updates). Webhooks are specifically tied to document generation deliveries.
+
+## Current User
+
+`get_current_user` reads the connected user from the documented account endpoint.
+
+## Sources
+
+- [API overview and authentication](https://help.docupilot.app/developers/api-overview)
+- [Document generation options and response envelope](https://help.docupilot.app/create-document/api-and-webhook-integration)
+- [Developer capabilities](https://www.docupilot.com/document-automation-api)

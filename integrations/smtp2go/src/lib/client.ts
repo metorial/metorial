@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { randomUUID } from 'node:crypto';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 export class Client {
   private axios;
@@ -16,9 +17,42 @@ export class Client {
     });
   }
 
-  private async post<T = any>(path: string, data: Record<string, any> = {}): Promise<T> {
-    let response = await this.axios.post(path, data);
-    return response.data;
+  private async request<T = any>(
+    method: 'post' | 'patch',
+    path: string,
+    data: Record<string, unknown> = {}
+  ): Promise<T> {
+    try {
+      let response = await this.axios.request({ method, url: path, data });
+      let body = response.data;
+      let error = body?.data?.error ?? body?.error;
+      if (error || body?.data?.error_code || body?.error_code) {
+        throw createApiServiceError(
+          `SMTP2GO API request failed: ${error ?? 'Unknown error'}`,
+          {
+            reason: 'smtp2go_api_error',
+            upstreamStatus: response.status,
+            upstreamCode: body?.data?.error_code ?? body?.error_code
+          }
+        );
+      }
+      return body;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'SMTP2GO',
+        reason: 'smtp2go_api_error',
+        operation: path,
+        nestedKeys: ['data', 'field_validation_errors', 'errors']
+      });
+    }
+  }
+
+  private post<T = any>(path: string, data: Record<string, unknown> = {}): Promise<T> {
+    return this.request<T>('post', path, data);
+  }
+
+  async getApiPermissions() {
+    return this.post('/api_keys/permissions');
   }
 
   // ── Email ──
@@ -36,7 +70,14 @@ export class Client {
     inlines?: Array<{ filename: string; fileblob: string; mimetype: string }>;
     templateId?: string;
     templateData?: Record<string, string>;
+    schedule?: string;
+    fastAccept?: boolean;
   }) {
+    if (!params.htmlBody && !params.textBody && !params.templateId) {
+      throw createApiServiceError(
+        'Provide htmlBody, textBody, or templateId to send an email.'
+      );
+    }
     return this.post('/email/send', {
       sender: params.sender,
       to: params.to,
@@ -49,7 +90,9 @@ export class Client {
       attachments: params.attachments,
       inlines: params.inlines,
       template_id: params.templateId,
-      template_data: params.templateData
+      template_data: params.templateData,
+      schedule: params.schedule,
+      fastaccept: params.fastAccept
     });
   }
 
@@ -81,19 +124,17 @@ export class Client {
       filter_query: params.filterQuery,
       username: params.username,
       opened_only: params.openedOnly,
-      clicked_only: params.clickedOnly,
-      sort_by: params.sortBy,
-      sort_dir: params.sortDir
+      clicked_only: params.clickedOnly
     });
   }
 
   // ── SMS ──
 
-  async sendSms(params: { to: string[]; from: string; body: string }) {
+  async sendSms(params: { to: string[]; from?: string; body: string }) {
     return this.post('/sms/send', {
-      to: params.to,
-      from: params.from,
-      body: params.body
+      destination: params.to,
+      sender: params.from,
+      content: params.body
     });
   }
 
@@ -105,17 +146,23 @@ export class Client {
 
   async addTemplate(params: {
     templateName: string;
+    templateId?: string;
     htmlBody?: string;
     textBody?: string;
     subject?: string;
     sender?: string;
   }) {
+    if (params.sender !== undefined) {
+      throw createApiServiceError(
+        'SMTP2GO templates do not store a sender. Set sender when sending the email.'
+      );
+    }
     return this.post('/template/add', {
+      id: params.templateId ?? randomUUID().replaceAll('-', '').slice(0, 24),
       template_name: params.templateName,
-      html_body: params.htmlBody,
-      text_body: params.textBody,
-      subject: params.subject,
-      sender: params.sender
+      html_body: params.htmlBody ?? '',
+      text_body: params.textBody ?? '',
+      subject: params.subject ?? ''
     });
   }
 
@@ -127,19 +174,23 @@ export class Client {
     subject?: string;
     sender?: string;
   }) {
+    if (params.sender !== undefined) {
+      throw createApiServiceError(
+        'SMTP2GO templates do not store a sender. Set sender when sending the email.'
+      );
+    }
     return this.post('/template/edit', {
-      template_id: params.templateId,
+      id: params.templateId,
       template_name: params.templateName,
       html_body: params.htmlBody,
       text_body: params.textBody,
-      subject: params.subject,
-      sender: params.sender
+      subject: params.subject
     });
   }
 
   async deleteTemplate(params: { templateId: string }) {
     return this.post('/template/delete', {
-      template_id: params.templateId
+      id: params.templateId
     });
   }
 
@@ -149,25 +200,28 @@ export class Client {
     continueToken?: string;
   }) {
     return this.post('/template/search', {
-      template_name: params.templateName,
-      limit: params.limit,
+      search_terms: params.templateName ? [params.templateName] : undefined,
+      fuzzy_search: params.templateName ? true : undefined,
+      page_size: params.limit,
       continue_token: params.continueToken
     });
   }
 
   async viewTemplate(params: { templateId: string }) {
     return this.post('/template/view', {
-      template_id: params.templateId
+      id: params.templateId
     });
   }
 
   // ── Statistics ──
 
-  async getEmailBounces(params?: { startDate?: string; endDate?: string }) {
-    return this.post('/stats/email_bounces', {
-      start_date: params?.startDate,
-      end_date: params?.endDate
-    });
+  async getEmailBounces(params?: { startDate?: string; endDate?: string; username?: string }) {
+    if (params?.startDate !== undefined || params?.endDate !== undefined) {
+      throw createApiServiceError(
+        'This SMTP2GO statistics report does not support date filters. Omit startDate and endDate, or use Get Email History.'
+      );
+    }
+    return this.post('/stats/email_bounces', { username: params?.username });
   }
 
   async getEmailCycle(params?: { startDate?: string; endDate?: string }) {
@@ -198,11 +252,13 @@ export class Client {
     });
   }
 
-  async getEmailSummary(params?: { startDate?: string; endDate?: string }) {
-    return this.post('/stats/email_summary', {
-      start_date: params?.startDate,
-      end_date: params?.endDate
-    });
+  async getEmailSummary(params?: { startDate?: string; endDate?: string; username?: string }) {
+    if (params?.startDate !== undefined || params?.endDate !== undefined) {
+      throw createApiServiceError(
+        'This SMTP2GO statistics report does not support date filters. Omit startDate and endDate, or use Get Email History.'
+      );
+    }
+    return this.post('/stats/email_summary', { username: params?.username });
   }
 
   // ── Activity ──
@@ -215,6 +271,8 @@ export class Client {
     searchSender?: string;
     searchRecipient?: string;
     searchUsernames?: string;
+    usernames?: string[];
+    searchEmailId?: string;
     limit?: number;
     continueToken?: string;
     onlyLatest?: boolean;
@@ -227,7 +285,9 @@ export class Client {
       search_subject: params.searchSubject,
       search_sender: params.searchSender,
       search_recipient: params.searchRecipient,
-      search_usernames: params.searchUsernames,
+      search_usernames:
+        params.usernames ?? (params.searchUsernames ? [params.searchUsernames] : undefined),
+      search_email_id: params.searchEmailId,
       limit: params.limit,
       continue_token: params.continueToken,
       only_latest: params.onlyLatest,
@@ -351,21 +411,52 @@ export class Client {
   // ── Suppressions ──
 
   async addSuppression(params: { suppressions: string[]; subaccountId?: string }) {
-    return this.post('/suppression/add', {
-      suppressions: params.suppressions,
-      subaccount_id: params.subaccountId
-    });
+    let suppressions: string[] = [];
+    for (let emailAddress of params.suppressions) {
+      let result = await this.post('/suppression/add', {
+        email_address: emailAddress,
+        subaccount_id: params.subaccountId
+      });
+      if (result.data?.added) suppressions.push(result.data.email_address ?? emailAddress);
+    }
+    return { data: { suppressions } };
   }
 
-  async removeSuppression(params: { suppressions: string[]; subaccountId?: string }) {
-    return this.post('/suppression/remove', {
-      suppressions: params.suppressions,
-      subaccount_id: params.subaccountId
-    });
+  async removeSuppression(params: {
+    suppressions: string[];
+    subaccountId?: string;
+    reasons?: string[];
+  }) {
+    let suppressions: string[] = [];
+    let results: Array<{ emailAddress: string; reason: string; removed: boolean }> = [];
+    for (let emailAddress of params.suppressions) {
+      let result = await this.post('/suppression/remove', {
+        email_address: emailAddress,
+        reasons: params.reasons ?? ['manual', 'spam', 'unsubscribe', 'bounce', 'compliance'],
+        subaccount_id: params.subaccountId
+      });
+      for (let entry of result.data?.suppressions ?? []) {
+        results.push({
+          emailAddress: entry.email_address ?? emailAddress,
+          reason: entry.reason,
+          removed: entry.removed === true
+        });
+      }
+      if (result.data?.suppressions?.some((entry: { removed?: boolean }) => entry.removed)) {
+        suppressions.push(emailAddress);
+      }
+    }
+    return { data: { suppressions, results } };
   }
 
-  async viewSuppressions(params?: { subaccountId?: string }) {
+  async viewSuppressions(params?: {
+    subaccountId?: string;
+    continueToken?: string;
+    emailAddress?: string;
+  }) {
     return this.post('/suppression/view', {
+      continue_token: params?.continueToken,
+      email_address: params?.emailAddress,
       subaccount_id: params?.subaccountId
     });
   }
@@ -380,7 +471,7 @@ export class Client {
   }) {
     return this.post('/users/smtp/add', {
       username: params.username,
-      password: params.password,
+      email_password: params.password,
       description: params.description,
       subaccount_id: params.subaccountId
     });
@@ -392,9 +483,9 @@ export class Client {
     description?: string;
     subaccountId?: string;
   }) {
-    return this.post('/users/smtp/edit', {
+    return this.request('patch', '/users/smtp/edit', {
       username: params.username,
-      password: params.password,
+      email_password: params.password,
       description: params.description,
       subaccount_id: params.subaccountId
     });
@@ -415,89 +506,128 @@ export class Client {
 
   // ── Webhooks ──
 
-  async addWebhook(params: {
-    url: string;
-    events?: string[];
-    smsEvents?: boolean;
-    usernames?: string[];
-    outputType?: string;
-    authorizationHeader?: string;
-    customHeaders?: string[];
-  }) {
-    return this.post('/webhook/add', {
-      url: params.url,
-      events: params.events,
-      sms_events: params.smsEvents,
-      usernames: params.usernames,
-      output_type: params.outputType,
-      authorization_header: params.authorizationHeader,
-      custom_headers: params.customHeaders
-    });
-  }
-
-  async viewWebhooks() {
-    return this.post('/webhook/view');
-  }
-
-  async editWebhook(params: {
-    webhookId: string;
+  private webhookPayload(params: {
     url?: string;
     events?: string[];
     smsEvents?: boolean;
+    smsEventTypes?: string[];
     usernames?: string[];
     outputType?: string;
     authorizationHeader?: string;
     customHeaders?: string[];
+    httpHeaders?: string[];
+    subaccountId?: string;
+    disabled?: boolean;
   }) {
-    return this.post('/webhook/edit', {
-      webhook_id: params.webhookId,
+    if (params.events?.includes('resubscribe')) {
+      throw createApiServiceError('SMTP2GO does not support resubscribe webhook events.');
+    }
+    let authorization = params.authorizationHeader?.match(/^(Bearer|Basic)\s+(.+)$/i);
+    return {
       url: params.url,
       events: params.events,
-      sms_events: params.smsEvents,
+      sms_events:
+        params.smsEventTypes ??
+        (params.smsEvents === undefined
+          ? undefined
+          : params.smsEvents
+            ? ['delivered', 'failed', 'rejected', 'sending', 'submitted']
+            : []),
       usernames: params.usernames,
-      output_type: params.outputType,
-      authorization_header: params.authorizationHeader,
-      custom_headers: params.customHeaders
+      output_format: params.outputType,
+      auth_header_type:
+        params.authorizationHeader === undefined
+          ? undefined
+          : params.authorizationHeader === ''
+            ? ''
+            : (authorization?.[1]?.toLowerCase() ?? 'bearer'),
+      auth_header_value: authorization?.[2] ?? params.authorizationHeader,
+      headers: params.customHeaders,
+      custom_headers: params.httpHeaders,
+      subaccount_id: params.subaccountId,
+      disabled: params.disabled
+    };
+  }
+
+  async addWebhook(params: Parameters<Client['webhookPayload']>[0] & { url: string }) {
+    return this.post('/webhook/add', this.webhookPayload(params));
+  }
+
+  async viewWebhooks(params?: { subaccountId?: string }) {
+    return this.post('/webhook/view', { subaccount_id: params?.subaccountId });
+  }
+
+  private webhookId(value: string) {
+    let id = Number(value);
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id <= 0) {
+      throw createApiServiceError('Provide a positive numeric webhook ID from List Webhooks.');
+    }
+    return id;
+  }
+
+  async editWebhook(params: Parameters<Client['webhookPayload']>[0] & { webhookId: string }) {
+    return this.post('/webhook/edit', {
+      id: this.webhookId(params.webhookId),
+      ...this.webhookPayload(params)
     });
   }
 
-  async removeWebhook(params: { webhookId: string }) {
+  async removeWebhook(params: { webhookId: string; subaccountId?: string }) {
     return this.post('/webhook/remove', {
-      webhook_id: params.webhookId
+      id: this.webhookId(params.webhookId),
+      subaccount_id: params.subaccountId
     });
   }
 
   // ── Subaccounts ──
 
-  async addSubaccount(params: { email: string; password: string; name?: string }) {
+  async addSubaccount(params: { email?: string; password?: string; name?: string }) {
+    if (params.password !== undefined) {
+      throw createApiServiceError(
+        'SMTP2GO subaccounts use email invitations. Omit password when creating a subaccount.'
+      );
+    }
+    let fullname = params.name ?? params.email;
+    if (!fullname) throw createApiServiceError('Provide a name or email for the subaccount.');
     return this.post('/subaccount/add', {
-      email: params.email,
-      password: params.password,
-      name: params.name
+      subaccount_email: params.email,
+      fullname
     });
   }
 
   async editSubaccount(params: { subaccountId: string; email?: string; name?: string }) {
+    if (params.email !== undefined) {
+      throw createApiServiceError(
+        'SMTP2GO does not support changing a subaccount email with this endpoint. Omit email.'
+      );
+    }
     return this.post('/subaccount/edit', {
-      subaccount_id: params.subaccountId,
-      email: params.email,
-      name: params.name
+      id: params.subaccountId,
+      fullname: params.name
     });
   }
 
-  async viewSubaccounts() {
-    return this.post('/subaccount/view');
+  async viewSubaccounts(params?: {
+    continueToken?: string;
+    pageSize?: number;
+    searchTerms?: string[];
+  }) {
+    return this.post('/subaccounts/search', {
+      continue_token: params?.continueToken,
+      page_size: params?.pageSize,
+      search_terms: params?.searchTerms
+    });
   }
 
   async closeSubaccount(params: { subaccountId: string }) {
     return this.post('/subaccount/close', {
-      subaccount_id: params.subaccountId
+      id: params.subaccountId
     });
   }
 
   async reopenSubaccount(params: { subaccountId: string }) {
     return this.post('/subaccount/reopen', {
-      subaccount_id: params.subaccountId
+      id: params.subaccountId
     });
   }
 }

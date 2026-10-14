@@ -1,16 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Generate a PDF document by combining a pre-defined template with JSON data. Returns a URL to the generated PDF hosted on a CDN.
+  description: `Generate a downloadable PDF document by combining a pre-defined template with JSON data.
 Supports password protection, configurable PDF standards, image resampling, and custom expiration times.
 You can also load data from an external URL instead of passing it inline.`,
   instructions: [
-    'Provide either "templateData" or "loadDataFrom" to populate the template, but not both.',
+    'Use "templateData" or "loadDataFrom" to populate the template. If both are provided, "loadDataFrom" overrides "templateData".',
     'The "expiration" value is in minutes, from 1 to 10080 (7 days).'
   ],
   constraints: [
@@ -32,7 +32,7 @@ You can also load data from an external URL instead of passing it inline.`,
         .string()
         .optional()
         .describe(
-          'External URL to load template data from. Overrides templateData if both provided.'
+          'External URL to load template data from. Overrides templateData if both are provided.'
         ),
       version: z
         .number()
@@ -90,6 +90,13 @@ You can also load data from an external URL instead of passing it inline.`,
       passwordProtected: ctx.input.passwordProtected,
       password: ctx.input.password,
       pdfVersion: ctx.input.pdfVersion
+    });
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: 'application/pdf',
+      filename: ctx.input.outputFile || 'output.pdf'
     });
 
     return {

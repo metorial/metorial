@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let publishBot = SlateTool.create(spec, {
   name: 'Publish Bot',
   key: 'publish_bot',
-  description: `Publish a bot to the live environment. This makes all draft changes available to real users on the connected platforms (website, Messenger).`,
+  description: `Publish a bot to the live environment. This makes all draft changes available to real users on the connected platforms (website, Messenger). ${botScopeGuidance}`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot to publish')
+      botId: botIdSchema
     })
   )
   .output(

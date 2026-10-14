@@ -1,79 +1,32 @@
-Now let me get more details on the Ahrefs Connect OAuth flow for API v3:The page requires JavaScript. Let me search for more details.Now I have enough information to write the specification.
-
-# Slates Specification for Ahrefs
-
-## Overview
-
-Ahrefs is an SEO toolset that maintains one of the largest web crawl indexes. Its API (v3) provides programmatic access to SEO data including backlink analysis, keyword research, organic traffic estimates, site auditing, rank tracking, SERP analysis, and AI brand monitoring.
+# Ahrefs API Specification
 
 ## Authentication
 
-Ahrefs supports two authentication methods depending on the use case:
+API keys use `Authorization: Bearer <token>` with API v3. Workspace owners and admins create keys in Account Settings → API keys. Availability and quotas depend on the subscription plan.
 
-### API Key (Bearer Token)
+Ahrefs Connect uses authorization-code OAuth with PKCE. Authorization uses `https://app.ahrefs.com/web/oauth/authorize`; the code exchange uses `https://ahrefs.com/oauth/token` with a form-encoded body. Access tokens expire after one year. No refresh tokens are issued: users must reconnect after expiry. New production Connect apps require provider approval and activation.
 
-You need an API key to send requests via Ahrefs API v3. Provide it in the `Authorization` header when making requests: `Authorization: Bearer YOUR_API_KEY`.
+## Reports
 
-Create and manage existing API keys in **Account settings / API keys**. Only workspace owners and admins have access to this section.
+Site Explorer tools expose domain metrics, backlinks, referring domains, anchors, organic keywords and competitors, top pages, linked domains, country metrics, and historical reports. Keyword tools expose overview metrics, matching and related terms, and search-volume reports. The SERP tool retrieves ranking URLs and SEO metrics. Optional `select` values choose provider fields; common fields are supplied for the refreshed reports when omitted.
 
-Each key has a lifetime of 1 year, after which it will expire and become inactive.
+Batch analysis uses `POST /v3/batch-analysis/batch-analysis`, with 1–100 structured targets and an array of selected metrics. The public `targets` input remains a list of domain or URL strings. Optional `mode` and `protocol` apply to every target. The existing optional `date` remains the requested snapshot date, defaulting to today. The current provider endpoint has no date-selection parameter and cannot fulfill historical snapshots; requests for a date other than today receive an explicit unsupported-date error instead of current data. No supported legacy historical batch request was verified.
 
-Ahrefs API is fully available for Enterprise plans. On all other plans, you'll have access to a limited set of free test queries.
+`get_limits_and_usage` returns the API key expiration, subscription, nullable unit limits, usage, and billing reset date.
 
-### OAuth 2.0 (Ahrefs Connect)
+The existing Rank Tracker, Site Audit, Brand Radar, and management tools retain their public contracts. Their full current-API request compatibility is outside this focused refresh; check endpoint-specific required inputs against the current reference before relying on these branches.
 
-For third-party integrations built through the Ahrefs Connect program, all API calls require authorization and are made on behalf of an authorized Ahrefs user. Your app must obtain an API access token for that user.
+## Limits
 
-Use OAuth 2.0 to integrate authorization into your application. There are two variants depending on whether you're building a web application or a desktop application. For web applications, you'll need to implement a multi-step process involving generating a state parameter, redirecting users, handling callbacks, and exchanging authorization codes for access tokens. For desktop applications, the process is similar but simplified, with the access token provided directly in the callback.
+Most paid reports cost at least 50 API units. Ahrefs documents a default limit of 60 requests per minute; throttling can also return HTTP 429. Endpoint access, Brand Radar indexes, and historical data depend on the subscription.
 
-The OAuth 2.0 flow for web applications involves:
+Ahrefs removed `offset` from many API endpoints in 2024. Existing optional offset inputs remain for compatibility, but callers must check the endpoint documentation: they are not a reliable pagination mechanism for those endpoints. Site Audit Page Explorer has its own documented offset support.
 
-1. Redirect the user to the Ahrefs authorization URL with a `state` parameter and your `client_id`.
-2. The user authorizes the application.
-3. The callback request will include the `code` parameter your application must use when requesting the access token.
-4. Send a POST request to `https://ahrefs.com/oauth2/token.php` with `client_id`, `client_secret`, `code`, `grant_type=authorization_code`, and `redirect_uri`.
-5. The response includes an `access_token`, `expires_in`, `token_type` (bearer), `scope` (api), and a `refresh_token` for obtaining new tokens.
+## Official sources
 
-Access tokens are passed as Bearer tokens in the `Authorization` header, the same as API keys.
-
-## Features
-
-### Site Explorer
-
-Site Explorer provides overview stats and historical charts, backlinks, and organic and paid traffic reports. You can analyze any domain or URL to retrieve metrics such as Domain Rating, referring domains, organic traffic estimates, top pages, anchor text distribution, and new/lost backlinks. Data can be scoped by exact URL, domain, or prefix mode.
-
-- **Target modes**: Exact URL, domain (with or without subdomains), or URL prefix.
-- Retrieve both current snapshots and historical trends.
-
-### Keywords Explorer
-
-Keywords Explorer provides metrics for a single keyword or a list of keywords, search volume history and volume by country, and keyword ideas reports. Use this to research keywords, get difficulty scores, search volume data, click metrics, and discover related keyword suggestions.
-
-- Supports querying individual keywords or bulk lists.
-- Data is available segmented by country.
-
-### SERP Overview
-
-Retrieve the current search engine results page data for a given keyword, including the ranking URLs and their associated metrics. Useful for competitive analysis of specific search queries.
-
-### Rank Tracker
-
-Monitor keyword ranking positions over time for tracked projects. The API supports both reading rank data and managing Rank Tracker projects (creating, updating, deleting projects and tracked keywords).
-
-- Management endpoints for projects and keyword lists are available and free of unit cost.
-
-### Site Audit
-
-Site Audit provides projects' Health Scores, full issue reports, and content of crawled pages. Access technical SEO audit data including crawl results, detected issues, and page-level details for your configured Site Audit projects.
-
-### Brand Radar
-
-Brand Radar provides brand overview stats, historical performance charts, and real prompts with citations across multiple AI agents. Monitor how your brand appears in AI-generated responses across different AI platforms.
-
-### Management
-
-Management endpoints allow you to manage your Rank Tracker projects and Keywords Explorer lists. These are free endpoints that let you create, update, and organize your tracking configurations programmatically.
-
-## Events
-
-There is no mention of webhook functionality in the Ahrefs API documentation. The Ahrefs API does not currently offer webhook functionality. The provider does not support events.
+- [API overview](https://docs.ahrefs.com/en/api/docs/introduction)
+- [Full OpenAPI specification](https://docs.ahrefs.com/openapi.json)
+- [OAuth guide](https://docs.ahrefs.com/en/ahrefs-connect/docs/oauth-guide)
+- [Batch analysis](https://docs.ahrefs.com/en/api/reference/batch-analysis/post-batch-analysis)
+- [Keywords overview](https://docs.ahrefs.com/en/api/reference/keywords-explorer/get-overview)
+- [API changelog](https://docs.ahrefs.com/en/api/docs/changelog)

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,8 +23,14 @@ export let listExpenses = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      from: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      to: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      from: z.iso
+        .date()
+        .optional()
+        .describe('Start date (YYYY-MM-DD), applied to the returned expenses'),
+      to: z.iso
+        .date()
+        .optional()
+        .describe('End date (YYYY-MM-DD), applied to the returned expenses'),
       includeCategories: z
         .boolean()
         .optional()
@@ -51,18 +57,27 @@ export let listExpenses = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new EverhourClient(ctx.auth.token);
-    let expenses = await client.listExpenses({ from: ctx.input.from, to: ctx.input.to });
-    let mapped = expenses.map((e: any) => ({
-      expenseId: e.id,
-      amountCents: e.amount,
-      billable: e.billable,
-      categoryId: e.category,
-      date: e.date,
-      details: e.details,
-      projectId: e.project,
-      quantity: e.quantity,
-      userId: e.user
-    }));
+    if (ctx.input.from && ctx.input.to && ctx.input.from > ctx.input.to) {
+      throw createApiServiceError('from must be on or before to.');
+    }
+    let expenses = await client.listExpenses();
+    let mapped = expenses
+      .filter(
+        (e: any) =>
+          (!ctx.input.from || e.date >= ctx.input.from) &&
+          (!ctx.input.to || e.date <= ctx.input.to)
+      )
+      .map((e: any) => ({
+        expenseId: e.id,
+        amountCents: e.amount,
+        billable: e.billable ?? undefined,
+        categoryId: e.category,
+        date: e.date,
+        details: e.details ?? undefined,
+        projectId: e.project ?? undefined,
+        quantity: e.quantity ?? undefined,
+        userId: e.user ?? undefined
+      }));
 
     let categories: any;
     if (ctx.input.includeCategories) {
@@ -70,10 +85,10 @@ export let listExpenses = SlateTool.create(spec, {
       categories = cats.map((c: any) => ({
         categoryId: c.id,
         name: c.name,
-        color: c.color,
-        unitBased: c.unitBased,
-        unitName: c.unitName,
-        unitPriceCents: c.unitPrice
+        color: c.color ?? undefined,
+        unitBased: c.unitBased ?? undefined,
+        unitName: c.unitName ?? undefined,
+        unitPriceCents: c.unitPrice ?? undefined
       }));
     }
 
@@ -118,13 +133,13 @@ export let createExpense = SlateTool.create(spec, {
       output: {
         expenseId: result.id,
         amountCents: result.amount,
-        billable: result.billable,
+        billable: result.billable ?? undefined,
         categoryId: result.category,
         date: result.date,
-        details: result.details,
-        projectId: result.project,
-        quantity: result.quantity,
-        userId: result.user
+        details: result.details ?? undefined,
+        projectId: result.project ?? undefined,
+        quantity: result.quantity ?? undefined,
+        userId: result.user ?? undefined
       },
       message: `Created expense of **$${(ctx.input.amountCents / 100).toFixed(2)}** on ${ctx.input.date}.`
     };
@@ -164,13 +179,13 @@ export let updateExpense = SlateTool.create(spec, {
       output: {
         expenseId: result.id,
         amountCents: result.amount,
-        billable: result.billable,
+        billable: result.billable ?? undefined,
         categoryId: result.category,
         date: result.date,
-        details: result.details,
-        projectId: result.project,
-        quantity: result.quantity,
-        userId: result.user
+        details: result.details ?? undefined,
+        projectId: result.project ?? undefined,
+        quantity: result.quantity ?? undefined,
+        userId: result.user ?? undefined
       },
       message: `Updated expense ${expenseId}.`
     };

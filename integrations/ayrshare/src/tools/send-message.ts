@@ -8,7 +8,7 @@ export let sendMessage = SlateTool.create(spec, {
   key: 'send_message',
   description: `Send a direct message on Facebook, Instagram, or X/Twitter. Supports text messages and media attachments (images, videos, voice files).`,
   constraints: [
-    'Requires Business plan or above.',
+    'Messaging must be activated for the account and user profile.',
     'X/Twitter accepts only a single media URL.',
     'Facebook and Instagram voice messages must be .aac or .wav format.'
   ],
@@ -33,13 +33,17 @@ export let sendMessage = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Message sending status'),
+      messages: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Individual text and media message results'),
       messageId: z.string().optional().describe('Generated message identifier'),
       recipientId: z.string().optional().describe('Recipient ID')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -53,10 +57,11 @@ export let sendMessage = SlateTool.create(spec, {
     return {
       output: {
         status: result.status || 'success',
-        messageId: result.messageId,
-        recipientId: result.recipientId
+        messageId: result.messageId ?? result.messages?.[0]?.messageId,
+        recipientId: result.recipientId ?? result.messages?.[0]?.recipientId,
+        messages: result.messages
       },
-      message: `Message sent to **${ctx.input.recipientId}** on **${ctx.input.platform}**. Message ID: **${result.messageId}**.`
+      message: `Message sent to **${ctx.input.recipientId}** on **${ctx.input.platform}**. Status: **${result.status}**.`
     };
   })
   .build();

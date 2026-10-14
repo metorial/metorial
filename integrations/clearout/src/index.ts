@@ -5,9 +5,12 @@ import {
   domainLookup,
   findEmail,
   getCredits,
+  getFinderResult,
   manageBulkFinder,
   manageBulkVerification,
   reverseLookup,
+  startBulkFinder,
+  startBulkVerification,
   verifyEmail
 } from './tools';
 export let provider = Slate.create({
@@ -20,7 +23,10 @@ export let provider = Slate.create({
     reverseLookup,
     domainLookup,
     autocompleteCompany,
-    getCredits
+    getCredits,
+    getFinderResult,
+    startBulkFinder,
+    startBulkVerification
   ],
   triggers: []
 });

@@ -1,6 +1,4 @@
-Now let me get the OAuth and webhook details from the official docs:Now I have comprehensive information from the official Todoist API v1 documentation. Let me compile the specification.
-
-# Slates Specification for Todoist
+# Todoist API Specification
 
 ## Overview
 
@@ -24,7 +22,9 @@ The following items are needed: Client ID, Client Secret, and Redirect URL. Thes
 2. **Redirect:** Upon granting access, the user is redirected to your configured redirect URL with a `code` and `state` parameter.
 3. **Token Exchange:** Exchange the authorization code for an access token by sending a POST request to `https://api.todoist.com/oauth/access_token` with `client_id`, `client_secret`, and `code`.
 
-The response returns an `access_token` with `token_type: "Bearer"`.
+The response returns `access_token` and `token_type: "Bearer"`. Newly created OAuth applications also return `refresh_token` and an `expires_in` value of 3600 seconds. Refresh uses `POST /oauth/access_token` with `grant_type=refresh_token`, the current refresh token, and client credentials. Persist the rotated refresh token; if a grace-window retry omits it, preserve the prior value. Legacy applications without refresh tokens return a long-lived access token and a 10-year compatibility expiry; these connections remain usable without scheduled refresh.
+
+The integration requests `data:read_write`, `data:delete`, and `project:delete`. The read/write scope includes `task:add` and `data:read`; `backups:read` is not requested because no backup tools are exposed.
 
 **Available Scopes:**
 
@@ -161,3 +161,21 @@ Notifications when filters are created, updated, or deleted.
 Notification when a reminder fires.
 
 - Events: `reminder:fired`
+
+
+## Implemented API contracts
+
+- Active tasks, projects, sections, labels, comments, and collaborators use cursor pagination and return `results` plus `next_cursor`; existing list tools collect all pages.
+- Task filter expressions use `GET /api/v1/tasks/filter?query=...`. Project, section, label, and ID constraints supplied together with a filter expression are applied to the filtered results.
+- Task moves use `POST /api/v1/tasks/{task_id}/move`, with exactly one destination enforced by the tool.
+- Completed history uses `GET /api/v1/tasks/completed/by_completion_date`, required RFC 3339 `since`/`until` values, a maximum three-month window, and the `items` response array. `get_completed_tasks` returns one page and a continuation cursor.
+- Saved filter operations use `POST /api/v1/sync` with the `filters` resource and `filter_add`, `filter_update`, or `filter_delete` commands. Command success is checked in `sync_status`; new filter IDs come from `temp_id_mapping`.
+- Identity uses `GET /api/v1/user`; returned fields are explicitly selected so the provider's user token cannot appear in tool output. Authentication profile names use `full_name`.
+- Productivity uses `GET /api/v1/tasks/completed/stats`; weekly records use `from`/`to`, and streaks and karma settings are under `goals`.
+- Current task responses use `checked`, `added_at`, `responsible_uid`, `assigned_by_uid`, and `child_order`. Section order uses `section_order`; comments use `file_attachment`. Known comment targets are retained from list/create input because the current comment view omits those IDs.
+
+For compatibility, existing numeric label order fields return 0 when the provider reports no explicit order. Existing string timestamp fields return an empty string when the provider returns no timestamp. Existing comment-count fields remain numeric and return zero when the current API does not provide a count; they should not be treated as an authoritative count. Project URLs use the documented `todoist://project?id=...` scheme when the provider omits a web URL; task URLs use the documented `https://app.todoist.com/app/task/<id>` format.
+
+Saved-filter availability and maximum counts depend on the account plan. Weekly productivity history is available on Pro and Business plans. Provider capabilities described elsewhere in this specification are not all exposed by this integration; no live provider verification was performed in this refresh.
+
+Source: [Official Todoist API v1 documentation](https://developer.todoist.com/api/v1/).

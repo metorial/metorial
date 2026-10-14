@@ -15,7 +15,7 @@ export let getAccountStatus = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      userId: z.string().describe('Account user/API key ID'),
+      userId: z.string().describe('Non-secret fingerprint identifying the connected API key'),
       apiCredits: z.number().describe('Current API credit balance'),
       apiRefill: z.number().describe('Unix timestamp of next credit refill'),
       apiRefillAmount: z.number().describe('Number of credits added at each refill'),

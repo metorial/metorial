@@ -74,6 +74,7 @@ export let listProducts = SlateTool.create(spec, {
     let products = Array.isArray(result) ? result : (result?.products ?? result?.data ?? []);
 
     let mapped = products.map((p: any) => ({
+      ...p,
       productId: p.id,
       productUuid: p.product_uuid,
       productName: p.product_name,
@@ -82,16 +83,15 @@ export let listProducts = SlateTool.create(spec, {
       vendorName: p.vendor_name,
       includeVariantBooking: p.include_variant_booking,
       bookWithoutPay: p.book_without_pay,
-      imageUrl: p.image_url,
+      imageUrl: p.image_url ?? undefined,
       variantsCount: p.variants_count,
       appointments: p.appointments?.map((a: any) => ({
+        ...a,
         appointmentId: a.id,
         name: a.name,
         price: a.price,
-        currency: a.currency,
-        ...a
-      })),
-      ...p
+        currency: a.currency
+      }))
     }));
 
     return {

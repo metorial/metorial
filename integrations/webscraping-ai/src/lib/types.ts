@@ -4,7 +4,7 @@ export interface ScrapingOptions {
   jsTimeout?: number;
   timeout?: number;
   waitFor?: string;
-  proxy?: 'datacenter' | 'residential';
+  proxy?: 'datacenter' | 'residential' | 'stealth' | 'auto';
   country?: string;
   device?: 'desktop' | 'mobile' | 'tablet';
   headers?: Record<string, string>;
@@ -18,6 +18,7 @@ export interface HtmlGetOptions extends ScrapingOptions {}
 
 export interface HtmlPostOptions extends ScrapingOptions {
   body?: string;
+  contentType?: string;
 }
 
 export interface TextOptions extends ScrapingOptions {
@@ -46,4 +47,21 @@ export interface AccountInfo {
   remainingApiCalls: number;
   resetsAt: string;
   remainingConcurrency: number;
+  remainingMonthlyCredits?: number;
+  remainingPaygCredits?: number;
+  remainingTotalCredits?: number;
+}
+
+export interface SearchOptions {
+  query: string;
+  country?: string;
+  language?: string;
+  page?: number;
+}
+
+export interface StructuredDataOptions {
+  url: string;
+  country?: string;
+  transcript?: boolean;
+  transcriptLanguage?: string;
 }

@@ -9,11 +9,12 @@ export let scrapeAsMarkdown = SlateTool.create(spec, {
   description: `Scrape a web page and return its content converted to Markdown format. Ideal for feeding web content into LLMs, RAG systems, or any text-processing pipeline.
 Supports the same browser rendering, proxy, and interaction options as standard scraping.`,
   instructions: [
-    'The `jsSnippet` parameter should be provided as a **plain JavaScript string** — it will be automatically Base64-encoded before sending to the API.'
+    'The `jsSnippet` parameter should be provided as a **plain JavaScript string** — it will be automatically Base64-encoded before sending to the API.',
+    'Use download_markdown to save the converted page as a file. Use scrape_extended to inspect the target status; Markdown conversion can succeed for target error pages.'
   ],
   constraints: [
     'Timeout must be between 5 and 60 seconds.',
-    'Credit cost is the same as standard scraping (10 with browser, 1 without).'
+    'Datacenter proxies cost 10 credits with browser rendering or 1 without. Residential proxies cost 125 with browser rendering or 25 without.'
   ],
   tags: {
     destructive: false,

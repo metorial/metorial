@@ -18,7 +18,7 @@ export let getDeal = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Comma-separated list of related data to include (e.g., "people,companies,tags")'
+          'Space-separated list of related data to include (e.g., "people company tags")'
         )
     })
   )
@@ -45,7 +45,7 @@ export let getDeal = SlateTool.create(spec, {
     });
 
     let result = await client.getDeal(ctx.input.dealId, {
-      includes: ctx.input.includes
+      includes: ctx.input.includes?.replace(/,/g, ' ')
     });
 
     let deal = result?.deal ?? result;

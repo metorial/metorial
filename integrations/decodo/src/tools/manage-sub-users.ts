@@ -9,7 +9,7 @@ let subUserSchema = z.object({
   status: z.string().describe('Sub-user status (active, disabled)'),
   createdAt: z.string().describe('Creation timestamp'),
   traffic: z.number().describe('Traffic used in GB'),
-  trafficLimit: z.number().describe('Traffic limit in GB'),
+  trafficLimit: z.number().nullable().describe('Traffic limit in GB, or null for unlimited'),
   serviceType: z.string().describe('Service type (e.g. residential_proxies)'),
   autoDisable: z
     .boolean()
@@ -32,7 +32,7 @@ export let listSubUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let subUsers = await client.listSubUsers();
 
     return {
@@ -65,7 +65,7 @@ export let createSubUser = SlateTool.create(spec, {
   )
   .output(subUserSchema)
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let subUser = await client.createSubUser({
       username: ctx.input.username,
       password: ctx.input.password,
@@ -103,7 +103,7 @@ export let updateSubUser = SlateTool.create(spec, {
   )
   .output(subUserSchema)
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let subUser = await client.updateSubUser(ctx.input.subUserId, {
       password: ctx.input.password,
       trafficLimit: ctx.input.trafficLimit,
@@ -141,7 +141,7 @@ export let deleteSubUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     await client.deleteSubUser(ctx.input.subUserId);
 
     return {
@@ -160,7 +160,7 @@ export let getSubUserTraffic = SlateTool.create(spec, {
   description: `Get traffic usage statistics for a specific proxy sub-user. Supports predefined time periods (24h, 7 days, month) or custom date ranges.`,
   constraints: [
     'Requires API Key authentication (Public API).',
-    'For custom date ranges, both "from" and "to" must be provided.'
+    'Custom date ranges default to sub-user creation and today when dates are omitted.'
   ],
   tags: {
     readOnly: true
@@ -175,11 +175,11 @@ export let getSubUserTraffic = SlateTool.create(spec, {
       from: z
         .string()
         .optional()
-        .describe('Start date in yyyy-mm-dd format (required if period is "custom")'),
+        .describe('Start date in yyyy-mm-dd format (optional for custom periods)'),
       to: z
         .string()
         .optional()
-        .describe('End date in yyyy-mm-dd format (required if period is "custom")'),
+        .describe('End date in yyyy-mm-dd format (optional for custom periods)'),
       serviceType: z
         .string()
         .optional()
@@ -194,7 +194,7 @@ export let getSubUserTraffic = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let traffic = await client.getSubUserTraffic(ctx.input.subUserId, {
       type: ctx.input.period,
       from: ctx.input.from,
@@ -206,5 +206,23 @@ export let getSubUserTraffic = SlateTool.create(spec, {
       output: traffic,
       message: `Sub-user \`${ctx.input.subUserId}\` has used **${traffic.traffic} GB** total (${traffic.trafficRx} GB received, ${traffic.trafficTx} GB sent) in the **${ctx.input.period}** period.`
     };
+  })
+  .build();
+
+export let getSubUser = SlateTool.create(spec, {
+  name: 'Get Sub-User',
+  key: 'get_sub_user',
+  description:
+    'Retrieve a residential proxy sub-user by ID, including current status, traffic usage, and traffic limit. Use List Sub-Users to discover IDs.',
+  constraints: ['Requires API Key authentication (Public API).'],
+  tags: { readOnly: true }
+})
+  .input(z.object({ subUserId: z.number().describe('Sub-user ID from List Sub-Users') }))
+  .output(subUserSchema)
+  .handleInvocation(async ctx => {
+    let output = await new PublicApiClient(ctx.auth.token, ctx.auth.authMethod).getSubUser(
+      ctx.input.subUserId
+    );
+    return { output, message: `Sub-user **${output.username}** is **${output.status}**.` };
   })
   .build();

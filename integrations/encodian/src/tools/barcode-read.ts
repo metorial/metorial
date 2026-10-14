@@ -25,11 +25,13 @@ export let barcodeRead = SlateTool.create(spec, {
   .output(
     z.object({
       scannedCodes: z.any().describe('Scanned barcode/QR code data'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
     let body: Record<string, any> = {
       fileContent: ctx.input.fileContent
@@ -52,9 +54,13 @@ export let barcodeRead = SlateTool.create(spec, {
       output: {
         scannedCodes:
           result.barcodes || result.Barcodes || result.qrCodes || result.QrCodes || result,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully scanned **${ctx.input.codeType}** from ${ctx.input.sourceType}.`
+      message: client.message(
+        `Successfully scanned **${ctx.input.codeType}** from ${ctx.input.sourceType}.`
+      )
     };
   })
   .build();

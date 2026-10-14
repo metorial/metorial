@@ -27,6 +27,10 @@ export let getTestimonial = SlateTool.create(spec, {
       position: z.string().optional().describe('Reviewer job title'),
       location: z.string().optional().describe('Reviewer location'),
       avatar: z.string().optional().describe('Reviewer avatar URL'),
+      avatarDetails: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider avatar URL and image sizes'),
       approved: z.number().optional().describe('Approval status'),
       featured: z.number().optional().describe('Whether the testimonial is featured'),
       added: z.number().optional().describe('Timestamp when testimonial was added'),
@@ -51,6 +55,7 @@ export let getTestimonial = SlateTool.create(spec, {
         position: t.position,
         location: t.location,
         avatar: t.avatar,
+        avatarDetails: t.avatarDetails,
         approved: t.approved,
         featured: t.featured,
         added: t.added,

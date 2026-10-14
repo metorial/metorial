@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,11 @@ export let deleteContact = SlateTool.create(spec, {
       externalCustomerId: z
         .string()
         .optional()
-        .describe('External customer ID (used if contactId is not provided)')
+        .describe('External customer ID (used if contactId is not provided)'),
+      erase: z
+        .boolean()
+        .optional()
+        .describe('Permanently erase profile and activity when true; defaults to false')
     })
   )
   .output(
@@ -29,12 +33,12 @@ export let deleteContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.contactId) {
-      await client.deleteContact(ctx.input.contactId);
+    if (ctx.input.contactId !== undefined) {
+      await client.deleteContact(ctx.input.contactId, ctx.input.erase);
     } else if (ctx.input.externalCustomerId) {
-      await client.deleteContactByExternalId(ctx.input.externalCustomerId);
+      await client.deleteContactByExternalId(ctx.input.externalCustomerId, ctx.input.erase);
     } else {
-      throw new Error('Either contactId or externalCustomerId must be provided');
+      throw createApiServiceError('Either contactId or externalCustomerId must be provided');
     }
 
     let identifier = ctx.input.contactId

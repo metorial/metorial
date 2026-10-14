@@ -44,7 +44,7 @@ export let copyTemplate = SlateTool.create(spec, {
 
     let result = await client.copyTemplate(templateId, params);
 
-    let newTemplateData = result?.data?.[0] || result?.data || result;
+    let newTemplateData = result.data[0];
 
     return {
       output: {

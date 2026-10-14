@@ -1,6 +1,30 @@
-# <img src="logo.png" height="20"> Ai/ml API
+# <img src="logo.png" height="20"> AI/ML API
 
-Unified gateway to 400+ AI/ML models for text generation, image generation, video generation, music generation, speech-to-text, text-to-speech, content moderation, 3D model generation, vision/OCR, embeddings, and AI-powered web search. Generate chat completions and reasoning with models like GPT, Claude, Gemini, DeepSeek, and Llama. Create images from text prompts using Flux, Stable Diffusion, and DALL-E. Generate videos from text or images asynchronously. Convert speech to text and text to speech in 120+ languages. Moderate content for safety classification. Generate 3D objects from text or images. Extract text and structured data from images via OCR. Produce text embeddings for semantic search. Search the web for real-time information. Create AI Assistants for customer support and data analysis. Interact in real time via WebSocket for voice and text.
+Generate chat responses, images, speech audio, transcription text, embeddings, moderation classifications, and MiniMax videos through AI/ML API. Discover model IDs and capabilities before invoking a model, identify the connected account, and retrieve asynchronous results after an initial request finishes polling.
+
+## Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `chat_completion` | Generate a response from conversation messages. |
+| `generate_image` | Generate downloadable images; existing provider URL or base64 values are retained. |
+| `text_to_speech` | Generate downloadable speech audio and return the provider URL when available. |
+| `speech_to_text` | Submit an audio URL and poll for its transcription. |
+| `generate_embeddings` | Generate numeric vectors; base64 responses also retain their original encoded value. |
+| `moderate_content` | Classify text or images with a compatible Llama Guard model. |
+| `generate_video` | Generate a MiniMax video and poll for its downloadable result. |
+| `list_models` | Discover model IDs, aliases, endpoint types, and optional capabilities, modalities, and pricing. |
+| `get_current_user` | Identify the connected account and check its balance. |
+| `get_video_result` | Check a previously submitted video task. |
+| `get_transcription_result` | Retrieve a previously submitted transcription task. |
+
+## Setup and model selection
+
+Use an AI/ML API key from the [account dashboard](https://aimlapi.com/app/keys). The default API base URL is `https://api.aimlapi.com`.
+
+Call `list_models` to discover a model ID and its documentation URL. Parameters vary by model: image count, image size, negative prompts, JSON mode, voice, and other settings are not universally supported. Image moderation requires a vision-capable model such as `meta-llama/Llama-Guard-3-11B-Vision-Turbo`.
+
+If an asynchronous operation is still processing, use its returned `generationId` with the corresponding result tool. The provider retains transcription results for one hour.
 
 ## License
 

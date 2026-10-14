@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -69,7 +69,8 @@ export let manageLists = SlateTool.create(spec, {
       }
 
       case 'get_reports': {
-        if (listId === undefined) throw new Error('listId is required for get_reports action');
+        if (listId === undefined)
+          throw createApiServiceError('listId is required for get_reports action.');
         let response = await client.getListReports(listId, limit, offset);
         let reports = response?.result ?? [];
         return {
@@ -79,10 +80,15 @@ export let manageLists = SlateTool.create(spec, {
       }
 
       case 'add': {
-        if (listId === undefined) throw new Error('listId is required for add action');
-        if (!channelId) throw new Error('channelId is required for add action');
-        if (!socialNetwork) throw new Error('socialNetwork is required for add action');
-        await client.addToList(listId, channelId, socialNetwork);
+        if (listId === undefined)
+          throw createApiServiceError('listId is required for add action.');
+        if (!channelId) throw createApiServiceError('channelId is required for add action.');
+        if (!socialNetwork)
+          throw createApiServiceError('socialNetwork is required for add action.');
+        let response = await client.addToList(listId, channelId, socialNetwork);
+        if (response?.result === false) {
+          throw createApiServiceError('HypeAuditor did not add the influencer to the list.');
+        }
         return {
           output: { success: true },
           message: `Added **${channelId}** (${socialNetwork}) to list **${listId}**.`
@@ -90,9 +96,21 @@ export let manageLists = SlateTool.create(spec, {
       }
 
       case 'remove': {
-        if (listId === undefined) throw new Error('listId is required for remove action');
-        if (reportId === undefined) throw new Error('reportId is required for remove action');
-        await client.removeFromList(reportId, listId);
+        if (listId === undefined)
+          throw createApiServiceError('listId is required for remove action.');
+        if (reportId === undefined)
+          throw createApiServiceError('reportId is required for remove action.');
+        if (listId === 0) {
+          throw createApiServiceError(
+            'Reports cannot be removed from the default Recent Searches list. Choose a custom list.'
+          );
+        }
+        let response = await client.removeFromList(reportId, listId);
+        if (response?.result !== true) {
+          throw createApiServiceError(
+            'HypeAuditor did not confirm removing the report from the list.'
+          );
+        }
         return {
           output: { success: true },
           message: `Removed report **${reportId}** from list **${listId}**.`

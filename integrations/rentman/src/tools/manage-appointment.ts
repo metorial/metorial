@@ -37,9 +37,9 @@ export let createAppointment = SlateTool.create(spec, {
       end: ctx.input.end
     };
 
-    if (ctx.input.location) body.location = ctx.input.location;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
-    if (ctx.input.isInternal !== undefined) body.is_internal = ctx.input.isInternal;
+    if (ctx.input.location !== undefined) body.location = ctx.input.location;
+    if (ctx.input.memo !== undefined) body.remark = ctx.input.memo;
+    if (ctx.input.isInternal !== undefined) body.is_public = !ctx.input.isInternal;
 
     let result = await client.create('appointments', body);
     let a = result.data as any;
@@ -50,7 +50,7 @@ export let createAppointment = SlateTool.create(spec, {
         name: a.name,
         start: a.start,
         end: a.end,
-        createdAt: a.created
+        createdAt: a.created ?? undefined
       },
       message: `Created appointment **${a.name}** (ID: ${a.id}).`
     };
@@ -88,7 +88,13 @@ export let updateAppointment = SlateTool.create(spec, {
     if (ctx.input.start !== undefined) body.start = ctx.input.start;
     if (ctx.input.end !== undefined) body.end = ctx.input.end;
     if (ctx.input.location !== undefined) body.location = ctx.input.location;
-    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
+    if (ctx.input.memo !== undefined) body.remark = ctx.input.memo;
+
+    if (ctx.input.start === undefined || ctx.input.end === undefined) {
+      let current = await client.get('appointments', ctx.input.appointmentId);
+      body.start ??= current.data.start;
+      body.end ??= current.data.end;
+    }
 
     let result = await client.update('appointments', ctx.input.appointmentId, body);
     let a = result.data as any;
@@ -97,7 +103,7 @@ export let updateAppointment = SlateTool.create(spec, {
       output: {
         appointmentId: a.id,
         name: a.name,
-        updatedAt: a.modified
+        updatedAt: a.modified ?? undefined
       },
       message: `Updated appointment **${a.name}** (ID: ${a.id}).`
     };

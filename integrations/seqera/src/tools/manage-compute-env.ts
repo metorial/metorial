@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageComputeEnv = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let manageComputeEnv = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       computeEnvId: z.string().describe('The compute environment ID'),
       action: z
         .enum(['describe', 'set_primary', 'delete'])
@@ -38,8 +40,8 @@ export let manageComputeEnv = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.action === 'delete') {
@@ -58,13 +60,13 @@ export let manageComputeEnv = SlateTool.create(spec, {
       let env = await client.describeComputeEnv(ctx.input.computeEnvId);
       return {
         output: {
-          computeEnvId: env.id,
-          name: env.name,
-          description: env.description,
-          platform: env.platform,
-          status: env.status,
+          computeEnvId: env.id ?? undefined,
+          name: env.name ?? undefined,
+          description: env.description ?? undefined,
+          platform: env.platform ?? undefined,
+          status: env.status ?? undefined,
           primary: true,
-          workDir: env.workDir
+          workDir: env.workDir ?? undefined
         },
         message: `Compute environment **${env.name || ctx.input.computeEnvId}** set as primary.`
       };
@@ -73,13 +75,13 @@ export let manageComputeEnv = SlateTool.create(spec, {
     let env = await client.describeComputeEnv(ctx.input.computeEnvId);
     return {
       output: {
-        computeEnvId: env.id,
-        name: env.name,
-        description: env.description,
-        platform: env.platform,
-        status: env.status,
-        primary: env.primary,
-        workDir: env.workDir
+        computeEnvId: env.id ?? undefined,
+        name: env.name ?? undefined,
+        description: env.description ?? undefined,
+        platform: env.platform ?? undefined,
+        status: env.status ?? undefined,
+        primary: env.primary ?? undefined,
+        workDir: env.workDir ?? undefined
       },
       message: `Compute environment **${env.name || ctx.input.computeEnvId}** — Platform: **${env.platform || 'unknown'}**, Status: **${env.status || 'unknown'}**.`
     };

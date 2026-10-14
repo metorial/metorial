@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -65,42 +65,45 @@ Projects can have statuses like Active, Archived, Planned, Pending, or Floating.
     let { action, projectId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (!ctx.input.name?.trim()) {
+        throw createApiServiceError('name is required for create.');
+      }
       let result = await client.createProject(fields);
       return {
         output: {
           projectId: result._id,
-          name: result.name,
-          projectCode: result.projectCode,
-          status: result.status,
-          start: result.start,
-          end: result.end,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          name: result.name ?? undefined,
+          projectCode: result.projectCode ?? undefined,
+          status: result.status ?? undefined,
+          start: result.start ?? undefined,
+          end: result.end ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created project **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
     if (action === 'update') {
-      if (!projectId) throw new Error('projectId is required for update');
+      if (!projectId) throw createApiServiceError('projectId is required for update');
       let result = await client.updateProject(projectId, fields);
       let project = Array.isArray(result) ? result[0] : result;
       return {
         output: {
           projectId: project._id,
-          name: project.name,
-          projectCode: project.projectCode,
-          status: project.status,
-          start: project.start,
-          end: project.end,
-          createdDate: project.createdDate,
-          updatedDate: project.updatedDate
+          name: project.name ?? undefined,
+          projectCode: project.projectCode ?? undefined,
+          status: project.status ?? undefined,
+          start: project.start ?? undefined,
+          end: project.end ?? undefined,
+          createdDate: project.createdDate ?? undefined,
+          updatedDate: project.updatedDate ?? undefined
         },
         message: `Updated project **${project.name}** (ID: \`${project._id}\`).`
       };
     }
 
-    if (!projectId) throw new Error('projectId is required for delete');
+    if (!projectId) throw createApiServiceError('projectId is required for delete');
     await client.deleteProject(projectId);
     return {
       output: { projectId },

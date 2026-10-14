@@ -1,21 +1,24 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageScheduleEntryTool = SlateTool.create(spec, {
   name: 'Manage Schedule Entry',
   key: 'manage_schedule_entry',
-  description: `Create or update a schedule entry (event) in a Basecamp project's schedule.
+  description: `Call list_accounts to discover the accountId for this operation. Create or update a schedule entry (event) in a Basecamp project's schedule.
 To **create**, provide the \`projectId\`, \`scheduleId\`, \`summary\`, \`startsAt\`, and \`endsAt\`.
 To **update**, provide the \`projectId\`, \`entryId\`, and the fields to change.`,
   instructions: [
     'Use Get Project to find the schedule dock item and its ID.',
+    'When updating, omitted fields are preserved. Recurring events must be edited in Basecamp.',
     'Dates must be in ISO 8601 format (e.g., "2025-06-15T09:00:00Z").'
   ]
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       action: z.enum(['create', 'update']).describe('Action to perform'),
       scheduleId: z
@@ -52,20 +55,21 @@ To **update**, provide the \`projectId\`, \`entryId\`, and the fields to change.
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let { action, projectId } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.scheduleId)
-        throw new Error('scheduleId is required for creating a schedule entry');
+        throw createApiServiceError('scheduleId is required for creating a schedule entry');
       if (!ctx.input.summary)
-        throw new Error('summary is required for creating a schedule entry');
+        throw createApiServiceError('summary is required for creating a schedule entry');
       if (!ctx.input.startsAt)
-        throw new Error('startsAt is required for creating a schedule entry');
+        throw createApiServiceError('startsAt is required for creating a schedule entry');
       if (!ctx.input.endsAt)
-        throw new Error('endsAt is required for creating a schedule entry');
+        throw createApiServiceError('endsAt is required for creating a schedule entry');
 
       let entry = await client.createScheduleEntry(projectId, ctx.input.scheduleId, {
         summary: ctx.input.summary,
@@ -93,7 +97,7 @@ To **update**, provide the \`projectId\`, \`entryId\`, and the fields to change.
 
     // update
     if (!ctx.input.entryId)
-      throw new Error('entryId is required for updating a schedule entry');
+      throw createApiServiceError('entryId is required for updating a schedule entry');
 
     let entry = await client.updateScheduleEntry(projectId, ctx.input.entryId, {
       summary: ctx.input.summary,

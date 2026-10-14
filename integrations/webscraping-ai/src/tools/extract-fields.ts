@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { scrapingOptionsSchema } from '../lib/schemas';
@@ -35,7 +35,13 @@ Works well for product details, articles, profiles, contact info, and similar st
       extractedFields: z
         .record(z.string(), z.any())
         .describe(
-          'The extracted field values as a JSON object matching the requested field names.'
+          'The original provider response. Current responses wrap the extracted field values in result.'
+        ),
+      fields: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'The extracted values keyed by the requested field names. Missing values can be null.'
         )
     })
   )
@@ -61,7 +67,12 @@ Works well for product details, articles, profiles, contact info, and similar st
 
     let fieldNames = Object.keys(ctx.input.fields);
     return {
-      output: { extractedFields },
+      output: {
+        extractedFields,
+        fields: isApiErrorRecord(extractedFields.result)
+          ? extractedFields.result
+          : extractedFields
+      },
       message: `Successfully extracted ${fieldNames.length} field(s) from **${ctx.input.url}**: ${fieldNames.join(', ')}.`
     };
   })

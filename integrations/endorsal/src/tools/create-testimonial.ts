@@ -52,8 +52,7 @@ export let createTestimonial = SlateTool.create(spec, {
       location: ctx.input.location,
       avatar: ctx.input.avatar,
       approved: ctx.input.approved !== undefined ? (ctx.input.approved ? 1 : 0) : undefined,
-      featured: ctx.input.featured !== undefined ? (ctx.input.featured ? 1 : 0) : undefined,
-      added: Date.now()
+      featured: ctx.input.featured !== undefined ? (ctx.input.featured ? 1 : 0) : undefined
     });
 
     return {

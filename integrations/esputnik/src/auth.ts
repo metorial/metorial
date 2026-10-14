@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,23 +25,11 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.yespo.io/api'
-      });
-
-      let basicToken = Buffer.from(`x:${ctx.output.token}`).toString('base64');
-
-      let response = await axios.get('/v1/account/info', {
-        headers: {
-          Authorization: `Basic ${basicToken}`,
-          'Content-Type': 'application/json; charset=UTF-8'
-        }
-      });
-
+      let account = await new Client(ctx.output).getAccountInfo();
       return {
         profile: {
-          name: response.data?.organisationName || response.data?.name,
-          id: response.data?.id?.toString()
+          name: account.organisationName || account.name || account.userEmail,
+          id: (account.orgId ?? account.id ?? account.userEmail)?.toString()
         }
       };
     }

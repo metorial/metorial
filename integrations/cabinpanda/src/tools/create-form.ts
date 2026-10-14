@@ -40,8 +40,8 @@ export let createForm = SlateTool.create(spec, {
 
     return {
       output: {
-        formId: form?.key ?? form?.id?.toString(),
-        name: form?.name,
+        formId: form?.key?.toString() ?? form?.id?.toString(),
+        name: form?.name ?? undefined,
         raw: form
       },
       message: `Created form **${form?.name ?? ctx.input.name}**.`

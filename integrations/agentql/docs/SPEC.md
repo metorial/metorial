@@ -1,4 +1,4 @@
-# Slates Specification for Agentql
+# AgentQL API Integration
 
 ## Overview
 
@@ -40,8 +40,12 @@ Create a remote browser session that provides a Chrome DevTools Protocol (CDP) U
 - Optional user agent preset to simulate different operating systems (windows, macos, linux).
 - Proxy configuration for the browser session, supporting both AgentQL's managed (Tetra) proxy infrastructure with optional country selection and custom proxy servers.
 - Remote browser sessions provide CDP access for full browser control.
-- Browser profiles include LIGHT (default) and STEALTH modes for enhanced bot detection avoidance.
+- Browser profiles include `light` (default) and `tf-browser` for full browser features. The API preserves `stealth` as a deprecated alias of `tf-browser`.
 - A shutdown_mode parameter controls session teardown behavior: `on_disconnect` (default) terminates the session when the last client disconnects, while `on_inactivity_timeout` keeps the session alive for reuse within a configurable timeout window.
+
+### Browser Session Usage
+
+`list_session_usage` retrieves browser session IDs, lifecycle status, duration, proxy byte counts, and timestamps from `/v1/tetra/usage`. Supports session/sub-user filtering, timestamp filters, `created_at_desc` or `updated_at_asc` sorting, and page-number pagination with `has_more`.
 
 ### Cross-Site Query Compatibility
 
@@ -50,3 +54,10 @@ Cross-site compatibility lets you use the same query across different sites with
 ## Events
 
 The provider does not support events. AgentQL is a request-response API for data extraction and browser automation, and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+
+## API References
+
+- [REST API guide](https://docs.agentql.com/rest-api/api-reference)
+- [Current OpenAPI contract](https://api.agentql.com/openapi.json)
+
+Web query metadata can be absent or null in the current OpenAPI contract. Request IDs and generated queries are returned when present. Captured screenshots are available as downloadable files; the existing base64 screenshot output is retained for compatibility. Document extraction remains documented in the REST guide even though the current OpenAPI document omits that route.

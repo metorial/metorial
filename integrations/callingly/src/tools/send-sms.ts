@@ -59,8 +59,8 @@ export let sendSms = SlateTool.create(spec, {
         leadId: result.lead_id ? String(result.lead_id) : undefined,
         conversationId: result.conversation_id ? String(result.conversation_id) : undefined,
         smsId: result.sms_id ? String(result.sms_id) : undefined,
-        sentAt: result.sent_at,
-        direction: result.direction
+        sentAt: result.sent_at ?? undefined,
+        direction: result.direction ?? undefined
       },
       message: `SMS sent to **${ctx.input.phoneNumber}** from **${ctx.input.smsNumber}**.`
     };

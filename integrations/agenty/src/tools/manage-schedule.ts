@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageSchedule = SlateTool.create(spec, {
   key: 'manage_schedule',
   description: `Create, view, or delete a schedule for an agent. Schedules use CRON expressions to automatically start jobs at specified intervals (e.g. every 5 minutes, hourly, daily).`,
   instructions: [
-    'CRON format: "seconds minutes hours dayOfMonth month dayOfWeek year". Example: "0 0 9 ? * MON-FRI *" runs at 9 AM on weekdays.',
+    'Current Agenty AI accounts use UNIX CRON: "minutes hours dayOfMonth month dayOfWeek". Example: "0 9 * * 1-5" runs at 9 AM on weekdays. Legacy accounts may use Quartz CRON; use the format supported by your account.',
     'Use action "create" to set a schedule, "get" to view the current schedule, or "delete" to remove it.'
   ]
 })
@@ -56,14 +56,17 @@ export let manageSchedule = SlateTool.create(spec, {
       let result = await client.deleteSchedule(ctx.input.agentId);
       return {
         output: {
-          statusCode: result.status_code || 200,
+          statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
           message: result.message || 'Schedule deleted successfully.'
         },
         message: `Deleted schedule for agent **${ctx.input.agentId}**.`
       };
     }
 
-    // create
+    if (!ctx.input.cronExpression?.trim()) {
+      throw createApiServiceError('cronExpression is required when creating a schedule.');
+    }
+
     let result = await client.createSchedule(ctx.input.agentId, {
       type: 'cron',
       expression: ctx.input.cronExpression || '',
@@ -72,7 +75,7 @@ export let manageSchedule = SlateTool.create(spec, {
 
     return {
       output: {
-        statusCode: result.status_code || 200,
+        statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
         message: result.message || 'Scheduled successfully.'
       },
       message: `Created schedule for agent **${ctx.input.agentId}** with CRON: \`${ctx.input.cronExpression}\`.`

@@ -28,6 +28,7 @@ export let listAppointments = SlateTool.create(spec, {
     z.object({
       appointmentId: z.number().optional().describe('Retrieve a specific appointment by ID'),
       productId: z.number().optional().describe('Filter appointments by product ID'),
+      searchTerm: z.string().optional().describe('Appointment search term'),
       limit: z
         .number()
         .min(1)
@@ -48,6 +49,7 @@ export let listAppointments = SlateTool.create(spec, {
     let result = await client.listAppointments({
       appointmentId: ctx.input.appointmentId,
       productId: ctx.input.productId,
+      searchTerm: ctx.input.searchTerm,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -59,7 +61,7 @@ export let listAppointments = SlateTool.create(spec, {
     let mapped = appointments.map((a: any) => ({
       appointmentId: a.id,
       name: a.name,
-      productId: a.product_id,
+      productId: a.product_id ?? a.product_detail_id,
       duration: a.duration,
       price: a.price,
       currency: a.currency,

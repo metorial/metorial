@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SignWellClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,21 +25,14 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://www.signwell.com/api/v1'
-      });
-
-      let response = await axios.get('/me', {
-        headers: {
-          'X-Api-Key': ctx.output.token
-        }
-      });
+      let client = new SignWellClient({ token: ctx.output.token });
+      let result = await client.getMe();
 
       return {
         profile: {
-          id: response.data.id,
-          email: response.data.email,
-          name: response.data.name
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name
         }
       };
     }

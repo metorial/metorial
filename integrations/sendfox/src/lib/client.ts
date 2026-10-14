@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   current_page: number;
@@ -46,8 +46,8 @@ export interface SendFoxList {
   name: string;
   created_at: string;
   subscribed_contacts_count?: number;
-  average_email_open_percent?: string;
-  average_email_click_percent?: string;
+  average_email_open_percent?: number | string | null;
+  average_email_click_percent?: number | string | null;
 }
 
 export interface SendFoxCampaign {
@@ -63,13 +63,22 @@ export interface SendFoxCampaign {
   from_email: string;
   from_name: string;
   timezone: string | null;
+  preview_text: string | null;
+}
+
+export interface SendFoxCampaignStats {
   sent_count: number;
   unique_open_count: number;
   unique_click_count: number;
   unsubscribe_count: number;
   bounce_count: number;
   spam_count: number;
-  preview_text: string | null;
+  open_rate: number;
+  click_rate: number;
+  unsubscribe_rate: number;
+  bounce_rate: number;
+  spam_rate: number;
+  link_stats?: Array<{ url: string; clicks: number }>;
 }
 
 export interface SendFoxUser {
@@ -82,16 +91,18 @@ export interface SendFoxUser {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.sendfox.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SendFox',
+          reason: 'sendfox_api_error'
+        })
     });
   }
 
@@ -137,8 +148,8 @@ export class Client {
     let body: Record<string, unknown> = {
       email: params.email
     };
-    if (params.firstName) body.first_name = params.firstName;
-    if (params.lastName) body.last_name = params.lastName;
+    if (params.firstName !== undefined) body.first_name = params.firstName;
+    if (params.lastName !== undefined) body.last_name = params.lastName;
     if (params.lists) body.lists = params.lists;
     if (params.contactFields) body.contact_fields = params.contactFields;
 
@@ -182,10 +193,18 @@ export class Client {
     }>;
     listIds?: number[];
   }): Promise<{ created: number; updated: number }> {
-    let body: Record<string, unknown> = {
-      contacts: params.contacts
+    if (params.contacts.length === 0 || params.contacts.length > 1000) {
+      throw createApiServiceError('Provide between 1 and 1,000 contacts to import.', {
+        reason: 'invalid_contact_batch'
+      });
+    }
+
+    let body = {
+      contacts: params.contacts.map(contact => ({
+        ...contact,
+        ...(params.listIds !== undefined ? { lists: params.listIds } : {})
+      }))
     };
-    if (params.listIds) body.list_ids = params.listIds;
 
     let response = await this.axios.post('/contacts/batch', body);
     return response.data;
@@ -202,6 +221,14 @@ export class Client {
 
   async getList(listId: number): Promise<SendFoxList> {
     let response = await this.axios.get(`/lists/${listId}`);
+    return response.data;
+  }
+
+  async listListContacts(
+    listId: number,
+    options: { page?: number; query?: string; status?: 'subscribed' | 'unsubscribed' } = {}
+  ): Promise<PaginatedResponse<SendFoxContact>> {
+    let response = await this.axios.get(`/lists/${listId}/contacts`, { params: options });
     return response.data;
   }
 
@@ -239,6 +266,31 @@ export class Client {
     return response.data;
   }
 
+  async getCampaignStats(
+    campaignId: number,
+    options: { includeLinkStats?: boolean; linkLimit?: number } = {}
+  ): Promise<SendFoxCampaignStats> {
+    let response = await this.axios.get(`/campaigns/${campaignId}/stats`, {
+      params: {
+        include_link_stats: options.includeLinkStats,
+        link_limit: options.linkLimit
+      }
+    });
+    return response.data;
+  }
+
+  async getCampaignStatsBatch(
+    campaignIds: number[]
+  ): Promise<Array<SendFoxCampaignStats & { id: number }>> {
+    if (campaignIds.length === 0) return [];
+    let params = new URLSearchParams();
+    for (let campaignId of campaignIds) {
+      params.append('campaign_ids[]', String(campaignId));
+    }
+    let response = await this.axios.get('/campaigns/stats', { params });
+    return response.data.data;
+  }
+
   async createCampaign(params: {
     title: string;
     subject: string;
@@ -256,7 +308,7 @@ export class Client {
       html: params.html,
       from_name: params.fromName,
       from_email: params.fromEmail,
-      list_ids: params.listIds
+      lists: params.listIds
     };
     if (params.scheduledAt) body.scheduled_at = params.scheduledAt;
     if (params.timezone) body.timezone = params.timezone;
@@ -286,7 +338,7 @@ export class Client {
     if (params.html !== undefined) body.html = params.html;
     if (params.fromName !== undefined) body.from_name = params.fromName;
     if (params.fromEmail !== undefined) body.from_email = params.fromEmail;
-    if (params.listIds !== undefined) body.list_ids = params.listIds;
+    if (params.listIds !== undefined) body.lists = params.listIds;
     if (params.scheduledAt !== undefined) body.scheduled_at = params.scheduledAt;
     if (params.timezone !== undefined) body.timezone = params.timezone;
     if (params.previewText !== undefined) body.preview_text = params.previewText;

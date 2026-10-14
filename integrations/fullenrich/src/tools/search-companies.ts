@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { companySchema, mapCompany } from '../lib/profiles';
 import { spec } from '../spec';
 
 let filterSchema = z.object({
@@ -13,31 +14,6 @@ let rangeFilterSchema = z.object({
   min: z.number().optional().describe('Minimum value (inclusive)'),
   max: z.number().optional().describe('Maximum value (inclusive)'),
   exclude: z.boolean().optional().describe('If true, excludes this range')
-});
-
-let companySchema = z.object({
-  companyId: z.string().optional(),
-  name: z.string().optional(),
-  domain: z.string().optional(),
-  description: z.string().optional(),
-  yearFounded: z.number().optional(),
-  headcount: z.number().optional(),
-  headcountRange: z.string().optional(),
-  companyType: z.string().optional(),
-  industry: z.string().optional(),
-  specialties: z.array(z.string()).optional(),
-  headquarters: z
-    .object({
-      line1: z.string().optional(),
-      line2: z.string().optional(),
-      city: z.string().optional(),
-      region: z.string().optional(),
-      country: z.string().optional(),
-      countryCode: z.string().optional()
-    })
-    .optional(),
-  linkedinUrl: z.string().optional(),
-  linkedinFollowerCount: z.number().optional()
 });
 
 export let searchCompanies = SlateTool.create(spec, {
@@ -61,8 +37,20 @@ Costs 0.25 credits per company returned.`,
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of results to skip (max 10,000)'),
-      limit: z.number().optional().describe('Results per page (default 10, max 100)'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(0)
+        .max(10000)
+        .optional()
+        .describe('Number of results to skip (max 10,000)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (default 10, max 100)'),
       searchAfter: z
         .string()
         .optional()
@@ -124,7 +112,7 @@ Costs 0.25 credits per company returned.`,
       search_after: ctx.input.searchAfter,
       names: toApiFilter(ctx.input.names),
       domains: toApiFilter(ctx.input.domains),
-      linkedin_urls: toApiFilter(ctx.input.linkedinUrls),
+      professional_network_urls: toApiFilter(ctx.input.linkedinUrls),
       keywords: toApiFilter(ctx.input.keywords),
       specialties: toApiFilter(ctx.input.specialties),
       industries: toApiFilter(ctx.input.industries),
@@ -135,30 +123,7 @@ Costs 0.25 credits per company returned.`,
       company_ids: toApiFilter(ctx.input.companyIds)
     });
 
-    let companies = (result.companies ?? []).map((company: any) => ({
-      companyId: company.id,
-      name: company.name,
-      domain: company.domain,
-      description: company.description,
-      yearFounded: company.year_founded,
-      headcount: company.headcount,
-      headcountRange: company.headcount_range,
-      companyType: company.company_type,
-      industry: company.industry?.main_industry,
-      specialties: company.specialties,
-      headquarters: company.locations?.headquarters
-        ? {
-            line1: company.locations.headquarters.line1,
-            line2: company.locations.headquarters.line2,
-            city: company.locations.headquarters.city,
-            region: company.locations.headquarters.region,
-            country: company.locations.headquarters.country,
-            countryCode: company.locations.headquarters.country_code
-          }
-        : undefined,
-      linkedinUrl: company.social_profiles?.linkedin?.url,
-      linkedinFollowerCount: company.social_profiles?.linkedin?.follower_count
-    }));
+    let companies = (result.companies ?? []).map(mapCompany);
 
     return {
       output: {

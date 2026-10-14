@@ -28,9 +28,13 @@ export let getRun = SlateTool.create(spec, {
         .number()
         .describe('Whether extracted data is available (1 = ready, 0 = not ready)'),
       startTime: z.string().describe('When the run started'),
-      endTime: z.string().describe('When the run ended'),
+      endTime: z
+        .string()
+        .describe('When the run ended; empty while the end time is unavailable'),
       pages: z.number().describe('Number of pages scraped'),
-      md5sum: z.string().describe('MD5 checksum of the extracted data'),
+      md5sum: z
+        .string()
+        .describe('MD5 checksum of the extracted data; empty while unavailable'),
       startUrl: z.string().describe('URL the run started scraping from'),
       startTemplate: z.string().describe('Template used as the entry point'),
       startValue: z.string().describe('Value passed to the project for parameterized scraping')
@@ -46,11 +50,11 @@ export let getRun = SlateTool.create(spec, {
         projectToken: run.project_token,
         runToken: run.run_token,
         status: run.status,
-        dataReady: run.data_ready,
+        dataReady: Number(Boolean(run.data_ready)),
         startTime: run.start_time,
-        endTime: run.end_time,
+        endTime: run.end_time ?? '',
         pages: run.pages,
-        md5sum: run.md5sum,
+        md5sum: run.md5sum ?? '',
         startUrl: run.start_url,
         startTemplate: run.start_template,
         startValue: run.start_value

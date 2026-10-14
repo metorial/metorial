@@ -1,25 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attributeSchema, cookieSchema, validateExtraction } from '../lib/schemas';
 import { spec } from '../spec';
-
-let attributeSchema = z.object({
-  name: z.string().describe('Name of the data field to extract'),
-  description: z
-    .string()
-    .describe('Natural-language description of what this field should contain'),
-  type: z
-    .enum(['string', 'integer', 'number', 'bool', 'list'])
-    .optional()
-    .describe('Expected output type for this field')
-});
-
-let cookieSchema = z.object({
-  name: z.string().describe('Cookie name'),
-  value: z.string().describe('Cookie value'),
-  domain: z.string().optional().describe('Cookie domain'),
-  path: z.string().optional().describe('Cookie path')
-});
 
 export let createScraperTool = SlateTool.create(spec, {
   name: 'Create Scraper',
@@ -65,6 +48,15 @@ Ideal for scenarios where the same type of data needs to be extracted from many 
     })
   )
   .handleInvocation(async ctx => {
+    validateExtraction(ctx.input);
+    if (!ctx.input.attributes.length) {
+      throw createApiServiceError('Provide at least one attribute for scraper generation.');
+    }
+    if (!ctx.input.sampleUrl?.trim() && !ctx.input.sampleContent?.trim()) {
+      throw createApiServiceError(
+        'Provide a non-empty sampleUrl or sampleContent before creating a scraper.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     ctx.info('Creating new scraper...');

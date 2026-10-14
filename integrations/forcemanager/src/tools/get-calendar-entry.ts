@@ -41,7 +41,7 @@ Fetch by ID or list/search entries with filtering by owner, account, date range,
 
     let params: Record<string, any> = {};
     if (ctx.input.query) params.q = ctx.input.query;
-    if (ctx.input.ownerId) params.ownerId = ctx.input.ownerId;
+    if (ctx.input.ownerId) params.salesRepId = ctx.input.ownerId;
     if (ctx.input.accountId) params.accountId = ctx.input.accountId;
 
     let result = await client.listCalendarEntries(params, ctx.input.page);

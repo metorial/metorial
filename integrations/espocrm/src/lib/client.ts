@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getResponseHeaderValue,
+  pickDefined
+} from 'slates';
 import { createHmacSignature } from './hmac';
 
 export interface AuthConfig {
@@ -20,6 +26,8 @@ export interface ListParams {
   order?: 'asc' | 'desc';
   where?: WhereClause[];
   textFilter?: string;
+  primaryFilter?: string;
+  boolFilterList?: string[];
 }
 
 export interface WhereClause {
@@ -36,10 +44,18 @@ export interface ListResponse {
 export class Client {
   private http: ReturnType<typeof createAxios>;
   private authConfig: AuthConfig;
+  private siteUrl: string;
 
   constructor(config: ClientConfig) {
     let siteUrl = config.siteUrl.replace(/\/+$/, '');
+    this.siteUrl = siteUrl;
     this.authConfig = config.auth;
+
+    if (config.auth.authMethod === 'hmac' && !config.auth.secretKey) {
+      throw createApiServiceError(
+        'A secret key is required for HMAC authentication. Reconnect with both API and secret keys.'
+      );
+    }
 
     this.http = createAxios({
       baseURL: `${siteUrl}/api/v1`,
@@ -67,6 +83,17 @@ export class Client {
       }
       return reqConfig;
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'EspoCRM',
+            reason: 'espocrm_api_error'
+          })
+        )
+    );
   }
 
   async createRecord(
@@ -104,29 +131,12 @@ export class Client {
   }
 
   async listRecords(entityType: string, params: ListParams = {}): Promise<ListResponse> {
-    let queryParams: Record<string, any> = {};
-
-    if (params.offset !== undefined) queryParams.offset = params.offset;
-    if (params.maxSize !== undefined) queryParams.maxSize = params.maxSize;
-    if (params.select && params.select.length > 0)
-      queryParams.select = params.select.join(',');
-    if (params.orderBy) queryParams.orderBy = params.orderBy;
-    if (params.order) queryParams.order = params.order;
-    if (params.textFilter) queryParams.q = params.textFilter;
-
-    if (params.where && params.where.length > 0) {
-      for (let i = 0; i < params.where.length; i++) {
-        let clause = params.where[i]!;
-        queryParams[`where[${i}][type]`] = clause.type;
-        if (clause.attribute) queryParams[`where[${i}][attribute]`] = clause.attribute;
-        if (clause.value !== undefined) queryParams[`where[${i}][value]`] = clause.value;
-      }
-    }
-
-    let response = await this.http.get(`/${entityType}`, { params: queryParams });
+    let response = await this.http.get(`/${entityType}`, {
+      params: { searchParams: JSON.stringify(pickDefined(params)) }
+    });
     return {
       list: response.data.list || [],
-      total: response.data.total || 0
+      total: response.data.total ?? 0
     };
   }
 
@@ -136,20 +146,12 @@ export class Client {
     linkName: string,
     params: ListParams = {}
   ): Promise<ListResponse> {
-    let queryParams: Record<string, any> = {};
-    if (params.offset !== undefined) queryParams.offset = params.offset;
-    if (params.maxSize !== undefined) queryParams.maxSize = params.maxSize;
-    if (params.select && params.select.length > 0)
-      queryParams.select = params.select.join(',');
-    if (params.orderBy) queryParams.orderBy = params.orderBy;
-    if (params.order) queryParams.order = params.order;
-
     let response = await this.http.get(`/${entityType}/${recordId}/${linkName}`, {
-      params: queryParams
+      params: { searchParams: JSON.stringify(pickDefined(params)) }
     });
     return {
       list: response.data.list || [],
-      total: response.data.total || 0
+      total: response.data.total ?? 0
     };
   }
 
@@ -184,6 +186,38 @@ export class Client {
     return response.data;
   }
 
+  async getLeadConversionAttributes(
+    leadId: string
+  ): Promise<Record<string, Record<string, any>>> {
+    let response = await this.http.post('/Lead/action/getConvertAttributes', { id: leadId });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<Record<string, any>> {
+    let response = await this.http.get('/App/user');
+    let user = response.data?.user;
+    if (!user || typeof user.id !== 'string') {
+      throw createApiServiceError('EspoCRM did not return a current user record.');
+    }
+    return user;
+  }
+
+  async listStream(params: {
+    entityType?: string;
+    recordId?: string;
+    offset?: number;
+    maxSize?: number;
+  }): Promise<ListResponse> {
+    let path =
+      params.entityType && params.recordId
+        ? `/${params.entityType}/${params.recordId}/stream`
+        : '/Stream';
+    let response = await this.http.get(path, {
+      params: pickDefined({ offset: params.offset, maxSize: params.maxSize })
+    });
+    return { list: response.data.list || [], total: response.data.total ?? 0 };
+  }
+
   async sendEmail(emailData: Record<string, any>): Promise<Record<string, any>> {
     let response = await this.http.post('/Email', {
       ...emailData,
@@ -198,6 +232,8 @@ export class Client {
     role: string;
     relatedType?: string;
     relatedId?: string;
+    parentType?: string;
+    field?: string;
     file: string;
   }): Promise<Record<string, any>> {
     let response = await this.http.post('/Attachment', data);
@@ -213,13 +249,43 @@ export class Client {
     await this.http.delete(`/Attachment/${attachmentId}`);
   }
 
+  getAttachmentDownload(attachmentId: string): {
+    url: string;
+    headers: Record<string, string>;
+  } {
+    let headers: Record<string, string> =
+      this.authConfig.authMethod === 'basic'
+        ? { 'Espo-Authorization': this.authConfig.token }
+        : { 'X-Api-Key': this.authConfig.token };
+    return {
+      url: `${this.siteUrl}/api/v1/Attachment/file/${encodeURIComponent(attachmentId)}`,
+      headers
+    };
+  }
+
+  async getAttachmentFile(
+    attachmentId: string
+  ): Promise<{ content: ArrayBuffer; mimeType?: string }> {
+    let response = await this.http.get<ArrayBuffer>(
+      `/Attachment/file/${encodeURIComponent(attachmentId)}`,
+      {
+        responseType: 'arraybuffer'
+      }
+    );
+    return {
+      content: response.data,
+      mimeType: getResponseHeaderValue(response.headers, 'content-type')
+    };
+  }
+
   async generatePdf(
     entityType: string,
     entityId: string,
     templateId: string
   ): Promise<Record<string, any>> {
-    let response = await this.http.post(`/${entityType}/action/getPdf`, {
-      id: entityId,
+    let response = await this.http.post('/Pdf/action/massPrint', {
+      entityType,
+      idList: [entityId],
       templateId
     });
     return response.data;

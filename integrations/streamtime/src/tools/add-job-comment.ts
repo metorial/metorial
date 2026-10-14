@@ -19,7 +19,12 @@ export let addJobComment = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Comment text to add. If omitted, only retrieves existing entries.'),
-      activityEntryTypeId: z.number().optional().describe('Type of activity entry')
+      activityEntryTypeId: z
+        .number()
+        .optional()
+        .describe(
+          'Filter the returned activity entries by this type ID. New comments use the provider comment type.'
+        )
     })
   )
   .output(
@@ -41,15 +46,15 @@ export let addJobComment = SlateTool.create(spec, {
 
     if (ctx.input.comment) {
       let body: Record<string, any> = {
-        comment: ctx.input.comment
+        message: ctx.input.comment
       };
-      if (ctx.input.activityEntryTypeId !== undefined) {
-        body.activityEntryTypeId = ctx.input.activityEntryTypeId;
-      }
       output.newEntry = await client.createJobActivityEntry(ctx.input.jobId, body);
     }
 
-    output.activityEntries = await client.listJobActivityEntries(ctx.input.jobId);
+    output.activityEntries = await client.listJobActivityEntries(
+      ctx.input.jobId,
+      ctx.input.activityEntryTypeId
+    );
 
     return {
       output: output as any,

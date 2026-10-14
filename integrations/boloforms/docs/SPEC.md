@@ -1,4 +1,4 @@
-# Slates Specification for Boloforms
+# BoloForms Integration Specification
 
 ## Overview
 
@@ -34,7 +34,7 @@ There are no OAuth flows, scopes, or additional credentials required beyond the 
 
 ### Document Management
 
-Retrieve a list of documents with optional filtering. Supports PDF documents, form-based documents, and templates. Documents can be filtered by type (PDFs, forms, templates).
+Retrieve single-signature PDFs (`PDF`) or PDF templates (`PDF_TEMPLATE`) with optional status, archive, date range, and pagination filters. The `workspaceid` header is required and is supplied by the tool's `workspaceId` input. The public API does not document a workspace-discovery endpoint. Pagination uses whole-number pages from 1 to 10000 and limits from 1 to 100. The API sorts by `createdAt`; legacy `filter`, `query`, and `sortBy` inputs remain available for existing callers.
 
 ### Send Templates for Signing
 
@@ -45,22 +45,41 @@ Send documents with pre-filled fields and create templates for future use. You c
 - **Mail data**: Custom subject and message for the signing email.
 - **Document ID**: The ID of the template to send.
 - You can batch up to 100 recipients in one request.
+- PDF template recipients require unique `roleTitle` values that exactly match template roles; recipient names cannot substitute for role titles.
+- For PDF templates, `createdDocumentId` is the respondent Mongo ObjectId used as `responseId` by reminder and void operations.
 
 ### Retrieve Template Respondents
 
-Fetch information about who has responded to a specific template-based document, including signer details and status.
+Fetch information about who has responded to a PDF template, including signer details and status. Supply `templateId`, `respondentDocumentId`, or both. A direct single respondent object is returned in the tool's `respondents` array.
 
 ### Retrieve Form Responses
 
-BoloForms handles form submissions without the need for a server. With the API, you can dynamically process, store, and manage form submissions. Retrieve form responses with optional filtering for specific forms.
+BoloForms handles form submissions without the need for a server. Retrieve form responses by supplying `formId`, `responseId`, or both. `responseId` can be a Mongo ObjectId or a `formResponseId` UUID. A direct single response object is returned in the tool's `responses` array. Pagination applies when listing by `formId` only.
+
+### Send Signing Reminders
+
+Send reminder emails or SMS to pending signers on a PDF or a PDF template respondent document. For `PDF_TEMPLATE`, provide the template UUID as `documentId` and the respondent Mongo ObjectId as `responseId`. The API permits five reminder requests per 15 minutes per API key and rejects requests for signed, void, expired, declined, or deleted documents. Returned data includes reminded and skipped signers.
+
+### Void Signing Documents
+
+Void an in-progress PDF or PDF template respondent document. The template identifier requirements match reminders. Already-voided documents return a successful response. Signed, paid, declined, expired, and deleted documents cannot be voided.
 
 ### Download Signed Documents
 
-Download signed documents via URLs provided by the API. Completed documents include a finished PDF URL in the response data.
+Completed respondent records may include a finished PDF URL. This integration retrieves the respondent metadata; it does not expose a separate file-download tool.
 
 ### Embeddable Signing
 
 BoloSign provides embed documentation allowing you to embed signing workflows directly into your application.
+
+## API References
+
+- https://bolosign-developer-docs.readme.io/reference/getdocuments
+- https://bolosign-developer-docs.readme.io/reference/sendtemplateforsigning
+- https://bolosign-developer-docs.readme.io/reference/gettemplaterespondents
+- https://bolosign-developer-docs.readme.io/reference/getformresponses
+- https://bolosign-developer-docs.readme.io/reference/sendreminder
+- https://bolosign-developer-docs.readme.io/reference/voiddocument
 
 ## Events
 

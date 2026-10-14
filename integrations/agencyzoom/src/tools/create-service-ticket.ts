@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createServiceTicket = SlateTool.create(spec, {
   name: 'Create Service Ticket',
   key: 'create_service_ticket',
-  description: `Create a new service ticket in AgencyZoom. A service ticket tracks a customer service request or issue. Requires a customer ID; optionally assign a CSR, set category, priority, pipeline stage, description, and tags.`,
+  description: `Create a new service ticket in AgencyZoom. A service ticket tracks a customer service request or issue. AgencyZoom requires customerId, subject, category, priority, pipelineId, and stageId. Optionally assign a CSR and set description or tags.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,6 +15,10 @@ export let createServiceTicket = SlateTool.create(spec, {
   .input(
     z.object({
       customerId: z.string().describe('ID of the customer to create the service ticket for'),
+      subject: z
+        .string()
+        .optional()
+        .describe('Service ticket summary. Required by AgencyZoom.'),
       csrId: z
         .string()
         .optional()
@@ -59,22 +63,19 @@ export let createServiceTicket = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {
       customerId: ctx.input.customerId
     };
-    if (ctx.input.csrId) data.csrId = ctx.input.csrId;
-    if (ctx.input.category) data.category = ctx.input.category;
-    if (ctx.input.priority) data.priority = ctx.input.priority;
-    if (ctx.input.pipelineId) data.pipelineId = ctx.input.pipelineId;
-    if (ctx.input.stageId) data.stageId = ctx.input.stageId;
-    if (ctx.input.description) data.description = ctx.input.description;
-    if (ctx.input.tags) data.tags = ctx.input.tags;
+    if (ctx.input.subject !== undefined) data.subject = ctx.input.subject;
+    if (ctx.input.csrId !== undefined) data.csrId = ctx.input.csrId;
+    if (ctx.input.category !== undefined) data.category = ctx.input.category;
+    if (ctx.input.priority !== undefined) data.priority = ctx.input.priority;
+    if (ctx.input.pipelineId !== undefined) data.pipelineId = ctx.input.pipelineId;
+    if (ctx.input.stageId !== undefined) data.stageId = ctx.input.stageId;
+    if (ctx.input.description !== undefined) data.description = ctx.input.description;
+    if (ctx.input.tags !== undefined) data.tags = ctx.input.tags;
 
     let result = await client.createServiceTicket(data);
 

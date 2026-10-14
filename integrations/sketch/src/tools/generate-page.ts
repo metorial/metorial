@@ -69,8 +69,8 @@ let artboardInputSchema = z.object({
 
 let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
   let style = createStyle({
-    fillColor: input.fillColor ? hexToColor(input.fillColor) : undefined,
-    borderColor: input.borderColor ? hexToColor(input.borderColor) : undefined,
+    fillColor: input.fillColor !== undefined ? hexToColor(input.fillColor) : undefined,
+    borderColor: input.borderColor !== undefined ? hexToColor(input.borderColor) : undefined,
     borderThickness: input.borderThickness,
     opacity: input.opacity
   });
@@ -92,10 +92,10 @@ let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
     isVisible: input.isVisible
   });
 
-  if (input.layerClass === 'text' && input.textContent) {
+  if (input.layerClass === 'text') {
     layer.attributedString = {
       _class: 'attributedString',
-      string: input.textContent,
+      string: input.textContent ?? '',
       attributes: []
     };
   }
@@ -106,11 +106,11 @@ let buildLayer = (input: z.infer<typeof layerInputSchema>): SketchLayer => {
 export let generatePageTool = SlateTool.create(spec, {
   name: 'Generate Page',
   key: 'generate_page',
-  description: `Generate a Sketch page JSON structure with artboards and layers. Creates valid Sketch file format JSON that can be included in a .sketch archive.
+  description: `Generate a Sketch page JSON structure with artboards and layers. Produces draft JSON and a downloadable page JSON file. The draft is not a complete, version-validated native Sketch file.
 
 Use this to programmatically create page content for Sketch documents, including artboards sized for common device screens and layers with fills, borders, and text.`,
   instructions: [
-    'The output is a single page JSON object. To build a full document, use the "Generate Document" tool which assembles pages, document.json, and meta.json together.',
+    'Returns a page JSON object and downloadable JSON file. Use Generate Document for draft document.json, meta.json, user.json, and page structures; neither generator certifies native Sketch compatibility.',
     'Artboard dimensions default to iPhone size (375×812). Common sizes: iPhone (375×812), iPad (768×1024), Desktop (1440×900).'
   ]
 })
@@ -128,7 +128,7 @@ Use this to programmatically create page content for Sketch documents, including
       page: z
         .record(z.string(), z.unknown())
         .describe(
-          'The generated Sketch page JSON object, ready to be placed in the pages/ folder of a .sketch archive'
+          'Draft Sketch page JSON object; validate and complete required fields against the target file-format schema'
         )
     })
   )
@@ -150,11 +150,19 @@ Use this to programmatically create page content for Sketch documents, including
       layers: artboardLayers
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(JSON.stringify(page, null, 2), {
+        headers: { 'content-type': 'application/json' }
+      }),
+      filename: `${page.do_objectID}.json`
+    });
+
     return {
       output: {
         page: page as unknown as Record<string, unknown>
       },
-      message: `Generated page **"${ctx.input.pageName}"** with **${artboardLayers.length}** artboard(s).`
+      message: `Generated draft page **"${ctx.input.pageName}"** with **${artboardLayers.length}** artboard(s).`
     };
   })
   .build();

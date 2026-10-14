@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCategories = SlateTool.create(spec, {
   name: 'List Categories',
   key: 'list_categories',
-  description: `Lists work order categories from MaintainX. Categories help classify work orders according to organizational needs. Use category names when creating or updating work orders.`,
+  description: `Lists work order categories from MaintainX. Categories help classify work orders according to organizational needs. Use category names when creating or updating work orders. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,14 @@ export let listCategories = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      organizationId: organizationIdSchema,
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -32,10 +40,7 @@ export let listCategories = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listCategories({
       limit: ctx.input.limit,
@@ -43,8 +48,8 @@ export let listCategories = SlateTool.create(spec, {
     });
 
     let categories = (result.categories ?? []).map((c: any) => ({
-      categoryId: c.id,
-      name: c.name
+      categoryId: c.id ?? undefined,
+      name: c.label ?? undefined
     }));
 
     return {

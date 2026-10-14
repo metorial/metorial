@@ -16,13 +16,16 @@ import {
   getBoardItems,
   getBoardMembers,
   getConnectors,
+  getCurrentUser,
+  getFrameItems,
   getTags,
   listBoards,
   removeBoardMember,
   shareBoard,
   updateBoard,
   updateBoardItem,
-  updateBoardMember
+  updateBoardMember,
+  updateTag
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -36,11 +39,14 @@ export let provider = Slate.create({
     createBoardItem,
     updateBoardItem,
     getBoardItems,
+    getCurrentUser,
+    getFrameItems,
     deleteBoardItem,
     createConnector,
     getConnectors,
     deleteConnector,
     createTag,
+    updateTag,
     getTags,
     attachTag,
     detachTag,

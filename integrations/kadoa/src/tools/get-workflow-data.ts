@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getWorkflowData = SlateTool.create(spec, {
@@ -45,6 +46,20 @@ Can also retrieve data from a specific workflow run by providing a run ID.`,
   )
   .handleInvocation(async ctx => {
     let client = new KadoaClient({ token: ctx.auth.token });
+    validateKadoaInteger(ctx.input.page, 'page', 1);
+    validateKadoaInteger(ctx.input.limit, 'limit', 0);
+
+    if (ctx.input.filters !== undefined) {
+      let filters: unknown;
+      try {
+        filters = JSON.parse(ctx.input.filters);
+      } catch {
+        throw createApiServiceError('filters must be a JSON-encoded array of filter objects.');
+      }
+      if (!Array.isArray(filters)) {
+        throw createApiServiceError('filters must be a JSON-encoded array of filter objects.');
+      }
+    }
 
     let result = await client.getWorkflowData(ctx.input.workflowId, {
       runId: ctx.input.runId,
@@ -56,17 +71,23 @@ Can also retrieve data from a specific workflow run by providing a run ID.`,
       includeAnomalies: ctx.input.includeAnomalies
     });
 
+    if (!Array.isArray(result.data)) {
+      throw createApiServiceError(
+        'Kadoa returned invalid workflow data. Try retrieving the data again.'
+      );
+    }
+
     return {
       output: {
         workflowId: result.workflowId || ctx.input.workflowId,
-        runId: result.runId,
-        executedAt: result.executedAt,
-        records: result.data || [],
+        runId: result.runId ?? undefined,
+        executedAt: result.executedAt ?? undefined,
+        records: result.data,
         totalCount: result.pagination?.totalCount,
         page: result.pagination?.page,
         totalPages: result.pagination?.totalPages
       },
-      message: `Retrieved **${(result.data || []).length}** record(s) from workflow **${ctx.input.workflowId}**${result.pagination?.totalCount ? ` (${result.pagination.totalCount} total)` : ''}.`
+      message: `Retrieved **${result.data.length}** record(s) from workflow **${ctx.input.workflowId}**${result.pagination?.totalCount ? ` (${result.pagination.totalCount} total)` : ''}.`
     };
   })
   .build();

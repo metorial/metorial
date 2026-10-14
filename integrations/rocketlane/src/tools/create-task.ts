@@ -35,7 +35,12 @@ export let createTask = SlateTool.create(spec, {
       effort: z.number().optional().describe('Estimated effort in minutes'),
       progress: z.number().optional().describe('Task progress percentage (0-100)'),
       description: z.string().optional().describe('Task description'),
-      status: z.string().optional().describe('Task status'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Numeric task status option ID as a string. Call list_custom_fields with entityType task for status options.'
+        ),
       priority: z.string().optional().describe('Task priority'),
       fields: z
         .array(
@@ -56,7 +61,12 @@ export let createTask = SlateTool.create(spec, {
       phaseId: z.number().optional().describe('Phase ID'),
       startDate: z.string().nullable().optional().describe('Start date'),
       dueDate: z.string().nullable().optional().describe('Due date'),
-      status: z.any().optional().describe('Task status'),
+      status: z
+        .any()
+        .optional()
+        .describe(
+          'Numeric task status option ID as a string. Call list_custom_fields with entityType task for status options.'
+        ),
       assignees: z.array(z.any()).optional().describe('Assigned users')
     })
   )

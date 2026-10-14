@@ -23,6 +23,10 @@ export let detectNsfw = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       nsfw: z.boolean().describe('Whether NSFW content was detected'),
       nudity: z.boolean().describe('Whether nudity was detected'),
       gore: z.boolean().describe('Whether gore/violence was detected'),
@@ -42,6 +46,7 @@ export let detectNsfw = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         nsfw: result.nsfw,
         nudity: result.nudity,
         gore: result.gore,

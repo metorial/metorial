@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let completeAddressSuggestion = SlateTool.create(spec, {
   name: 'Complete Address Suggestion',
   key: 'complete_address_suggestion',
-  description: `Resolve a full verified address from an autocomplete suggestion. Takes a preview ID from the **Autocomplete Address** tool and returns the complete, standardized address. This is the second step in the autocomplete workflow after getting suggestions.`,
+  description: `Resolve a full verified address from an autocomplete suggestion. Takes a previewId selection token from the **Autocomplete Address** tool and returns the complete, standardized address. This is the second step in the autocomplete workflow after getting suggestions.`,
   instructions: [
     'Use a previewId obtained from the Autocomplete Address tool.',
     'Only call this when the user has selected a specific suggestion.'
@@ -21,19 +21,21 @@ export let completeAddressSuggestion = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      previewId: z.string().describe('The preview ID from an autocomplete suggestion'),
+      previewId: z
+        .string()
+        .describe('The previewId selection token from an autocomplete suggestion'),
       geocode: z.boolean().optional().describe('Include latitude/longitude coordinates'),
       properCase: z.boolean().optional().describe('Return address in proper case')
     })
   )
   .output(
     z.object({
-      line1: z.string().describe('Primary address line'),
+      line1: z.string().nullable().describe('Primary address line'),
       line2: z.string().optional().describe('Secondary address line'),
-      city: z.string().describe('City'),
-      provinceOrState: z.string().describe('Province or state'),
-      postalOrZip: z.string().describe('Postal or ZIP code'),
-      country: z.string().describe('Country code'),
+      city: z.string().nullable().describe('City'),
+      provinceOrState: z.string().nullable().describe('Province or state'),
+      postalOrZip: z.string().nullable().describe('Postal or ZIP code'),
+      country: z.string().nullable().describe('Country code'),
       countryName: z.string().optional().describe('Full country name'),
       zipPlus4: z.string().optional().describe('ZIP+4 code (US only)'),
       status: z.string().optional().describe('Verification status'),
@@ -64,7 +66,7 @@ export let completeAddressSuggestion = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Resolved address: ${result.line1}, ${result.city}, ${result.provinceOrState} ${result.postalOrZip}, ${result.country.toUpperCase()}.`
+      message: `Resolved address: ${result.line1}, ${result.city}, ${result.provinceOrState} ${result.postalOrZip}, ${result.country?.toUpperCase() ?? 'unknown country'}.`
     };
   })
   .build();

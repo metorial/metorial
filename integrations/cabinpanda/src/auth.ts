@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { CabinPandaClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,24 +28,14 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.cabinpanda.com/api/v1'
-      });
-
-      let response = await client.get('/profile', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
-
-      let profile = response.data?.data;
+      let client = new CabinPandaClient({ token: ctx.output.token });
+      let profile = await client.getProfile();
 
       return {
         profile: {
           id: profile?.id?.toString(),
-          email: profile?.email,
-          name: profile?.name
+          email: profile?.email ?? undefined,
+          name: profile?.name ?? undefined
         }
       };
     }

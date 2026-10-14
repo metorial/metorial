@@ -20,6 +20,7 @@ export let getProject = SlateTool.create(spec, {
     z.object({
       projectId: z.string(),
       title: z.string(),
+      overview: z.string().optional(),
       createdAt: z.string(),
       authorId: z.string().nullable().optional(),
       authorName: z.string().nullable().optional(),
@@ -35,6 +36,7 @@ export let getProject = SlateTool.create(spec, {
       output: {
         projectId: project.id,
         title: project.title,
+        overview: project.overview,
         createdAt: project.created_at,
         authorId: project.author?.id ?? null,
         authorName: project.author?.name ?? null,

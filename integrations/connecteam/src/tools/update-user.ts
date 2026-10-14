@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,32 +64,50 @@ export let updateUser = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let result: any;
 
     if (ctx.input.action === 'update' && ctx.input.users) {
-      result = await client.updateUsers(ctx.input.users);
+      if (ctx.input.users.length < 1 || ctx.input.users.length > 25) {
+        throw createApiServiceError('Provide between 1 and 25 users to update.');
+      }
+      let users = ctx.input.users.map(({ emailAddress, ...user }) => ({
+        ...user,
+        ...(emailAddress === undefined ? {} : { email: emailAddress })
+      }));
+      result = await client.updateUsers(users);
       return {
         output: { result },
         message: `Updated **${ctx.input.users.length}** user(s).`
       };
     } else if (ctx.input.action === 'archive' && ctx.input.archiveUserIds) {
+      if (ctx.input.archiveUserIds.length === 0) {
+        throw createApiServiceError('Provide at least one archiveUserIds entry.');
+      }
       result = await client.archiveUsers(ctx.input.archiveUserIds);
       return {
         output: { result },
         message: `Archived **${ctx.input.archiveUserIds.length}** user(s).`
       };
     } else if (ctx.input.action === 'promote_to_admin' && ctx.input.promoteDetails) {
-      result = await client.promoteToAdmin(ctx.input.promoteDetails);
+      if (ctx.input.promoteDetails.title === undefined) {
+        throw createApiServiceError('promoteDetails.title is required for promote_to_admin.');
+      }
+      result = await client.promoteToAdmin({
+        ...ctx.input.promoteDetails,
+        title: ctx.input.promoteDetails.title
+      });
       return {
         output: { result },
-        message: `Promoted user **${ctx.input.promoteDetails.userId}** to admin.`
+        message: `Sent an admin invitation for user **${ctx.input.promoteDetails.userId}**.`
       };
     }
 
-    throw new Error('Invalid action or missing required fields for the specified action.');
+    throw createApiServiceError(
+      'Invalid action or missing required fields for the specified action.'
+    );
   })
   .build();

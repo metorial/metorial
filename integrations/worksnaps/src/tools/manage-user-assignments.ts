@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,24 +20,33 @@ export let manageUserAssignments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project'),
+      projectId: z
+        .string()
+        .describe('The ID of the project. Call list_projects to discover available projects.'),
       action: z.enum(['list', 'create', 'update', 'remove']).describe('Action to perform'),
       userAssignmentId: z
         .string()
         .optional()
         .describe('Assignment ID (required for update/remove)'),
       userId: z.number().optional().describe('User ID to assign (required for create)'),
-      role: z.string().optional().describe('Role: "Manager", "Member", or "Observer"'),
+      role: z
+        .string()
+        .optional()
+        .describe('Role for create: "Manager", "Member", or "Observer"'),
       hourlyRate: z.number().optional().describe('Hourly rate for the user in this project'),
       allowLoggingTime: z.boolean().optional().describe('Whether the user can log time'),
       windowForDeletingTime: z
         .number()
         .optional()
-        .describe('Days allowed for deleting time (-1=unlimited, 0=none, 1-30=days)'),
+        .describe(
+          'Days allowed for deleting time: -1, 0, 1, 2, 3, 5, 7, 10, 14, or 30 (-1=unlimited, 0=none)'
+        ),
       windowForAddingOfflineTime: z
         .number()
         .optional()
-        .describe('Days allowed for adding offline time (-1=unlimited, 0=none, 1-30=days)')
+        .describe(
+          'Days allowed for adding offline time: -1, 0, 1, 2, 3, 5, 7, 10, 14, or 30 (-1=unlimited, 0=none)'
+        )
     })
   )
   .output(
@@ -76,6 +85,8 @@ export let manageUserAssignments = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
+      if (userId === undefined)
+        throw createApiServiceError('userId is required for create action');
       let assignment = await client.createUserAssignment(projectId, {
         userId,
         role,
@@ -92,7 +103,18 @@ export let manageUserAssignments = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!userAssignmentId) throw new Error('userAssignmentId is required for update action');
+      if (!userAssignmentId)
+        throw createApiServiceError('userAssignmentId is required for update action');
+      if (
+        [
+          hourlyRate,
+          allowLoggingTime,
+          windowForDeletingTime,
+          windowForAddingOfflineTime
+        ].every(value => value === undefined)
+      ) {
+        throw createApiServiceError('Provide at least one assignment setting to update.');
+      }
       let assignment = await client.updateUserAssignment(projectId, userAssignmentId, {
         hourlyRate,
         flagAllowLoggingTime:
@@ -107,7 +129,8 @@ export let manageUserAssignments = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!userAssignmentId) throw new Error('userAssignmentId is required for remove action');
+      if (!userAssignmentId)
+        throw createApiServiceError('userAssignmentId is required for remove action');
       await client.deleteUserAssignment(projectId, userAssignmentId);
       return {
         output: { removed: true },
@@ -115,6 +138,6 @@ export let manageUserAssignments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -18,8 +18,8 @@ export let listTags = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Specific tag ID to retrieve. Omit to list all tags.'),
-      page: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Results per page')
+      page: z.number().optional().describe('Page number for pagination, starting at 0'),
+      perPage: z.number().optional().describe('Results per page, from 1 to 100')
     })
   )
   .output(

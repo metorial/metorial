@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let runWorkflow = SlateTool.create(spec, {
@@ -34,6 +35,7 @@ Returns the job ID for tracking the run.`,
   )
   .handleInvocation(async ctx => {
     let client = new KadoaClient({ token: ctx.auth.token });
+    validateKadoaInteger(ctx.input.limit, 'limit', 1);
 
     let result = await client.runWorkflow(ctx.input.workflowId, {
       variables: ctx.input.variables,
@@ -42,9 +44,9 @@ Returns the job ID for tracking the run.`,
 
     return {
       output: {
-        jobId: result.jobId,
-        status: result.status,
-        message: result.message
+        jobId: result.jobId ?? undefined,
+        status: result.status ?? undefined,
+        message: result.message ?? undefined
       },
       message: `Workflow **${ctx.input.workflowId}** started.${result.jobId ? ` Job ID: **${result.jobId}**` : ''}`
     };

@@ -23,7 +23,17 @@ Use for bulk competitor analysis, portfolio monitoring, or comparing multiple do
       date: z
         .string()
         .optional()
-        .describe('Date for the snapshot in YYYY-MM-DD format. Defaults to today.'),
+        .describe(
+          'Date for the requested snapshot in YYYY-MM-DD format. Defaults to today. The current Ahrefs batch API cannot fulfill historical snapshots; dates other than today return an explicit unsupported-date error.'
+        ),
+      mode: z
+        .enum(['exact', 'domain', 'subdomains', 'prefix'])
+        .optional()
+        .describe('Scope used for every target. Defaults to subdomains.'),
+      protocol: z
+        .enum(['both', 'http', 'https'])
+        .optional()
+        .describe('Protocol used for every target. Defaults to both.'),
       select: z.string().optional().describe('Comma-separated list of metrics to return')
     })
   )
@@ -38,7 +48,9 @@ Use for bulk competitor analysis, portfolio monitoring, or comparing multiple do
     let result = await client.batchAnalysis({
       targets: ctx.input.targets,
       date: ctx.input.date,
-      select: ctx.input.select
+      select: ctx.input.select,
+      mode: ctx.input.mode,
+      protocol: ctx.input.protocol
     });
 
     return {

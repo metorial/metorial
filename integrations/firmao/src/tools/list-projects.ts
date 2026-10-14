@@ -61,13 +61,13 @@ export let listProjects = SlateTool.create(spec, {
     let projects = result.data.map((p: any) => ({
       projectId: p.id,
       name: p.name,
-      description: p.description,
-      startDate: p.startDate,
-      endDate: p.endDate,
-      status: p.status,
-      budget: p.budget,
-      creationDate: p.creationDate,
-      lastModificationDate: p.lastModificationDate
+      description: p.description ?? undefined,
+      startDate: p.startDate ?? undefined,
+      endDate: p.endDate ?? undefined,
+      status: p.status ?? undefined,
+      budget: p.budget ?? undefined,
+      creationDate: p.creationDate ?? undefined,
+      lastModificationDate: p.lastModificationDate ?? p.lastUpdateDate ?? undefined
     }));
 
     return {

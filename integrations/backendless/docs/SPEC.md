@@ -1,4 +1,4 @@
-# Slates Specification for Backendless
+# Backendless Specification
 
 ## Overview
 

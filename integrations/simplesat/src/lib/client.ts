@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export interface PaginatedResponse<T> {
   count: number;
@@ -31,9 +36,10 @@ export interface Question {
   text: string;
   metric: string;
   order: number;
-  rating_scale: number | null;
+  rating_scale: number | boolean | null;
+  type?: string;
   required: boolean;
-  choices: QuestionChoice[];
+  choices: (string | QuestionChoice)[];
   rules: QuestionRule[];
   survey: {
     id: number;
@@ -54,7 +60,7 @@ export interface AnswerSurvey {
 export interface Answer {
   id: number;
   choice: string | null;
-  choice_label: string | null;
+  choice_label?: string | null;
   created: string;
   modified: string;
   follow_up_answer: string | null;
@@ -72,7 +78,8 @@ export interface ResponseCustomer {
 }
 
 export interface ResponseTicket {
-  id: string | null;
+  id: number | string | null;
+  external_id?: string | null;
   subject: string | null;
 }
 
@@ -84,7 +91,7 @@ export interface ResponseSurvey {
 export interface ResponseAnswer {
   id: number;
   choice: string | null;
-  choice_label: string | null;
+  choice_label?: string | null;
   sentiment: string | null;
   follow_up_answer: string | null;
   question: AnswerQuestion;
@@ -138,13 +145,76 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Simplesat API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.simplesat.io/api/v1',
-      headers: {
-        'X-Simplesat-Token': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-Simplesat-Token', value: config.token.trim() },
+      headers: { Accept: 'application/json' },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Simplesat',
+          reason: 'simplesat_api_error'
+        })
     });
+  }
+
+  private pagination(params?: { page?: number; pageSize?: number }, maxPageSize = 100) {
+    let page = params?.page ?? 1;
+    let pageSize = params?.pageSize ?? 100;
+    if (!Number.isSafeInteger(page) || page < 1) {
+      throw createApiServiceError('Page must be a positive whole number.');
+    }
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > maxPageSize) {
+      throw createApiServiceError(
+        `Page size must be a whole number between 1 and ${maxPageSize}.`
+      );
+    }
+    return { page, page_size: pageSize };
+  }
+
+  private normalizePage<T>(
+    data: {
+      count: number;
+      next: string | null;
+      previous: string | null;
+      results?: T[];
+    } & Record<string, unknown>,
+    resource: string
+  ): PaginatedResponse<T> {
+    let results = data[resource] ?? data.results;
+    if (!Array.isArray(results)) {
+      throw createApiServiceError(`Simplesat returned an invalid ${resource} page.`);
+    }
+    return {
+      count: data.count,
+      next: data.next ?? null,
+      previous: data.previous ?? null,
+      results
+    };
+  }
+
+  private dateFilter(value: string | undefined, endOfDay = false) {
+    if (value === undefined) return undefined;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      let date = new Date(`${value}T00:00:00Z`);
+      if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        throw createApiServiceError(
+          'Date filters must be valid YYYY-MM-DD dates or ISO 8601 timestamps.'
+        );
+      }
+      return `${value}T${endOfDay ? '23:59:59.999999' : '00:00:00'}Z`;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) {
+      throw createApiServiceError(
+        'Date filters must be valid YYYY-MM-DD dates or ISO 8601 timestamps.'
+      );
+    }
+    return value;
   }
 
   async listSurveys(params?: {
@@ -152,12 +222,9 @@ export class Client {
     pageSize?: number;
   }): Promise<PaginatedResponse<Survey>> {
     let response = await this.axios.get('/surveys', {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100
-      }
+      params: this.pagination(params)
     });
-    return response.data;
+    return this.normalizePage<Survey>(response.data, 'surveys');
   }
 
   async listQuestions(params?: {
@@ -165,17 +232,17 @@ export class Client {
     pageSize?: number;
     surveyId?: number;
   }): Promise<PaginatedResponse<Question>> {
-    let queryParams: Record<string, unknown> = {
-      page: params?.page ?? 1,
-      page_size: params?.pageSize ?? 100
-    };
-    if (params?.surveyId) {
-      queryParams.survey = params.surveyId;
+    let queryParams: Record<string, unknown> = this.pagination(params);
+    if (params?.surveyId !== undefined) {
+      if (!Number.isSafeInteger(params.surveyId) || params.surveyId < 1) {
+        throw createApiServiceError('Survey ID must be a positive whole number.');
+      }
+      queryParams.survey_id = params.surveyId;
     }
     let response = await this.axios.get('/questions', {
       params: queryParams
     });
-    return response.data;
+    return this.normalizePage<Question>(response.data, 'questions');
   }
 
   async searchAnswers(params?: {
@@ -184,17 +251,15 @@ export class Client {
     page?: number;
     pageSize?: number;
   }): Promise<PaginatedResponse<Answer>> {
-    let body: Record<string, unknown> = {};
-    if (params?.startDate) body.start_date = params.startDate;
-    if (params?.endDate) body.end_date = params.endDate;
+    let body = pickDefined({
+      start_date: this.dateFilter(params?.startDate),
+      end_date: this.dateFilter(params?.endDate, true)
+    });
 
     let response = await this.axios.post('/answers/search', body, {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100
-      }
+      params: this.pagination(params)
     });
-    return response.data;
+    return this.normalizePage<Answer>(response.data, 'answers');
   }
 
   async searchResponses(params?: {
@@ -203,71 +268,62 @@ export class Client {
     page?: number;
     pageSize?: number;
   }): Promise<PaginatedResponse<SurveyResponse>> {
-    let body: Record<string, unknown> = {};
-    if (params?.startDate) body.start_date = params.startDate;
-    if (params?.endDate) body.end_date = params.endDate;
+    let body = pickDefined({
+      start_date: this.dateFilter(params?.startDate),
+      end_date: this.dateFilter(params?.endDate, true)
+    });
 
     let response = await this.axios.post('/responses/search', body, {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100
-      }
+      params: this.pagination(params)
     });
-    return response.data;
+    return this.normalizePage<SurveyResponse>(response.data, 'responses');
   }
 
   async upsertCustomer(input: CustomerUpsertInput): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      email: input.email
-    };
-    if (input.name) body.name = input.name;
-    if (input.company) body.company = input.company;
-    if (input.customAttributes) body.custom_attributes = input.customAttributes;
-
-    let response = await this.axios.post(
-      'https://api.simplesat.io/api/customers/create-or-update/',
-      body
-    );
+    let body = pickDefined({
+      email: input.email,
+      name: input.name,
+      company: input.company,
+      custom_attributes: input.customAttributes
+    });
+    let response = await this.axios.post('/customers', body);
     return response.data;
   }
 
   async sendSurveyEmail(input: SendSurveyEmailInput): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      customer: {
+    let body = pickDefined({
+      customer: pickDefined({
         email: input.customer.email,
-        ...(input.customer.name && { name: input.customer.name }),
-        ...(input.customer.company && { company: input.customer.company }),
-        ...(input.customer.customAttributes && {
-          custom_attributes: input.customer.customAttributes
-        })
-      }
-    };
-
-    if (input.teamMember) {
-      let teamMemberObj: Record<string, unknown> = {};
-      if (input.teamMember.teamMemberId) teamMemberObj.id = input.teamMember.teamMemberId;
-      if (input.teamMember.email) teamMemberObj.email = input.teamMember.email;
-      if (input.teamMember.name) teamMemberObj.name = input.teamMember.name;
-      body.team_member = teamMemberObj;
-    }
-
-    if (input.ticket) {
-      let ticketObj: Record<string, unknown> = {};
-      if (input.ticket.ticketId) ticketObj.id = input.ticket.ticketId;
-      if (input.ticket.subject) ticketObj.subject = input.ticket.subject;
-      if (input.ticket.customAttributes)
-        ticketObj.custom_attributes = input.ticket.customAttributes;
-      body.ticket = ticketObj;
-    }
-
+        name: input.customer.name,
+        company: input.customer.company,
+        custom_attributes: input.customer.customAttributes
+      }),
+      team_member: input.teamMember
+        ? pickDefined({
+            id: input.teamMember.teamMemberId,
+            email: input.teamMember.email,
+            name: input.teamMember.name
+          })
+        : undefined,
+      ticket: input.ticket
+        ? pickDefined({
+            id: input.ticket.ticketId,
+            subject: input.ticket.subject,
+            custom_attributes: input.ticket.customAttributes
+          })
+        : undefined
+    });
     let response = await this.axios.post(
-      `https://api.simplesat.io/api/v1/event-based-emails/${input.surveyToken}/send`,
+      `/surveys/${encodeURIComponent(input.surveyToken)}/email`,
       body
     );
     return response.data;
   }
 
   async getTeamMember(teamMemberId: number): Promise<TeamMember> {
+    if (!Number.isSafeInteger(teamMemberId) || teamMemberId < 1) {
+      throw createApiServiceError('Team member ID must be a positive whole number.');
+    }
     let response = await this.axios.get(`/team-members/${teamMemberId}`);
     return response.data;
   }
@@ -277,11 +333,40 @@ export class Client {
     pageSize?: number;
   }): Promise<PaginatedResponse<TeamMember>> {
     let response = await this.axios.get('/team-members', {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100
-      }
+      params: this.pagination(params)
     });
+    return this.normalizePage<TeamMember>(response.data, 'team_members');
+  }
+
+  async listCustomers(params?: {
+    page?: number;
+    pageSize?: number;
+    createdAfter?: string;
+    createdBefore?: string;
+    modifiedAfter?: string;
+    modifiedBefore?: string;
+    subscribed?: boolean;
+  }): Promise<PaginatedResponse<Record<string, unknown>>> {
+    let response = await this.axios.get('/customers', {
+      params: pickDefined({
+        ...this.pagination(params, 250),
+        created_after: this.dateFilter(params?.createdAfter),
+        created_before: this.dateFilter(params?.createdBefore, true),
+        modified_after: this.dateFilter(params?.modifiedAfter),
+        modified_before: this.dateFilter(params?.modifiedBefore, true),
+        subscribed: params?.subscribed
+      })
+    });
+    return this.normalizePage<Record<string, unknown>>(response.data, 'customers');
+  }
+
+  async getCustomer(customerId: number): Promise<Record<string, unknown>> {
+    if (!Number.isSafeInteger(customerId) || customerId < 1) {
+      throw createApiServiceError(
+        'Customer ID must be a positive whole number. Call list_customers to discover IDs.'
+      );
+    }
+    let response = await this.axios.get(`/customers/${customerId}`);
     return response.data;
   }
 

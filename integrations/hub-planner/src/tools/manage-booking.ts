@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageBooking = SlateTool.create(spec, {
   name: 'Manage Booking',
   key: 'manage_booking',
   description: `Create, update, or delete a resource booking in Hub Planner. Bookings schedule resources onto projects for specific date ranges.
-When creating, **resourceId**, **projectId**, **start**, and **end** are required. Supports percentage-based and minute-based allocation, repeating bookings, and approval workflows.`,
+When creating, **resourceId**, **projectId**, **start**, and **end** are required. Supports percentage-based and minute-based allocation and booking requests.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -83,45 +83,55 @@ When creating, **resourceId**, **projectId**, **start**, and **end** are require
     } = ctx.input;
 
     if (action === 'create') {
+      if (
+        !ctx.input.resourceId?.trim() ||
+        !ctx.input.projectId?.trim() ||
+        !ctx.input.start?.trim() ||
+        !ctx.input.end?.trim()
+      ) {
+        throw createApiServiceError(
+          'resourceId, projectId, start, end are required for create.'
+        );
+      }
       let body: Record<string, any> = { ...fields, resource: resourceId, project: projectId };
-      if (allowOverschedule) body.allowOverschedule = true;
+      if (allowOverschedule !== undefined) body.allowOverschedule = allowOverschedule;
       let result = await client.createBooking(body);
       return {
         output: {
           bookingId: result._id,
-          resourceId: result.resource,
-          projectId: result.project,
-          start: result.start,
-          end: result.end,
-          title: result.title,
-          state: result.state,
-          type: result.type,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          resourceId: result.resource ?? undefined,
+          projectId: result.project ?? undefined,
+          start: result.start ?? undefined,
+          end: result.end ?? undefined,
+          title: result.title ?? undefined,
+          state: result.state ?? undefined,
+          type: result.type ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created booking (ID: \`${result._id}\`) for resource \`${result.resource}\` on project \`${result.project}\`.`
       };
     }
 
     if (action === 'update') {
-      if (!bookingId) throw new Error('bookingId is required for update');
+      if (!bookingId) throw createApiServiceError('bookingId is required for update');
       let body: Record<string, any> = { ...fields };
       if (resourceId) body.resource = resourceId;
       if (projectId) body.project = projectId;
-      if (allowOverschedule) body.allowOverschedule = true;
+      if (allowOverschedule !== undefined) body.allowOverschedule = allowOverschedule;
       let result = await client.updateBooking(bookingId, body);
       return {
         output: {
           bookingId: result._id,
-          resourceId: result.resource,
-          projectId: result.project,
-          start: result.start,
-          end: result.end,
-          title: result.title,
-          state: result.state,
-          type: result.type,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          resourceId: result.resource ?? undefined,
+          projectId: result.project ?? undefined,
+          start: result.start ?? undefined,
+          end: result.end ?? undefined,
+          title: result.title ?? undefined,
+          state: result.state ?? undefined,
+          type: result.type ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Updated booking \`${result._id}\`.`
       };
@@ -129,15 +139,16 @@ When creating, **resourceId**, **projectId**, **start**, and **end** are require
 
     if (action === 'delete_bulk') {
       if (!bookingIds || bookingIds.length === 0)
-        throw new Error('bookingIds is required for bulk delete');
-      await client.deleteBookingsBulk(bookingIds);
+        throw createApiServiceError('bookingIds is required for bulk delete');
+      let result = await client.deleteBookingsBulk(bookingIds);
+      let deletedCount = typeof result?.count === 'number' ? result.count : undefined;
       return {
-        output: { deletedCount: bookingIds.length },
-        message: `Deleted **${bookingIds.length}** bookings.`
+        output: { deletedCount },
+        message: 'Deleted the requested bookings.'
       };
     }
 
-    if (!bookingId) throw new Error('bookingId is required for delete');
+    if (!bookingId) throw createApiServiceError('bookingId is required for delete');
     await client.deleteBooking(bookingId);
     return {
       output: { bookingId },

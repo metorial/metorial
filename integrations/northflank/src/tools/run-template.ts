@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let runTemplate = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let runTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       templateId: z.string().describe('ID of the template to run'),
       arguments: z
         .record(z.string(), z.any())
@@ -30,7 +32,9 @@ export let runTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let result = await client.runTemplate(ctx.input.templateId, ctx.input.arguments);

@@ -22,7 +22,12 @@ let customFieldOutputSchema = z.object({
     .array(enumOptionSchema)
     .optional()
     .describe('Available options for select/multiselect fields'),
-  groupId: z.number().nullable().optional().describe('Custom field group ID')
+  groupId: z.number().nullable().optional().describe('Numeric custom field group ID'),
+  fieldGroupId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Custom field group ID returned by Kommo')
 });
 
 export let listCustomFieldsTool = SlateTool.create(spec, {
@@ -70,7 +75,13 @@ export let listCustomFieldsTool = SlateTool.create(spec, {
         value: e.value,
         sort: e.sort
       })),
-      groupId: f.group_id
+      groupId:
+        typeof f.group_id === 'number'
+          ? f.group_id
+          : f.group_id == null
+            ? f.group_id
+            : undefined,
+      fieldGroupId: f.group_id == null ? f.group_id : String(f.group_id)
     }));
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,6 +17,12 @@ export let manageOpportunity = SlateTool.create(spec, {
       action: z
         .enum(['create', 'update', 'delete'])
         .describe('Action to perform on the opportunity'),
+      leadId: z
+        .string()
+        .optional()
+        .describe(
+          'Lead ID to associate with a new opportunity. Required for create; use search_leads to discover it.'
+        ),
       opportunityId: z
         .string()
         .optional()
@@ -52,15 +58,12 @@ export let manageOpportunity = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
         let data: Record<string, any> = {};
+        if (ctx.input.leadId !== undefined) data.leadId = ctx.input.leadId;
         if (ctx.input.carrier !== undefined) data.carrier = ctx.input.carrier;
         if (ctx.input.productLine !== undefined) data.productLine = ctx.input.productLine;
         if (ctx.input.premium !== undefined) data.premium = ctx.input.premium;
@@ -76,7 +79,7 @@ export let manageOpportunity = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.opportunityId) {
-          throw new Error('opportunityId is required for "update" action');
+          throw createApiServiceError('opportunityId is required for "update" action');
         }
         let data: Record<string, any> = {};
         if (ctx.input.carrier !== undefined) data.carrier = ctx.input.carrier;
@@ -94,7 +97,7 @@ export let manageOpportunity = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.opportunityId) {
-          throw new Error('opportunityId is required for "delete" action');
+          throw createApiServiceError('opportunityId is required for "delete" action');
         }
         await client.deleteOpportunity(ctx.input.opportunityId);
         return {

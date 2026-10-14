@@ -1,4 +1,4 @@
-# Slates Specification for Tomba
+# Tomba Integration Specification
 
 ## Overview
 
@@ -55,9 +55,15 @@ Allows finding professional emails using just a LinkedIn profile URL.
 
 ### Email & Domain Enrichment
 
-Lets you look up person and company data based on an email. For example, you could retrieve a person's name, location, and social handles from an email.
+Lets you look up person and company data based on an email. For example, you could retrieve a person's name, job title, company, country, and social handles from an email.
 
-- Returns data such as name, company, position, social profiles (Twitter, LinkedIn), gender, country, and more.
+- Returns native Tomba fields such as name, company, position, social profiles (Twitter, LinkedIn), country, confidence score, and verification status.
+- `enrich` preserves Tomba's null email when no matching profile exists.
+
+### Email Formats and Sources
+
+- `get_email_formats` returns a company's email patterns and the percentage using each pattern via `GET /email-format?domain=...`. Successful calls use email count credits, including empty results.
+- `get_email_sources` returns public source URLs, extraction dates, last-seen dates, and whether the address remains on the page via `GET /email-sources?email=...`.
 
 ### Phone Finder
 

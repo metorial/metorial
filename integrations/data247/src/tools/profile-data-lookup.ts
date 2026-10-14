@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRawData247Result } from '../lib/client';
 import { spec } from '../spec';
 
 export let profileDataLookup = SlateTool.create(spec, {
@@ -24,6 +24,10 @@ export let profileDataLookup = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResult: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider result in its original JSON types'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),
       address: z.string().optional().describe('Street address'),
@@ -54,6 +58,7 @@ export let profileDataLookup = SlateTool.create(spec, {
     let { firstname, lastname, address: addr, city: c, state: s, zip: z2, ...rest } = raw;
 
     let result = {
+      rawResult: getRawData247Result(raw),
       firstName: firstname,
       lastName: lastname,
       address: addr,

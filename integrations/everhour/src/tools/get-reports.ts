@@ -65,20 +65,20 @@ export let getReport = SlateTool.create(spec, {
     }
 
     let entries = (Array.isArray(data) ? data : []).map((entry: any) => ({
-      projectId: entry.projectId,
-      projectName: entry.projectName,
-      clientId: entry.clientId,
-      clientName: entry.clientName,
-      memberId: entry.memberId,
-      memberName: entry.memberName,
-      totalTimeSeconds: entry.time,
-      billableTimeSeconds: entry.billableTime,
-      nonBillableTimeSeconds: entry.nonBillableTime,
-      billableAmountCents: entry.billableAmount,
-      costsCents: entry.costs,
-      profitCents: entry.profit,
-      uninvoicedAmountCents: entry.uninvoicedAmount,
-      expensesCents: entry.expenses
+      projectId: entry.projectId ?? undefined,
+      projectName: entry.projectName ?? undefined,
+      clientId: entry.clientId ?? undefined,
+      clientName: entry.clientName ?? undefined,
+      memberId: entry.memberId ?? undefined,
+      memberName: entry.memberName ?? undefined,
+      totalTimeSeconds: entry.time ?? undefined,
+      billableTimeSeconds: entry.billableTime ?? undefined,
+      nonBillableTimeSeconds: entry.nonBillableTime ?? undefined,
+      billableAmountCents: entry.billableAmount ?? undefined,
+      costsCents: entry.costs ?? undefined,
+      profitCents: entry.profit ?? undefined,
+      uninvoicedAmountCents: entry.uninvoicedAmount ?? undefined,
+      expensesCents: entry.expenses ?? undefined
     }));
 
     return {

@@ -28,7 +28,10 @@ export let createDeal = SlateTool.create(spec, {
         .optional()
         .describe('Company name to associate. Creates a new company if no match is found'),
       primaryContactId: z.number().optional().describe('Primary contact person ID'),
-      sourceId: z.number().optional().describe('Lead source ID'),
+      sourceId: z
+        .number()
+        .optional()
+        .describe('Lead source ID. Call list_lead_sources to discover IDs.'),
       customFields: z
         .record(z.string(), z.any())
         .optional()

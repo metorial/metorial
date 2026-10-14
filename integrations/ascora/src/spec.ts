@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'ascora',
   name: 'Ascora',
   description:
-    'Cloud-based field service management and job management platform for trade businesses. Manage enquiries, customers, invoices, and payments.',
+    'Search customers and jobs, submit enquiries, and synchronise invoices and payments with accounting systems for trade businesses.',
   metadata: {},
   config,
   auth

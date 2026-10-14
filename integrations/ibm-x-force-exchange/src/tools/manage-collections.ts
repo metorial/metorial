@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { XForceClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ export let manageCollections = SlateTool.create(spec, {
   name: 'Manage Collections',
   key: 'manage_collections',
   description: `List, search, retrieve, or create threat intelligence collections (case files). Collections are collaborative workspaces for aggregating indicators of compromise (IPs, URLs, malware hashes, vulnerabilities) and contextual notes.
-Use the **action** field to specify the operation: "list" for your own, "listPublic" for public, "search", "get", or "create".`,
+Use the **action** field to specify the operation: "list" for your own, "listPublic" for public, "search", "get", or "create". Search defaults to private collections you own or can access; set searchScope to public to search public collections.`,
   tags: {
     readOnly: false
   }
@@ -42,6 +42,10 @@ Use the **action** field to specify the operation: "list" for your own, "listPub
         .string()
         .optional()
         .describe('Search query (required for "search" action)'),
+      searchScope: z
+        .enum(['private', 'public'])
+        .optional()
+        .describe('Collections to search (default: private, including shared collections)'),
       title: z.string().optional().describe('Collection title (required for "create" action)'),
       description: z
         .string()
@@ -77,10 +81,12 @@ Use the **action** field to specify the operation: "list" for your own, "listPub
       title: c.title,
       description: c.description,
       created: c.created,
-      owner: c.owner ? { userId: c.owner.userid, name: c.owner.name } : undefined,
-      tlp: c.tlp,
+      owner: c.owner
+        ? { userId: c.owner.userid ?? c.owner.uuid, name: c.owner.name }
+        : undefined,
+      tlp: c.tlp ?? c.tlpColor?.tlpColorName,
       tags: c.tags,
-      contentCount: c.contents?.length
+      contentCount: Array.isArray(c.contents) ? c.contents.length : c.contents?.reports?.length
     });
 
     switch (ctx.input.action) {
@@ -108,20 +114,23 @@ Use the **action** field to specify the operation: "list" for your own, "listPub
 
       case 'search': {
         if (!ctx.input.searchQuery)
-          throw new Error('searchQuery is required for "search" action');
+          throw createApiServiceError('searchQuery is required for "search" action.');
         ctx.progress('Searching collections...');
-        let data = await client.searchCollections(ctx.input.searchQuery);
+        let data = await client.searchCollections(
+          ctx.input.searchQuery,
+          ctx.input.searchScope
+        );
         let casefiles = data.casefiles || data || [];
         let mapped = casefiles.map(mapCollection);
         return {
-          output: { collections: mapped, totalCount: data.totalRows || mapped.length },
+          output: { collections: mapped, totalCount: data.totalRows ?? mapped.length },
           message: `Found **${mapped.length}** collection(s) matching "${ctx.input.searchQuery}"`
         };
       }
 
       case 'get': {
         if (!ctx.input.collectionId)
-          throw new Error('collectionId is required for "get" action');
+          throw createApiServiceError('collectionId is required for "get" action.');
         ctx.progress('Fetching collection...');
         let data = await client.getCollection(ctx.input.collectionId);
         return {
@@ -131,7 +140,8 @@ Use the **action** field to specify the operation: "list" for your own, "listPub
       }
 
       case 'create': {
-        if (!ctx.input.title) throw new Error('title is required for "create" action');
+        if (!ctx.input.title)
+          throw createApiServiceError('title is required for "create" action.');
         ctx.progress('Creating collection...');
         let data = await client.createCollection({
           title: ctx.input.title,

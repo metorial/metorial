@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -86,7 +86,7 @@ When creating an order, you can also include line items.`,
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating a sales order');
+        throw createApiServiceError('Fields are required for creating a sales order');
       }
       let result = await client.createSalesOrder(ctx.input.fields);
       let salesOrderId = result?.id;
@@ -106,7 +106,7 @@ When creating an order, you can also include line items.`,
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.salesOrderId) {
-        throw new Error('salesOrderId is required for updating a sales order');
+        throw createApiServiceError('salesOrderId is required for updating a sales order');
       }
       await client.updateSalesOrder(ctx.input.salesOrderId, ctx.input.fields || {});
       let salesOrder = await client.getSalesOrder(ctx.input.salesOrderId);
@@ -122,7 +122,7 @@ When creating an order, you can also include line items.`,
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.salesOrderId) {
-        throw new Error('salesOrderId is required for deleting a sales order');
+        throw createApiServiceError('salesOrderId is required for deleting a sales order');
       }
       await client.deleteSalesOrder(ctx.input.salesOrderId);
       return {
@@ -134,6 +134,6 @@ When creating an order, you can also include line items.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

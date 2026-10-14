@@ -68,7 +68,7 @@ export let updateAppointment = SlateTool.create(spec, {
       lastname: ctx.input.lastName,
       email: ctx.input.email,
       phone: ctx.input.phone,
-      notificationmsg: ctx.input.notes,
+      notes: ctx.input.notes,
       location: ctx.input.location,
       pricegross: ctx.input.priceGross,
       additional1: ctx.input.additional1,

@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Imagior
 
-Generate and customize images from design templates via API. Retrieve and inspect template structures to discover customizable elements (text, colors, images, positioning). List and sort user templates, generate images with element overrides, and check account credit balance. Suited for bulk image generation including social media graphics, certificates, product images, badges, and marketing materials.
+Generate and customize downloadable images from design templates. List and sort your templates, inspect customizable text, colors, images, and positioning, then generate a PNG with element overrides. Check your account credit balance before generation; each image consumes one credit.
+
+Use `list_templates` to find a template ID and `get_template_elements` to discover the element names and properties accepted by `generate_image`. Templates are designed in the Imagior dashboard.
+
+API reference: [Imagior documentation](https://docs.imagior.com/api-reference/image-generate).
 
 ## License
 

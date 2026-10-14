@@ -27,7 +27,7 @@ export let listCompanies = SlateTool.create(spec, {
       includes: z
         .string()
         .optional()
-        .describe('Comma-separated list of related data to include (e.g., "people,tags")')
+        .describe('Space-separated list of related data to include (e.g., "positions tags")')
     })
   )
   .output(
@@ -46,13 +46,14 @@ export let listCompanies = SlateTool.create(spec, {
     if (ctx.input.query) {
       result = await client.searchCompanies(ctx.input.query, {
         page: ctx.input.page,
-        perpage: ctx.input.perPage
+        perpage: ctx.input.perPage,
+        includes: ctx.input.includes?.replace(/,/g, ' ')
       });
     } else {
       result = await client.listCompanies({
         page: ctx.input.page,
         perpage: ctx.input.perPage,
-        includes: ctx.input.includes
+        includes: ctx.input.includes?.replace(/,/g, ' ')
       });
     }
 

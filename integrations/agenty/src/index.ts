@@ -8,14 +8,17 @@ import {
   extractStructuredData,
   generatePdf,
   getAgent,
+  getFileUrl,
   getJobLogs,
   getJobResults,
   getJobStatus,
   getPageContent,
   listAgents,
   listJobs,
+  listListRows,
   manageAgentInput,
   manageList,
+  manageListRow,
   manageSchedule,
   startJob,
   stopJob
@@ -33,14 +36,17 @@ export let provider = Slate.create({
     getJobResults,
     getJobLogs,
     listJobs,
+    listListRows,
     exportJobResult,
     manageAgentInput,
     manageSchedule,
     manageList,
+    manageListRow,
     captureScreenshot,
     generatePdf,
     getPageContent,
-    extractStructuredData
+    extractStructuredData,
+    getFileUrl
   ],
   triggers: []
 });

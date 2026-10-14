@@ -1,6 +1,8 @@
 # Northflank
 
-Build, deploy, and scale applications, jobs, and databases on Northflank's cloud or your own AWS, GCP, and Azure infrastructure. Create and manage projects, build services from Git repositories, deploy containers, run scheduled or manual jobs, and provision database addons (PostgreSQL, MongoDB, MySQL, Redis, MinIO, RabbitMQ). Manage secrets, environment variables, domains, TLS certificates, and container registries. Orchestrate release pipelines with staged promotions, preview environments, and infrastructure-as-code templates. Scale services with autoscaling policies, monitor logs and metrics, configure log sinks, manage BYOC clusters and nodes, and handle webhook notification integrations for build, job, backup, billing, autoscaling, and infrastructure alert events. Organize resources with tags, manage billing invoices, and administer team VCS integrations.
+Manage Northflank projects, deployment services, jobs, database addons, secret groups, and webhook notification integrations. Deploy external container images or internal builds, pause, resume, or restart services, run jobs and infrastructure templates, retrieve addon credentials, and trigger database backups. List projects, services, jobs, addons, pipelines, domains, templates, log sinks, tags, and invoices.
+
+Use `get_auth_info` to inspect the connected token's identity and scope. Organization-scoped tokens can call `list_teams` and pass a returned `teamId` to resource tools. Team-scoped tokens can omit `teamId`. Existing connections retain their saved team scope as a fallback.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TombaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,12 @@ export let domainSearch = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Two-letter country code to filter results (e.g. "US")'),
+      type: z
+        .enum(['all', 'personal', 'generic'])
+        .optional()
+        .describe(
+          'Filter personal addresses, generic role addresses, or all addresses (default: all)'
+        ),
       department: z
         .string()
         .optional()
@@ -59,12 +65,21 @@ export let domainSearch = SlateTool.create(spec, {
       organizationName: z.string().nullable().optional().describe('Organization name'),
       organizationDomain: z.string().nullable().optional().describe('Organization domain'),
       emails: z.array(emailSchema).describe('List of email addresses found'),
-      totalEmails: z.number().optional().describe('Total number of emails found'),
+      totalEmails: z
+        .number()
+        .optional()
+        .describe('Total matching email addresses across all pages'),
+      page: z.number().optional().describe('Current page'),
+      pageSize: z.number().optional().describe('Number of addresses per page'),
+      totalPages: z.number().optional().describe('Total number of pages'),
       country: z.string().nullable().optional().describe('Country of the organization'),
       lastUpdated: z.string().nullable().optional().describe('Last time the data was updated')
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.domain?.trim() && !ctx.input.company?.trim()) {
+      throw createApiServiceError('Provide a domain or company name to search.');
+    }
     let client = new TombaClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret
@@ -76,7 +91,8 @@ export let domainSearch = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit,
       country: ctx.input.country,
-      department: ctx.input.department
+      department: ctx.input.department,
+      type: ctx.input.type
     });
 
     let data = result.data || {};
@@ -98,12 +114,18 @@ export let domainSearch = SlateTool.create(spec, {
 
     return {
       output: {
-        organizationName: data.organization?.name || data.organization,
+        organizationName:
+          typeof data.organization === 'string'
+            ? data.organization
+            : (data.organization?.organization ?? data.organization?.name),
         organizationDomain: data.organization?.website_url || ctx.input.domain,
         emails,
-        totalEmails: data.total || emails.length,
-        country: data.country,
-        lastUpdated: data.last_updated
+        totalEmails: result.meta?.total ?? data.total ?? emails.length,
+        page: result.meta?.current,
+        pageSize: result.meta?.pageSize,
+        totalPages: result.meta?.total_pages,
+        country: data.organization?.location?.country ?? data.country,
+        lastUpdated: data.organization?.last_updated ?? data.last_updated
       },
       message: `Found **${emails.length}** email addresses for **${ctx.input.domain || ctx.input.company}**.`
     };

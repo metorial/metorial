@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formFieldSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let roleSchema = z.object({
@@ -13,7 +14,14 @@ let roleSchema = z.object({
     .describe('Type of signer. Defaults to Signer'),
   signerOrder: z.number().optional().describe('Signing order position'),
   locale: z.string().optional().describe('Locale for the signer, e.g. "EN"'),
-  privateMessage: z.string().optional().describe('Private message visible only to this signer')
+  privateMessage: z
+    .string()
+    .optional()
+    .describe('Private message visible only to this signer'),
+  formFields: z
+    .array(formFieldSchema)
+    .optional()
+    .describe('Additional or prefilled form fields for this template role')
 });
 
 export let sendFromTemplate = SlateTool.create(spec, {
@@ -73,6 +81,12 @@ export let sendFromTemplate = SlateTool.create(spec, {
         .describe('Send the document on behalf of this email address'),
       reminderSettings: z
         .object({
+          enableAutoReminder: z
+            .boolean()
+            .optional()
+            .describe(
+              'Enable automatic reminders; defaults to true when reminderSettings is provided'
+            ),
           reminderDays: z.number().optional().describe('Days between reminders'),
           reminderCount: z.number().optional().describe('Total number of reminders to send')
         })
@@ -87,7 +101,7 @@ export let sendFromTemplate = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 

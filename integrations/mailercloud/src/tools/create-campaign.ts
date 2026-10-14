@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createCampaign = SlateTool.create(spec, {
   name: 'Create Campaign',
   key: 'create_campaign',
-  description: `Create a new email campaign in your Mailercloud account. Campaigns require content (HTML or plain text) and a target audience (list ID or segment ID). You can specify the sender details, subject, reply-to address, and tags.`,
+  description: `Create a new email campaign in your Mailercloud account. Campaigns require content (HTML or plain text) and a target audience (list ID or segment ID). You can specify the sender details, subject, and reply-to address.`,
   instructions: [
     'Either htmlContent or textContent must be provided.',
     'Either listId or segmentId must be provided to target recipients.'
@@ -27,7 +27,10 @@ export let createCampaign = SlateTool.create(spec, {
       textContent: z.string().optional().describe('Plain text content of the email'),
       listId: z.string().optional().describe('ID of the list to send the campaign to'),
       segmentId: z.string().optional().describe('ID of the segment to send the campaign to'),
-      tags: z.array(z.string()).optional().describe('Tags for the campaign')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field. Omit it: campaign tags are not supported by this endpoint.')
     })
   )
   .output(
@@ -39,6 +42,18 @@ export let createCampaign = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.htmlContent?.trim() && !ctx.input.textContent?.trim()) {
+      throw createApiServiceError('Provide htmlContent or textContent for the campaign.');
+    }
+    if (!ctx.input.listId?.trim() && !ctx.input.segmentId?.trim()) {
+      throw createApiServiceError('Provide listId or segmentId for the campaign audience.');
+    }
+    if (ctx.input.tags?.length) {
+      throw createApiServiceError(
+        'Campaign tags are not supported by this endpoint. Omit tags.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createCampaign({
@@ -50,8 +65,7 @@ export let createCampaign = SlateTool.create(spec, {
       htmlContent: ctx.input.htmlContent,
       textContent: ctx.input.textContent,
       listId: ctx.input.listId,
-      segmentId: ctx.input.segmentId,
-      tags: ctx.input.tags as string[] | undefined
+      segmentId: ctx.input.segmentId
     });
 
     let data = result?.data ?? result;

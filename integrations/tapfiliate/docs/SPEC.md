@@ -1,4 +1,4 @@
-# Slates Specification for Tapfiliate
+# Tapfiliate Integration Specification
 
 ## Overview
 
@@ -12,7 +12,7 @@ Authentication with the Tapfiliate API is achieved by sending your `X-Api-Key` a
 X-Api-Key: "YOUR_API_KEY"
 ```
 
-You can get your API Key from your Profile Settings > API Key.
+Get your API key from Tapfiliate account settings.
 
 All API requests must be made over HTTPS. Plain HTTP calls will fail. API requests without authentication will also fail.
 
@@ -24,7 +24,7 @@ There are no OAuth flows or scopes. Authentication is solely via the API key. Ke
 
 ### Affiliate Management
 
-Create, retrieve, list, and delete affiliates. Manage affiliate details including personal information, company data, address, and custom fields. Assign affiliates to groups, manage meta data, and configure payout methods (e.g., PayPal). Supports filtering affiliates by email, referral code, click ID, source ID, parent ID, or affiliate group.
+Create, retrieve, list, and delete affiliates. Manage affiliate details including personal information, company data, address, and custom fields. Assign affiliates to groups, manage metadata, discover payout method IDs with list_affiliate_payout_methods, and configure payout details (e.g., PayPal). Supports filtering affiliates by email, referral code, click ID, source ID, parent ID, or affiliate group.
 
 ### Affiliate Prospects
 
@@ -44,7 +44,7 @@ Create and manage conversions (sales/transactions). Conversions can be attribute
 
 ### Customer Management
 
-Track customers referred by affiliates. Customers support statuses such as "trial", "lead", "new", "paying", and "canceled". Useful for SaaS and subscription businesses to implement recurring/lifetime commissions. Customers can be canceled and uncanceled.
+Track customers referred by affiliates. Customers support statuses such as "trial", "lead", "new", "paying", and "canceled". Useful for SaaS and subscription businesses to implement recurring/lifetime commissions. Customers can be canceled and uncanceled. The update_customer tool changes an external identifier or replaces metadata. Outputs keep customerId as the external identifier and add customerReference for the Tapfiliate-generated ID used by resource endpoints.
 
 ### Commission Management
 
@@ -52,11 +52,11 @@ Retrieve, list, and update commissions. Approve or disapprove individual commiss
 
 ### Payment Management
 
-Manage affiliate payments and balances. View all affiliate balances, create payments to settle balances, list payment history, and cancel payments. Supports multi-currency balances.
+Manage affiliate payments and balances. View non-zero affiliate balances, record completed payments with an explicit amount and currency, retrieve payment details, list payment history, and cancel recorded payments. Supports multi-currency balances. Funds must be transferred separately through your payment provider. Current string payment IDs use paymentReference; legacy numeric paymentId values remain supported. Supply exactly one identifier when canceling a payment.
 
 ### Click Tracking
 
-Create clicks programmatically for REST-only integrations (without JavaScript). List and retrieve detailed click information including browser, OS, geolocation, referrer, and landing page data.
+Create clicks programmatically for REST-only integrations (without JavaScript). List tracked clicks with browser, OS, referrer, and landing page details. Click creation accepts referrer, landing page, and tracking metadata.
 
 - Listing clicks is only available on the Enterprise plan.
 
@@ -66,7 +66,7 @@ Set and remove parent-child relationships between affiliates to support multi-le
 
 ### Meta Data
 
-Attach arbitrary key-value meta data to affiliates, customers, and conversions. Meta data can be managed individually by key or replaced entirely.
+Attach arbitrary key-value meta data to affiliates, customers, and conversions. Affiliate metadata can be replaced with update_affiliate_metadata. Conversion and customer update tools can replace metadata.
 
 ## Events
 
@@ -88,3 +88,9 @@ Tapfiliate offers a very flexible webhook system as part of its Triggers feature
 - **Payment Created**: Triggered when an affiliate's balance is settled in Tapfiliate.
 
 You can assign filters to triggered events, and the filters are different for each specific event. Each trigger can be configured to send a webhook (HTTP POST) to a specified URL with event data.
+
+## API References
+
+- [REST API v1.6](https://tapfiliate.com/docs/rest/)
+- [REST API integration guide](https://support.tapfiliate.com/en/articles/12682358-how-to-integrate-with-tapfiliate-via-the-rest-api)
+- [Automated payout workflow](https://support.tapfiliate.com/en/articles/13342050-automated-payouts-using-rest-api)

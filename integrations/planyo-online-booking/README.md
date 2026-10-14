@@ -1,6 +1,13 @@
 # <img src="logo.png" height="20"> Planyo Online Booking
 
-Create, modify, cancel, and search reservations for bookable resources such as vacation properties, car rentals, hotels, equipment, and event spaces. Manage resource availability, vacations, and weekly schedules. Configure pricing rules, calculate rental prices, and handle seasonal pricing. Record and track payments against reservations. Create and manage customers, assign roles, and search users by custom properties. Define additional products, coupons, and vouchers for reservations. Generate invoices, send customer emails, and sync availability via iCal feeds. Manage site and meta-site settings, notification templates, and webhook callbacks for reservation lifecycle, payment, check-in/check-out, and scheduling events.
+Create, modify, confirm, cancel, and delete reservations for bookable resources. Search reservations by dates or customer details, discover available resources with rental prices, check booking constraints, and view resource usage. Record and list payments, manage customers and their custom properties, create and list discount vouchers, and retrieve site information.
+
+## Search tools
+
+- `search_resources`: find available resources for a period and quantity, with pricing and custom property filters.
+- `search_reservations`: find existing bookings by customer details, reservation ID, or resource name without choosing a date range.
+
+For `reservation_action` with action `Verify`, supply `verificationCode`. A custom reservation price cannot be combined with a voucher code.
 
 ## License
 

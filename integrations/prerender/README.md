@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Prerender
 
-Manage pre-rendered HTML cache for JavaScript-heavy websites to improve SEO. Recache single or multiple URLs on demand, search cached URLs by query or exact match, clear cache using wildcard patterns, submit and manage XML sitemaps for automated crawling, control recache speed, manage connected domains, and render pages through a headless browser. Supports desktop and mobile adaptive rendering.
+Manage pre-rendered HTML cache for JavaScript-heavy websites to improve SEO. Recache single or multiple URLs on demand, search cached URLs by query or exact match, clear cache using wildcard patterns and poll the clear-job status, submit XML sitemaps to import new URLs and manage sitemap registrations, control recache speed, manage connected domains, and render pages through a headless browser with a downloadable HTML snapshot. Supports desktop and mobile adaptive rendering.
+
+The documented REST API is available on every plan. Cache clearing requires a current plan; legacy plans require provider support.
 
 ## License
 

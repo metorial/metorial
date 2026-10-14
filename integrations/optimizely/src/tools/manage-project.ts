@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExperimentationClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,6 +23,10 @@ Projects are top-level containers that hold experiments, audiences, events, and 
         .string()
         .optional()
         .describe('Platform type, e.g. "web", "custom" (for create)'),
+      sdks: z
+        .array(z.string())
+        .optional()
+        .describe('SDK languages for a custom-platform project (for create)'),
       page: z.number().optional().describe('Page number (for list)'),
       perPage: z.number().optional().describe('Items per page (for list)')
     })
@@ -48,7 +52,7 @@ Projects are top-level containers that hold experiments, audiences, events, and 
         };
       }
       case 'get': {
-        if (!ctx.input.projectId) throw new Error('projectId is required');
+        if (!ctx.input.projectId) throw createApiServiceError('projectId is required');
         let project = await client.getProject(ctx.input.projectId);
         return {
           output: { project },
@@ -56,11 +60,13 @@ Projects are top-level containers that hold experiments, audiences, events, and 
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for creating a project');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a project');
         let project = await client.createProject({
           name: ctx.input.name,
           description: ctx.input.description,
-          platform: ctx.input.platform
+          platform: ctx.input.platform,
+          sdks: ctx.input.sdks
         });
         return {
           output: { project },
@@ -68,7 +74,7 @@ Projects are top-level containers that hold experiments, audiences, events, and 
         };
       }
       case 'update': {
-        if (!ctx.input.projectId) throw new Error('projectId is required');
+        if (!ctx.input.projectId) throw createApiServiceError('projectId is required');
         let updateData: Record<string, any> = {};
         if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
         if (ctx.input.description !== undefined)

@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Documint
 
-Generate customized PDF documents by merging data into pre-designed templates. Create invoices, contracts, proposals, certificates, and reports on the fly by populating dynamic tokens with custom data. List and retrieve available templates. Send documents for e-signature with support for multiple signers and signing order. Generated PDF links are available for 24 hours.
+Generate downloadable PDF documents by merging data into templates. List, retrieve, rename, and permanently delete templates. Create invoices, contracts, proposals, certificates, and reports using custom data. Original Documint PDF links expire after 24 hours, so save generated files for long-term use.
 
 ## License
 

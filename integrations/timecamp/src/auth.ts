@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,23 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://www.timecamp.com/third_party/api'
-      });
-
-      let response = await axios.get('/me', {
-        headers: {
-          Authorization: ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
 
       return {
         profile: {
           id: String(user.user_id),
-          email: user.email,
-          name: user.display_name
+          email: user.email ?? undefined,
+          name: user.display_name ?? user.email ?? String(user.user_id)
         }
       };
     }

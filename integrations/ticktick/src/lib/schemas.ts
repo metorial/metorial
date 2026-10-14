@@ -1,6 +1,19 @@
 import { z } from 'zod';
+import type { Project, Task } from './client';
+
+export let projectIdSchema = z
+  .string()
+  .describe('Project ID. Call list_projects to discover accessible project IDs.');
 
 export let checklistItemSchema = z.object({
+  id: z
+    .string()
+    .optional()
+    .describe('Existing checklist item ID from get_task; omit for a new item'),
+  completedTime: z
+    .string()
+    .optional()
+    .describe('Completion time in yyyy-MM-ddTHH:mm:ssZ format'),
   title: z.string().describe('Subtask title'),
   status: z.number().optional().describe('0 = uncompleted, 1 = completed'),
   isAllDay: z.boolean().optional().describe('Whether this is an all-day subtask'),
@@ -59,47 +72,47 @@ export let projectOutputSchema = z.object({
   kind: z.string().optional().describe('Project kind: TASK or NOTE')
 });
 
-export let mapTask = (task: any) => ({
+export let mapTask = (task: Task) => ({
   taskId: task.id,
   projectId: task.projectId,
   title: task.title,
-  content: task.content,
-  desc: task.desc,
-  isAllDay: task.isAllDay,
-  startDate: task.startDate,
-  dueDate: task.dueDate,
-  timeZone: task.timeZone,
-  isFloating: task.isFloating,
-  reminders: task.reminders,
-  repeatFlag: task.repeatFlag,
+  content: task.content ?? undefined,
+  desc: task.desc ?? undefined,
+  isAllDay: task.isAllDay ?? undefined,
+  startDate: task.startDate ?? undefined,
+  dueDate: task.dueDate ?? undefined,
+  timeZone: task.timeZone ?? undefined,
+  isFloating: task.isFloating ?? undefined,
+  reminders: task.reminders ?? undefined,
+  repeatFlag: task.repeatFlag ?? undefined,
   priority: task.priority ?? 0,
   status: task.status ?? 0,
-  completedTime: task.completedTime,
-  sortOrder: task.sortOrder,
-  items: task.items?.map((item: any) => ({
+  completedTime: task.completedTime ?? undefined,
+  sortOrder: task.sortOrder ?? undefined,
+  items: task.items?.map(item => ({
     subtaskId: item.id,
     title: item.title,
     status: item.status ?? 0,
-    completedTime: item.completedTime,
-    isAllDay: item.isAllDay,
-    sortOrder: item.sortOrder,
-    startDate: item.startDate,
-    timeZone: item.timeZone
+    completedTime: item.completedTime ?? undefined,
+    isAllDay: item.isAllDay ?? undefined,
+    sortOrder: item.sortOrder ?? undefined,
+    startDate: item.startDate ?? undefined,
+    timeZone: item.timeZone ?? undefined
   })),
-  modifiedTime: task.modifiedTime,
-  createdTime: task.createdTime,
-  tags: task.tags,
-  kind: task.kind
+  modifiedTime: task.modifiedTime ?? undefined,
+  createdTime: task.createdTime ?? undefined,
+  tags: task.tags ?? undefined,
+  kind: task.kind ?? undefined
 });
 
-export let mapProject = (project: any) => ({
+export let mapProject = (project: Project) => ({
   projectId: project.id,
   name: project.name,
-  color: project.color,
-  sortOrder: project.sortOrder,
-  closed: project.closed,
-  groupId: project.groupId,
-  viewMode: project.viewMode,
-  permission: project.permission,
-  kind: project.kind
+  color: project.color ?? undefined,
+  sortOrder: project.sortOrder ?? undefined,
+  closed: project.closed ?? undefined,
+  groupId: project.groupId ?? undefined,
+  viewMode: project.viewMode ?? undefined,
+  permission: project.permission ?? undefined,
+  kind: project.kind ?? undefined
 });

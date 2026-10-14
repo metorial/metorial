@@ -5,8 +5,11 @@ import {
   deleteContact,
   deleteDeal,
   getContact,
+  listAccounts,
+  listAutomations,
   listContacts,
   listDeals,
+  listTemplates,
   manageContactLists,
   manageContactTags,
   manageDeal,
@@ -21,6 +24,8 @@ export let provider = Slate.create({
     createUpdateContact,
     deleteContact,
     getContact,
+    listAccounts,
+    listAutomations,
     listContacts,
     manageContactTags,
     manageContactLists,
@@ -30,6 +35,7 @@ export let provider = Slate.create({
     manageDeal,
     deleteDeal,
     listDeals,
+    listTemplates,
     manageLists
   ],
   triggers: []

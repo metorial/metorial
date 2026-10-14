@@ -1,13 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let http = createAxios({
-  baseURL: 'https://api.geoapify.com'
+let http = createAuthenticatedAxios({
+  baseURL: 'https://api.geoapify.com',
+  timeout: 60000,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Geoapify',
+      reason: 'geoapify_api_error'
+    })
 });
 
 export class GeoapifyClient {
   private apiKey: string;
 
   constructor(config: { token: string }) {
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Geoapify API key is required. Reconnect with a valid API key.'
+      );
+    }
     this.apiKey = config.token;
   }
 
@@ -212,6 +223,13 @@ export class GeoapifyClient {
     return response.data;
   }
 
+  async getIsoline(isolineId: string) {
+    let response = await http.get('/v1/isoline', {
+      params: { id: isolineId, apiKey: this.apiKey }
+    });
+    return { data: response.data, status: response.status };
+  }
+
   // ── IP Geolocation ──
 
   async ipGeolocation(params: { ip?: string }) {
@@ -253,7 +271,7 @@ export class GeoapifyClient {
       params: {
         id: params.placeId,
         geometry: params.geometry,
-        level: params.level,
+        sublevel: params.level,
         apiKey: this.apiKey
       }
     });
@@ -264,12 +282,16 @@ export class GeoapifyClient {
 
   async searchPostcodes(params: {
     postcode?: string;
+    lat?: number;
+    lon?: number;
     countryCode?: string;
     geometry?: string;
   }) {
     let response = await http.get('/v1/postcode/search', {
       params: {
         postcode: params.postcode,
+        lat: params.lat,
+        lon: params.lon,
         countrycode: params.countryCode,
         geometry: params.geometry,
         apiKey: this.apiKey
@@ -349,6 +371,7 @@ export class GeoapifyClient {
     let response = await http.get('/v1/batch/geocode/search', {
       params: {
         id: jobId,
+        format: 'json',
         apiKey: this.apiKey
       }
     });
@@ -379,6 +402,7 @@ export class GeoapifyClient {
     let response = await http.get('/v1/batch/geocode/reverse', {
       params: {
         id: jobId,
+        format: 'json',
         apiKey: this.apiKey
       }
     });

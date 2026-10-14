@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageBotTool = SlateTool.create(spec, {
@@ -24,7 +25,10 @@ export let manageBotTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Natural language instructions defining the bot personality and behavior'),
-      model: z.string().optional().describe('AI model identifier (e.g. gpt-4, claude-3)'),
+      model: z
+        .string()
+        .optional()
+        .describe('AI model identifier; call list_models to discover available models'),
       datasetId: z.string().optional().describe('ID of the dataset to attach to the bot'),
       skillsetId: z.string().optional().describe('ID of the skillset to attach to the bot'),
       privacy: z.boolean().optional().describe('Enable privacy features'),
@@ -80,40 +84,40 @@ export let manageBotTool = SlateTool.create(spec, {
       return {
         output: {
           botId: result.id,
-          name: result.name,
-          description: result.description,
-          backstory: result.backstory,
-          model: result.model,
-          datasetId: result.datasetId,
-          skillsetId: result.skillsetId,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          name: result.name ?? name,
+          description: result.description ?? description,
+          backstory: result.backstory ?? backstory,
+          model: result.model ?? model,
+          datasetId: result.datasetId ?? datasetId,
+          skillsetId: result.skillsetId ?? skillsetId,
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Bot **${result.name || result.id}** created successfully.`
       };
     }
 
     if (action === 'fetch') {
-      if (!botId) throw new Error('botId is required for fetch');
+      if (!botId) throw createApiServiceError('botId is required for fetch');
       let result = await client.fetchBot(botId);
       return {
         output: {
           botId: result.id,
           name: result.name,
           description: result.description,
-          backstory: result.backstory,
+          backstory: result.backstory ?? undefined,
           model: result.model,
-          datasetId: result.datasetId,
-          skillsetId: result.skillsetId,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          datasetId: result.datasetId ?? undefined,
+          skillsetId: result.skillsetId ?? undefined,
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Fetched bot **${result.name || result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!botId) throw new Error('botId is required for update');
+      if (!botId) throw createApiServiceError('botId is required for update');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
@@ -128,21 +132,21 @@ export let manageBotTool = SlateTool.create(spec, {
       return {
         output: {
           botId: result.id || botId,
-          name: result.name,
-          description: result.description,
-          backstory: result.backstory,
-          model: result.model,
-          datasetId: result.datasetId,
-          skillsetId: result.skillsetId,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt
+          name: result.name ?? name,
+          description: result.description ?? description,
+          backstory: result.backstory ?? backstory,
+          model: result.model ?? model,
+          datasetId: result.datasetId ?? datasetId,
+          skillsetId: result.skillsetId ?? skillsetId,
+          createdAt: formatTimestamp(result.createdAt),
+          updatedAt: formatTimestamp(result.updatedAt)
         },
         message: `Bot **${botId}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!botId) throw new Error('botId is required for delete');
+      if (!botId) throw createApiServiceError('botId is required for delete');
       await client.deleteBot(botId);
       return {
         output: {
@@ -152,6 +156,6 @@ export let manageBotTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

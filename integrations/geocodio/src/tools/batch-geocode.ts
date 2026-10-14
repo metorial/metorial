@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,9 @@ Set **direction** to "forward" for addresses or "reverse" for coordinates. Enric
           'Geocoding direction: "forward" for addresses to coordinates, "reverse" for coordinates to addresses'
         ),
       queries: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(10000)
         .describe(
           'Array of address strings (forward) or "latitude,longitude" strings (reverse)'
         ),
@@ -34,7 +36,12 @@ Set **direction** to "forward" for addresses or "reverse" for coordinates. Enric
         .array(z.string())
         .optional()
         .describe('Data enrichment fields to append, e.g. ["timezone", "census"]'),
-      limit: z.number().optional().describe('Maximum number of results per query')
+      limit: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .optional()
+        .describe('Maximum number of results per query; 0 means no limit')
     })
   )
   .output(
@@ -68,6 +75,28 @@ Set **direction** to "forward" for addresses or "reverse" for coordinates. Enric
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.direction === 'reverse') {
+      for (let query of ctx.input.queries) {
+        let parts = query.split(',');
+        let [latitude, longitude] = parts.map(Number);
+        if (
+          parts.length !== 2 ||
+          parts.some(part => !part.trim()) ||
+          latitude === undefined ||
+          longitude === undefined ||
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude) ||
+          latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180
+        ) {
+          throw createApiServiceError(
+            'Reverse batch queries must contain valid "latitude,longitude" coordinate pairs.'
+          );
+        }
+      }
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let response: any;

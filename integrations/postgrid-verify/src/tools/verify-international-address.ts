@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,9 @@ let summarySchema = z
       .describe(
         'Verification status code (V=Verified, P=Partial, U=Unverified, A=Ambiguous, C=Conflict, R=Reverted)'
       ),
+    verificationStatus: z.string().optional().describe('Provider verification status'),
+    matchScore: z.number().optional().describe('Address match score from 0 to 100'),
+    message: z.string().optional().describe('Verification summary message'),
     inputMatchLevel: z.string().optional().describe('Match level of the input'),
     verifiedMatchLevel: z.string().optional().describe('Match level of the verified address'),
     parsingStatus: z.string().optional().describe('Address parsing status')
@@ -67,6 +70,16 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      status: z
+        .enum(['verified', 'corrected', 'failed'])
+        .optional()
+        .describe('Verification status'),
+      error: z.string().optional().describe('Failure reason for an address'),
+      countryName: z.string().optional().describe('Full country name'),
+      details: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Additional parsed address details'),
       formattedAddress: z
         .string()
         .optional()
@@ -103,12 +116,15 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
           postalOrZip?: string;
           country?: string;
         };
-    if (ctx.input.freeformAddress) {
+    if (ctx.input.freeformAddress !== undefined && ctx.input.address !== undefined) {
+      throw createApiServiceError('Provide only one of freeformAddress or address.');
+    }
+    if (ctx.input.freeformAddress?.trim()) {
       addressInput = ctx.input.freeformAddress;
     } else if (ctx.input.address) {
       addressInput = ctx.input.address;
     } else {
-      throw new Error('Either freeformAddress or address must be provided');
+      throw createApiServiceError('Provide either a non-empty freeformAddress or address.');
     }
 
     let result = await client.verifyInternationalAddress(addressInput, {
@@ -117,7 +133,7 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
       properCase: ctx.input.properCase
     });
 
-    let statusDescription = '';
+    let statusDescription = result.status || 'unknown';
     if (result.summary?.status) {
       let statusMap: Record<string, string> = {
         V: 'Verified',

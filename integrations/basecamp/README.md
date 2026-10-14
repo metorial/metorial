@@ -1,8 +1,18 @@
 # <img src="https://provider-logos.metorial-cdn.com/basecamp.png" height="20"> Basecamp
 
-Manage projects, to-do lists, messages, and team collaboration in Basecamp. Create and organize projects, manage to-do lists and tasks, post messages and comments, share files and documents, schedule events, and track project activity. Supports managing campfires (group chats), message boards, check-ins, and webhooks for real-time event notifications.
+Discover authorized Basecamp accounts and your profile, manage projects and to-do lists, create and complete tasks, post messages and comments, send Campfire messages, and schedule events.
+
+Call `list_accounts` first, then pass the chosen `accountId` to account-scoped tools. Connections with a previously saved account ID can continue using it when the tool input is omitted. Use `get_project` to discover enabled project tools and their IDs. Partial updates preserve omitted project, to-do list, to-do, and non-recurring schedule fields.
 
 ## Tools
+
+### List Accounts
+
+Discover authorized Basecamp accounts with their IDs, names, and URLs.
+
+### Get Current User
+
+Read your authenticated profile in the selected Basecamp account.
 
 ### Create Project
 

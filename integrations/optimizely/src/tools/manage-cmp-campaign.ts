@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmpClient } from '../lib/cmp-client';
 import { spec } from '../spec';
@@ -32,7 +32,7 @@ Campaigns are top-level containers for organizing related content tasks, briefs,
         .optional()
         .describe('Custom field values (for create/update)'),
       page: z.number().optional().describe('Page number (for list)'),
-      limit: z.number().optional().describe('Items per page (for list)')
+      limit: z.number().optional().describe('Items per page, from 1 to 100 (for list)')
     })
   )
   .output(
@@ -57,17 +57,17 @@ Campaigns are top-level containers for organizing related content tasks, briefs,
         };
       }
       case 'get': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required');
+        if (!ctx.input.campaignId) throw createApiServiceError('campaignId is required');
         let campaign = await client.getCampaign(ctx.input.campaignId);
         return {
           output: { campaign },
-          message: `Retrieved CMP campaign **${campaign.name || ctx.input.campaignId}**.`
+          message: `Retrieved CMP campaign **${campaign.title || campaign.name || ctx.input.campaignId}**.`
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
         let campaign = await client.createCampaign({
-          name: ctx.input.name,
+          title: ctx.input.name,
           description: ctx.input.description,
           start_date: ctx.input.startDate,
           end_date: ctx.input.endDate,
@@ -75,13 +75,13 @@ Campaigns are top-level containers for organizing related content tasks, briefs,
         });
         return {
           output: { campaign },
-          message: `Created CMP campaign **${campaign.name}**.`
+          message: `Created CMP campaign **${campaign.title || campaign.name}**.`
         };
       }
       case 'update': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required');
+        if (!ctx.input.campaignId) throw createApiServiceError('campaignId is required');
         let updateData: Record<string, any> = {};
-        if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
+        if (ctx.input.name !== undefined) updateData.title = ctx.input.name;
         if (ctx.input.description !== undefined)
           updateData.description = ctx.input.description;
         if (ctx.input.startDate !== undefined) updateData.start_date = ctx.input.startDate;
@@ -91,7 +91,7 @@ Campaigns are top-level containers for organizing related content tasks, briefs,
         let campaign = await client.updateCampaign(ctx.input.campaignId, updateData);
         return {
           output: { campaign },
-          message: `Updated CMP campaign **${campaign.name || ctx.input.campaignId}**.`
+          message: `Updated CMP campaign **${campaign.title || campaign.name || ctx.input.campaignId}**.`
         };
       }
     }

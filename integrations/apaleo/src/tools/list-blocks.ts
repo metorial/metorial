@@ -11,10 +11,13 @@ export let listBlocks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      propertyId: z.string().optional().describe('Property ID'),
+      propertyId: z
+        .string()
+        .optional()
+        .describe('Property ID. Call list_properties to discover available properties.'),
       groupId: z.string().optional().describe('Filter by group ID'),
       status: z
-        .enum(['Tentative', 'Definite', 'Washed', 'Canceled'])
+        .enum(['Tentative', 'Definite', 'Washed', 'Canceled', 'Optional'])
         .optional()
         .describe('Filter by block status'),
       from: z.string().optional().describe('From date (YYYY-MM-DD)'),
@@ -41,6 +44,10 @@ export let listBlocks = SlateTool.create(spec, {
               from: z.string().optional(),
               to: z.string().optional(),
               blockedUnits: z.number().optional(),
+              timeSlices: z
+                .array(z.record(z.string(), z.unknown()))
+                .optional()
+                .describe('Blocked room counts and prices for each time slice.'),
               pickedReservations: z.number().optional(),
               created: z.string().optional(),
               modified: z.string().optional()
@@ -68,10 +75,13 @@ export let listBlocks = SlateTool.create(spec, {
       blockId: b.id,
       groupId: b.group?.id,
       status: b.status,
-      property: b.property ? { propertyId: b.property.id, name: b.property.name } : undefined,
+      property: b.property
+        ? { propertyId: b.property.id ?? undefined, name: b.property.name ?? undefined }
+        : undefined,
       from: b.from,
       to: b.to,
       blockedUnits: b.blockedUnits,
+      timeSlices: b.timeSlices ?? undefined,
       pickedReservations: b.pickedReservations,
       created: b.created,
       modified: b.modified
@@ -80,9 +90,9 @@ export let listBlocks = SlateTool.create(spec, {
     return {
       output: {
         blocks,
-        count: result.count || blocks.length
+        count: result.count ?? blocks.length
       },
-      message: `Found **${result.count || blocks.length}** blocks.`
+      message: `Found **${result.count ?? blocks.length}** blocks.`
     };
   })
   .build();

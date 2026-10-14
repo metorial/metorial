@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listFontsTool = SlateTool.create(spec, {
   name: 'List Fonts',
   key: 'list_fonts',
-  description: `List all available fonts in your Mapbox account. Fonts are used in map styles for labels, text layers, and annotations. Returns the font stack names and their available font faces.`,
+  description: `List all available fonts in your Mapbox account. Fonts are used in map styles for labels, text layers, and annotations. Returns the exact font names available for your map styles.`,
   tags: {
     readOnly: true
   }
@@ -17,7 +17,7 @@ export let listFontsTool = SlateTool.create(spec, {
       fonts: z
         .array(
           z.object({
-            fontFamily: z.string().describe('Font family name'),
+            fontFamily: z.string().describe('Exact font name returned by Mapbox'),
             fontStyles: z
               .array(z.string())
               .optional()
@@ -35,19 +35,15 @@ export let listFontsTool = SlateTool.create(spec, {
 
     let result = await client.listFonts();
 
-    // The Fonts API returns an object with font family names as keys and arrays of font style names as values
-    let fonts: Array<{ fontFamily: string; fontStyles?: string[] }> = [];
-    if (result && typeof result === 'object') {
-      for (let [family, styles] of Object.entries(result)) {
-        fonts.push({
-          fontFamily: family,
-          fontStyles: Array.isArray(styles) ? (styles as string[]) : undefined
-        });
-      }
+    if (!Array.isArray(result) || result.some(font => typeof font !== 'string')) {
+      throw createApiServiceError(
+        'Mapbox returned an invalid font list. Expected an array of font names.'
+      );
     }
+    let fonts = result.map(fontFamily => ({ fontFamily }));
 
     return {
       output: { fonts },
-      message: `Found **${fonts.length}** font famil${fonts.length !== 1 ? 'ies' : 'y'}.`
+      message: `Found **${fonts.length}** font${fonts.length !== 1 ? 's' : ''}.`
     };
   });

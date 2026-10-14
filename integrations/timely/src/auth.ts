@@ -1,15 +1,25 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let http = createAxios({
-  baseURL: 'https://api.timelyapp.com/1.1'
+let http = createAuthenticatedAxios({
+  baseURL: 'https://api.timelyapp.com/1.1',
+  timeout: 30000,
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Timely', reason: 'timely_api_error' })
 });
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      refreshToken: z.string().optional()
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -20,12 +30,16 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://dev.timelyapp.com/'
+        url: 'https://developer.timely.com/'
       }
     ],
-
-    scopes: [],
-
+    scopes: [
+      {
+        scope: 'manage',
+        title: 'Manage workspace resources',
+        description: 'Access Timely resources according to your workspace role'
+      }
+    ],
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         response_type: 'code',
@@ -33,12 +47,9 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri,
         state: ctx.state
       });
-
-      return {
-        url: `https://api.timelyapp.com/1.1/oauth/authorize?${params.toString()}`
-      };
+      if (ctx.scopes.length) params.set('scope', ctx.scopes.join(' '));
+      return { url: `https://api.timelyapp.com/1.1/oauth/authorize?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
       let response = await http.post('/oauth/token', {
         grant_type: 'authorization_code',
@@ -47,53 +58,50 @@ export let auth = SlateAuth.create()
         code: ctx.code,
         redirect_uri: ctx.redirectUri
       });
-
       return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Timely',
+          operation: 'authorization'
+        })
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'This Timely connection has no refresh token. Reconnect the account to renew authorization.'
+        );
+      }
       let response = await http.post('/oauth/token', {
         grant_type: 'refresh_token',
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
         refresh_token: ctx.output.refreshToken
       });
-
       return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token || ctx.output.refreshToken
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Timely',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     },
-
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string };
-      input: Record<string, never>;
-      scopes: string[];
+      output: { token: string; refreshToken?: string; expiresAt?: string };
     }) => {
       let accountsRes = await http.get('/accounts', {
         headers: { Authorization: `Bearer ${ctx.output.token}` }
       });
-
-      let accounts = accountsRes.data;
-      let accountId = accounts?.[0]?.id;
-
-      if (!accountId) {
-        return { profile: {} };
-      }
-
+      let accountId = accountsRes.data?.[0]?.id;
+      if (!accountId) return { profile: {} };
       let userRes = await http.get(`/${accountId}/users/current`, {
         headers: { Authorization: `Bearer ${ctx.output.token}` }
       });
-
       let user = userRes.data;
-
       return {
         profile: {
           id: String(user.id),

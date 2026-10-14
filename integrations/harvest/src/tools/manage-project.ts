@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageProject = SlateTool.create(spec, {
   name: 'Manage Project',
   key: 'manage_project',
-  description: `Create, update, or delete a project in Harvest. Projects are associated with clients and can be configured with billing methods, budget types, and team assignments.`,
+  description: `Create, update, or delete a project in Harvest. Projects are associated with clients and can be configured with billing methods, budget types, and team assignments. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   instructions: [
     'For **billBy**, valid values are: "Tasks", "People", or "none".',
     'For **budgetBy**, valid values are: "project", "project_cost", "task", "task_fees", "person", "none".'
@@ -18,6 +19,7 @@ export let manageProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       projectId: z.number().optional().describe('Project ID (required for update/delete)'),
       clientId: z.number().optional().describe('Client ID (required for create)'),
@@ -74,11 +76,12 @@ export let manageProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for delete');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for delete');
       await client.deleteProject(ctx.input.projectId);
       return {
         output: { projectId: ctx.input.projectId, deleted: true },
@@ -94,7 +97,7 @@ export let manageProject = SlateTool.create(spec, {
         !ctx.input.billBy ||
         !ctx.input.budgetBy
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'clientId, name, isBillable, billBy, and budgetBy are required for create'
         );
       }
@@ -135,7 +138,7 @@ export let manageProject = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.projectId) throw new Error('projectId is required for update');
+    if (!ctx.input.projectId) throw createApiServiceError('projectId is required for update');
     let project = await client.updateProject(ctx.input.projectId, {
       clientId: ctx.input.clientId,
       name: ctx.input.name,

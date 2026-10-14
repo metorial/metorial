@@ -1,6 +1,4 @@
-Now let me check the actual API documentation to see available resources/endpoints:Now I have enough information to write the specification.
-
-# Slates Specification for Elorus
+# Elorus Integration Specification
 
 ## Overview
 
@@ -10,11 +8,11 @@ Elorus is a cloud-based invoicing, expense management, and time tracking platfor
 
 Elorus uses **token-based authentication** with an API key.
 
-Two credentials are required for every API request:
+Requests use the API key plus the target organization ID:
 
 1. **API Key (Token):** To find your API key, open the Elorus web application and navigate to the "User Profile". The API key is personal and there's only one key per user.
 
-2. **Organization ID:** X-Elorus-Organization: Organization ID. The organization whose data you wish to access. To find the Organization ID visit the Elorus web application and navigate to "Settings > Organization > Organization ID". Each organization has an ID of its own.
+2. **Organization ID:** Supplied through the optional `organizationId` tool input or a saved default. X-Elorus-Organization: Organization ID. The organization whose data you wish to access. To find the Organization ID visit the Elorus web application and navigate to "Settings > Organization > Organization ID". Each organization has an ID of its own.
 
 Both values must be sent as HTTP headers on every request:
 
@@ -24,7 +22,7 @@ X-Elorus-Organization: <your-organization-id>
 Content-Type: application/json
 ```
 
-The base URL is `https://api.elorus.com/v1.2/`. There are no OAuth flows or scopes — authentication is purely via the static API key and organization ID pair.
+The base URL is `https://api.elorus.com/v1.2/`. There are no OAuth flows or scopes. The public API has no current-user or organization-discovery endpoint, so no profile request is made during token authentication. Retrieve the organization ID from the Elorus settings page before using tools.
 
 ## Features
 

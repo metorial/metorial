@@ -1,6 +1,10 @@
-# Mxtoolbox
+# MXToolbox
 
-Run DNS and email authentication lookups for domains and IP addresses, including MX, SPF, DKIM, DMARC, BIMI, MTA-STS, PTR, and TXT records. Check domain blacklist status and diagnose email deliverability issues. Create, update, delete, and query infrastructure monitors for blacklist, SMTP, HTTP, TCP, DNS, and mail flow health. Manage monitor tags for organizing and filtering monitors. Set up short-term Quickwatch monitors that auto-expire. Track API usage against plan limits.
+Run DNS, email authentication, blacklist, and network diagnostics. List or retrieve infrastructure monitors and their tags, filter by command or target, and create or delete monitors. Track DNS and network API quotas separately. Monitor and network access depend on your API plan.
+
+For DKIM, provide a selector or use a `domain:selector` hostname. TCP diagnostics require a port. The `aa` lookup value remains available as an alias for `aaaa`.
+
+API keys are available under Settings > API and are sent as a plain Authorization header value. See the [API reference](https://api.mxtoolbox.com/api/api-reference) for supported commands and account limits.
 
 ## License
 

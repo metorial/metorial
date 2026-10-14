@@ -12,6 +12,9 @@ import {
   listCustomers,
   listInvoices,
   listOverpayments,
+  setCustomerChasing,
+  setInvoiceChasing,
+  setOrganisationChasing,
   syncOrganisation,
   upsertContactPerson,
   upsertCreditNote,
@@ -39,7 +42,10 @@ export let provider = Slate.create({
     upsertOverpayment,
     listOverpayments,
     getOrganisation,
-    syncOrganisation
+    syncOrganisation,
+    setCustomerChasing,
+    setInvoiceChasing,
+    setOrganisationChasing
   ],
   triggers: []
 });

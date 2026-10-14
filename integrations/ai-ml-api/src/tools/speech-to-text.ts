@@ -1,6 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  assertGenerationSucceeded,
+  Client,
+  getTranscript,
+  isTranscriptionPending
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let speechToText = SlateTool.create(spec, {
@@ -11,7 +16,8 @@ Submits the audio for asynchronous processing and polls until the transcription 
 Generated transcriptions are stored on the server for 1 hour.`,
   instructions: [
     'Use model IDs like "#g1_whisper-large", "#g1_whisper-medium", "#g1_whisper-small".',
-    'Provide a publicly accessible URL to the audio file.'
+    'Provide a publicly accessible URL to the audio file.',
+    'If the transcription is still processing, call get_transcription_result with its generationId.'
   ],
   constraints: [
     'Audio transcriptions are stored on the server for 1 hour from creation.',
@@ -50,14 +56,25 @@ Generated transcriptions are stored on the server for 1 hour.`,
     });
 
     let generationId = createResult.generation_id;
+    if (!generationId) {
+      throw createApiServiceError(
+        'AI/ML API returned no transcription generation ID. Try again.'
+      );
+    }
     let maxAttempts = 30;
     let pollIntervalMs = 5000;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let result = await client.getSpeechToTextResult(generationId);
+      assertGenerationSucceeded(result, 'Transcription');
 
-      if (result.status !== 'waiting' && result.status !== 'active') {
-        let transcript = result.result?.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+      if (!isTranscriptionPending(result.status)) {
+        let transcript = getTranscript(result);
+        if (result.status === 'completed' && transcript === undefined) {
+          throw createApiServiceError(
+            'AI/ML API reported a completed transcription without text. Try get_transcription_result.'
+          );
+        }
 
         return {
           output: {
@@ -81,7 +98,7 @@ Generated transcriptions are stored on the server for 1 hour.`,
         status: 'pending',
         transcript: undefined
       },
-      message: `Transcription is still processing. Use generation ID \`${generationId}\` to check status later.`
+      message: `Transcription is still processing. Call get_transcription_result with generation ID \`${generationId}\` to check status later.`
     };
   })
   .build();

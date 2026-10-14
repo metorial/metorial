@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ProcessResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let inpaintOutpaint = SlateTool.create(spec, {
@@ -55,8 +55,17 @@ export let inpaintOutpaint = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.mode === 'inpaint' && !ctx.input.maskImageUrl?.trim()) {
+      throw createApiServiceError('maskImageUrl is required for inpainting.');
+    }
+    if (
+      ctx.input.mode === 'outpaint' &&
+      (ctx.input.width === undefined || ctx.input.height === undefined)
+    ) {
+      throw createApiServiceError('width and height are required for outpainting.');
+    }
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProcessResult;
 
     if (ctx.input.mode === 'outpaint') {
       result = await client.processImageSync({
@@ -89,6 +98,10 @@ export let inpaintOutpaint = SlateTool.create(spec, {
           }
         }
       });
+    }
+
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
     }
 
     let opLabel = ctx.input.mode === 'outpaint' ? 'Outpainting' : 'Inpainting';

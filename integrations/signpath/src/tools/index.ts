@@ -1,9 +1,12 @@
 export * from './approve-deny-signing-request';
+export { downloadSignedArtifact } from './download-signed-artifact';
 export * from './get-audit-log';
 export * from './get-certificate';
+export { getCurrentUser } from './get-current-user';
 export * from './get-project';
 export * from './get-signing-policies';
 export * from './get-signing-request';
+export { getSigningRequestStatus } from './get-signing-request-status';
 export * from './list-certificates';
 export * from './list-projects';
 export * from './resubmit-signing-request';

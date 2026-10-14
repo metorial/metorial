@@ -7,7 +7,7 @@ export let searchContacts = SlateTool.create(spec, {
   name: 'Search Contacts',
   key: 'search_contacts',
   description: `Search for contacts using filters such as cell numbers, tags, and date ranges. Supports pagination. Costs 10 credits per request.`,
-  constraints: ['Costs 10 credits per request'],
+  constraints: ['Costs 10 credits per request', 'At least one search filter is required.'],
   tags: {
     readOnly: true
   }
@@ -32,7 +32,13 @@ export let searchContacts = SlateTool.create(spec, {
         .optional()
         .describe('Filter contacts updated on or before this date (ISO 8601)'),
       skip: z.number().optional().describe('Number of records to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of contacts to return')
+      limit: z.number().optional().describe('Maximum number of contacts to return'),
+      fields: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Contact fields to return, such as cell, firstname, or c1. If omitted, only the contact ID is returned.'
+        )
     })
   )
   .output(
@@ -61,6 +67,9 @@ export let searchContacts = SlateTool.create(spec, {
 
     let result = await client.searchContacts({
       find: Object.keys(find).length > 0 ? find : undefined,
+      projection: ctx.input.fields?.length
+        ? Object.fromEntries(ctx.input.fields.map(field => [field, 1]))
+        : undefined,
       options: Object.keys(options).length > 0 ? options : undefined
     });
 

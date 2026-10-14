@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listConversations = SlateTool.create(spec, {
@@ -56,24 +56,30 @@ export let listConversations = SlateTool.create(spec, {
 
     if (ctx.input.conversationId) {
       let result = await client.getConversation(ctx.input.conversationId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       let transcript: any[] | undefined;
 
       if (ctx.input.includeTranscript) {
         let transcriptResult = await client.getConversationTranscript(
           ctx.input.conversationId
         );
-        transcript = transcriptResult.data || transcriptResult;
+        let transcriptData = transcriptResult.data ?? transcriptResult;
+        transcript = Array.isArray(transcriptData)
+          ? transcriptData
+          : (transcriptData?.transcript ?? transcriptData?.items);
+        if (!Array.isArray(transcript)) {
+          throw createApiServiceError('Insighto.ai did not return a conversation transcript.');
+        }
       }
 
       return {
         output: {
           conversation: {
             conversationId: data.id,
-            contactId: data.contact_id,
-            assistantId: data.assistant_id,
-            widgetId: data.widget_id,
-            createdAt: data.created_at,
+            contactId: data.contact_id ?? undefined,
+            assistantId: data.assistant_id ?? undefined,
+            widgetId: data.widget_id ?? undefined,
+            createdAt: data.created_at ?? undefined,
             transcript
           }
         },
@@ -82,42 +88,48 @@ export let listConversations = SlateTool.create(spec, {
     }
 
     if (ctx.input.contactId) {
-      let result = await client.getConversationsByContact(ctx.input.contactId);
-      let items = result.data || result.items || result;
-      let list = Array.isArray(items) ? items : [];
+      let result = await client.getConversationsByContact(ctx.input.contactId, {
+        page: ctx.input.page,
+        size: ctx.input.size
+      });
+      let { items: list, total } = getListResult(result);
       return {
         output: {
           conversations: list.map((c: any) => ({
             conversationId: c.id,
-            contactId: c.contact_id,
-            assistantId: c.assistant_id,
-            widgetId: c.widget_id,
-            createdAt: c.created_at
+            contactId: c.contact_id ?? undefined,
+            assistantId: c.assistant_id ?? undefined,
+            widgetId: c.widget_id ?? undefined,
+            createdAt: c.created_at ?? undefined
           })),
-          totalCount: list.length
+          totalCount: total
         },
         message: `Found **${list.length}** conversation(s) for contact \`${ctx.input.contactId}\`.`
       };
     }
 
+    if (!ctx.input.dateFrom || !ctx.input.dateTo) {
+      throw createApiServiceError(
+        'dateFrom and dateTo are required when listing all conversations.'
+      );
+    }
     let result = await client.listConversations({
       page: ctx.input.page,
       size: ctx.input.size,
       date_from: ctx.input.dateFrom,
       date_to: ctx.input.dateTo
     });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         conversations: list.map((c: any) => ({
           conversationId: c.id,
-          contactId: c.contact_id,
-          assistantId: c.assistant_id,
-          widgetId: c.widget_id,
-          createdAt: c.created_at
+          contactId: c.contact_id ?? undefined,
+          assistantId: c.assistant_id ?? undefined,
+          widgetId: c.widget_id ?? undefined,
+          createdAt: c.created_at ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** conversation(s).`
     };

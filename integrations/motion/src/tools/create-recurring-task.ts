@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createRecurringTask = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let createRecurringTask = SlateTool.create(spec, {
   key: 'create_recurring_task',
   description: `Create a recurring task in Motion that repeats on a configurable schedule. Supports setting frequency, duration, ideal scheduling time, priority, and assignee.`,
   instructions: [
-    'The `frequency` object defines the recurrence pattern. Its structure depends on the Motion API frequency format.',
+    'Use `frequencyPattern` for the documented recurrence string, such as daily_every_day, weekly_any_day, or monthly_15. Legacy `frequency` objects remain accepted. Provide exactly one frequency input.',
     'The `idealTime` should be in HH:mm format (24-hour).'
   ],
   tags: {
@@ -19,11 +20,18 @@ export let createRecurringTask = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Title of the recurring task'),
-      workspaceId: z.string().describe('ID of the workspace'),
+      workspaceId: workspaceIdSchema,
       assigneeId: z.string().describe('User ID to assign the recurring task to'),
       frequency: z
         .record(z.string(), z.unknown())
-        .describe('Recurrence frequency configuration object'),
+        .optional()
+        .describe('Legacy recurrence configuration object. Prefer frequencyPattern.'),
+      frequencyPattern: z
+        .string()
+        .optional()
+        .describe(
+          'Motion recurrence string, for example daily_every_day or weekly_specific_days_[MO, TU, FR]. Provide this or frequency.'
+        ),
       deadlineType: z
         .enum(['HARD', 'SOFT'])
         .optional()
@@ -62,13 +70,23 @@ export let createRecurringTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.frequency !== undefined && ctx.input.frequencyPattern !== undefined) {
+      throw createApiServiceError('Provide either frequency or frequencyPattern, not both.');
+    }
+    let frequency = ctx.input.frequencyPattern ?? ctx.input.frequency;
+    if (frequency === undefined || (typeof frequency === 'string' && !frequency.trim())) {
+      throw createApiServiceError(
+        'Provide a recurrence frequencyPattern or legacy frequency object.'
+      );
+    }
+
     let client = new MotionClient({ token: ctx.auth.token });
 
     let task = await client.createRecurringTask({
       name: ctx.input.name,
       workspaceId: ctx.input.workspaceId,
       assigneeId: ctx.input.assigneeId,
-      frequency: ctx.input.frequency,
+      frequency,
       deadlineType: ctx.input.deadlineType,
       duration: ctx.input.duration,
       startingOn: ctx.input.startingOn,

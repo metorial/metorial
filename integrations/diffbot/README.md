@@ -1,6 +1,12 @@
 # <img src="logo.svg" height="20"> Diffbot
 
-Extract structured data from web pages using AI-powered computer vision and NLP. Automatically classify and parse articles, products, events, jobs, discussions, images, and videos into clean JSON. Search a knowledge graph of 10+ billion entities (organizations, people, articles, products) using Diffbot Query Language (DQL). Enrich person and organization records from minimal identifiers. Analyze natural language text to extract entities, facts, sentiment, and relationships. Crawl entire websites or process bulk URL lists through extraction APIs. Define custom extraction rules with CSS selectors for specific domains.
+Extract structured data from web pages and supplied HTML/text. Search the
+Knowledge Graph with DQL, enrich person and organization records, and analyze
+text for entities, facts, and sentiment. Create and manage website crawls and
+bulk URL extraction jobs, retrieve their results as downloadable files, inspect
+account usage, and search Diffbot's web index for ranked page URLs and highlights.
+
+See the [integration specification](docs/SPEC.md) for tool coverage and API references.
 
 ## License
 

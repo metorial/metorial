@@ -20,6 +20,11 @@ Useful for determining if an email address is currently active before sending ca
   .output(
     z.object({
       found: z.boolean().describe('Whether activity data was found for the email'),
+      activeFirstSeen: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('First date when activity was detected, when available'),
       activeInDays: z
         .string()
         .nullable()
@@ -38,8 +43,9 @@ Useful for determining if an email address is currently active before sending ca
     let result = await client.getActivityData(ctx.input.email);
 
     let output = {
-      found: Boolean(result.found),
-      activeInDays: result.active_in_days as string | null
+      found: result.found === true,
+      activeInDays: result.active_in_days ?? null,
+      activeFirstSeen: result.active_first_seen ?? null
     };
 
     if (output.found && output.activeInDays) {

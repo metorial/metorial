@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   batchGeocode,
   calculateDistance,
+  calculateDistanceMatrix,
   createGeocodingList,
   deleteGeocodingList,
   downloadGeocodingList,
@@ -18,6 +19,7 @@ export let provider = Slate.create({
     reverseGeocode,
     batchGeocode,
     calculateDistance,
+    calculateDistanceMatrix,
     createGeocodingList,
     getListStatus,
     getLists,

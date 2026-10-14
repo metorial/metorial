@@ -79,7 +79,7 @@ export let getPostHistory = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -93,7 +93,7 @@ export let getPostHistory = SlateTool.create(spec, {
       type: ctx.input.type
     });
 
-    let history = result.history || [];
+    let history = Array.isArray(result) ? result : result.history || [];
     let posts = history.map((item: any) => ({
       postId: item.id,
       post: item.post,
@@ -101,14 +101,15 @@ export let getPostHistory = SlateTool.create(spec, {
       status: item.status,
       type: item.type,
       created: item.created,
-      scheduleDate: item.scheduleDate,
+      scheduleDate:
+        typeof item.scheduleDate === 'string' ? item.scheduleDate : item.scheduleDate?.utc,
       mediaUrls: item.mediaUrls
     }));
 
     return {
       output: {
         posts,
-        count: result.count || posts.length
+        count: result.count ?? posts.length
       },
       message: `Retrieved **${posts.length}** posts from history.`
     };

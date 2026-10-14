@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PrintMailClient } from '../lib/client';
+import { PrintMailClient, resolveOrderType } from '../lib/client';
 import { spec } from '../spec';
+import { getPreviewRefreshAt } from './get-file-url';
 
 export let getOrder = SlateTool.create(spec, {
   name: 'Get Mail Order',
@@ -55,31 +56,18 @@ export let getOrder = SlateTool.create(spec, {
     let client = new PrintMailClient(ctx.auth.token);
     let { orderId, orderType } = ctx.input;
 
-    if (!orderType) {
-      if (orderId.startsWith('letter_')) orderType = 'letter';
-      else if (orderId.startsWith('postcard_')) orderType = 'postcard';
-      else if (orderId.startsWith('cheque_')) orderType = 'cheque';
-      else if (orderId.startsWith('self_mailer_')) orderType = 'self_mailer';
-      else
-        throw new Error(
-          `Could not determine order type from ID "${orderId}". Please specify orderType.`
-        );
-    }
+    orderType = resolveOrderType(orderId, orderType);
 
-    let order: any;
-    switch (orderType) {
-      case 'letter':
-        order = await client.getLetter(orderId);
-        break;
-      case 'postcard':
-        order = await client.getPostcard(orderId);
-        break;
-      case 'cheque':
-        order = await client.getCheque(orderId);
-        break;
-      case 'self_mailer':
-        order = await client.getSelfMailer(orderId);
-        break;
+    let order = await client.getOrder(orderId, orderType);
+
+    if (typeof order.url === 'string' && order.url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: order.url,
+        mimeType: 'application/pdf',
+        refreshReference: { orderId: order.id, orderType: orderType },
+        refreshAt: getPreviewRefreshAt(order.url)
+      });
     }
 
     return {

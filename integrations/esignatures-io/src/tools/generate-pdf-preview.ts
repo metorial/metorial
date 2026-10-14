@@ -31,7 +31,7 @@ export let generatePdfPreview = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status || 'queued'
+        status: result.status
       },
       message: `PDF preview generation queued for contract **${ctx.input.contractId}**. A webhook notification will be sent when the PDF is ready.`
     };

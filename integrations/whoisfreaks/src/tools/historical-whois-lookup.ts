@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let historicalWhoisLookup = SlateTool.create(spec, {
   name: 'Historical WHOIS Lookup',
   key: 'historical_whois_lookup',
-  description: `Retrieve historical WHOIS records for a domain name. Returns all previously captured WHOIS snapshots including registration changes, ownership transfers, and registrar updates over time. Each record is deduplicated and unique.`,
+  description: `Retrieve one page of historical WHOIS records for a domain name, including registration changes, ownership transfers, and registrar updates over time. The response includes pagination metadata.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -16,7 +16,8 @@ export let historicalWhoisLookup = SlateTool.create(spec, {
     z.object({
       domainName: z
         .string()
-        .describe('Domain name to look up historical WHOIS records for (e.g. "example.com")')
+        .describe('Domain name to look up historical WHOIS records for (e.g. "example.com")'),
+      page: z.number().int().min(1).optional().describe('Page number, starting at 1')
     })
   )
   .output(
@@ -26,7 +27,7 @@ export let historicalWhoisLookup = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
-    let result = await client.historicalWhoisLookup(ctx.input.domainName);
+    let result = await client.historicalWhoisLookup(ctx.input.domainName, ctx.input.page);
 
     return {
       output: { historicalRecords: result },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let todoSchema = z.object({
@@ -26,7 +27,7 @@ let todoSchema = z.object({
 export let listTodosTool = SlateTool.create(spec, {
   name: 'List To-Dos',
   key: 'list_todos',
-  description: `List to-do items from a specific to-do list within a Basecamp project. By default returns active, pending to-dos. Use \`completed: true\` to see completed items.`,
+  description: `Call list_accounts to discover the accountId for this operation. List to-do items from a specific to-do list within a Basecamp project. By default returns active, pending to-dos. Use \`completed: true\` to see completed items.`,
   instructions: [
     'Use the Get Project tool to find the todoset ID, then List To-Do Lists to find the todoListId.'
   ],
@@ -36,6 +37,7 @@ export let listTodosTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       todoListId: z.string().describe('ID of the to-do list'),
       completed: z.boolean().optional().describe('Set to true to list completed to-dos')
@@ -49,7 +51,8 @@ export let listTodosTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let todos = await client.listTodos(ctx.input.projectId, ctx.input.todoListId, {

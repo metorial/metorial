@@ -54,13 +54,19 @@ export let listContacts = SlateTool.create(spec, {
       list: ctx.input.list
     });
 
-    let items = Array.isArray(result) ? result : result?.results || result?.data || [];
+    let items = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.results)
+        ? result.results
+        : Array.isArray(result?.data)
+          ? result.data
+          : [];
     let contacts = items.map((c: any) => ({
       contactId: c.id ? String(c.id) : undefined,
-      phone: c.phone,
-      firstName: c.first_name,
-      lastName: c.last_name,
-      email: c.email
+      phone: c.phone ?? undefined,
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      email: c.email ?? undefined
     }));
 
     return {

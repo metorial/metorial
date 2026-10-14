@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let emailResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   email: z.string().optional().describe('The email address that was verified'),
   valid: z.string().optional().describe('Whether the email is valid'),
   reason: z.string().optional().describe('Reason for the validity status'),
@@ -14,6 +15,7 @@ let emailResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   email: raw.email,
   valid: raw.valid,
   reason: raw.reason,

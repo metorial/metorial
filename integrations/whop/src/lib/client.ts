@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { whopApiError } from './errors';
 
 let BASE_URL = 'https://api.whop.com/api/v1';
 
@@ -6,11 +7,10 @@ export class WhopClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter: whopApiError
     });
   }
 
@@ -25,11 +25,12 @@ export class WhopClient {
     direction?: string;
   }) {
     let response = await this.axios.get('/products', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
-        'visibilities[]': params.visibilities,
+        visibilities: params.visibilities,
         order: params.order,
         direction: params.direction
       }
@@ -38,7 +39,7 @@ export class WhopClient {
   }
 
   async getProduct(productId: string) {
-    let response = await this.axios.get(`/products/${productId}`);
+    let response = await this.axios.get(`/products/${encodeURIComponent(productId)}`);
     return response.data;
   }
 
@@ -54,7 +55,7 @@ export class WhopClient {
     sendWelcomeMessage?: boolean;
   }) {
     let response = await this.axios.post('/products', {
-      company_id: data.companyId,
+      account_id: data.companyId,
       title: data.title,
       description: data.description,
       headline: data.headline,
@@ -80,7 +81,7 @@ export class WhopClient {
       sendWelcomeMessage?: boolean;
     }
   ) {
-    let response = await this.axios.patch(`/products/${productId}`, {
+    let response = await this.axios.patch(`/products/${encodeURIComponent(productId)}`, {
       title: data.title,
       description: data.description,
       headline: data.headline,
@@ -94,7 +95,7 @@ export class WhopClient {
   }
 
   async deleteProduct(productId: string) {
-    let response = await this.axios.delete(`/products/${productId}`);
+    let response = await this.axios.delete(`/products/${encodeURIComponent(productId)}`);
     return response.data;
   }
 
@@ -128,7 +129,7 @@ export class WhopClient {
   }
 
   async getPlan(planId: string) {
-    let response = await this.axios.get(`/plans/${planId}`);
+    let response = await this.axios.get(`/plans/${encodeURIComponent(planId)}`);
     return response.data;
   }
 
@@ -188,7 +189,7 @@ export class WhopClient {
       internalNotes?: string;
     }
   ) {
-    let response = await this.axios.patch(`/plans/${planId}`, {
+    let response = await this.axios.patch(`/plans/${encodeURIComponent(planId)}`, {
       title: data.title,
       description: data.description,
       billing_period: data.billingPeriod,
@@ -206,7 +207,7 @@ export class WhopClient {
   }
 
   async deletePlan(planId: string) {
-    let response = await this.axios.delete(`/plans/${planId}`);
+    let response = await this.axios.delete(`/plans/${encodeURIComponent(planId)}`);
     return response.data;
   }
 
@@ -224,14 +225,15 @@ export class WhopClient {
     direction?: string;
   }) {
     let response = await this.axios.get('/memberships', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
-        'product_ids[]': params.productIds,
-        'statuses[]': params.statuses,
-        'plan_ids[]': params.planIds,
-        'user_ids[]': params.userIds,
+        product_ids: params.productIds,
+        statuses: params.statuses,
+        plan_ids: params.planIds,
+        user_ids: params.userIds,
         order: params.order,
         direction: params.direction
       }
@@ -240,38 +242,48 @@ export class WhopClient {
   }
 
   async getMembership(membershipId: string) {
-    let response = await this.axios.get(`/memberships/${membershipId}`);
+    let response = await this.axios.get(`/memberships/${encodeURIComponent(membershipId)}`);
     return response.data;
   }
 
   async updateMembership(membershipId: string, metadata: Record<string, string>) {
-    let response = await this.axios.patch(`/memberships/${membershipId}`, {
+    let response = await this.axios.patch(`/memberships/${encodeURIComponent(membershipId)}`, {
       metadata
     });
     return response.data;
   }
 
   async cancelMembership(membershipId: string, cancellationMode?: string) {
-    let response = await this.axios.post(`/memberships/${membershipId}/cancel`, {
-      cancellation_mode: cancellationMode
-    });
+    let response = await this.axios.post(
+      `/memberships/${encodeURIComponent(membershipId)}/cancel`,
+      {
+        cancellation_mode: cancellationMode
+      }
+    );
     return response.data;
   }
 
   async uncancelMembership(membershipId: string) {
-    let response = await this.axios.post(`/memberships/${membershipId}/uncancel`);
+    let response = await this.axios.post(
+      `/memberships/${encodeURIComponent(membershipId)}/uncancel`
+    );
     return response.data;
   }
 
   async pauseMembership(membershipId: string, voidPayments?: boolean) {
-    let response = await this.axios.post(`/memberships/${membershipId}/pause`, {
-      void_payments: voidPayments
-    });
+    let response = await this.axios.post(
+      `/memberships/${encodeURIComponent(membershipId)}/pause`,
+      {
+        void_payments: voidPayments
+      }
+    );
     return response.data;
   }
 
   async resumeMembership(membershipId: string) {
-    let response = await this.axios.post(`/memberships/${membershipId}/resume`);
+    let response = await this.axios.post(
+      `/memberships/${encodeURIComponent(membershipId)}/resume`
+    );
     return response.data;
   }
 
@@ -289,14 +301,15 @@ export class WhopClient {
     direction?: string;
   }) {
     let response = await this.axios.get('/members', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
         query: params.query,
-        'statuses[]': params.statuses,
+        statuses: params.statuses,
         access_level: params.accessLevel,
-        'product_ids[]': params.productIds,
+        product_ids: params.productIds,
         order: params.order,
         direction: params.direction
       }
@@ -305,7 +318,7 @@ export class WhopClient {
   }
 
   async getMember(memberId: string) {
-    let response = await this.axios.get(`/members/${memberId}`);
+    let response = await this.axios.get(`/members/${encodeURIComponent(memberId)}`);
     return response.data;
   }
 
@@ -323,13 +336,14 @@ export class WhopClient {
     query?: string;
   }) {
     let response = await this.axios.get('/payments', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
-        'product_ids[]': params.productIds,
-        'statuses[]': params.statuses,
-        'billing_reasons[]': params.billingReasons,
+        product_ids: params.productIds,
+        statuses: params.statuses,
+        billing_reasons: params.billingReasons,
         order: params.order,
         direction: params.direction,
         query: params.query
@@ -339,7 +353,7 @@ export class WhopClient {
   }
 
   async getPayment(paymentId: string) {
-    let response = await this.axios.get(`/payments/${paymentId}`);
+    let response = await this.axios.get(`/payments/${encodeURIComponent(paymentId)}`);
     return response.data;
   }
 
@@ -348,7 +362,10 @@ export class WhopClient {
     if (partialAmount !== undefined) {
       body.partial_amount = partialAmount;
     }
-    let response = await this.axios.post(`/payments/${paymentId}/refund`, body);
+    let response = await this.axios.post(
+      `/payments/${encodeURIComponent(paymentId)}/refund`,
+      body
+    );
     return response.data;
   }
 
@@ -363,12 +380,13 @@ export class WhopClient {
     status?: string;
   }) {
     let response = await this.axios.get('/promo_codes', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
-        'product_ids[]': params.productIds,
-        'plan_ids[]': params.planIds,
+        product_ids: params.productIds,
+        plan_ids: params.planIds,
         status: params.status
       }
     });
@@ -376,7 +394,7 @@ export class WhopClient {
   }
 
   async getPromoCode(promoCodeId: string) {
-    let response = await this.axios.get(`/promo_codes/${promoCodeId}`);
+    let response = await this.axios.get(`/promo_codes/${encodeURIComponent(promoCodeId)}`);
     return response.data;
   }
 
@@ -398,7 +416,7 @@ export class WhopClient {
     existingMembershipsOnly?: boolean;
   }) {
     let response = await this.axios.post('/promo_codes', {
-      company_id: data.companyId,
+      account_id: data.companyId,
       code: data.code,
       promo_type: data.promoType,
       amount_off: data.amountOff,
@@ -418,7 +436,7 @@ export class WhopClient {
   }
 
   async deletePromoCode(promoCodeId: string) {
-    let response = await this.axios.delete(`/promo_codes/${promoCodeId}`);
+    let response = await this.axios.delete(`/promo_codes/${encodeURIComponent(promoCodeId)}`);
     return response.data;
   }
 
@@ -431,6 +449,7 @@ export class WhopClient {
     plan?: {
       companyId: string;
       productId?: string;
+      product?: { title: string; externalIdentifier: string };
       currency: string;
       initialPrice?: number;
       renewalPrice?: number;
@@ -452,13 +471,19 @@ export class WhopClient {
     };
 
     if (data.mode === 'setup') {
-      body.company_id = data.companyId;
+      body.account_id = data.companyId;
     } else if (data.planId) {
       body.plan_id = data.planId;
     } else if (data.plan) {
       body.plan = {
         company_id: data.plan.companyId,
         product_id: data.plan.productId,
+        product: data.plan.product
+          ? {
+              title: data.plan.product.title,
+              external_identifier: data.plan.product.externalIdentifier
+            }
+          : undefined,
         currency: data.plan.currency,
         initial_price: data.plan.initialPrice,
         renewal_price: data.plan.renewalPrice,
@@ -473,7 +498,9 @@ export class WhopClient {
   }
 
   async getCheckoutConfiguration(checkoutId: string) {
-    let response = await this.axios.get(`/checkout_configurations/${checkoutId}`);
+    let response = await this.axios.get(
+      `/checkout_configurations/${encodeURIComponent(checkoutId)}`
+    );
     return response.data;
   }
 
@@ -484,8 +511,9 @@ export class WhopClient {
     planId?: string;
   }) {
     let response = await this.axios.get('/checkout_configurations', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
         plan_id: params.planId
@@ -506,12 +534,13 @@ export class WhopClient {
     direction?: string;
   }) {
     let response = await this.axios.get('/invoices', {
+      paramsSerializer: { indexes: null },
       params: {
-        company_id: params.companyId,
+        account_id: params.companyId,
         after: params.after,
         first: params.first,
-        'statuses[]': params.statuses,
-        'product_ids[]': params.productIds,
+        statuses: params.statuses,
+        product_ids: params.productIds,
         order: params.order,
         direction: params.direction
       }
@@ -520,14 +549,28 @@ export class WhopClient {
   }
 
   async getInvoice(invoiceId: string) {
-    let response = await this.axios.get(`/invoices/${invoiceId}`);
+    let response = await this.axios.get(`/invoices/${encodeURIComponent(invoiceId)}`);
     return response.data;
   }
 
   // ── Users ─────────────────────────────────────────────────
 
   async getUser(userIdOrUsername: string) {
-    let response = await this.axios.get(`/users/${userIdOrUsername}`);
+    let response = await this.axios.get(`/users/${encodeURIComponent(userIdOrUsername)}`);
+    return response.data;
+  }
+
+  // ── Account and OAuth identity discovery ───────────────────
+
+  async listAccounts(params: { after?: string; first?: number; query?: string }) {
+    let response = await this.axios.get('/accounts', {
+      params: { after: params.after, first: params.first, query: params.query }
+    });
+    return response.data;
+  }
+
+  async getCurrentUser() {
+    let response = await this.axios.get('https://api.whop.com/oauth/userinfo');
     return response.data;
   }
 

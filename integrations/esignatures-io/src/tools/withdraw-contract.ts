@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let withdrawContract = SlateTool.create(spec, {
   name: 'Withdraw Contract',
   key: 'withdraw_contract',
-  description: `Withdraws a contract to prevent further signing. The contract data is retained but signers can no longer sign it. Can also be used when a signer declines.`,
+  description: `Withdraws a contract to prevent further signing. The contract data is retained but signers can no longer sign it. Signed contracts cannot be withdrawn.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -31,7 +31,7 @@ export let withdrawContract = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status || 'queued'
+        status: result.status
       },
       message: `Contract **${ctx.input.contractId}** has been withdrawn. Signers can no longer sign this contract.`
     };

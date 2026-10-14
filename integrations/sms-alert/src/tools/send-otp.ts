@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SmsAlertClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,9 @@ The message template must include an **[otp]** tag which will be replaced by the
       senderId: z
         .string()
         .optional()
-        .describe('Sender ID for the OTP message. Falls back to configured default.'),
+        .describe(
+          'Sender ID for the OTP message. Uses the configured default, then the account default when omitted.'
+        ),
       mobileNumber: z
         .string()
         .describe('Mobile number to send the OTP to (with or without country code).'),
@@ -38,12 +40,21 @@ The message template must include an **[otp]** tag which will be replaced by the
         .min(3)
         .max(8)
         .optional()
-        .describe('Number of digits in the OTP (3-8, default: 4).'),
-      maxRetries: z.number().optional().describe('Maximum send attempts (default: 5).'),
+        .describe(
+          'Number of digits in the OTP (3-8, default: 4). Overrides the length attribute in the OTP tag.'
+        ),
+      maxRetries: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum send attempts (default: 5). Overrides the retry attribute in the OTP tag.'
+        ),
       validityMinutes: z
         .number()
         .optional()
-        .describe('OTP validity period in minutes (default: 15).'),
+        .describe(
+          'OTP validity period in minutes (default: 15). Overrides the validity attribute in the OTP tag.'
+        ),
       route: z.string().optional().describe('SMS route to use for sending the OTP.')
     })
   )
@@ -54,17 +65,21 @@ The message template must include an **[otp]** tag which will be replaced by the
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
     let senderId = ctx.input.senderId || ctx.config.senderId;
 
-    if (!senderId) {
-      throw new Error(
-        'Sender ID is required. Set it in the configuration or provide it in the input.'
-      );
+    if (!/\[otp(?:\s[^\]]*)?\]/i.test(ctx.input.message)) {
+      throw createApiServiceError('Message template must contain the [otp] tag.');
     }
 
-    if (!ctx.input.message.includes('[otp]')) {
-      throw new Error('Message template must contain the [otp] tag.');
+    for (let [field, value] of [
+      ['otpLength', ctx.input.otpLength],
+      ['maxRetries', ctx.input.maxRetries],
+      ['validityMinutes', ctx.input.validityMinutes]
+    ] as const) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+        throw createApiServiceError(`${field} must be a positive whole number.`);
+      }
     }
 
     ctx.info(`Sending OTP to ${ctx.input.mobileNumber}`);
@@ -81,7 +96,7 @@ The message template must include an **[otp]** tag which will be replaced by the
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        description: result.description ?? result
       },
       message: `OTP sent to **${ctx.input.mobileNumber}** with status: **${result.status || 'unknown'}**`
     };

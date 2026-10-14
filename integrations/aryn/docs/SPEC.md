@@ -1,4 +1,4 @@
-# Slates Specification for Aryn
+# Aryn Integration Specification
 
 ## Overview
 
@@ -69,4 +69,10 @@ Users can analyze document collections using a Deep Analytics Workspace. It supp
 
 ## Events
 
-The provider does not support events. Aryn's API is request-response based for document processing, storage, and search. There are no webhooks or event subscription mechanisms available.
+This integration does not expose event subscriptions. The plan-execution tool can collect Aryn's streaming query events into a single result when summaries are requested.
+
+## Tool Coverage
+
+The integration exposes synchronous parsing with downloadable JSON, Markdown, HTML, and extracted images; DocSet and document management; URL-based document ingestion; original source-file downloads; property extraction and suggestion; search; natural-language queries; plan generation; and execution of inspected logical plans.
+
+The existing `run_query` tool always returns the original nonstreaming query response, preserving the query identifier and actual result value types. Aryn supplies summaries only through streaming; use `generate_query_plan` followed by `execute_query_plan` with `summarizeResult` enabled for summaries. That new tool collects all events and returns scalar streamed results as text because the provider does not supply type markers. Requests are buffered and have a five-minute timeout. Asynchronous task operations are available from the provider but are not exposed as tools here.

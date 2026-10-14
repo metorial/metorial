@@ -18,7 +18,7 @@ export let getPerson = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Comma-separated list of related data to include (e.g., "companies,tags,contact_details,addrs")'
+          'Space-separated list of related data to include (e.g., "companies tags emails tels addrs")'
         )
     })
   )
@@ -45,7 +45,7 @@ export let getPerson = SlateTool.create(spec, {
     });
 
     let result = await client.getPerson(ctx.input.personId, {
-      includes: ctx.input.includes
+      includes: ctx.input.includes?.replace(/,/g, ' ')
     });
 
     let person = result?.person ?? result;

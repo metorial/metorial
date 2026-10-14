@@ -10,7 +10,10 @@ import {
   getProject,
   getTask,
   getUser,
+  listCompletedTasks,
   listProjects,
+  moveTasks,
+  searchTasks,
   updateProject,
   updateTask
 } from './tools';
@@ -28,7 +31,10 @@ export let provider = Slate.create({
     updateProject,
     deleteProject,
     batchTasks,
-    getUser
+    getUser,
+    listCompletedTasks,
+    moveTasks,
+    searchTasks
   ],
   triggers: []
 });

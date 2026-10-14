@@ -7,7 +7,7 @@ export let updateCase = SlateTool.create(spec, {
   name: 'Update Case',
   key: 'update_case',
   description: `Update an existing case in CommCare. Modify case properties, change ownership, update relationships (indices), or close the case.
-Can also be used to reopen a closed case by setting close to false.`,
+The JSON Case API cannot reopen an already closed case; false leaves an open case open.`,
   tags: {
     destructive: false
   }
@@ -17,11 +17,18 @@ Can also be used to reopen a closed case by setting close to false.`,
       caseId: z.string().describe('The unique case ID to update'),
       caseName: z.string().optional().describe('Updated name for the case'),
       ownerId: z.string().optional().describe('New owner ID for the case'),
-      close: z.boolean().optional().describe('Set to true to close the case, false to reopen'),
+      close: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set to true to close the case. False is accepted for open cases; the API cannot reopen closed cases.'
+        ),
       properties: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Case properties to update as key-value pairs'),
+        .describe(
+          'Case properties to update as key-value pairs; CommCare requires string values'
+        ),
       indices: z
         .record(
           z.string(),

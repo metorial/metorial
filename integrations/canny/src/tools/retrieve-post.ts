@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,6 +51,13 @@ export let retrievePostTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.postId
+        ? Boolean(ctx.input.boardId || ctx.input.urlName)
+        : !ctx.input.boardId || !ctx.input.urlName
+    ) {
+      throw createApiServiceError('Provide postId alone, or both boardId and urlName.');
+    }
     let client = new CannyClient(ctx.auth.token);
     let p = await client.retrievePost({
       id: ctx.input.postId,

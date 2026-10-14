@@ -24,7 +24,7 @@ export let deleteContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
 
     await client.deleteContact(ctx.input.contactId);

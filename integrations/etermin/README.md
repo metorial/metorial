@@ -1,6 +1,6 @@
 # Etermin
 
-Create, read, update, and delete appointments and contacts in an online scheduling platform. Query available time slots and working times for specific calendars and dates. Manage bookable services and calendars. Create vouchers with configurable values, usage limits, and expiration dates. Retrieve company account information. Supports single sign-on token management for enterprise accounts.
+Create, read, update, and delete appointments and contacts in an online scheduling platform. Query available time slots and working times for specific calendars and dates. Manage bookable services and inspect calendars. List, create, and delete calendar absences to control booking availability. Create vouchers with configurable values, usage limits, and expiration dates. Retrieve company account information.
 
 ## License
 

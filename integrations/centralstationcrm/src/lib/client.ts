@@ -32,21 +32,25 @@ export interface DealData {
 }
 
 export interface TaskData {
-  subject?: string;
-  description?: string;
-  due_at?: string;
+  name?: string;
+  precise_time?: string;
+  fuzzy?: boolean;
   user_id?: number;
-  person_id?: number;
-  company_id?: number;
-  deal_id?: number;
-  project_id?: number;
-  done?: boolean;
+  attachable_type?: string;
+  attachable_id?: number;
+  finished?: boolean;
 }
 
 export interface NoteData {
   content?: string;
-  attachable_type?: string;
-  attachable_id?: number;
+  type?: string;
+  badge?: string;
+  format?: string;
+  name?: string;
+  person_ids?: number[];
+  company_ids?: number[];
+  deal_ids?: number[];
+  project_ids?: number[];
 }
 
 export interface ProjectData {
@@ -129,10 +133,16 @@ export class Client {
     return response.data;
   }
 
-  async searchPeople(query: string, params?: PaginationParams) {
-    let response = await this.axios.get('/people.json', {
-      params: { ...params, q: query }
-    });
+  async searchPeople(
+    params: PaginationParams & {
+      name?: string;
+      first_name?: string;
+      email?: string;
+      phone?: string;
+      includes?: string;
+    }
+  ) {
+    let response = await this.axios.get('/people/search.json', { params });
     return response.data;
   }
 
@@ -276,9 +286,9 @@ export class Client {
     return response.data;
   }
 
-  async searchCompanies(query: string, params?: PaginationParams) {
-    let response = await this.axios.get('/companies.json', {
-      params: { ...params, q: query }
+  async searchCompanies(query: string, params?: PaginationParams & { includes?: string }) {
+    let response = await this.axios.get('/companies/search.json', {
+      params: { ...params, name: query }
     });
     return response.data;
   }
@@ -346,7 +356,14 @@ export class Client {
 
   // ====== Tasks ======
 
-  async listTasks(params?: PaginationParams) {
+  async listTasks(
+    params?: PaginationParams & {
+      state?: 'open' | 'closed';
+      before?: string;
+      after?: string;
+      user_id?: number;
+    }
+  ) {
     let response = await this.axios.get('/tasks.json', { params });
     return response.data;
   }
@@ -374,29 +391,34 @@ export class Client {
   // ====== Notes ======
 
   async listNotes(
-    params?: PaginationParams & { attachable_type?: string; attachable_id?: number }
+    params?: PaginationParams & {
+      person_id?: number;
+      company_id?: number;
+      deal_id?: number;
+      project_id?: number;
+    }
   ) {
-    let response = await this.axios.get('/actions.json', { params });
+    let response = await this.axios.get('/protocols.json', { params });
     return response.data;
   }
 
   async getNote(noteId: number) {
-    let response = await this.axios.get(`/actions/${noteId}.json`);
+    let response = await this.axios.get(`/protocols/${noteId}.json`);
     return response.data;
   }
 
   async createNote(data: NoteData) {
-    let response = await this.axios.post('/actions.json', { action: data });
+    let response = await this.axios.post('/protocols.json', { protocol: data });
     return response.data;
   }
 
   async updateNote(noteId: number, data: NoteData) {
-    let response = await this.axios.put(`/actions/${noteId}.json`, { action: data });
+    let response = await this.axios.put(`/protocols/${noteId}.json`, { protocol: data });
     return response.data;
   }
 
   async deleteNote(noteId: number) {
-    let response = await this.axios.delete(`/actions/${noteId}.json`);
+    let response = await this.axios.delete(`/protocols/${noteId}.json`);
     return response.data;
   }
 
@@ -429,7 +451,12 @@ export class Client {
 
   // ====== Users ======
 
-  async listUsers(params?: PaginationParams) {
+  async getCurrentUser() {
+    let response = await this.axios.get('/user.json');
+    return response.data;
+  }
+
+  async listUsers(params?: PaginationParams & { active?: string }) {
     let response = await this.axios.get('/users.json', { params });
     return response.data;
   }

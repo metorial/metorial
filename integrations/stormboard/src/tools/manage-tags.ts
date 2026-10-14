@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageTags = SlateTool.create(spec, {
 
     if (action === 'list') {
       let tags = await client.listTags(stormId);
-      let list = Array.isArray(tags) ? tags : [];
+      let list = tags;
       return {
         output: { tags: list, success: true },
         message: `Found **${list.length}** tag(s) in Storm ${stormId}.`
@@ -46,7 +46,9 @@ export let manageTags = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!tagName) {
-        throw new Error('tagName is required for creating a tag');
+        throw createApiServiceError('tagName is required for creating a tag', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let tag = await client.createTag(stormId, { name: tagName });
       return {
@@ -57,7 +59,9 @@ export let manageTags = SlateTool.create(spec, {
 
     if (action === 'tag_idea') {
       if (!ideaId || !tagId) {
-        throw new Error('ideaId and tagId are required for tagging an idea');
+        throw createApiServiceError('ideaId and tagId are required for tagging an idea', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let tag = await client.createIdeaTagData(stormId, ideaId, {
         tag_id: tagId,
@@ -71,7 +75,9 @@ export let manageTags = SlateTool.create(spec, {
 
     if (action === 'get_idea_tags') {
       if (!ideaId) {
-        throw new Error('ideaId is required for getting idea tags');
+        throw createApiServiceError('ideaId is required for getting idea tags', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let ideaTags = await client.getIdeaTagData(stormId, ideaId);
       return {

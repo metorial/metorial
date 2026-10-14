@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,10 @@ export let createBulkCampaign = SlateTool.create(spec, {
   .input(
     z.object({
       brandId: z.string().describe('ID of the brand'),
-      name: z.string().optional().describe('Campaign name'),
+      name: z
+        .string()
+        .optional()
+        .describe('Campaign name (required when creating a campaign)'),
       subject: z.string().optional().describe('Email subject line'),
       preview: z
         .string()
@@ -61,6 +64,9 @@ export let createBulkCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.name) {
+      throw createApiServiceError('name is required to create a bulk campaign.');
+    }
     let client = new Client(ctx.auth.token);
 
     let payload: Record<string, unknown> = {};

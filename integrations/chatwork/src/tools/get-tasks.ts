@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -40,7 +40,11 @@ export let getTasks = SlateTool.create(spec, {
         .optional()
         .describe(
           'Filter by the account ID of the task assigner (only for personal task list)'
-        )
+        ),
+      assigneeAccountId: z
+        .number()
+        .optional()
+        .describe('Filter room tasks by assignee account ID. Requires roomId.')
     })
   )
   .output(
@@ -49,14 +53,16 @@ export let getTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.assigneeAccountId !== undefined && ctx.input.roomId === undefined) {
+      throw createApiServiceError('Set roomId to filter tasks by assigneeAccountId.');
+    }
     let client = createClient(ctx.auth);
 
-    if (ctx.input.roomId) {
-      let tasks = await client.getRoomTasks(ctx.input.roomId);
-
-      if (ctx.input.status) {
-        tasks = tasks.filter(t => t.status === ctx.input.status);
-      }
+    if (ctx.input.roomId !== undefined) {
+      let tasks = await client.getRoomTasks(ctx.input.roomId, {
+        accountId: ctx.input.assigneeAccountId,
+        status: ctx.input.status
+      });
 
       return {
         output: {

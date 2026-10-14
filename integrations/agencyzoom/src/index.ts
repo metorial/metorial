@@ -14,8 +14,11 @@ import {
   deletePolicy,
   deleteTask,
   getCustomer,
+  getCustomerAmsPolicies,
   getLead,
   getOpportunity,
+  getSalesSummary,
+  getTask,
   listReferenceData,
   manageLeadOpportunity,
   manageLeadQuote,
@@ -64,7 +67,10 @@ export let provider = Slate.create({
     createServiceTicket,
     updateServiceTicket,
     batchCreateContacts,
-    listReferenceData
+    listReferenceData,
+    getTask,
+    getCustomerAmsPolicies,
+    getSalesSummary
   ],
   triggers: []
 });

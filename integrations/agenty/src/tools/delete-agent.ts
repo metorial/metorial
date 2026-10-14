@@ -29,7 +29,7 @@ export let deleteAgent = SlateTool.create(spec, {
 
     return {
       output: {
-        statusCode: result.status_code || 200,
+        statusCode: typeof result.status_code === 'number' ? result.status_code : 200,
         message: result.message || 'Agent deleted successfully.'
       },
       message: `Deleted agent **${ctx.input.agentId}**.`

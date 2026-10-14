@@ -39,7 +39,7 @@ export let createExpense = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, subdomain: ctx.config.subdomain });
 
     let data: Record<string, any> = { amount: ctx.input.amount };
-    if (ctx.input.date) data.date = ctx.input.date;
+    if (ctx.input.date !== undefined) data.incurred_on = ctx.input.date;
     if (ctx.input.description) data.description = ctx.input.description;
     if (ctx.input.clientId) data.client_id = ctx.input.clientId;
     if (ctx.input.projectId) data.project_id = ctx.input.projectId;
@@ -79,7 +79,7 @@ export let updateExpense = SlateTool.create(spec, {
 
     let data: Record<string, any> = {};
     if (ctx.input.amount !== undefined) data.amount = ctx.input.amount;
-    if (ctx.input.date !== undefined) data.date = ctx.input.date;
+    if (ctx.input.date !== undefined) data.incurred_on = ctx.input.date;
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
     if (ctx.input.clientId !== undefined) data.client_id = ctx.input.clientId;
     if (ctx.input.projectId !== undefined) data.project_id = ctx.input.projectId;
@@ -147,8 +147,8 @@ export let getExpenses = SlateTool.create(spec, {
     return {
       output: {
         expenses,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${expenses.length} expense(s).`
     };
@@ -187,13 +187,13 @@ export let deleteExpense = SlateTool.create(spec, {
 
 let mapExpense = (e: any) => ({
   expenseId: e.id,
-  clientId: e.client_id,
-  projectId: e.project_id,
-  userId: e.user_id,
-  invoiceId: e.invoice_id,
+  clientId: e.client_id ?? undefined,
+  projectId: e.project_id ?? undefined,
+  userId: e.user_id ?? undefined,
+  invoiceId: e.invoice_id ?? undefined,
   amount: e.amount,
-  date: e.date,
-  description: e.description,
-  createdAt: e.created_at,
-  updatedAt: e.updated_at
+  date: e.date ?? e.incurred_on ?? undefined,
+  description: e.description ?? undefined,
+  createdAt: e.created_at ?? undefined,
+  updatedAt: e.updated_at ?? undefined
 });

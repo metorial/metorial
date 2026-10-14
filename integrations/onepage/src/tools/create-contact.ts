@@ -41,7 +41,11 @@ export let createContact = SlateTool.create(spec, {
       urls: z.array(urlSchema).optional().describe('URLs and social profiles'),
       address: addressSchema.optional().describe('Postal address'),
       tags: z.array(z.string()).optional().describe('Tags to apply to the contact'),
-      starValue: z.number().optional().describe('Star rating (0-5)'),
+      starValue: z
+        .number()
+        .optional()
+        .describe('Legacy unsupported star rating. Use starred instead.'),
+      starred: z.boolean().optional().describe('Whether the contact is starred'),
       customFields: z.array(customFieldValueSchema).optional().describe('Custom field values')
     })
   )

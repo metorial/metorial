@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,12 @@ export let suggestDomainCategorization = SlateTool.create(spec, {
         .optional()
         .describe('Suggested category (for category type)'),
       threatType: z.string().optional().describe('Type of threat (for threat type)'),
+      categoryIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Suggested security category IDs (for threat type). Call list_categories to discover category IDs.'
+        ),
       notes: z.string().optional().describe('Additional notes about the submission')
     })
   )
@@ -38,9 +44,12 @@ export let suggestDomainCategorization = SlateTool.create(spec, {
         notes: ctx.input.notes
       });
     } else {
+      if (!ctx.input.notes)
+        throw createApiServiceError('Provide notes explaining the threat report.');
       result = await client.suggestDomainThreat({
         domain: ctx.input.domain,
         threat_type: ctx.input.threatType,
+        category_ids: ctx.input.categoryIds,
         notes: ctx.input.notes
       });
     }

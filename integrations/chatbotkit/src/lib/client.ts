@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -18,19 +18,31 @@ export interface ListResponse<T> {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    let headers: Record<string, string> = {
-      Authorization: `Bearer ${config.token}`
-    };
-    if (config.runAsUserId) {
-      headers['X-RunAs-User-ID'] = config.runAsUserId;
+    if (!config.token.trim()) {
+      throw createApiServiceError('A ChatBotKit API secret key is required.');
     }
-    this.axios = createAxios({
+    let headers: Record<string, string> = { Accept: 'application/json' };
+    if (config.runAsUserId) {
+      headers['X-RunAs-UserId'] = config.runAsUserId;
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.chatbotkit.com/v1',
+      authHeader: { value: `Bearer ${config.token.trim()}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ChatBotKit',
+          reason: 'chatbotkit_api_error'
+        }),
       headers
     });
+  }
+
+  async listModels(params?: ListParams & { type?: string }): Promise<ListResponse<any>> {
+    let response = await this.axios.get('/platform/model/list', { params });
+    return response.data;
   }
 
   // ---- Bots ----
@@ -41,7 +53,7 @@ export class Client {
   }
 
   async fetchBot(botId: string): Promise<any> {
-    let response = await this.axios.get(`/bot/${botId}/fetch`);
+    let response = await this.axios.get(`/bot/${encodeURIComponent(botId)}/fetch`);
     return response.data;
   }
 
@@ -61,12 +73,12 @@ export class Client {
   }
 
   async updateBot(botId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/bot/${botId}/update`, data);
+    let response = await this.axios.post(`/bot/${encodeURIComponent(botId)}/update`, data);
     return response.data;
   }
 
   async deleteBot(botId: string): Promise<any> {
-    let response = await this.axios.post(`/bot/${botId}/delete`);
+    let response = await this.axios.post(`/bot/${encodeURIComponent(botId)}/delete`);
     return response.data;
   }
 
@@ -78,7 +90,9 @@ export class Client {
   }
 
   async fetchConversation(conversationId: string): Promise<any> {
-    let response = await this.axios.get(`/conversation/${conversationId}/fetch`);
+    let response = await this.axios.get(
+      `/conversation/${encodeURIComponent(conversationId)}/fetch`
+    );
     return response.data;
   }
 
@@ -95,12 +109,17 @@ export class Client {
   }
 
   async updateConversation(conversationId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/update`, data);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteConversation(conversationId: string): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/delete`);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/delete`
+    );
     return response.data;
   }
 
@@ -108,12 +127,17 @@ export class Client {
     conversationId: string,
     data: { text: string; meta?: Record<string, any> }
   ): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/send`, data);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/send`,
+      data
+    );
     return response.data;
   }
 
   async receiveMessage(conversationId: string): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/receive`);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/receive`
+    );
     return response.data;
   }
 
@@ -130,17 +154,27 @@ export class Client {
   }): Promise<any> {
     if (data.conversationId) {
       let { conversationId, ...rest } = data;
-      let response = await this.axios.post(`/conversation/${conversationId}/complete`, rest);
+      let response = await this.axios.post(
+        `/conversation/${encodeURIComponent(conversationId)}/complete`,
+        rest
+      );
       return response.data;
     }
-    let response = await this.axios.post('/conversation/complete', data);
+    let { text, meta, ...rest } = data;
+    let response = await this.axios.post('/conversation/complete', {
+      ...rest,
+      messages: data.messages ?? [{ type: 'user', text: text ?? '', meta }]
+    });
     return response.data;
   }
 
   async listMessages(conversationId: string, params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get(`/conversation/${conversationId}/message/list`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/conversation/${encodeURIComponent(conversationId)}/message/list`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
@@ -153,7 +187,7 @@ export class Client {
     }
   ): Promise<any> {
     let response = await this.axios.post(
-      `/conversation/${conversationId}/message/create`,
+      `/conversation/${encodeURIComponent(conversationId)}/message/create`,
       data
     );
     return response.data;
@@ -167,7 +201,7 @@ export class Client {
   }
 
   async fetchDataset(datasetId: string): Promise<any> {
-    let response = await this.axios.get(`/dataset/${datasetId}/fetch`);
+    let response = await this.axios.get(`/dataset/${encodeURIComponent(datasetId)}/fetch`);
     return response.data;
   }
 
@@ -182,19 +216,25 @@ export class Client {
   }
 
   async updateDataset(datasetId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/dataset/${datasetId}/update`, data);
+    let response = await this.axios.post(
+      `/dataset/${encodeURIComponent(datasetId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteDataset(datasetId: string): Promise<any> {
-    let response = await this.axios.post(`/dataset/${datasetId}/delete`);
+    let response = await this.axios.post(`/dataset/${encodeURIComponent(datasetId)}/delete`);
     return response.data;
   }
 
   // ---- Dataset Records ----
 
   async listRecords(datasetId: string, params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get(`/dataset/${datasetId}/record/list`, { params });
+    let response = await this.axios.get(
+      `/dataset/${encodeURIComponent(datasetId)}/record/list`,
+      { params }
+    );
     return response.data;
   }
 
@@ -205,12 +245,17 @@ export class Client {
       meta?: Record<string, any>;
     }
   ): Promise<any> {
-    let response = await this.axios.post(`/dataset/${datasetId}/record/create`, data);
+    let response = await this.axios.post(
+      `/dataset/${encodeURIComponent(datasetId)}/record/create`,
+      data
+    );
     return response.data;
   }
 
   async fetchRecord(datasetId: string, recordId: string): Promise<any> {
-    let response = await this.axios.get(`/dataset/${datasetId}/record/${recordId}/fetch`);
+    let response = await this.axios.get(
+      `/dataset/${encodeURIComponent(datasetId)}/record/${encodeURIComponent(recordId)}/fetch`
+    );
     return response.data;
   }
 
@@ -220,19 +265,23 @@ export class Client {
     data: Record<string, any>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/dataset/${datasetId}/record/${recordId}/update`,
+      `/dataset/${encodeURIComponent(datasetId)}/record/${encodeURIComponent(recordId)}/update`,
       data
     );
     return response.data;
   }
 
   async deleteRecord(datasetId: string, recordId: string): Promise<any> {
-    let response = await this.axios.post(`/dataset/${datasetId}/record/${recordId}/delete`);
+    let response = await this.axios.post(
+      `/dataset/${encodeURIComponent(datasetId)}/record/${encodeURIComponent(recordId)}/delete`
+    );
     return response.data;
   }
 
   async searchRecords(datasetId: string, query: string): Promise<any> {
-    let response = await this.axios.post(`/dataset/${datasetId}/record/search`, { query });
+    let response = await this.axios.post(`/dataset/${encodeURIComponent(datasetId)}/search`, {
+      search: query
+    });
     return response.data;
   }
 
@@ -244,7 +293,7 @@ export class Client {
   }
 
   async fetchSkillset(skillsetId: string): Promise<any> {
-    let response = await this.axios.get(`/skillset/${skillsetId}/fetch`);
+    let response = await this.axios.get(`/skillset/${encodeURIComponent(skillsetId)}/fetch`);
     return response.data;
   }
 
@@ -258,19 +307,25 @@ export class Client {
   }
 
   async updateSkillset(skillsetId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/skillset/${skillsetId}/update`, data);
+    let response = await this.axios.post(
+      `/skillset/${encodeURIComponent(skillsetId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteSkillset(skillsetId: string): Promise<any> {
-    let response = await this.axios.post(`/skillset/${skillsetId}/delete`);
+    let response = await this.axios.post(`/skillset/${encodeURIComponent(skillsetId)}/delete`);
     return response.data;
   }
 
   // ---- Abilities (sub-resource of Skillsets) ----
 
   async listAbilities(skillsetId: string, params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get(`/skillset/${skillsetId}/ability/list`, { params });
+    let response = await this.axios.get(
+      `/skillset/${encodeURIComponent(skillsetId)}/ability/list`,
+      { params }
+    );
     return response.data;
   }
 
@@ -283,7 +338,10 @@ export class Client {
       meta?: Record<string, any>;
     }
   ): Promise<any> {
-    let response = await this.axios.post(`/skillset/${skillsetId}/ability/create`, data);
+    let response = await this.axios.post(
+      `/skillset/${encodeURIComponent(skillsetId)}/ability/create`,
+      data
+    );
     return response.data;
   }
 
@@ -293,7 +351,7 @@ export class Client {
     data: Record<string, any>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/skillset/${skillsetId}/ability/${abilityId}/update`,
+      `/skillset/${encodeURIComponent(skillsetId)}/ability/${encodeURIComponent(abilityId)}/update`,
       data
     );
     return response.data;
@@ -301,7 +359,7 @@ export class Client {
 
   async deleteAbility(skillsetId: string, abilityId: string): Promise<any> {
     let response = await this.axios.post(
-      `/skillset/${skillsetId}/ability/${abilityId}/delete`
+      `/skillset/${encodeURIComponent(skillsetId)}/ability/${encodeURIComponent(abilityId)}/delete`
     );
     return response.data;
   }
@@ -314,11 +372,12 @@ export class Client {
   }
 
   async fetchContact(contactId: string): Promise<any> {
-    let response = await this.axios.get(`/contact/${contactId}/fetch`);
+    let response = await this.axios.get(`/contact/${encodeURIComponent(contactId)}/fetch`);
     return response.data;
   }
 
   async createContact(data: {
+    fingerprint?: string;
     name?: string;
     email?: string;
     phone?: string;
@@ -329,16 +388,20 @@ export class Client {
   }
 
   async updateContact(contactId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/contact/${contactId}/update`, data);
+    let response = await this.axios.post(
+      `/contact/${encodeURIComponent(contactId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteContact(contactId: string): Promise<any> {
-    let response = await this.axios.post(`/contact/${contactId}/delete`);
+    let response = await this.axios.post(`/contact/${encodeURIComponent(contactId)}/delete`);
     return response.data;
   }
 
   async ensureContact(data: {
+    fingerprint: string;
     name?: string;
     email?: string;
     phone?: string;
@@ -352,7 +415,10 @@ export class Client {
     contactId: string,
     params?: ListParams
   ): Promise<ListResponse<any>> {
-    let response = await this.axios.get(`/contact/${contactId}/conversation/list`, { params });
+    let response = await this.axios.get(
+      `/contact/${encodeURIComponent(contactId)}/conversation/list`,
+      { params }
+    );
     return response.data;
   }
 
@@ -364,7 +430,7 @@ export class Client {
   }
 
   async fetchMemory(memoryId: string): Promise<any> {
-    let response = await this.axios.get(`/memory/${memoryId}/fetch`);
+    let response = await this.axios.get(`/memory/${encodeURIComponent(memoryId)}/fetch`);
     return response.data;
   }
 
@@ -379,49 +445,72 @@ export class Client {
   }
 
   async updateMemory(memoryId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/memory/${memoryId}/update`, data);
+    let response = await this.axios.post(
+      `/memory/${encodeURIComponent(memoryId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteMemory(memoryId: string): Promise<any> {
-    let response = await this.axios.post(`/memory/${memoryId}/delete`);
+    let response = await this.axios.post(`/memory/${encodeURIComponent(memoryId)}/delete`);
     return response.data;
   }
 
   async searchBotMemories(botId: string, query: string): Promise<any> {
-    let response = await this.axios.post(`/bot/${botId}/memory/search`, { query });
+    let response = await this.axios.post(`/bot/${encodeURIComponent(botId)}/memory/search`, {
+      search: query
+    });
     return response.data;
   }
 
   async searchContactMemories(contactId: string, query: string): Promise<any> {
-    let response = await this.axios.post(`/contact/${contactId}/memory/search`, { query });
+    let response = await this.axios.post(
+      `/contact/${encodeURIComponent(contactId)}/memory/search`,
+      { search: query }
+    );
     return response.data;
   }
 
   // ---- Integrations ----
 
-  async listIntegrations(params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get('/integration/list', { params });
+  async listIntegrations(params?: ListParams, type?: string): Promise<ListResponse<any>> {
+    let path = type ? `/integration/${encodeURIComponent(type)}/list` : '/integration/list';
+    let response = await this.axios.get(path, { params });
     return response.data;
   }
 
-  async fetchIntegration(integrationId: string): Promise<any> {
-    let response = await this.axios.get(`/integration/${integrationId}/fetch`);
+  async fetchIntegration(integrationId: string, type?: string): Promise<any> {
+    let path = type
+      ? `/integration/${encodeURIComponent(type)}/${encodeURIComponent(integrationId)}/fetch`
+      : `/integration/${encodeURIComponent(integrationId)}/fetch`;
+    let response = await this.axios.get(path);
     return response.data;
   }
 
   async createIntegration(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/integration/create', data);
+    let { type, ...body } = data;
+    let path = type
+      ? `/integration/${encodeURIComponent(type)}/create`
+      : '/integration/create';
+    let response = await this.axios.post(path, body);
     return response.data;
   }
 
   async updateIntegration(integrationId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/integration/${integrationId}/update`, data);
+    let { type, ...body } = data;
+    let path = type
+      ? `/integration/${encodeURIComponent(type)}/${encodeURIComponent(integrationId)}/update`
+      : `/integration/${encodeURIComponent(integrationId)}/update`;
+    let response = await this.axios.post(path, body);
     return response.data;
   }
 
-  async deleteIntegration(integrationId: string): Promise<any> {
-    let response = await this.axios.post(`/integration/${integrationId}/delete`);
+  async deleteIntegration(integrationId: string, type?: string): Promise<any> {
+    let path = type
+      ? `/integration/${encodeURIComponent(type)}/${encodeURIComponent(integrationId)}/delete`
+      : `/integration/${encodeURIComponent(integrationId)}/delete`;
+    let response = await this.axios.post(path);
     return response.data;
   }
 
@@ -433,17 +522,17 @@ export class Client {
   }
 
   async fetchFile(fileId: string): Promise<any> {
-    let response = await this.axios.get(`/file/${fileId}/fetch`);
+    let response = await this.axios.get(`/file/${encodeURIComponent(fileId)}/fetch`);
     return response.data;
   }
 
   async updateFile(fileId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/file/${fileId}/update`, data);
+    let response = await this.axios.post(`/file/${encodeURIComponent(fileId)}/update`, data);
     return response.data;
   }
 
   async deleteFile(fileId: string): Promise<any> {
-    let response = await this.axios.post(`/file/${fileId}/delete`);
+    let response = await this.axios.post(`/file/${encodeURIComponent(fileId)}/delete`);
     return response.data;
   }
 
@@ -455,7 +544,7 @@ export class Client {
   }
 
   async fetchSpace(spaceId: string): Promise<any> {
-    let response = await this.axios.get(`/space/${spaceId}/fetch`);
+    let response = await this.axios.get(`/space/${encodeURIComponent(spaceId)}/fetch`);
     return response.data;
   }
 
@@ -469,12 +558,12 @@ export class Client {
   }
 
   async updateSpace(spaceId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/space/${spaceId}/update`, data);
+    let response = await this.axios.post(`/space/${encodeURIComponent(spaceId)}/update`, data);
     return response.data;
   }
 
   async deleteSpace(spaceId: string): Promise<any> {
-    let response = await this.axios.post(`/space/${spaceId}/delete`);
+    let response = await this.axios.post(`/space/${encodeURIComponent(spaceId)}/delete`);
     return response.data;
   }
 
@@ -486,7 +575,7 @@ export class Client {
   }
 
   async fetchSecret(secretId: string): Promise<any> {
-    let response = await this.axios.get(`/secret/${secretId}/fetch`);
+    let response = await this.axios.get(`/secret/${encodeURIComponent(secretId)}/fetch`);
     return response.data;
   }
 
@@ -501,12 +590,15 @@ export class Client {
   }
 
   async updateSecret(secretId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/secret/${secretId}/update`, data);
+    let response = await this.axios.post(
+      `/secret/${encodeURIComponent(secretId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteSecret(secretId: string): Promise<any> {
-    let response = await this.axios.post(`/secret/${secretId}/delete`);
+    let response = await this.axios.post(`/secret/${encodeURIComponent(secretId)}/delete`);
     return response.data;
   }
 
@@ -518,7 +610,7 @@ export class Client {
   }
 
   async fetchTask(taskId: string): Promise<any> {
-    let response = await this.axios.get(`/task/${taskId}/fetch`);
+    let response = await this.axios.get(`/task/${encodeURIComponent(taskId)}/fetch`);
     return response.data;
   }
 
@@ -528,12 +620,12 @@ export class Client {
   }
 
   async updateTask(taskId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/task/${taskId}/update`, data);
+    let response = await this.axios.post(`/task/${encodeURIComponent(taskId)}/update`, data);
     return response.data;
   }
 
   async deleteTask(taskId: string): Promise<any> {
-    let response = await this.axios.post(`/task/${taskId}/delete`);
+    let response = await this.axios.post(`/task/${encodeURIComponent(taskId)}/delete`);
     return response.data;
   }
 
@@ -545,7 +637,7 @@ export class Client {
   }
 
   async fetchBlueprint(blueprintId: string): Promise<any> {
-    let response = await this.axios.get(`/blueprint/${blueprintId}/fetch`);
+    let response = await this.axios.get(`/blueprint/${encodeURIComponent(blueprintId)}/fetch`);
     return response.data;
   }
 
@@ -555,29 +647,40 @@ export class Client {
   }
 
   async updateBlueprint(blueprintId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/blueprint/${blueprintId}/update`, data);
+    let response = await this.axios.post(
+      `/blueprint/${encodeURIComponent(blueprintId)}/update`,
+      data
+    );
     return response.data;
   }
 
   async deleteBlueprint(blueprintId: string): Promise<any> {
-    let response = await this.axios.post(`/blueprint/${blueprintId}/delete`);
+    let response = await this.axios.post(
+      `/blueprint/${encodeURIComponent(blueprintId)}/delete`
+    );
     return response.data;
   }
 
   async cloneBlueprint(blueprintId: string): Promise<any> {
-    let response = await this.axios.post(`/blueprint/${blueprintId}/clone`);
+    let response = await this.axios.post(
+      `/blueprint/${encodeURIComponent(blueprintId)}/clone`
+    );
     return response.data;
   }
 
   // ---- Conversation Voting ----
 
   async upvoteConversation(conversationId: string): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/upvote`);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/upvote`
+    );
     return response.data;
   }
 
   async downvoteConversation(conversationId: string): Promise<any> {
-    let response = await this.axios.post(`/conversation/${conversationId}/downvote`);
+    let response = await this.axios.post(
+      `/conversation/${encodeURIComponent(conversationId)}/downvote`
+    );
     return response.data;
   }
 
@@ -585,14 +688,14 @@ export class Client {
 
   async upvoteMessage(conversationId: string, messageId: string): Promise<any> {
     let response = await this.axios.post(
-      `/conversation/${conversationId}/message/${messageId}/upvote`
+      `/conversation/${encodeURIComponent(conversationId)}/message/${encodeURIComponent(messageId)}/upvote`
     );
     return response.data;
   }
 
   async downvoteMessage(conversationId: string, messageId: string): Promise<any> {
     let response = await this.axios.post(
-      `/conversation/${conversationId}/message/${messageId}/downvote`
+      `/conversation/${encodeURIComponent(conversationId)}/message/${encodeURIComponent(messageId)}/downvote`
     );
     return response.data;
   }

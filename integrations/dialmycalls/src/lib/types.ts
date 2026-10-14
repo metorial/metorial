@@ -7,7 +7,7 @@ export interface Contact {
   email?: string;
   extra1?: string;
   miscellaneous?: string;
-  groups?: string;
+  groups?: string | Array<{ id: string }>;
   created_at?: string;
   updated_at?: string;
 }

@@ -27,7 +27,7 @@ let appointmentSchema = z.object({
 export let listAppointments = SlateTool.create(spec, {
   name: 'List Appointments',
   key: 'list_appointments',
-  description: `Retrieve a list of scheduled appointments. Filter by date range, calendar, appointment type, client name, email, or phone. Returns up to 100 appointments per request.`,
+  description: `Retrieve a list of scheduled appointments. Filter by date range, calendar, appointment type, client name, email, or phone. Defaults to 100 appointments per request; set max to change the result limit.`,
   tags: {
     readOnly: true
   }
@@ -47,7 +47,13 @@ export let listAppointments = SlateTool.create(spec, {
       canceled: z
         .boolean()
         .optional()
-        .describe('Include canceled appointments (default: false)'),
+        .describe(
+          'Return canceled appointments instead of scheduled appointments (default: false)'
+        ),
+      showAll: z
+        .boolean()
+        .optional()
+        .describe('Return both scheduled and canceled appointments'),
       firstName: z.string().optional().describe('Filter by client first name'),
       lastName: z.string().optional().describe('Filter by client last name'),
       email: z.string().optional().describe('Filter by client email'),
@@ -76,6 +82,7 @@ export let listAppointments = SlateTool.create(spec, {
       calendarID: ctx.input.calendarId,
       appointmentTypeID: ctx.input.appointmentTypeId,
       canceled: ctx.input.canceled,
+      showall: ctx.input.showAll,
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
       email: ctx.input.email,

@@ -19,7 +19,9 @@ Poll until the status is "completed" or "failed".`,
   )
   .output(
     z.object({
-      status: z.string().describe('Job status (e.g. "processing", "completed", "failed")'),
+      status: z
+        .string()
+        .describe('Job status (e.g. "queued", "active", "completed", "failed")'),
       extractedData: z
         .any()
         .optional()
@@ -27,7 +29,11 @@ Poll until the status is "completed" or "failed".`,
       schema: z
         .record(z.string(), z.any())
         .optional()
-        .describe('JSON Schema used or auto-generated for the extraction')
+        .describe('JSON Schema used or auto-generated for the extraction'),
+      error: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Error details if the job failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -39,12 +45,13 @@ Poll until the status is "completed" or "failed".`,
       output: {
         status: result.status,
         extractedData: result.data ?? result.result,
-        schema: result.schema
+        schema: result.schema,
+        error: result.error ?? undefined
       },
       message:
         result.status === 'completed'
           ? `Extraction job completed successfully.`
-          : `Extraction job status: **${result.status}**. ${result.status === 'processing' ? 'Try again shortly.' : ''}`
+          : `Extraction job status: **${result.status}**. ${['queued', 'active', 'processing'].includes(result.status) ? 'Try again shortly.' : ''}`
     };
   })
   .build();

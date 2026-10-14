@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DromoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let createHeadlessImport = SlateTool.create(spec, {
   instructions: [
     'Provide either `originalFilename` (for file-based imports) or `initialData` (for JSON-based imports), not both.',
     'When using file upload, use the returned `uploadUrl` to PUT the file contents within 30 minutes.',
-    'The Headless API is a premium add-on to the Dromo Enterprise plan.'
+    'The Headless API requires the Dromo Headless premium add-on.'
   ],
   constraints: ['Rate limit: 20 requests per minute for creating headless imports.']
 })
@@ -24,7 +24,21 @@ export let createHeadlessImport = SlateTool.create(spec, {
       initialData: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('JSON array of objects to import directly instead of uploading a file')
+        .describe(
+          'JSON array of objects to import directly instead of uploading a file; maximum 15 MB'
+        ),
+      settings: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Settings that override the saved schema for this import'),
+      hooks: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Serializable hooks that override the saved schema for this import'),
+      importMetadata: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Import metadata, including an optional user object')
     })
   )
   .output(
@@ -38,14 +52,34 @@ export let createHeadlessImport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.initialData !== undefined) === (ctx.input.originalFilename !== undefined)) {
+      throw createApiServiceError('Provide exactly one of originalFilename or initialData.');
+    }
+    if (ctx.input.originalFilename !== undefined && !ctx.input.originalFilename.trim()) {
+      throw createApiServiceError('Provide a non-empty originalFilename.');
+    }
+    if (
+      ctx.input.initialData !== undefined &&
+      Buffer.byteLength(JSON.stringify(ctx.input.initialData), 'utf8') > 15_000_000
+    ) {
+      throw createApiServiceError(
+        'initialData must be at most 15 MB. Upload a file for larger imports.'
+      );
+    }
     let client = new DromoClient({ token: ctx.auth.token });
 
     let params: {
       schema_id: string;
       original_filename?: string;
       initial_data?: Record<string, any>[];
+      settings?: Record<string, any>;
+      hooks?: Record<string, any>;
+      import_metadata?: Record<string, any>;
     } = {
-      schema_id: ctx.input.schemaId
+      schema_id: ctx.input.schemaId,
+      settings: ctx.input.settings,
+      hooks: ctx.input.hooks,
+      import_metadata: ctx.input.importMetadata
     };
 
     if (ctx.input.initialData) {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -22,7 +22,24 @@ export let createMessage = SlateTool.create(spec, {
         .describe('Message channel'),
       fromAgent: z.boolean().describe('Whether this message is from an agent'),
       senderEmail: z.string().optional().describe('Email of the message sender'),
-      receiverEmail: z.string().optional().describe('Email of the message receiver'),
+      receiverEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Customer receiver email for outgoing public messages; omit for incoming messages and internal notes'
+        ),
+      sourceFromAddress: z
+        .string()
+        .optional()
+        .describe(
+          'Email routing sender address; outgoing email must use a connected Gorgias email integration'
+        ),
+      sourceToAddress: z
+        .string()
+        .optional()
+        .describe(
+          'Email routing recipient address; incoming email can target your connected support mailbox'
+        ),
       subject: z.string().optional().describe('Message subject line'),
       bodyHtml: z.string().optional().describe('HTML body of the message'),
       bodyText: z.string().optional().describe('Plain text body of the message'),
@@ -51,9 +68,30 @@ export let createMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
+    if (ctx.input.channel === 'internal' && !ctx.input.fromAgent) {
+      throw createApiServiceError('Internal notes require fromAgent=true.');
+    }
+    if (
+      ctx.input.receiverEmail &&
+      (!ctx.input.fromAgent || ctx.input.channel === 'internal')
+    ) {
+      throw createApiServiceError(
+        'Omit receiverEmail for incoming messages and internal notes.'
+      );
+    }
+    let sender = ctx.input.senderEmail
+      ? { email: ctx.input.senderEmail }
+      : ctx.input.fromAgent
+        ? { id: (await client.getUser(0)).id }
+        : undefined;
+    if (!sender) {
+      throw createApiServiceError('Provide senderEmail for a customer message.');
+    }
     let messageData: any = {
-      channel: ctx.input.channel === 'internal' ? 'note' : ctx.input.channel,
-      via: ctx.input.channel === 'internal' ? 'api' : ctx.input.channel,
+      channel: ctx.input.channel === 'internal' ? 'internal-note' : ctx.input.channel,
+      via: 'api',
+      sender,
+      public: ctx.input.channel !== 'internal',
       from_agent: ctx.input.fromAgent,
       body_html: ctx.input.bodyHtml,
       body_text: ctx.input.bodyText,
@@ -61,18 +99,21 @@ export let createMessage = SlateTool.create(spec, {
       subject: ctx.input.subject
     };
 
-    if (ctx.input.senderEmail) {
-      messageData.sender = { email: ctx.input.senderEmail };
-    }
-
     if (ctx.input.receiverEmail) {
       messageData.receiver = { email: ctx.input.receiverEmail };
     }
 
     if (ctx.input.channel === 'email') {
+      let fromAddress = ctx.input.sourceFromAddress || ctx.input.senderEmail;
+      if (!fromAddress || (!ctx.input.receiverEmail && !ctx.input.sourceToAddress)) {
+        throw createApiServiceError(
+          'Email messages require routing sender and recipient addresses. Use a connected Gorgias email integration as the outgoing sender address.'
+        );
+      }
+      let toAddress = ctx.input.sourceToAddress || ctx.input.receiverEmail;
       messageData.source = {
-        from: ctx.input.senderEmail ? { address: ctx.input.senderEmail } : undefined,
-        to: ctx.input.receiverEmail ? [{ address: ctx.input.receiverEmail }] : []
+        from: { address: fromAddress },
+        to: toAddress ? [{ address: toAddress }] : []
       };
     }
 

@@ -50,7 +50,8 @@ Supports personalization variables using {{variable}} syntax for dynamic content
     z.object({
       smsMessageId: z.string().nullable().describe('Unique SMS message ID for tracking.'),
       statusCode: z.number().describe('HTTP status code from the API.'),
-      accepted: z.boolean().describe('Whether the SMS was accepted for delivery.')
+      accepted: z.boolean().describe('Whether the SMS was accepted for delivery.'),
+      paused: z.boolean().optional().describe('Whether sending is paused for this message.')
     })
   )
   .handleInvocation(async ctx => {
@@ -66,21 +67,18 @@ Supports personalization variables using {{variable}} syntax for dynamic content
       }))
     });
 
-    let accepted = result.statusCode >= 200 && result.statusCode < 300;
-
-    if (!accepted) {
-      ctx.warn(['SMS was not accepted', result]);
-    }
+    let accepted = Boolean(result.smsMessageId);
 
     return {
       output: {
         smsMessageId: result.smsMessageId,
         statusCode: result.statusCode,
-        accepted
+        accepted,
+        paused: result.paused
       },
       message: accepted
-        ? `SMS sent to **${ctx.input.to.join(', ')}**${result.smsMessageId ? ` (SMS ID: \`${result.smsMessageId}\`)` : ''}.`
-        : `SMS sending failed with status ${result.statusCode}.`
+        ? `SMS ${result.paused ? 'queued with sending paused' : 'queued'} for **${ctx.input.to.join(', ')}** (SMS ID: \`${result.smsMessageId}\`).`
+        : 'The provider returned no SMS message ID. Delivery acceptance could not be confirmed.'
     };
   })
   .build();

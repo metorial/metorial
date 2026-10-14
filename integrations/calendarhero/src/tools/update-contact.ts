@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,6 +15,7 @@ export let updateContact = SlateTool.create(spec, {
       title: z.string().optional().describe('Updated job title'),
       organization: z.string().optional().describe('Updated organization name'),
       emails: z.array(z.string()).optional().describe('Updated email addresses'),
+      defaultEmail: z.string().optional().describe('Updated preferred email address'),
       phoneNumbers: z.array(z.string()).optional().describe('Updated phone numbers')
     })
   )
@@ -29,12 +30,32 @@ export let updateContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let updateData: any = {};
-    if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-    if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
-    if (ctx.input.organization !== undefined) updateData.organization = ctx.input.organization;
-    if (ctx.input.emails !== undefined) updateData.email = ctx.input.emails;
-    if (ctx.input.phoneNumbers !== undefined) updateData.telephone = ctx.input.phoneNumbers;
+    let changes = pickDefined({
+      name: ctx.input.name,
+      title: ctx.input.title,
+      organization: ctx.input.organization,
+      defaultEmail: ctx.input.defaultEmail,
+      email: ctx.input.emails,
+      telephone: ctx.input.phoneNumbers
+    });
+    if (Object.keys(changes).length === 0) {
+      throw createApiServiceError('Provide at least one contact field to update.');
+    }
+    let emails = ctx.input.emails;
+    if (emails === undefined) {
+      let contact = await client.getContact(ctx.input.contactId, { basic: true });
+      emails = Array.isArray(contact.email)
+        ? contact.email
+        : contact.email
+          ? [contact.email]
+          : [];
+    }
+    if (!emails?.length || emails.some((email: string) => !email.trim())) {
+      throw createApiServiceError(
+        'CalendarHero requires at least one email address. Provide a non-empty emails array.'
+      );
+    }
+    let updateData = { ...changes, email: emails };
 
     let result = await client.updateContact(ctx.input.contactId, updateData);
 

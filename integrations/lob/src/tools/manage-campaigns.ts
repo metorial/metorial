@@ -9,6 +9,9 @@ let campaignOutputSchema = z.object({
   description: z.string().optional().nullable().describe('Campaign description'),
   scheduleSendDate: z.string().optional().nullable().describe('Scheduled send date'),
   status: z.string().optional().nullable().describe('Campaign status'),
+  scheduleType: z.string().optional().nullable().describe('Campaign scheduling type'),
+  isDraft: z.boolean().optional().nullable().describe('Whether the campaign is still a draft'),
+  useType: z.string().optional().nullable().describe('Mail use type'),
   dateCreated: z.string().optional().nullable().describe('Creation date'),
   dateModified: z.string().optional().nullable().describe('Last modification date')
 });
@@ -17,8 +20,11 @@ let mapCampaign = (data: any) => ({
   campaignId: data.id,
   name: data.name,
   description: data.description ?? null,
-  scheduleSendDate: data.schedule_send_date ?? null,
+  scheduleSendDate: data.send_date ?? data.schedule_send_date ?? null,
   status: data.status ?? null,
+  scheduleType: data.schedule_type ?? null,
+  isDraft: data.is_draft ?? null,
+  useType: data.use_type ?? null,
   dateCreated: data.date_created ?? null,
   dateModified: data.date_modified ?? null
 });
@@ -36,8 +42,18 @@ export let createCampaign = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Campaign name'),
       description: z.string().optional().describe('Campaign description'),
-      scheduleSendDate: z.string().optional().describe('ISO 8601 date to schedule sending'),
-      useType: z.string().optional().describe('Use type (e.g., "marketing" or "operational")')
+      scheduleSendDate: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field. Omit it: the documented campaign API supports immediate scheduling only.'
+        ),
+      useType: z
+        .string()
+        .optional()
+        .describe(
+          'marketing or operational. If omitted, the account must have a default mail use type configured.'
+        )
     })
   )
   .output(campaignOutputSchema)
@@ -90,26 +106,48 @@ export let listCampaigns = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Number of campaigns to return (max 100, default 10)'),
-      offset: z.number().optional().describe('Number of campaigns to skip')
+      offset: z.number().optional().describe('Number of campaigns to skip'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor from previousUrl; cannot be combined with after'),
+      after: z
+        .string()
+        .optional()
+        .describe('Next-page cursor from nextUrl; cannot be combined with before')
     })
   )
   .output(
     z.object({
       campaigns: z.array(campaignOutputSchema),
-      totalCount: z.number().describe('Total count')
+      totalCount: z.number().describe('Total count'),
+      nextUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Next-page URL; pass its after query value to after'),
+      previousUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Previous-page URL; pass its before query value to before')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listCampaigns({
       limit: ctx.input.limit,
+      before: ctx.input.before,
+      after: ctx.input.after,
       offset: ctx.input.offset
     });
     let campaigns = (result.data || []).map(mapCampaign);
     return {
       output: {
         campaigns,
-        totalCount: result.total_count ?? result.count ?? campaigns.length
+        totalCount: result.total_count ?? result.count ?? campaigns.length,
+        nextUrl: result.next_url ?? null,
+        previousUrl: result.previous_url ?? null
       },
       message: `Found **${campaigns.length}** campaigns`
     };
@@ -118,7 +156,7 @@ export let listCampaigns = SlateTool.create(spec, {
 export let updateCampaign = SlateTool.create(spec, {
   name: 'Update Campaign',
   key: 'update_campaign',
-  description: `Update a campaign's name, description, or scheduled send date.`,
+  description: `Update a campaign's name or description. Date scheduling is not supported by the documented campaign API.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -129,7 +167,12 @@ export let updateCampaign = SlateTool.create(spec, {
       campaignId: z.string().describe('The campaign ID to update'),
       name: z.string().optional().describe('New campaign name'),
       description: z.string().optional().describe('New description'),
-      scheduleSendDate: z.string().optional().describe('New scheduled send date')
+      scheduleSendDate: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field. Omit it: the documented campaign API supports immediate scheduling only.'
+        )
     })
   )
   .output(campaignOutputSchema)
@@ -149,7 +192,7 @@ export let updateCampaign = SlateTool.create(spec, {
 export let sendCampaign = SlateTool.create(spec, {
   name: 'Send Campaign',
   key: 'send_campaign',
-  description: `Send a campaign immediately. The campaign must have creatives and audiences configured before sending.`,
+  description: `Send a campaign using its configured schedule. The campaign must have creatives and audiences configured before sending.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -166,7 +209,7 @@ export let sendCampaign = SlateTool.create(spec, {
     let result = await client.sendCampaign(ctx.input.campaignId);
     return {
       output: mapCampaign(result),
-      message: `Campaign **${result.id}** is now sending`
+      message: `Submitted campaign **${result.id}** for sending`
     };
   });
 
@@ -196,8 +239,11 @@ export let deleteCampaign = SlateTool.create(spec, {
     return {
       output: {
         campaignId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted campaign **${ctx.input.campaignId}**`
+      message:
+        result.deleted === true
+          ? `Deleted campaign **${ctx.input.campaignId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

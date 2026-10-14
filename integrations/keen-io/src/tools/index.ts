@@ -7,4 +7,5 @@ export * from './manage-access-keys';
 export * from './manage-cached-datasets';
 export * from './manage-saved-queries';
 export * from './record-events';
+export * from './run-multi-analysis';
 export * from './run-query';

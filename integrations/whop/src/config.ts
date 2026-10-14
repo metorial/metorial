@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     companyId: z
       .string()
       .optional()
-      .describe('Your Whop company ID (e.g. biz_xxxxx). Required for most API operations.')
+      .describe(
+        'Default Whop company/account ID (e.g. biz_xxxxx). Optional: call list_accounts and pass its accountId as companyId to each tool.'
+      )
   })
 );

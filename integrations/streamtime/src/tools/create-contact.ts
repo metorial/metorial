@@ -48,7 +48,7 @@ export let createContact = SlateTool.create(spec, {
       output: {
         contactId: result.id,
         firstName: result.firstName,
-        lastName: result.lastName,
+        lastName: result.lastName ?? '',
         raw: result
       },
       message: `Created contact **${result.firstName} ${result.lastName}** (ID: ${result.id}) under company ${ctx.input.companyId}.`

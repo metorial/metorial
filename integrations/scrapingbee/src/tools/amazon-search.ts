@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,13 +31,15 @@ export let amazonSearch = SlateTool.create(spec, {
       countryCode: z
         .string()
         .optional()
-        .describe('Two-letter country code for localized results'),
+        .describe(
+          'Two-letter geolocation country code. Omit when it matches the selected Amazon marketplace country.'
+        ),
       device: z.enum(['desktop', 'mobile']).optional().describe('Device type to emulate'),
       sortBy: z
         .string()
         .optional()
         .describe(
-          'Sort order for search results (e.g., "price-asc-rank", "price-desc-rank", "review-rank", "date-desc-rank")'
+          'Sort order: featured, most_recent, price_low_to_high, price_high_to_low, average_review, or bestsellers. Legacy Amazon sort names are also accepted.'
         ),
       minPrice: z.number().optional().describe('Minimum price filter'),
       maxPrice: z.number().optional().describe('Maximum price filter'),
@@ -68,7 +70,7 @@ export let amazonSearch = SlateTool.create(spec, {
     }
 
     if (!ctx.input.query) {
-      throw new Error('Either query or asin must be provided');
+      throw createApiServiceError('Either query or asin must be provided.');
     }
 
     let result = await client.amazonSearch({

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let screenshot = SlateTool.create(spec, {
   name: 'Website Screenshot',
   key: 'website_screenshot',
-  description: `Capture a live screenshot of any web page by providing its URL.
+  description: `Capture a live screenshot of a publicly accessible web page and make the image available for download.
 Useful for visual verification, archiving web pages, generating thumbnails, or previewing website content.`,
   tags: {
     destructive: false,
@@ -28,6 +28,11 @@ Useful for visual verification, archiving web pages, generating thumbnails, or p
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getWebsiteScreenshot(ctx.input.url);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.screenshotUrl
+    });
 
     return {
       output: result,

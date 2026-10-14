@@ -1,17 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCompany = SlateTool.create(spec, {
   name: 'Get Company',
   key: 'get_company',
-  description: `Retrieve company-level settings from Harvest including timezone, currency, time tracking preferences, and plan details.`,
+  description: `Retrieve company-level settings from Harvest including timezone, currency, time tracking preferences, and plan details. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
+  constraints: ['Requires administrator access.'],
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ accountId: harvestAccountIdSchema }))
   .output(
     z.object({
       baseUri: z.string().optional().describe('Base URI of the company'),
@@ -39,7 +41,7 @@ export let getCompany = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let company = await client.getCompany();

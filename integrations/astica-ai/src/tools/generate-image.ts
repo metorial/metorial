@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AsticaDesignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,8 @@ Supports quality settings, negative prompts to exclude unwanted elements, reprod
   instructions: [
     'Provide a descriptive prompt (max 350 characters) specifying the desired style, colors, and subject.',
     'Use negativePrompt to exclude unwanted elements from the generated image.',
-    'Set a seed value for reproducible image generation.'
+    'Set a whole-number seed value for reproducible image generation.',
+    'Low-priority requests may return a URL to check for results instead of a completed image.'
   ],
   constraints: [
     'Prompt and negative prompt are limited to 350 characters each.',
@@ -67,6 +68,17 @@ Supports quality settings, negative prompts to exclude unwanted elements, reprod
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.prompt.trim() || ctx.input.prompt.length > 350) {
+      throw createApiServiceError(
+        'Provide a non-empty image prompt of at most 350 characters.'
+      );
+    }
+    if (ctx.input.negativePrompt && ctx.input.negativePrompt.length > 350) {
+      throw createApiServiceError('The negative image prompt must be at most 350 characters.');
+    }
+    if (ctx.input.seed !== undefined && !Number.isInteger(ctx.input.seed)) {
+      throw createApiServiceError('The image generation seed must be a whole number.');
+    }
     let client = new AsticaDesignClient(ctx.auth.token);
 
     ctx.info(`Generating image with prompt: "${ctx.input.prompt.substring(0, 80)}..."`);
@@ -82,15 +94,39 @@ Supports quality settings, negative prompts to exclude unwanted elements, reprod
       lowPriority: ctx.input.lowPriority ? 1 : 0
     });
 
+    let imageUrl = result.output || '';
+    let completed = result.status === 'success' && !ctx.input.lowPriority;
+    if (completed) {
+      if (
+        typeof imageUrl !== 'string' ||
+        !URL.canParse(imageUrl) ||
+        !['https:', 'http:'].includes(new URL(imageUrl).protocol)
+      ) {
+        throw createApiServiceError(
+          'Astica completed image generation without returning a valid image URL.'
+        );
+      }
+      await ctx.addAttachment({
+        type: 'url',
+        url: imageUrl,
+        mimeType:
+          (result.generate_lossless ?? (ctx.input.lossless ? 1 : 0)) === 1
+            ? 'image/png'
+            : 'image/jpeg'
+      });
+    }
+
     return {
       output: {
         status: result.status || 'unknown',
-        imageUrl: result.output || '',
+        imageUrl,
         quality: result.generate_quality,
         lossless: result.generate_lossless,
         seed: result.seed
       },
-      message: `Image generated successfully. [View image](${result.output})`
+      message: completed
+        ? `Image generated successfully. [View image](${imageUrl})`
+        : `${ctx.input.lowPriority ? 'Low-priority image generation submitted.' : 'Image generation submitted.'} Status: ${result.status || 'unknown'}.${imageUrl ? ` Check results at ${imageUrl}.` : ''}`
     };
   })
   .build();

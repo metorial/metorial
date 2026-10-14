@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -12,10 +12,10 @@ Requires the **Data Store API Key** (found under Data Sources > choose a Data St
   instructions: [
     'The Data Store API Key is different from your account API Key. Find it by going to Data Sources, choosing a Data Store, and clicking "Use Our API".',
     'When adding a record, provide field names and values as key-value pairs in the "fields" parameter.',
-    'To delete, provide either a recordId or matchCriteria (field name/value pairs to match against).'
+    'To delete by matching fields, include all fields marked unique in Get Data Store Fields. Other fields do not identify the record.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -41,7 +41,7 @@ Requires the **Data Store API Key** (found under Data Sources > choose a Data St
         .record(z.string(), z.any())
         .optional()
         .describe(
-          'Field name/value pairs to match for deletion (required for delete_by_match action).'
+          'Unique field name/value pairs that identify the record to delete (required for delete_by_match action).'
         )
     })
   )
@@ -57,7 +57,7 @@ Requires the **Data Store API Key** (found under Data Sources > choose a Data St
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required when adding a Data Store record.');
+        throw createApiServiceError('Fields are required when adding a Data Store record.');
       }
       result = await client.addDataStoreRecord(ctx.input.dataStoreApiKey, ctx.input.fields);
       return {
@@ -66,7 +66,7 @@ Requires the **Data Store API Key** (found under Data Sources > choose a Data St
       };
     } else if (ctx.input.action === 'delete_by_id') {
       if (!ctx.input.recordId) {
-        throw new Error('Record ID is required for delete_by_id action.');
+        throw createApiServiceError('Record ID is required for delete_by_id action.');
       }
       result = await client.deleteDataStoreRecordById(
         ctx.input.dataStoreApiKey,
@@ -78,7 +78,7 @@ Requires the **Data Store API Key** (found under Data Sources > choose a Data St
       };
     } else {
       if (!ctx.input.matchCriteria) {
-        throw new Error('Match criteria are required for delete_by_match action.');
+        throw createApiServiceError('Match criteria are required for delete_by_match action.');
       }
       result = await client.deleteDataStoreRecord(
         ctx.input.dataStoreApiKey,

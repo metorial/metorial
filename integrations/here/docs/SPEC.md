@@ -1,4 +1,4 @@
-# Slates Specification for Here
+# HERE Integration Specification
 
 ## Overview
 
@@ -39,46 +39,29 @@ An optional scope can be added to the request body to request a project scoped a
 
 ## Features
 
-### Geocoding & Search
+### Geocoding and Search
 
-Comprehensive geocoding and search functionality based on HERE's freshest database of addresses and POIs/Place information. Supports forward geocoding (address to coordinates), reverse geocoding (coordinates to address), autosuggest, and place/POI discovery. Access a comprehensive place data set with 400 Places categories and over 260 attributes, such as names, addresses, opening hours, reviews, and ratings.
+Geocode free-form, qualified, and hybrid address queries; reverse geocode coordinates; discover or browse places; retrieve autosuggest or address autocomplete results; and look up a place by its HERE identifier. Discover and autosuggest require a geographic search context. Browse requires a search center.
 
-### Routing
+### Routing and Reachability
 
-Calculate routes between waypoints for multiple transport modes including car, truck, bicycle, pedestrian, and public transit. Additional advanced location features include map attributes (access to premium features such as speed limits, traffic lights, dynamic EV PoI data and road curvature), EV charge-aware routing, matrix and isoline routing, waypoints sequencing, route matching, geofencing and more.
+Calculate road routes for cars, trucks, bicycles, pedestrians, scooters, taxis, and buses. Road bus routing describes a vehicle journey rather than a public transit itinerary. Route results include the requested geometry, actions, tolls, elevation, and routing notices. Matrix routing supports synchronous calculations with explicit or automatically derived regions. Isoline routing returns reachable-area boundaries and origin or destination details.
 
-- **Matrix Routing**: Lets you request route summary matrices that are based on the routes between origins and destinations.
-- **Isoline Routing**: Calculate reachable areas from a point based on time or distance constraints.
-- **EV Routing**: The EV routing features extend the routing service with electric vehicle specific options. Routing responses can contain details of energy consumption of the vehicle on the route. Route calculations can also add charging stations to the route.
-- **Toll Cost Calculation**: Calculate the total cost due for road usage and specify many toll-relevant vehicle parameters, like weight, width, length, height, trailer height or fuel type.
+### Public Transit
 
-### Map Rendering
+Calculate public transit journeys through the Transit API, including walking connections, departure or arrival planning, mode filters, transfer limits, wheelchair accessibility, and route details. Results retain provider route identifiers, sections, station information, and line details. Transit coverage depends on the available agency data.
 
-Render map tiles in raster and vector formats with customizable styles. Supports satellite imagery, terrain views, and fleet-specific overlays such as truck restriction attributes. Integrate personalized static map images into applications with access to a variety of styles and the ability to overlay custom data.
+### Traffic, Weather, and Positioning
 
-### Traffic
-
-Returns detailed real-time traffic flow and incident information based on a spatial query. This includes all standard and advanced features, such as lane level traffic and deep coverage. For each segment of the road network that is covered, this API can provide speed values, along with additional information characterizing the traffic conditions and information for specific lanes of a multilane roadway, motorways, freeways and major roads.
+Retrieve traffic flow and incidents for a geographic area. Retrieve current weather, forecasts, astronomy, and alerts; weather output also includes the complete provider report with location metadata. Estimate device position from WLAN, GSM, and LTE measurements.
 
 ### Tour Planning
 
-With Tour Planning API, you can dynamically optimize routes for multiple vehicles visiting a set of locations given real-life constraints such as limited capacity in a vehicle or delivery time windows. Supports multi-depot vehicle routing, open-ended routes, mixed fleet types, and pickup-and-delivery scheduling.
+Submit a synchronous vehicle routing problem with fleet types, profiles, costs, shifts, capacities, jobs, service times, and time windows. Retrieve optimized tours, unassigned jobs, and solution statistics. Large problems remain subject to the provider's synchronous limits.
 
-### Geofencing
+## Connection and Coverage Limits
 
-Geofencing API allows monitoring of mobile assets in reference to a geographic area inside/outside a geofence or distance to the next border. For each polygon geofence that covers the asset position or is close to it, the Fleet Telematics Geofencing returns the geofence geometry together with the asset's distance to this geometry.
-
-### Positioning
-
-Use radio network data to build applications requiring location estimates. This cloud-based service allows sub-meter positioning for mobile devices to offer improved overall position accuracy. Supports cellular and Wi-Fi network signal measurements.
-
-### Destination Weather
-
-The HERE Destination Weather API is a RESTful API that provides weather forecasts and reports on current weather conditions. The API provides solutions for the following high-level use cases: Get current weather reports or weather forecasts for a specific location. Check for severe weather alerts at a specific location.
-
-### Fleet Telematics
-
-Provides fleet-specific services including route matching (snapping GPS traces to roads), custom routing with truck-specific parameters, and access to road attributes like speed limits and truck restrictions. Improve telematic application with GPS road snapping feature to enrich GPS positioning with road attributes.
+The integration accepts an API key or a manually supplied bearer access token. It does not issue or automatically refresh bearer tokens; replace them when they expire. Individual APIs require the relevant application service access. Map rendering, geofencing, route matching, asynchronous jobs, and full electric-vehicle consumption configuration are not exposed by the tools.
 
 ## Events
 

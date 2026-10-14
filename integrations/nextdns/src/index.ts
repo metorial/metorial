@@ -13,6 +13,7 @@ import {
   manageRewrites,
   updateParentalControl,
   updatePrivacy,
+  updateProfile,
   updateSecurity,
   updateSettings
 } from './tools';
@@ -22,6 +23,7 @@ export let provider = Slate.create({
     listProfiles,
     getProfile,
     createProfile,
+    updateProfile,
     deleteProfile,
     updateSecurity,
     updatePrivacy,

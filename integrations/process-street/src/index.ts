@@ -3,12 +3,15 @@ import { spec } from './spec';
 import {
   createWorkflowRun,
   deleteWorkflowRun,
+  getCurrentApiKey,
   getWorkflowRun,
   listDataSets,
+  listFormFieldOptions,
   listTasks,
   listUsers,
   listWorkflowFormFields,
   listWorkflowRuns,
+  listWorkflowRunsPage,
   listWorkflows,
   manageApprovals,
   manageDataSetRecords,
@@ -20,6 +23,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentApiKey,
+    listWorkflowRunsPage,
+    listFormFieldOptions,
     listWorkflows,
     listWorkflowRuns,
     createWorkflowRun,

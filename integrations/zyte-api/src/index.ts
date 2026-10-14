@@ -4,6 +4,7 @@ import {
   extractArticle,
   extractData,
   extractProduct,
+  extractSerp,
   fetchPage,
   renderPage,
   takeScreenshot
@@ -11,6 +12,14 @@ import {
 
 export let provider = Slate.create({
   spec,
-  tools: [fetchPage, renderPage, takeScreenshot, extractProduct, extractArticle, extractData],
+  tools: [
+    fetchPage,
+    renderPage,
+    takeScreenshot,
+    extractProduct,
+    extractArticle,
+    extractData,
+    extractSerp
+  ],
   triggers: []
 });

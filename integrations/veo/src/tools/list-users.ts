@@ -14,7 +14,12 @@ export let listUsers = SlateTool.create(spec, {
   .input(
     z.object({
       searchTerm: z.string().optional().describe('Search by first name, last name, or email'),
-      organisationId: z.string().optional().describe('Filter by organisation ID'),
+      organisationId: z
+        .string()
+        .optional()
+        .describe(
+          'Organisation ID to filter by. Call list_organisations to discover your organisations.'
+        ),
       pageSize: z.number().optional().default(20).describe('Number of users per page'),
       pageNumber: z
         .number()
@@ -47,8 +52,8 @@ export let listUsers = SlateTool.create(spec, {
       orderByDirection: ctx.input.orderByDirection
     });
 
-    let items = result.Items ?? result.items ?? [];
-    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? 0;
+    let items = Array.isArray(result) ? result : (result.Items ?? result.items ?? []);
+    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? items.length;
     let page = result.Page ?? result.page ?? ctx.input.pageNumber;
     let pageSize = result.PageSize ?? result.pageSize ?? ctx.input.pageSize;
 

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteLink = SlateTool.create(spec, {
   name: 'Delete Short Link',
   key: 'delete_link',
-  description: `Permanently delete an existing short link. Once deleted, the short URL will no longer redirect to its destination and the slug becomes available for reuse.`,
+  description: `Permanently delete an existing short link. Once deleted, the short URL will no longer redirect to its destination.`,
   tags: {
     destructive: true,
     readOnly: false

@@ -45,7 +45,13 @@ export let listProducts = SlateTool.create(spec, {
           groups: z
             .array(z.string())
             .optional()
-            .describe('Filter by product group external IDs'),
+            .describe(
+              'Filter by product group external IDs; resolved using list_product_groups'
+            ),
+          groupIds: z
+            .array(z.number())
+            .optional()
+            .describe('Filter by product group internal IDs from list_product_groups'),
           offerActive: z.boolean().optional().describe('Filter by offer active status')
         })
         .optional()

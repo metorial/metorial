@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageSavedQueries = SlateTool.create(spec, {
@@ -13,6 +13,9 @@ export let manageSavedQueries = SlateTool.create(spec, {
     'Use action "run" to execute a saved query and get its result.',
     'Use action "create" or "update" to save a query definition by name.',
     'Use action "delete" to remove a saved query.'
+  ],
+  constraints: [
+    'Creating, updating, listing, and deleting saved queries require a Master Key. Running results supports a Read Key or a suitably permitted Access Key.'
   ],
   tags: {
     destructive: false,
@@ -60,7 +63,7 @@ export let manageSavedQueries = SlateTool.create(spec, {
             .number()
             .optional()
             .describe(
-              'Refresh rate in seconds for cached queries (min 14400 = 4 hours, max 172800 = 48 hours)'
+              'Refresh rate in seconds: 0 disables caching; 14400-172800 enables caching every 4-48 hours'
             )
         })
         .optional()
@@ -82,10 +85,7 @@ export let manageSavedQueries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     switch (ctx.input.action) {
       case 'list': {
@@ -97,7 +97,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.queryName) throw new Error('queryName is required for "get" action');
+        if (!ctx.input.queryName)
+          throw createApiServiceError('queryName is required for "get" action');
         let query = await client.getSavedQuery(ctx.input.queryName);
         return {
           output: { savedQuery: query, success: true },
@@ -106,7 +107,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
       }
 
       case 'run': {
-        if (!ctx.input.queryName) throw new Error('queryName is required for "run" action');
+        if (!ctx.input.queryName)
+          throw createApiServiceError('queryName is required for "run" action');
         let result = await client.runSavedQuery(ctx.input.queryName);
         return {
           output: { queryResult: result, success: true },
@@ -117,32 +119,70 @@ export let manageSavedQueries = SlateTool.create(spec, {
       case 'create':
       case 'update': {
         if (!ctx.input.queryName)
-          throw new Error('queryName is required for "create"/"update" action');
+          throw createApiServiceError('queryName is required for "create"/"update" action');
         if (!ctx.input.queryDefinition)
-          throw new Error('queryDefinition is required for "create"/"update" action');
+          throw createApiServiceError(
+            'queryDefinition is required for "create"/"update" action'
+          );
 
-        let def: Record<string, any> = {
-          analysis_type: ctx.input.queryDefinition.analysisType,
-          event_collection: ctx.input.queryDefinition.collectionName
-        };
+        let definition = ctx.input.queryDefinition;
+        if (
+          definition.refreshRate !== undefined &&
+          (!Number.isInteger(definition.refreshRate) ||
+            (definition.refreshRate !== 0 &&
+              (definition.refreshRate < 14400 || definition.refreshRate > 172800)))
+        ) {
+          throw createApiServiceError(
+            'refreshRate must be 0 to disable caching or a whole number from 14400 to 172800 seconds.'
+          );
+        }
+        let query: Record<string, any> = {};
+        if (definition.analysisType !== undefined)
+          query.analysis_type = definition.analysisType;
+        if (definition.collectionName !== undefined)
+          query.event_collection = definition.collectionName;
         if (ctx.input.queryDefinition.targetProperty)
-          def.target_property = ctx.input.queryDefinition.targetProperty;
+          query.target_property = ctx.input.queryDefinition.targetProperty;
         if (ctx.input.queryDefinition.timeframe)
-          def.timeframe = ctx.input.queryDefinition.timeframe;
+          query.timeframe = ctx.input.queryDefinition.timeframe;
         if (ctx.input.queryDefinition.interval)
-          def.interval = ctx.input.queryDefinition.interval;
+          query.interval = ctx.input.queryDefinition.interval;
         if (ctx.input.queryDefinition.groupBy)
-          def.group_by = ctx.input.queryDefinition.groupBy;
+          query.group_by = ctx.input.queryDefinition.groupBy;
         if (ctx.input.queryDefinition.timezone)
-          def.timezone = ctx.input.queryDefinition.timezone;
-        if (ctx.input.queryDefinition.refreshRate !== undefined)
-          def.refresh_rate = ctx.input.queryDefinition.refreshRate;
+          query.timezone = ctx.input.queryDefinition.timezone;
         if (ctx.input.queryDefinition.filters) {
-          def.filters = ctx.input.queryDefinition.filters.map(f => ({
+          query.filters = ctx.input.queryDefinition.filters.map(f => ({
             property_name: f.propertyName,
             operator: f.operator,
             property_value: f.propertyValue
           }));
+        }
+
+        let def: Record<string, any> = {};
+        if (Object.keys(query).length > 0) def.query = query;
+        if (definition.refreshRate !== undefined) def.refresh_rate = definition.refreshRate;
+        if (
+          ctx.input.action === 'create' &&
+          (!definition.analysisType || !definition.collectionName)
+        ) {
+          throw createApiServiceError(
+            'queryDefinition.analysisType and collectionName are required to create a saved query.'
+          );
+        }
+        if (Object.keys(def).length === 0) {
+          throw createApiServiceError(
+            'Provide query fields or refreshRate to create or update a saved query.'
+          );
+        }
+        if (ctx.input.action === 'update' && def.query) {
+          let existing = await client.getSavedQuery(ctx.input.queryName);
+          if (!isApiErrorRecord(existing.query)) {
+            throw createApiServiceError(
+              'Keen.io returned a saved query without a query definition.'
+            );
+          }
+          def.query = { ...existing.query, ...query };
         }
 
         let saved = await client.createSavedQuery(ctx.input.queryName, def);
@@ -153,7 +193,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.queryName) throw new Error('queryName is required for "delete" action');
+        if (!ctx.input.queryName)
+          throw createApiServiceError('queryName is required for "delete" action');
         await client.deleteSavedQuery(ctx.input.queryName);
         return {
           output: { success: true },

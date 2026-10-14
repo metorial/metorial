@@ -13,8 +13,18 @@ export let listContactsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageSize: z.number().optional().describe('Number of items per page'),
-      pageStartIndex: z.number().optional().describe('Index of the first element to return')
+      pageSize: z
+        .number()
+        .min(1)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .optional()
+        .describe('Number of items per page'),
+      pageStartIndex: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .optional()
+        .describe('Zero-based page index to return')
     })
   )
   .output(
@@ -36,7 +46,7 @@ export let listContactsTool = SlateTool.create(spec, {
     let contacts = Array.isArray(result)
       ? result
       : (result?.items ?? result?.data ?? [result]);
-    let totalCount = result?.totalCount ?? result?.total ?? contacts.length;
+    let totalCount = result?.count ?? result?.totalCount ?? result?.total ?? contacts.length;
 
     return {
       output: { contacts, totalCount },

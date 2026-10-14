@@ -83,6 +83,10 @@ Supports platform-specific options, auto-hashtag generation, link shortening, an
         })
         .optional()
         .describe('Automatically repost the content on a schedule'),
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe('Unique key per profile to detect repeated post submissions'),
       platformOptions: z
         .record(z.string(), z.record(z.string(), z.unknown()))
         .optional()
@@ -100,6 +104,10 @@ Supports platform-specific options, auto-hashtag generation, link shortening, an
         .optional()
         .describe('Platform-specific post IDs and statuses'),
       scheduleDate: z.string().optional().describe('Scheduled publication date if applicable'),
+      posts: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Post results for a user profile or an auto-repost series'),
       errors: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -108,11 +116,11 @@ Supports platform-specific options, auto-hashtag generation, link shortening, an
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
-    let params: Record<string, unknown> = {
+    let params: Parameters<Client['createPost']>[0] & Record<string, unknown> = {
       post: ctx.input.post,
       platforms: ctx.input.platforms
     };
@@ -128,29 +136,54 @@ Supports platform-specific options, auto-hashtag generation, link shortening, an
     if (ctx.input.unsplash) params.unsplash = ctx.input.unsplash;
     if (ctx.input.firstComment) params.firstComment = ctx.input.firstComment;
     if (ctx.input.autoRepost) params.autoRepost = ctx.input.autoRepost;
+    if (ctx.input.idempotencyKey) params.idempotencyKey = ctx.input.idempotencyKey;
 
+    let optionKeys: Record<string, string> = {
+      facebook: 'faceBookOptions',
+      linkedin: 'linkedInOptions',
+      snapchat: 'snapChatOptions',
+      tiktok: 'tikTokOptions',
+      youtube: 'youTubeOptions'
+    };
     if (ctx.input.platformOptions) {
       for (let [platform, options] of Object.entries(ctx.input.platformOptions)) {
-        let optionsKey = `${platform}Options`;
+        let optionsKey = optionKeys[platform] ?? `${platform}Options`;
         params[optionsKey] = options;
       }
     }
 
-    let result = await client.createPost(params as any);
+    if (ctx.input.title) {
+      for (let platform of ctx.input.platforms) {
+        if (platform === 'youtube')
+          params.youTubeOptions = { title: ctx.input.title, ...params.youTubeOptions };
+        if (platform === 'reddit')
+          params.redditOptions = { title: ctx.input.title, ...params.redditOptions };
+      }
+    }
+    let result = await client.createPost(params);
 
-    let postId = result.id || result.postId;
+    let posts = Array.isArray(result) ? result : result.posts;
+    let postResult = Array.isArray(posts) ? posts[0] : result;
+    let postId = postResult?.id || postResult?.postId;
+    let status = result.status ?? postResult?.status;
     let scheduled = ctx.input.scheduleDate ? ` scheduled for ${ctx.input.scheduleDate}` : '';
     let platformList = ctx.input.platforms.join(', ');
+
+    let message =
+      status === 'error'
+        ? `Post **${postId}** returned mixed platform results. Review the returned errors before retrying.`
+        : `Post **${postId}**${scheduled} created on **${platformList}**. Status: **${status}**.`;
 
     return {
       output: {
         postId,
-        status: result.status,
-        postIds: result.postIds,
-        scheduleDate: result.scheduleDate,
-        errors: result.errors
+        status,
+        postIds: postResult?.postIds,
+        scheduleDate: postResult?.scheduleDate,
+        errors: postResult?.errors ?? result.errors,
+        posts
       },
-      message: `Post **${postId}**${scheduled} created on **${platformList}**. Status: **${result.status}**.`
+      message
     };
   })
   .build();

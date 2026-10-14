@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChameleonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ let environmentSchema = z.object({
 let mapEnvironment = (e: Record<string, unknown>) => ({
   environmentId: e.id as string,
   name: e.name as string | undefined,
-  description: e.description as string | undefined,
+  description: (e.description ?? undefined) as string | undefined,
   shortName: e.short_name as string | undefined,
   archivedAt: e.archived_at as string | null | undefined,
   createdAt: e.created_at as string | undefined,
@@ -69,6 +69,8 @@ Environments group domains and are used to control which experiences show in whi
     let client = new ChameleonClient(ctx.auth.token);
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.name)
+        throw createApiServiceError('Provide name to create an environment.');
       let result = await client.createUrlGroup({
         name: ctx.input.name!,
         description: ctx.input.description,
@@ -81,6 +83,8 @@ Environments group domains and are used to control which experiences show in whi
     }
 
     if (ctx.input.action === 'update') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('Provide environmentId to update an environment.');
       let result = await client.updateUrlGroup(ctx.input.environmentId!, {
         name: ctx.input.name,
         description: ctx.input.description,

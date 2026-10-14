@@ -35,7 +35,7 @@ export let updateTask = SlateTool.create(spec, {
         .array(z.string())
         .nullable()
         .optional()
-        .describe('New assignee list, or null to clear'),
+        .describe('New assignee list; use an empty array to clear'),
       priority: z
         .enum(['Critical', 'High', 'Medium', 'Low'])
         .nullable()

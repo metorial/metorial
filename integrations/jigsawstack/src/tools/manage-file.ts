@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getFile = SlateTool.create(spec, {
   name: 'Get File',
   key: 'get_file',
-  description: `Retrieve a previously uploaded file from JigsawStack's file storage. Returns the file's accessible URL. Files can be referenced by their key in other API calls (e.g., vOCR, speech-to-text).`,
+  description: `Retrieve a previously uploaded file from JigsawStack's file storage. Prepares the file for download and returns its provider URL. Files can be referenced by their key in other API calls (e.g., vOCR, speech-to-text).`,
   tags: {
     readOnly: true
   }
@@ -27,6 +27,15 @@ export let getFile = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getFile({ key: ctx.input.fileKey });
+    await ctx.addAttachment(
+      result.kind === 'metadata'
+        ? await client.prepareGeneratedDownload(result.url, { filename: result.key })
+        : {
+            type: 'url',
+            url: client.getFileUrl(ctx.input.fileKey),
+            headers: { 'x-api-key': ctx.auth.token }
+          }
+    );
 
     return {
       output: {

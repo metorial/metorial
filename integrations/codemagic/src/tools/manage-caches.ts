@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CodemagicClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let manageCaches = SlateTool.create(spec, {
     'Set action to "delete" and provide a cacheId to delete a specific cache.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -41,7 +41,15 @@ export let manageCaches = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of caches (returned for "list" action)'),
-      deleted: z.boolean().optional().describe('Whether the delete operation succeeded')
+      deleted: z
+        .boolean()
+        .optional()
+        .describe('Whether deletion is confirmed complete; false while the request is queued'),
+      deletionStarted: z
+        .boolean()
+        .optional()
+        .describe('Whether cache deletion was accepted for asynchronous processing'),
+      cacheIds: z.array(z.string()).optional().describe('Cache IDs scheduled for deletion')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,24 +73,26 @@ export let manageCaches = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete_all') {
-      await client.deleteAllCaches(ctx.input.appId);
+      let result = await client.deleteAllCaches(ctx.input.appId);
       return {
-        output: { deleted: true },
-        message: `Deleted all caches for app \`${ctx.input.appId}\`.`
+        output: { deleted: false, deletionStarted: true, cacheIds: result.caches },
+        message: `Cache deletion was queued for app \`${ctx.input.appId}\`. Completion is asynchronous.`
       };
     }
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.cacheId) {
-        throw new Error('cacheId is required for delete action');
+        throw createApiServiceError(
+          'cacheId is required for the delete action. Use the list action to discover cache IDs.'
+        );
       }
-      await client.deleteCache(ctx.input.appId, ctx.input.cacheId);
+      let result = await client.deleteCache(ctx.input.appId, ctx.input.cacheId);
       return {
-        output: { deleted: true },
-        message: `Deleted cache \`${ctx.input.cacheId}\` for app \`${ctx.input.appId}\`.`
+        output: { deleted: false, deletionStarted: true, cacheIds: result.caches },
+        message: `Deletion was queued for cache \`${ctx.input.cacheId}\`. Completion is asynchronous.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown cache action: ${ctx.input.action}`);
   })
   .build();

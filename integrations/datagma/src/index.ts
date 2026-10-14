@@ -7,6 +7,7 @@ import {
   enrichTwitter,
   findEmail,
   findPeople,
+  findVerifiedEmail,
   getCreditBalance,
   reverseLookup,
   searchPhone
@@ -18,6 +19,7 @@ export let provider = Slate.create({
     enrichPerson,
     enrichCompany,
     findEmail,
+    findVerifiedEmail,
     searchPhone,
     reverseLookup,
     detectJobChange,

@@ -57,17 +57,17 @@ export let listLeads = SlateTool.create(spec, {
 
     let leads = leadsArray.map((lead: any) => ({
       leadId: String(lead.id),
-      firstName: lead.fname,
-      lastName: lead.lname,
-      email: lead.email,
-      phoneNumber: lead.phone_number,
-      company: lead.company,
-      source: lead.source,
-      status: lead.status,
-      result: lead.result,
-      stage: lead.stage,
+      firstName: lead.fname ?? undefined,
+      lastName: lead.lname ?? undefined,
+      email: lead.email ?? undefined,
+      phoneNumber: lead.phone_number ?? undefined,
+      company: lead.company ?? undefined,
+      source: lead.source ?? undefined,
+      status: lead.status ?? undefined,
+      result: lead.result ?? undefined,
+      stage: lead.stage ?? undefined,
       tags: lead.tags,
-      createdAt: lead.created_at
+      createdAt: lead.created_at ?? undefined
     }));
 
     return {

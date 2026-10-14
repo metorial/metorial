@@ -41,9 +41,9 @@ export let listWebhooks = SlateTool.create(spec, {
       query: ctx.input.query
     });
 
-    let items = Array.isArray(data) ? data : (data?.items ?? data?.form_webhooks ?? []);
+    let items = data;
 
-    let webhooks = items.map((w: any) => ({
+    let webhooks = items.map(w => ({
       webhookId: w.id,
       formId: w.form_id,
       name: w.name ?? '',

@@ -37,6 +37,7 @@ Provide at least one identifier: company name, domain, LinkedIn ID, or LinkedIn 
       companyName: z.string().optional().describe('Company name.'),
       companyDomain: z.string().optional().describe('Company website domain.'),
       companyLinkedin: z.string().optional().describe('Company LinkedIn URL.'),
+      companyLinkedinId: z.string().optional().describe('LinkedIn company ID.'),
       companyIndustry: z.string().optional().describe('Primary industry.'),
       companySubindustry: z.string().optional().describe('Sub-industry.'),
       companySize: z.number().optional().describe('Employee headcount.'),
@@ -74,29 +75,32 @@ Provide at least one identifier: company name, domain, LinkedIn ID, or LinkedIn 
     ctx.info({ message: 'Company enrichment completed', companyName: d.company_name });
 
     let output = {
-      companyName: d.company_name,
-      companyDomain: d.company_domain,
-      companyLinkedin: d.company_linkedin,
-      companyIndustry: d.company_industry,
-      companySubindustry: d.company_subindustry,
-      companySize: d.company_size,
-      companySizeRange: d.company_size_range,
-      companyType: d.company_type,
-      companyDescription: d.company_description,
-      companyFounded: d.company_founded,
-      companyRevenue: d.company_revenue,
-      companyFunding: d.company_funding,
-      companyLastFundingRound: d.company_last_funding_round,
-      companyTicker: d.company_ticker,
-      companyLocation: d.company_location,
-      companyStreet: d.company_street,
-      companyLocality: d.company_locality,
-      companyRegion: d.company_region,
-      companyPostalCode: d.company_postal_code,
-      companyCountry: d.company_country,
-      twitterUrl: d.twitter_url,
-      facebookUrl: d.facebook_url,
-      linkedinUrl: d.linkedin_url
+      companyName: d.company_name ?? undefined,
+      companyDomain: d.company_domain ?? undefined,
+      companyLinkedin: d.company_linkedin ?? undefined,
+      companyLinkedinId: d.company_linkedin_id ?? undefined,
+      companyIndustry: d.company_industry ?? undefined,
+      companySubindustry: d.company_subindustry ?? undefined,
+      companySize: d.company_size ?? undefined,
+      companySizeRange: d.company_size_range ?? undefined,
+      companyType: d.company_type ?? undefined,
+      companyDescription: d.company_description ?? undefined,
+      companyFounded: d.company_founded ?? undefined,
+      companyRevenue:
+        d.company_revenue_range ??
+        (d.company_revenue == null ? undefined : String(d.company_revenue)),
+      companyFunding: d.company_funding == null ? undefined : String(d.company_funding),
+      companyLastFundingRound: d.company_last_funding_round ?? undefined,
+      companyTicker: d.company_ticker ?? undefined,
+      companyLocation: d.company_location ?? undefined,
+      companyStreet: d.company_street ?? undefined,
+      companyLocality: d.company_locality ?? undefined,
+      companyRegion: d.company_region ?? undefined,
+      companyPostalCode: d.company_postal_code ?? undefined,
+      companyCountry: d.company_country ?? undefined,
+      twitterUrl: d.company_twitter ?? d.twitter_url ?? undefined,
+      facebookUrl: d.company_facebook ?? d.facebook_url ?? undefined,
+      linkedinUrl: d.company_linkedin ?? d.linkedin_url ?? undefined
     };
 
     let parts = [

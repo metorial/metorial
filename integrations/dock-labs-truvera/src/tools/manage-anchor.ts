@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -55,7 +55,7 @@ Multiple documents can be batched into a single anchor via a Merkle tree to save
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.documents || ctx.input.documents.length === 0) {
-          throw new Error('documents is required for create action');
+          throw createApiServiceError('documents is required for create action');
         }
         let result = await client.createAnchor(ctx.input.documents);
         return {
@@ -64,7 +64,8 @@ Multiple documents can be batched into a single anchor via a Merkle tree to save
         };
       }
       case 'get': {
-        if (!ctx.input.anchorId) throw new Error('anchorId is required for get action');
+        if (!ctx.input.anchorId)
+          throw createApiServiceError('anchorId is required for get action');
         let result = await client.getAnchor(ctx.input.anchorId);
         return {
           output: { anchor: result },
@@ -82,9 +83,10 @@ Multiple documents can be batched into a single anchor via a Merkle tree to save
         };
       }
       case 'verify': {
-        if (!ctx.input.anchorId) throw new Error('anchorId is required for verify action');
+        if (!ctx.input.anchorId)
+          throw createApiServiceError('anchorId is required for verify action');
         if (!ctx.input.documents || ctx.input.documents.length === 0) {
-          throw new Error('documents is required for verify action');
+          throw createApiServiceError('documents is required for verify action');
         }
         let result = await client.verifyAnchor(ctx.input.anchorId, ctx.input.documents);
         let verified = (result.verified === true) as boolean;

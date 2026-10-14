@@ -1,6 +1,4 @@
-Now let me check for the credits balance endpoint:Now I have enough information to write the specification.
-
-# Slates Specification for Bettercontact
+# BetterContact API specification
 
 ## Overview
 
@@ -8,7 +6,7 @@ BetterContact is a B2B contact enrichment platform that uses waterfall enrichmen
 
 ## Authentication
 
-All API endpoints are authenticated using the `api_key` parameter provided in the request. The API key is passed via the `X-API-Key` HTTP header.
+All API endpoints use the `X-API-Key` HTTP header. Some endpoints also accept a legacy `api_key` parameter; the header is preferred.
 
 The API key is a unique code that identifies your BetterContact account. It's used when connecting to services like the Google Sheets Add-on, HubSpot, Clay, or other API features.
 
@@ -39,7 +37,13 @@ Submit one or more contacts for enrichment to find their work email addresses an
 
 ### Retrieve Enrichment Results
 
-Poll for the results of a previously submitted enrichment request using its request ID. The response includes a status indicator (e.g., "terminated" when complete), a summary of results (total, valid, catch-all, undeliverable, not found), and the enriched contact data.
+Poll for the results of a previously submitted enrichment request using its request ID. The response includes a status indicator (e.g., "terminated" when complete), a summary of results (total, valid, catch-all, undeliverable, not found), and the enriched contact data. While processing, HTTP 202 responses have no results or summary; the tool returns `completed: false` and placeholder empty results. Only `terminated` is final. `on_hold` requests resume after a credit top-up. Result custom fields are normalised from the documented name/value array to the existing record format.
+
+### Synchronous Profile Lookups
+
+`POST /enrich_profile/lead` returns a person and their current company immediately under `data`. Provide a LinkedIn profile URL, or first name, last name and company domain together. Company name is optional and cannot replace the domain. These profiles exclude email and phone data. Successful matches cost 0.1 credit.
+
+`POST /enrich_profile/company` returns a company immediately under `data`. Provide company domain, company LinkedIn URL, or both. This endpoint consumes no credits. Missing profiles return HTTP 404.
 
 ### Credits Balance
 
@@ -56,3 +60,12 @@ When an enrichment request finishes processing, the results are pushed to the we
 - **Configuration**: Provide the `webhook` parameter (a URL) in the enrichment request body.
 - The webhook receives the same enrichment result payload that would be returned by the polling endpoint, including enriched contact data, statuses, and credit usage.
 - This is a per-request webhook — you specify the URL with each enrichment request rather than configuring a global subscription.
+
+## Official References
+
+- https://doc.bettercontact.rocks/api-reference/endpoint/create
+- https://doc.bettercontact.rocks/api-reference/endpoint/get
+- https://doc.bettercontact.rocks/api-reference/statuses
+- https://doc.bettercontact.rocks/api-reference/enrich_profile/lead
+- https://doc.bettercontact.rocks/api-reference/enrich_profile/company
+- https://doc.bettercontact.rocks/api-reference/endpoint/account

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getIdea = SlateTool.create(spec, {
   name: 'Get Idea',
   key: 'get_idea',
-  description: `Retrieve detailed data and metadata for a specific idea in a Storm, including its content, type, position, and tag data.`,
+  description: `Retrieve an idea's ID, content, type, color, position, and lock status. Use manage_tags with action "get_idea_tags" to retrieve its tag data.`,
   tags: {
     readOnly: true
   }
@@ -36,13 +36,13 @@ export let getIdea = SlateTool.create(spec, {
     return {
       output: {
         ideaId: idea.id,
-        type: idea.type,
-        color: idea.color,
-        text: idea.data?.text || idea.text,
-        x: idea.x,
-        y: idea.y,
-        z: idea.z,
-        lock: idea.lock
+        type: idea.type ?? undefined,
+        color: idea.color ?? undefined,
+        text: idea.data?.text ?? idea.text ?? undefined,
+        x: idea.x ?? undefined,
+        y: idea.y ?? undefined,
+        z: idea.z ?? undefined,
+        lock: idea.lock ?? undefined
       },
       message: `Retrieved idea **${idea.id}** from Storm ${ctx.input.stormId}.`
     };

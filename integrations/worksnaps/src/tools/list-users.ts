@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Retrieve all user accounts in the Worksnaps organization. Returns user profile information including name, email, login, and timezone.`,
+  description: `Retrieve users in projects managed by the authenticated user. Returns user profile information including name, email, login, and timezone.`,
   tags: {
     destructive: false,
     readOnly: true

@@ -35,7 +35,7 @@ export interface ProfileSummary {
     count: number;
     data: ProfileOption[];
   };
-  da: ActionConfig[];
+  da: ActionConfig | ActionConfig[];
 }
 
 export interface Profile {
@@ -296,4 +296,10 @@ export interface DeviceTypeCategory {
   PK: string;
   name: string;
   icons: string[];
+}
+
+export interface ProfileRestriction {
+  PK: string;
+  name: string;
+  description: string | null;
 }

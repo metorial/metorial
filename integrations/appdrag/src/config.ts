@@ -6,7 +6,7 @@ export let config = SlateConfig.create(
     appId: z
       .string()
       .describe(
-        'Your AppDrag App ID. Found in the top-left corner of the CloudBackend Portal.'
+        'Your AppDrag project subdomain (App ID), as used in https://{appId}.appdrag.site. Also shown in the top-left corner of the CloudBackend Portal.'
       )
   })
 );

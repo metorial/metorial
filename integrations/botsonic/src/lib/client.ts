@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   page?: number;
@@ -7,10 +7,10 @@ export interface PaginationParams {
 
 export interface PaginatedResponse<T> {
   items: T[];
-  total: number;
-  page: number;
-  size: number;
-  pages: number;
+  total?: number;
+  page?: number;
+  size?: number;
+  pages?: number;
 }
 
 export interface BotOutput {
@@ -93,7 +93,7 @@ export interface ConversationDetailOutput extends ConversationOutput {
 
 export interface GenerateResponseOutput {
   answer: string;
-  message_id: string;
+  message_id?: string;
   sources: any[];
   chat_history: any[];
   generated_images: any[];
@@ -104,18 +104,88 @@ export interface GenerateResponseOutput {
   end_chat_feedback: string;
 }
 
-export class BusinessClient {
-  private http;
+export interface BotApiOutput {
+  id: string;
+  bot_id: string;
+  token: string;
+  bot_api_type: string;
+  end_user_rate_limit: number;
+  created_at: string;
+  updated_at: string;
+}
 
-  constructor(token: string) {
-    this.http = createAxios({
+export interface StarterPresetsOutput {
+  starter_questions: StarterQuestionOutput[];
+  welcome_message: string;
+}
+
+export class BusinessClient {
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  private botToken?: string;
+
+  constructor(
+    private token: string,
+    private credentialType?: 'account' | 'bot',
+    private botId?: string,
+    private workspaceId?: string
+  ) {
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'Botsonic API credentials are missing. Reconnect the account.',
+        {
+          reason: 'missing_credentials'
+        }
+      );
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.botsonic.ai/v1/business',
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        api_key_header_auth: token
-      }
+        'USER-API-KEY': token
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Botsonic',
+          reason: 'botsonic_api_error'
+        })
     });
+  }
+
+  private ensureAccountKey() {
+    if (this.credentialType === 'bot') {
+      throw createApiServiceError(
+        'This operation needs an account API Secret Key connection.',
+        {
+          reason: 'account_key_required'
+        }
+      );
+    }
+  }
+
+  private async botHeaders() {
+    if (this.credentialType === 'bot' || (!this.credentialType && !this.botId)) {
+      // Older connections did not persist a credential type; preserve bot-token callers.
+      return { 'USER-API-KEY': undefined, 'X-BOT-KEY': this.token };
+    }
+    if (!this.botId) {
+      throw createApiServiceError(
+        'Provide botId from list_bots, or use a Bot API Token connection.',
+        {
+          reason: 'bot_id_required'
+        }
+      );
+    }
+    if (!this.botToken) {
+      let result = await this.getBotApiKey(this.botId, this.workspaceId);
+      if (!result.token) {
+        throw createApiServiceError('Botsonic did not return an API token for this bot.', {
+          reason: 'missing_bot_token'
+        });
+      }
+      this.botToken = result.token;
+    }
+    return { 'USER-API-KEY': undefined, 'X-BOT-KEY': this.botToken };
   }
 
   // --- Response Generation ---
@@ -129,15 +199,19 @@ export class BusinessClient {
     starterQuestionId?: string;
     fullHistory?: boolean;
   }): Promise<GenerateResponseOutput> {
-    let response = await this.http.post('/botsonic', {
-      input_text: params.inputText,
-      chat_id: params.chatId,
-      chat_history: params.chatHistory,
-      response_type: params.responseType,
-      source: params.source,
-      starter_question_id: params.starterQuestionId,
-      full_history: params.fullHistory
-    });
+    let response = await this.http.post(
+      '/botsonic',
+      {
+        input_text: params.inputText,
+        chat_id: params.chatId,
+        chat_history: params.chatHistory,
+        response_type: params.responseType,
+        source: params.source,
+        starter_question_id: params.starterQuestionId,
+        full_history: params.fullHistory
+      },
+      { headers: await this.botHeaders(), params: { stream: false } }
+    );
     return response.data;
   }
 
@@ -151,6 +225,7 @@ export class BusinessClient {
       workspaceId?: string;
     }
   ): Promise<PaginatedResponse<BotOutput>> {
+    this.ensureAccountKey();
     let response = await this.http.get('/bot/all', {
       params: {
         search_query: params?.searchQuery,
@@ -165,26 +240,38 @@ export class BusinessClient {
   }
 
   async getBot(botId: string, workspaceId?: string): Promise<BotOutput> {
-    let response = await this.http.get(`/bot/${botId}`, {
+    this.ensureAccountKey();
+    let response = await this.http.get(`/bot/${encodeURIComponent(botId)}`, {
       params: { workspace_id: workspaceId }
     });
     return response.data;
   }
 
-  async createBot(params: Record<string, any>): Promise<BotOutput> {
-    let response = await this.http.post('/bot', params);
+  async createBot(params: {
+    bot_name?: string;
+    bot_template_id?: string;
+    workspace_id?: string;
+  }): Promise<BotOutput> {
+    this.ensureAccountKey();
+    let response = await this.http.post('/bot', params, {
+      params: { workspace_id: params.workspace_id }
+    });
     return response.data;
   }
 
   async deleteBot(botId: string, workspaceId?: string): Promise<BotOutput> {
-    let response = await this.http.delete(`/bot/${botId}`, {
+    this.ensureAccountKey();
+    let response = await this.http.delete(`/bot/${encodeURIComponent(botId)}`, {
       params: { workspace_id: workspaceId }
     });
     return response.data;
   }
 
-  async getBotApiKey(botId: string): Promise<any> {
-    let response = await this.http.get(`/bot/${botId}/bot-api-key`);
+  async getBotApiKey(botId: string, workspaceId?: string): Promise<BotApiOutput> {
+    this.ensureAccountKey();
+    let response = await this.http.get(`/bot/${encodeURIComponent(botId)}/bot-api-key`, {
+      params: { workspace_id: workspaceId }
+    });
     return response.data;
   }
 
@@ -198,6 +285,7 @@ export class BusinessClient {
     }
   ): Promise<PaginatedResponse<BotDataOutput>> {
     let response = await this.http.get('/bot-data/all', {
+      headers: await this.botHeaders(),
       params: {
         search_query: params?.searchQuery,
         sort_by: params?.sortBy,
@@ -215,12 +303,16 @@ export class BusinessClient {
     fileUrl: string;
     fileName?: string;
   }): Promise<any> {
-    let response = await this.http.post('/bot-data/upload-file', {
-      id: params.id,
-      bot_id: params.botId,
-      file_url: params.fileUrl,
-      file_name: params.fileName
-    });
+    let response = await this.http.post(
+      '/bot-data/upload-file',
+      {
+        id: params.id,
+        bot_id: params.botId,
+        file_url: params.fileUrl,
+        file_name: params.fileName
+      },
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 
@@ -230,12 +322,16 @@ export class BusinessClient {
     text: string;
     title?: string;
   }): Promise<any> {
-    let response = await this.http.post('/bot-data/upload-text', {
-      id: params.id,
-      bot_id: params.botId,
-      text: params.text,
-      title: params.title
-    });
+    let response = await this.http.post(
+      '/bot-data/upload-text',
+      {
+        id: params.id,
+        bot_id: params.botId,
+        text: params.text,
+        title: params.title
+      },
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 
@@ -245,17 +341,23 @@ export class BusinessClient {
     isSitemap?: boolean;
     sitemapRoot?: string;
   }): Promise<any> {
-    let response = await this.http.post('/bot-data/bulk-upsert-urls', {
-      urls: params.urls,
-      sitemap_id: params.sitemapId,
-      is_sitemap: params.isSitemap,
-      sitemap_root: params.sitemapRoot
-    });
+    let response = await this.http.post(
+      '/bot-data/bulk-upsert-urls',
+      {
+        urls: params.urls,
+        sitemap_id: params.sitemapId,
+        is_sitemap: params.isSitemap,
+        sitemap_root: params.sitemapRoot
+      },
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 
   async deleteBotData(dataId: string): Promise<BotDataOutput> {
-    let response = await this.http.delete(`/bot-data/${dataId}`);
+    let response = await this.http.delete(`/bot-data/${encodeURIComponent(dataId)}`, {
+      headers: await this.botHeaders()
+    });
     return response.data;
   }
 
@@ -269,6 +371,7 @@ export class BusinessClient {
     }
   ): Promise<PaginatedResponse<FaqOutput>> {
     let response = await this.http.get('/bot-faq/all', {
+      headers: await this.botHeaders(),
       params: {
         search_query: params?.searchQuery,
         sort_by: params?.sortBy,
@@ -281,12 +384,16 @@ export class BusinessClient {
   }
 
   async createFaq(params: { question: string; answer: string }): Promise<FaqOutput> {
-    let response = await this.http.post('/bot-faq', params);
+    let response = await this.http.post('/bot-faq', params, {
+      headers: await this.botHeaders()
+    });
     return response.data;
   }
 
   async deleteFaq(faqId: string): Promise<any> {
-    let response = await this.http.delete(`/bot-faq/${faqId}`);
+    let response = await this.http.delete(`/bot-faq/${encodeURIComponent(faqId)}`, {
+      headers: await this.botHeaders()
+    });
     return response.data;
   }
 
@@ -300,6 +407,7 @@ export class BusinessClient {
     }
   ): Promise<PaginatedResponse<StarterQuestionOutput>> {
     let response = await this.http.get('/bot-starter-questions/all', {
+      headers: await this.botHeaders(),
       params: {
         search_query: params?.searchQuery,
         sort_by: params?.sortBy,
@@ -316,7 +424,9 @@ export class BusinessClient {
     answer: string;
     order?: number;
   }): Promise<StarterQuestionOutput> {
-    let response = await this.http.post('/bot-starter-questions', params);
+    let response = await this.http.post('/bot-starter-questions', params, {
+      headers: await this.botHeaders()
+    });
     return response.data;
   }
 
@@ -329,23 +439,24 @@ export class BusinessClient {
     }
   ): Promise<StarterQuestionOutput> {
     let response = await this.http.patch(
-      `/bot-starter-questions/${starterQuestionId}`,
-      params
+      `/bot-starter-questions/${encodeURIComponent(starterQuestionId)}`,
+      params,
+      { headers: await this.botHeaders() }
     );
     return response.data;
   }
 
   async deleteStarterQuestion(starterQuestionId: string): Promise<any> {
-    let response = await this.http.delete(`/bot-starter-questions/${starterQuestionId}`);
+    let response = await this.http.delete(
+      `/bot-starter-questions/${encodeURIComponent(starterQuestionId)}`,
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 
-  async listStarterPresets(params?: PaginationParams): Promise<PaginatedResponse<any>> {
+  async listStarterPresets(): Promise<StarterPresetsOutput> {
     let response = await this.http.get('/bot-starter-presets/all', {
-      params: {
-        page: params?.page,
-        size: params?.size
-      }
+      headers: await this.botHeaders()
     });
     return response.data;
   }
@@ -362,6 +473,7 @@ export class BusinessClient {
     }
   ): Promise<PaginatedResponse<ConversationOutput>> {
     let response = await this.http.get('/bot-data/conversations/all', {
+      headers: await this.botHeaders(),
       params: {
         search_query: params?.searchQuery,
         sort_by: params?.sortBy,
@@ -376,7 +488,10 @@ export class BusinessClient {
   }
 
   async getConversation(chatId: string): Promise<ConversationDetailOutput> {
-    let response = await this.http.get(`/bot-data/conversations/${chatId}`);
+    let response = await this.http.get(
+      `/bot-data/conversations/${encodeURIComponent(chatId)}`,
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 
@@ -387,10 +502,14 @@ export class BusinessClient {
       feedback?: string;
     }
   ): Promise<any> {
-    let response = await this.http.post(`/bot-data/conversations/${chatId}/end-chat`, {
-      status: params?.status || 'none',
-      feedback: params?.feedback
-    });
+    let response = await this.http.post(
+      `/bot-data/conversations/${encodeURIComponent(chatId)}/end-chat`,
+      {
+        status: params?.status || 'none',
+        feedback: params?.feedback
+      },
+      { headers: await this.botHeaders() }
+    );
     return response.data;
   }
 }

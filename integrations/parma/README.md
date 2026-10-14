@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Parma
 
-Manage customer relationships, notes, and stay-in-touch reminders in Parma CRM. Create and search relationships representing customer contacts. Add notes to relationships to log interactions, touchpoints, and meeting details. Retrieve authenticated user profile information. Detect when new relationships are created to trigger downstream workflows.
+Manage contacts and companies in Parma CRM. Discover groups, create relationships, search and retrieve contacts, add interaction notes, read relationship note history, and retrieve the authenticated user profile.
 
 ## License
 

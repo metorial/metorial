@@ -22,7 +22,14 @@ export let princeOptionsSchema = z
       .describe(
         "Enable Prince's native JavaScript engine (separate from DocRaptor's JS engine)."
       ),
-    maxPasses: z.number().optional().describe('Maximum number of document layout passes.'),
+    maxPasses: z
+      .number()
+      .refine(
+        value => Number.isInteger(value) && value > 0,
+        'Must be a positive whole number.'
+      )
+      .optional()
+      .describe('Maximum number of document layout passes.'),
     encrypt: z.boolean().optional().describe('Enable PDF encryption.'),
     keyBits: z
       .union([z.literal(40), z.literal(128)])
@@ -58,6 +65,10 @@ export let princeOptionsSchema = z
       .describe('Fetch external assets sequentially rather than in parallel.'),
     httpTimeout: z
       .number()
+      .refine(
+        value => Number.isInteger(value) && value >= 1 && value <= 60,
+        'Must be a whole number from 1 to 60.'
+      )
       .optional()
       .describe('Timeout in seconds for downloading external resources (1-60).'),
     insecure: z
@@ -67,7 +78,7 @@ export let princeOptionsSchema = z
     noEmbedFonts: z.boolean().optional().describe('Do not embed fonts in the PDF.'),
     noSubsetFonts: z.boolean().optional().describe('Do not subset embedded fonts.'),
     noCompress: z.boolean().optional().describe('Disable PDF compression.'),
-    cssDpi: z.number().optional().describe('DPI for CSS units (e.g. 96, 72, 200).'),
+    cssDpi: z.number().positive().optional().describe('DPI for CSS units (e.g. 96, 72, 200).'),
     profile: z
       .string()
       .optional()
@@ -129,4 +140,18 @@ export let baseDocumentInputSchema = z.object({
     .optional()
     .describe('Suppress JavaScript console.log errors.'),
   princeOptions: princeOptionsSchema
+});
+
+export let hostedDocumentInputSchema = baseDocumentInputSchema.extend({
+  hostedDownloadLimit: z
+    .number()
+    .refine(value => Number.isInteger(value) && value > 0, 'Must be a positive whole number.')
+    .optional()
+    .describe('Maximum number of times the hosted document can be downloaded.'),
+  hostedExpiresAt: z
+    .string()
+    .optional()
+    .describe(
+      'ISO 8601 datetime including seconds when the hosted document expires. Times without an offset are interpreted as UTC.'
+    )
 });

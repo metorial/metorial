@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrintMailClient } from '../lib/client';
 import { spec } from '../spec';
+import { getPreviewRefreshAt } from './get-file-url';
 
 let inlineAddressSchema = z
   .object({
@@ -87,6 +88,16 @@ export let sendSelfMailer = SlateTool.create(spec, {
     if (ctx.input.metadata) requestData.metadata = ctx.input.metadata;
 
     let selfMailer = await client.createSelfMailer(requestData as any);
+
+    if (typeof selfMailer.url === 'string' && selfMailer.url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: selfMailer.url,
+        mimeType: 'application/pdf',
+        refreshReference: { orderId: selfMailer.id, orderType: 'self_mailer' },
+        refreshAt: getPreviewRefreshAt(selfMailer.url)
+      });
+    }
 
     return {
       output: {

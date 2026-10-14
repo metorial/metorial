@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId, environmentId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getNodeStatus = SlateTool.create(spec, {
@@ -14,14 +15,31 @@ Use this to monitor node health, diagnose issues, or verify a node is running co
 })
   .input(
     z.object({
-      consortiumId: z.string().describe('Consortium ID'),
-      environmentId: z.string().describe('Environment ID'),
+      consortiumId,
+      environmentId,
       nodeId: z.string().describe('Node ID'),
       includeLogs: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to include recent node logs')
+        .describe('Whether to include recent node logs'),
+      logType: z
+        .enum(['geth', 'constellation', 'pantheon', 'ethsigner', 'orion', 'ethconnect', 'baf'])
+        .optional()
+        .describe('Log component. Defaults to geth for Geth/Quorum and pantheon for Besu.'),
+      maxLogLines: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(20)
+        .describe('Maximum log lines when includeLogs is true'),
+      logFromPosition: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Starting log position when includeLogs is true')
     })
   )
   .output(
@@ -51,38 +69,43 @@ Use this to monitor node health, diagnose issues, or verify a node is running co
       ctx.input.nodeId
     );
 
-    let status: any;
-    try {
-      status = await client.getNodeStatus(
+    let status = await client.getNodeStatus(
+      ctx.input.consortiumId,
+      ctx.input.environmentId,
+      ctx.input.nodeId
+    );
+
+    let logs: unknown;
+    if (ctx.input.includeLogs) {
+      let defaultLogTypes: Record<string, string> = {
+        geth: 'geth',
+        quorum: 'geth',
+        pantheon: 'pantheon',
+        besu: 'pantheon'
+      };
+      let logType = ctx.input.logType ?? defaultLogTypes[node.provider];
+      if (!logType) {
+        throw createApiServiceError('Provide a supported logType for this node protocol.', {
+          reason: 'invalid_input'
+        });
+      }
+      logs = await client.getNodeLogs(
         ctx.input.consortiumId,
         ctx.input.environmentId,
-        ctx.input.nodeId
+        ctx.input.nodeId,
+        logType,
+        { maxlines: ctx.input.maxLogLines, frompos: ctx.input.logFromPosition }
       );
-    } catch {
-      // Status endpoint may not be available for all node states
-    }
-
-    let logs: any;
-    if (ctx.input.includeLogs) {
-      try {
-        logs = await client.getNodeLogs(
-          ctx.input.consortiumId,
-          ctx.input.environmentId,
-          ctx.input.nodeId
-        );
-      } catch {
-        // Logs may not be available
-      }
     }
 
     return {
       output: {
-        nodeId: node._id,
-        name: node.name,
-        state: node.state,
-        role: node.role,
-        size: node.size,
-        urls: node.urls,
+        nodeId: node._id ?? node.id,
+        name: node.name ?? undefined,
+        state: node.state ?? undefined,
+        role: node.role ?? undefined,
+        size: node.size ?? undefined,
+        urls: status.urls ?? node.urls,
         status,
         logs
       },

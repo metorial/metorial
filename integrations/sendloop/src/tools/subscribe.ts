@@ -31,13 +31,18 @@ export let subscribe = SlateTool.create(spec, {
   .output(
     z.object({
       subscriberId: z.string().describe('ID of the newly subscribed subscriber'),
-      success: z.boolean().describe('Whether the subscription was successful')
+      success: z.boolean().describe('Whether the subscription request was successful'),
+      subscriptionStatus: z
+        .string()
+        .optional()
+        .describe('Subscription state, including pending confirmation'),
+      redirectUrl: z.string().optional().describe('Provider subscription result URL')
     })
   )
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let result = await client.subscribe({
@@ -50,9 +55,11 @@ export let subscribe = SlateTool.create(spec, {
     return {
       output: {
         subscriberId: String(result.SubscriberID || result.SubscriberId || ''),
-        success: true
+        success: true,
+        subscriptionStatus: result.SubscriptionStatus,
+        redirectUrl: result.RedirectURL
       },
-      message: `Successfully subscribed **${ctx.input.emailAddress}** to list **${ctx.input.listId}**.`
+      message: `Subscription request accepted for **${ctx.input.emailAddress}** in list **${ctx.input.listId}** (${result.SubscriptionStatus || 'status unavailable'}).`
     };
   })
   .build();

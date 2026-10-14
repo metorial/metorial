@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -61,16 +61,21 @@ export let manageManualTasks = SlateTool.create(spec, {
 
       let data = await client.getManualTasks(params);
       let tasks = Array.isArray(data) ? data : (data?.tasks ?? []);
+      if (ctx.input.campaignId !== undefined) {
+        tasks = tasks.filter(
+          (t: any) => (t.campaign?.campaign_id ?? t.campaign_id) === ctx.input.campaignId
+        );
+      }
 
       let mapped = tasks.map((t: any) => ({
-        taskId: t.id,
-        prospectEmail: t.prospect_email ?? t.email,
-        taskType: t.type,
-        taskName: t.name,
-        taskMessage: t.message,
-        dueDate: t.due_date,
-        campaignId: t.campaign_id,
-        campaignName: t.campaign_name,
+        taskId: t.task?.id ?? t.id,
+        prospectEmail: t.prospect?.email ?? t.prospect_email ?? t.email,
+        taskType: t.task?.type ?? t.type,
+        taskName: t.task?.name ?? t.name,
+        taskMessage: t.task?.message ?? t.message,
+        dueDate: t.task?.due_date ?? t.due_date,
+        campaignId: t.campaign?.campaign_id ?? t.campaign_id,
+        campaignName: t.campaign?.campaign_name ?? t.campaign_name,
         status: t.status
       }));
 
@@ -81,7 +86,9 @@ export let manageManualTasks = SlateTool.create(spec, {
     }
 
     if (!ctx.input.taskId) {
-      throw new Error('taskId is required for done/ignored actions');
+      throw createApiServiceError('taskId is required for done/ignored actions.', {
+        reason: 'missing_task_id'
+      });
     }
 
     await client.updateManualTask(ctx.input.taskId, ctx.input.action);

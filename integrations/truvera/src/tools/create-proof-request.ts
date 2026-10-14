@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -40,12 +40,23 @@ export let createProofRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.templateId && ctx.input.inputDescriptors !== undefined) {
+      throw createApiServiceError(
+        'Choose either templateId or inputDescriptors, so no credential requirements are ignored.'
+      );
+    }
+    if (ctx.input.templateId && ctx.input.purpose !== undefined) {
+      throw createApiServiceError(
+        "A request created from a template uses that template's purpose. Omit purpose or create a standalone request."
+      );
+    }
     let client = createClient(ctx);
     let result: any;
 
     if (ctx.input.templateId) {
-      result = await client.createProofRequestFromTemplate(ctx.input.templateId, {
+      result = await client.createProofRequest({
         name: ctx.input.requestName,
+        template: ctx.input.templateId,
         did: ctx.input.verifierDid,
         nonce: ctx.input.nonce
       });

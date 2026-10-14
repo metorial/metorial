@@ -28,6 +28,7 @@ export let createField = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      fieldId: z.number().describe('ID of the created field'),
       fieldLabel: z.string().describe('Display label of the created field'),
       fieldMergeTag: z.string().describe('Merge tag key of the created field')
     })
@@ -39,6 +40,7 @@ export let createField = SlateTool.create(spec, {
 
     return {
       output: {
+        fieldId: field.id,
         fieldLabel: field.fieldLabel,
         fieldMergeTag: field.fieldMergeTag
       },

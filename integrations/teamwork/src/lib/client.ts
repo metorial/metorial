@@ -1,33 +1,39 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class TeamworkClient {
   private axios;
 
   constructor(config: {
     token: string;
-    siteName: string;
-    region: string;
+    siteName?: string;
+    region?: string;
     apiEndpoint?: string;
+    authType?: 'oauth' | 'api_key';
   }) {
     let baseURL: string;
     if (config.apiEndpoint) {
       baseURL = config.apiEndpoint;
     } else {
+      if (!config.siteName) {
+        throw createApiServiceError('Reconnect Teamwork with your site name to continue.');
+      }
       let domain = config.region === 'eu' ? 'eu.teamwork.com' : 'teamwork.com';
       baseURL = `https://${config.siteName}.${domain}`;
     }
 
-    let isApiKey = !config.apiEndpoint;
+    let isApiKey = config.authType ? config.authType === 'api_key' : !config.apiEndpoint;
     let authHeader = isApiKey
       ? `Basic ${btoa(`${config.token}:x`)}`
       : `Bearer ${config.token}`;
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Teamwork',
+          reason: 'teamwork_api_error'
+        })
     });
   }
 
@@ -48,9 +54,9 @@ export class TeamworkClient {
     if (params?.page) queryParams.page = String(params.page);
     if (params?.pageSize) queryParams.pageSize = String(params.pageSize);
     if (params?.searchTerm) queryParams.searchTerm = params.searchTerm;
-    if (params?.orderBy) queryParams.orderBy = params.orderBy;
+    if (params?.orderBy) queryParams.orderby = params.orderBy;
     if (params?.companyId) queryParams.companyId = params.companyId;
-    if (params?.categoryId) queryParams.categoryId = params.categoryId;
+    if (params?.categoryId) queryParams.catId = params.categoryId;
     if (params?.includeCounts) queryParams.includeCounts = 'true';
 
     let response = await this.axios.get('/projects.json', { params: queryParams });
@@ -77,7 +83,7 @@ export class TeamworkClient {
         name: data.name,
         description: data.description,
         companyId: data.companyId,
-        categoryId: data.categoryId,
+        'category-id': data.categoryId,
         'start-date': data.startDate,
         'end-date': data.endDate,
         status: data.status,
@@ -105,7 +111,7 @@ export class TeamworkClient {
         name: data.name,
         description: data.description,
         companyId: data.companyId,
-        categoryId: data.categoryId,
+        'category-id': data.categoryId,
         'start-date': data.startDate,
         'end-date': data.endDate,
         status: data.status,
@@ -170,8 +176,9 @@ export class TeamworkClient {
       queryParams['responsible-party-ids'] = params.responsiblePartyIds;
     if (params?.startDate) queryParams.startDate = params.startDate;
     if (params?.endDate) queryParams.endDate = params.endDate;
-    if (params?.includeCompleted) queryParams.includeCompletedTasks = 'true';
-    if (params?.tagIds) queryParams.tagIds = params.tagIds;
+    if (params?.includeCompleted !== undefined)
+      queryParams.includeCompletedTasks = String(params.includeCompleted);
+    if (params?.tagIds) queryParams['tag-ids'] = params.tagIds;
     if (params?.searchTerm) queryParams.searchTerm = params.searchTerm;
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.orderMode) queryParams.orderMode = params.orderMode;
@@ -288,6 +295,7 @@ export class TeamworkClient {
     description?: string;
     personId: string;
     date: string;
+    time?: string;
     hours: number;
     minutes: number;
     isBillable?: boolean;
@@ -299,7 +307,9 @@ export class TeamworkClient {
     } else if (params.projectId) {
       path = `/projects/${params.projectId}/time_entries.json`;
     } else {
-      throw new Error('Either projectId or taskId is required to create a time entry');
+      throw createApiServiceError(
+        'Either projectId or taskId is required to create a time entry'
+      );
     }
 
     let response = await this.axios.post(path, {
@@ -307,6 +317,7 @@ export class TeamworkClient {
         description: params.description,
         'person-id': params.personId,
         date: params.date,
+        time: params.time ?? '00:00',
         hours: String(params.hours),
         minutes: String(params.minutes),
         isbillable: params.isBillable ? '1' : '0',
@@ -321,6 +332,7 @@ export class TeamworkClient {
     data: {
       description?: string;
       date?: string;
+      time?: string;
       hours?: number;
       minutes?: number;
       isBillable?: boolean;
@@ -330,6 +342,7 @@ export class TeamworkClient {
     let entry: Record<string, any> = {};
     if (data.description !== undefined) entry.description = data.description;
     if (data.date !== undefined) entry.date = data.date;
+    if (data.time !== undefined) entry.time = data.time;
     if (data.hours !== undefined) entry.hours = String(data.hours);
     if (data.minutes !== undefined) entry.minutes = String(data.minutes);
     if (data.isBillable !== undefined) entry.isbillable = data.isBillable ? '1' : '0';
@@ -366,15 +379,14 @@ export class TeamworkClient {
     pageSize?: number;
   }) {
     let queryParams: Record<string, string> = {};
-    if (params?.find) queryParams.find = params.find;
+    if (params?.find) queryParams.status = params.find;
     if (params?.page) queryParams.page = String(params.page);
     if (params?.pageSize) queryParams.pageSize = String(params.pageSize);
 
-    let path = params?.projectId
-      ? `/projects/${params.projectId}/milestones.json`
-      : '/milestones.json';
-
-    let response = await this.axios.get(path, { params: queryParams });
+    if (params?.projectId) queryParams.projectIds = params.projectId;
+    let response = await this.axios.get('/projects/api/v3/milestones.json', {
+      params: queryParams
+    });
     return response.data;
   }
 
@@ -472,6 +484,11 @@ export class TeamworkClient {
 
   async getCurrentUser() {
     let response = await this.axios.get('/me.json');
+    if (response.data?.person?.id == null) {
+      throw createApiServiceError(
+        'Teamwork did not return the authenticated user. Reconnect the account.'
+      );
+    }
     return response.data;
   }
 
@@ -717,7 +734,7 @@ export class TeamworkClient {
       notebook: {
         name: data.name,
         content: data.content,
-        categoryId: data.categoryId,
+        'category-id': data.categoryId,
         tags: data.tags,
         notify: data.notify
       }
@@ -738,7 +755,7 @@ export class TeamworkClient {
       notebook: {
         name: data.name,
         content: data.content,
-        categoryId: data.categoryId,
+        'category-id': data.categoryId,
         tags: data.tags
       }
     });

@@ -12,4 +12,5 @@ export { listAutomations } from './list-automations';
 export { listEsignSessions } from './list-esign-sessions';
 export { listPlaceholders } from './list-placeholders';
 export { resendEsignInvitation } from './resend-esign-invitation';
+export { sendTestEmail } from './send-test-email';
 export { updateAutomation } from './update-automation';

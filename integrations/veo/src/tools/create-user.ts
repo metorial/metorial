@@ -16,7 +16,9 @@ export let createUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organisationId: z.string().describe('ID of the organisation to add the user to'),
+      organisationId: z
+        .string()
+        .describe('Organisation ID. Call list_organisations to discover your organisations.'),
       firstName: z.string().describe('First name of the user'),
       lastName: z.string().describe('Last name of the user'),
       email: z.string().describe('Email address for the user'),

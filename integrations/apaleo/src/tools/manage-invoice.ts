@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApaleoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,26 @@ export let manageInvoice = SlateTool.create(spec, {
       invoiceId: z
         .string()
         .optional()
-        .describe('Invoice ID (for "cancel", "mark_paid", or "get")')
+        .describe('Invoice ID (for "cancel", "mark_paid", or "get")'),
+      languageCode: z
+        .string()
+        .optional()
+        .describe('Invoice language for create; defaults to the account default language.'),
+      reasonCode: z
+        .enum([
+          'ChangeOfRecipientDetails',
+          'ChangeOfInvoiceRecipient',
+          'ChangeOfPaymentMethod',
+          'ChangeOfInvoiceTransactions',
+          'Other'
+        ])
+        .optional()
+        .describe('Cancellation reason; defaults to Other.'),
+      paymentMethod: z
+        .string()
+        .optional()
+        .describe('Payment method required for mark_paid, such as Cash or BankTransfer.'),
+      receipt: z.string().optional().describe('Payment receipt required for mark_paid.')
     })
   )
   .output(
@@ -56,8 +75,11 @@ export let manageInvoice = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.folioId) throw new Error('folioId is required to create an invoice');
-        let result = await client.createInvoice(ctx.input.folioId);
+        if (!ctx.input.folioId)
+          throw createApiServiceError('folioId is required to create an invoice');
+        let languageCode =
+          ctx.input.languageCode ?? (await client.getCurrentAccount()).defaultLanguage;
+        let result = await client.createInvoice(ctx.input.folioId, languageCode);
         let invoiceId = result.id;
         return {
           output: { invoiceId, action, success: true },
@@ -65,23 +87,35 @@ export let manageInvoice = SlateTool.create(spec, {
         };
       }
       case 'cancel': {
-        if (!ctx.input.invoiceId) throw new Error('invoiceId is required to cancel');
-        await client.cancelInvoice(ctx.input.invoiceId);
+        if (!ctx.input.invoiceId)
+          throw createApiServiceError('invoiceId is required to cancel');
+        await client.cancelInvoice(ctx.input.invoiceId, ctx.input.reasonCode ?? 'Other');
         return {
           output: { invoiceId: ctx.input.invoiceId, action, success: true },
           message: `Cancelled invoice **${ctx.input.invoiceId}**.`
         };
       }
       case 'mark_paid': {
-        if (!ctx.input.invoiceId) throw new Error('invoiceId is required to mark as paid');
-        await client.markInvoicePaid(ctx.input.invoiceId);
+        if (!ctx.input.invoiceId)
+          throw createApiServiceError('invoiceId is required to mark as paid');
+        if (!ctx.input.paymentMethod || !ctx.input.receipt) {
+          throw createApiServiceError(
+            'paymentMethod and receipt are required to mark an invoice as paid.'
+          );
+        }
+        await client.markInvoicePaid(
+          ctx.input.invoiceId,
+          ctx.input.paymentMethod,
+          ctx.input.receipt
+        );
         return {
           output: { invoiceId: ctx.input.invoiceId, action, success: true },
           message: `Marked invoice **${ctx.input.invoiceId}** as paid.`
         };
       }
       case 'get': {
-        if (!ctx.input.invoiceId) throw new Error('invoiceId is required to get invoice');
+        if (!ctx.input.invoiceId)
+          throw createApiServiceError('invoiceId is required to get invoice');
         let inv = await client.getInvoice(ctx.input.invoiceId);
         return {
           output: {
@@ -94,10 +128,10 @@ export let manageInvoice = SlateTool.create(spec, {
               type: inv.type,
               status: inv.status,
               folioId: inv.folioId,
-              reservationId: inv.reservation?.id,
-              propertyId: inv.property?.id,
-              recipientName: inv.recipient?.name,
-              totalGrossAmount: inv.totalGrossAmount,
+              reservationId: inv.stayInfo?.reservationId ?? inv.reservation?.id,
+              propertyId: inv.propertyId ?? inv.property?.id,
+              recipientName: inv.to?.name ?? inv.recipient?.name,
+              totalGrossAmount: inv.total ?? inv.totalGrossAmount,
               created: inv.created
             }
           },

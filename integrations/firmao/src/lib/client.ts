@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 import type { FirmaoListParams, FirmaoListResponse } from './types';
 
 export class FirmaoClient {
@@ -8,12 +13,35 @@ export class FirmaoClient {
     token: string;
     organizationId: string;
   }) {
-    this.axios = createAxios({
-      baseURL: `https://system.firmao.net/${params.organizationId}/svc/v1`,
-      headers: {
-        Authorization: `Basic ${params.token}`,
-        'Content-Type': 'application/json; charset=UTF-8'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://system.firmao.net/${encodeURIComponent(params.organizationId)}/svc/v1`,
+      authHeader: { value: `Basic ${params.token}` },
+      contentType: 'application/json; charset=UTF-8',
+      timeout: 30_000,
+      errorMapping: {
+        extractResponseData: response => {
+          let data = response.data;
+          return isApiErrorRecord(data)
+            ? {
+                ...data,
+                message: data.message ?? data.errorCode,
+                code: data.errorCode ?? data.code
+              }
+            : data;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Firmao',
+          reason: 'firmao_api_error',
+          extractUpstreamCode: error => {
+            if (!isApiErrorRecord(error) || !isApiErrorRecord(error.data)) return undefined;
+            let upstream = error.data.upstream;
+            return isApiErrorRecord(upstream) && typeof upstream.code === 'string'
+              ? upstream.code
+              : undefined;
+          }
+        })
     });
   }
 
@@ -39,18 +67,36 @@ export class FirmaoClient {
     resource: string,
     params?: FirmaoListParams
   ): Promise<FirmaoListResponse<T>> {
-    let query = this.buildQueryString(params);
+    if (params?.start !== undefined && (!Number.isInteger(params.start) || params.start < 0)) {
+      throw createApiServiceError('Pagination start must be a non-negative integer.');
+    }
+    if (params?.limit !== undefined && (!Number.isInteger(params.limit) || params.limit < 1)) {
+      throw createApiServiceError('Pagination limit must be a positive integer.');
+    }
+    let query = this.buildQueryString({
+      ...params,
+      start: params?.start ?? 0,
+      limit: params?.limit ?? 50
+    });
+    query += `${query ? '&' : '?'}dataFormat=MEDIUM`;
     let response = await this.axios.get(`/${resource}${query}`);
     let data = response.data;
+    let records = Array.isArray(data) ? data : data?.data;
+
+    if (!Array.isArray(records)) {
+      throw createApiServiceError('Firmao returned an invalid list response.', {
+        reason: 'firmao_invalid_response'
+      });
+    }
 
     return {
-      data: data.data ?? data ?? [],
-      totalSize: data.totalSize ?? 0
+      data: records,
+      totalSize: data?.totalSize ?? records.length
     };
   }
 
   async getById<T = any>(resource: string, id: number | string): Promise<T> {
-    let response = await this.axios.get(`/${resource}/${id}`);
+    let response = await this.axios.get(`/${resource}/${encodeURIComponent(String(id))}`);
     return response.data;
   }
 
@@ -64,7 +110,10 @@ export class FirmaoClient {
     id: number | string,
     body: Record<string, any>
   ): Promise<T> {
-    let response = await this.axios.put(`/${resource}/${id}`, body);
+    let response = await this.axios.put(
+      `/${resource}/${encodeURIComponent(String(id))}`,
+      body
+    );
     return response.data;
   }
 
@@ -124,8 +173,9 @@ export class FirmaoClient {
     return response.data;
   }
 
-  async listNumberingSeries(): Promise<any> {
-    let response = await this.axios.get('/invoicenumbers?dataFormat=MEDIUM');
-    return response.data;
+  async listNumberingSeries(
+    params?: FirmaoListParams
+  ): Promise<FirmaoListResponse<Record<string, unknown>>> {
+    return this.list('invoicenumbers', params);
   }
 }

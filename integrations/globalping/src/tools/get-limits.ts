@@ -41,33 +41,22 @@ Useful for checking how many tests you can still run before hitting the hourly l
 
     let data = await client.getLimits();
 
-    let rateLimit = data.rateLimit as Record<string, unknown> | undefined;
-    let create = (rateLimit?.measurements as Record<string, unknown> | undefined)?.create as
-      | Record<string, unknown>
-      | undefined;
-
-    let creditsRemaining: number | null | undefined;
-    if (
-      data.credits &&
-      typeof data.credits === 'object' &&
-      'remaining' in (data.credits as Record<string, unknown>)
-    ) {
-      creditsRemaining = (data.credits as Record<string, unknown>).remaining as number;
-    }
+    let create = data.rateLimit.measurements.create;
+    let creditsRemaining = data.credits?.remaining;
 
     return {
       output: {
         rateLimit: {
           measurementsCreate: {
-            type: (create?.type as string) ?? 'ip',
-            limit: (create?.limit as number) ?? 0,
-            remaining: (create?.remaining as number) ?? 0,
-            reset: (create?.reset as number) ?? 0
+            type: create.type,
+            limit: create.limit,
+            remaining: create.remaining,
+            reset: create.reset
           }
         },
         creditsRemaining
       },
-      message: `Rate limit: **${create?.remaining ?? 0}** / **${create?.limit ?? 0}** measurements remaining. Resets in **${create?.reset ?? 0}** seconds.${creditsRemaining !== undefined ? ` Credits remaining: **${creditsRemaining}**.` : ''}`
+      message: `Rate limit: **${create.remaining}** / **${create.limit}** measurements remaining. Resets in **${create.reset}** seconds.${creditsRemaining !== undefined ? ` Credits remaining: **${creditsRemaining}**.` : ''}`
     };
   })
   .build();

@@ -26,11 +26,11 @@ export let listSubmissions = SlateTool.create(spec, {
       beforeDate: z
         .string()
         .optional()
-        .describe('Return results created before this UTC date-time'),
+        .describe('Return results created on or after this UTC date-time'),
       afterDate: z
         .string()
         .optional()
-        .describe('Return results created after this UTC date-time')
+        .describe('Return results created before this UTC date-time')
     })
   )
   .output(

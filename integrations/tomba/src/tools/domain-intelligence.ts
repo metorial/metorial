@@ -81,10 +81,10 @@ export let domainIntelligence = SlateTool.create(spec, {
     let includeStatus = ctx.input.includeStatus !== false;
 
     let [countResult, statusResult, techResult, similarResult] = await Promise.all([
-      client.emailCount(ctx.input.domain).catch(() => null),
-      includeStatus ? client.domainStatus(ctx.input.domain).catch(() => null) : null,
-      includeTech ? client.technology(ctx.input.domain).catch(() => null) : null,
-      includeSimilar ? client.similarDomains(ctx.input.domain).catch(() => null) : null
+      client.emailCount(ctx.input.domain),
+      includeStatus ? client.domainStatus(ctx.input.domain) : null,
+      includeTech ? client.technology(ctx.input.domain) : null,
+      includeSimilar ? client.similarDomains(ctx.input.domain) : null
     ]);
 
     let countData = countResult?.data || {};
@@ -98,7 +98,9 @@ export let domainIntelligence = SlateTool.create(spec, {
         name: t.name,
         icon: t.icon,
         website: t.website,
-        categories: t.categories
+        categories: t.categories?.map((category: string | { name: string }) =>
+          typeof category === 'string' ? category : category.name
+        )
       })
     );
 

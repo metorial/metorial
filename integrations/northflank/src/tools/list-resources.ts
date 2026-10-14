@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listResources = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let listResources = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       resourceType: z
         .enum([
           'jobs',
@@ -50,7 +52,9 @@ export let listResources = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let { resourceType, projectId } = ctx.input;
@@ -65,7 +69,7 @@ export let listResources = SlateTool.create(spec, {
     let label: string = resourceType;
 
     if (resourceType === 'jobs') {
-      if (!projectId) throw new Error('projectId is required for listing jobs');
+      if (!projectId) throw createApiServiceError('projectId is required for listing jobs');
       let result = await client.listJobs(projectId, paginationParams);
       pagination = result.pagination;
       resources = (result.data?.jobs || []).map((j: any) => ({
@@ -75,7 +79,7 @@ export let listResources = SlateTool.create(spec, {
         tags: j.tags
       }));
     } else if (resourceType === 'addons') {
-      if (!projectId) throw new Error('projectId is required for listing addons');
+      if (!projectId) throw createApiServiceError('projectId is required for listing addons');
       let result = await client.listAddons(projectId, paginationParams);
       pagination = result.pagination;
       resources = (result.data?.addons || []).map((a: any) => ({
@@ -85,7 +89,8 @@ export let listResources = SlateTool.create(spec, {
         tags: a.tags
       }));
     } else if (resourceType === 'pipelines') {
-      if (!projectId) throw new Error('projectId is required for listing pipelines');
+      if (!projectId)
+        throw createApiServiceError('projectId is required for listing pipelines');
       let result = await client.listPipelines(projectId, paginationParams);
       pagination = result.pagination;
       resources = (result.data?.pipelines || []).map((p: any) => ({
@@ -135,7 +140,7 @@ export let listResources = SlateTool.create(spec, {
         createdAt: i.createdAt
       }));
     } else {
-      throw new Error(`Unknown resource type: ${resourceType}`);
+      throw createApiServiceError(`Unknown resource type: ${resourceType}`);
     }
 
     return {

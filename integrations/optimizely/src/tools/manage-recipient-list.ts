@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CampaignClient } from '../lib/campaign-client';
 import { spec } from '../spec';
@@ -19,6 +19,18 @@ Recipient lists hold subscriber data that mailings are sent to. Use this to mana
       action: z
         .enum(['create', 'get', 'list', 'add_recipient', 'remove_recipient'])
         .describe('Action to perform'),
+      clientId: z
+        .string()
+        .optional()
+        .describe(
+          'Campaign client ID from Administration > API Overview; overrides campaignClientId in config'
+        ),
+      recipientAddress: z
+        .string()
+        .optional()
+        .describe(
+          'String recipient ID, usually an email address (for remove_recipient; preferred for email recipients)'
+        ),
       listId: z
         .number()
         .optional()
@@ -46,23 +58,24 @@ Recipient lists hold subscriber data that mailings are sent to. Use this to mana
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.campaignClientId)
-      throw new Error('campaignClientId must be set in config for Campaign API');
-    let client = new CampaignClient(ctx.auth.token, ctx.config.campaignClientId);
+    let clientId = ctx.input.clientId ?? ctx.config.campaignClientId;
+    if (!clientId)
+      throw createApiServiceError('campaignClientId must be set in config for Campaign API');
+    let client = new CampaignClient(ctx.auth.token, clientId);
 
     switch (ctx.input.action) {
       case 'list': {
-        let recipientLists = await client.listRecipientLists({
+        let result = await client.listRecipientLists({
           page: ctx.input.page,
           pageSize: ctx.input.pageSize
         });
         return {
-          output: { recipientLists: Array.isArray(recipientLists) ? recipientLists : [] },
+          output: { recipientLists: Array.isArray(result) ? result : result.elements || [] },
           message: `Listed Campaign recipient lists.`
         };
       }
       case 'get': {
-        if (!ctx.input.listId) throw new Error('listId is required');
+        if (!ctx.input.listId) throw createApiServiceError('listId is required');
         let recipientList = await client.getRecipientList(ctx.input.listId);
         return {
           output: { recipientList },
@@ -70,7 +83,7 @@ Recipient lists hold subscriber data that mailings are sent to. Use this to mana
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
         let recipientList = await client.createRecipientList({
           name: ctx.input.name,
           description: ctx.input.description
@@ -81,8 +94,8 @@ Recipient lists hold subscriber data that mailings are sent to. Use this to mana
         };
       }
       case 'add_recipient': {
-        if (!ctx.input.listId) throw new Error('listId is required');
-        if (!ctx.input.email) throw new Error('email is required');
+        if (!ctx.input.listId) throw createApiServiceError('listId is required');
+        if (!ctx.input.email) throw createApiServiceError('email is required');
         let recipient = await client.addRecipient(ctx.input.listId, {
           email: ctx.input.email,
           attributes: ctx.input.attributes
@@ -93,12 +106,14 @@ Recipient lists hold subscriber data that mailings are sent to. Use this to mana
         };
       }
       case 'remove_recipient': {
-        if (!ctx.input.listId) throw new Error('listId is required');
-        if (!ctx.input.recipientId) throw new Error('recipientId is required');
-        await client.removeRecipient(ctx.input.listId, ctx.input.recipientId);
+        if (!ctx.input.listId) throw createApiServiceError('listId is required');
+        let recipientId = ctx.input.recipientAddress ?? ctx.input.recipientId;
+        if (recipientId === undefined || recipientId === '')
+          throw createApiServiceError('recipientId or recipientAddress is required');
+        await client.removeRecipient(ctx.input.listId, recipientId);
         return {
           output: {},
-          message: `Removed recipient ${ctx.input.recipientId} from list ${ctx.input.listId}.`
+          message: `Removed recipient ${recipientId} from list ${ctx.input.listId}.`
         };
       }
     }

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listQuestions = SlateTool.create(spec, {
   name: 'List Questions',
   key: 'list_questions',
-  description: `Retrieve survey questions from your Simplesat account. Can be filtered by survey ID. Returns question text, type, choices, ordering, and associated rules.`,
+  description: `Retrieve survey questions from your Simplesat account. Can be filtered by survey ID. Returns question text, type, choices, ordering, and rating-scale status.`,
   tags: {
     readOnly: true
   }
@@ -27,7 +27,15 @@ export let listQuestions = SlateTool.create(spec, {
           text: z.string().describe('Question text'),
           metric: z.string().describe('Metric type for this question'),
           order: z.number().describe('Display order of the question'),
-          ratingScale: z.number().nullable().describe('Rating scale (if applicable)'),
+          ratingScale: z
+            .number()
+            .nullable()
+            .describe('Legacy numeric rating scale when supplied by the API'),
+          isRatingScale: z
+            .boolean()
+            .nullable()
+            .describe('Whether the question uses a rating scale'),
+          questionType: z.string().nullable().describe('Question type'),
           required: z.boolean().describe('Whether this question is required'),
           choices: z
             .array(
@@ -57,9 +65,13 @@ export let listQuestions = SlateTool.create(spec, {
       text: q.text,
       metric: q.metric,
       order: q.order,
-      ratingScale: q.rating_scale,
+      ratingScale: typeof q.rating_scale === 'number' ? q.rating_scale : null,
+      isRatingScale: typeof q.rating_scale === 'boolean' ? q.rating_scale : null,
+      questionType: q.type ?? null,
       required: q.required,
-      choices: q.choices,
+      choices: q.choices.map(choice =>
+        typeof choice === 'string' ? { label: choice, value: choice } : choice
+      ),
       surveyId: q.survey.id,
       surveyName: q.survey.name
     }));

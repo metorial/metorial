@@ -5,13 +5,15 @@ import {
   getDataStoreFields,
   getImageStats,
   getWidgetStats,
+  listBeePluginUsers,
   listImages,
   listMaps,
   manageDataStoreRecord,
   manageMapLocation,
   managePhotoshopImage,
   suspendWidgetUser,
-  updateTimer
+  updateTimer,
+  whoAmI
 } from './tools';
 
 export let provider = Slate.create({
@@ -27,7 +29,9 @@ export let provider = Slate.create({
     deleteImage,
     managePhotoshopImage,
     getWidgetStats,
-    suspendWidgetUser
+    suspendWidgetUser,
+    whoAmI,
+    listBeePluginUsers
   ],
   triggers: []
 });

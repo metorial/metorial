@@ -7,7 +7,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Census Bureau API key for higher rate limits (up to 500 queries/day without key)'
+          'Census Bureau API key required for statistical data queries. Public metadata, geocoder, and TIGERweb tools can be used without a key.'
         )
     })
   )

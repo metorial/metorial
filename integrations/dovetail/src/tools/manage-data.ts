@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageData = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageData = SlateTool.create(spec, {
   key: 'manage_data',
   description: `Create, update, or delete data entries in Dovetail. Data entries store structured research data like survey responses or feedback. Supports associating data with projects.`,
   instructions: [
-    'To create data, provide at least a title, content, or projectId.',
+    'To create data, provide projectId from list_projects and optionally a title or initial content.',
     'To update data, provide the dataId and the title to change.',
     'To delete data, provide the dataId and set action to "delete".'
   ],
@@ -22,7 +23,9 @@ export let manageData = SlateTool.create(spec, {
       dataId: z.string().optional().describe('Data ID (required for update and delete)'),
       title: z.string().optional().describe('Data entry title'),
       content: z.string().optional().describe('Data entry content'),
-      projectId: z.string().optional().describe('Associated project ID (for create)')
+      projectId: projectIdSchema
+        .optional()
+        .describe('Project ID from list_projects (required for create).')
     })
   )
   .output(
@@ -39,6 +42,10 @@ export let manageData = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.projectId)
+        throw createApiServiceError(
+          'projectId from list_projects is required to create data.'
+        );
       let data = await client.createData({
         title: ctx.input.title,
         content: ctx.input.content,
@@ -57,10 +64,16 @@ export let manageData = SlateTool.create(spec, {
     }
 
     if (!ctx.input.dataId) {
-      throw new Error('dataId is required for update and delete actions');
+      throw createApiServiceError('dataId is required for update and delete actions');
     }
 
     if (ctx.input.action === 'update') {
+      if (ctx.input.content !== undefined)
+        throw createApiServiceError(
+          'Dovetail cannot patch data content. Supply a title to update, or create data with initial content.'
+        );
+      if (ctx.input.title === undefined)
+        throw createApiServiceError('Provide a title to update the data entry.');
       let data = await client.updateData(ctx.input.dataId, {
         title: ctx.input.title
       });

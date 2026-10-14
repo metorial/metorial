@@ -21,11 +21,12 @@ export let logCall = SlateTool.create(spec, {
       callResult: z
         .string()
         .optional()
-        .describe(
-          'Result of the call (e.g. "interested", "not interested", "no answer", "left voicemail")'
-        ),
+        .describe("Call result key from the account's configured results"),
       callTimeInt: z.number().optional().describe('Time of the call as Unix timestamp'),
-      via: z.string().optional().describe('How the call was made (e.g. "phone", "skype")'),
+      via: z
+        .string()
+        .optional()
+        .describe('How the call was made: unknown, jabber, talkdesk, or phone'),
       recordingLink: z.string().optional().describe('Link to call recording')
     })
   )

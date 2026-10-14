@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -22,7 +22,18 @@ export let updateContact = SlateTool.create(spec, {
       mobile: z.string().optional().describe('Mobile phone number'),
       phone: z.string().optional().describe('Phone number'),
       otherPhone: z.string().optional().describe('Other phone number'),
-      company: z.string().optional().describe('Company name'),
+      company: z
+        .string()
+        .optional()
+        .describe(
+          'Existing company name. Must identify exactly one company. An empty string removes the company link.'
+        ),
+      companyId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Company ID from search_companies. Provide either companyId or company.'),
       website: z.string().optional().describe('Website URL'),
       linkedInHandle: z.string().optional().describe('LinkedIn handle'),
       twitterHandle: z.string().optional().describe('Twitter handle'),
@@ -45,17 +56,13 @@ export let updateContact = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let { contactId, customFields, ...fields } = ctx.input;
-
-    let updateData: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(fields)) {
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
-    }
-    if (customFields) {
-      Object.assign(updateData, customFields);
-    }
+    let { contactId, customFields, company, companyId, ...fields } = ctx.input;
+    let companyValue = await client.resolveContactCompany({ company, companyId });
+    let updateData = {
+      ...pickDefined(fields),
+      ...customFields,
+      ...(companyValue !== undefined ? { company: companyValue } : {})
+    };
 
     await client.updateContact(contactId, updateData);
 

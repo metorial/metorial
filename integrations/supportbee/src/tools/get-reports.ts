@@ -6,11 +6,10 @@ import { spec } from '../spec';
 export let getReports = SlateTool.create(spec, {
   name: 'Get Reports',
   key: 'get_reports',
-  description: `Retrieve support performance reports. Includes average first response time, ticket counts, and reply counts. Filter by user, team, label, and date range (max 30 days window).`,
+  description: `Retrieve support performance reports (admin access required). Includes average first response time, ticket counts, and reply counts. Filter by user, team, label, and start date.`,
   tags: {
     readOnly: true
-  },
-  constraints: ['Report data covers a maximum 30-day window.']
+  }
 })
   .input(
     z.object({

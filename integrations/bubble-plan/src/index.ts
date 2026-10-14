@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createClient,
   createComment,
   createContact,
   createEvent,
@@ -14,6 +15,7 @@ import {
   deleteProject,
   deleteSubtask,
   deleteTask,
+  deleteTimeEntry,
   getProject,
   listClients,
   listComments,
@@ -29,11 +31,13 @@ import {
   updateEvent,
   updateProject,
   updateSubtask,
-  updateTask
+  updateTask,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
     listProjects,
     getProject,
     createProject,
@@ -57,12 +61,14 @@ export let provider = Slate.create({
     deleteEvent,
     listTimeEntries,
     createTimeEntry,
+    deleteTimeEntry,
     listUsers,
     listContacts,
     createContact,
     updateContact,
     deleteContact,
-    listClients
+    listClients,
+    createClient
   ],
   triggers: []
 });

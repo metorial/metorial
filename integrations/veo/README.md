@@ -1,6 +1,6 @@
 # Veo
 
-Upload, manage, and analyze videos for educational observation and professional development. Tag key moments in videos with predefined performance markers, retrieve AI-powered analysis and transcripts, and collaborate through comments and threaded notes. Manage users and organisations, including inviting, creating, and deactivating users with role-based access. Create and manage groups (collaboration spaces, video banks, communities, and cohorts) and their memberships. Organise content into portfolios. Download transcoded videos in various resolutions via time-limited URLs.
+Manage VEO video resources for educational observation and professional development. Create video resources and obtain upload URLs, retrieve video details and transcripts, and download transcoded videos in their available resolutions. Collaborate through comments and tag-session notes, manage users and group memberships, and organise content into portfolios. Retrieve your profile and discover your organisations before provisioning users or filtering groups.
 
 ## License
 

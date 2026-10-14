@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Metatextai
 
-Classify, extract, and generate text using custom and pre-built NLP models. Perform sentiment analysis, keyword extraction, named entity recognition, and text generation via API. Train and deploy custom text classification, extraction, and generation models using labeled data. Access pre-built hub models for common tasks like sentiment analysis, keyword extraction, blog post generation, and news headline summarization without training.
+Classify text and extract entities using deployed Metatext AI projects through the V2 Inference API. Also includes the existing pre-built sentiment, keyword, spam, and text generation tools and custom V1 model inference.
+
+Connect with an Inference API key. Obtain project IDs and model names from your project deployment details. The current [Inference API documentation](https://docs.metatext.ai/api-reference/inference) describes V2 classification and extraction; availability and response formats of the older hub and V1 endpoints depend on your deployment.
 
 ## License
 

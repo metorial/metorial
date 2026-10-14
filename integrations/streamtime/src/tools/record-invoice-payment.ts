@@ -16,9 +16,19 @@ export let recordInvoicePayment = SlateTool.create(spec, {
     z.object({
       invoiceId: z.number().describe('ID of the invoice to record payment against'),
       amount: z.number().describe('Payment amount'),
-      date: z.string().optional().describe('Payment date (YYYY-MM-DD). Defaults to today.'),
+      date: z
+        .string()
+        .optional()
+        .describe(
+          'Payment date (YYYY-MM-DD). Optional; the provider determines the date when omitted.'
+        ),
       reference: z.string().optional().describe('Payment reference or note'),
-      paymentAccountId: z.number().optional().describe('ID of the payment account')
+      paymentAccountId: z
+        .number()
+        .optional()
+        .describe(
+          'ID of the payment account. Required by Streamtime for invoices not managed by an external accounting platform.'
+        )
     })
   )
   .output(
@@ -31,14 +41,15 @@ export let recordInvoicePayment = SlateTool.create(spec, {
     let client = new StreamtimeClient({ token: ctx.auth.token });
 
     let body: Record<string, any> = {
-      amount: ctx.input.amount
+      amountPaidIncTax: ctx.input.amount
     };
-    if (ctx.input.date !== undefined) body.date = ctx.input.date;
-    if (ctx.input.reference !== undefined) body.reference = ctx.input.reference;
-    if (ctx.input.paymentAccountId !== undefined)
-      body.paymentAccountId = ctx.input.paymentAccountId;
-
-    let result = await client.createInvoicePayment(ctx.input.invoiceId, body);
+    if (ctx.input.date !== undefined) body.paymentDate = ctx.input.date;
+    if (ctx.input.reference !== undefined) body.notes = ctx.input.reference;
+    let result = await client.createInvoicePayment(
+      ctx.input.invoiceId,
+      body,
+      ctx.input.paymentAccountId
+    );
 
     return {
       output: {

@@ -43,7 +43,7 @@ export let listUsers = SlateTool.create(spec, {
       roles: z
         .string()
         .optional()
-        .describe('Filter by role (1=member, 3=team_admin, 4=org_admin)'),
+        .describe('Filter by role (1=org_admin, 4=team_admin, 3=member)'),
       status: z.string().optional().describe('Filter by account status (active, inactive)'),
       limit: z.number().optional().describe('Maximum number of users to return (max 100)'),
       offset: z.number().optional().describe('Offset for pagination')
@@ -66,20 +66,20 @@ export let listUsers = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let usersRaw = result.users ?? [];
+    let usersRaw = result.results ?? result.users ?? [];
     let users = usersRaw.map((u: any) => ({
       userId: u.id,
-      username: u.username,
-      email: u.email,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      isActive: u.is_active,
+      username: u.username ?? undefined,
+      email: u.email ?? undefined,
+      firstName: u.first_name ?? undefined,
+      lastName: u.last_name ?? undefined,
+      isActive: u.is_active ?? undefined,
       roles: u.roles?.map((r: any) => ({ role: r.role, name: r.name })),
       teams: u.teams?.map((t: any) => ({ teamId: t.id, name: t.name }))
     }));
 
     return {
-      output: { users, totalCount: result.total_users ?? users.length },
+      output: { users, totalCount: result.count ?? result.total_users ?? users.length },
       message: `Found **${users.length}** user(s).`
     };
   })

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -104,6 +104,10 @@ export let updateSegment = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
+    if (ctx.input.name === undefined && ctx.input.description === undefined) {
+      throw createApiServiceError('Provide a segment name or description to update.');
+    }
+
     let segment = await client.updateSegment(ctx.input.segmentId, {
       name: ctx.input.name,
       description: ctx.input.description
@@ -207,12 +211,12 @@ export let manageSegmentMembers = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.userIds || ctx.input.userIds.length === 0) {
-        throw new Error('userIds is required for add action');
+        throw createApiServiceError('userIds is required for add action');
       }
       result = await client.addUsersToSegment(ctx.input.segmentId, ctx.input.userIds);
     } else if (ctx.input.action === 'remove') {
       if (!ctx.input.userIds || ctx.input.userIds.length === 0) {
-        throw new Error('userIds is required for remove action');
+        throw createApiServiceError('userIds is required for remove action');
       }
       result = await client.removeUsersFromSegment(ctx.input.segmentId, ctx.input.userIds);
     } else {

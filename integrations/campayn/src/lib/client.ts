@@ -1,4 +1,37 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+
+let campaynApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Campayn',
+    reason: 'campayn_api_error',
+    detailKeys: [
+      'msg',
+      'message',
+      'detail',
+      'error',
+      'error_description',
+      'errorCode',
+      'code'
+    ],
+    extractResponse: (input, helpers) => {
+      let response = helpers.getResponse(input);
+      if (!helpers.isRecord(input) || !helpers.isRecord(input.data)) return response;
+      let baggage = helpers.isRecord(input.data.baggage) ? input.data.baggage : undefined;
+      return baggage?.response !== undefined
+        ? { ...response, data: baggage.response }
+        : response;
+    },
+    extractUpstreamCode: (input, response, helpers) => {
+      if (helpers.isRecord(response?.data) && typeof response.data.errorCode === 'string') {
+        return response.data.errorCode;
+      }
+      if (helpers.isRecord(input) && helpers.isRecord(input.data)) {
+        let upstream = helpers.isRecord(input.data.upstream) ? input.data.upstream : undefined;
+        if (typeof upstream?.code === 'string') return upstream.code;
+      }
+      return undefined;
+    }
+  });
 
 export interface CampaynList {
   id: string;
@@ -115,20 +148,25 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://campayn.com/api/v1',
-      headers: {
-        Authorization: `TRUEREST apikey=${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `TRUEREST apikey=${config.token}` },
+      errorAdapter: campaynApiError
     });
+  }
+
+  private async request<T>(request: () => Promise<{ data: T }>): Promise<T> {
+    let { data } = await request();
+    if (isApiErrorRecord(data) && (data.success === false || data.success === 0)) {
+      throw campaynApiError({ response: { data } });
+    }
+    return data;
   }
 
   // ---- Lists ----
 
   async getLists(): Promise<CampaynList[]> {
-    let response = await this.axios.get('/lists.json');
-    return response.data;
+    return this.request(() => this.axios.get<CampaynList[]>('/lists.json'));
   }
 
   async getListContacts(listId: string, filter?: string): Promise<CampaynContactSummary[]> {
@@ -136,31 +174,44 @@ export class Client {
     if (filter) {
       params['filter[contact]'] = filter;
     }
-    let response = await this.axios.get(`/lists/${listId}/contacts.json`, { params });
-    return response.data;
+    return this.request(() =>
+      this.axios.get<CampaynContactSummary[]>(
+        `/lists/${encodeURIComponent(listId)}/contacts.json`,
+        { params }
+      )
+    );
   }
 
   // ---- Contacts ----
 
   async getContact(contactId: string): Promise<CampaynContact> {
-    let response = await this.axios.get(`/contacts/${contactId}.json`);
-    return response.data;
+    return this.request(() =>
+      this.axios.get<CampaynContact>(`/contacts/${encodeURIComponent(contactId)}.json`)
+    );
   }
 
   async createContact(
     listId: string,
     contact: CampaynCreateContactInput
   ): Promise<{ success: boolean }> {
-    let response = await this.axios.post(`/lists/${listId}/contacts.json`, contact);
-    return response.data;
+    return this.request(() =>
+      this.axios.post<{ success: boolean }>(
+        `/lists/${encodeURIComponent(listId)}/contacts.json`,
+        contact
+      )
+    );
   }
 
   async updateContact(
     contactId: string,
     contact: Partial<CampaynCreateContactInput>
   ): Promise<{ success: boolean }> {
-    let response = await this.axios.put(`/contacts/${contactId}.json`, contact);
-    return response.data;
+    return this.request(() =>
+      this.axios.put<{ success: boolean }>(
+        `/contacts/${encodeURIComponent(contactId)}.json`,
+        contact
+      )
+    );
   }
 
   async unsubscribeByEmail(
@@ -172,22 +223,29 @@ export class Client {
     msg: string;
     unsubscribeCount: number;
   }> {
-    let response = await this.axios.post(`/lists/${listId}/unsubscribe.json`, { email });
-    return response.data;
+    return this.request(() =>
+      this.axios.post<{
+        contactCount: number;
+        success: boolean;
+        msg: string;
+        unsubscribeCount: number;
+      }>(`/lists/${encodeURIComponent(listId)}/unsubscribe.json`, { email })
+    );
   }
 
   async unsubscribeById(listId: string, contactId: string): Promise<{ success: number }> {
-    let response = await this.axios.post(`/lists/${listId}/unsubscribe.json`, {
-      id: contactId
-    });
-    return response.data;
+    return this.request(() =>
+      this.axios.post<{ success: number }>(
+        `/lists/${encodeURIComponent(listId)}/unsubscribe.json`,
+        { id: contactId }
+      )
+    );
   }
 
   // ---- Emails ----
 
   async getEmails(): Promise<CampaynEmail[]> {
-    let response = await this.axios.get('/emails.json');
-    return response.data;
+    return this.request(() => this.axios.get<CampaynEmail[]>('/emails.json'));
   }
 
   // ---- Reports ----
@@ -200,8 +258,9 @@ export class Client {
     if (to !== undefined) {
       params.to = to;
     }
-    let response = await this.axios.get('/reports/calendar.json', { params });
-    return response.data;
+    return this.request(() =>
+      this.axios.get<CampaynReport[]>('/reports/calendar.json', { params })
+    );
   }
 
   // ---- Forms ----
@@ -211,12 +270,18 @@ export class Client {
     if (formType !== undefined) {
       params['filter[form_type]'] = formType;
     }
-    let response = await this.axios.get(`/lists/${listId}/forms.json`, { params });
-    return response.data;
+    return this.request(() =>
+      this.axios.get<CampaynForm[]>(`/lists/${encodeURIComponent(listId)}/forms.json`, {
+        params
+      })
+    );
   }
 
   async getForm(listId: string, formId: string): Promise<CampaynForm> {
-    let response = await this.axios.get(`/lists/${listId}/forms/${formId}.json`);
-    return response.data;
+    return this.request(() =>
+      this.axios.get<CampaynForm>(
+        `/lists/${encodeURIComponent(listId)}/forms/${encodeURIComponent(formId)}.json`
+      )
+    );
   }
 }

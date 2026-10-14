@@ -1,10 +1,8 @@
-Now let me check the OpenAPI spec for more details on the API capabilities:Based on my research, I now have a comprehensive understanding of Motion's API. Let me compile the specification.
-
-# Slates Specification for Motion
+# Motion API Specification
 
 ## Overview
 
-Motion (usemotion.com) is an AI-powered productivity platform that automates task scheduling, calendar management, and project planning. It automates task scheduling, calendar management, and project planning. The API allows programmatic management of tasks, projects, workspaces, recurring tasks, comments, custom fields, schedules, and users.
+Motion (usemotion.com) is an AI-powered productivity platform that automates task scheduling, calendar management, and project planning. The API allows programmatic management of tasks, projects, workspaces, recurring tasks, comments, custom fields, schedules, and users.
 
 ## Authentication
 
@@ -13,7 +11,7 @@ Motion uses API key authentication.
 1. Log into Motion and under the Settings tab, create an API key. Be sure to copy the key, as it will only be shown once for security reasons.
 2. Pass in your API key as a `X-API-Key` header.
 
-All requests are made against the base URL `https://api.usemotion.com/v1`.
+Task, project, workspace, user, schedule, and comment requests use `https://api.usemotion.com/v1`. Custom-field requests use `https://api.usemotion.com/beta`.
 
 **Example:**
 
@@ -36,7 +34,7 @@ Create, retrieve, and list projects within workspaces. Projects belong to a work
 
 ### Recurring Tasks
 
-Create recurring tasks and manage them, including listing and deleting. Recurring tasks support configurable frequency, duration (integer in minutes or "REMINDER"), and start date in ISO 8601 format. You can optionally specify an ideal time for scheduling (HH:mm format). Tasks can be assigned a schedule they must adhere to, defaulting to "Work Hours".
+Create recurring tasks and manage them, including listing and deleting. Recurring tasks support documented recurrence strings (for example `daily_every_day`, `weekly_any_day`, or `monthly_15`), duration (integer in minutes or "REMINDER"), and start date in ISO 8601 format. You can optionally specify an ideal time for scheduling (HH:mm format). Tasks can be assigned a schedule they must adhere to, defaulting to "Work Hours".
 
 ### Comments
 
@@ -60,8 +58,23 @@ Retrieve the available statuses for a workspace. Statuses indicate whether they 
 
 ### User Management
 
-List users in your workspace and retrieve the authenticated user's profile information.
+List users in your workspace and retrieve the authenticated user's profile information directly with `get_current_user`. The existing `list_users` tool also retains its optional `includeMe` profile output.
 
 ## Events
 
 The provider does not support events. Motion's API does not offer webhooks or any built-in event subscription mechanism. Third-party platforms (e.g., Pipedream, Zapier) implement polling-based workarounds to detect changes, but these are not native to the Motion API.
+
+## API Contract Notes
+
+- Call `list_workspaces` to discover workspace IDs before creating or filtering workspace resources.
+- Task listing accepts either `status` or `includeAllStatuses`, never both.
+- Task updates reject unassigning and assigning in the same operation before any mutation. `moveAssigneeId` requires `moveToWorkspaceId`.
+- `create_recurring_task` accepts `frequencyPattern` for documented recurrence strings. Its legacy object-valued `frequency` field remains available; provide exactly one of the two fields.
+- Custom-field setting and removal inputs are mutually exclusive.
+- Status listing handles the documented array of status wrappers while retaining support for flat status entries.
+
+## Sources
+
+- [Motion API reference](https://docs.usemotion.com/api-reference/tasks/list/)
+- [Recurring frequency cookbook](https://docs.usemotion.com/cookbooks/frequency/)
+- [Current API-key owner](https://docs.usemotion.com/api-reference/users/me/)

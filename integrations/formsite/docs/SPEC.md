@@ -1,4 +1,4 @@
-# Slates Specification for Formsite
+# Formsite Specification
 
 ## Overview
 
@@ -9,7 +9,7 @@ Formsite is an online form and survey builder that allows users to create web fo
 Formsite uses **API Key (Access Token)** authentication. The access token acts as an API password and must be included in every API request. It gives access to all forms and results in the account.
 
 **How to obtain the token:**
-The access token can be found on the Form Settings → Integrations → Formsite API page. The Formsite API is only available for Pro 1 accounts and above.
+The access token can be found on the Form Settings → Integrations → Formsite API page. The Formsite API requires a Professional level account.
 
 **How to use the token:**
 
@@ -54,6 +54,7 @@ Each result includes metadata such as start/finish/update dates, user IP, browse
 - **Searching**: Search for results where a specific item equals, contains, begins with, or ends with a given value. Multiple search criteria can be combined with AND/OR logic.
 - **Results Views**: Apply a predefined Results View to control which columns are returned.
 - A maximum of 500 results is returned per request; use pagination to retrieve more.
+- Retrieve a known submission with `get_form_result`, which uses the documented exact search for the `result_id` meta item. Multiple-choice answers retain each selected choice's value, position, and optional other text.
 
 ### Webhook Management
 

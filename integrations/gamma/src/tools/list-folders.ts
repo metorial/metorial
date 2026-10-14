@@ -24,7 +24,13 @@ You must be a member of a folder to add content to it.`,
   .input(
     z.object({
       query: z.string().optional().describe('Search folders by name (case-sensitive)'),
-      limit: z.number().optional().describe('Number of folders per page (max 50)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page size must be a whole number.')
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Number of folders per page (max 50)'),
       after: z.string().optional().describe('Cursor token for fetching the next page')
     })
   )
@@ -68,7 +74,7 @@ You must be a member of a folder to add content to it.`,
       output: {
         folders,
         hasMore: result.hasMore,
-        nextCursor: result.nextCursor
+        nextCursor: result.nextCursor ?? undefined
       },
       message
     };

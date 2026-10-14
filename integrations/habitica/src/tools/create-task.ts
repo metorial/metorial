@@ -87,7 +87,9 @@ Configure difficulty, notes, checklists, tags, due dates (To-Dos), repeat schedu
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let taskData: Record<string, any> = {

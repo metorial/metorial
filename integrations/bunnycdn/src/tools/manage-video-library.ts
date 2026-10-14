@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
@@ -105,6 +105,15 @@ export let manageVideoLibrary = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.videoLibraryId === undefined ||
+        ctx.input.videoLibraryId <= 0 ||
+        !Number.isInteger(ctx.input.videoLibraryId))
+    )
+      throw createApiServiceError('A positive videoLibraryId is required for this action.');
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim())
+      throw createApiServiceError('A name is required to create a video library.');
     let client = new CoreClient({ token: ctx.auth.token });
 
     switch (ctx.input.action) {

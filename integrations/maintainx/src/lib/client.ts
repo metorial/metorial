@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 import type {
   AssetStatus,
   DowntimeType,
@@ -13,7 +18,7 @@ export interface ClientConfig {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
     let headers: Record<string, string> = {
@@ -21,13 +26,51 @@ export class Client {
     };
 
     if (config.organizationId) {
-      headers['x-organization-ids'] = config.organizationId;
+      if (!/^\d+$/.test(config.organizationId)) {
+        throw createApiServiceError(
+          'Organization ID must be a single numeric ID from list_organizations.'
+        );
+      }
+      headers['x-organization-id'] = config.organizationId;
     }
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.getmaintainx.com/v1',
-      headers
+      headers,
+      timeout: 30000,
+      paramsSerializer: { indexes: null },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'MaintainX',
+          reason: 'maintainx_api_error'
+        })
     });
+  }
+
+  static fromContext(ctx: {
+    auth: { token: string; organizationId?: string; requiresOrganizationId?: boolean };
+    input: { organizationId?: string };
+    config: unknown;
+  }) {
+    let legacyOrganizationId =
+      ctx.config && typeof ctx.config === 'object' && 'organizationId' in ctx.config
+        ? ctx.config.organizationId
+        : undefined;
+    let organizationId =
+      ctx.input.organizationId ??
+      ctx.auth.organizationId ??
+      (typeof legacyOrganizationId === 'string' ? legacyOrganizationId : undefined);
+    if (ctx.auth.requiresOrganizationId && !organizationId) {
+      throw createApiServiceError(
+        'This key can access multiple organizations. Call list_organizations and provide organizationId.'
+      );
+    }
+    return new Client({ token: ctx.auth.token, organizationId });
+  }
+
+  async listOrganizations(params?: PaginationParams) {
+    let response = await this.axios.get('/organizations', { params });
+    return response.data;
   }
 
   // --- Work Orders ---
@@ -48,31 +91,27 @@ export class Client {
 
     if (params?.cursor) queryParams.cursor = params.cursor;
     if (params?.limit) queryParams.limit = params.limit;
-    if (params?.status) queryParams.status = params.status;
-    if (params?.priority) queryParams.priority = params.priority;
-    if (params?.type) queryParams.type = params.type;
+    if (params?.status) queryParams.statuses = [params.status];
+    if (params?.priority) queryParams.priorities = [params.priority];
     if (params?.createdAtGte) queryParams['createdAt[gte]'] = params.createdAtGte;
     if (params?.createdAtLte) queryParams['createdAt[lte]'] = params.createdAtLte;
     if (params?.updatedAtGte) queryParams['updatedAt[gte]'] = params.updatedAtGte;
     if (params?.updatedAtLte) queryParams['updatedAt[lte]'] = params.updatedAtLte;
 
-    if (params?.expand) {
-      for (let exp of params.expand) {
-        queryParams.expand = exp;
-      }
-    }
+    if (params?.expand) queryParams.expand = params.expand;
 
     let response = await this.axios.get('/workorders', { params: queryParams });
+    if (params?.type) {
+      response.data.workOrders = (response.data.workOrders ?? []).filter(
+        (workOrder: { type?: string | null }) => workOrder.type === params.type
+      );
+    }
     return response.data;
   }
 
   async getWorkOrder(workOrderId: number, expand?: string[]) {
     let params: Record<string, any> = {};
-    if (expand) {
-      for (let exp of expand) {
-        params.expand = exp;
-      }
-    }
+    if (expand) params.expand = expand;
     let response = await this.axios.get(`/workorders/${workOrderId}`, { params });
     return response.data;
   }
@@ -90,9 +129,27 @@ export class Client {
     workOrderType?: string;
     procedureId?: number;
     teamId?: number;
-    extraFields?: Record<string, any>[];
+    extraFields?: Record<string, string>;
   }) {
-    let response = await this.axios.post('/workorders', data);
+    let { status, assignees, teamId, workOrderType, procedureId, ...fields } = data;
+    let response = await this.axios.post(
+      '/workorders',
+      pickDefined({
+        ...fields,
+        type: workOrderType,
+        procedureTemplateId: procedureId,
+        assignees:
+          assignees !== undefined || teamId !== undefined
+            ? [
+                ...(assignees ?? []).map(id => ({ type: 'USER', id })),
+                ...(teamId === undefined ? [] : [{ type: 'TEAM', id: teamId }])
+              ]
+            : undefined
+      })
+    );
+    if (status && status !== 'OPEN') {
+      await this.applyPostWriteWorkOrderStatus(response.data.id, status, 'created');
+    }
     return response.data;
   }
 
@@ -109,20 +166,81 @@ export class Client {
       categories?: string[];
       dueDate?: string;
       teamId?: number;
-      extraFields?: Record<string, any>[];
+      extraFields?: Record<string, string>;
     }
   ) {
-    let response = await this.axios.patch(`/workorders/${workOrderId}`, data);
+    let { status, assignees, teamId, ...fields } = data;
+    let payload = pickDefined({
+      ...fields,
+      assignees:
+        assignees !== undefined || teamId !== undefined
+          ? [
+              ...(assignees ?? []).map(id => ({ type: 'USER', id })),
+              ...(teamId === undefined ? [] : [{ type: 'TEAM', id: teamId }])
+            ]
+          : undefined
+    });
+    if (!Object.keys(payload).length && status === undefined) {
+      throw createApiServiceError('Provide at least one work order field to update.');
+    }
+    if (Object.keys(payload).length) {
+      let response = await this.axios.patch(`/workorders/${workOrderId}`, payload);
+      if (status === undefined) return response.data;
+      return this.applyPostWriteWorkOrderStatus(workOrderId, status, 'updated');
+    }
+    let response = await this.axios.patch(`/workorders/${workOrderId}/status`, { status });
     return response.data;
+  }
+
+  private async applyPostWriteWorkOrderStatus(
+    workOrderId: number,
+    status: WorkOrderStatus,
+    completedWrite: 'created' | 'updated'
+  ) {
+    try {
+      let response = await this.axios.patch(`/workorders/${workOrderId}/status`, { status });
+      return response.data;
+    } catch (error) {
+      let serviceError = buildApiServiceError(error, {
+        providerLabel: 'MaintainX',
+        reason: 'maintainx_api_error',
+        operation: `set status for work order #${workOrderId}`
+      });
+      let remediation =
+        `Retrieve work order #${workOrderId} with get_work_order, then retry only ` +
+        `update_work_order with workOrderId ${workOrderId} and status if needed. ` +
+        (completedWrite === 'created'
+          ? 'Do not repeat create_work_order: the work order already exists.'
+          : 'Do not repeat the completed field update: those fields are already saved.');
+      serviceError.data.message =
+        `Work order #${workOrderId} was ${completedWrite}, but its status update to ${status} ` +
+        `failed or could not be confirmed. ${remediation} Upstream: ${serviceError.data.message}`;
+      serviceError.message = serviceError.data.message;
+      serviceError.data.hint = `${remediation}${serviceError.data.hint ? ` ${serviceError.data.hint}` : ''}`;
+      serviceError.data.workOrderId = workOrderId;
+      serviceError.data.completedWrite = completedWrite;
+      serviceError.data.requestedStatus = status;
+      serviceError.data.statusUpdateConfirmed = false;
+      throw serviceError;
+    }
   }
 
   // --- Work Requests ---
 
-  async listWorkRequests(params?: PaginationParams) {
+  async listWorkRequests(
+    params?: PaginationParams & {
+      title?: string;
+      status?: string;
+      priority?: WorkOrderPriority;
+    }
+  ) {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
     if (params?.limit) queryParams.limit = params.limit;
 
+    if (params?.title !== undefined) queryParams.title = params.title;
+    if (params?.status !== undefined) queryParams.statuses = [params.status];
+    if (params?.priority !== undefined) queryParams.priorities = [params.priority];
     let response = await this.axios.get('/workrequests', { params: queryParams });
     return response.data;
   }
@@ -156,11 +274,7 @@ export class Client {
     if (params?.limit) queryParams.limit = params.limit;
     if (params?.locationId) queryParams.locationId = params.locationId;
 
-    if (params?.expand) {
-      for (let exp of params.expand) {
-        queryParams.expand = exp;
-      }
-    }
+    if (params?.expand) queryParams.expand = params.expand;
 
     let response = await this.axios.get('/assets', { params: queryParams });
     return response.data;
@@ -183,9 +297,17 @@ export class Client {
     teamIds?: number[];
     assetTypes?: string[];
     vendorIds?: number[];
-    extraFields?: Record<string, any>[];
+    extraFields?: Record<string, string>;
   }) {
-    let response = await this.axios.post('/assets', data);
+    let response = await this.axios.post(
+      '/assets',
+      pickDefined({
+        ...data,
+        manufacturer:
+          data.manufacturer === undefined ? undefined : { name: data.manufacturer },
+        model: data.model === undefined ? undefined : { name: data.model }
+      })
+    );
     return response.data;
   }
 
@@ -203,10 +325,18 @@ export class Client {
       teamIds?: number[];
       assetTypes?: string[];
       vendorIds?: number[];
-      extraFields?: Record<string, any>[];
+      extraFields?: Record<string, string>;
     }
   ) {
-    let response = await this.axios.patch(`/assets/${assetId}`, data);
+    let response = await this.axios.patch(
+      `/assets/${assetId}`,
+      pickDefined({
+        ...data,
+        manufacturer:
+          data.manufacturer === undefined ? undefined : { name: data.manufacturer },
+        model: data.model === undefined ? undefined : { name: data.model }
+      })
+    );
     return response.data;
   }
 
@@ -252,7 +382,13 @@ export class Client {
     latitude?: number;
     parentId?: number;
   }) {
-    let response = await this.axios.post('/locations', data);
+    if (data.longitude !== undefined || data.latitude !== undefined) {
+      throw createApiServiceError(
+        'The MaintainX location API does not accept longitude or latitude. Use address instead.'
+      );
+    }
+    let { longitude: _longitude, latitude: _latitude, ...payload } = data;
+    let response = await this.axios.post('/locations', payload);
     return response.data;
   }
 
@@ -282,7 +418,16 @@ export class Client {
     barcode?: string;
     nonStock?: boolean;
   }) {
-    let response = await this.axios.post('/parts', data);
+    if (data.nonStock !== undefined) {
+      throw createApiServiceError(
+        'The MaintainX parts API does not accept nonStock. Omit that field.'
+      );
+    }
+    let { quantity, nonStock: _nonStock, ...fields } = data;
+    let response = await this.axios.post(
+      '/parts',
+      pickDefined({ ...fields, availableQuantity: quantity })
+    );
     return response.data;
   }
 
@@ -299,7 +444,16 @@ export class Client {
       nonStock?: boolean;
     }
   ) {
-    let response = await this.axios.patch(`/parts/${partId}`, data);
+    if (data.nonStock !== undefined) {
+      throw createApiServiceError(
+        'The MaintainX parts API does not accept nonStock. Omit that field.'
+      );
+    }
+    let { quantity, nonStock: _nonStock, ...fields } = data;
+    let response = await this.axios.patch(
+      `/parts/${partId}`,
+      pickDefined({ ...fields, availableQuantity: quantity })
+    );
     return response.data;
   }
 
@@ -309,7 +463,8 @@ export class Client {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
     if (params?.limit) queryParams.limit = params.limit;
-    if (params?.assetId) queryParams.assetId = params.assetId;
+    if (params?.assetId !== undefined) queryParams.assets = [params.assetId];
+    queryParams.expand = ['asset'];
 
     let response = await this.axios.get('/meters', { params: queryParams });
     return response.data;
@@ -327,7 +482,10 @@ export class Client {
       date?: string;
     }
   ) {
-    let response = await this.axios.post(`/meters/${meterId}/readings`, data);
+    let response = await this.axios.post(
+      `/meters/${meterId}/readings`,
+      pickDefined({ readingValue: data.value, readingDate: data.date })
+    );
     return response.data;
   }
 
@@ -358,7 +516,23 @@ export class Client {
       unitCost?: number;
     }>;
   }) {
-    let response = await this.axios.post('/purchaseorders', data);
+    if (data.items === undefined || data.items.some(item => item.quantity === undefined)) {
+      throw createApiServiceError(
+        'Provide items and a quantity for every purchase order item.'
+      );
+    }
+    let response = await this.axios.post(
+      '/purchaseorders',
+      pickDefined({
+        title: data.title,
+        note: data.description,
+        vendorId: data.vendorId ?? null,
+        items: data.items.map(({ quantity, ...item }) => ({
+          ...item,
+          quantityOrdered: quantity
+        }))
+      })
+    );
     return response.data;
   }
 
@@ -385,7 +559,19 @@ export class Client {
     address?: string;
     website?: string;
   }) {
-    let response = await this.axios.post('/vendors', data);
+    if (data.address !== undefined || data.website !== undefined) {
+      throw createApiServiceError(
+        'The MaintainX vendor API does not accept address or website. Omit those fields.'
+      );
+    }
+    let response = await this.axios.post(
+      '/vendors',
+      pickDefined({
+        name: data.name,
+        emails: data.email === undefined ? undefined : [data.email],
+        phoneNumbers: data.phone === undefined ? undefined : [data.phone]
+      })
+    );
     return response.data;
   }
 
@@ -395,7 +581,9 @@ export class Client {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
     if (params?.limit) queryParams.limit = params.limit;
-    if (params?.onlyAssignable) queryParams.onlyAssignable = params.onlyAssignable;
+    if (params?.onlyAssignable !== undefined)
+      queryParams.onlyAssignable = params.onlyAssignable;
+    queryParams.expand = ['role'];
 
     let response = await this.axios.get('/users', { params: queryParams });
     return response.data;
@@ -435,11 +623,15 @@ export class Client {
 
   // --- Conversations / Messages ---
 
-  async listConversations(params?: PaginationParams) {
+  async listConversations(
+    params?: PaginationParams & { type?: 'GROUP' | 'DM' | 'TEAM'; onlyNamed?: boolean }
+  ) {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
     if (params?.limit) queryParams.limit = params.limit;
 
+    if (params?.type !== undefined) queryParams.type = params.type;
+    if (params?.onlyNamed !== undefined) queryParams.onlyNamed = params.onlyNamed;
     let response = await this.axios.get('/conversations', { params: queryParams });
     return response.data;
   }

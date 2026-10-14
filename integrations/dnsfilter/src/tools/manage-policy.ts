@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ export let managePolicy = SlateTool.create(spec, {
     let { action, policyId } = ctx.input;
 
     if (action === 'delete') {
-      if (!policyId) throw new Error('policyId is required for delete');
+      if (!policyId) throw createApiServiceError('policyId is required for delete');
       await client.deletePolicy(policyId);
       return {
         output: { deleted: true },
@@ -66,13 +66,19 @@ export let managePolicy = SlateTool.create(spec, {
     }
 
     let params: Record<string, any> = {};
+    if (ctx.input.blockedCategoryIds?.some(id => !/^\d+$/.test(id))) {
+      throw createApiServiceError(
+        'blockedCategoryIds must contain numeric category IDs from list_categories.'
+      );
+    }
     if (ctx.input.name) params.name = ctx.input.name;
     if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
     if (ctx.input.allowListDomains) params.whitelist_domains = ctx.input.allowListDomains;
     if (ctx.input.blockListDomains) params.blacklist_domains = ctx.input.blockListDomains;
-    if (ctx.input.blockedCategoryIds) params.blocked_categories = ctx.input.blockedCategoryIds;
+    if (ctx.input.blockedCategoryIds)
+      params.blacklist_categories = ctx.input.blockedCategoryIds.map(Number);
     if (ctx.input.blockedApplicationIds)
-      params.blocked_applications = ctx.input.blockedApplicationIds;
+      params.block_applications = ctx.input.blockedApplicationIds;
     if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
 
     if (action === 'create') {
@@ -83,7 +89,7 @@ export let managePolicy = SlateTool.create(spec, {
       };
     }
 
-    if (!policyId) throw new Error('policyId is required for update');
+    if (!policyId) throw createApiServiceError('policyId is required for update');
     let policy = await client.updatePolicy(policyId, params);
     return {
       output: { policy },

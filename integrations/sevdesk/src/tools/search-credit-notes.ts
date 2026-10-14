@@ -61,8 +61,8 @@ export let searchCreditNotes = SlateTool.create(spec, {
       contactId: cn.contact?.id ? String(cn.contact.id) : undefined,
       contactName: cn.contact?.name || undefined,
       status: cn.status != null ? String(cn.status) : undefined,
-      totalNet: cn.sumNet ?? undefined,
-      totalGross: cn.sumGross ?? undefined,
+      totalNet: cn.sumNet != null ? String(cn.sumNet) : undefined,
+      totalGross: cn.sumGross != null ? String(cn.sumGross) : undefined,
       creditNoteDate: cn.creditNoteDate ?? undefined,
       createdAt: cn.create ?? undefined
     }));

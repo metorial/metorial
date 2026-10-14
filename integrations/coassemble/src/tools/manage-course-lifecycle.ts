@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,11 @@ export let manageCourseLifecycle = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean().describe('Whether the action was performed successfully'),
-      result: z.record(z.string(), z.any()).optional().describe('Response data from the API')
+      result: z.record(z.string(), z.any()).optional().describe('Response data from the API'),
+      providerResult: z
+        .boolean()
+        .optional()
+        .describe('Boolean result when returned by Coassemble')
     })
   )
   .handleInvocation(async ctx => {
@@ -32,7 +36,7 @@ export let manageCourseLifecycle = SlateTool.create(spec, {
       authScheme: ctx.auth.authScheme
     });
 
-    let result: any;
+    let result: unknown;
 
     switch (ctx.input.action) {
       case 'publish':
@@ -56,12 +60,16 @@ export let manageCourseLifecycle = SlateTool.create(spec, {
       restore: 'Restored'
     };
 
+    let success = result !== false;
     return {
       output: {
-        success: true,
-        result: result ?? undefined
+        success,
+        result: isApiErrorRecord(result) ? result : undefined,
+        providerResult: typeof result === 'boolean' ? result : undefined
       },
-      message: `${actionLabels[ctx.input.action]} course **${ctx.input.courseId}**.`
+      message: success
+        ? `${actionLabels[ctx.input.action]} course **${ctx.input.courseId}**.`
+        : `Coassemble did not ${ctx.input.action} course **${ctx.input.courseId}**.`
     };
   })
   .build();

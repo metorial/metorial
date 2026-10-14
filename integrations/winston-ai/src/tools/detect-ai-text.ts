@@ -10,7 +10,7 @@ export let detectAiText = SlateTool.create(spec, {
 
 Accepts plain text, a publicly accessible file URL (.pdf, .doc, .docx), or a website URL as input. Supports 12+ languages with auto-detection.`,
   instructions: [
-    'Provide exactly one of: text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.',
+    'Provide text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.',
     'For reliable results, text should be at least 600 characters. The minimum accepted length is 300 characters.'
   ],
   constraints: [
@@ -36,7 +36,7 @@ Accepts plain text, a publicly accessible file URL (.pdf, .doc, .docx), or a web
       version: z
         .string()
         .optional()
-        .describe('Detection model version (e.g. "4.14" or "latest")'),
+        .describe('Detection model version (e.g. "5.0" or "latest")'),
       sentences: z
         .boolean()
         .optional()

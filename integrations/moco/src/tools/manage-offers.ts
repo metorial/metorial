@@ -1,9 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let offerItemSchema = z.object({
+  type: z
+    .enum(['title', 'description', 'item', 'subtotal', 'page-break', 'separator'])
+    .optional()
+    .describe('Line item type; defaults to item.'),
   title: z.string().describe('Line item title'),
   description: z.string().optional().describe('Line item description'),
   quantity: z.number().optional().describe('Quantity'),
@@ -14,6 +19,10 @@ let offerItemSchema = z.object({
 
 let offerOutputSchema = z.object({
   offerId: z.number().describe('Offer/proposal ID'),
+  items: z
+    .array(z.unknown())
+    .optional()
+    .describe('Offer line items, available in offer details'),
   title: z.string().optional().describe('Offer title'),
   identifier: z.string().optional().describe('Offer number/identifier'),
   status: z.string().optional().describe('Offer status'),
@@ -34,6 +43,7 @@ let offerOutputSchema = z.object({
 
 let mapOffer = (o: any) => ({
   offerId: o.id,
+  items: o.items,
   title: o.title,
   identifier: o.identifier,
   status: o.status,
@@ -43,7 +53,7 @@ let mapOffer = (o: any) => ({
   netTotal: o.net_total,
   tax: o.tax,
   grossTotal: o.gross_total,
-  recipientAddress: o.recipient_address,
+  recipientAddress: o.recipient_address ?? undefined,
   tags: o.tags,
   company: o.company,
   project: o.project,
@@ -62,6 +72,7 @@ export let listOffers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       status: z
         .enum(['created', 'sent', 'accepted', 'partially_billed', 'billed', 'archived'])
         .optional()
@@ -83,6 +94,8 @@ export let listOffers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.status) params.status = ctx.input.status;
     if (ctx.input.companyId) params.company_id = ctx.input.companyId;
     if (ctx.input.projectId) params.project_id = ctx.input.projectId;
@@ -140,7 +153,20 @@ export let createOffer = SlateTool.create(spec, {
       date: z.string().describe('Offer date (YYYY-MM-DD)'),
       dueDate: z.string().describe('Valid until date (YYYY-MM-DD)'),
       title: z.string().describe('Offer title'),
-      tax: z.number().describe('Tax percentage (e.g., 19.0)'),
+      tax: z
+        .number()
+        .optional()
+        .describe(
+          'Tax percentage matching an active sales VAT code. Use vatCodeId for explicit selection.'
+        ),
+      vatCodeId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Active sales VAT code ID from your account tax settings; takes precedence over tax.'
+        ),
       currency: z.string().describe('Currency code (e.g., "EUR")'),
       items: z.array(offerItemSchema).describe('Offer line items'),
       companyId: z.number().optional().describe('Associated company ID'),
@@ -153,14 +179,23 @@ export let createOffer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
+    if (ctx.input.tax === undefined && ctx.input.vatCodeId === undefined) {
+      throw createApiServiceError('Provide tax or vatCodeId to select the sales VAT code.');
+    }
+    if (ctx.input.items.length === 0) {
+      throw createApiServiceError('Provide at least one line item.');
+    }
+
     let data: Record<string, any> = {
       recipient_address: ctx.input.recipientAddress,
       date: ctx.input.date,
       due_date: ctx.input.dueDate,
       title: ctx.input.title,
       tax: ctx.input.tax,
+      vat_code_id: ctx.input.vatCodeId,
       currency: ctx.input.currency,
       items: ctx.input.items.map(item => ({
+        type: item.type ?? 'item',
         title: item.title,
         description: item.description,
         quantity: item.quantity,

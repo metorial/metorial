@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/client';
+import { createClient, parseCost } from '../lib/client';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -23,12 +23,12 @@ let toolFunctionSchema = z.object({
 export let chatCompletion = SlateTool.create(spec, {
   name: 'Chat Completion',
   key: 'chat_completion',
-  description: `Send conversational prompts to hundreds of AI language models through a unified endpoint. Supports advanced features including web search grounding, RAG augmentation, persistent memory, hallucination reduction via integrity checking, and function calling/tools.`,
+  description: `Send conversational prompts to available AI language models through a unified endpoint. Supports advanced features including web search grounding, RAG augmentation, persistent memory, hallucination reduction via integrity checking, and function calling/tools.`,
   instructions: [
     'Set "online" to true to augment responses with live web search results.',
     'Use "ragTune" to reference a previously uploaded document collection for RAG augmentation.',
     'Set "integrity" to 12 or 13 for hallucination reduction via multi-query election.',
-    'Use "memory" and "memSession" for persistent conversational memory across requests.'
+    'Use "memory", "memSession", and "user" for persistent conversational memory across requests.'
   ],
   tags: {
     destructive: false,
@@ -115,7 +115,17 @@ export let chatCompletion = SlateTool.create(spec, {
         .describe('Set to 1 to enable persistent conversational memory'),
       memSession: z.string().optional().describe('Session ID for memory context grouping'),
       memExpire: z.number().optional().describe('Memory expiration in minutes (max 1440)'),
-      memClear: z.boolean().optional().describe('Set to true to clear the session memory')
+      memClear: z.boolean().optional().describe('Set to true to clear the session memory'),
+      user: z
+        .string()
+        .optional()
+        .describe('End-user identifier for isolated memory and user-scoped saved settings'),
+      toolsModel: z
+        .string()
+        .optional()
+        .describe(
+          'Model to handle function calls; choose an available OpenAI or Anthropic model'
+        )
     })
   )
   .output(
@@ -176,13 +186,16 @@ export let chatCompletion = SlateTool.create(spec, {
       memory: ctx.input.memory,
       memSession: ctx.input.memSession,
       memExpire: ctx.input.memExpire,
-      memClear: ctx.input.memClear
+      memClear: ctx.input.memClear,
+      user: ctx.input.user,
+      toolsModel: ctx.input.toolsModel
     });
 
+    let cost = parseCost(result.usage?.cost);
     let choice = result.choices?.[0];
     let message = choice?.message;
 
-    let toolCalls = message?.tool_calls?.map((tc: any) => ({
+    let toolCalls = message?.tool_calls?.map(tc => ({
       toolCallId: tc.id,
       functionName: tc.function?.name,
       arguments: tc.function?.arguments
@@ -208,10 +221,10 @@ export let chatCompletion = SlateTool.create(spec, {
         promptTokens: result.usage?.prompt_tokens ?? 0,
         completionTokens: result.usage?.completion_tokens ?? 0,
         totalTokens: result.usage?.total_tokens ?? 0,
-        cost: result.usage?.cost,
+        cost,
         latencyMs: result.usage?.latency_ms
       },
-      message: `Generated completion using **${result.model}**${result.provider ? ` via ${result.provider}` : ''}. ${result.usage?.total_tokens ?? 0} tokens used${result.usage?.cost ? ` ($${result.usage.cost.toFixed(6)})` : ''}.\n\n> ${contentPreview}`
+      message: `Generated completion using **${result.model}**${result.provider ? ` via ${result.provider}` : ''}. ${result.usage?.total_tokens ?? 0} tokens used${cost !== undefined ? ` ($${cost.toFixed(6)})` : ''}.\n\n> ${contentPreview}`
     };
   })
   .build();

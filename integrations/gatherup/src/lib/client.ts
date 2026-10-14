@@ -1,8 +1,10 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://app.gatherup.com/api'
-});
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -11,28 +13,99 @@ export interface ClientConfig {
 }
 
 export class Client {
-  constructor(private config: ClientConfig) {}
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
-  private buildBody(params: Record<string, unknown> = {}): Record<string, unknown> {
+  constructor(private config: ClientConfig) {
+    if (!config.token.trim() || !config.clientId.trim()) {
+      throw createApiServiceError('GatherUp bearer token and Client ID are required.');
+    }
+
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://app.gatherup.com/api',
+      timeout: 30_000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorMapping: {
+        extractResponseData: response => {
+          if (!isApiErrorRecord(response.data)) return response.data;
+          return {
+            ...response.data,
+            message: response.data.errorMessage,
+            code:
+              response.data.errorCode === undefined
+                ? undefined
+                : String(response.data.errorCode)
+          };
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'GatherUp',
+          reason: 'gatherup_http_error',
+          extractUpstreamCode: error => {
+            if (!isApiErrorRecord(error) || !isApiErrorRecord(error.data)) return undefined;
+            let upstream = error.data.upstream;
+            return isApiErrorRecord(upstream) && typeof upstream.code === 'string'
+              ? upstream.code
+              : undefined;
+          }
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      if (!isApiErrorRecord(response.data)) {
+        throw createApiServiceError('GatherUp returned an invalid API response.', {
+          reason: 'gatherup_invalid_response',
+          upstreamStatus: response.status
+        });
+      }
+      let code = response.data.errorCode;
+      if (code !== undefined && Number(code) !== 0) {
+        let message =
+          typeof response.data.errorMessage === 'string'
+            ? response.data.errorMessage
+            : 'The request failed.';
+        throw createApiServiceError(
+          `GatherUp API request failed: ${message} (code: ${code})`,
+          {
+            reason: 'gatherup_api_error',
+            upstreamStatus: response.status,
+            upstreamCode: String(code)
+          }
+        );
+      }
+      return response;
+    });
+  }
+
+  private buildBody(
+    params: Record<string, unknown> = {},
+    includeAgent = true
+  ): Record<string, unknown> {
+    for (let [key, value] of Object.entries(params)) {
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        throw createApiServiceError(`${key} must be a whole number.`);
+      }
+      if ((key === 'page' || key === 'limit') && typeof value === 'number' && value < 1) {
+        throw createApiServiceError(`${key} must be at least 1.`);
+      }
+      if (key === 'delayFeedbackRequest' && typeof value === 'number' && value < 0) {
+        throw createApiServiceError('delayFeedbackRequest cannot be negative.');
+      }
+      if (key === 'roleId' && value !== undefined && ![3, 4, 5, 6].includes(value as number)) {
+        throw createApiServiceError('roleId must be 3, 4, 5, or 6.');
+      }
+    }
     let body: Record<string, unknown> = {
       clientId: this.config.clientId,
-      ...params
+      ...pickDefined(params)
     };
-    if (this.config.agent) {
+    if (includeAgent && this.config.agent) {
       body.agent = this.config.agent;
     }
     return body;
   }
 
   private buildQuery(params: Record<string, unknown> = {}): Record<string, unknown> {
-    let query: Record<string, unknown> = {
-      clientId: this.config.clientId,
-      ...params
-    };
-    if (this.config.agent) {
-      query.agent = this.config.agent;
-    }
-    return query;
+    return this.buildBody(params);
   }
 
   private get headers() {
@@ -45,7 +118,7 @@ export class Client {
   // ==================== Test ====================
 
   async testConnection(): Promise<{ errorCode: number; errorMessage: string }> {
-    let res = await http.post('/test', this.buildBody(), { headers: this.headers });
+    let res = await this.http.post('/test', this.buildBody(), { headers: this.headers });
     return res.data;
   }
 
@@ -59,11 +132,11 @@ export class Client {
       aggregateResponse?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/businesses/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -71,7 +144,7 @@ export class Client {
   }
 
   async getBusiness(businessId: number): Promise<any> {
-    let res = await http.post('/business/get', this.buildBody({ businessId }), {
+    let res = await this.http.post('/business/get', this.buildBody({ businessId }), {
       headers: this.headers
     });
     return res.data;
@@ -99,7 +172,7 @@ export class Client {
     businessOwnerLastName?: string;
     businessOwnerSendPasswordEmail?: number;
   }): Promise<any> {
-    let res = await http.post('/business/create', this.buildBody(params), {
+    let res = await this.http.post('/business/create', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -126,42 +199,53 @@ export class Client {
     feedbackThreshold?: number;
     pageThreshold?: number;
   }): Promise<any> {
-    let res = await http.post('/business/update', this.buildBody(params), {
+    let res = await this.http.post('/business/update', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
   }
 
   async deleteBusiness(businessId: number): Promise<any> {
-    let res = await http.post('/business/delete', this.buildBody({ businessId }), {
+    let res = await this.http.post('/business/delete', this.buildBody({ businessId }), {
       headers: this.headers
     });
     return res.data;
   }
 
   async searchBusiness(params: { by: string; search: string }): Promise<any> {
-    let res = await http.post('/business/search', this.buildBody(params), {
+    let res = await this.http.post('/business/search', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
   }
 
   async deactivateBusiness(businessId: number): Promise<any> {
-    let res = await http.post('/business/deactivate', this.buildBody({ businessId }), {
+    let res = await this.http.post('/business/deactivate', this.buildBody({ businessId }), {
       headers: this.headers
     });
     return res.data;
   }
 
   async reactivateBusiness(businessId: number): Promise<any> {
-    let res = await http.post('/business/reactivate', this.buildBody({ businessId }), {
+    let res = await this.http.post('/business/reactivate', this.buildBody({ businessId }), {
       headers: this.headers
     });
     return res.data;
   }
 
-  async getBusinessTypes(): Promise<any> {
-    let res = await http.post('/business/types', this.buildBody(), { headers: this.headers });
+  async getBusinessTypes(search?: string): Promise<any> {
+    let res = await this.http.post('/business/types', this.buildBody({ search }), {
+      headers: this.headers
+    });
+    return res.data;
+  }
+
+  async listAgencyClients(
+    params: { page?: number; includeBusinesses?: number } = {}
+  ): Promise<any> {
+    // Agency discovery must use global credentials, regardless of a configured client target.
+    let body = this.buildBody(params, false);
+    let res = await this.http.post('/agency/clients', body, { headers: this.headers });
     return res.data;
   }
 
@@ -180,11 +264,11 @@ export class Client {
       aggregateResponse?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/customers/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -192,11 +276,11 @@ export class Client {
   }
 
   async getCustomer(customerId: number): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/customers/get',
       this.buildBody({
         customerId,
-        aggregateResponse: 1
+        aggregateResponse: 0
       }),
       { headers: this.headers }
     );
@@ -216,7 +300,7 @@ export class Client {
     delayFeedbackRequest?: number;
     sendFeedbackRequest?: number;
   }): Promise<any> {
-    let res = await http.post('/customer/create', this.buildBody(params), {
+    let res = await this.http.post('/customer/create', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -233,14 +317,14 @@ export class Client {
     customerJobId?: string;
     customerTags?: string;
   }): Promise<any> {
-    let res = await http.post('/customer/update', this.buildBody(params), {
+    let res = await this.http.post('/customer/update', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
   }
 
   async deleteCustomer(customerId: number): Promise<any> {
-    let res = await http.post('/customer/delete', this.buildBody({ customerId }), {
+    let res = await this.http.post('/customer/delete', this.buildBody({ customerId }), {
       headers: this.headers
     });
     return res.data;
@@ -264,18 +348,18 @@ export class Client {
     };
     params.customers.forEach((c, i) => {
       let n = i + 1;
-      if (c.email) body[`customerEmail${n}`] = c.email;
-      if (c.firstName) body[`customerFirstName${n}`] = c.firstName;
-      if (c.lastName) body[`customerLastName${n}`] = c.lastName;
-      if (c.phone) body[`customerPhone${n}`] = c.phone;
-      if (c.customId) body[`customerCustomId${n}`] = c.customId;
-      if (c.jobId) body[`customerJobId${n}`] = c.jobId;
-      if (c.preference) body[`customerPreference${n}`] = c.preference;
-      if (c.tags) body[`customerTags${n}`] = c.tags;
+      if (c.email !== undefined) body[`customerEmail${n}`] = c.email;
+      if (c.firstName !== undefined) body[`customerFirstName${n}`] = c.firstName;
+      if (c.lastName !== undefined) body[`customerLastName${n}`] = c.lastName;
+      if (c.phone !== undefined) body[`customerPhone${n}`] = c.phone;
+      if (c.customId !== undefined) body[`customerCustomId${n}`] = c.customId;
+      if (c.jobId !== undefined) body[`customerJobId${n}`] = c.jobId;
+      if (c.preference !== undefined) body[`customerPreference${n}`] = c.preference;
+      if (c.tags !== undefined) body[`customerTags${n}`] = c.tags;
     });
-    body.aggregateResponse = 1;
+    body.aggregateResponse = 0;
 
-    let res = await http.post('/customers/create', this.buildBody(body), {
+    let res = await this.http.post('/customers/create', this.buildBody(body), {
       headers: this.headers
     });
     return res.data;
@@ -289,7 +373,7 @@ export class Client {
     checkThreshold?: number;
     jobId?: string;
   }): Promise<any> {
-    let res = await http.post('/customer/feedback/send', this.buildBody(params), {
+    let res = await this.http.post('/customer/feedback/send', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -309,11 +393,11 @@ export class Client {
       aggregateResponse?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/feedbacks/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -330,11 +414,11 @@ export class Client {
       aggregateResponse?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/feedbacks/responses/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -348,7 +432,7 @@ export class Client {
     visibility?: number;
     respondAsBusinessOwner?: number;
   }): Promise<any> {
-    let res = await http.post('/customer/reply', this.buildBody(params), {
+    let res = await this.http.post('/customer/reply', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -367,11 +451,11 @@ export class Client {
       aggregateResponse?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/online-reviews/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -379,7 +463,7 @@ export class Client {
   }
 
   async replyToOnlineReview(params: { reviewId: number; content: string }): Promise<any> {
-    let res = await http.post('/online-review/reply', this.buildBody(params), {
+    let res = await this.http.post('/online-review/reply', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -388,7 +472,7 @@ export class Client {
   async getFacebookRecommendations(
     params: { businessId?: string; from?: string; to?: string; page?: number } = {}
   ): Promise<any> {
-    let res = await http.post('/facebook-recommendations/get', this.buildBody(params), {
+    let res = await this.http.post('/facebook-recommendations/get', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -402,11 +486,11 @@ export class Client {
     to?: string;
     aggregateResponse?: number;
   }): Promise<any> {
-    let res = await http.post(
+    let res = await this.http.post(
       '/survey-questions/average/get',
       this.buildBody({
         ...params,
-        aggregateResponse: params.aggregateResponse ?? 1
+        aggregateResponse: params.aggregateResponse ?? 0
       }),
       { headers: this.headers }
     );
@@ -421,7 +505,7 @@ export class Client {
     includeSchemaOrg?: number;
     widgetType?: string;
   }): Promise<any> {
-    let res = await http.post('/widget/get-html', this.buildBody(params), {
+    let res = await this.http.post('/widget/get-html', this.buildBody(params), {
       headers: this.headers
     });
     return res.data;
@@ -439,7 +523,7 @@ export class Client {
       page?: number;
     } = {}
   ): Promise<any> {
-    let res = await http.get('/google-qa/get', {
+    let res = await this.http.get('/google-qa/get', {
       headers: this.headers,
       params: this.buildQuery(params)
     });
@@ -469,7 +553,9 @@ export class Client {
         body[`businessId${i + 1}`] = id;
       });
     }
-    let res = await http.post('/user/create', this.buildBody(body), { headers: this.headers });
+    let res = await this.http.post('/user/create', this.buildBody(body), {
+      headers: this.headers
+    });
     return res.data;
   }
 
@@ -480,9 +566,13 @@ export class Client {
     autoFeedback: number;
     autoSend?: number;
   }): Promise<any> {
-    let res = await http.post('/business/auto-feedback-requests', this.buildBody(params), {
-      headers: this.headers
-    });
+    let res = await this.http.post(
+      '/business/auto-feedback-requests',
+      this.buildBody(params),
+      {
+        headers: this.headers
+      }
+    );
     return res.data;
   }
 }

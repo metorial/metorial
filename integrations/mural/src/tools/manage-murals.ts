@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,12 @@ export let listMuralsTool = SlateTool.create(spec, {
     z.object({
       workspaceId: z.string().optional().describe('ID of the workspace to list murals from'),
       roomId: z.string().optional().describe('ID of the room to list murals from'),
-      limit: z.number().optional().describe('Maximum number of murals to return'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a whole number.')
+        .min(1)
+        .optional()
+        .describe('Maximum number of murals to return'),
       nextToken: z.string().optional().describe('Pagination token from a previous request')
     })
   )
@@ -38,8 +43,10 @@ export let listMuralsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
+    if (Boolean(ctx.input.roomId) === Boolean(ctx.input.workspaceId))
+      throw createApiServiceError('Provide exactly one of roomId or workspaceId.');
     let result: any;
     if (ctx.input.roomId) {
       result = await client.listMuralsInRoom(ctx.input.roomId, {
@@ -52,7 +59,7 @@ export let listMuralsTool = SlateTool.create(spec, {
         next: ctx.input.nextToken
       });
     } else {
-      throw new Error('Either workspaceId or roomId must be provided');
+      throw createApiServiceError('Either workspaceId or roomId must be provided');
     }
 
     let murals = result.value.map((m: any) => ({
@@ -89,7 +96,7 @@ export let getMuralTool = SlateTool.create(spec, {
   )
   .output(muralOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let m = await client.getMural(ctx.input.muralId);
 
     return {
@@ -112,18 +119,24 @@ export let getMuralTool = SlateTool.create(spec, {
 export let createMuralTool = SlateTool.create(spec, {
   name: 'Create Mural',
   key: 'create_mural',
-  description: `Create a new blank mural in a workspace. Optionally place it in a specific room. To create a mural from a template, use the **Create Mural From Template** tool instead.`
+  description: `Create a new blank mural in a room. Call list_workspaces and list_rooms to discover a destination room. To create a mural from a template, use the **Create Mural From Template** tool instead.`
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace to create the mural in'),
-      roomId: z.string().optional().describe('ID of the room to place the mural in'),
+      workspaceId: z
+        .string()
+        .optional()
+        .describe('Workspace containing the destination room; retained for compatibility'),
+      roomId: z
+        .string()
+        .optional()
+        .describe('Required destination room ID. Call list_rooms to discover room IDs.'),
       title: z.string().optional().describe('Title for the new mural')
     })
   )
   .output(muralOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let m = await client.createMural({
       workspaceId: ctx.input.workspaceId,
       roomId: ctx.input.roomId,
@@ -150,18 +163,21 @@ export let createMuralTool = SlateTool.create(spec, {
 export let updateMuralTool = SlateTool.create(spec, {
   name: 'Update Mural',
   key: 'update_mural',
-  description: `Update a mural's title or description.`
+  description: `Update a mural's title. Mural's public API does not support mural descriptions.`
 })
   .input(
     z.object({
       muralId: z.string().describe('ID of the mural to update'),
       title: z.string().optional().describe('New title for the mural'),
-      description: z.string().optional().describe('New description for the mural')
+      description: z
+        .string()
+        .optional()
+        .describe('Unsupported by Mural; omit this field and provide title instead')
     })
   )
   .output(muralOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let m = await client.updateMural(ctx.input.muralId, {
       title: ctx.input.title,
       description: ctx.input.description
@@ -203,7 +219,7 @@ export let deleteMuralTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteMural(ctx.input.muralId);
 
     return {
@@ -220,13 +236,24 @@ export let duplicateMuralTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      muralId: z.string().describe('ID of the mural to duplicate')
+      muralId: z.string().describe('ID of the mural to duplicate'),
+      roomId: z
+        .string()
+        .optional()
+        .describe('Destination room ID from list_rooms; defaults to the source room'),
+      title: z
+        .string()
+        .optional()
+        .describe('Title of the copy; defaults to the source title followed by (copy)')
     })
   )
   .output(muralOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let m = await client.duplicateMural(ctx.input.muralId);
+    let client = new Client(ctx.auth);
+    let m = await client.duplicateMural(ctx.input.muralId, {
+      roomId: ctx.input.roomId,
+      title: ctx.input.title
+    });
 
     return {
       output: {

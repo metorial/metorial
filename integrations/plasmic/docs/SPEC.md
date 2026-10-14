@@ -1,88 +1,29 @@
-Now let me get more details on the Write API:# Slates Specification for Plasmic
-
-## Overview
-
-Plasmic is a visual web design and development platform that allows users to build pages, components, and full applications visually. It provides a headless CMS, server-side rendering of components via REST APIs, and a programmatic write API for updating projects. Plasmic integrates with React-based frameworks and can be used as both a design tool and a content management system.
+# Plasmic Specification
 
 ## Authentication
 
-Plasmic uses API key-based authentication. There are two separate API systems, each with its own authentication mechanism:
+Project APIs authenticate with `x-plasmic-api-project-tokens: PROJECT_ID:TOKEN`. The public token is available in the project's Code panel; the secret token required for project writes is limited to enterprise customers.
 
-### Project API (Render API / Write API / Model API)
+CMS APIs authenticate with `x-plasmic-api-cms-tokens: CMS_ID:TOKEN`. The CMS Settings tab provides the database ID, public token, and secret token. Public tokens support published reads; secret tokens enable writes and draft reads. Project and CMS credentials can be connected independently, and write operations do not require a separate public token. Credentials must include a matching resource ID and at least one token.
 
-Used for rendering components, reading project models, and updating projects.
+These are resource-scoped credentials. No user-profile endpoint suitable for these credentials is documented in the public APIs covered here.
 
-- **Header**: `x-plasmic-api-project-tokens`
-- **Value format**: `PROJECTID:TOKEN`
-- **Token types**:
-  - **Public API Token** (for read operations like rendering): Found at `https://studio.plasmic.app/projects/[PROJECTID]/docs/loader#showToken=true`
-  - **Secret Token** (for write operations): Currently only available for enterprise customers
-- **Base URL (Render/Model)**: `https://codegen.plasmic.app/api/v1/`
-- **Base URL (Write)**: `https://studio.plasmic.app/api/v1/projects/`
+## Tools
 
-### CMS API
+- `list_cms_models`: Retrieve the connected database's model identifiers, names, and field schemas. Pass each model's `identifier`, rather than its internal table ID, as `modelId` in content tools.
+- `get_cms_item`: Retrieve the first entry matching a field filter, or null. Prefer a unique field such as a slug. `_id` targets the system row ID only when the model has no user-defined `_id` field.
+- `query_cms_items` and `count_cms_items`: Read model content or count matches. Filters use Plasmic's JSON `where` syntax. Query `order` accepts a field identifier, with optional `orderDirection` (`asc` or `desc`). Draft reads require a secret token.
+- `create_cms_item` and `create_cms_items`: Create one entry or a batch using field values and optional human-readable identifiers. The provider receives a `rows` array; returned entries include row IDs. `publish` optionally publishes the created entries immediately.
+- `update_cms_item`, `delete_cms_item`, and `publish_cms_item`: Mutate an entry at `/cms/rows/{rowId}`. Existing `modelId` inputs remain available for compatibility, but the provider addresses the entry by row ID. Updates accept optional identifiers and can publish immediately.
+- `render_component`: Return the `html` string from the Render API's JSON response. Supports preview, published, and versioned requests, props, variants, and hydration. Versioned requests require a version; `maxAge` requires `prepass`. Custom application code components are unavailable in server rendering.
+- `get_project_model`: Read the project's model. The Model API is experimental and may change.
+- `update_project`: Upsert component bodies and design tokens through the enterprise Write API. Component `uuid` maps to `byUuid`, `tplTree` maps to the provider's `body`, and `components` maps to `updateComponents`. An explicit UUID is authoritative: only that UUID and the body are sent for its update, without competing name/path selectors. `tplTree` uses Write API element objects, such as `{ "type": "text", "value": "Hello" }`, rather than Model API TplNodes. A path defines a page when creating/upserting without a UUID. Token types use Color, Spacing, Opacity, LineHeight, FontFamily, FontSize, or BoxShadow; lowercase names with hyphens are normalized.
 
-Used for managing content in the Plasmic CMS.
+## Provider references
 
-- **Header**: `x-plasmic-api-cms-tokens`
-- **Value format**: `CMS_ID:TOKEN`
-- **Token types**:
-  - **Public Token**: For read operations (e.g., querying items)
-  - **Secret Token**: For write operations (e.g., creating, updating, deleting items). Must only be used server-side.
-- **Base URL**: `https://data.plasmic.app/api/v1/cms/databases/`
-- CMS ID, Public Token, and Secret Token are found in the "CMS Settings" tab of the Plasmic dashboard.
-
-## Features
-
-### Component Rendering (Render API)
-
-Render Plasmic-designed pages and components as HTML via a REST API. This allows embedding Plasmic content in any application that can make HTTP requests, regardless of framework.
-
-- Supports three rendering modes: `preview` (latest revisions), `published` (only published changes), and `versioned` (specific version).
-- Component props and global variants can be customized via query parameters.
-- Optional JavaScript hydration can be included for interactive components.
-- Rendering happens on Plasmic's servers, so custom code components are not available in this mode.
-
-### Project Model Access (Model API)
-
-Retrieve a JSON representation of the full project structure, including all components, pages, design tokens, and metadata.
-
-- Returns the complete element tree (TplNodes) for each component and page.
-- Includes metadata about A/B tests, custom targets, and scheduled content (splits).
-- Supports the same `preview`, `published`, and `versioned` modes as the Render API.
-
-### Project Updates (Write API)
-
-Programmatically create and update components, pages, and design tokens in a Plasmic project.
-
-- Create new components or pages with specified content (element trees).
-- Update existing components by matching on UUID, name, or path.
-- Create or update design tokens (colors, spacing, fonts, shadows, etc.).
-- Secret token required; currently only available to enterprise customers.
-
-### CMS Content Management
-
-Full CRUD operations on content stored in Plasmic's built-in headless CMS.
-
-- **Query items**: Load all items or filter by field conditions using a JSON-based query syntax with logical operators (`$and`, `$or`, `$not`) and conditional operators.
-- **Count items**: Get the count of items matching filter criteria.
-- **Create items**: Add new content entries to a CMS model.
-- **Update items**: Modify existing content entries.
-- **Delete items**: Remove content entries.
-- **Publish items**: Publish draft items.
-- Supports loading draft versions of items (requires secret token).
-- Supports localized content retrieval.
-
-## Events
-
-### Project Publish Webhooks
-
-Plasmic can call configured webhooks when an editor publishes a project. These are configured in the Plasmic Studio publish dialog.
-
-- Each webhook can be configured with a custom URL and HTTP method.
-- Optionally includes a payload with the list of changed pages (`pagesChanged`) and changed imported projects/libraries (`importedProjectsChanged`).
-- Supports configuring multiple webhooks per project (e.g., separate staging and production webhooks).
-
-### CMS Publish Webhooks
-
-Plasmic supports webhooks that are triggered when a CMS entry is published, enabling integration with external systems upon content changes.
+- [CMS API reference](https://docs.plasmic.app/learn/plasmic-cms-api-reference/)
+- [Render API](https://docs.plasmic.app/learn/render-api/)
+- [Model API](https://docs.plasmic.app/learn/model-quickstart/)
+- [Write API](https://docs.plasmic.app/learn/write-api/)
+- [Official CMS SDK source](https://github.com/plasmicapp/plasmic/blob/master/plasmicpkgs/plasmic-cms/src/api.ts), including ordering and model discovery
+- [Official loader source](https://github.com/plasmicapp/plasmic/blob/master/platform/wab/src/wab/server/routes/loader.ts), including versioned rendering/model routes

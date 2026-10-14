@@ -1,6 +1,4 @@
-Let me get more details on the API V2 features.Now I have enough information to write a comprehensive specification.
-
-# Slates Specification for Kanbanize
+# Businessmap API Specification
 
 ## Overview
 
@@ -8,17 +6,17 @@ Kanbanize (now rebranded as Businessmap) is a Kanban-based project management an
 
 ## Authentication
 
-Kanbanize uses **API key** authentication.
+Businessmap uses **API key** authentication.
 
 - To generate an API key, go to your account, click on the user dropdown menu at the top right corner of your Kanbanize account and select "API".
 - The API key is passed as a custom HTTP header named `apikey` in every request.
-- The base URL is tenant-specific, following the format: `https://{subdomain}.kanbanize.com/api/v2/`
-- Each user must provide their **subdomain** (the unique account identifier) and their **API key**.
+- The base URL is tenant-specific, following the format: `https://{subdomain}.{domain}/api/v2/`
+- Each user must provide their **subdomain**, **API key**, and optionally the account **domain** (`kanbanize.com` or `businessmap.io`). The domain defaults to `kanbanize.com` for existing connections.
 
 Example request:
 
 ```
-GET https://{subdomain}.kanbanize.com/api/v2/users
+GET https://{subdomain}.{domain}/api/v2/users
 Headers:
   apikey: {your_api_key}
 ```
@@ -96,3 +94,20 @@ Supported events include: "Comment created", "Comment updated", and "Comment del
 Supported events include: "Board renamed", "Board archived", "Board unarchived", "Board deleted", and "Board structure changed". Payloads include `board_id` and `user_id`.
 
 Additionally, Kanbanize offers a more in-depth mechanism using Business Rules to invoke an external web-service, where you can build detailed filter/scenario conditions for when the webhook should be triggered — for example, when a card moves to a specific column and matches certain criteria.
+
+## Current tool surface
+
+The read-only `get_current_user`, `list_block_reasons`, and `list_card_types` tools
+provide identity and property discovery. Existing tools retain their public keys
+and field types. Card writes identify placement with column and lane IDs; board
+and workflow inputs are checked against the board structure. Create and update
+responses contain arrays of affected cards.
+
+Card lists use plural ID filters and the `state` parameter. `includeArchived`
+combines active and archived results, with up to 200 cards per state per page.
+Logged time is sent to `/loggedTime` in seconds. Relationships use `PUT` and
+`DELETE` on their parent, relative, predecessor, or successor resource URLs.
+Scalar custom-field values use `PUT /cards/{card_id}/customFields/{field_id}`.
+
+Source: [Official API v2 reference](https://demo.kanbanize.com/openapi),
+[OpenAPI JSON](https://demo.kanbanize.com/openapi/json).

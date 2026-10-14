@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -137,7 +137,7 @@ Configure the analysis through optional settings to enable/disable specific feat
           'Enable sub-scope parsing for hashtags, URLs, obfuscated text. Default: false'
         ),
       featureStandard: z
-        .enum(['ud', 'penn', 'native', 'description'])
+        .enum(['ud', 'penn', 'native', 'description', 'glossing'])
         .optional()
         .describe('Standard for grammar features output'),
       topicStandard: z
@@ -197,6 +197,9 @@ Configure the analysis through optional settings to enable/disable specific feat
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.fetchDefinitions && !ctx.input.words) {
+      throw createApiServiceError('Enable words when requesting dictionary definitions.');
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.parse(ctx.input.language, ctx.input.content, {

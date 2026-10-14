@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,7 @@ export let addUpdateSubscriber = SlateTool.create(spec, {
       subcategories: z
         .array(z.string())
         .optional()
-        .describe('List of subcategory IDs to assign the subscriber to'),
+        .describe('Numeric subcategory IDs. Call list_subcategories to discover IDs.'),
       customFields: z
         .array(
           z.object({
@@ -65,8 +65,26 @@ export let addUpdateSubscriber = SlateTool.create(spec, {
       if (existing?.Result?.StatusCode === '200' || existing?.Result?.Status === 'OK') {
         isExisting = true;
       }
-    } catch {
-      // Subscriber doesn't exist, proceed with insert
+    } catch (error) {
+      let data =
+        isApiErrorRecord(error) && isApiErrorRecord(error.data) ? error.data : undefined;
+      if (
+        data?.reason !== 'enginemailer_subscriber_not_found' &&
+        String(data?.upstreamStatus) !== '404'
+      ) {
+        throw error;
+      }
+    }
+
+    if (isExisting && ctx.input.updateType === 'Ignore') {
+      return {
+        output: {
+          status: 'OK',
+          statusCode: '200',
+          message: 'Existing subscriber data preserved.'
+        },
+        message: `Preserved existing subscriber **${ctx.input.email}**.`
+      };
     }
 
     let result: any;
@@ -74,9 +92,15 @@ export let addUpdateSubscriber = SlateTool.create(spec, {
       result = await client.updateSubscriber({
         email: ctx.input.email,
         subcategories: ctx.input.subcategories,
-        subcategories_type: ctx.input.updateType,
+        subcategories_type:
+          ctx.input.subcategories === undefined
+            ? undefined
+            : ctx.input.updateType === 'Append'
+              ? 1
+              : 3,
         customfields,
-        customfield_type: ctx.input.updateType
+        customfield_type:
+          customfields === undefined ? undefined : ctx.input.updateType === 'Append' ? 0 : 1
       });
     } else {
       result = await client.insertSubscriber({

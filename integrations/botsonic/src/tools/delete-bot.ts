@@ -24,7 +24,7 @@ export let deleteBot = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(ctx.auth.token, ctx.auth.credentialType);
 
     let result = await client.deleteBot(ctx.input.botId, ctx.input.workspaceId);
 

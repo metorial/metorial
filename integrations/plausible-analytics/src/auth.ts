@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your Plausible Analytics API key. Create one in Settings > API Keys.')
+        .describe(
+          'Your team-scoped Plausible Analytics API key. Select the team, then create a key in Settings > API Keys. Stats keys support analytics and read-only site management; writes require a Sites key.'
+        )
     }),
     getOutput: async ctx => {
       return {

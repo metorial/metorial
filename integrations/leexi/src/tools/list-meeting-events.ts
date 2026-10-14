@@ -76,7 +76,8 @@ export let listMeetingEvents = SlateTool.create(spec, {
       pagination: z.object({
         page: z.number().describe('Current page number'),
         items: z.number().describe('Items per page'),
-        count: z.number().describe('Total number of meeting events')
+        count: z.number().describe('Total number of meeting events'),
+        pages: z.number().optional().describe('Total number of pages')
       })
     })
   )
@@ -87,8 +88,8 @@ export let listMeetingEvents = SlateTool.create(spec, {
     let meetingEvents = (response.data || []).map((m: any) => ({
       meetingEventUuid: m.uuid,
       title: m.title,
-      organizer: m.organizer,
-      attendees: m.attendees,
+      organizer: typeof m.organizer === 'object' ? m.organizer?.email : m.organizer,
+      attendees: m.attendees?.map((a: any) => (typeof a === 'object' ? a.email : a)),
       meetingUrl: m.meeting_url,
       meetingProvider: m.meeting_provider,
       internal: m.internal,

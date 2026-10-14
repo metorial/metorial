@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createLocation = SlateTool.create(spec, {
   name: 'Create Location',
   key: 'create_location',
-  description: `Creates a new location in MaintainX. Locations can be assigned to assets, work orders, vendors, and teams.`,
+  description: `Creates a new location in MaintainX. Locations can be assigned to assets, work orders, vendors, and teams. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,10 +15,17 @@ export let createLocation = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       name: z.string().describe('Name of the location'),
       address: z.string().optional().describe('Street address'),
-      longitude: z.number().optional().describe('Longitude coordinate'),
-      latitude: z.number().optional().describe('Latitude coordinate'),
+      longitude: z
+        .number()
+        .optional()
+        .describe('Unsupported by the current MaintainX API; use address instead'),
+      latitude: z
+        .number()
+        .optional()
+        .describe('Unsupported by the current MaintainX API; use address instead'),
       parentId: z
         .number()
         .optional()
@@ -31,10 +39,7 @@ export let createLocation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createLocation({
       name: ctx.input.name,

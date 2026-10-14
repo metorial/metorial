@@ -30,11 +30,13 @@ export let aiRunPrompt = SlateTool.create(spec, {
   .output(
     z.object({
       response: z.string().describe('AI model response text'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let body: Record<string, any> = {
       model: ctx.input.model,
@@ -56,9 +58,11 @@ export let aiRunPrompt = SlateTool.create(spec, {
     return {
       output: {
         response: result.result || result.Result || result.text || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully executed AI prompt using **${ctx.input.model}**.`
+      message: client.message(`Successfully executed AI prompt using **${ctx.input.model}**.`)
     };
   })
   .build();

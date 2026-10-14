@@ -4,6 +4,10 @@ Manage product development records in Aha! including features, epics, releases, 
 
 ## Tools
 
+### Who Am I
+
+Retrieve the authenticated user and account subdomain to confirm which user and account a connection represents.
+
 ### Get Feature
 
 Retrieve full details of a specific feature by its ID or reference number. Returns the feature's name, description, status, assignee, dates, tags, custom fields, and requirements.

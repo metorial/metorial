@@ -1,4 +1,6 @@
+export { extractUrl } from './extract-url';
 export { getUsage } from './get-usage';
+export { listExtractDomains } from './list-extract-domains';
 export { scrapeAmazon } from './scrape-amazon';
 export { scrapeIdealista } from './scrape-idealista';
 export { scrapeUrl } from './scrape-url';

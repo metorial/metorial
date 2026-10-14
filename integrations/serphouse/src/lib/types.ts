@@ -126,6 +126,16 @@ export interface LanguageListParams {
 
 // ── Account ──
 
+export interface AccountPlan {
+  name?: string;
+  type?: string;
+  plan_type?: string;
+  price?: string | number;
+  currency?: string;
+  credit_available?: number;
+  credit_total?: number;
+}
+
 export interface AccountInfoResponse {
   status: string;
   msg: string;
@@ -133,11 +143,7 @@ export interface AccountInfoResponse {
     name?: string;
     email?: string;
     api_key?: string;
-    plan?: {
-      name?: string;
-      type?: string;
-      price?: string;
-    };
+    plan?: AccountPlan | AccountPlan[];
     credit?: {
       available?: number;
       total?: number;

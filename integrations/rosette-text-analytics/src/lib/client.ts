@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface RosetteClientConfig {
   token?: string;
@@ -38,16 +38,31 @@ export interface RecordSimilarityRequest {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: RosetteClientConfig) {
-    this.axios = createAxios({
-      baseURL: config.baseUrl,
+    let baseUrl: URL;
+    try {
+      baseUrl = new URL(config.baseUrl);
+    } catch {
+      throw createApiServiceError('Enter a valid HTTP or HTTPS Analytics API base URL.');
+    }
+    if (!['http:', 'https:'].includes(baseUrl.protocol)) {
+      throw createApiServiceError('The Analytics API base URL must use HTTP or HTTPS.');
+    }
+
+    this.axios = createAuthenticatedAxios({
+      baseURL: config.baseUrl.replace(/\/+$/, ''),
+      timeout: 30_000,
+      authHeader: config.token ? { name: 'X-RosetteAPI-Key', value: config.token } : undefined,
       headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(config.token ? { 'X-RosetteAPI-Key': config.token } : {})
-      }
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Rosette Text Analytics',
+          reason: 'upstream_error'
+        })
     });
   }
 
@@ -249,8 +264,8 @@ export class Client {
     options?: Record<string, unknown>
   ) {
     let response = await this.axios.post('/address-similarity', {
-      address1,
-      address2,
+      address1: this.normalizeAddress(address1),
+      address2: this.normalizeAddress(address2),
       ...options
     });
     return response.data;
@@ -271,5 +286,16 @@ export class Client {
   async info() {
     let response = await this.axios.get('/info');
     return response.data;
+  }
+
+  async supportedLanguages(endpoint: string) {
+    let response = await this.axios.get(`/${endpoint}/supported-languages`);
+    return response.data;
+  }
+
+  private normalizeAddress(address: AddressObject | string) {
+    if (typeof address === 'string') return address;
+    let { postalCode, ...fields } = address;
+    return { ...fields, ...(postalCode !== undefined ? { postCode: postalCode } : {}) };
   }
 }

@@ -20,11 +20,11 @@ export let getBuildProfile = SlateTool.create(spec, {
     z
       .object({
         profileId: z.string().optional(),
-        name: z.string().optional(),
+        name: z.string().nullish(),
         pinned: z.boolean().optional(),
         repositoryConnected: z.boolean().optional(),
         platformType: z.string().optional(),
-        lastBuildDate: z.string().optional()
+        lastBuildDate: z.string().nullish()
       })
       .passthrough()
   )
@@ -33,7 +33,10 @@ export let getBuildProfile = SlateTool.create(spec, {
     let profile = await client.getBuildProfile(ctx.input.profileId);
 
     return {
-      output: profile,
+      output: {
+        ...profile,
+        platformType: profile?.platformType == null ? undefined : String(profile.platformType)
+      },
       message: `Retrieved build profile **${profile?.name ?? ctx.input.profileId}**.`
     };
   })

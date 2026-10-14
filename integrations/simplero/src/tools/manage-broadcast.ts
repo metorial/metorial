@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ export let manageBroadcast = SlateTool.create(spec, {
   description: `Create, list, and retrieve email broadcasts in Simplero. Supports creating broadcasts with scheduling, sending test emails, and viewing broadcast activity (opens, clicks, bounces, unsubscribes).`,
   instructions: [
     'Set deliveryType to "now" to send immediately, "later" with deliverAt for scheduling, or "draft" to save as draft.',
-    'Use action "activity" to get detailed engagement metrics for a broadcast.'
+    'Use action "activity" to get detailed engagement metrics for a broadcast.',
+    'Use list_segments to discover segmentIds and manage_list_subscription with action "get_lists" to discover listIds.'
   ],
   tags: {
     destructive: false,
@@ -32,7 +33,10 @@ export let manageBroadcast = SlateTool.create(spec, {
       replyTo: z.string().optional().describe('Reply-to email address'),
       emailTemplateId: z.number().optional().describe('Email template ID to use'),
       listIds: z.array(z.number()).optional().describe('Mailing list IDs to send to'),
-      segmentIds: z.array(z.number()).optional().describe('Segment IDs to send to'),
+      segmentIds: z
+        .array(z.number())
+        .optional()
+        .describe('Segment IDs to send to; call list_segments to discover IDs'),
       deliveryType: z
         .enum(['now', 'later', 'draft'])
         .optional()
@@ -42,8 +46,8 @@ export let manageBroadcast = SlateTool.create(spec, {
         .optional()
         .describe('Scheduled delivery time (ISO 8601, used with deliveryType "later")'),
       testEmail: z.string().optional().describe('Email address to send a test broadcast to'),
-      page: z.number().optional().describe('Page number for listing'),
-      perPage: z.number().optional().describe('Results per page for listing'),
+      page: z.number().optional().describe('Page number for listing, starting at 0'),
+      perPage: z.number().optional().describe('Results per page for listing, from 1 to 100'),
       from: z.string().optional().describe('Filter broadcasts from this date'),
       to: z.string().optional().describe('Filter broadcasts to this date')
     })
@@ -83,7 +87,7 @@ export let manageBroadcast = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required.');
+      if (!ctx.input.broadcastId) throw createApiServiceError('broadcastId is required.');
       let broadcast = await client.getBroadcast(ctx.input.broadcastId);
       return {
         output: { broadcast },
@@ -92,7 +96,7 @@ export let manageBroadcast = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.subject) throw new Error('subject is required.');
+      if (!ctx.input.subject) throw createApiServiceError('subject is required.');
       let broadcast = await client.createBroadcast({
         subject: ctx.input.subject,
         body: ctx.input.htmlBody,
@@ -112,8 +116,8 @@ export let manageBroadcast = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'send_test') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required.');
-      if (!ctx.input.testEmail) throw new Error('testEmail is required.');
+      if (!ctx.input.broadcastId) throw createApiServiceError('broadcastId is required.');
+      if (!ctx.input.testEmail) throw createApiServiceError('testEmail is required.');
       let result = await client.sendTestBroadcast(ctx.input.broadcastId, ctx.input.testEmail);
       return {
         output: {
@@ -125,7 +129,7 @@ export let manageBroadcast = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'activity') {
-      if (!ctx.input.broadcastId) throw new Error('broadcastId is required.');
+      if (!ctx.input.broadcastId) throw createApiServiceError('broadcastId is required.');
       let activityReport = await client.getBroadcastActivity(ctx.input.broadcastId);
       return {
         output: { activityReport },
@@ -133,6 +137,6 @@ export let manageBroadcast = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

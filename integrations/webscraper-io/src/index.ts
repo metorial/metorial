@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  continueScrapingJob,
   createScrapingJob,
   createSitemap,
   deleteScrapingJob,
@@ -14,6 +15,7 @@ import {
   listScrapingJobs,
   listSitemaps,
   manageScheduler,
+  stopScrapingJob,
   updateSitemap
 } from './tools';
 export let provider = Slate.create({
@@ -28,6 +30,8 @@ export let provider = Slate.create({
     getScrapingJob,
     listScrapingJobs,
     deleteScrapingJob,
+    stopScrapingJob,
+    continueScrapingJob,
     downloadScrapedData,
     getDataQuality,
     getProblematicUrls,

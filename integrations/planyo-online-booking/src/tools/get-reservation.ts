@@ -76,7 +76,7 @@ export let getReservation = SlateTool.create(spec, {
         startTime: r.start_time ? String(r.start_time) : undefined,
         endTime: r.end_time ? String(r.end_time) : undefined,
         creationTime: r.creation_time ? String(r.creation_time) : undefined,
-        status: r.status ? String(r.status) : undefined,
+        status: r.status != null ? String(r.status) : undefined,
         quantity: r.quantity != null ? Number(r.quantity) : undefined,
         totalPrice: r.total_price != null ? Number(r.total_price) : undefined,
         originalPrice: r.original_price != null ? Number(r.original_price) : undefined,

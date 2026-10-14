@@ -1,4 +1,4 @@
-# Slates Specification for Serpdog
+# Serpdog API Specification
 
 ## Overview
 
@@ -56,7 +56,7 @@ Scrape job postings from Google Search results. Supports filtering by location, 
 
 ### YouTube Search
 
-Extract data from YouTube in real-time. Configurable by query and country.
+Retrieve YouTube search results as downloadable HTML, configurable by query, country, language, filters, and pagination. The current provider documentation requires `html=true` while structured JSON support remains in development.
 
 ### Bing Search
 
@@ -90,6 +90,35 @@ Scrape any website with a general-purpose web scraping API that handles blockage
 ### Account Information
 
 Retrieve account information including email address, plan name, quota, and number of requests remaining.
+
+### Request and File Handling
+
+Google Maps search requires a query and coordinates in `@latitude,longitude,zoom` format. Google News accepts either a result count or a pagination offset in a request. Yelp sorting uses the provider's `sortby` parameter. LinkedIn jobs supports on-site, remote, and hybrid work filters.
+
+Web pages, Google Search HTML, and YouTube HTML are also available as downloadable files. The existing content/result fields remain available for compatibility. Complete URLs and previously encoded URLs are both accepted; query encoding is handled automatically. API keys echoed in response metadata or links are removed from returned results.
+
+## Official Sources
+
+- [Getting started and API errors](https://docs.serpdog.io/)
+- [Account API](https://docs.serpdog.io/account-api)
+- [Google Search API](https://docs.serpdog.io/google-search-api)
+- [Google Maps API](https://docs.serpdog.io/google-maps-api)
+- [Google Maps Reviews](https://docs.serpdog.io/google-maps-api/google-maps-reviews-api)
+- [Google News API](https://docs.serpdog.io/google-news-api)
+- [Google Shopping API](https://docs.serpdog.io/google-shopping-api)
+- [Google Product API](https://docs.serpdog.io/google-product-api)
+- [Google Scholar API](https://docs.serpdog.io/google-scholar-api)
+- [Google Scholar Author Profile API](https://docs.serpdog.io/google-scholar-api/google-scholar-author-profile-api)
+- [Google Videos API](https://docs.serpdog.io/google-videos-api)
+- [Google Finance API](https://docs.serpdog.io/google-finance-api)
+- [Google Jobs API](https://docs.serpdog.io/google-jobs-api)
+- [Bing Search API](https://docs.serpdog.io/bing-search-api)
+- [Amazon Scraper API](https://docs.serpdog.io/amazon-scraper-api)
+- [Walmart Scraper API](https://docs.serpdog.io/walmart-scraper-api)
+- [Yelp Search API](https://docs.serpdog.io/yelp-search-api)
+- [LinkedIn Jobs API](https://docs.serpdog.io/linkedin-jobs-api)
+- [YouTube Search API](https://docs.serpdog.io/youtube-search-api)
+- [Web Scraping API](https://docs.serpdog.io/web-scraping-api)
 
 ## Events
 

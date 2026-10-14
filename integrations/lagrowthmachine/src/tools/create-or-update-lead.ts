@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let createOrUpdateLead = SlateTool.create(spec, {
   name: 'Create or Update Lead',
   key: 'create_or_update_lead',
-  description: `Create a new lead or update an existing lead in a La Growth Machine audience. At least one identifier is required: professional email, personal email, LinkedIn URL, Twitter handle, or first name + last name with company name/URL.`,
+  description: `Create a new lead or update an existing lead in La Growth Machine. Optionally add it to an audience by name or ID. Identify the lead by ID, professional or personal email, LinkedIn URL, Twitter handle, CRM ID, or first and last names with company name or URL.`,
   instructions: [
-    'The audience must already exist in La Growth Machine before adding leads to it.',
+    'The audience is created if its name does not match an existing audience. Omit audience to manage a lead without adding it to an audience.',
     'By default only empty fields are updated. To overwrite existing fields, enable "Update existing contact with changed or new fields" in LGM Outreach Settings.'
   ]
 })
@@ -16,8 +16,9 @@ export let createOrUpdateLead = SlateTool.create(spec, {
     z.object({
       audience: z
         .string()
+        .optional()
         .describe(
-          'Name of the LGM audience to add the lead to. Must already exist in La Growth Machine.'
+          'Audience name or ID. A new audience is created if no match exists. Omit to manage a lead without an audience.'
         ),
       leadId: z.string().optional().describe('Existing LGM lead ID to update'),
       firstname: z.string().optional().describe('First name of the lead'),
@@ -34,6 +35,12 @@ export let createOrUpdateLead = SlateTool.create(spec, {
       industry: z.string().optional().describe('Industry'),
       gender: z.string().optional().describe('Gender'),
       bio: z.string().optional().describe('Bio or description'),
+      note: z
+        .string()
+        .max(1500)
+        .optional()
+        .describe('Lead profile note. Replaces the existing note when provided.'),
+      crmId: z.string().optional().describe('Contact ID in the connected CRM'),
       profilePicture: z.string().optional().describe('Profile picture URL'),
       customAttribute1: z.string().optional().describe('Custom attribute 1'),
       customAttribute2: z.string().optional().describe('Custom attribute 2'),
@@ -49,7 +56,10 @@ export let createOrUpdateLead = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      result: z.any().describe('The created or updated lead record')
+      result: z
+        .any()
+        .describe('Creation or update result, including the lead ID and provider message'),
+      leadId: z.string().optional().describe('ID of the created or updated lead')
     })
   )
   .handleInvocation(async ctx => {
@@ -72,6 +82,8 @@ export let createOrUpdateLead = SlateTool.create(spec, {
       industry: ctx.input.industry,
       gender: ctx.input.gender,
       bio: ctx.input.bio,
+      note: ctx.input.note,
+      crmId: ctx.input.crmId,
       profilePicture: ctx.input.profilePicture,
       customAttribute1: ctx.input.customAttribute1,
       customAttribute2: ctx.input.customAttribute2,
@@ -86,8 +98,8 @@ export let createOrUpdateLead = SlateTool.create(spec, {
     });
 
     return {
-      output: { result },
-      message: `Lead successfully created or updated in audience **${ctx.input.audience}**.`
+      output: { result, leadId: result?.leadId },
+      message: result?.message ?? 'Lead creation or update completed.'
     };
   })
   .build();

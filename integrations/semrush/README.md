@@ -2,6 +2,12 @@
 
 Retrieve SEO, PPC, and competitive intelligence data for domains, keywords, and backlinks. Analyze domain rankings, organic and paid search performance, traffic estimates, and competitor landscapes across regional databases. Research keywords by volume, difficulty, CPC, and related terms. Pull backlink profiles including referring domains, anchor texts, and authority scores. Access website traffic analytics, audience demographics, geo distribution, and market intelligence. Manage Semrush projects, position tracking campaigns, and site audit configurations. Update and distribute business listing data in bulk. Retrieve local map rank tracking data including heatmaps and competitor rankings.
 
+## API access
+
+SEO Analytics and Trends reports require an API Key connection. Use Get API Unit Balance to check remaining Standard API units with a free read-only request before requesting reports. Trends reports require a separate Trends API subscription.
+
+Manage Project accepts the existing Standard API key and OAuth connections through their documented legacy endpoints. These project endpoints and the v3 keyword/backlink endpoints are deprecated by Semrush and remain available only while the provider supports them.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

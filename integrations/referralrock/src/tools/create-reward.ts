@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getFirstResult, getResponseEntity, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createReward = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createReward = SlateTool.create(spec, {
   key: 'create_reward',
   description: `Create a new reward for a member or referral. The reward can be associated with a specific member or referral and assigned a payout type.`,
   instructions: [
-    'Provide either memberId or referralId to associate the reward. When using memberId, also include programId for identification.'
+    'Provide memberId or referralId and payoutId. Use get_payouts with view types to discover payout IDs.'
   ],
   tags: {
     destructive: false,
@@ -24,7 +24,12 @@ export let createReward = SlateTool.create(spec, {
         .optional()
         .describe('Program ID (used with member identification)'),
       amount: z.number().describe('Reward amount'),
-      payoutId: z.string().optional().describe('Payout type ID'),
+      payoutId: z
+        .string()
+        .optional()
+        .describe(
+          'Payout type ID. Required by the provider; use get_payouts with view types to find it.'
+        ),
       eligibilityDate: z.string().optional().describe('Eligibility date for the reward'),
       description: z.string().optional().describe('Reward description')
     })
@@ -39,6 +44,16 @@ export let createReward = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.memberId && !ctx.input.referralId) {
+      throw createApiServiceError(
+        'Provide memberId or referralId to identify the reward recipient.'
+      );
+    }
+    if (!ctx.input.payoutId) {
+      throw createApiServiceError(
+        'Provide payoutId. Use get_payouts with view types to find available payout IDs.'
+      );
+    }
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
     let rewardInfo: Record<string, unknown> = {
@@ -52,21 +67,22 @@ export let createReward = SlateTool.create(spec, {
 
     if (ctx.input.memberId) {
       rewardInfo.memberQuery = {
-        primaryInfo: { memberId: ctx.input.memberId }
+        primaryInfo: { memberId: ctx.input.memberId },
+        ...(ctx.input.programId && { tertiaryInfo: { programId: ctx.input.programId } })
       };
     }
 
     if (ctx.input.referralId) {
       rewardInfo.referralQuery = {
-        primaryInfo: { referralId: ctx.input.referralId }
+        primaryInfo: { referralId: ctx.input.referralId },
+        ...(ctx.input.programId && { tertiaryInfo: { ProgramId: ctx.input.programId } })
       };
     }
 
     let result = await client.createRewards([rewardInfo]);
 
-    let results = result as unknown as Record<string, unknown>[];
-    let first = Array.isArray(results) ? results[0] : result;
-    let reward = (first?.reward || {}) as Record<string, unknown>;
+    let first = getFirstResult(result);
+    let reward = getResponseEntity(first, 'reward');
     let resultInfo = (first?.resultInfo || {}) as Record<string, unknown>;
 
     return {

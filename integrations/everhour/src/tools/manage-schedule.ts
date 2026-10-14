@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -62,13 +62,13 @@ export let listAssignments = SlateTool.create(spec, {
       userId: a.user,
       startDate: a.startDate,
       endDate: a.endDate,
-      days: a.days,
-      timeSeconds: a.time,
-      projectId: a.project,
-      taskId: a.task,
-      timeOffTypeId: a.timeOffType,
-      timeOffPeriod: a.timeOffPeriod,
-      status: a.status
+      days: a.days ?? undefined,
+      timeSeconds: a.time ?? undefined,
+      projectId: a.project ?? undefined,
+      taskId: a.task ?? undefined,
+      timeOffTypeId: a.timeOffType ?? undefined,
+      timeOffPeriod: a.timeOffPeriod ?? undefined,
+      status: a.status ?? undefined
     }));
 
     return {
@@ -99,11 +99,22 @@ export let createAssignment = SlateTool.create(spec, {
       timeOffTypeId: z
         .number()
         .optional()
-        .describe('Time off type ID (required for time-off type)'),
+        .describe(
+          'Time off type ID (required for time-off type). Call list_time_off_types to discover IDs.'
+        ),
       timeOffPeriod: z
-        .enum(['full-day', 'half-day', 'quarter-day'])
+        .enum([
+          'full-day',
+          'half-day',
+          'quarter-day',
+          'half-of-day',
+          'quarter-of-day',
+          'half-and-quarter-of-day'
+        ])
         .optional()
-        .describe('Time off period'),
+        .describe(
+          'Time off period. half-day and quarter-day are accepted aliases for half-of-day and quarter-of-day.'
+        ),
       status: z
         .enum(['pending', 'approved'])
         .optional()
@@ -120,6 +131,44 @@ export let createAssignment = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new EverhourClient(ctx.auth.token);
+    if (ctx.input.userId !== undefined && ctx.input.userIds !== undefined) {
+      throw createApiServiceError('Provide userId or userIds, not both.');
+    }
+    if (ctx.input.userId === undefined && !ctx.input.userIds?.length) {
+      throw createApiServiceError(
+        'Provide userId or a non-empty userIds list. Call list_users to discover IDs.'
+      );
+    }
+    if (ctx.input.type === 'project' && !ctx.input.projectId?.trim()) {
+      throw createApiServiceError(
+        'Project assignments require projectId. Call list_projects to discover IDs.'
+      );
+    }
+    if (ctx.input.type === 'time-off' && ctx.input.timeOffTypeId === undefined) {
+      throw createApiServiceError(
+        'Time-off assignments require timeOffTypeId. Call list_time_off_types to discover IDs.'
+      );
+    }
+    if (
+      ctx.input.type === 'project' &&
+      (ctx.input.timeOffTypeId !== undefined ||
+        ctx.input.timeOffPeriod !== undefined ||
+        ctx.input.status !== undefined)
+    ) {
+      throw createApiServiceError(
+        'timeOffTypeId, timeOffPeriod, and status apply only to time-off assignments.'
+      );
+    }
+    if (
+      ctx.input.type === 'time-off' &&
+      (ctx.input.projectId !== undefined ||
+        ctx.input.taskId !== undefined ||
+        ctx.input.timeSeconds !== undefined)
+    ) {
+      throw createApiServiceError(
+        'projectId, taskId, and timeSeconds apply only to project assignments.'
+      );
+    }
     let data: any = {
       type: ctx.input.type,
       startDate: ctx.input.startDate,
@@ -128,13 +177,20 @@ export let createAssignment = SlateTool.create(spec, {
     };
 
     if (ctx.input.userIds) data.users = ctx.input.userIds;
-    else if (ctx.input.userId) data.user = ctx.input.userId;
+    else if (ctx.input.userId !== undefined) data.user = ctx.input.userId;
 
     if (ctx.input.projectId) data.project = ctx.input.projectId;
     if (ctx.input.taskId) data.task = ctx.input.taskId;
-    if (ctx.input.timeSeconds) data.time = ctx.input.timeSeconds;
-    if (ctx.input.timeOffTypeId) data.timeOffType = ctx.input.timeOffTypeId;
-    if (ctx.input.timeOffPeriod) data.timeOffPeriod = ctx.input.timeOffPeriod;
+    if (ctx.input.timeSeconds !== undefined) data.time = ctx.input.timeSeconds;
+    if (ctx.input.timeOffTypeId !== undefined) data.timeOffType = ctx.input.timeOffTypeId;
+    if (ctx.input.timeOffPeriod) {
+      data.timeOffPeriod =
+        ctx.input.timeOffPeriod === 'half-day'
+          ? 'half-of-day'
+          : ctx.input.timeOffPeriod === 'quarter-day'
+            ? 'quarter-of-day'
+            : ctx.input.timeOffPeriod;
+    }
     if (ctx.input.status) data.status = ctx.input.status;
 
     let result = await client.createAssignment(data);
@@ -145,13 +201,13 @@ export let createAssignment = SlateTool.create(spec, {
       userId: a.user,
       startDate: a.startDate,
       endDate: a.endDate,
-      days: a.days,
-      timeSeconds: a.time,
-      projectId: a.project,
-      taskId: a.task,
-      timeOffTypeId: a.timeOffType,
-      timeOffPeriod: a.timeOffPeriod,
-      status: a.status
+      days: a.days ?? undefined,
+      timeSeconds: a.time ?? undefined,
+      projectId: a.project ?? undefined,
+      taskId: a.task ?? undefined,
+      timeOffTypeId: a.timeOffType ?? undefined,
+      timeOffPeriod: a.timeOffPeriod ?? undefined,
+      status: a.status ?? undefined
     }));
 
     return {
@@ -193,13 +249,13 @@ export let updateAssignment = SlateTool.create(spec, {
         userId: result.user,
         startDate: result.startDate,
         endDate: result.endDate,
-        days: result.days,
-        timeSeconds: result.time,
-        projectId: result.project,
-        taskId: result.task,
-        timeOffTypeId: result.timeOffType,
-        timeOffPeriod: result.timeOffPeriod,
-        status: result.status
+        days: result.days ?? undefined,
+        timeSeconds: result.time ?? undefined,
+        projectId: result.project ?? undefined,
+        taskId: result.task ?? undefined,
+        timeOffTypeId: result.timeOffType ?? undefined,
+        timeOffPeriod: result.timeOffPeriod ?? undefined,
+        status: result.status ?? undefined
       },
       message: `Updated assignment ${assignmentId}.`
     };
@@ -227,5 +283,41 @@ export let deleteAssignment = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted assignment ${ctx.input.assignmentId}.`
+    };
+  });
+
+export let listTimeOffTypes = SlateTool.create(spec, {
+  name: 'List Time Off Types',
+  key: 'list_time_off_types',
+  description:
+    'List available time-off categories and their IDs for creating time-off assignments.',
+  tags: { readOnly: true }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      timeOffTypes: z.array(
+        z.object({
+          timeOffTypeId: z.number().describe('Time-off type ID for create_assignment'),
+          name: z.string().describe('Time-off type name'),
+          color: z.string().optional().describe('Display color'),
+          paid: z.boolean().optional().describe('Whether this time off is paid'),
+          description: z.string().optional().describe('Time-off type description')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let types = await new EverhourClient(ctx.auth.token).listTimeOffTypes();
+    let timeOffTypes = types.map((type: any) => ({
+      timeOffTypeId: type.id,
+      name: type.name,
+      color: type.color ?? undefined,
+      paid: type.paid ?? undefined,
+      description: type.description ?? undefined
+    }));
+    return {
+      output: { timeOffTypes },
+      message: `Found **${timeOffTypes.length}** time-off type(s).`
     };
   });

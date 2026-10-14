@@ -6,6 +6,7 @@ import {
   createAsyncJob,
   getAccountStats,
   getAsyncJob,
+  getCurrentUser,
   googleSearch,
   scrapeWebpage,
   takeScreenshot
@@ -20,7 +21,8 @@ export let provider = Slate.create({
     amazonSearch,
     createAsyncJob,
     getAsyncJob,
-    getAccountStats
+    getAccountStats,
+    getCurrentUser
   ],
   triggers: []
 });

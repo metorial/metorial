@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,16 +54,21 @@ export let archiveManage = SlateTool.create(spec, {
         )
         .optional()
         .describe('Extracted files (for extract)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     if (ctx.input.operation === 'create') {
+      if (!ctx.input.files?.length)
+        throw createApiServiceError('Provide files to create an archive.');
       let body: Record<string, any> = {
         outputFilename: ctx.input.outputFilename || 'archive.zip',
-        files: ctx.input.files
+        documents: ctx.input.files,
+        FinalOperation: true
       };
       if (ctx.input.archivePassword) body.Password = ctx.input.archivePassword;
 
@@ -73,13 +78,21 @@ export let archiveManage = SlateTool.create(spec, {
         output: {
           fileName: result.Filename,
           fileContent: result.FileContent,
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Successfully created ZIP archive with **${ctx.input.files?.length || 0} files**.`
+        message: client.message(
+          `Successfully created ZIP archive with **${ctx.input.files?.length || 0} files**.`
+        )
       };
     } else {
+      if (!ctx.input.fileContent?.trim())
+        throw createApiServiceError('fileContent is required to extract an archive.');
       let body: Record<string, any> = {
-        fileContent: ctx.input.fileContent
+        fileContent: ctx.input.fileContent,
+        pathSeparator: 'ForwardSlash',
+        recursive: true
       };
       if (ctx.input.extractPassword) body.password = ctx.input.extractPassword;
 
@@ -91,9 +104,13 @@ export let archiveManage = SlateTool.create(spec, {
             fileName: d.fileName,
             fileContent: d.fileContent
           })),
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Successfully extracted **${result.documents?.length || 0} files** from ZIP archive.`
+        message: client.message(
+          `Successfully extracted **${result.documents?.length || 0} files** from ZIP archive.`
+        )
       };
     }
   })

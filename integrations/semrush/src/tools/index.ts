@@ -1,6 +1,7 @@
 export * from './analyze-backlinks';
 export * from './analyze-traffic';
 export * from './compare-domains';
+export * from './get-api-unit-balance';
 export * from './get-domain-competitors';
 export * from './get-domain-keywords';
 export * from './get-domain-overview';

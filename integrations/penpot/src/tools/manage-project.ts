@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageProjectTool = SlateTool.create(spec, {
@@ -32,13 +32,13 @@ export let manageProjectTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { action, teamId, projectId, name } = ctx.input;
 
     switch (action) {
       case 'create': {
         if (!teamId || !name)
-          throw new Error('teamId and name are required for create action');
+          throw createApiServiceError('teamId and name are required for create action');
         let project = await client.createProject(teamId, name);
         return {
           output: {
@@ -51,7 +51,7 @@ export let manageProjectTool = SlateTool.create(spec, {
       }
       case 'rename': {
         if (!projectId || !name)
-          throw new Error('projectId and name are required for rename action');
+          throw createApiServiceError('projectId and name are required for rename action');
         await client.renameProject(projectId, name);
         return {
           output: { projectId, name },
@@ -59,7 +59,7 @@ export let manageProjectTool = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!projectId) throw new Error('projectId is required for delete action');
+        if (!projectId) throw createApiServiceError('projectId is required for delete action');
         await client.deleteProject(projectId);
         return {
           output: { projectId },
@@ -68,7 +68,7 @@ export let manageProjectTool = SlateTool.create(spec, {
       }
       case 'pin': {
         if (!teamId || !projectId)
-          throw new Error('teamId and projectId are required for pin action');
+          throw createApiServiceError('teamId and projectId are required for pin action');
         await client.updateProjectPin(teamId, projectId, true);
         return {
           output: { projectId },
@@ -77,7 +77,7 @@ export let manageProjectTool = SlateTool.create(spec, {
       }
       case 'unpin': {
         if (!teamId || !projectId)
-          throw new Error('teamId and projectId are required for unpin action');
+          throw createApiServiceError('teamId and projectId are required for unpin action');
         await client.updateProjectPin(teamId, projectId, false);
         return {
           output: { projectId },

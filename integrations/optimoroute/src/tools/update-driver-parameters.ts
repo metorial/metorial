@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateBatch } from '../lib/client';
 import { spec } from '../spec';
 
 let singleDriverSchema = z.object({
@@ -60,6 +60,42 @@ export let updateDriverParameters = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    validateBatch(ctx.input.drivers, 'driver updates');
+    for (let driver of ctx.input.drivers) {
+      if (!driver.externalId.trim()) {
+        throw createApiServiceError('Provide an externalId for every driver.');
+      }
+      for (let field of [
+        'vehicleCapacity1',
+        'vehicleCapacity2',
+        'vehicleCapacity3',
+        'vehicleCapacity4'
+      ] as const) {
+        let capacity = driver[field];
+        if (capacity !== undefined && (!Number.isSafeInteger(capacity) || capacity < 0)) {
+          throw createApiServiceError(`${field} must be a nonnegative whole number.`);
+        }
+      }
+      for (let [latitude, longitude] of [
+        [driver.startLatitude, driver.startLongitude],
+        [driver.endLatitude, driver.endLongitude]
+      ]) {
+        if ((latitude === undefined) !== (longitude === undefined)) {
+          throw createApiServiceError(
+            'Provide both latitude and longitude for each custom driver location.'
+          );
+        }
+      }
+      if (
+        ctx.input.drivers.length > 1 &&
+        Boolean(driver.workTimeFrom) !== Boolean(driver.workTimeTo)
+      ) {
+        throw createApiServiceError(
+          'Provide both workTimeFrom and workTimeTo for bulk driver updates, or update this driver individually.'
+        );
+      }
+    }
 
     if (ctx.input.drivers.length === 1) {
       let d = ctx.input.drivers[0]!;

@@ -11,7 +11,17 @@ export let getViewer = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      first: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of organizations to return. Defaults to 100.'),
+      after: z.string().optional().describe('Cursor from a previous page of organizations.')
+    })
+  )
   .output(
     z.object({
       userId: z.string().optional().describe('ID of the authenticated user'),
@@ -24,18 +34,22 @@ export let getViewer = SlateTool.create(spec, {
             slug: z.string().describe('URL slug of the organization')
           })
         )
-        .describe('Organizations the user belongs to')
+        .describe('Organizations the user belongs to'),
+      pageInfo: z
+        .object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
+        .optional()
+        .describe('Organization pagination information')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
-    let viewer = await client.getViewer();
+    let viewer = await client.getViewer(ctx.input.first, ctx.input.after);
 
-    let organizations = (viewer?.organizations?.nodes || []).map((org: any) => ({
+    let organizations = viewer.organizations.nodes.map(org => ({
       organizationId: org.id,
       name: org.name,
       slug: org.slug
@@ -43,11 +57,12 @@ export let getViewer = SlateTool.create(spec, {
 
     return {
       output: {
-        userId: viewer?.user?.id,
-        name: viewer?.user?.name,
-        organizations
+        userId: viewer.id,
+        name: viewer.name,
+        organizations,
+        pageInfo: viewer.organizations.pageInfo
       },
-      message: `Retrieved profile for **${viewer?.user?.name || 'unknown user'}** with ${organizations.length} organization(s).`
+      message: `Retrieved profile for **${viewer.name}** with ${organizations.length} organization(s).`
     };
   })
   .build();

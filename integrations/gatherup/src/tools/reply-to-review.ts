@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let replyToReview = SlateTool.create(spec, {
   name: 'Reply to Review',
   key: 'reply_to_review',
-  description: `Reply to either a first-party feedback (customer reply) or a third-party online review (e.g., Google, Facebook). For first-party feedback, supports setting visibility and responding as business owner. For third-party reviews, sends a reply through the connected platform.`,
+  description: `Reply to either a first-party feedback (customer reply) or an eligible Google online review. For first-party feedback, supports setting visibility and responding as business owner. For third-party reviews, sends a reply through the authorized Google Business Profile connection.`,
   instructions: [
     'Use replyType "feedback" to reply to first-party feedback collected via GatherUp.',
-    'Use replyType "online_review" to reply to third-party reviews on Google, Facebook, etc.'
+    'Use replyType "online_review" to reply to eligible Google reviews with an authorized Google Business Profile connection.'
   ],
   tags: {
     destructive: false
@@ -57,8 +57,8 @@ export let replyToReview = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     if (ctx.input.replyType === 'feedback') {
-      if (!ctx.input.customerId) {
-        throw new Error('customerId is required for feedback replies');
+      if (ctx.input.customerId === undefined) {
+        throw createApiServiceError('customerId is required for feedback replies');
       }
       let data = await client.replyToCustomerFeedback({
         customerId: ctx.input.customerId,
@@ -68,12 +68,6 @@ export let replyToReview = SlateTool.create(spec, {
         respondAsBusinessOwner: ctx.input.respondAsOwner === false ? 0 : 1
       });
 
-      if (data.errorCode !== 0) {
-        throw new Error(
-          `Failed to reply to feedback: ${data.errorMessage} (code: ${data.errorCode})`
-        );
-      }
-
       return {
         output: {
           success: true,
@@ -82,19 +76,13 @@ export let replyToReview = SlateTool.create(spec, {
         message: `Replied to feedback from customer **${ctx.input.customerId}** successfully.`
       };
     } else {
-      if (!ctx.input.reviewId) {
-        throw new Error('reviewId is required for online review replies');
+      if (ctx.input.reviewId === undefined) {
+        throw createApiServiceError('reviewId is required for online review replies');
       }
       let data = await client.replyToOnlineReview({
         reviewId: ctx.input.reviewId,
         content: ctx.input.content
       });
-
-      if (data.errorCode !== 0) {
-        throw new Error(
-          `Failed to reply to online review: ${data.errorMessage} (code: ${data.errorCode})`
-        );
-      }
 
       return {
         output: {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseDatagmaNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchPhone = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ Optionally verify if the phone number is linked to a WhatsApp account.`,
   ],
   constraints: [
     'Rate limited to 10 requests per second.',
-    'Phone number search costs 30 credits.'
+    'Successful searches consume account credits.'
   ],
   tags: {
     destructive: false,
@@ -59,6 +60,17 @@ Optionally verify if the phone number is linked to a WhatsApp account.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.email?.trim() && !ctx.input.profileUrl?.trim()) {
+      throw createApiServiceError(
+        'Provide email, profileUrl, or both to search for phone numbers.'
+      );
+    }
+    if (
+      ctx.input.minimumMatch !== undefined &&
+      (ctx.input.minimumMatch < 0 || ctx.input.minimumMatch > 1)
+    ) {
+      throw createApiServiceError('minimumMatch must be between 0 and 1.');
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.searchPhone({
@@ -75,10 +87,19 @@ Optionally verify if the phone number is linked to a WhatsApp account.`,
       output: {
         person: result?.person,
         possiblePersons: result?.possible_persons,
-        visibleSources: result?.visible_sources,
-        availableSources: result?.available_sources,
-        personCount: result?.person_count,
-        creditBurn: result?.creditBurn
+        visibleSources: parseDatagmaNumber(
+          result?.visibleSources ?? result?.visible_sources,
+          'visibleSources'
+        ),
+        availableSources: parseDatagmaNumber(
+          result?.availableSources ?? result?.available_sources,
+          'availableSources'
+        ),
+        personCount: parseDatagmaNumber(
+          result?.personsCount ?? result?.person_count,
+          'personsCount'
+        ),
+        creditBurn: parseDatagmaNumber(result?.creditBurn, 'creditBurn')
       },
       message: `Found **${phoneCount}** phone number(s) for ${ctx.input.email || ctx.input.profileUrl || 'the contact'}.`
     };

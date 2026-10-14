@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -78,6 +78,9 @@ Also supports conversation actions like closing, labeling, and assigning.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.text && !ctx.input.markdown && !ctx.input.attachments?.length) {
+      throw createApiServiceError('Provide text, markdown, or at least one attachment.');
+    }
     let client = new Client({ token: ctx.auth.token });
     let post: Record<string, any> = {};
 
@@ -96,11 +99,6 @@ Also supports conversation actions like closing, labeling, and assigning.`,
     }
     if (ctx.input.username) post.username = ctx.input.username;
     if (ctx.input.usernameIcon) post.username_icon = ctx.input.usernameIcon;
-    if (ctx.input.notificationTitle || ctx.input.notificationBody) {
-      post.notification = {};
-      if (ctx.input.notificationTitle) post.notification.title = ctx.input.notificationTitle;
-      if (ctx.input.notificationBody) post.notification.body = ctx.input.notificationBody;
-    }
     if (ctx.input.conversationId) post.conversation = ctx.input.conversationId;
     if (ctx.input.references) post.references = ctx.input.references;
     if (ctx.input.teamId) post.team = ctx.input.teamId;
@@ -118,14 +116,23 @@ Also supports conversation actions like closing, labeling, and assigning.`,
       post.conversation_subject = ctx.input.conversationSubject;
     if (ctx.input.conversationColor) post.conversation_color = ctx.input.conversationColor;
 
+    post.notification = {
+      title: ctx.input.notificationTitle ?? 'New post',
+      body:
+        ctx.input.notificationBody ??
+        ctx.input.text ??
+        ctx.input.markdown ??
+        'New content added to the conversation.'
+    };
     let data = await client.createPost(post);
+    let conversationId = data.posts?.conversation;
 
     return {
       output: {
         postId: data.posts?.id,
-        conversationId: data.conversations?.[0]?.id
+        conversationId
       },
-      message: `Created post${data.conversations?.[0]?.id ? ` in conversation **${data.conversations[0].id}**` : ''}.`
+      message: `Created post${conversationId ? ` in conversation **${conversationId}**` : ''}.`
     };
   })
   .build();

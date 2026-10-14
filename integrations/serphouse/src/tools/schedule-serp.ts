@@ -66,13 +66,13 @@ export let scheduleSerp = SlateTool.create(spec, {
       device: task.device,
       serp_type: task.serpType,
       ...(task.loc ? { loc: task.loc } : {}),
-      ...(task.locId ? { loc_id: task.locId } : {}),
+      ...(task.locId !== undefined ? { loc_id: task.locId } : {}),
       ...(task.verbatim !== undefined ? { verbatim: task.verbatim ? 1 : 0 } : {}),
       ...(task.filterSimilarResults !== undefined
         ? { gfilter: task.filterSimilarResults ? 1 : 0 }
         : {}),
-      ...(task.page ? { page: task.page } : {}),
-      ...(task.numResults ? { num_result: task.numResults } : {}),
+      ...(task.page !== undefined ? { page: task.page } : {}),
+      ...(task.numResults !== undefined ? { num_result: task.numResults } : {}),
       ...(task.dateRange ? { date_range: task.dateRange } : {}),
       ...(task.postbackUrl ? { postback_url: task.postbackUrl } : {}),
       ...(task.pingbackUrl ? { pingback_url: task.pingbackUrl } : {})

@@ -1,6 +1,10 @@
 # <img src="logo.jpeg" height="20"> Webvizio
 
-Create, find, update, and delete projects and tasks for visual bug tracking and website feedback. Manage comments and threaded discussions on tasks. Tasks capture visual annotations pinned to live UI elements along with automatic technical metadata including screenshots, console logs, network logs, DOM snapshots, and user action recordings. Generate AI-ready prompts and retrieve error logs, reproduction steps, and screenshots for tasks to assist AI coding tools. Synchronize projects, tasks, and comments with external systems using External IDs.
+Create, find, update, and delete website feedback projects and tasks. Create, find, and delete task comments. Manage task status, priority, due dates, assignees, tags, file links, and time logs, including updating existing time-log entries by ID. Synchronize resources using external IDs.
+
+Connect with a personal access token from the Webhooks tab in your Webvizio account settings. Project, task, and comment operations require one of the documented resource identifiers; find_project also supports the project name. Task dueDate maps to the provider's executeAt field, and time-log durations use whole minutes.
+
+See the [tool and API reference](docs/SPEC.md) and [Webvizio incoming-webhook documentation](https://webvizio.com/help-center/incoming-webhooks/).
 
 ## License
 

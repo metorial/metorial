@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MiroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,7 @@ export let createTag = SlateTool.create(spec, {
       output: {
         tagId: tag.id,
         title: tag.title,
-        fillColor: tag.fillColor
+        fillColor: tag.fillColor ?? undefined
       },
       message: `Created tag **${tag.title}** (ID: ${tag.id}) on board ${ctx.input.boardId}.`
     };
@@ -67,8 +67,13 @@ export let getTags = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('If provided, retrieves tags attached to this specific item'),
-      limit: z.number().optional().describe('Maximum number of tags to return'),
-      offset: z.number().optional().describe('Offset for pagination')
+      limit: z
+        .number()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Maximum number of tags to return, from 1 to 50'),
+      offset: z.number().min(0).optional().describe('Zero-based offset for board tags')
     })
   )
   .output(
@@ -81,7 +86,12 @@ export let getTags = SlateTool.create(spec, {
             fillColor: z.string().optional().describe('Tag color')
           })
         )
-        .describe('List of tags')
+        .describe('List of tags'),
+      total: z.number().optional().describe('Total board tag count, if available'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Offset for the next board-tag page, if available')
     })
   )
   .handleInvocation(async ctx => {
@@ -103,11 +113,20 @@ export let getTags = SlateTool.create(spec, {
     let mappedTags = tagsList.map((tag: any) => ({
       tagId: tag.id,
       title: tag.title,
-      fillColor: tag.fillColor
+      fillColor: tag.fillColor ?? undefined
     }));
 
+    let nextOffset = Number(result.offset ?? ctx.input.offset ?? 0) + mappedTags.length;
+
     return {
-      output: { tags: mappedTags },
+      output: {
+        tags: mappedTags,
+        total: ctx.input.itemId ? undefined : (result.total ?? undefined),
+        offset:
+          !ctx.input.itemId && mappedTags.length > 0 && nextOffset < result.total
+            ? nextOffset
+            : undefined
+      },
       message: `Found **${mappedTags.length}** tag(s)${ctx.input.itemId ? ` on item ${ctx.input.itemId}` : ` on board ${ctx.input.boardId}`}.`
     };
   })
@@ -205,6 +224,64 @@ export let deleteTag = SlateTool.create(spec, {
     return {
       output: { deleted: true },
       message: `Deleted tag ${ctx.input.tagId} from board ${ctx.input.boardId}.`
+    };
+  })
+  .build();
+
+export let updateTag = SlateTool.create(spec, {
+  name: 'Update Tag',
+  key: 'update_tag',
+  description: 'Updates the title or color of an existing tag on a Miro board.',
+  instructions: ['Refresh the board to see tag changes made through the API.'],
+  tags: { destructive: false, readOnly: false }
+})
+  .input(
+    z.object({
+      boardId: z.string().min(1).describe('Board ID. Call list_boards to discover boards.'),
+      tagId: z.string().min(1).describe('Tag ID. Call get_tags to discover tags.'),
+      title: z
+        .string()
+        .max(120)
+        .optional()
+        .describe('New case-sensitive title, unique on the board'),
+      fillColor: z
+        .enum([
+          'red',
+          'light_green',
+          'cyan',
+          'yellow',
+          'dark_green',
+          'blue',
+          'violet',
+          'dark_blue',
+          'light_pink',
+          'orange',
+          'black',
+          'gray'
+        ])
+        .optional()
+        .describe('New tag color')
+    })
+  )
+  .output(
+    z.object({
+      tagId: z.string().describe('Updated tag ID'),
+      title: z.string().describe('Updated tag title'),
+      fillColor: z.string().optional().describe('Updated tag color')
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (ctx.input.title === undefined && ctx.input.fillColor === undefined) {
+      throw createApiServiceError('Provide title or fillColor to update the Miro tag.');
+    }
+    let client = new MiroClient({ token: ctx.auth.token });
+    let tag = await client.updateTag(ctx.input.boardId, ctx.input.tagId, {
+      title: ctx.input.title,
+      fillColor: ctx.input.fillColor
+    });
+    return {
+      output: { tagId: tag.id, title: tag.title, fillColor: tag.fillColor ?? undefined },
+      message: `Updated tag ${tag.id} on board ${ctx.input.boardId}.`
     };
   })
   .build();

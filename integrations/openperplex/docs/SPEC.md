@@ -1,64 +1,35 @@
-Now let me check the specific endpoints for more details on features:I have enough information now. Let me compile the specification.
+# OpenPerplex API specification
 
-# Slates Specification for Openperplex
+## Authentication and configuration
 
-## Overview
+Requests use the provider SDK version 0.3.0 base URL `https://v3.openperplexapi.com` and an API key in the `X-API-Key` header. Configuration is empty; the API key belongs to the authentication method. Empty keys and keys containing line breaks are rejected. No OAuth token refresh or scopes apply.
 
-Openperplex is an AI-powered web search and content retrieval API. It allows developers to perform web searches with LLM-generated answers, extract content from URLs, and capture website screenshots, with support for 14+ languages and 40+ geographic locations.
+## Tools and request payloads
 
-## Authentication
+| Tool | Method and endpoint | Request |
+| --- | --- | --- |
+| `web_search` | `GET /search` | Required `query`; optional `date_context`, `location`, `model`, `response_language`, `answer_type`, `search_type`, `return_citations`, `return_sources`, `return_images`, `recency_filter`. |
+| `custom_search` | `POST /custom_search` | Required `system_prompt` and `user_prompt`; optional `location`, `model`, `response_language`, `search_type`, `temperature`, `top_p`, `return_sources`, `return_images`, `recency_filter`. |
+| `query_url` | `GET /query_from_url` | Required `url` and `query`; optional `model`, `response_language`, `answer_type`. |
+| `extract_content` | `GET /get_website_text` or `GET /get_website_markdown` | Required `url`; the tool's existing `format` selects the endpoint and defaults to `text`. |
+| `website_screenshot` | `GET /get_website_screenshot` | Required `url`; returns `websiteUrl` and `screenshotUrl`, plus a downloadable image. |
 
-Openperplex uses API key authentication. All API requests must include the API key in the request headers:
+Public input names use camelCase and map to the snake_case request fields above. Existing defaults remain: `gpt-4o-mini`, `us`, response language `auto`, answer type `text`, search type `general`, recency `anytime`, return flags `false`, custom temperature `0.2`, and custom top-p `0.9`.
 
-```
-X-API-Key: YOUR_API_KEY
-```
+All existing enum values remain available. The historical SDK documents `gpt-4o-mini`, `gpt-4o`, `o3-mini-high`, and `o3-mini-medium`; the existing `gemini-2.0-flash` value is retained for compatibility but could not be verified against current provider documentation. Country and language fields remain strings. The SDK uses `uk` for the United Kingdom; use that documented code for localized results.
 
-To obtain an API key:
+The existing optional custom-search `responseLanguage` field and its request mapping are retained, although this parameter is not described in the provider SDK's custom-search documentation. This omission alone does not establish its removal.
 
-1. Sign up for an account at [api.openperplex.com](https://api.openperplex.com).
-2. Generate and copy your API key from the dashboard.
+## Response compatibility
 
-There are no OAuth flows, scopes, or additional credentials required.
+Search and URL-query tools retain `llmResponse` and optional numeric `responseTime`. Search tools also retain optional sources and images. The existing `llm_response`/`response`, `text`/`content`, `markdown`/`content`, and `screenshot_url`/`url` compatibility mappings are preserved. Text and Markdown extraction continue returning the actual extracted `content`; screenshot results continue returning the actual provider `screenshotUrl`.
 
-## Features
+Malformed selected results, missing answer/content fields, and invalid screenshot URLs are reported as service failures instead of successful empty results. Validation applies only to the selected aliases and fields returned by the tool; unused aliases, extra fields, and HTTP MIME labels do not restrict otherwise valid results. URL queries ignore sources and images because they do not return those fields. Empty strings from an explicitly present answer or extracted-content field remain valid. Web page and screenshot URLs must be HTTP or HTTPS. Requests have a bounded timeout and do not follow redirects with API credentials.
 
-### Web Search
+The API's streaming endpoints are not exposed by this integration. No account/profile endpoint is established by the available provider SDK, so no identity tool has been invented. There are no triggers.
 
-Perform AI-powered web searches that return LLM-generated answers along with sources and citations. The search crawls the web, retrieves relevant results, and synthesizes an answer using a selected AI model.
+## Provider evidence and availability
 
-- **Query**: The search question or query string.
-- **Model selection**: Choose the underlying LLM model (e.g., `gpt-4o-mini`, `gpt-4o`, `o3-mini-high`, `o3-mini-medium`, `gemini-2.0-flash`).
-- **Location**: Country code (40+ supported) to get localized search results.
-- **Response language**: Supports 14+ languages; `auto` detects language from the query.
-- **Response format**: Output can be `text`, `markdown`, or `html`.
-- **Date context**: Optional date string to provide temporal context to the search.
-- **Recency filter**: Filter results by time range — `hour`, `day`, `week`, `month`, `year`, or `anytime`.
-- **Return options**: Optionally include source citations and relevant images in the response.
+As checked on 2026-10-14, the [official documentation host](https://docs.openperplex.com/introduction), [home page](https://openperplex.com/), and [legacy API host](https://api.openperplex.com/) display domain-parking content. This does not establish the operating status of the different SDK-documented API host `https://v3.openperplexapi.com`. Current endpoint availability, models, native response schemas, and screenshot URL expiration/download behavior remain unverified.
 
-### Custom Search
-
-Perform web searches with custom system and user prompts, giving full control over how the LLM processes and responds to search results. This is useful for tailoring outputs to specific use cases such as summarization, analysis, or structured extraction.
-
-- Supports the same location, language, model, and format parameters as standard search.
-- Accepts a custom **system prompt** to guide the LLM's behavior.
-
-### Streaming Search
-
-Both standard and custom searches are available in streaming mode, delivering results incrementally in real time. Streamed responses are chunked by type (LLM text, sources, images, response time).
-
-### URL Content Querying
-
-Ask questions about the content of a specific URL. The API fetches the page content and uses an LLM to answer a query based on that content.
-
-### Website Content Extraction
-
-Extract the content of a web page as plain text or Markdown. Useful for ingesting web content into downstream AI pipelines or applications.
-
-### Website Screenshots
-
-Capture a live screenshot of any web page by providing its URL. Useful for visual verification, archiving, or thumbnail generation.
-
-## Events
-
-The provider does not support events.
+The [provider-maintained Python SDK](https://github.com/YassKhazzan/openperplex_python_library) and [published SDK version 0.3.0](https://pypi.org/project/openperplex/0.3.0/) document the historical capabilities and parameters. The [immutable SDK source](https://github.com/YassKhazzan/openperplex_python_library/blob/cf3ac7d412077794500f7bfb39dd6ecab32a69a3/src/openperplex/openperplex.py) and [2025-02-10 host-change commit](https://github.com/YassKhazzan/openperplex_python_library/commit/cf3ac7d412077794500f7bfb39dd6ecab32a69a3) establish `https://v3.openperplexapi.com` as both clients' default host, `X-API-Key` authentication, request methods and payloads, and JSON response parsing. The SDK does not declare native response-field schemas, and historical source does not prove the hosted API currently operates. The integration corrects the base URL while preserving existing method/path mappings and public contracts; no new provider capabilities were inferred from the parked legacy domains.

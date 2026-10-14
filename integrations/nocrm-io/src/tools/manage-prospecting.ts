@@ -10,6 +10,7 @@ export let manageProspecting = SlateTool.create(spec, {
   instructions: [
     'Use "list_lists" to list all prospecting lists.',
     'Use "create_list" to create a new prospecting list.',
+    'Use "get_list" to discover column headers and prospect IDs before adding, updating, deleting, or converting prospects.',
     'Use "add_prospects" to add prospects to a list. Provide prospectFields as an array of field objects.',
     'Use "update_prospect" to update a prospect\'s fields.',
     'Use "delete_prospect" to remove a prospect from a list.',
@@ -91,7 +92,14 @@ export let manageProspecting = SlateTool.create(spec, {
         .object({
           prospectingListId: z.number().describe('List ID'),
           name: z.string().describe('List name'),
-          description: z.string().optional().describe('List description')
+          description: z.string().optional().describe('List description'),
+          columnNames: z
+            .array(z.string())
+            .optional()
+            .describe('Exact column headers to use in prospectFields and fields'),
+          userId: z.number().optional().describe('Assigned user ID'),
+          isArchived: z.boolean().optional().describe('Whether this list is archived'),
+          permalink: z.string().optional().describe('Link to the prospecting list')
         })
         .optional()
         .describe('Single prospecting list'),
@@ -136,8 +144,13 @@ export let manageProspecting = SlateTool.create(spec, {
           prospectingList: {
             prospectingListId: list.id,
             name: list.title,
-            description: list.description ?? undefined
-          }
+            description: list.description ?? undefined,
+            columnNames: list.column_names ?? undefined,
+            userId: list.user?.id ?? undefined,
+            isArchived: list.is_archived ?? undefined,
+            permalink: list.permalink ?? undefined
+          },
+          prospects: list.spreadsheet_rows ?? []
         },
         message: `Retrieved prospecting list **"${list.title}"** (ID: ${list.id}).`
       };

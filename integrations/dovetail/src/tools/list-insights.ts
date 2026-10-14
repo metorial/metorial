@@ -17,13 +17,18 @@ export let listInsights = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          "Filter insights by a specific user ID. If provided, returns only that user's personal insights."
+          'Legacy personal-insight endpoint. Prefer workspace-wide listing for new workflows.'
         ),
       sort: z
         .enum(['created_at:asc', 'created_at:desc', 'title:asc', 'title:desc'])
         .optional()
-        .describe('Sort order (only for workspace-wide listing)'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+        .describe('Sort order'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -39,7 +44,7 @@ export let listInsights = SlateTool.create(spec, {
           authorId: z.string().nullable().optional(),
           published: z.boolean().optional(),
           createdAt: z.string(),
-          updatedAt: z.string()
+          updatedAt: z.string().optional()
         })
       ),
       totalCount: z.number().optional(),
@@ -50,26 +55,8 @@ export let listInsights = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.userId) {
-      let userInsights = await client.listUserInsights(ctx.input.userId);
-      let insights = userInsights.map(i => ({
-        insightId: i.id,
-        title: i.title,
-        previewText: i.preview_text ?? null,
-        projectId: i.project_id ?? null,
-        projectTitle: i.project_title ?? null,
-        authorId: i.author_id ?? null,
-        published: i.published,
-        createdAt: i.created_at,
-        updatedAt: i.updated_at
-      }));
-      return {
-        output: { insights },
-        message: `Found **${insights.length}** insights for user ${ctx.input.userId}.`
-      };
-    }
-
     let result = await client.listInsights({
+      userId: ctx.input.userId,
       sort: ctx.input.sort,
       limit: ctx.input.limit,
       startCursor: ctx.input.startCursor
@@ -79,8 +66,8 @@ export let listInsights = SlateTool.create(spec, {
       insightId: i.id,
       title: i.title,
       previewText: i.preview_text ?? null,
-      projectId: i.project_id ?? null,
-      projectTitle: i.project_title ?? null,
+      projectId: i.project?.id ?? i.project_id ?? null,
+      projectTitle: i.project?.title ?? i.project_title ?? null,
       authorId: i.author_id ?? null,
       published: i.published,
       createdAt: i.created_at,

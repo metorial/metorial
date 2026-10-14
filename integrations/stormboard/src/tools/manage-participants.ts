@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let manageParticipants = SlateTool.create(spec, {
 
     if (action === 'list') {
       let participants = await client.listParticipants(stormId);
-      let list = Array.isArray(participants) ? participants : [];
+      let list = participants;
       return {
         output: { participants: list, success: true },
         message: `Found **${list.length}** participant(s) in Storm ${stormId}.`
@@ -44,7 +44,9 @@ export let manageParticipants = SlateTool.create(spec, {
 
     if (action === 'invite') {
       if (!email) {
-        throw new Error('email is required for inviting a participant');
+        throw createApiServiceError('email is required for inviting a participant', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let result = await client.inviteParticipant(stormId, { email });
       return {
@@ -71,7 +73,9 @@ export let manageParticipants = SlateTool.create(spec, {
 
     if (action === 'join') {
       if (!accessKey) {
-        throw new Error('accessKey is required for joining a Storm');
+        throw createApiServiceError('accessKey is required for joining a Storm', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let result = await client.joinStorm(stormId, accessKey);
       return {

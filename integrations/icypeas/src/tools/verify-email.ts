@@ -14,7 +14,7 @@ export let verifyEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      email: z.string().describe('The email address to verify')
+      email: z.string().trim().email().describe('The email address to verify')
     })
   )
   .output(
@@ -29,15 +29,16 @@ export let verifyEmail = SlateTool.create(spec, {
     let result = await client.emailVerification({
       email: ctx.input.email
     });
+    let searchId = result.item?._id || result._id || result.id;
 
     return {
       output: {
         success: result.success ?? true,
-        searchId: result._id || result.id
+        searchId
       },
       message:
         result.success !== false
-          ? `Email verification submitted for **${ctx.input.email}**. Search ID: \`${result._id || result.id}\``
+          ? `Email verification submitted for **${ctx.input.email}**. Search ID: \`${searchId}\``
           : `Email verification failed: ${JSON.stringify(result)}`
     };
   })

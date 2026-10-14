@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { scrapeOptionsSchema, sessionOptionsSchema } from '../lib/schemas';
+import { getScreenshotFile } from '../lib/screenshot';
 import { spec } from '../spec';
 
 export let batchScrape = SlateTool.create(spec, {
@@ -66,10 +67,16 @@ Returns results for each URL in the same order as provided. Each page's content 
     ctx.progress('Waiting for batch scrape job to complete...');
     let result = await client.pollForCompletion(
       () => client.getBatchScrapeJobStatus(jobId),
-      () => client.getBatchScrapeJobResult(jobId)
+      () => client.getBatchScrapeJobResult(jobId),
+      { jobId }
     );
 
     let pages = result.data as Record<string, unknown>[] | undefined;
+    for (let page of pages ?? []) {
+      if (typeof page.screenshot === 'string' && page.screenshot) {
+        await ctx.addAttachment(getScreenshotFile(page.screenshot));
+      }
+    }
 
     return {
       output: {

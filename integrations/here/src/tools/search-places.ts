@@ -69,7 +69,7 @@ Returns place names, addresses, coordinates, categories, contacts, and opening h
   instructions: [
     'Use "query" for free-text discovery searches like "pizza near me" or "hotel in Paris".',
     'Use "categories" without a query for structured browsing by HERE category IDs (e.g. "100-1000-0000" for restaurants).',
-    'Either "at" or "inArea" must be provided to establish the search location.',
+    'Browse mode requires "at". Discover mode requires "at" or an "inArea" circle or bounding box; these geographic centers are mutually exclusive.',
     'Use "name" with "categories" to filter places by name within a category.'
   ],
   tags: {
@@ -84,7 +84,12 @@ Returns place names, addresses, coordinates, categories, contacts, and opening h
         .describe(
           'Free-text search query (e.g. "coffee shop", "pizza restaurant"). Triggers discover mode.'
         ),
-      at: z.string().describe('Search center as "lat,lng" (e.g. "52.5308,13.3847")'),
+      at: z
+        .string()
+        .optional()
+        .describe(
+          'Search center as "lat,lng"; required for browse mode (e.g. "52.5308,13.3847")'
+        ),
       categories: z
         .string()
         .optional()

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -76,23 +76,31 @@ Returns all settings including URL, XPath, alerts, notification endpoints, check
     return {
       output: {
         wachetId: wachet.id ?? ctx.input.wachetId,
-        name: wachet.name,
-        url: wachet.url,
-        xPath: wachet.xPath,
-        excludeXPath: wachet.excludeXPath,
-        regex: wachet.regex,
-        jobType: wachet.jobType,
-        recurrenceInSeconds: wachet.recurrenceInSeconds,
+        name: wachet.name ?? undefined,
+        url: wachet.url ?? undefined,
+        xPath: wachet.xPath ?? undefined,
+        excludeXPath: wachet.excludeXPath ?? undefined,
+        regex: wachet.regex ?? undefined,
+        jobType: wachet.jobType == null ? undefined : String(wachet.jobType),
+        recurrenceInSeconds: wachet.recurrenceInSeconds ?? undefined,
         dynamicContent: wachet.dynamicContent,
-        folderId: wachet.folderId,
-        alerts: wachet.alerts?.map(a => ({ type: a.type })),
-        notificationEndpoints: wachet.notificationEndpoints,
-        proxies: wachet.proxies,
-        crawlingDepth: wachet.crawlingDepth,
-        lastCheckTimestamp: wachet.data?.lastCheckTimestamp,
-        lastValue: wachet.data?.raw,
-        lastError: wachet.data?.error,
-        note: wachet.note
+        folderId: wachet.folderId ?? undefined,
+        alerts: wachet.alerts?.map(a => ({ type: String(a.type) })),
+        notificationEndpoints: wachet.notificationEndpoints?.map(e => ({
+          type: String(e.type),
+          value: e.value ?? undefined
+        })),
+        proxies: wachet.proxies?.map(p => {
+          if (!p.location) {
+            throw createApiServiceError('Wachete returned a proxy without its location.');
+          }
+          return { location: p.location };
+        }),
+        crawlingDepth: wachet.crawlingDepth ?? undefined,
+        lastCheckTimestamp: wachet.data?.lastCheckTimestamp ?? undefined,
+        lastValue: wachet.data?.raw ?? undefined,
+        lastError: wachet.data?.error ?? undefined,
+        note: wachet.note ?? undefined
       },
       message: `Monitor **${wachet.name}** monitors \`${wachet.url}\` (type: ${wachet.jobType}).`
     };

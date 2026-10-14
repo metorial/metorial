@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,8 +18,8 @@ Returns full project details including name, status, dates, budget, resources, a
         .string()
         .optional()
         .describe('Specific project ID to retrieve. If omitted, lists all projects.'),
-      page: z.number().optional().describe('Page number for pagination (0-based)'),
-      limit: z.number().optional().describe('Number of projects per page')
+      page: z.number().min(0).optional().describe('Page number for pagination (0-based)'),
+      limit: z.number().min(1).max(1000).optional().describe('Number of projects per page')
     })
   )
   .output(
@@ -37,6 +37,12 @@ Returns full project details including name, status, dates, budget, resources, a
             budgetHours: z.number().optional().describe('Budget hours'),
             budgetCashAmount: z.number().optional().describe('Budget cash amount'),
             budgetCurrency: z.string().optional().describe('Budget currency'),
+            resources: z.array(z.string()).optional().describe('Assigned resource IDs'),
+            projectManagers: z
+              .array(z.string())
+              .optional()
+              .describe('Project manager resource IDs'),
+            customFields: z.array(z.any()).optional().describe('Project custom fields'),
             metadata: z.string().optional().describe('Custom metadata'),
             createdDate: z.string().optional().describe('Creation timestamp'),
             updatedDate: z.string().optional().describe('Last update timestamp')
@@ -46,6 +52,12 @@ Returns full project details including name, status, dates, budget, resources, a
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.page !== undefined && !Number.isInteger(ctx.input.page)) {
+      throw createApiServiceError('page must be a whole number starting at 0.');
+    }
+    if (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) {
+      throw createApiServiceError('limit must be a whole number between 1 and 1000.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.projectId) {
@@ -55,18 +67,21 @@ Returns full project details including name, status, dates, budget, resources, a
           projects: [
             {
               projectId: project._id,
-              name: project.name,
-              projectCode: project.projectCode,
-              status: project.status,
-              start: project.start,
-              end: project.end,
-              note: project.note,
-              budgetHours: project.budgetHours,
-              budgetCashAmount: project.budgetCashAmount,
-              budgetCurrency: project.budgetCurrency,
-              metadata: project.metadata,
-              createdDate: project.createdDate,
-              updatedDate: project.updatedDate
+              name: project.name ?? undefined,
+              projectCode: project.projectCode ?? undefined,
+              status: project.status ?? undefined,
+              start: project.start ?? undefined,
+              end: project.end ?? undefined,
+              note: project.note ?? undefined,
+              budgetHours: project.budgetHours ?? undefined,
+              budgetCashAmount: project.budgetCashAmount ?? undefined,
+              budgetCurrency: project.budgetCurrency ?? undefined,
+              resources: project.resources ?? undefined,
+              projectManagers: project.projectManagers ?? undefined,
+              customFields: project.customFields ?? undefined,
+              metadata: project.metadata ?? undefined,
+              createdDate: project.createdDate ?? undefined,
+              updatedDate: project.updatedDate ?? undefined
             }
           ]
         },
@@ -79,18 +94,21 @@ Returns full project details including name, status, dates, budget, resources, a
       output: {
         projects: projects.map((p: any) => ({
           projectId: p._id,
-          name: p.name,
-          projectCode: p.projectCode,
-          status: p.status,
-          start: p.start,
-          end: p.end,
-          note: p.note,
-          budgetHours: p.budgetHours,
-          budgetCashAmount: p.budgetCashAmount,
-          budgetCurrency: p.budgetCurrency,
-          metadata: p.metadata,
-          createdDate: p.createdDate,
-          updatedDate: p.updatedDate
+          name: p.name ?? undefined,
+          projectCode: p.projectCode ?? undefined,
+          status: p.status ?? undefined,
+          start: p.start ?? undefined,
+          end: p.end ?? undefined,
+          note: p.note ?? undefined,
+          budgetHours: p.budgetHours ?? undefined,
+          budgetCashAmount: p.budgetCashAmount ?? undefined,
+          budgetCurrency: p.budgetCurrency ?? undefined,
+          resources: p.resources ?? undefined,
+          projectManagers: p.projectManagers ?? undefined,
+          customFields: p.customFields ?? undefined,
+          metadata: p.metadata ?? undefined,
+          createdDate: p.createdDate ?? undefined,
+          updatedDate: p.updatedDate ?? undefined
         }))
       },
       message: `Retrieved **${projects.length}** projects.`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,17 @@ export let updateAppointment = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Updated client last name'),
       email: z.string().optional().describe('Updated client email'),
       phone: z.string().optional().describe('Updated client phone number'),
-      notes: z.string().optional().describe('Updated notes'),
+      notes: z.string().optional().describe('Updated notes; requires admin=true'),
+      certificate: z
+        .string()
+        .optional()
+        .describe('Updated package or coupon code; requires admin=true'),
+      admin: z
+        .boolean()
+        .optional()
+        .describe(
+          'Update as an administrator, disabling field validation; required to set notes or a certificate'
+        ),
       fields: z
         .array(
           z.object({
@@ -48,17 +58,27 @@ export let updateAppointment = SlateTool.create(spec, {
       authMethod: ctx.auth.authMethod
     });
 
-    let updateData: Record<string, any> = {};
-    if (ctx.input.firstName !== undefined) updateData.firstName = ctx.input.firstName;
-    if (ctx.input.lastName !== undefined) updateData.lastName = ctx.input.lastName;
-    if (ctx.input.email !== undefined) updateData.email = ctx.input.email;
-    if (ctx.input.phone !== undefined) updateData.phone = ctx.input.phone;
-    if (ctx.input.notes !== undefined) updateData.notes = ctx.input.notes;
-    if (ctx.input.fields !== undefined) {
-      updateData.fields = ctx.input.fields.map(f => ({ id: f.fieldId, value: f.value }));
+    if (
+      (ctx.input.notes !== undefined || ctx.input.certificate !== undefined) &&
+      ctx.input.admin !== true
+    ) {
+      throw createApiServiceError('Setting notes or a certificate requires admin=true.');
     }
-
-    let a = await client.updateAppointment(ctx.input.appointmentId, updateData);
+    let updateData = pickDefined({
+      firstName: ctx.input.firstName,
+      lastName: ctx.input.lastName,
+      email: ctx.input.email,
+      phone: ctx.input.phone,
+      notes: ctx.input.notes,
+      certificate: ctx.input.certificate,
+      fields: ctx.input.fields?.map(f => ({ id: f.fieldId, value: f.value }))
+    });
+    if (Object.keys(updateData).length === 0) {
+      throw createApiServiceError('Provide at least one appointment field to update.');
+    }
+    let a = await client.updateAppointment(ctx.input.appointmentId, updateData, {
+      admin: ctx.input.admin
+    });
 
     return {
       output: {

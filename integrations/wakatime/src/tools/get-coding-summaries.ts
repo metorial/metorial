@@ -74,7 +74,7 @@ export let getCodingSummaries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result = await client.getSummaries({
       start: ctx.input.startDate,

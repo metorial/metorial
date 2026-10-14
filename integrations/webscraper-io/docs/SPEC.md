@@ -1,4 +1,4 @@
-# Slates Specification for Webscraper io
+# Web Scraper API Specification
 
 ## Overview
 
@@ -8,11 +8,7 @@ Web Scraper (webscraper.io) is a web scraping platform offering a Chrome browser
 
 Web Scraper Cloud uses **API token** authentication. Users can visit https://cloud.webscraper.io/api to acquire their API key.
 
-The API token is passed as a query parameter on every request:
-
-```
-https://api.webscraper.io/api/v1/<endpoint>?api_token=<YOUR API TOKEN>
-```
+The API token is sent as a Bearer credential in the Authorization header on every request. The API base URL is `https://api.webscraper.io/api/v1`.
 
 There are no OAuth flows, scopes, or additional credentials required. The single API token provides full access to all API capabilities tied to the user's account.
 
@@ -26,13 +22,14 @@ Sitemaps define the structure and rules for scraping a website, including start 
 
 Users can create scraping jobs to execute a sitemap and extract data from the target website. Key configuration options include:
 
-- **Driver**: `fast` (skips JavaScript) or `fulljs` (executes JavaScript on pages).
+- **Driver**: `fast` (skips JavaScript) or `fulljs` (executes JavaScript on pages), mapped to the API’s `render_js` boolean.
 - **Proxy**: Choice of datacenter or residential proxies across many countries.
-- **Page load delay and request interval**: Controls timing between requests.
+- **Page load delay and request interval**: Required whole millisecond values; a proxy is also required for new and scheduled jobs. Scheduled jobs default to the UTC timezone when omitted.
+- **Priority**: Optional execution priority from 1 to 5.
 - **Start URL overrides**: Optionally override the sitemap's start URLs for a specific job.
 - **Custom ID**: An optional identifier included in webhook notifications for tracking.
 
-Jobs go through statuses: waiting, scheduling, scheduled, started, finished, failed, or stopped.
+Stop requests and continuation requests are available for job recovery. Omitted continuation settings retain the current settings. Jobs go through statuses: waiting, scheduling, scheduled, started, finished, failed, or stopped.
 
 ### Scraping Job Monitoring and Data Quality
 
@@ -40,7 +37,7 @@ Users can retrieve the status and statistics of scraping jobs, including counts 
 
 ### Data Download
 
-Scraped data from completed jobs can be downloaded in JSON or CSV format.
+Scraped data from finished jobs can be downloaded as JSONL or CSV files. The JSONL export contains one JSON object per line. Existing JSON record and CSV text outputs remain available for compatibility.
 
 ### Scheduler
 

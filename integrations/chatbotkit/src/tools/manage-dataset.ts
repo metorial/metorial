@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageDatasetTool = SlateTool.create(spec, {
@@ -27,6 +28,15 @@ export let manageDatasetTool = SlateTool.create(spec, {
         .describe('Dataset ID (required for update, delete, fetch, and record actions)'),
       name: z.string().optional().describe('Dataset name'),
       description: z.string().optional().describe('Dataset description'),
+      cursor: z.string().optional().describe('Pagination cursor for nested list actions'),
+      take: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'take must be a positive whole number'
+        )
+        .optional()
+        .describe('Page size for nested list actions'),
       meta: z.record(z.string(), z.any()).optional().describe('Arbitrary metadata'),
       recordAction: z
         .enum(['create', 'update', 'delete', 'fetch', 'list', 'search'])
@@ -51,6 +61,10 @@ export let manageDatasetTool = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('List of records (for list/search)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor for the next page of nested list results'),
       createdAt: z.string().optional().describe('Creation timestamp')
     })
   )
@@ -72,10 +86,15 @@ export let manageDatasetTool = SlateTool.create(spec, {
       searchQuery
     } = ctx.input;
 
+    if (recordAction && !datasetId) {
+      throw createApiServiceError('datasetId is required for record actions.');
+    }
+
     // Record-level actions
     if (recordAction && datasetId) {
       if (recordAction === 'create') {
-        if (!recordText) throw new Error('recordText is required to create a record');
+        if (!recordText)
+          throw createApiServiceError('recordText is required to create a record');
         let result = await client.createRecord(datasetId, { text: recordText, meta });
         return {
           output: { datasetId, recordId: result.id, recordText },
@@ -83,7 +102,7 @@ export let manageDatasetTool = SlateTool.create(spec, {
         };
       }
       if (recordAction === 'fetch') {
-        if (!recordId) throw new Error('recordId is required to fetch a record');
+        if (!recordId) throw createApiServiceError('recordId is required to fetch a record');
         let result = await client.fetchRecord(datasetId, recordId);
         return {
           output: { datasetId, recordId: result.id, recordText: result.text },
@@ -91,7 +110,7 @@ export let manageDatasetTool = SlateTool.create(spec, {
         };
       }
       if (recordAction === 'update') {
-        if (!recordId) throw new Error('recordId is required to update a record');
+        if (!recordId) throw createApiServiceError('recordId is required to update a record');
         let updateData: Record<string, any> = {};
         if (recordText !== undefined) updateData.text = recordText;
         if (meta !== undefined) updateData.meta = meta;
@@ -102,7 +121,7 @@ export let manageDatasetTool = SlateTool.create(spec, {
         };
       }
       if (recordAction === 'delete') {
-        if (!recordId) throw new Error('recordId is required to delete a record');
+        if (!recordId) throw createApiServiceError('recordId is required to delete a record');
         await client.deleteRecord(datasetId, recordId);
         return {
           output: { datasetId, recordId },
@@ -110,14 +129,18 @@ export let manageDatasetTool = SlateTool.create(spec, {
         };
       }
       if (recordAction === 'list') {
-        let result = await client.listRecords(datasetId);
+        let result = await client.listRecords(datasetId, {
+          cursor: ctx.input.cursor,
+          take: ctx.input.take
+        });
         return {
-          output: { datasetId, records: result.items },
+          output: { datasetId, records: result.items, cursor: result.cursor ?? undefined },
           message: `Found **${result.items.length}** records in dataset **${datasetId}**.`
         };
       }
       if (recordAction === 'search') {
-        if (!searchQuery) throw new Error('searchQuery is required for record search');
+        if (!searchQuery)
+          throw createApiServiceError('searchQuery is required for record search');
         let result = await client.searchRecords(datasetId, searchQuery);
         let items = result.items || result.records || [];
         return {
@@ -133,30 +156,30 @@ export let manageDatasetTool = SlateTool.create(spec, {
       return {
         output: {
           datasetId: result.id,
-          name: result.name,
-          description: result.description,
-          createdAt: result.createdAt
+          name: result.name ?? name,
+          description: result.description ?? description,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Dataset **${result.name || result.id}** created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!datasetId) throw new Error('datasetId is required for fetch');
+      if (!datasetId) throw createApiServiceError('datasetId is required for fetch');
       let result = await client.fetchDataset(datasetId);
       return {
         output: {
           datasetId: result.id,
           name: result.name,
           description: result.description,
-          createdAt: result.createdAt
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Fetched dataset **${result.name || result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!datasetId) throw new Error('datasetId is required for update');
+      if (!datasetId) throw createApiServiceError('datasetId is required for update');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
@@ -169,7 +192,7 @@ export let manageDatasetTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!datasetId) throw new Error('datasetId is required for delete');
+      if (!datasetId) throw createApiServiceError('datasetId is required for delete');
       await client.deleteDataset(datasetId);
       return {
         output: { datasetId },
@@ -177,6 +200,6 @@ export let manageDatasetTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

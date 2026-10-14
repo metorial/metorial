@@ -6,7 +6,11 @@ import { spec } from '../spec';
 export let createClientAccount = SlateTool.create(spec, {
   name: 'Create Client Account',
   key: 'create_client_account',
-  description: `Provision a new client sub-account under your agency Hyperise account. Each sub-account can have its own custom domain, team members, and image templates. **Requires an Agency or White Label plan.**`,
+  description: `DEPRECATED — use \`create_client_organization\` instead. Provision a new client sub-account under your agency Hyperise account. Each sub-account can have its own custom domain, team members, and image templates. **Requires an Agency or White Label plan.**`,
+  instructions: [
+    'Use create_client_organization to create client accounts with an explicit seat allocation.'
+  ],
+  tags: { deprecated: true },
   constraints: ['Only available on Hyperise Agency and White Label plans.']
 })
   .input(

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -72,25 +72,27 @@ export let manageColumns = SlateTool.create(spec, {
 
     switch (action) {
       case 'delete':
-        if (!columnName) throw new Error('columnName is required for delete');
+        if (!columnName) throw createApiServiceError('columnName is required for delete');
         await client.deleteColumn(sheetHandle, columnName);
         break;
 
       case 'delete_multiple':
         if (!ctx.input.columnNames || ctx.input.columnNames.length === 0) {
-          throw new Error('columnNames is required for delete_multiple');
+          throw createApiServiceError('columnNames is required for delete_multiple');
         }
         result = await client.deleteMultipleColumns(sheetHandle, ctx.input.columnNames);
         break;
 
       case 'rename':
-        if (!ctx.input.renames) throw new Error('renames is required for rename');
+        if (!ctx.input.renames) throw createApiServiceError('renames is required for rename');
         result = await client.renameColumns(sheetHandle, ctx.input.renames);
         break;
 
       case 'combine':
         if (!ctx.input.columnNames || ctx.input.columnNames.length < 2) {
-          throw new Error('columnNames with at least 2 columns is required for combine');
+          throw createApiServiceError(
+            'columnNames with at least 2 columns is required for combine'
+          );
         }
         result = await client.combineColumns(sheetHandle, {
           columns: ctx.input.columnNames,
@@ -100,8 +102,9 @@ export let manageColumns = SlateTool.create(spec, {
         break;
 
       case 'split':
-        if (!columnName) throw new Error('columnName is required for split');
-        if (!ctx.input.separator) throw new Error('separator is required for split');
+        if (!columnName) throw createApiServiceError('columnName is required for split');
+        if (!ctx.input.separator)
+          throw createApiServiceError('separator is required for split');
         result = await client.splitColumn(sheetHandle, {
           column: columnName,
           delimiter: ctx.input.separator
@@ -109,35 +112,40 @@ export let manageColumns = SlateTool.create(spec, {
         break;
 
       case 'cast_type':
-        if (!columnName) throw new Error('columnName is required for cast_type');
+        if (!columnName) throw createApiServiceError('columnName is required for cast_type');
         if (!ctx.input.targetDataType)
-          throw new Error('targetDataType is required for cast_type');
+          throw createApiServiceError('targetDataType is required for cast_type');
         result = await client.castColumn(sheetHandle, columnName, ctx.input.targetDataType);
         break;
 
       case 'change_case':
-        if (!columnName) throw new Error('columnName is required for change_case');
-        if (!ctx.input.caseType) throw new Error('caseType is required for change_case');
+        if (!columnName) throw createApiServiceError('columnName is required for change_case');
+        if (!ctx.input.caseType)
+          throw createApiServiceError('caseType is required for change_case');
         result = await client.changeCase(sheetHandle, columnName, ctx.input.caseType);
         break;
 
       case 'trim_whitespace':
-        if (!columnName) throw new Error('columnName is required for trim_whitespace');
+        if (!columnName)
+          throw createApiServiceError('columnName is required for trim_whitespace');
         result = await client.trimWhitespace(sheetHandle, columnName);
         break;
 
       case 'extract_domain':
-        if (!columnName) throw new Error('columnName is required for extract_domain');
+        if (!columnName)
+          throw createApiServiceError('columnName is required for extract_domain');
         result = await client.extractDomain(sheetHandle, columnName);
         break;
 
       case 'explode_json':
-        if (!columnName) throw new Error('columnName is required for explode_json');
+        if (!columnName)
+          throw createApiServiceError('columnName is required for explode_json');
         result = await client.explodeJson(sheetHandle, columnName);
         break;
 
       case 'unroll_delimited':
-        if (!columnName) throw new Error('columnName is required for unroll_delimited');
+        if (!columnName)
+          throw createApiServiceError('columnName is required for unroll_delimited');
         result = await client.unrollDelimitedColumn(sheetHandle, columnName, {
           delimiter: ctx.input.separator
         });

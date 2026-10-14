@@ -7,7 +7,7 @@ let labelSchema = z.object({
   labelId: z.string().describe('Label ID'),
   name: z.string().describe('Label name'),
   color: z.string().describe('Label color'),
-  order: z.number().describe('Display order'),
+  order: z.number().describe('Display order, or 0 when no explicit order is set'),
   isFavorite: z.boolean().describe('Whether label is favorited')
 });
 

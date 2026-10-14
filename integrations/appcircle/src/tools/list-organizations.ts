@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listOrganizations = SlateTool.create(spec, {
@@ -35,6 +35,9 @@ export let listOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.page !== undefined && ctx.input.page < 1) {
+      throw createApiServiceError('page must be at least 1 for organization discovery.');
+    }
     let client = createClient(ctx);
     let result = await client.listOrganizations({
       search: ctx.input.search,
@@ -42,7 +45,10 @@ export let listOrganizations = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let orgs = result?.data ?? (Array.isArray(result) ? result : []);
+    let orgs = getAppcircleList(
+      Array.isArray(result) ? result : result?.data,
+      'organizations'
+    );
 
     return {
       output: {

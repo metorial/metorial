@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,16 @@ export let listConstituents = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Sort fields (comma-separated). Prefix with "-" for descending.'),
-      constituentCodeId: z.string().optional().describe('Filter by constituent code ID.'),
+      constituentCodeId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy unsupported code ID filter. Use constituentCodes with code names instead.'
+        ),
+      constituentCodes: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by constituent code names, such as Board Member or Volunteer.'),
       listId: z.string().optional().describe('Filter by list ID.'),
       includeDeceased: z.boolean().optional().describe('Include deceased constituents.'),
       includeInactive: z.boolean().optional().describe('Include inactive constituents.')
@@ -43,6 +52,12 @@ export let listConstituents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.constituentCodeId !== undefined) {
+      throw createApiServiceError(
+        'Blackbaud filters constituents by code name. Use constituentCodes instead of constituentCodeId.'
+      );
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       subscriptionKey: ctx.auth.subscriptionKey
@@ -54,7 +69,7 @@ export let listConstituents = SlateTool.create(spec, {
       dateAdded: ctx.input.dateAdded,
       lastModified: ctx.input.lastModified,
       sort: ctx.input.sort,
-      constituentCodeId: ctx.input.constituentCodeId,
+      constituentCodes: ctx.input.constituentCodes,
       constituentListId: ctx.input.listId,
       includeDeceased: ctx.input.includeDeceased,
       includeInactive: ctx.input.includeInactive

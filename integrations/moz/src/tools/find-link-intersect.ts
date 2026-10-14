@@ -79,12 +79,13 @@ export let findLinkIntersectTool = SlateTool.create(spec, {
     });
 
     let results = (response.results || []).map((r: any) => ({
-      sourcePage: r.page || r.source?.page,
-      sourceRootDomain: r.root_domain || r.source?.root_domain,
-      sourceDomainAuthority: r.domain_authority || r.source?.domain_authority,
-      sourcePageAuthority: r.page_authority || r.source?.page_authority,
-      sourceSpamScore: r.spam_score || r.source?.spam_score,
-      matchingTargetCount: r.matching_target_count
+      ...r,
+      sourcePage: r.page ?? r.source?.page,
+      sourceRootDomain: r.root_domain ?? r.source?.root_domain,
+      sourceDomainAuthority: r.domain_authority ?? r.source?.domain_authority,
+      sourcePageAuthority: r.page_authority ?? r.source?.page_authority,
+      sourceSpamScore: r.spam_score ?? r.source?.spam_score,
+      matchingTargetCount: r.matching_target_count ?? r.matching_target_indexes?.length
     }));
 
     return {

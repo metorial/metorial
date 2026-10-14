@@ -9,8 +9,9 @@ export let createCall = SlateTool.create(spec, {
   description: `Create a new call or meeting record in Leexi from an uploaded recording. The recording must first be uploaded using the presigned URL from the **Get Presigned Recording URL** tool. Call processing is asynchronous and typically takes a few minutes.`,
   instructions: [
     'First use "Get Presigned Recording URL" to get an upload URL, then upload your recording file via PUT to that URL.',
-    'Use the returned S3 key as the "recordingS3Key" parameter.',
-    'The "userUuid" must be a valid, licensed Leexi user. Use "List Users" to find available UUIDs.'
+    'Use the returned S3 key as the "recordingS3Key" parameter and the returned uploadHeaders for the PUT upload.',
+    'The "userUuid" must be a valid, licensed Leexi user. Use "List Users" to find available UUIDs.',
+    'Prefer customers and participatingUserUuids for new calls. Do not combine these with the legacy emails or rawPhoneNumber fields.'
   ],
   constraints: [
     'Rate limited to 10 requests/minute for call creation.',
@@ -38,7 +39,36 @@ export let createCall = SlateTool.create(spec, {
         .describe('Language locale code (e.g., "en-US", "fr-FR", "de-DE")'),
       tags: z.array(z.string()).optional().describe('Array of tag names to apply to the call'),
       emails: z.array(z.string()).optional().describe('Email addresses of other participants'),
-      rawPhoneNumber: z.string().optional().describe('Customer phone number')
+      rawPhoneNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Customer phone number (legacy field; cannot be combined with customers or participatingUserUuids)'
+        ),
+      participatingUserUuids: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Other Leexi participants. Call list_users to discover user UUIDs; cannot be combined with emails or rawPhoneNumber.'
+        ),
+      customers: z
+        .array(
+          z.object({
+            name: z.string().optional().describe('Customer name, used to identify speakers'),
+            email: z.string().optional().describe('Customer email address'),
+            phoneNumber: z.string().optional().describe('Customer phone number'),
+            customerUuid: z
+              .string()
+              .optional()
+              .describe(
+                'Existing customer UUID; when supplied, other customer attributes are ignored and unknown UUIDs are skipped'
+              )
+          })
+        )
+        .optional()
+        .describe(
+          'External participants, each with at least one attribute. Cannot be combined with emails or rawPhoneNumber.'
+        )
     })
   )
   .output(

@@ -40,8 +40,7 @@ export let getEmailLog = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let m = await client.getEmailLog(ctx.input.messageId);
@@ -50,11 +49,11 @@ export let getEmailLog = SlateTool.create(spec, {
       output: {
         messageId: m.message_id || ctx.input.messageId,
         status: m.status,
-        subject: m.subject,
+        subject: m.subject ?? undefined,
         from: m.from,
         to: m.to,
         sentAt: m.sent_at,
-        category: m.category,
+        category: m.category ?? undefined,
         sendingStream: m.sending_stream,
         opensCount: m.opens_count,
         clicksCount: m.clicks_count,

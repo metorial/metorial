@@ -1,4 +1,4 @@
-# Slates Specification for Fullenrich
+# FullEnrich Integration Specification
 
 ## Overview
 
@@ -18,7 +18,7 @@ The API key can be obtained from the FullEnrich dashboard at `https://app.fullen
 
 ### Contact Enrichment
 
-Find verified contact information (work email, personal email, mobile phone number) and professional profile details for people you want to reach. Requires at minimum the contact's first name, last name, and either a company domain or company name. Optionally, providing a LinkedIn URL increases the probability of finding results. Supports bulk enrichment of up to 100 contacts per request. The enrichment process is **asynchronous** — you submit a request and receive results via webhook or by polling a GET endpoint. Credits are only consumed when a phone number or email is found.
+Find verified contact information (work email, personal email, mobile phone number) and professional profile details for people you want to reach. Requires either a LinkedIn URL or the contact's first name, last name, and a company domain or company name. Providing all known identifiers improves matching. Supports bulk enrichment of up to 100 contacts per request. The enrichment process is **asynchronous** — you submit a request and receive results via webhook or by polling a GET endpoint. Credits are only consumed when a phone number or email is found.
 
 ### Reverse Email Lookup
 
@@ -32,9 +32,13 @@ Search for contacts using filters such as job title, location, industry, company
 
 Search for companies using various filters. Returns company details such as name, industry, headcount, and location. Like People Search, this is synchronous and returns results immediately.
 
+### Person and Company Lookup
+
+Resolve a known person by LinkedIn profile URL or numeric ID, or by full name combined with a company identifier. Resolve a known company by domain, LinkedIn URL, or numeric ID. Lookup results return at most one record in an array, stable IDs, professional details, and credits consumed. Empty arrays indicate no match.
+
 ### Credit Balance
 
-Check remaining credits available in your workspace. Useful for monitoring usage before initiating enrichment requests.
+Check credits currently spendable with the API key, capped by any consumption limit configured on the key. Useful for monitoring usage before initiating enrichment requests.
 
 ### API Key Verification
 

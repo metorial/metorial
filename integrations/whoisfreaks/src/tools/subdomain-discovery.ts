@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let subdomainDiscovery = SlateTool.create(spec, {
   name: 'Subdomain Discovery',
   key: 'subdomain_discovery',
-  description: `Discover all known subdomains for a given domain. Returns each subdomain with details such as first seen date, last seen date, and current status (active/inactive). Useful for security audits, attack surface mapping, and infrastructure analysis.`,
+  description: `Retrieve one page of known subdomains for a given domain, with first-seen, last-seen, and active/inactive status metadata. Filter by observation dates or status when investigating an attack surface.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -17,7 +17,28 @@ export let subdomainDiscovery = SlateTool.create(spec, {
       domainName: z
         .string()
         .describe('Domain name to discover subdomains for (e.g. "example.com")'),
-      page: z.number().optional().describe('Page number for paginated results')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page number must be a safe integer.')
+        .min(1)
+        .optional()
+        .describe('Page number for paginated results'),
+      after: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Only records created after this date (YYYY-MM-DD)'),
+      before: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Only records created before this date (YYYY-MM-DD)'),
+      status: z
+        .enum(['active', 'inactive'])
+        .optional()
+        .describe('Subdomain status; omit for both')
     })
   )
   .output(
@@ -27,7 +48,11 @@ export let subdomainDiscovery = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
-    let result = await client.subdomainLookup(ctx.input.domainName, ctx.input.page);
+    let result = await client.subdomainLookup(ctx.input.domainName, ctx.input.page, {
+      after: ctx.input.after,
+      before: ctx.input.before,
+      status: ctx.input.status
+    });
 
     return {
       output: { subdomains: result },

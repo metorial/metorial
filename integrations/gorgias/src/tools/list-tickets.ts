@@ -14,11 +14,35 @@ export let listTickets = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      limit: z.number().optional().describe('Number of tickets to return (default 30)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of tickets to return (default 30)'),
       customerId: z.number().optional().describe('Filter by customer ID'),
       assigneeUserId: z.number().optional().describe('Filter by assigned agent user ID'),
       assigneeTeamId: z.number().optional().describe('Filter by assigned team ID'),
-      status: z.enum(['open', 'closed']).optional().describe('Filter by ticket status')
+      status: z
+        .enum(['open', 'closed'])
+        .optional()
+        .describe('Legacy status filter; use viewId for documented view filtering'),
+      viewId: z
+        .number()
+        .optional()
+        .describe('View ID. Call list_views to discover views whose filters select tickets'),
+      externalId: z.string().optional().describe('Ticket identifier in an external system'),
+      trashed: z.boolean().optional().describe('Whether to include trashed tickets'),
+      orderBy: z
+        .enum([
+          'created_datetime:asc',
+          'created_datetime:desc',
+          'updated_datetime:asc',
+          'updated_datetime:desc'
+        ])
+        .optional()
+        .describe('Ticket ordering')
     })
   )
   .output(
@@ -50,7 +74,11 @@ export let listTickets = SlateTool.create(spec, {
       customer_id: ctx.input.customerId,
       assignee_user_id: ctx.input.assigneeUserId,
       assignee_team_id: ctx.input.assigneeTeamId,
-      status: ctx.input.status
+      status: ctx.input.status,
+      view_id: ctx.input.viewId,
+      external_id: ctx.input.externalId,
+      trashed: ctx.input.trashed,
+      order_by: ctx.input.orderBy
     });
 
     let tickets = result.data.map((t: any) => ({
@@ -72,10 +100,10 @@ export let listTickets = SlateTool.create(spec, {
     return {
       output: {
         tickets,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
-      message: `Found **${tickets.length}** ticket(s).${result.meta.next_cursor ? ' More results available with the next cursor.' : ''}`
+      message: `Found **${tickets.length}** ticket(s).${result.meta?.next_cursor ? ' More results available with the next cursor.' : ''}`
     };
   })
   .build();

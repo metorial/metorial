@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   computeFunnel,
+  computeMetric,
   createAlert,
   createFunnel,
   createWebhook,
@@ -36,7 +37,8 @@ export let provider = Slate.create({
     deleteFunnel,
     updateFunnel,
     setFunnelFavourite,
-    computeFunnel
+    computeFunnel,
+    computeMetric
   ],
   triggers: []
 });

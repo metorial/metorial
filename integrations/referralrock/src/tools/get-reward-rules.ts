@@ -32,7 +32,11 @@ export let getRewardRules = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('Program ID to get reward rules for')
+      programId: z
+        .string()
+        .describe(
+          'Program ID to get reward rules for. Use list_programs to discover program IDs.'
+        )
     })
   )
   .output(
@@ -45,7 +49,8 @@ export let getRewardRules = SlateTool.create(spec, {
 
     let result = await client.getRewardRules(ctx.input.programId);
 
-    let rules = ((result as unknown as Record<string, unknown>[]) || []).map(r => {
+    let ruleRecords = Array.isArray(result) ? result : [result];
+    let rules = ruleRecords.map(r => {
       let reward = (r.reward || {}) as Record<string, unknown>;
       let trigger = (r.trigger || {}) as Record<string, unknown>;
       return {

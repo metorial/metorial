@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let funnelStepSchema = z
@@ -68,17 +68,21 @@ export let funnelAnalysis = SlateTool.create(spec, {
   .output(
     z.object({
       result: z.array(z.number()).describe('Array of counts at each funnel step'),
-      stepsInfo: z
+      stepsInfo: z.array(z.any()).optional().describe('Detailed information for each step'),
+      actors: z
         .array(z.any())
         .optional()
-        .describe('Detailed information for each step, including actor IDs if requested')
+        .describe(
+          'Actor IDs for each requested step, with null entries for steps that omit them'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
+
+    if (ctx.input.steps[0]?.inverted || ctx.input.steps[0]?.optional) {
+      throw createApiServiceError('The first funnel step cannot be inverted or optional.');
+    }
 
     let steps = ctx.input.steps.map(step => {
       let s: Record<string, any> = {
@@ -101,7 +105,10 @@ export let funnelAnalysis = SlateTool.create(spec, {
 
     let response = await client.runFunnelAnalysis({ steps });
 
-    let resultArray = Array.isArray(response.result) ? response.result : [];
+    if (!Array.isArray(response.result)) {
+      throw createApiServiceError('Keen.io returned a funnel response without step counts.');
+    }
+    let resultArray = response.result;
     let stepLabels = ctx.input.steps.map(
       (s, i) => `Step ${i + 1} (${s.collectionName}): **${resultArray[i] ?? 'N/A'}**`
     );
@@ -109,7 +116,8 @@ export let funnelAnalysis = SlateTool.create(spec, {
     return {
       output: {
         result: resultArray,
-        stepsInfo: response.steps
+        stepsInfo: response.steps,
+        actors: response.actors
       },
       message: `Funnel analysis across **${ctx.input.steps.length}** steps:\n${stepLabels.join('\n')}`
     };

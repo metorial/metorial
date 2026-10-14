@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let ipGeolocation = SlateTool.create(spec, {
   name: 'IP Geolocation',
   key: 'ip_geolocation',
-  description: `Detect a user's approximate location by IP address. Returns country, city, coordinates, timezone, and language information. Omit the IP address to detect the caller's own location.`,
+  description: `Look up an IP address's approximate location, country, city, coordinates, timezone, and languages. Omitting the IP uses the integration server's outbound IP address.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +16,9 @@ export let ipGeolocation = SlateTool.create(spec, {
       ipAddress: z
         .string()
         .optional()
-        .describe("IP address to geolocate. Leave empty to detect the caller's IP.")
+        .describe(
+          "IP address to geolocate. Leave empty to use the integration server's outbound IP."
+        )
     })
   )
   .output(

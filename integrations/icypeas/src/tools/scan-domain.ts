@@ -14,7 +14,7 @@ export let scanDomain = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      domainOrCompany: z.string().describe('Domain name or company name to scan')
+      domainOrCompany: z.string().trim().min(1).describe('Domain name or company name to scan')
     })
   )
   .output(
@@ -29,15 +29,16 @@ export let scanDomain = SlateTool.create(spec, {
     let result = await client.domainSearch({
       domainOrCompany: ctx.input.domainOrCompany
     });
+    let searchId = result.item?._id || result._id || result.id;
 
     return {
       output: {
         success: result.success ?? true,
-        searchId: result._id || result.id
+        searchId
       },
       message:
         result.success !== false
-          ? `Domain scan submitted for **${ctx.input.domainOrCompany}**. Search ID: \`${result._id || result.id}\``
+          ? `Domain scan submitted for **${ctx.input.domainOrCompany}**. Search ID: \`${searchId}\``
           : `Domain scan failed: ${JSON.stringify(result)}`
     };
   })

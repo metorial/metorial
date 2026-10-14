@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let apiClient = createAxios({
-  baseURL: 'https://app.bettercontact.rocks/api/v2'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,16 +28,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await apiClient.get('/account', {
-        headers: {
-          'X-API-Key': ctx.output.token
-        }
-      });
+      let account = await new Client({ token: ctx.output.token }).getCreditsBalance();
 
       return {
         profile: {
-          email: response.data.email,
-          creditsLeft: response.data.credits_left
+          email: account.email,
+          creditsLeft: account.creditsLeft
         }
       };
     }

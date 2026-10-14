@@ -1,9 +1,48 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.emailable.com'
+let oauthAxios = createAxios({
+  baseURL: 'https://app.emailable.com'
 });
+
+let exchangeToken = async (body: Record<string, string>, previousRefreshToken?: string) => {
+  let data = await requestAxiosData(
+    'exchange OAuth token',
+    () => oauthAxios.post('/oauth/token', new URLSearchParams(body)),
+    (error, operation) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Emailable',
+        operation,
+        reason: 'emailable_oauth_error'
+      })
+  );
+  return normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Emailable',
+    operation: 'token exchange',
+    previousRefreshToken,
+    refreshTokenFallbackMode: 'falsy',
+    required: true,
+    expiresInType: 'number'
+  });
+};
+
+let getProfile = async (ctx: { output: { token: string } }) => {
+  let account = await new Client({ token: ctx.output.token }).getAccount();
+  return {
+    profile: {
+      email: account.ownerEmail,
+      availableCredits: account.availableCredits
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,39 +56,21 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
-      token: z.string().describe('Your Emailable API key (found in the Emailable Dashboard)')
+      token: z
+        .string()
+        .min(1)
+        .describe(
+          'Your private Emailable API key from the Emailable Dashboard. Public keys only support single email verification and cannot connect this account.'
+        )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await apiAxios.get('/v1/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      return {
-        profile: {
-          email: response.data.owner_email,
-          availableCredits: response.data.available_credits
-        }
-      };
-    }
+    getOutput: async ctx => ({ output: { token: ctx.input.token } }),
+    getProfile
   })
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
     scopes: [
       {
         title: 'All Access',
@@ -57,7 +78,6 @@ export let auth = SlateAuth.create()
         scope: 'all'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         response_type: 'code',
@@ -65,69 +85,49 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri,
         state: ctx.state
       });
-
-      return {
-        url: `https://api.emailable.com/oauth/authorize?${params.toString()}`
-      };
+      return { url: `https://app.emailable.com/oauth/authorize?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
-      let response = await apiAxios.post('/oauth/token', {
+      let output = await exchangeToken({
         grant_type: 'authorization_code',
         code: ctx.code,
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
         redirect_uri: ctx.redirectUri
       });
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
+      if (!output.refreshToken) {
+        throw createApiServiceError(
+          'Emailable did not return a refresh token. Reconnect the account.',
+          {
+            reason: 'emailable_oauth_error'
+          }
+        );
+      }
+      return { output };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let response = await apiAxios.post('/oauth/token', {
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: {
-      output: { token: string };
-      input: Record<string, never>;
-      scopes: string[];
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
     }) => {
-      let response = await apiAxios.get('/v1/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      return {
-        profile: {
-          email: response.data.owner_email,
-          availableCredits: response.data.available_credits
-        }
-      };
-    }
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'The Emailable refresh token is missing. Reconnect the account.',
+          {
+            reason: 'emailable_oauth_error'
+          }
+        );
+      }
+      let output = await exchangeToken(
+        {
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        },
+        ctx.output.refreshToken
+      );
+      return { output };
+    },
+    getProfile
   });

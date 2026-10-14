@@ -1,17 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { assertGenerationSucceeded, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateVideo = SlateTool.create(spec, {
   name: 'Generate Video',
   key: 'generate_video',
-  description: `Generate videos from text prompts or reference images using video generation models like MiniMax and Kling AI.
+  description: `Generate videos from text prompts or reference images using MiniMax video models.
 Video generation is asynchronous — the tool submits the request and polls for results.
 Supports text-to-video and image-to-video workflows.`,
   instructions: [
     'Use model IDs like "video-01" for MiniMax video generation.',
-    'Optionally provide a firstFrameImage URL to use as the starting frame for image-to-video generation.'
+    'Optionally provide a firstFrameImage URL to use as the starting frame for image-to-video generation.',
+    'If the video is still processing, call get_video_result with its generationId.'
   ],
   constraints: [
     'Video generation typically takes less than a minute but may take longer for complex prompts.'
@@ -51,14 +52,30 @@ Supports text-to-video and image-to-video workflows.`,
       firstFrameImage: ctx.input.firstFrameImage
     });
 
-    let generationId = createResult.generation_id;
+    let generationId = createResult.generation_id ?? createResult.id;
+    if (!generationId) {
+      throw createApiServiceError('AI/ML API returned no video generation ID. Try again.');
+    }
     let maxAttempts = 30;
     let pollIntervalMs = 10000;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let result = await client.getVideoResult(generationId);
+      assertGenerationSucceeded(result, 'Video');
 
       if (result.status === 'completed') {
+        if (!result.video?.url) {
+          throw createApiServiceError(
+            'AI/ML API reported a completed video without a download URL. Try get_video_result.'
+          );
+        }
+        if (result.video?.url) {
+          await ctx.addAttachment({
+            type: 'url',
+            url: result.video.url,
+            mimeType: 'video/mp4'
+          });
+        }
         return {
           output: {
             generationId,
@@ -66,17 +83,6 @@ Supports text-to-video and image-to-video workflows.`,
             videoUrl: result.video?.url
           },
           message: `Video generated successfully using **${ctx.input.model}**. ${result.video?.url ? `[View video](${result.video.url})` : ''}`
-        };
-      }
-
-      if (result.status === 'failed' || result.status === 'error') {
-        return {
-          output: {
-            generationId,
-            status: result.status,
-            videoUrl: undefined
-          },
-          message: `Video generation failed with status: ${result.status}.`
         };
       }
 
@@ -90,7 +96,7 @@ Supports text-to-video and image-to-video workflows.`,
         status: 'processing',
         videoUrl: undefined
       },
-      message: `Video is still processing. Generation ID: \`${generationId}\`.`
+      message: `Video is still processing. Call get_video_result with generation ID: \`${generationId}\`.`
     };
   })
   .build();

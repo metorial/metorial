@@ -59,7 +59,7 @@ export let getCodingStats = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let stats = await client.getStats(ctx.input.range, {
       project: ctx.input.project,

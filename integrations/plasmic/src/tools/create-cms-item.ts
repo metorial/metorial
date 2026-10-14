@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
+import { cmsModelIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createCmsItem = SlateTool.create(spec, {
@@ -13,14 +14,13 @@ export let createCmsItem = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      modelId: z
-        .string()
-        .describe('Unique identifier of the CMS model/table to create the item in'),
+      modelId: cmsModelIdSchema,
       fields: z
         .record(z.string(), z.unknown())
         .describe(
           'Field values for the new item. Keys should match the model field identifiers'
         ),
+      identifier: z.string().optional().describe('Human-readable identifier for the CMS item'),
       publish: z
         .boolean()
         .optional()
@@ -33,8 +33,8 @@ export let createCmsItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.cmsId || !ctx.auth.cmsPublicToken || !ctx.auth.cmsSecretToken) {
-      throw new Error('CMS ID, public token, and secret token are required to create items');
+    if (!ctx.auth.cmsId || !ctx.auth.cmsSecretToken) {
+      throw createApiServiceError('CMS ID and secret token are required to create items');
     }
 
     let client = new CmsClient({
@@ -46,6 +46,7 @@ export let createCmsItem = SlateTool.create(spec, {
     let result = await client.createItem({
       modelId: ctx.input.modelId,
       data: ctx.input.fields,
+      identifier: ctx.input.identifier,
       publish: ctx.input.publish
     });
 

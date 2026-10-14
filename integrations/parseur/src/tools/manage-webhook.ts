@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,7 +63,7 @@ export let manageWebhook = SlateTool.create(spec, {
     switch (action) {
       case 'create': {
         if (!event || !targetUrl) {
-          throw new Error('event and targetUrl are required for create action');
+          throw createApiServiceError('event and targetUrl are required for create action');
         }
         let webhook = await client.createWebhook({
           event,
@@ -77,7 +77,9 @@ export let manageWebhook = SlateTool.create(spec, {
       }
       case 'enable': {
         if (!mailboxId || !webhookId) {
-          throw new Error('mailboxId and webhookId are required for enable action');
+          throw createApiServiceError(
+            'mailboxId and webhookId are required for enable action'
+          );
         }
         await client.enableWebhook(mailboxId, webhookId);
         resultMessage = `Webhook ${webhookId} enabled on mailbox ${mailboxId}`;
@@ -85,7 +87,9 @@ export let manageWebhook = SlateTool.create(spec, {
       }
       case 'disable': {
         if (!mailboxId || !webhookId) {
-          throw new Error('mailboxId and webhookId are required for disable action');
+          throw createApiServiceError(
+            'mailboxId and webhookId are required for disable action'
+          );
         }
         await client.disableWebhook(mailboxId, webhookId);
         resultMessage = `Webhook ${webhookId} disabled on mailbox ${mailboxId}`;
@@ -93,7 +97,7 @@ export let manageWebhook = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!webhookId) {
-          throw new Error('webhookId is required for delete action');
+          throw createApiServiceError('webhookId is required for delete action');
         }
         await client.deleteWebhook(webhookId);
         resultMessage = `Webhook ${webhookId} deleted`;

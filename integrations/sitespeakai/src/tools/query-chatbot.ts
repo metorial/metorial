@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { chatbotIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let queryChatbot = SlateTool.create(spec, {
@@ -14,9 +15,7 @@ export let queryChatbot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z
-        .string()
-        .describe('The ID of the chatbot to query. Found on the chatbot settings page.'),
+      chatbotId: chatbotIdSchema,
       prompt: z.string().describe('The question or query text to send to the chatbot.'),
       conversationId: z
         .string()

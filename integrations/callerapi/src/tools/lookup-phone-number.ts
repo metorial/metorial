@@ -48,7 +48,7 @@ export let lookupPhoneNumber = SlateTool.create(spec, {
   description: `Retrieve comprehensive intelligence about a phone number including carrier info, spam reputation, complaint history, and porting status. Aggregates data from multiple sources. Optionally includes HLR (Home Location Register) data for real-time network validation.`,
   instructions: [
     'Phone numbers must be in E.164 format (e.g., +16502530000)',
-    'Enabling HLR adds 1-3 seconds to response time but provides real-time carrier validation at no additional cost'
+    'Enable HLR when you need carrier validation in addition to spam and caller intelligence'
   ],
   tags: {
     readOnly: true

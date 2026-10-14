@@ -35,7 +35,11 @@ export let createSchema = SlateTool.create(spec, {
       settings: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Optional schema-level settings')
+        .describe('Optional schema-level settings; defaults to an empty object'),
+      hooks: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Serializable Dromo hooks with callback source code as strings')
     })
   )
   .output(
@@ -59,7 +63,8 @@ export let createSchema = SlateTool.create(spec, {
         alternateMatches: f.alternateMatches,
         validators: f.validators
       })),
-      settings: ctx.input.settings
+      settings: ctx.input.settings,
+      hooks: ctx.input.hooks
     });
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,10 @@ export let manageTagsTool = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'retrieve', 'list']).describe('The action to perform'),
-      boardId: z.string().optional().describe('Board ID (required for create and list)'),
+      boardId: z
+        .string()
+        .optional()
+        .describe('Board ID (required for create; optional filter for list)'),
       tagId: z.string().optional().describe('Tag ID (for retrieve)'),
       name: z.string().optional().describe('Tag name (for create)'),
       limit: z.number().optional().describe('Number of tags to return (for list)'),
@@ -55,8 +58,8 @@ export let manageTagsTool = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.boardId) throw new Error('boardId is required for create');
-        if (!ctx.input.name) throw new Error('name is required for create');
+        if (!ctx.input.boardId) throw createApiServiceError('boardId is required for create');
+        if (!ctx.input.name) throw createApiServiceError('name is required for create');
         let result = await client.createTag({
           boardID: ctx.input.boardId,
           name: ctx.input.name
@@ -77,7 +80,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
 
       case 'retrieve': {
-        if (!ctx.input.tagId) throw new Error('tagId is required for retrieve');
+        if (!ctx.input.tagId) throw createApiServiceError('tagId is required for retrieve');
         let tag = await client.retrieveTag(ctx.input.tagId);
         return {
           output: {
@@ -95,7 +98,6 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
 
       case 'list': {
-        if (!ctx.input.boardId) throw new Error('boardId is required for list');
         let result = await client.listTags({
           boardID: ctx.input.boardId,
           limit: ctx.input.limit,
@@ -115,7 +117,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

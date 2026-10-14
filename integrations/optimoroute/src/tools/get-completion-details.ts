@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getCompletionImageRefreshAt, getCompletionImages } from '../lib/completion-images';
 import { spec } from '../spec';
 
 let completionDataSchema = z.object({
@@ -96,14 +97,46 @@ export let getCompletionDetails = SlateTool.create(spec, {
 
     let result = await client.getCompletionDetails(requestOrders);
 
-    let orders = (result.orders || []).map((o: Record<string, unknown>) => ({
-      success: o.success as boolean,
-      orderNo: o.orderNo as string | undefined,
-      orderId: o.id as string | undefined,
-      completionData: o.data as Record<string, unknown> | undefined,
-      code: o.code as string | undefined,
-      message: o.message as string | undefined
-    }));
+    for (let [index, order] of (result.orders || []).entries()) {
+      if (!order.success) continue;
+      let reference = {
+        orderNo: order.orderNo ?? requestOrders[index]?.orderNo,
+        orderId: order.id ?? requestOrders[index]?.id
+      };
+      for (let image of getCompletionImages(order.data)) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: image.url,
+          mimeType: image.mimeType,
+          refreshReference: { ...reference, imagePath: image.path },
+          refreshAt: getCompletionImageRefreshAt(image.url)
+        });
+      }
+    }
+
+    let orders = (result.orders || []).map((o: Record<string, unknown>) => {
+      let data = isApiErrorRecord(o.data) ? o.data : undefined;
+      let form = data && isApiErrorRecord(data.form) ? data.form : undefined;
+      return {
+        success: o.success as boolean,
+        orderNo: o.orderNo as string | undefined,
+        orderId: o.id as string | undefined,
+        completionData: data
+          ? {
+              ...data,
+              trackingUrl: data.trackingUrl ?? data.tracking_url,
+              notes: data.notes ?? form?.note,
+              signatures:
+                data.signatures ??
+                (isApiErrorRecord(form?.signature) ? [form.signature] : undefined),
+              photos: data.photos ?? form?.images,
+              barcodes: data.barcodes ?? form?.barcode
+            }
+          : undefined,
+        code: o.code as string | undefined,
+        message: o.message as string | undefined
+      };
+    });
 
     let found = orders.filter((o: { success: boolean }) => o.success).length;
 

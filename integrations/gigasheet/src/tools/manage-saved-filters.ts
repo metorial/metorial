@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,13 +39,16 @@ export let manageSavedFilters = SlateTool.create(spec, {
         break;
 
       case 'get':
-        if (!ctx.input.filterHandle) throw new Error('filterHandle is required for get');
+        if (!ctx.input.filterHandle)
+          throw createApiServiceError('filterHandle is required for get');
         result = await client.getSavedFilter(ctx.input.filterHandle);
         break;
 
       case 'create_or_update':
         if (!ctx.input.filterHandle || !ctx.input.filterConfig) {
-          throw new Error('filterHandle and filterConfig are required for create_or_update');
+          throw createApiServiceError(
+            'filterHandle and filterConfig are required for create_or_update'
+          );
         }
         result = await client.createOrUpdateSavedFilter(
           ctx.input.filterHandle,
@@ -54,7 +57,8 @@ export let manageSavedFilters = SlateTool.create(spec, {
         break;
 
       case 'delete':
-        if (!ctx.input.filterHandle) throw new Error('filterHandle is required for delete');
+        if (!ctx.input.filterHandle)
+          throw createApiServiceError('filterHandle is required for delete');
         await client.deleteSavedFilter(ctx.input.filterHandle);
         result = { deleted: true };
         break;

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getMetadata = SlateTool.create(spec, {
   name: 'Get Metadata',
   key: 'get_metadata',
-  description: `Retrieves the complete schema of custom fields, meta attributes, and marketing audiences configured in your SuiteDash account. Use this to discover available CRM Contact Custom Fields, CRM Company Custom Fields, Project Custom Fields, and Marketing Audience subscription options before creating or updating records.`,
+  description: `Retrieves contact metadata, custom field definitions, and configured options from SuiteDash. Use this before creating or updating contacts or selecting marketing audiences. Use Get Company Metadata for company field definitions.`,
   instructions: [
     'Call this tool first to discover the available custom fields for your account before using Create Contact, Update Contact, or Subscribe to Marketing Audience.'
   ],

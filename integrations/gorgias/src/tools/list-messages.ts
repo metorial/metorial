@@ -15,7 +15,13 @@ export let listMessages = SlateTool.create(spec, {
     z.object({
       ticketId: z.number().describe('ID of the ticket to list messages for'),
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of messages to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of messages to return')
     })
   )
   .output(
@@ -60,8 +66,8 @@ export let listMessages = SlateTool.create(spec, {
     return {
       output: {
         messages,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
       message: `Found **${messages.length}** message(s) in ticket **#${ctx.input.ticketId}**.`
     };

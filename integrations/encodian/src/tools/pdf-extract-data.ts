@@ -47,41 +47,51 @@ Supports extracting the full text layer, text by page, structured form data, tab
       pageCount: z.number().optional().describe('Total page count'),
       fileSize: z.string().optional().describe('File size'),
       metadata: z.any().optional().describe('Document metadata'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
     let outputData: any = {};
 
     switch (ctx.input.extractionType) {
       case 'text':
         result = await client.extractPdfText({
-          fileContent: ctx.input.fileContent
+          FileName: 'input.pdf',
+          FileContent: ctx.input.fileContent,
+          FinalOperation: true
         });
-        outputData.text = result.text || result.Text || '';
+        outputData.text = result.TextLayer ?? result.text ?? result.Text ?? '';
         break;
 
       case 'text_by_page':
         result = await client.extractPdfTextByPage({
           fileContent: ctx.input.fileContent
         });
-        outputData.pages = result.pages || result.Pages || [];
+        outputData.pages = (result.pages ?? result.Pages ?? []).map((page: any) => ({
+          pageNumber: page.Number ?? page.pageNumber,
+          text: page.Text ?? page.text ?? ''
+        }));
         break;
 
       case 'form_data':
         result = await client.extractPdfFormData({
-          fileContent: ctx.input.fileContent
+          FileName: 'input.pdf',
+          FileContent: ctx.input.fileContent,
+          FinalOperation: false
         });
-        outputData.formFields = result.formData || result.FormData || result;
+        outputData.formFields =
+          result['Form Data'] ?? result.formData ?? result.FormData ?? result;
         break;
 
       case 'table_data':
         result = await client.extractPdfTableData({
           fileContent: ctx.input.fileContent
         });
-        outputData.tableData = result.tableData || result.TableData || result;
+        outputData.tableData = result.result ?? result.tableData ?? result.TableData ?? result;
         break;
 
       case 'images':
@@ -94,21 +104,29 @@ Supports extracting the full text layer, text by page, structured form data, tab
         }));
         break;
 
-      case 'metadata':
+      case 'metadata': {
         result = await client.getPdfMetadata({
+          FileName: 'input.pdf',
           fileContent: ctx.input.fileContent
         });
-        outputData.pageCount = result.pageCount || result.PageCount;
-        outputData.fileSize = result.fileSize || result.FileSize;
+        outputData.pageCount = result.NumberOfPages ?? result.pageCount ?? result.PageCount;
+        let fileSize = result.FileSize ?? result.fileSize;
+        outputData.fileSize =
+          fileSize === undefined || fileSize === null ? undefined : String(fileSize);
         outputData.metadata = result;
         break;
+      }
     }
 
     outputData.operationId = result.OperationId || '';
+    outputData.operationStatus = client.operationStatus;
+    outputData.statusUrl = client.statusUrl;
 
     return {
       output: outputData,
-      message: `Successfully extracted **${ctx.input.extractionType}** from PDF document.`
+      message: client.message(
+        `Successfully extracted **${ctx.input.extractionType}** from PDF document.`
+      )
     };
   })
   .build();

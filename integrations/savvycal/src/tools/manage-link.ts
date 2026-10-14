@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,8 @@ export let manageLinkTool = SlateTool.create(spec, {
     let { action, linkId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a link');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a link.');
 
       let l = await client.createLink({
         name: ctx.input.name,
@@ -78,7 +79,9 @@ export let manageLinkTool = SlateTool.create(spec, {
     }
 
     if (!linkId)
-      throw new Error('Link ID is required for update, delete, and duplicate actions');
+      throw createApiServiceError(
+        'Link ID is required for update, delete, and duplicate actions.'
+      );
 
     if (action === 'update') {
       let l = await client.updateLink(linkId, {

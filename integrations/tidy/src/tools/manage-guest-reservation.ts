@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 let reservationOutputSchema = z.object({
@@ -15,9 +16,9 @@ let reservationOutputSchema = z.object({
 });
 
 let mapReservation = (data: any) => ({
-  reservationId: data.id,
-  addressId: data.address_id,
-  jobId: data.job_id ?? null,
+  reservationId: formatTidyId(data.id),
+  addressId: formatTidyId(data.address_id),
+  jobId: data.job_id == null ? null : formatTidyId(data.job_id),
   checkInDate: data.check_in?.date ?? data.check_in_date ?? '',
   checkInTime: data.check_in?.time ?? data.check_in_time ?? null,
   checkOutDate: data.check_out?.date ?? data.check_out_date ?? '',

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/lessonspace",
-  "description": "Create and manage virtual classroom spaces for online tutoring and teaching. Launch spaces with configurable whiteboards, video conferencing, and document editing. Generate per-user join URLs with customizable roles, permissions, and feature toggles. Manage sessions, retrieve session recordings, transcriptions, and AI-generated lesson summaries. List and manage organisation users. Configure space branding, theming, locale, and access restrictions.",
+  "description": "Create and manage virtual classroom spaces for online tutoring and teaching. Launch spaces with configurable whiteboards, video conferencing, and document editing. Generate per-user join URLs with customizable roles, permissions, and feature toggles. Manage sessions, retrieve session recordings, transcriptions, and AI-generated lesson summaries. List and manage organisation users. Configure space branding, theming, locale, and access restrictions. Delete session or space recording data for retention workflows.",
   "categories": ["education-and-learning", "scheduling-and-calendars"],
   "skills": [
     "launch virtual classroom spaces",
@@ -12,7 +12,7 @@
     "manage organisation users",
     "set user roles and permissions",
     "customize space branding and theming",
-    "track real-time session events"
+    "delete session and space recording data"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/lessonspace.svg"
 }

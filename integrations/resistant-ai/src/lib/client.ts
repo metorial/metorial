@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api-dot-stackgo-300922.ts.r.appspot.com/api';
 
@@ -60,14 +60,33 @@ export interface ListParams {
 }
 
 export class IdentityCheckClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(token: string) {
-    this.http = createAxios({
+  constructor(auth: { token: string; providerKind?: string; documentsBaseUrl?: string }) {
+    if (
+      (auth.providerKind !== undefined && auth.providerKind !== 'identitycheck') ||
+      auth.documentsBaseUrl !== undefined
+    ) {
+      throw createApiServiceError(
+        'This legacy IdentityCheck tool requires the IdentityCheck API Key connection. Use the document tools with Resistant Documents credentials.'
+      );
+    }
+    if (!auth.token.trim()) {
+      throw createApiServiceError(
+        'An IdentityCheck API key is required. Reconnect with your API key.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${auth.token}` },
+      timeout: 30_000,
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'IdentityCheck',
+          reason: 'identitycheck_api_error'
+        }),
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json'
       }
     });
@@ -88,7 +107,9 @@ export class IdentityCheckClient {
   }
 
   async getVerification(verificationId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/verifications/${verificationId}`);
+    let response = await this.http.get(
+      `/identitycheck/verifications/${encodeURIComponent(verificationId)}`
+    );
     return response.data;
   }
 
@@ -107,14 +128,14 @@ export class IdentityCheckClient {
 
   async cancelVerification(verificationId: string): Promise<Record<string, any>> {
     let response = await this.http.post(
-      `/identitycheck/verifications/${verificationId}/cancel`
+      `/identitycheck/verifications/${encodeURIComponent(verificationId)}/cancel`
     );
     return response.data;
   }
 
   async resendVerificationEmail(verificationId: string): Promise<Record<string, any>> {
     let response = await this.http.post(
-      `/identitycheck/verifications/${verificationId}/resend`
+      `/identitycheck/verifications/${encodeURIComponent(verificationId)}/resend`
     );
     return response.data;
   }
@@ -133,7 +154,9 @@ export class IdentityCheckClient {
   }
 
   async getAmlScreening(screeningId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/aml/screenings/${screeningId}`);
+    let response = await this.http.get(
+      `/identitycheck/aml/screenings/${encodeURIComponent(screeningId)}`
+    );
     return response.data;
   }
 
@@ -163,7 +186,9 @@ export class IdentityCheckClient {
   }
 
   async getProofOfAddress(checkId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/proof-of-address/${checkId}`);
+    let response = await this.http.get(
+      `/identitycheck/proof-of-address/${encodeURIComponent(checkId)}`
+    );
     return response.data;
   }
 
@@ -181,7 +206,9 @@ export class IdentityCheckClient {
   }
 
   async getBackgroundCheck(checkId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/background-checks/${checkId}`);
+    let response = await this.http.get(
+      `/identitycheck/background-checks/${encodeURIComponent(checkId)}`
+    );
     return response.data;
   }
 
@@ -200,7 +227,9 @@ export class IdentityCheckClient {
   }
 
   async getCreditCheck(checkId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/credit-checks/${checkId}`);
+    let response = await this.http.get(
+      `/identitycheck/credit-checks/${encodeURIComponent(checkId)}`
+    );
     return response.data;
   }
 
@@ -218,7 +247,9 @@ export class IdentityCheckClient {
   }
 
   async getKybReport(reportId: string): Promise<Record<string, any>> {
-    let response = await this.http.get(`/identitycheck/kyb/reports/${reportId}`);
+    let response = await this.http.get(
+      `/identitycheck/kyb/reports/${encodeURIComponent(reportId)}`
+    );
     return response.data;
   }
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,7 @@ export let manageTeams = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let params: Record<string, string | number> = {};
+      if (ctx.input.organizationId) params.organization = ctx.input.organizationId;
       if (ctx.input.limit) params.limit = ctx.input.limit;
       if (ctx.input.offset) params.offset = ctx.input.offset;
 
@@ -54,8 +55,9 @@ export let manageTeams = SlateTool.create(spec, {
       let teams = (data.teams || []).map((t: any) => ({
         teamId: t.id,
         name: t.name,
-        emoji: t.emoji,
-        organizationId: t.organization?.id,
+        emoji: t.emoji ?? undefined,
+        organizationId:
+          typeof t.organization === 'string' ? t.organization : t.organization?.id,
         activeMembers: t.active_members?.map((m: any) => (typeof m === 'string' ? m : m.id)),
         observers: t.observers?.map((o: any) => (typeof o === 'string' ? o : o.id))
       }));
@@ -72,12 +74,12 @@ export let manageTeams = SlateTool.create(spec, {
     if (ctx.input.activeMembers) fields.active_members = ctx.input.activeMembers;
     if (ctx.input.observers) fields.observers = ctx.input.observers;
     if (ctx.input.mentionNotification)
-      fields.mention_notification = ctx.input.mentionNotification;
+      fields.team_mention_behavior = ctx.input.mentionNotification;
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for creating teams');
-      if (!ctx.input.name) throw new Error('name is required for creating teams');
+        throw createApiServiceError('organizationId is required for creating teams');
+      if (!ctx.input.name) throw createApiServiceError('name is required for creating teams');
       fields.organization = ctx.input.organizationId;
       let data = await client.createTeams(fields);
       let teams = Array.isArray(data.teams) ? data.teams : [data.teams];
@@ -86,8 +88,9 @@ export let manageTeams = SlateTool.create(spec, {
           teams: teams.map((t: any) => ({
             teamId: t.id,
             name: t.name,
-            emoji: t.emoji,
-            organizationId: t.organization?.id,
+            emoji: t.emoji ?? undefined,
+            organizationId:
+              typeof t.organization === 'string' ? t.organization : t.organization?.id,
             activeMembers: t.active_members?.map((m: any) =>
               typeof m === 'string' ? m : m.id
             ),
@@ -99,7 +102,8 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.teamId) throw new Error('teamId is required for updating teams');
+    if (!ctx.input.teamId)
+      throw createApiServiceError('teamId is required for updating teams');
     let data = await client.updateTeams([ctx.input.teamId], fields);
     let teams = Array.isArray(data.teams) ? data.teams : [data.teams];
     return {
@@ -107,8 +111,9 @@ export let manageTeams = SlateTool.create(spec, {
         teams: teams.map((t: any) => ({
           teamId: t.id,
           name: t.name,
-          emoji: t.emoji,
-          organizationId: t.organization?.id,
+          emoji: t.emoji ?? undefined,
+          organizationId:
+            typeof t.organization === 'string' ? t.organization : t.organization?.id,
           activeMembers: t.active_members?.map((m: any) => (typeof m === 'string' ? m : m.id)),
           observers: t.observers?.map((o: any) => (typeof o === 'string' ? o : o.id))
         }))

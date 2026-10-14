@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,12 @@ export let listTimeEntries = SlateTool.create(spec, {
       from: z.string().describe('Start date (YYYY-MM-DD). Required to filter time entries.'),
       to: z.string().describe('End date (YYYY-MM-DD). Required to filter time entries.'),
       taskIds: z.string().optional().describe('Comma-separated task IDs to filter by'),
-      userIds: z.string().optional().describe('Comma-separated user IDs to filter by'),
+      userIds: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated numeric user IDs to filter by, or me for the authenticated user'
+        ),
       withSubtasks: z.boolean().optional().describe('Include subtask entries')
     })
   )
@@ -42,6 +47,9 @@ export let listTimeEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.from > ctx.input.to) {
+      throw createApiServiceError('from must be on or before to.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let entries = await client.getTimeEntries({
@@ -49,20 +57,20 @@ export let listTimeEntries = SlateTool.create(spec, {
       to: ctx.input.to,
       taskIds: ctx.input.taskIds,
       userIds: ctx.input.userIds,
-      withSubtasks: ctx.input.withSubtasks ? 1 : undefined
+      withSubtasks: ctx.input.withSubtasks
     });
 
     let mapped = (entries || []).map(e => ({
       entryId: String(e.id),
       duration: String(e.duration),
-      userId: String(e.user_id),
-      userName: e.user_name || '',
-      taskId: String(e.task_id),
-      taskName: e.name || '',
+      userId: String(e.user?.id ?? ''),
+      userName: e.user?.display_name ?? '',
+      taskId: String(e.task?.id ?? ''),
+      taskName: e.task?.name ?? '',
       date: e.date || '',
       startTime: e.start_time || '',
       endTime: e.end_time || '',
-      billable: String(e.billable || '0'),
+      billable: e.billable ? '1' : '0',
       description: e.description || '',
       lastModified: e.last_modify || ''
     }));

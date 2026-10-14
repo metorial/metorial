@@ -1,6 +1,10 @@
-# <img src="logo.svg" height="20"> Kontent.ai
+# Kontent.ai
 
-Manage structured content in a headless CMS. Create, update, publish, and deliver content items and their language variants across multiple environments. Manage content types, taxonomies, assets, workflows, collections, spaces, and languages. Retrieve published or preview content via REST and GraphQL APIs. Upload and organize binary files and assets with metadata. Define and manage workflow stages and transitions for content lifecycle. Synchronize content changes using queue-based Sync API with continuation tokens. Apply image transformations such as resizing, cropping, and format conversion. Manage users, roles, and project settings.
+Manage structured content and localized variants using the Kontent.ai Management API. List and inspect content items and content types, create and delete items, update variant content, and publish or schedule content. List workflows, languages, collections, and taxonomy groups; inspect, update, and delete assets.
+
+Use a Management API key or personal API key with the permissions needed for each operation. Supply `environmentId` from Kontent.ai project settings when calling a tool, and use `get_environment` to verify the environment name and access. Existing connections can keep their saved environment ID as a default. Environment discovery across subscriptions requires a separate Subscription API credential and is outside this integration.
+
+`get_language_variant` retrieves the latest version of a specific localization. `delete_language_variant` removes one localization; deleting the last remaining variant also deletes its parent item. Use `list_languages` to discover language codenames and continuation tokens to fetch additional pages. For workflow changes, use `list_workflows` to discover workflow and step IDs.
 
 ## License
 

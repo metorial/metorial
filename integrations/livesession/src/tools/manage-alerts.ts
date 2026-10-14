@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,9 @@ let alertSchema = z.object({
   events: z.array(alertEventSchema).optional().describe('Events that trigger this alert'),
   provider: z.string().optional().describe('Notification provider (slack or webhooks)'),
   slackChannelId: z.string().optional().describe('Slack channel ID if provider is slack'),
-  webhookId: z.string().optional().describe('Webhook endpoint ID if provider is webhooks')
+  webhookId: z.string().optional().describe('Webhook endpoint ID if provider is webhooks'),
+  enabled: z.boolean().optional().describe('Whether the alert is active'),
+  creationDate: z.string().optional().describe('Alert creation date in ISO 8601 format')
 });
 
 let mapAlert = (a: any) => ({
@@ -23,7 +25,9 @@ let mapAlert = (a: any) => ({
   events: a.events,
   provider: a.provider,
   slackChannelId: a.slack_channel_id,
-  webhookId: a.webhook_id
+  webhookId: a.webhook_id,
+  enabled: a.enabled,
+  creationDate: a.creation_date
 });
 
 export let listAlerts = SlateTool.create(spec, {
@@ -77,6 +81,12 @@ export let createAlert = SlateTool.create(spec, {
   )
   .output(alertSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.provider === 'slack' && !ctx.input.slackChannelId) {
+      throw createApiServiceError('slackChannelId is required when provider is slack.');
+    }
+    if (ctx.input.provider === 'webhooks' && !ctx.input.webhookId) {
+      throw createApiServiceError('webhookId is required when provider is webhooks.');
+    }
     let client = new Client(ctx.auth.token);
     let result = await client.createAlert({
       name: ctx.input.name,
@@ -160,9 +170,12 @@ export let deleteAlert = SlateTool.create(spec, {
     return {
       output: {
         alertId: result.alert_id || ctx.input.alertId,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted alert **${ctx.input.alertId}**.`
+      message:
+        result.deleted === true
+          ? `Deleted alert **${ctx.input.alertId}**.`
+          : `LiveSession did not confirm deletion of alert **${ctx.input.alertId}**.`
     };
   })
   .build();

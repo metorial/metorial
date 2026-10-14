@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProjectClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,9 +8,10 @@ export let updateProject = SlateTool.create(spec, {
   key: 'update_project',
   description: `Programmatically create or update components, pages, and design tokens in a Plasmic project via the Write API. Components can be matched by UUID, name, or path for updating. Design tokens support colors, spacing, fonts, shadows, and other styling values. **Requires a project secret token (enterprise only).**`,
   instructions: [
-    'Components are matched for update by UUID first, then by name, then by path.',
-    'Set `isPage` to true when creating a page rather than a component.',
-    'Token types include: color, spacing, font-family, font-size, line-height, opacity, box-shadow.'
+    'Components are upserted by a matching UUID, name, or path.',
+    'When `uuid` is provided, it selects the component; `name`, `path`, and `isPage` are ignored for that update.',
+    'Provide `path` to create a page. The `tplTree` object uses Write API element types, such as { type: "text", value: "Hello" }, rather than Model API TplNodes.',
+    'Token types include Color, Spacing, FontFamily, FontSize, LineHeight, Opacity, and BoxShadow. Lowercase names with hyphens are also accepted.'
   ],
   constraints: [
     'Write API access requires a secret token, currently only available to enterprise customers.'
@@ -34,7 +35,9 @@ export let updateProject = SlateTool.create(spec, {
             tplTree: z
               .record(z.string(), z.unknown())
               .optional()
-              .describe('Element tree structure defining the component content')
+              .describe(
+                'Write API element body defining the component content; required when providing a component. For example: { type: "text", value: "Hello" }'
+              )
           })
         )
         .optional()
@@ -61,11 +64,11 @@ export let updateProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.projectId || !ctx.auth.projectToken) {
-      throw new Error('Project ID and project token are required');
+    if (!ctx.auth.projectId) {
+      throw createApiServiceError('Project ID is required');
     }
     if (!ctx.auth.projectSecretToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Project secret token is required for write operations (enterprise only)'
       );
     }
@@ -76,15 +79,10 @@ export let updateProject = SlateTool.create(spec, {
       projectSecretToken: ctx.auth.projectSecretToken
     });
 
-    let body: Record<string, unknown> = {};
-    if (ctx.input.components) {
-      body.upsertComponents = ctx.input.components;
-    }
-    if (ctx.input.tokens) {
-      body.upsertTokens = ctx.input.tokens;
-    }
-
-    let result = await client.updateProject(body as any);
+    let result = await client.updateProject({
+      components: ctx.input.components,
+      tokens: ctx.input.tokens
+    });
 
     let parts: string[] = [];
     if (ctx.input.components?.length) {

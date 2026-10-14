@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,8 @@ export let uploadDocument = SlateTool.create(spec, {
   key: 'upload_document',
   description: `Upload an email or text document to a Parseur mailbox for processing. Provide the email content (HTML or plain text) along with metadata. Processing is asynchronous — the document will be queued for parsing.`,
   instructions: [
-    'The recipient must be the mailbox email address (e.g. your-prefix@parseur.com).',
+    'The recipient must be the mailbox email address (e.g. your-prefix@in.parseur.com). Use Get Mailbox to retrieve it.',
+    'Provide subject and from, which the email API requires.',
     'Provide either bodyHtml or bodyPlain (HTML takes priority if both are provided).',
     'Processing is asynchronous. Use Get Document or List Documents to check status.'
   ],
@@ -18,9 +19,12 @@ export let uploadDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      recipient: z.string().describe('Mailbox email address (e.g. your-prefix@parseur.com)'),
-      subject: z.string().optional().describe('Email subject line'),
-      from: z.string().optional().describe('Sender email address'),
+      recipient: z.string().describe('Mailbox email address returned by Get Mailbox'),
+      subject: z
+        .string()
+        .optional()
+        .describe('Email subject line (required by the email API)'),
+      from: z.string().optional().describe('Sender email address (required by the email API)'),
       to: z.string().optional().describe('To recipients (comma-separated)'),
       cc: z.string().optional().describe('CC recipients (comma-separated)'),
       bcc: z.string().optional().describe('BCC recipients (comma-separated)'),
@@ -39,6 +43,16 @@ export let uploadDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.subject || !ctx.input.from) {
+      throw createApiServiceError(
+        'subject and from are required to upload an email document.'
+      );
+    }
+    if (!ctx.input.bodyHtml && !ctx.input.bodyPlain) {
+      throw createApiServiceError(
+        'Provide bodyHtml or bodyPlain to upload an email document.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     await client.uploadEmailDocument({

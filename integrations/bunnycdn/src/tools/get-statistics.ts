@@ -106,19 +106,19 @@ export let getStatistics = SlateTool.create(spec, {
 
     return {
       output: {
-        totalBandwidthUsed: stats.TotalBandwidthUsed,
-        totalOriginTraffic: stats.TotalOriginTraffic,
-        averageOriginResponseTime: stats.AverageOriginResponseTime,
-        totalRequestsServed: stats.TotalRequestsServed,
-        cacheHitRate: stats.CacheHitRate,
-        bandwidthUsedChart: stats.BandwidthUsedChart,
-        cacheHitRateChart: stats.CacheHitRateChart,
-        requestsServedChart: stats.RequestsServedChart,
-        originTrafficChart: stats.OriginTrafficChart,
-        error3xxChart: stats.Error3xxChart,
-        error4xxChart: stats.Error4xxChart,
-        error5xxChart: stats.Error5xxChart,
-        geoTrafficDistribution: stats.GeoTrafficDistribution
+        totalBandwidthUsed: stats.TotalBandwidthUsed ?? undefined,
+        totalOriginTraffic: stats.TotalOriginTraffic ?? undefined,
+        averageOriginResponseTime: stats.AverageOriginResponseTime ?? undefined,
+        totalRequestsServed: stats.TotalRequestsServed ?? undefined,
+        cacheHitRate: stats.CacheHitRate ?? undefined,
+        bandwidthUsedChart: stats.BandwidthUsedChart ?? undefined,
+        cacheHitRateChart: stats.CacheHitRateChart ?? undefined,
+        requestsServedChart: stats.RequestsServedChart ?? undefined,
+        originTrafficChart: stats.OriginTrafficChart ?? undefined,
+        error3xxChart: stats.Error3xxChart ?? undefined,
+        error4xxChart: stats.Error4xxChart ?? undefined,
+        error5xxChart: stats.Error5xxChart ?? undefined,
+        geoTrafficDistribution: stats.GeoTrafficDistribution ?? undefined
       },
       message: `Statistics${pullZoneInfo}${dateInfo}: **${stats.TotalRequestsServed?.toLocaleString()}** requests, **${formatBytes(stats.TotalBandwidthUsed)}** bandwidth, **${((stats.CacheHitRate || 0) * 100).toFixed(1)}%** cache hit rate.`
     };

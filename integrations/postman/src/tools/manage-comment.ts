@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -71,7 +71,7 @@ export let manageCommentTool = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!body) throw new Error('body is required for create.');
+      if (!body) throw createApiServiceError('body is required for create.');
       let result = await client.createComment(entityType, entityId, body, collectionId);
       return {
         output: { comment: result },
@@ -80,8 +80,8 @@ export let manageCommentTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!commentId) throw new Error('commentId is required for update.');
-      if (!body) throw new Error('body is required for update.');
+      if (!commentId) throw createApiServiceError('commentId is required for update.');
+      if (!body) throw createApiServiceError('body is required for update.');
       let result = await client.updateComment(
         entityType,
         entityId,
@@ -95,7 +95,7 @@ export let manageCommentTool = SlateTool.create(spec, {
       };
     }
 
-    if (!commentId) throw new Error('commentId is required for delete.');
+    if (!commentId) throw createApiServiceError('commentId is required for delete.');
     await client.deleteComment(entityType, entityId, commentId, collectionId);
     return {
       output: { comment: { commentId } },

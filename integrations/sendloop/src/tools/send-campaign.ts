@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,13 @@ export let sendCampaign = SlateTool.create(spec, {
       campaignId: z.string().describe('ID of the campaign'),
       action: z
         .enum(['send', 'pause', 'resume', 'cancel_schedule'])
-        .describe('The delivery action to perform')
+        .describe('The delivery action to perform'),
+      sendDate: z
+        .string()
+        .optional()
+        .describe(
+          'For send: NOW (default), or YYYY-MM-DD HH:mm:ss to schedule delivery in the account timezone'
+        )
     })
   )
   .output(
@@ -33,16 +39,28 @@ export let sendCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let { campaignId, action } = ctx.input;
 
+    if (action !== 'send' && ctx.input.sendDate !== undefined) {
+      throw createApiServiceError('sendDate is only supported for the send action.');
+    }
     if (action === 'send') {
-      await client.sendCampaign(campaignId);
+      let sendDate = ctx.input.sendDate ?? 'NOW';
+      if (sendDate !== 'NOW' && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(sendDate)) {
+        throw createApiServiceError(
+          'sendDate must be NOW or formatted as YYYY-MM-DD HH:mm:ss.'
+        );
+      }
+      await client.sendCampaign(campaignId, sendDate);
       return {
         output: { success: true },
-        message: `Campaign **${campaignId}** is now sending.`
+        message:
+          sendDate === 'NOW'
+            ? `Campaign **${campaignId}** was submitted for sending.`
+            : `Campaign **${campaignId}** was scheduled for **${sendDate}**.`
       };
     }
 
@@ -70,6 +88,6 @@ export let sendCampaign = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

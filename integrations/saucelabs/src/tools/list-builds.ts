@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { buildTimestampToIso, buildTimeToTimestamp } from '../lib/builds';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -38,14 +39,18 @@ export let listBuilds = SlateTool.create(spec, {
       start: z
         .string()
         .optional()
-        .describe('Only return builds created after this time (ISO 8601)'),
+        .describe(
+          'Only return builds whose earliest job ran on or after this time (ISO 8601 or Unix seconds)'
+        ),
       end: z
         .string()
         .optional()
-        .describe('Only return builds created before this time (ISO 8601)'),
+        .describe(
+          'Only return builds whose latest job ran on or before this time (ISO 8601 or Unix seconds)'
+        ),
       limit: z.number().optional().describe('Maximum number of builds to return'),
       offset: z.number().optional().describe('Offset for pagination'),
-      sort: z.enum(['asc', 'desc']).optional().describe('Sort order by creation time')
+      sort: z.enum(['asc', 'desc']).optional().describe('Sort order by build name')
     })
   )
   .output(
@@ -59,8 +64,8 @@ export let listBuilds = SlateTool.create(spec, {
     let result = await client.listBuilds(ctx.input.source, {
       status: ctx.input.status,
       name: ctx.input.name,
-      start: ctx.input.start,
-      end: ctx.input.end,
+      start: buildTimeToTimestamp(ctx.input.start, 'start'),
+      end: buildTimeToTimestamp(ctx.input.end, 'end'),
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort
@@ -69,14 +74,14 @@ export let listBuilds = SlateTool.create(spec, {
     let buildsRaw = result.builds ?? [];
     let builds = buildsRaw.map((b: any) => ({
       buildId: b.id,
-      name: b.name,
-      status: b.status,
-      startTime: b.start_time,
-      endTime: b.end_time,
+      name: b.name ?? undefined,
+      status: b.status ?? undefined,
+      startTime: buildTimestampToIso(b.start_time),
+      endTime: buildTimestampToIso(b.end_time),
       jobsPassed: b.jobs?.passed,
       jobsFailed: b.jobs?.failed,
       jobsErrored: b.jobs?.errored,
-      jobsComplete: b.jobs?.complete
+      jobsComplete: b.jobs?.finished ?? b.jobs?.complete
     }));
 
     return {

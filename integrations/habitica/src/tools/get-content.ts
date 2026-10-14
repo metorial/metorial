@@ -7,10 +7,7 @@ export let getContent = SlateTool.create(spec, {
   name: 'Get Game Content',
   key: 'get_content',
   description: `Retrieve Habitica's game content data including gear definitions, quest details, pet/mount info, food, hatching potions, spells, and appearance options.
-This is a read-only reference useful for looking up valid item keys, quest scroll identifiers, and other game data.`,
-  constraints: [
-    'Returns a large dataset; consider using a specific content section if possible.'
-  ],
+This read-only summary reports available content sections, item counts, and valid skill identifiers.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -42,7 +39,9 @@ This is a read-only reference useful for looking up valid item keys, quest scrol
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let content = await client.getContent(ctx.input.language);
@@ -59,10 +58,8 @@ This is a read-only reference useful for looking up valid item keys, quest scrol
     let spellKeys: string[] = [];
     if (spells && typeof spells === 'object') {
       for (let classKey of Object.keys(spells)) {
-        if (typeof spells[classKey] === 'object') {
-          spellKeys.push(
-            ...Object.keys(spells[classKey]).map((s: string) => `${classKey}.${s}`)
-          );
+        if (spells[classKey] && typeof spells[classKey] === 'object') {
+          spellKeys.push(...Object.keys(spells[classKey]));
         }
       }
     }

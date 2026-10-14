@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,39 +40,42 @@ When creating, **name**, **date**, and **projectId** are required. Milestones ma
     let { action, milestoneId, projectId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (!ctx.input.name?.trim() || !ctx.input.date?.trim() || !ctx.input.projectId?.trim()) {
+        throw createApiServiceError('name, date, projectId are required for create.');
+      }
       let body: Record<string, any> = { ...fields, project: projectId };
       let result = await client.createMilestone(body);
       return {
         output: {
           milestoneId: result._id,
-          name: result.name,
-          date: result.date,
-          projectId: result.project,
-          metadata: result.metadata
+          name: result.name ?? undefined,
+          date: result.date ?? undefined,
+          projectId: result.project ?? undefined,
+          metadata: result.metadata ?? undefined
         },
         message: `Created milestone **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
     if (action === 'update') {
-      if (!milestoneId) throw new Error('milestoneId is required for update');
+      if (!milestoneId) throw createApiServiceError('milestoneId is required for update');
       let existing = await client.getMilestone(milestoneId);
-      let body: Record<string, any> = { ...existing, ...fields };
+      let body: Record<string, any> = { ...existing, ...pickDefined(fields) };
       if (projectId) body.project = projectId;
       let result = await client.updateMilestone(milestoneId, body);
       return {
         output: {
           milestoneId: result._id,
-          name: result.name,
-          date: result.date,
-          projectId: result.project,
-          metadata: result.metadata
+          name: result.name ?? undefined,
+          date: result.date ?? undefined,
+          projectId: result.project ?? undefined,
+          metadata: result.metadata ?? undefined
         },
         message: `Updated milestone **${result.name}** (ID: \`${result._id}\`).`
       };
     }
 
-    if (!milestoneId) throw new Error('milestoneId is required for delete');
+    if (!milestoneId) throw createApiServiceError('milestoneId is required for delete');
     await client.deleteMilestone(milestoneId);
     return {
       output: { milestoneId },

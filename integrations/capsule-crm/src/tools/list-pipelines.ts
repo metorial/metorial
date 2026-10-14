@@ -6,12 +6,24 @@ import { spec } from '../spec';
 export let listPipelines = SlateTool.create(spec, {
   name: 'List Pipelines',
   key: 'list_pipelines',
-  description: `List all sales pipelines and their milestones from Capsule CRM. Useful for finding milestone IDs when creating or updating opportunities.`,
+  description: `List sales pipelines and all their milestones from Capsule CRM. Useful for finding milestone IDs when creating or updating opportunities.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z.number().int().positive().optional().describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Pipelines per page (default: 50)'),
+      includeDeleted: z.boolean().optional().describe('Include archived pipelines')
+    })
+  )
   .output(
     z.object({
       pipelines: z
@@ -24,6 +36,10 @@ export let listPipelines = SlateTool.create(spec, {
                 z.object({
                   milestoneId: z.number().describe('Milestone ID'),
                   name: z.string().describe('Milestone name'),
+                  complete: z
+                    .boolean()
+                    .optional()
+                    .describe('Whether this milestone closes the opportunity'),
                   probability: z.number().optional().describe('Default probability percentage')
                 })
               )
@@ -37,14 +53,15 @@ export let listPipelines = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CapsuleClient({ token: ctx.auth.token });
 
-    let pipelineResult = await client.listPipelines();
+    let pipelineResult = await client.listPipelines(ctx.input);
     let pipelines = await Promise.all(
       (pipelineResult.pipelines || []).map(async (p: any) => {
         let milestoneResult = await client.listMilestones(p.id);
         let milestones = (milestoneResult.milestones || []).map((m: any) => ({
           milestoneId: m.id,
           name: m.name,
-          probability: m.probability
+          probability: m.probability ?? undefined,
+          complete: m.complete ?? undefined
         }));
 
         return {

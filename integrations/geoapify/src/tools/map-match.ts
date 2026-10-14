@@ -43,6 +43,7 @@ export let mapMatch = SlateTool.create(spec, {
       waypoints: z
         .array(waypointInputSchema)
         .min(2)
+        .max(1000)
         .describe('GPS points to snap to the road network (at least 2)')
     })
   )

@@ -1,4 +1,4 @@
-# Slates Specification for Rosette Text Analytics
+# Rosette Text Analytics Specification
 
 ## Overview
 
@@ -21,9 +21,15 @@ X-RosetteAPI-Key: your_api_key_here
 
 ## Features
 
+### API and Language Discovery
+
+- `get_api_info` retrieves the service name, version, and build information from `GET /info`.
+- `list_supported_languages` retrieves supported language/script combinations or source/target language pairs, including transliteration schemes and license status, for selected text analysis and name matching endpoints.
+- The API does not document an account or current-user endpoint; API information identifies the connected installation rather than the authenticated account.
+
 ### Language Identification
 
-Given a text field, Rosette detects the language it is most likely to be. Supports language identification in 55 languages. Multilingual detection mode can identify language regions within the same document.
+Given a text field, Rosette detects the language it is most likely to be. Call `list_supported_languages` with the `language` endpoint to discover supported languages for the connected installation. Multilingual detection mode can identify language regions within the same document.
 
 ### Entity Extraction and Linking
 
@@ -105,13 +111,11 @@ Provides syntactic dependency parse trees showing grammatical relationships betw
 
 ### Transliteration
 
-Converts text from one script to another without translation, preserving phonetic representation.
+Transliterates Arabizi or Romanized Arabic chat text into native Arabic script. This tool exposes the default direction only; reverse transliteration is not exposed. The provider ignores the language input because only Arabic is supported. For name translation across other supported languages and scripts, use `translate_name`.
 
 ### Event Extraction
 
-Extracts events from unstructured text and adds the structure of associating entities into events that deliver the necessary information for decision making.
-
-- Users can build custom machine models for entities and event detection using annotation software and can select from statistical or deep neural network (DNN) based models.
+The provider documents event extraction with installed models and schemas. This integration does not expose event extraction tools; configuring or discovering custom models is outside this refresh.
 
 ## Events
 

@@ -35,6 +35,7 @@ export let getSchema = SlateTool.create(spec, {
       name: z.string().describe('Name of the schema'),
       fields: z.array(schemaFieldSchema).describe('Fields defined in the schema'),
       settings: z.record(z.string(), z.any()).optional().describe('Schema-level settings'),
+      hooks: z.record(z.string(), z.any()).optional().describe('Serializable schema hooks'),
       createdDate: z
         .string()
         .optional()
@@ -56,13 +57,21 @@ export let getSchema = SlateTool.create(spec, {
         fields: (schema.fields ?? []).map(f => ({
           key: f.key,
           label: f.label,
-          type: f.type,
+          type:
+            typeof f.type === 'string'
+              ? f.type
+              : f.type === undefined
+                ? undefined
+                : JSON.stringify(f.type),
           description: f.description,
-          required: f.required,
+          required:
+            f.required ??
+            f.validators?.some(v => v && typeof v === 'object' && v.validate === 'required'),
           alternateMatches: f.alternateMatches,
           validators: f.validators
         })),
         settings: schema.settings,
+        hooks: schema.hooks,
         createdDate: schema.created_date,
         updatedDate: schema.updated_date
       },

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let startCrawl = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let startCrawl = SlateTool.create(spec, {
 Provide a single URL or multiple URLs from the same domain. Returns a session ID for tracking progress.`,
   constraints: [
     'All URLs must be from the same domain or subdomain.',
-    'maxDepth range: 1-200, maxPages range: 1-100000.'
+    'maxDepth and maxPages must be positive whole numbers.'
   ],
   tags: {
     destructive: false
@@ -23,11 +24,11 @@ Provide a single URL or multiple URLs from the same domain. Returns a session ID
         .array(z.string())
         .optional()
         .describe('Multiple URLs to crawl (same domain)'),
-      maxDepth: z
+      maxDepth: z.number().optional().describe('Maximum crawl depth (positive whole number)'),
+      maxPages: z
         .number()
         .optional()
-        .describe('Maximum crawl depth (default varies, max 200)'),
-      maxPages: z.number().optional().describe('Maximum number of pages to crawl (max 100000)')
+        .describe('Maximum number of pages to crawl (positive whole number)')
     })
   )
   .output(
@@ -39,8 +40,13 @@ Provide a single URL or multiple URLs from the same domain. Returns a session ID
     let client = new KadoaClient({ token: ctx.auth.token });
 
     if (!ctx.input.url && (!ctx.input.startUrls || ctx.input.startUrls.length === 0)) {
-      throw new Error('Either url or startUrls must be provided');
+      throw createApiServiceError(
+        'Either url or at least one startUrls entry must be provided.'
+      );
     }
+
+    validateKadoaInteger(ctx.input.maxDepth, 'maxDepth', 1);
+    validateKadoaInteger(ctx.input.maxPages, 'maxPages', 1);
 
     let result = await client.startCrawl({
       url: ctx.input.url,
@@ -49,7 +55,13 @@ Provide a single URL or multiple URLs from the same domain. Returns a session ID
       maxPages: ctx.input.maxPages
     });
 
-    let sessionId = result.sessionId || result.id || result;
+    let sessionId =
+      result.sessionId || result.id || (typeof result === 'string' ? result : undefined);
+    if (typeof sessionId !== 'string' || !sessionId) {
+      throw createApiServiceError(
+        'Kadoa did not return a crawl session ID. Check the crawl in your dashboard before retrying.'
+      );
+    }
 
     return {
       output: {

@@ -2,12 +2,14 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteTemplate,
+  downloadTemplate,
   getEnvironmentStatus,
   getRenderTags,
   getTemplateDetails,
   getTemplateStructure,
   listTemplates,
-  renderDocument
+  renderDocument,
+  uploadTemplate
 } from './tools';
 
 export let provider = Slate.create({
@@ -19,7 +21,9 @@ export let provider = Slate.create({
     getTemplateStructure,
     getTemplateDetails,
     getEnvironmentStatus,
-    getRenderTags
+    getRenderTags,
+    uploadTemplate,
+    downloadTemplate
   ],
   triggers: []
 });

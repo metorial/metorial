@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,12 +63,13 @@ export let googleMapsSearch = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let retrieve = ctx.input.retrieve || 'search';
 
-    let data: any;
+    let data: unknown;
     let message: string;
 
     switch (retrieve) {
       case 'reviews':
-        if (!ctx.input.dataId) throw new Error('dataId is required for fetching reviews');
+        if (!ctx.input.dataId)
+          throw createApiServiceError('dataId is required for fetching reviews');
         data = await client.googleMapsReviews({
           dataId: ctx.input.dataId,
           hl: ctx.input.language,
@@ -80,7 +81,8 @@ export let googleMapsSearch = SlateTool.create(spec, {
         break;
 
       case 'photos':
-        if (!ctx.input.dataId) throw new Error('dataId is required for fetching photos');
+        if (!ctx.input.dataId)
+          throw createApiServiceError('dataId is required for fetching photos');
         data = await client.googleMapsPhotos({
           dataId: ctx.input.dataId,
           hl: ctx.input.language,
@@ -91,7 +93,8 @@ export let googleMapsSearch = SlateTool.create(spec, {
         break;
 
       case 'posts':
-        if (!ctx.input.dataId) throw new Error('dataId is required for fetching posts');
+        if (!ctx.input.dataId)
+          throw createApiServiceError('dataId is required for fetching posts');
         data = await client.googleMapsPosts({
           dataId: ctx.input.dataId
         });
@@ -99,7 +102,12 @@ export let googleMapsSearch = SlateTool.create(spec, {
         break;
 
       default:
-        if (!ctx.input.query) throw new Error('query is required for maps search');
+        if (!ctx.input.query) throw createApiServiceError('query is required for maps search');
+        if (!ctx.input.coordinates) {
+          throw createApiServiceError(
+            'coordinates is required for maps search. Use @latitude,longitude,zoom.'
+          );
+        }
         data = await client.googleMapsSearch({
           q: ctx.input.query,
           ll: ctx.input.coordinates,

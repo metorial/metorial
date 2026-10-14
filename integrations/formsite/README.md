@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Formsite
 
-Retrieve form definitions, field structures, and submission results from Formsite online forms and surveys. List all forms and their status, get item/field definitions for labeling, and search, filter, sort, and paginate through form submission data. Manage webhooks for real-time notifications when results are completed. Read-only access to form data — cannot create, edit, or delete submissions.
+Retrieve form definitions, field structures, and submission results from Formsite online forms and surveys. List all forms and their status, get item/field definitions for labeling, and search, filter, sort, and paginate through form submission data. Retrieve a known submission by its result ID with selected choice details. Manage webhooks for real-time notifications when results are completed. Read-only access to form data — cannot create, edit, or delete submissions.
 
 ## License
 

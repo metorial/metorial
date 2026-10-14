@@ -1,22 +1,50 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
 
-  constructor(private config: { token: string; subdomain: string }) {
-    this.axios = createAxios({
-      baseURL: `https://${config.subdomain}.repairshopr.com/api/v1`
+  constructor(config: { token: string; subdomain: string }) {
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(config.subdomain)) {
+      throw createApiServiceError(
+        'Enter your RepairShopr subdomain without a URL or domain suffix.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://${config.subdomain}.repairshopr.com/api/v1`,
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30000
     });
   }
 
   private params(extra: Record<string, any> = {}) {
-    let cleaned: Record<string, any> = { api_key: this.config.token };
+    let cleaned: Record<string, any> = {};
     for (let [key, value] of Object.entries(extra)) {
       if (value !== undefined && value !== null) {
         cleaned[key] = value;
       }
     }
     return cleaned;
+  }
+
+  async convertEstimateToInvoice(estimateId: number) {
+    let response = await this.axios.post(`/estimates/${estimateId}/convert_to_invoice`);
+    return response.data;
+  }
+
+  private async resolveTicketTypeId(ticketType?: string, ticketTypeId?: number) {
+    if (ticketTypeId !== undefined || ticketType === undefined) return ticketTypeId;
+    let response = await this.axios.get('/tickets/settings');
+    let types = response.data.ticket_types || [];
+    let type = types.find(
+      (item: { id: number; name: string }) =>
+        item.name?.toLowerCase() === ticketType.toLowerCase()
+    );
+    if (!type) {
+      throw createApiServiceError(
+        'Ticket type was not found. Use an exact ticket type name or provide ticketTypeId.'
+      );
+    }
+    return type.id;
   }
 
   // ── Customers ──
@@ -243,7 +271,7 @@ export class Client {
       params: this.params({
         status: params?.status,
         customer_id: params?.customerId,
-        assigned_to: params?.assignedTo,
+        user_id: params?.assignedTo,
         created_before: params?.createdBefore,
         created_after: params?.createdAfter,
         sort: params?.sort,
@@ -269,6 +297,8 @@ export class Client {
     priority?: string;
     assignedTo?: number;
     ticketType?: string;
+    ticketTypeId?: number;
+    problemType?: string;
     dueDate?: string;
   }) {
     let response = await this.axios.post(
@@ -276,11 +306,21 @@ export class Client {
       {
         customer_id: data.customerId,
         subject: data.subject,
-        description: data.description,
+        comments_attributes:
+          data.description === undefined
+            ? undefined
+            : [
+                {
+                  body: data.description,
+                  subject: 'Initial issue',
+                  do_not_email: true
+                }
+              ],
         status: data.status,
         priority: data.priority,
-        assigned_to: data.assignedTo,
-        ticket_type: data.ticketType,
+        user_id: data.assignedTo,
+        ticket_type_id: await this.resolveTicketTypeId(data.ticketType, data.ticketTypeId),
+        problem_type: data.problemType,
         due_date: data.dueDate
       },
       {
@@ -297,8 +337,9 @@ export class Client {
       description: 'description',
       status: 'status',
       priority: 'priority',
-      assignedTo: 'assigned_to',
-      ticketType: 'ticket_type',
+      assignedTo: 'user_id',
+      ticketTypeId: 'ticket_type_id',
+      problemType: 'problem_type',
       dueDate: 'due_date',
       customerId: 'customer_id'
     };
@@ -306,6 +347,9 @@ export class Client {
       if (data[camel] !== undefined) {
         body[snake] = data[camel];
       }
+    }
+    if (data.ticketType !== undefined && data.ticketTypeId === undefined) {
+      body.ticket_type_id = await this.resolveTicketTypeId(data.ticketType);
     }
     let response = await this.axios.put(`/tickets/${ticketId}`, body, {
       params: this.params()
@@ -405,12 +449,12 @@ export class Client {
       number: data.number,
       date: data.date,
       due_date: data.dueDate,
-      notes: data.notes
+      note: data.notes
     };
     if (data.lineItems) {
       body.line_items = data.lineItems.map(item => ({
         name: item.name,
-        description: item.description,
+        item: item.description,
         quantity: item.quantity,
         price: item.price,
         taxable: item.taxable,
@@ -426,7 +470,7 @@ export class Client {
   async updateInvoice(invoiceId: number, data: Record<string, any>) {
     let body: Record<string, any> = {};
     let fieldMap: Record<string, string> = {
-      notes: 'notes',
+      notes: 'note',
       dueDate: 'due_date',
       date: 'date',
       status: 'status'
@@ -497,12 +541,12 @@ export class Client {
       ticket_id: data.ticketId,
       number: data.number,
       date: data.date,
-      notes: data.notes
+      note: data.notes
     };
     if (data.lineItems) {
       body.line_items = data.lineItems.map(item => ({
         name: item.name,
-        description: item.description,
+        item: item.description,
         quantity: item.quantity,
         price: item.price,
         taxable: item.taxable,
@@ -518,7 +562,7 @@ export class Client {
   async updateEstimate(estimateId: number, data: Record<string, any>) {
     let body: Record<string, any> = {};
     let fieldMap: Record<string, string> = {
-      notes: 'notes',
+      notes: 'note',
       status: 'status',
       date: 'date'
     };
@@ -552,8 +596,8 @@ export class Client {
   }) {
     let response = await this.axios.get('/leads', {
       params: this.params({
-        status: params?.status,
-        assigned_to: params?.assignedTo,
+        'statuses[]': params?.status === undefined ? undefined : [params.status],
+        'users[]': params?.assignedTo === undefined ? undefined : [params.assignedTo],
         created_before: params?.createdBefore,
         created_after: params?.createdAfter,
         query: params?.query,
@@ -587,13 +631,13 @@ export class Client {
     let response = await this.axios.post(
       '/leads',
       {
-        firstname: data.firstname,
-        lastname: data.lastname,
+        first_name: data.firstname,
+        last_name: data.lastname,
         email: data.email,
         phone: data.phone,
         business_name: data.businessName,
-        notes: data.notes,
-        assigned_to: data.assignedTo,
+        hidden_notes: data.notes,
+        user_id: data.assignedTo,
         status: data.status,
         address: data.address,
         city: data.city,
@@ -610,13 +654,13 @@ export class Client {
   async updateLead(leadId: number, data: Record<string, any>) {
     let body: Record<string, any> = {};
     let fieldMap: Record<string, string> = {
-      firstname: 'firstname',
-      lastname: 'lastname',
+      firstname: 'first_name',
+      lastname: 'last_name',
       email: 'email',
       phone: 'phone',
       businessName: 'business_name',
-      notes: 'notes',
-      assignedTo: 'assigned_to',
+      notes: 'hidden_notes',
+      assignedTo: 'user_id',
       status: 'status',
       address: 'address',
       city: 'city',
@@ -677,13 +721,13 @@ export class Client {
       {
         name: data.name,
         description: data.description,
-        cost: data.cost,
+        price_cost: data.cost,
         price_retail: data.price,
-        category_id: data.categoryId,
-        sku: data.sku,
+        category_ids: data.categoryId === undefined ? undefined : [data.categoryId],
+        product_skus_attributes: data.sku === undefined ? undefined : [{ value: data.sku }],
         quantity: data.quantity,
         upc_code: data.upc,
-        location: data.optionalLocation
+        physical_location: data.optionalLocation
       },
       {
         params: this.params()
@@ -697,19 +741,19 @@ export class Client {
     let fieldMap: Record<string, string> = {
       name: 'name',
       description: 'description',
-      cost: 'cost',
+      cost: 'price_cost',
       price: 'price_retail',
-      categoryId: 'category_id',
-      sku: 'sku',
       quantity: 'quantity',
       upc: 'upc_code',
-      location: 'location'
+      location: 'physical_location'
     };
     for (let [camel, snake] of Object.entries(fieldMap)) {
       if (data[camel] !== undefined) {
         body[snake] = data[camel];
       }
     }
+    if (data.categoryId !== undefined) body.category_ids = [data.categoryId];
+    if (data.sku !== undefined) body.product_skus_attributes = [{ value: data.sku }];
     let response = await this.axios.put(`/products/${productId}`, body, {
       params: this.params()
     });
@@ -850,7 +894,7 @@ export class Client {
         user_id: data.userId,
         location: data.location,
         email_customer: data.emailCustomer,
-        appointment_duration: data.appointmentDuration,
+        appointment_duration: data.appointmentDuration?.toString(),
         appointment_type_id: data.appointmentTypeId,
         all_day: data.allDay,
         do_not_email: data.doNotEmail
@@ -874,7 +918,6 @@ export class Client {
       userId: 'user_id',
       location: 'location',
       emailCustomer: 'email_customer',
-      appointmentDuration: 'appointment_duration',
       appointmentTypeId: 'appointment_type_id',
       allDay: 'all_day'
     };
@@ -882,6 +925,9 @@ export class Client {
       if (data[camel] !== undefined) {
         body[snake] = data[camel];
       }
+    }
+    if (data.appointmentDuration !== undefined) {
+      body.appointment_duration = data.appointmentDuration.toString();
     }
     let response = await this.axios.put(`/appointments/${appointmentId}`, body, {
       params: this.params()
@@ -931,11 +977,21 @@ export class Client {
     paymentDate?: string;
     notes?: string;
   }) {
+    let amountCents = Math.round(data.amount * 100);
+    if (
+      !Number.isSafeInteger(amountCents) ||
+      amountCents <= 0 ||
+      Math.abs(data.amount * 100 - amountCents) > 0.000001
+    ) {
+      throw createApiServiceError(
+        'Payment amount must be positive and use at most two decimal places.'
+      );
+    }
     let response = await this.axios.post(
       '/payments',
       {
         invoice_id: data.invoiceId,
-        amount: data.amount,
+        amount_cents: amountCents,
         payment_method: data.paymentMethod,
         applied_at: data.paymentDate,
         notes: data.notes
@@ -944,6 +1000,11 @@ export class Client {
         params: this.params()
       }
     );
+    if (response.data.payment?.success === false) {
+      throw createApiServiceError(
+        'RepairShopr did not accept the payment. Check the payment method and invoice, then retry.'
+      );
+    }
     return response.data;
   }
 

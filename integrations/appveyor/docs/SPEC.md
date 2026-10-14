@@ -1,4 +1,4 @@
-# Slates Specification for Appveyor
+# AppVeyor API capabilities
 
 ## Overview
 
@@ -12,7 +12,7 @@ AppVeyor uses bearer token authentication. The token can be found on the API tok
 Authorization: Bearer <token>
 ```
 
-The API token can be acquired from https://ci.appveyor.com/api-token.
+The API token can be acquired from https://ci.appveyor.com/api-keys. Provide the target account name with API token authentication when using a user-level key.
 
 AppVeyor has two types of API keys:
 

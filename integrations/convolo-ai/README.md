@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Convolo Ai
 
-Trigger phone calls to leads and connect them with available sales agents using Speed To Lead™. Retrieve call reports and statistics for both inbound (Speed To Lead) and outbound (Power Dialer) sales campaigns. Filter call data by date range, status, agents, teams, and projects. Dynamically assign agents to calls and pass lead details such as phone number, name, and email. Access aggregated call metrics including total calls, answered calls, missed calls, talk times, and AI talk time breakdowns.
+Trigger phone calls to leads and connect them with available sales agents using Speed To Lead™. Retrieve call reports and statistics for both inbound (Speed To Lead) and outbound (Power Dialer) sales campaigns. Filter call data by date range, status, agents, teams, and projects. Discover dialer agent IDs and contact details, and count matching calls without fetching call records. Dynamically assign agents to calls and pass lead details such as phone number, name, and email. Access aggregated call metrics including total calls, answered calls, missed calls, talk times, and AI talk time breakdowns.
 
 ## License
 

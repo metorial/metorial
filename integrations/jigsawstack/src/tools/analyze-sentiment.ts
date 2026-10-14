@@ -19,6 +19,10 @@ export let analyzeSentiment = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       sentiment: z.object({
         emotion: z.string().describe('Overall emotional tone (e.g., joy, anger, sadness)'),
         sentiment: z
@@ -47,6 +51,7 @@ export let analyzeSentiment = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         sentiment: {
           emotion: result.sentiment.emotion,
           sentiment: result.sentiment.sentiment,

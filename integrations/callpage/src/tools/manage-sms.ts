@@ -7,7 +7,11 @@ let smsMessageIdEnum = z.enum([
   'post_call_visitor',
   'scheduled_call_reminder',
   'post_call_manager',
-  'missed_call_notification'
+  'missed_call_notification',
+  'visitor.dial-completed',
+  'visitor.call-scheduled',
+  'manager.call-completed',
+  'user.missed-call-complaint'
 ]);
 
 export let listSmsTemplates = SlateTool.create(spec, {
@@ -59,7 +63,9 @@ export let upsertSmsTemplate = SlateTool.create(spec, {
   .input(
     z.object({
       widgetId: z.number().describe('The widget ID'),
-      messageId: smsMessageIdEnum.describe('Template type identifier'),
+      messageId: smsMessageIdEnum.describe(
+        'Template identifier from list_sms_templates, or a friendly template type'
+      ),
       enabled: z.boolean().describe('Whether this SMS template is active'),
       text: z
         .string()

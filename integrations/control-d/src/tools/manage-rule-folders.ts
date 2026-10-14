@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { actionDescription, createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -41,8 +41,8 @@ export let manageRuleFolders = SlateTool.create(spec, {
     let { operation, profileId, folderId, name, action, enabled, via } = ctx.input;
 
     if (operation === 'create') {
-      if (!name) throw new Error('name is required for create');
-      if (action === undefined) throw new Error('action is required for create');
+      if (!name) throw createApiServiceError('name is required for create');
+      if (action === undefined) throw createApiServiceError('action is required for create');
       let folder = await client.createRuleFolder(profileId, {
         name,
         action,
@@ -66,8 +66,8 @@ export let manageRuleFolders = SlateTool.create(spec, {
     }
 
     if (operation === 'update') {
-      if (!folderId) throw new Error('folderId is required for update');
-      if (action === undefined) throw new Error('action is required for update');
+      if (!folderId) throw createApiServiceError('folderId is required for update');
+      if (action === undefined) throw createApiServiceError('action is required for update');
       let folder = await client.modifyRuleFolder(profileId, folderId, {
         name,
         action,
@@ -91,7 +91,7 @@ export let manageRuleFolders = SlateTool.create(spec, {
     }
 
     if (operation === 'delete') {
-      if (!folderId) throw new Error('folderId is required for delete');
+      if (!folderId) throw createApiServiceError('folderId is required for delete');
       await client.deleteRuleFolder(profileId, folderId);
       return {
         output: { folders: [] },

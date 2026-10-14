@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,9 +19,13 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token || /[\r\n]/.test(token)) {
+        throw createApiServiceError('Enter a valid Pdfless workspace API key.');
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     }

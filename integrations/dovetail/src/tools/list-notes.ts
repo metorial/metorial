@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listNotes = SlateTool.create(spec, {
   name: 'List Notes',
   key: 'list_notes',
-  description: `List research notes across the Dovetail workspace. Supports filtering by title, content, author, and date range, with pagination and sorting.`,
+  description: `List research notes across the Dovetail workspace. Supports title and date filters. Content filtering uses full-text search with an opaque nextCursor and does not support sort.`,
   tags: {
     readOnly: true
   }
@@ -33,7 +33,12 @@ export let listNotes = SlateTool.create(spec, {
         .enum(['created_at:asc', 'created_at:desc', 'title:asc', 'title:desc'])
         .optional()
         .describe('Sort order'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -48,7 +53,7 @@ export let listNotes = SlateTool.create(spec, {
           projectTitle: z.string().nullable().optional(),
           authorId: z.string().nullable().optional(),
           createdAt: z.string(),
-          updatedAt: z.string()
+          updatedAt: z.string().optional()
         })
       ),
       totalCount: z.number(),
@@ -73,8 +78,8 @@ export let listNotes = SlateTool.create(spec, {
       noteId: n.id,
       title: n.title,
       previewText: n.preview_text ?? null,
-      projectId: n.project_id ?? null,
-      projectTitle: n.project_title ?? null,
+      projectId: n.project?.id ?? n.project_id ?? null,
+      projectTitle: n.project?.title ?? n.project_title ?? null,
       authorId: n.author_id ?? null,
       createdAt: n.created_at,
       updatedAt: n.updated_at

@@ -1,15 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotChatClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let rateAnswer = SlateTool.create(spec, {
   name: 'Rate Answer',
   key: 'rate_answer',
-  description: `Rate a bot's answer as positive, negative, or neutral (reset). Use the answerId from a chat response to submit the rating. Also supports recording a human support escalation for a given answer.`
+  description: `Rate a bot's answer as positive, negative, or neutral (reset). Use the answerId from a chat response to submit the rating. Call list_teams to discover accessible team IDs.`
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID that generated the answer'),
       answerId: z.string().describe('Answer ID to rate (from the chat response)'),
       rating: z
@@ -28,7 +30,7 @@ export let rateAnswer = SlateTool.create(spec, {
       ctx.input.rating === 'positive' ? 1 : ctx.input.rating === 'negative' ? -1 : 0;
 
     await client.rateAnswer(
-      ctx.config.teamId,
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
       ctx.input.botId,
       ctx.input.answerId,
       ratingValue

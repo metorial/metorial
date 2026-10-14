@@ -1,39 +1,86 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export class SemrushV4Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(config: { token: string }) {
-    this.axios = createAxios({
+  private projectPath: string;
+
+  constructor(config: { token: string; authType?: 'api_key' | 'oauth' }) {
+    this.projectPath =
+      config.authType === 'api_key' ? '/management/v1/projects' : '/apis/v4/projects/v0';
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.semrush.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+      ...(config.authType === 'api_key'
+        ? { params: { key: config.token } }
+        : { authHeader: { value: `Bearer ${config.token}` } }),
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Semrush',
+          reason: 'upstream_http_error'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      let data: unknown = response.data;
+      if (
+        isApiErrorRecord(data) &&
+        (data.error || (isApiErrorRecord(data.meta) && data.meta.success === false))
+      ) {
+        let error = isApiErrorRecord(data.error) ? data.error : data;
+        throw createApiServiceError(
+          `Semrush API error: ${typeof error.message === 'string' ? error.message : 'The request was unsuccessful.'}`,
+          {
+            reason: 'upstream_api_error',
+            upstreamStatus: response.status,
+            upstreamCode: error.code === undefined ? undefined : String(error.code)
+          }
+        );
       }
+      return response;
     });
   }
 
   // Project Management
 
   async listProjects(): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get('/management/v1/projects');
-    return response.data?.data || response.data || [];
+    let response = await this.axios.get(this.projectPath);
+    let projects: unknown = response.data?.projects ?? response.data?.data ?? response.data;
+    if (!Array.isArray(projects) || projects.some(project => !isApiErrorRecord(project))) {
+      throw createApiServiceError('Semrush returned an invalid projects list.');
+    }
+    return projects;
   }
 
   async getProject(projectId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/management/v1/projects/${projectId}`);
-    return response.data?.data || response.data;
+    let response = await this.axios.get(
+      `${this.projectPath}/${encodeURIComponent(projectId)}`
+    );
+    let project: unknown = response.data?.data ?? response.data;
+    if (!isApiErrorRecord(project))
+      throw createApiServiceError('Semrush returned invalid project details.');
+    return project;
   }
 
   async createProject(params: {
     domain: string;
     name?: string;
   }): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/management/v1/projects', {
-      domain: params.domain,
-      name: params.name
-    });
-    return response.data?.data || response.data;
+    let response = await this.axios.post(
+      this.projectPath,
+      pickDefined({
+        url: params.domain,
+        project_name: params.name
+      })
+    );
+    let project: unknown = response.data?.data ?? response.data;
+    if (!isApiErrorRecord(project))
+      throw createApiServiceError('Semrush returned invalid project details.');
+    return project;
   }
 
   async updateProject(
@@ -43,19 +90,43 @@ export class SemrushV4Client {
       domain?: string;
     }
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.put(`/management/v1/projects/${projectId}`, params);
-    return response.data?.data || response.data;
+    if (params.domain !== undefined) {
+      throw createApiServiceError(
+        'Semrush supports renaming projects; their domain cannot be changed.'
+      );
+    }
+    if (!params.name?.trim()) {
+      throw createApiServiceError('projectName is required when renaming a project.');
+    }
+    if (!/^\d+$/.test(projectId) || !Number.isSafeInteger(Number(projectId))) {
+      throw createApiServiceError(
+        'Provide the numeric project ID returned by manage_project list.'
+      );
+    }
+    let response = await this.axios.put(this.projectPath, {
+      project_id: Number(projectId),
+      project_name: params.name
+    });
+    let project: unknown = response.data?.data ?? response.data;
+    if (!isApiErrorRecord(project))
+      throw createApiServiceError('Semrush returned invalid project details.');
+    return project;
   }
 
   async deleteProject(projectId: string): Promise<void> {
-    await this.axios.delete(`/management/v1/projects/${projectId}`);
+    let response = await this.axios.delete(
+      `${this.projectPath}/${encodeURIComponent(projectId)}`
+    );
+    if (this.projectPath === '/apis/v4/projects/v0' && response.data?.result !== true) {
+      throw createApiServiceError('Semrush did not confirm that the project was deleted.');
+    }
   }
 
   // Position Tracking
 
   async getPositionTrackingCampaigns(projectId: string): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns`
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns`
     );
     return response.data?.data || response.data || [];
   }
@@ -72,7 +143,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns`,
       params
     );
     return response.data?.data || response.data;
@@ -87,7 +158,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns/${campaignId}/keywords`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns/${encodeURIComponent(campaignId)}/keywords`,
       { params }
     );
     return response.data?.data || response.data || [];
@@ -99,7 +170,7 @@ export class SemrushV4Client {
     keywords: string[]
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns/${campaignId}/keywords`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns/${encodeURIComponent(campaignId)}/keywords`,
       { keywords }
     );
     return response.data?.data || response.data;
@@ -111,7 +182,7 @@ export class SemrushV4Client {
     keywords: string[]
   ): Promise<void> {
     await this.axios.delete(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns/${campaignId}/keywords`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns/${encodeURIComponent(campaignId)}/keywords`,
       { data: { keywords } }
     );
   }
@@ -125,7 +196,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/management/v1/projects/${projectId}/position-tracking/campaigns/${campaignId}/report`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/position-tracking/campaigns/${encodeURIComponent(campaignId)}/report`,
       { params }
     );
     return response.data?.data || response.data || [];
@@ -141,7 +212,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/management/v1/projects/${projectId}/site-audit/enable`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/site-audit/enable`,
       params
     );
     return response.data?.data || response.data;
@@ -149,7 +220,7 @@ export class SemrushV4Client {
 
   async runSiteAudit(projectId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/management/v1/projects/${projectId}/site-audit/run`
+      `/management/v1/projects/${encodeURIComponent(projectId)}/site-audit/run`
     );
     return response.data?.data || response.data;
   }
@@ -159,8 +230,8 @@ export class SemrushV4Client {
     snapshotId?: string
   ): Promise<Record<string, unknown>> {
     let url = snapshotId
-      ? `/management/v1/projects/${projectId}/site-audit/snapshots/${snapshotId}`
-      : `/management/v1/projects/${projectId}/site-audit/snapshots/latest`;
+      ? `/management/v1/projects/${encodeURIComponent(projectId)}/site-audit/snapshots/${encodeURIComponent(snapshotId)}`
+      : `/management/v1/projects/${encodeURIComponent(projectId)}/site-audit/snapshots/latest`;
     let response = await this.axios.get(url);
     return response.data?.data || response.data;
   }
@@ -175,10 +246,10 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>[]> {
     let snapshotPath = params?.snapshotId
-      ? `/snapshots/${params.snapshotId}`
+      ? `/snapshots/${encodeURIComponent(params.snapshotId)}`
       : '/snapshots/latest';
     let response = await this.axios.get(
-      `/management/v1/projects/${projectId}/site-audit${snapshotPath}/issues`,
+      `/management/v1/projects/${encodeURIComponent(projectId)}/site-audit${snapshotPath}/issues`,
       {
         params: {
           limit: params?.limit,
@@ -203,7 +274,9 @@ export class SemrushV4Client {
   }
 
   async getLocation(locationId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/listing-management/v1/locations/${locationId}`);
+    let response = await this.axios.get(
+      `/listing-management/v1/locations/${encodeURIComponent(locationId)}`
+    );
     return response.data?.data || response.data;
   }
 
@@ -229,14 +302,16 @@ export class SemrushV4Client {
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.put(
-      `/listing-management/v1/locations/${locationId}`,
+      `/listing-management/v1/locations/${encodeURIComponent(locationId)}`,
       params
     );
     return response.data?.data || response.data;
   }
 
   async deleteLocation(locationId: string): Promise<void> {
-    await this.axios.delete(`/listing-management/v1/locations/${locationId}`);
+    await this.axios.delete(
+      `/listing-management/v1/locations/${encodeURIComponent(locationId)}`
+    );
   }
 
   // Map Rank Tracker
@@ -252,7 +327,9 @@ export class SemrushV4Client {
   }
 
   async getMapRankTrackerCampaign(campaignId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/map-rank-tracker/v2/campaigns/${campaignId}`);
+    let response = await this.axios.get(
+      `/map-rank-tracker/v2/campaigns/${encodeURIComponent(campaignId)}`
+    );
     return response.data?.data || response.data;
   }
 
@@ -264,7 +341,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/map-rank-tracker/v2/campaigns/${campaignId}/keywords`,
+      `/map-rank-tracker/v2/campaigns/${encodeURIComponent(campaignId)}/keywords`,
       {
         params
       }
@@ -277,7 +354,7 @@ export class SemrushV4Client {
     keywordId: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/map-rank-tracker/v2/campaigns/${campaignId}/keywords/${keywordId}/heatmap`
+      `/map-rank-tracker/v2/campaigns/${encodeURIComponent(campaignId)}/keywords/${encodeURIComponent(keywordId)}/heatmap`
     );
     return response.data?.data || response.data;
   }
@@ -290,7 +367,7 @@ export class SemrushV4Client {
     }
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/map-rank-tracker/v2/campaigns/${campaignId}/competitors`,
+      `/map-rank-tracker/v2/campaigns/${encodeURIComponent(campaignId)}/competitors`,
       {
         params
       }

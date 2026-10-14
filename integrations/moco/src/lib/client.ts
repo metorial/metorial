@@ -1,21 +1,48 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private domain: string;
   private token: string;
 
   constructor(config: { token: string; domain: string }) {
-    this.domain = config.domain;
-    this.token = config.token;
+    this.domain = typeof config.domain === 'string' ? config.domain.trim().toLowerCase() : '';
+    this.token = typeof config.token === 'string' ? config.token.trim() : '';
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(this.domain)) {
+      throw createApiServiceError(
+        'Enter your MOCO account subdomain without a URL or .mocoapp.com suffix.'
+      );
+    }
+    if (!this.token) {
+      throw createApiServiceError('A MOCO API key is required.');
+    }
   }
 
   private get http() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: `https://${this.domain}.mocoapp.com/api/v1`,
-      headers: {
-        Authorization: `Token token=${this.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Token token=${this.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'MOCO',
+          reason: 'moco_api_error',
+          extractMessage: (error, helpers) => {
+            if (
+              helpers.isRecord(error) &&
+              helpers.isRecord(error.data) &&
+              helpers.isRecord(error.data.baggage)
+            ) {
+              let response = error.data.baggage.response;
+              let details: string[] = [];
+              if (helpers.isRecord(response) && helpers.isRecord(response.errors)) {
+                helpers.collectDetails(Object.values(response.errors), details);
+              } else {
+                helpers.collectDetails(response, details);
+              }
+              if (details.length) return details.join('; ');
+            }
+            return undefined;
+          }
+        })
     });
   }
 
@@ -98,8 +125,8 @@ export class Client {
 
   // ---- Project Tasks ----
 
-  async listProjectTasks(projectId: number) {
-    let response = await this.http.get(`/projects/${projectId}/tasks`);
+  async listProjectTasks(projectId: number, params?: Record<string, unknown>) {
+    let response = await this.http.get(`/projects/${projectId}/tasks`, { params });
     return response.data;
   }
 
@@ -278,8 +305,10 @@ export class Client {
     return response.data;
   }
 
-  async deleteInvoice(invoiceId: number) {
-    await this.http.delete(`/invoices/${invoiceId}`);
+  async deleteInvoice(invoiceId: number, reason?: string) {
+    await this.http.delete(`/invoices/${invoiceId}`, {
+      data: reason === undefined ? undefined : { reason }
+    });
   }
 
   async sendInvoiceEmail(invoiceId: number, data: Record<string, any>) {
@@ -295,7 +324,7 @@ export class Client {
   }
 
   async createInvoicePayment(invoiceId: number, data: Record<string, any>) {
-    let response = await this.http.post(`/invoices/${invoiceId}/payments`, {
+    let response = await this.http.post('/invoices/payments', {
       ...data,
       invoice_id: invoiceId
     });
@@ -379,7 +408,7 @@ export class Client {
   }
 
   async touchPresence(data?: Record<string, any>) {
-    let response = await this.http.post('/users/presences/touch', data || {});
+    let response = await this.http.post('/users/presences/touch', undefined, { params: data });
     return response.data;
   }
 

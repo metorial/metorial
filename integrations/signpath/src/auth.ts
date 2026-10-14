@@ -1,10 +1,16 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { createSignPathClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('SignPath API bearer token')
+      token: z.string().describe('SignPath API bearer token'),
+      organizationId: z
+        .string()
+        .optional()
+        .describe('Organization associated with the API token'),
+      baseUrl: z.string().optional().describe('SignPath instance URL')
     })
   )
   .addTokenAuth({
@@ -12,38 +18,41 @@ export let auth = SlateAuth.create()
     name: 'API Token',
     key: 'api_token',
     inputSchema: z.object({
-      apiToken: z.string().describe('API token generated from SignPath user profile settings')
+      apiToken: z
+        .string()
+        .min(1)
+        .describe('API token generated from SignPath user profile settings'),
+      organizationId: z
+        .string()
+        .min(1)
+        .describe(
+          'Organization ID from your SignPath organization page or signing-policy API example'
+        ),
+      baseUrl: z
+        .string()
+        .default('https://app.signpath.io')
+        .describe('Base URL of your SignPath instance')
     }),
-    getOutput: async ctx => {
+    getOutput: async ctx => ({
+      output: {
+        token: ctx.input.apiToken,
+        organizationId: ctx.input.organizationId,
+        baseUrl: ctx.input.baseUrl
+      }
+    }),
+    getProfile: async (ctx: {
+      output: { token: string; organizationId?: string; baseUrl?: string };
+    }) => {
+      let user = await createSignPathClient({ auth: ctx.output }).getCurrentUser();
       return {
-        output: {
-          token: ctx.input.apiToken
+        profile: {
+          id: user.userId,
+          name: user.name,
+          email:
+            user.accountEmailAddress ??
+            user.notificationEmailAddress.confirmedEmail ??
+            undefined
         }
       };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let axios = createAxios({});
-      try {
-        let response = await axios.get(
-          'https://app.signpath.io/API/v1-pre/InteractiveUsers/Me',
-          {
-            headers: {
-              Authorization: `Bearer ${ctx.output.token}`
-            }
-          }
-        );
-        let user = response.data;
-        return {
-          profile: {
-            id: user.id,
-            name: user.name || user.displayName,
-            email: user.email
-          }
-        };
-      } catch {
-        return {
-          profile: {}
-        };
-      }
     }
   });

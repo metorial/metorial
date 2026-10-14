@@ -1,4 +1,70 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+let mapCrustdataError = (error: unknown) => {
+  let normalized =
+    isApiErrorRecord(error) && error.name === 'SlateError' && isApiErrorRecord(error.data)
+      ? error.data
+      : undefined;
+  let upstream =
+    normalized && isApiErrorRecord(normalized.upstream) ? normalized.upstream : undefined;
+  let baggage =
+    normalized && isApiErrorRecord(normalized.baggage) ? normalized.baggage : undefined;
+  let mapped = buildApiServiceError(error, {
+    providerLabel: 'Crustdata',
+    reason: 'crustdata_api_error',
+    nestedKeys: ['error', 'errors'],
+    extractResponse: () =>
+      normalized
+        ? {
+            status:
+              typeof upstream?.status === 'number'
+                ? upstream.status
+                : typeof normalized.status === 'number'
+                  ? normalized.status
+                  : undefined,
+            data: baggage?.response
+          }
+        : undefined,
+    extractUpstreamCode: () => (typeof upstream?.code === 'string' ? upstream.code : undefined)
+  });
+  if (normalized && mapped !== error) {
+    mapped.data.normalizedError = normalized;
+    mapped.data.retryable = normalized.retryable;
+    mapped.data.provider = normalized.provider;
+    mapped.data.upstream = normalized.upstream;
+  }
+  return mapped;
+};
+
+export interface CreditBalanceResponse {
+  account: {
+    credits: number;
+    recurring_credits: number;
+    recurring_credits_frequency: string | null;
+    recurring_credits_refresh_date: string | null;
+    wallets?: Record<string, unknown>[];
+    credit_topups?: Record<string, unknown>[];
+    [key: string]: unknown;
+  };
+}
+
+export interface EndpointPermissionsResponse {
+  api_version: string;
+  token_limit_rpm: number | null;
+  endpoints: Array<{
+    path: string;
+    category: string;
+    status: string;
+    effective_rate_limit_rpm: number | null;
+    fields: { enabled: string[]; disabled: string[] };
+    [key: string]: unknown;
+  }>;
+}
 
 let BASE_URL = 'https://api.crustdata.com';
 
@@ -25,16 +91,26 @@ export interface SortOption {
 }
 
 export class CrustdataClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  private currentHttp: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.http = createAxios({
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'A Crustdata API token is required. Reconnect with a valid token.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Token ${token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Token ${token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: mapCrustdataError
+    });
+    this.currentHttp = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${token}` },
+      headers: { Accept: 'application/json', 'x-api-version': '2025-11-01' },
+      errorAdapter: mapCrustdataError
     });
   }
 
@@ -47,6 +123,15 @@ export class CrustdataClient {
     fields?: string[];
     enrichRealtime?: boolean;
   }) {
+    if (
+      ![params.companyDomain, params.companyName, params.companyId].some(value =>
+        value?.trim()
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide a company domain, company name, or Crustdata company ID.'
+      );
+    }
     let queryParams = new URLSearchParams();
     if (params.companyDomain) queryParams.set('company_domain', params.companyDomain);
     if (params.companyName) queryParams.set('company_name', params.companyName);
@@ -113,6 +198,9 @@ export class CrustdataClient {
     fields?: string[];
     enrichRealtime?: boolean;
   }) {
+    if (![params.linkedinProfileUrl, params.email, params.name].some(value => value?.trim())) {
+      throw createApiServiceError('Provide a LinkedIn profile URL, email, or person name.');
+    }
     let queryParams = new URLSearchParams();
     if (params.linkedinProfileUrl)
       queryParams.set('linkedin_profile_url', params.linkedinProfileUrl);
@@ -238,10 +326,29 @@ export class CrustdataClient {
     if (params.geolocation) body.geolocation = params.geolocation;
     if (params.sources) body.sources = params.sources;
     if (params.site) body.site = params.site;
-    if (params.startDate) body.startDate = params.startDate;
-    if (params.endDate) body.endDate = params.endDate;
+    if (params.startDate !== undefined) body.startDate = params.startDate;
+    if (params.endDate !== undefined) body.endDate = params.endDate;
 
     let response = await this.http.post(`/screener/web-search${queryString}`, body);
+    return response.data;
+  }
+
+  async getCreditBalance() {
+    let response = await this.currentHttp.get<CreditBalanceResponse>('/account/credits');
+    return response.data;
+  }
+
+  async listEndpointPermissions(params: {
+    path?: string;
+    category?: string;
+    status?: string;
+  }) {
+    let response = await this.currentHttp.get<EndpointPermissionsResponse>(
+      '/account/endpoints',
+      {
+        params
+      }
+    );
     return response.data;
   }
 

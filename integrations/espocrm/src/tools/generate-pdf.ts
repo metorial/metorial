@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Generate a PDF document from a record in EspoCRM using a PDF template. Templates are configured in the EspoCRM admin panel under PDF Templates.`,
+  description: `Generate a downloadable PDF document from a record in EspoCRM using a PDF template. Templates are configured in the EspoCRM admin panel under PDF Templates.`,
   instructions: [
     'A PDF template must be created in EspoCRM before using this tool.',
     'Use the list_records tool with entityType "Template" to find available template IDs.'
@@ -33,16 +33,30 @@ export let generatePdf = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
+    await client.getRecord(ctx.input.entityType, ctx.input.recordId, ['id']);
+
     let result = await client.generatePdf(
       ctx.input.entityType,
       ctx.input.recordId,
       ctx.input.templateId
     );
 
+    let attachmentId = result.id || result.attachmentId;
+    if (typeof attachmentId !== 'string' || !attachmentId) {
+      throw createApiServiceError('EspoCRM did not return a generated PDF file ID.');
+    }
+    let file = await client.getAttachmentFile(attachmentId);
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(file.content),
+      filename: `${ctx.input.entityType}-${ctx.input.recordId}.pdf`,
+      mimeType: file.mimeType || 'application/pdf'
+    });
+
     return {
       output: {
         success: true,
-        attachmentId: result.id || result.attachmentId
+        attachmentId
       },
       message: `PDF generated from ${ctx.input.entityType} **${ctx.input.recordId}** using template **${ctx.input.templateId}**.`
     };

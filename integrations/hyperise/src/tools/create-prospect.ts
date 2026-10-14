@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,11 @@ let prospectFieldsSchema = z.object({
   customImage3: z
     .string()
     .optional()
-    .describe('Custom image 3 as a URL or base64-encoded image')
+    .describe('Custom image 3 as a URL or base64-encoded image'),
+  customText1: z.string().optional().describe('Custom text 1 (max 255 chars)'),
+  customText2: z.string().optional().describe('Custom text 2 (max 255 chars)'),
+  customText3: z.string().optional().describe('Custom text 3 (max 255 chars)'),
+  customText4: z.string().optional().describe('Custom text 4 (max 255 chars)')
 });
 
 let toApiFields = (fields: z.infer<typeof prospectFieldsSchema>): Record<string, unknown> => {
@@ -58,6 +62,10 @@ let toApiFields = (fields: z.infer<typeof prospectFieldsSchema>): Record<string,
   if (fields.customImage1 !== undefined) result.custom_image_1 = fields.customImage1;
   if (fields.customImage2 !== undefined) result.custom_image_2 = fields.customImage2;
   if (fields.customImage3 !== undefined) result.custom_image_3 = fields.customImage3;
+  if (fields.customText1 !== undefined) result.custom_text_1 = fields.customText1;
+  if (fields.customText2 !== undefined) result.custom_text_2 = fields.customText2;
+  if (fields.customText3 !== undefined) result.custom_text_3 = fields.customText3;
+  if (fields.customText4 !== undefined) result.custom_text_4 = fields.customText4;
   return result;
 };
 
@@ -82,6 +90,15 @@ export let createProspect = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.businessName?.trim() ||
+      !ctx.input.email?.trim() ||
+      !ctx.input.website?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide businessName, email, and website to create a Hyperise prospect.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
     let apiData = toApiFields(ctx.input);
     let result = await client.createProspect(apiData);

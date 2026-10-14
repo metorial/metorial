@@ -18,6 +18,12 @@ export let updateTemplate = SlateTool.create(spec, {
       name: z.string().optional().describe('Updated template name'),
       subject: z.string().optional().describe('Updated default email subject'),
       message: z.string().optional().describe('Updated default email message'),
+      draft: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set false to mark the template available for use, or true to keep it as a draft'
+        ),
       reminders: z.boolean().optional().describe('Enable or disable reminders'),
       applySigningOrder: z.boolean().optional().describe('Enable or disable signing order'),
       allowDecline: z.boolean().optional().describe('Allow or disallow declining'),
@@ -42,10 +48,10 @@ export let updateTemplate = SlateTool.create(spec, {
 
     let output = {
       templateId: result.id,
-      name: result.name,
-      subject: result.subject,
-      message: result.message,
-      updatedAt: result.updated_at
+      name: result.name ?? undefined,
+      subject: result.subject ?? undefined,
+      message: result.message ?? undefined,
+      updatedAt: result.updated_at ?? undefined
     };
 
     return {

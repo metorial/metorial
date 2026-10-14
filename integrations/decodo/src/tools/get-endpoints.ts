@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PublicApiClient } from '../lib/public-api-client';
+import { type ProxyEndpoint, PublicApiClient } from '../lib/public-api-client';
 import { spec } from '../spec';
 
 export let getProxyEndpoints = SlateTool.create(spec, {
@@ -34,9 +34,9 @@ export let getProxyEndpoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
 
-    let endpoints: any;
+    let endpoints: ProxyEndpoint[];
     if (ctx.input.endpointType) {
       let endpoint = await client.getEndpointsByType(ctx.input.endpointType);
       endpoints = [endpoint];
@@ -46,7 +46,7 @@ export let getProxyEndpoints = SlateTool.create(spec, {
 
     return {
       output: { endpoints },
-      message: `Found **${endpoints.length}** endpoint type(s): ${endpoints.map((e: any) => e.type).join(', ')}.`
+      message: `Found **${endpoints.length}** endpoint type(s): ${endpoints.map(e => e.type).join(', ')}.`
     };
   })
   .build();

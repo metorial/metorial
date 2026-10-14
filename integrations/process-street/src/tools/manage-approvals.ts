@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let approvalSchema = z.object({
@@ -16,13 +17,14 @@ let approvalSchema = z.object({
 export let manageApprovals = SlateTool.create(spec, {
   name: 'Manage Approvals',
   key: 'manage_approvals',
-  description: `List, approve, or reject approval tasks in a workflow run. Approval tasks are special tasks used to approve or reject the work in another task.`,
+  description: `List completed approval decisions, approve, or reject approval tasks in a workflow run. Pending approvals are not included in the list. Approval tasks are special tasks used to approve or reject the work in another task.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       workflowRunId: z.string().describe('ID of the workflow run'),
       action: z.enum(['list', 'approve', 'reject']).describe('Action to perform'),
       approvalTaskId: z
@@ -38,6 +40,7 @@ export let manageApprovals = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       approvals: z
         .array(approvalSchema)
         .optional()
@@ -50,7 +53,7 @@ export let manageApprovals = SlateTool.create(spec, {
     let { workflowRunId, action, approvalTaskId, subjectTaskId, comment } = ctx.input;
 
     if (action === 'list') {
-      let data = await client.listApprovals(workflowRunId);
+      let data = await client.listApprovals(workflowRunId, ctx.input.cursor);
       let approvals = (data.approvals || []).map((a: any) => ({
         approvalId: a.id,
         approvalTaskId: a.approvalTaskId,
@@ -61,13 +64,13 @@ export let manageApprovals = SlateTool.create(spec, {
         reviewedByUsername: a.reviewedBy?.username
       }));
       return {
-        output: { approvals, success: true },
+        output: { approvals, nextCursor: getNextCursor(data), success: true },
         message: `Found **${approvals.length}** approval(s).`
       };
     }
 
     if (!approvalTaskId) {
-      throw new Error('approvalTaskId is required for approve/reject actions');
+      throw createApiServiceError('approvalTaskId is required for approve/reject actions');
     }
 
     let status = action === 'approve' ? 'Approved' : 'Rejected';

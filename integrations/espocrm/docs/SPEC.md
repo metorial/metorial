@@ -1,138 +1,76 @@
-# Slates Specification for Espocrm
+# EspoCRM Integration
 
-## Overview
-
-EspoCRM is an open-source Customer Relationship Management (CRM) platform that allows managing contacts, accounts, leads, opportunities, cases, and other business entities. It is self-hosted and provides a REST API that mirrors all operations available through its web UI. The system is highly customizable, supporting custom entity types and fields.
+Manage CRM records and activity in a self-hosted or cloud EspoCRM instance.
+The API uses your instance's site URL with the `/api/v1/` path. Roles and instance
+customizations determine which entity types, fields, and actions are available.
 
 ## Authentication
 
-EspoCRM is a self-hosted application, so all API requests require the **Site URL** of the specific EspoCRM instance (the URL used to access EspoCRM in the browser). The API root path is `api/v1/`.
+Set the site URL to the address used to open EspoCRM in your browser. Choose one
+of the supported authentication methods:
 
-EspoCRM supports three authentication methods, all configured through **API Users** (Administration > API Users):
+- **API Key:** create an API User under Administration > API Users, choose API
+  Key authentication, and assign roles with the required entity permissions.
+- **HMAC:** create an API User with HMAC authentication and provide its API Key
+  and Secret Key. Requests are signed with HMAC-SHA256.
+- **Basic:** provide a regular user's username and password or authentication
+  token. EspoCRM recommends API Users for integrations. A token can be obtained
+  through `GET App/user` and used in place of the password.
 
-### 1. API Key Authentication (Recommended for simplicity)
+Use `get_current_user` to identify the connected user. Its result contains
+profile and team identifiers; authentication tokens are not returned.
 
-The simplest method. Create an API User with the "API Key" authentication method. Apply a needed role to the user to grant access to specific scopes.
+See the [official authentication documentation](https://docs.espocrm.com/development/api/#authentication).
 
-Send the API key in a header with each request:
+## Record management
 
-```
-X-Api-Key: API_KEY_COPIED_FROM_THE_USER_DETAIL_VIEW
-```
+Dedicated tools manage Contacts, Accounts, Leads, Opportunities, Cases,
+Meetings, Calls, and Tasks. `manage_record` additionally creates, updates, or
+deletes any entity type supported by the instance, including custom entities.
+Supply field names and values defined in Administration > Entity Manager.
 
-### 2. HMAC Authentication (Recommended for security)
+`get_record` retrieves a record by ID. `list_records` searches and lists records
+with field selection, sorting, pagination, text search, primary filters,
+boolean filters, and structured where conditions. When record counting is
+disabled, EspoCRM returns a negative total: `-1` means another page exists and
+`-2` means the last page. The tool's `hasMore` value handles these sentinels.
 
-The most secure method. Create an API User with the "HMAC authentication" method. Apply a needed role to the user to grant access to specific scopes.
+`manage_relationships` links, unlinks, or lists related records using the link
+name configured in Entity Manager. Call and Meeting durations are supplied in
+minutes. Date and time values use `YYYY-MM-DD HH:mm:ss` in UTC.
 
-The API User will have an API Key and a Secret Key. Each request requires a computed signature header:
+See [CRUD operations](https://docs.espocrm.com/development/api/crud/),
+[search parameters](https://docs.espocrm.com/development/api-search-params/), and
+[related records](https://docs.espocrm.com/development/api/relationships/).
 
-```
-X-Hmac-Authorization: base64Encode(apiKey + ':' + hashHmacSha256(method + ' /' + uri, secretKey))
-```
+## Lead conversion
 
-Where `method` is GET/POST/PUT/DELETE and `uri` is the request path (e.g., `Lead/action/convert`).
+`convert_lead` copies attributes using the instance's lead conversion settings.
+Accounts and Contacts are created by default; Opportunities are opt-in. An
+existing `accountId` is associated through a newly created Contact or
+Opportunity instead of creating another Account. The result includes the IDs
+of the resulting records. Conversion respects create permissions and duplicate
+checks.
 
-### 3. Basic Authentication (Not recommended)
+## Email and streams
 
-For regular users, EspoCRM uses Basic Authentication. A username and password (or token) are passed through the Authorization header encoded with Base64.
+`send_email` sends email through the instance's configured outgoing email
+account. It accepts a parent record and previously uploaded attachment IDs.
+`post_stream_note` posts a comment to a record's activity stream. `list_stream`
+reads the current user's stream or a particular record's notes and updates.
 
-```
-Espo-Authorization: base64Encode(username + ':' + passwordOrToken)
-```
+See the [stream API](https://docs.espocrm.com/development/api/stream/).
 
-To use a token instead of a password, first obtain a token via `GET App/user` with username/password credentials. Then use the returned token for subsequent requests.
+## Files and PDFs
 
-### Access Control
+`manage_attachments` uploads base64 file content, prepares an existing file for
+download, or deletes a file. To upload to a File or Attachment-Multiple field,
+provide the corresponding `relatedType` or `parentType` and `field`. After
+uploading, update the owning record's file ID or attachment ID array.
 
-It's recommended to create a separate API User with specific permissions (defined by Roles) and use this user for API calls. You can have multiple API Users for different purposes, give each user specific permissions. Roles define which entity types (scopes) the API user can access and what operations they may perform.
+`generate_pdf` produces a downloadable document for one record using a PDF
+template. Use `list_records` with entity type `Template` to find template IDs.
+EspoCRM removes the generated temporary file after one hour; the tool retrieves
+its contents immediately for download.
 
-## Features
-
-### Contact & Account Management
-
-Manage people and organizations as Contacts and Accounts. Create, read, update, and delete records. Link contacts to accounts and manage relationships between entities.
-
-### Lead & Opportunity Management
-
-Track sales leads and opportunities through configurable pipelines. Convert leads into contacts, accounts, and opportunities.
-
-### Case Management
-
-Track support cases/tickets, associate them with contacts and accounts, and manage their lifecycle through status stages.
-
-### Activities & Calendar
-
-Manage meetings, calls, tasks, and other calendar events. Associate activities with CRM records (contacts, accounts, leads, etc.).
-
-### Email Integration
-
-Send and receive emails within the CRM. Configure IMAP/SMTP for email accounts. Send mass emails and manage email templates.
-
-### Stream & Activity Feed
-
-Each record has a stream (activity feed) for notes, posts, and updates. The API allows reading and posting to streams.
-
-### Entity Relationships
-
-Link records together (e.g., contacts to accounts, opportunities to contacts). Add, remove, and list related records for any entity.
-
-### Custom Entities & Fields
-
-EspoCRM supports custom entity types and custom fields defined through the Entity Manager. The API works with custom entities the same way as built-in ones.
-
-### File Attachments
-
-Upload and manage file attachments associated with records.
-
-### Data Import
-
-Import records from CSV or other sources into the CRM.
-
-### Document & Knowledge Base Management
-
-Store and organize documents and knowledge base articles within the CRM.
-
-### PDF Generation
-
-Generate PDF documents from records using configurable templates.
-
-### Currency Rates
-
-Manage and retrieve currency conversion rates.
-
-### Internationalization
-
-Retrieve and manage language/translation data through the API.
-
-### OpenAPI Specification
-
-As of v9.3, the OpenAPI specification for an EspoCRM instance (including custom entity types and fields) can be obtained from the `/api/v1/OpenApi` endpoint. This is instance-specific and reflects custom configurations.
-
-## Events
-
-Webhooks allow other applications to subscribe to specific events happening in EspoCRM and receive data related to those events. Webhooks are supposed to be created via API by other applications. The webhook has a specific Event and URL.
-
-Webhooks are created via `POST api/v1/Webhook` with an event name and a target URL. Request sending is processed by the scheduled job "Process Webhook Queue." By default, it runs every 5 minutes.
-
-### Record Created (`ENTITY_TYPE.create`)
-
-Triggered when a record of a given entity type is created. All record attributes are sent in the payload. Works for any entity type (e.g., `Contact.create`, `Lead.create`, `Account.create`).
-
-### Record Updated (`ENTITY_TYPE.update`)
-
-Triggered when a record is updated. Only the updated attributes are included in the payload.
-
-### Record Deleted (`ENTITY_TYPE.delete`)
-
-Triggered when a record is removed.
-
-### Field Updated (`ENTITY_TYPE.fieldUpdate.FIELD`)
-
-Triggered when a specific field on an entity is updated. New field attributes are sent in the payload. For example, `Account.fieldUpdate.assignedUserId` fires when the assigned user of an account changes.
-
-### Configuration Options
-
-- **`url`**: The endpoint URL that receives the webhook POST requests.
-- **`skipOwn`**: Boolean option to skip events initiated by the user owning the webhook.
-- Each webhook returns a **secret key** that can be used to verify request authenticity via the `Signature` header.
-- The API User creating webhooks must have the _Webhooks_ scope enabled in their role, as well as access to the relevant entity types.
+See the [attachment API](https://docs.espocrm.com/development/api/attachment/).

@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let addTravelBoundary = SlateTool.create(spec, {
   name: 'Add Travel Boundary',
   key: 'add_travel_boundary',
-  description: `Add a travel boundary (isochrone) to an existing location. Travel boundaries visualize the area reachable from a location within a given time or distance, useful for service area analysis, delivery zones, and coverage planning.`,
+  description: `Add a travel boundary (isochrone) to an existing location. Travel boundaries visualize the area reachable from a location within a given travel time, useful for service area analysis, delivery zones, and coverage planning.`,
   instructions: [
-    'Specify the travel mode (e.g. "driving", "walking"), a numeric value, and the unit (e.g. "minutes", "kilometers").'
+    'Specify a positive travel time value in minutes and a travel mode of "driving", "walking", or "cycling". The default mode is "driving" and the default unit is "minutes".'
   ],
   tags: {
     destructive: false,
@@ -21,12 +21,12 @@ export let addTravelBoundary = SlateTool.create(spec, {
       mode: z
         .string()
         .optional()
-        .describe('Travel mode: "driving", "walking", "cycling", or "transit"'),
-      value: z.number().optional().describe('Travel time or distance value'),
+        .describe('Travel mode: "driving", "walking", or "cycling"; defaults to "driving"'),
+      value: z.number().optional().describe('Positive travel time in minutes'),
       unit: z
         .string()
         .optional()
-        .describe('Unit for the value: "minutes", "kilometers", "miles"')
+        .describe('Unit for the value: "minutes"; defaults to "minutes"')
     })
   )
   .output(
@@ -40,7 +40,7 @@ export let addTravelBoundary = SlateTool.create(spec, {
         travelBoundary: z
           .object({
             mode: z.string().optional().describe('Travel mode'),
-            value: z.number().optional().describe('Travel value'),
+            value: z.number().optional().describe('Travel time in minutes'),
             unit: z.string().optional().describe('Travel unit')
           })
           .passthrough()
@@ -74,7 +74,7 @@ export let addTravelBoundary = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Added travel boundary to location **${output.title || output.locationId}** (${ctx.input.value} ${ctx.input.unit} ${ctx.input.mode}).`
+      message: `Added travel boundary to location **${output.title || output.locationId}** (${output.travelBoundary?.value ?? ctx.input.value} ${output.travelBoundary?.unit ?? ctx.input.unit ?? 'minutes'} ${output.travelBoundary?.mode ?? ctx.input.mode ?? 'driving'}).`
     };
   })
   .build();

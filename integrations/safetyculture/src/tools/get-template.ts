@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,7 +36,7 @@ export let getTemplate = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.templateId && !ctx.input.inspectionId) {
-      throw new Error('Either templateId or inspectionId must be provided');
+      throw createApiServiceError('Either templateId or inspectionId must be provided');
     }
 
     let template: any;
@@ -48,11 +48,11 @@ export let getTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        templateId: template.template_id || template.id,
+        templateId: template.template_id || template.id || ctx.input.templateId,
         name: template.name || template.title,
-        description: template.description,
-        modifiedAt: template.modified_at,
-        createdAt: template.created_at,
+        description: template.description ?? undefined,
+        modifiedAt: template.modified_at ?? undefined,
+        createdAt: template.created_at ?? undefined,
         rawTemplate: template
       },
       message: `Retrieved template **${template.name || template.title || template.template_id || template.id}**.`

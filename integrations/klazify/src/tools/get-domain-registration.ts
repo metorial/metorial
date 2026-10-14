@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDomainRegistration = SlateTool.create(spec, {
@@ -14,7 +15,8 @@ export let getDomainRegistration = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL or domain to look up registration data for')
+      url: z.string().describe('The URL or domain to look up registration data for'),
+      refresh: refreshSchema
     })
   )
   .output(
@@ -39,15 +41,19 @@ export let getDomainRegistration = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.domainExpiration(ctx.input.url);
+    let result = await client.domainExpiration(ctx.input.url, ctx.input.refresh);
 
     let reg = result.domain_registration_data ?? {};
 
     let output = {
       domainAgeDate: reg.domain_age_date ?? null,
-      domainAgeDaysAgo: reg.domain_age_days_ago ?? null,
+      domainAgeDaysAgo:
+        reg.domain_age_days_ago == null ? null : String(reg.domain_age_days_ago),
       domainExpirationDate: reg.domain_expiration_date ?? null,
-      domainExpirationDaysLeft: reg.domain_expiration_days_left ?? null
+      domainExpirationDaysLeft:
+        reg.domain_expiration_days_left == null
+          ? null
+          : String(reg.domain_expiration_days_left)
     };
 
     return {

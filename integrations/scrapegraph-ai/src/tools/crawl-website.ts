@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let crawlWebsite = SlateTool.create(spec, {
   name: 'Crawl Website',
   key: 'crawl_website',
-  description: `Crawls multiple pages of a website starting from a given URL, following links with configurable depth and breadth.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Crawls multiple pages of a website starting from a given URL, following links with configurable depth and breadth.
 Two modes: **AI extraction** (structured output with a prompt) and **markdown conversion** (no AI, lower cost). Supports crawl rules for include/exclude paths, sitemap-based discovery, and webhook notifications on completion.`,
   instructions: [
     'Set extractionMode to false for markdown-only crawling without AI processing (80% cheaper).',

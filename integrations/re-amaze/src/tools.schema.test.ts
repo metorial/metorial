@@ -5,11 +5,11 @@ import { provider } from './index';
 describeMcpCompatibleToolSchemas('Re:amaze tool input schemas', provider.actions);
 
 describe('Re:amaze tool schema registration', () => {
-  it('registers all 34 unique tools with supported production IDs', () => {
+  it('registers all 35 unique tools with supported production IDs', () => {
     let tools = provider.actions.filter(action => action.type === 'tool');
     let keys = tools.map(tool => tool.key);
-    expect(keys).toHaveLength(34);
-    expect(new Set(keys).size).toBe(34);
+    expect(keys).toHaveLength(35);
+    expect(new Set(keys).size).toBe(35);
     expect(keys).toEqual(
       expect.arrayContaining([
         'list_messages',
@@ -19,6 +19,7 @@ describe('Re:amaze tool schema registration', () => {
         'get_incident',
         'list_contact_identities',
         'create_contact_identity',
+        'create_contact_identity_by_identifier',
         'update_contact_note'
       ])
     );

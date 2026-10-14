@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let listWorkflows = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ environmentId: environmentIdInput }))
   .output(
     z.object({
       workflows: z.array(
@@ -19,6 +20,15 @@ export let listWorkflows = SlateTool.create(spec, {
           workflowId: z.string().describe('Internal ID of the workflow'),
           name: z.string().describe('Name of the workflow'),
           codename: z.string().describe('Codename of the workflow'),
+          publishedStepId: z
+            .string()
+            .optional()
+            .describe('ID of the predefined Published step'),
+          scheduledStepId: z
+            .string()
+            .optional()
+            .describe('ID of the predefined Scheduled step'),
+          archivedStepId: z.string().optional().describe('ID of the predefined Archived step'),
           steps: z
             .array(
               z.object({
@@ -38,7 +48,11 @@ export let listWorkflows = SlateTool.create(spec, {
                 contentTypeIds: z
                   .array(z.string())
                   .optional()
-                  .describe('Content type IDs this workflow applies to')
+                  .describe('Content type IDs this workflow applies to'),
+                collectionIds: z
+                  .array(z.string())
+                  .optional()
+                  .describe('Collection IDs this workflow applies to')
               })
             )
             .optional()
@@ -50,7 +64,7 @@ export let listWorkflows = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let workflows = await client.listWorkflows();
@@ -59,6 +73,9 @@ export let listWorkflows = SlateTool.create(spec, {
       workflowId: w.id,
       name: w.name,
       codename: w.codename,
+      publishedStepId: w.published_step?.id,
+      scheduledStepId: w.scheduled_step?.id,
+      archivedStepId: w.archived_step?.id,
       steps: (w.steps || []).map(s => ({
         stepId: s.id,
         name: s.name,
@@ -67,7 +84,10 @@ export let listWorkflows = SlateTool.create(spec, {
         transitionsTo: (s.transitions_to || []).map(t => t.step?.id || t.step?.codename || '')
       })),
       scopes: w.scopes?.map(s => ({
-        contentTypeIds: s.content_types?.map(ct => ct.id || ct.codename || '')
+        contentTypeIds: s.content_types?.map(ct => ct.id || ct.codename || ''),
+        collectionIds: s.collections?.map(
+          collection => collection.id || collection.codename || ''
+        )
       }))
     }));
 

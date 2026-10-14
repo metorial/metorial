@@ -11,7 +11,14 @@ export let listUsers = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      mailboxId: z
+        .string()
+        .optional()
+        .describe('Mailbox ID from list_mailboxes to select its users')
+    })
+  )
   .output(
     z.object({
       users: z.array(z.record(z.string(), z.any())).describe('List of Helpwise users')
@@ -20,8 +27,10 @@ export let listUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listUsers();
-    let users = Array.isArray(result) ? result : (result.users ?? result.data ?? []);
+    let result = await client.listUsers(ctx.input.mailboxId);
+    let users = Array.isArray(result)
+      ? result
+      : (result.users ?? result.data?.users ?? result.data ?? []);
 
     return {
       output: { users },

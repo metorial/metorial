@@ -1,87 +1,71 @@
-Let me check the official API documentation for more details on the available endpoints and features.Now let me check if sevdesk has native webhook support or if integrations rely on polling.Now let me check the Make.com documentation for more details on sevdesk's features and whether there's DATEV export support mentioned in the API.I now have enough information to write a comprehensive specification. Based on my research, sevDesk does not offer native webhooks — integration platforms like Pipedream and Make.com use polling-based triggers to detect new resources.
+# sevDesk Integration Specification
 
-# Slates Specification for Sevdesk
-
-## Overview
-
-sevDesk is a cloud-based accounting platform for SMEs and freelancers, primarily in Germany and Austria. It covers invoicing, expense management, contact management, order management, inventory/parts management, and financial accounting with German GoBD compliance. API access requires the paid "Buchhaltung Pro" plan.
+sevDesk provides cloud accounting, invoicing, expense tracking, contacts, orders,
+and inventory management. This integration uses the API at
+`https://my.sevdesk.de/api/v1`.
 
 ## Authentication
 
-sevDesk uses **API token authentication**. Each sevDesk administrator account has a single API token — a 32-character hexadecimal string.
+Connect using the API token from Settings > User in the sevDesk web application.
+The API token is sent in the `Authorization` header. Tokens remain valid while
+the owning user exists, unless regenerated.
 
-**How to obtain the token:**
-Navigate to **Settings > User** (German: Einstellungen > Benutzer) in the sevDesk web UI at `https://my.sevdesk.de`, click on the desired user, and find the API token below the language setting. It is recommended to create a dedicated user for API access.
+Connection verification uses the documented bookkeeping-version endpoint. The
+public API specification does not expose a current-user endpoint, so the
+connection does not infer the token owner from the first user in an account.
 
-**How to use the token:**
-The token must be passed via the `Authorization` header on every request:
+## Available workflows
 
-```
-Authorization: <your-api-token>
-```
+- Create, retrieve, update, delete, and search contacts. Optionally add contact
+  addresses and communication details.
+- Create draft invoices with line items; retrieve and search invoices; send by
+  email; record payments; cancel invoices; and convert orders to invoices.
+- Prepare downloadable invoice PDFs without marking an invoice as sent.
+- Create credit notes from invoices and search credit notes.
+- Create vouchers, retrieve voucher details, search vouchers, and record payments.
+- Create orders through the order factory, retrieve order details, and search
+  orders. Order creation currently creates an order without positions.
+- Create and search inventory parts.
+- Create or update accounting contacts, and add communication details to contacts.
+- Discover check accounts, valid receipt account/tax combinations, and the
+  connected bookkeeping system version.
+- Prepare a downloadable ZIP of DATEV CSV accounting data for a date range.
 
-> **Note:** Previously, tokens could also be passed as a `token` query parameter, but this method has been removed as of April 2025 for security reasons. Only the Authorization header method is supported now.
+## Bookkeeping versions and payments
 
-**Token characteristics:**
+Use `get_bookkeeping_system_version` to determine which accounting model applies.
+Version 1.0 uses legacy tax types and voucher accounting types. Version 2.0 uses
+`taxRuleId` and voucher `accountDatevId`; `get_receipt_guidance` provides eligible
+receipt account/tax combinations.
 
-- Tokens do not expire; they have an infinite lifetime.
-- Tokens are tied to a specific user account. If that user is deleted, the token is permanently lost with no recovery path.
+All voucher positions must consistently use net or gross amounts. Provide the
+corresponding `sumNet` or `sumGross` on every position.
 
-**Base URL:** `https://my.sevdesk.de/api/v1/`
+Payment types follow the provider contract: `FULL_PAYMENT` for full payments,
+`N` for partial payments, and the documented difference reasons. Online check
+accounts require an existing `checkAccountTransactionId`. Other account types
+create a transaction automatically.
 
-## Features
+Dates supplied as `YYYY-MM-DD` are converted to the provider's timestamp or
+ISO date-time format where required. Search result counts describe the returned
+page, not the total number of records in the account.
 
-### Contact Management
+## Files and exports
 
-Create, read, update, and search contacts (customers, suppliers, etc.). Contacts can be categorized and enriched with addresses, communication ways (email, phone, mobile, fax, website), and accounting-specific information. You can also check customer number availability.
+Invoice PDFs and DATEV CSV ZIPs are provided as downloadable files, with structured
+metadata in the tool result. For compatibility, `get_invoice_pdf.base64Content`
+also returns the provider's documented base64 PDF content, and
+`export_datev.exportContent` retains the provider's JSON export data or download
+reference. Unsupported binary responses are not coerced into these fields.
 
-### Invoice Management
+The existing synchronous DATEV workflow uses the provider's documented,
+deprecated `/Export/datevCSV` endpoint. The account's accounting year must already
+be configured. Its revenue/expense inputs map to the provider's `E`/`X` document
+scope codes. The provider also offers an asynchronous export-job workflow, which
+is not exposed by this integration.
 
-Create, retrieve, search, cancel, and delete invoices. Invoices support configurable properties such as invoice date, due date, discount amount, delivery dates, line items (positions), and tax rules. Additional capabilities include:
+## Official references
 
-- Sending invoices via email with the invoice attached as a PDF.
-- Rendering and downloading invoice PDFs.
-- Marking invoices as sent via a chosen send type.
-- Checking partial payment status.
-- Booking invoices (recording payments).
-- Creating dunning notices, advance invoices, and partial invoices.
-- Creating e-invoices (electronic invoices).
-- **Consideration:** Invoices in sevDesk system version 2.0 use `taxRule` instead of the older `taxType`/`taxSet` properties. Only specific combinations of tax rules, tax rates, and booking accounts are valid — the Receipt Guidance endpoint helps determine valid combinations.
-
-### Credit Notes
-
-Create and manage credit notes linked to invoices. Credit notes follow similar tax rule constraints as invoices.
-
-### Voucher Management
-
-Create, update, retrieve, search, and book vouchers (incoming invoices/receipts). Voucher positions can be managed individually. Files (e.g., scanned receipts) can be uploaded and attached to vouchers.
-
-- **Consideration:** Vouchers must comply with GoBD requirements. Enshrining a voucher (making it immutable for legal compliance) cannot be undone.
-
-### Order Management
-
-Create, update, retrieve, search, and delete orders. Order positions (line items) can be managed separately. Orders follow the same tax rule system as invoices and vouchers.
-
-### Parts / Inventory Management
-
-Create, update, retrieve, and search parts (products/services) in the inventory. You can query the current stock amount of a given part.
-
-### Communication Ways
-
-Create, search, and delete communication ways for contacts (e.g., email addresses, phone numbers, websites). Each communication way has a type (private, work, fax, mobile, newsletter, invoice address, etc.).
-
-### Accounting Contacts
-
-Create accounting-specific contact records that store financial information like debitor/creditor numbers for bookkeeping purposes.
-
-### DATEV Export
-
-Export accounting data in DATEV format for transfer to tax advisors or external accounting systems. Dedicated API endpoints exist for generating these exports.
-
-### Receipt Guidance
-
-Query which booking accounts, tax rules, and tax rates are compatible with each other, based on client settings (e.g., whether the business is a "Kleinunternehmer" under §19 UStG). This is essential for creating compliant vouchers, invoices, and credit notes.
-
-## Events
-
-The provider does not support events. sevDesk does not offer native webhooks or a purpose-built event subscription mechanism through its API.
+- [API reference and authentication](https://api.sevdesk.de/)
+- [OpenAPI schema](https://api.sevdesk.de/openapi.yaml)
+- [Invoice status transitions](https://tech.sevdesk.com/api_news/posts/2024_04_04-changing-status-invoices-cretid-notes/)

@@ -7,10 +7,12 @@ import {
   deleteBranch,
   deleteGraph,
   executeGraphQL,
+  getAccount,
   getBranch,
   getGraph,
   getSchema,
   getViewer,
+  listGraphs,
   listSubgraphs,
   publishSubgraph
 } from './tools';
@@ -19,6 +21,8 @@ export let provider = Slate.create({
   spec,
   tools: [
     getViewer,
+    getAccount,
+    listGraphs,
     createGraph,
     getGraph,
     deleteGraph,

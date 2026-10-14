@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,8 +36,8 @@ export let manageOnboarding = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action } = ctx.input;
@@ -54,7 +54,7 @@ export let manageOnboarding = SlateTool.create(spec, {
     }
 
     if (action === 'get_assignments') {
-      if (!ctx.input.packId) throw new Error('packId is required.');
+      if (!ctx.input.packId) throw createApiServiceError('packId is required.');
       let result = await client.getPackAssignments(ctx.input.packId, {
         limit: ctx.input.limit,
         offset: ctx.input.offset
@@ -66,8 +66,11 @@ export let manageOnboarding = SlateTool.create(spec, {
     }
 
     if (action === 'assign_users') {
-      if (!ctx.input.packId) throw new Error('packId is required.');
-      if (!ctx.input.userIds) throw new Error('userIds is required.');
+      if (!ctx.input.packId) throw createApiServiceError('packId is required.');
+      if (!ctx.input.userIds) throw createApiServiceError('userIds is required.');
+      if (ctx.input.userIds.length < 1 || ctx.input.userIds.length > 500) {
+        throw createApiServiceError('Provide between 1 and 500 userIds for assign_users.');
+      }
       let result = await client.assignUsersToPack(ctx.input.packId, {
         userIds: ctx.input.userIds
       });
@@ -77,6 +80,6 @@ export let manageOnboarding = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

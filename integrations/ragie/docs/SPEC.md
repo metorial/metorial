@@ -1,4 +1,4 @@
-# Slates Specification for Ragie
+# Ragie Integration Specification
 
 ## Overview
 
@@ -52,7 +52,7 @@ In a regular RAG system, it's possible that the top_k chunks come from a single 
 
 RAG falls short for tasks like "extract all emails" or "extract all contacts" which require extracting precise semi-structured information from unstructured data. The entity extraction feature enables you to create an instruction — a natural language prompt that guides Ragie on what action to take on a document. Once created, it is automatically applied to every created or updated document.
 
-- Instructions include a natural language prompt, an optional JSON schema for structured output, a scope (chunk-level or document-level), and an optional metadata filter.
+- Creating instructions requires a unique name, a natural language prompt, and a JSON schema for structured output. Scope (chunk-level or document-level), activation, context templates, partition, and metadata filters are optional.
 - Entity extraction is supported on all document types including images.
 - Extracted entities can be retrieved per document or per instruction.
 
@@ -76,6 +76,12 @@ Documents may be logically separated into partitions. Retrievals can provide an 
 ### Document Content Access
 
 You can get the content of a document. The media_type parameter can be used to request the content in a different format. When requesting as application/json, additional metadata is included. Using mime types such as audio/mpeg or video/mp4 will stream the file in a playable format.
+
+`get_document` preserves text content and summaries when requested. `list_document_chunks` supports cursor pagination and chunk index ranges. `download_document_source` prepares the original document source for download through Ragie's authenticated source endpoint.
+
+### Partition Discovery
+
+`list_partitions` exposes the current partition fields and cursor pagination. A partition's name is its operational identifier. `manage_partitions` creates, inspects, or deletes partitions by this identifier. Its legacy list action requires creation and update timestamps, which the current API does not expose; it reports a clear error when those fields are missing instead of inventing values. Successful creation returns the provider's real fields and does not fail merely because timestamps are absent.
 
 ## Events
 

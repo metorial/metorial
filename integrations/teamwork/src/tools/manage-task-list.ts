@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -46,7 +46,8 @@ export let manageTaskList = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required to create a task list');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required to create a task list');
       let result = await client.createTaskList(ctx.input.projectId, {
         name: ctx.input.name,
         description: ctx.input.description
@@ -80,6 +81,6 @@ export let manageTaskList = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,3 +1,4 @@
+export * from './archive-records';
 export * from './complete-activity';
 export * from './confirm-purchase-order';
 export * from './confirm-sale-order';
@@ -7,6 +8,7 @@ export * from './delete-records';
 export * from './download-attachment';
 export * from './execute-method';
 export * from './get-current-user';
+export * from './get-record-defaults';
 export * from './list-model-fields';
 export * from './list-models';
 export * from './mark-opportunity-won';

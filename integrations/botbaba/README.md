@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Botbaba
 
-Manage and deploy no-code chatbots for WhatsApp and web channels. Retrieve bot listings, send WhatsApp template messages via 360Dialog or Gupshup, and handle e-commerce workflows including ordering, payments, and cart abandonment. Supports lead generation, SMS campaigns, and integration with e-commerce platforms like Shopify and WooCommerce.
+List your Botbaba chatbots and submit WhatsApp template messages through 360Dialog or Gupshup. For templates with provider-specific fields, submit the complete JSON request copied from the Botbaba dashboard.
+
+Authenticate with the auth token on your Botbaba profile page. WhatsApp messaging requires a configured Business API integration and an approved template; successful submission does not confirm delivery.
+
+See the [official messaging guide](https://kb.botbaba.io/docs/how-to-forward-a-template-message-with-custom-data-using-botbabas-api-and-postman-runner/) for copying a template request.
 
 ## License
 

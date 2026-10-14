@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
@@ -27,6 +28,7 @@ export let createEstimate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       clientId: z.string().describe('Contact ID of the client.'),
       documentTypeId: z.string().describe('Document type ID for the estimate.'),
       date: z.string().optional().describe('Estimate date (YYYY-MM-DD). Defaults to today.'),
@@ -36,7 +38,10 @@ export let createEstimate = SlateTool.create(spec, {
         .describe('"total" or "initial" pricing mode. Defaults to "total".'),
       currencyCode: z.string().optional().describe('Currency code (e.g. "EUR").'),
       items: z.array(lineItemSchema).describe('Line items for the estimate.'),
-      reference: z.string().optional().describe('Reference or PO number.'),
+      reference: z
+        .string()
+        .optional()
+        .describe('Legacy unsupported field. Use customId for an external reference.'),
       customId: z.string().optional().describe('Custom external identifier (API-only).')
     })
   )
@@ -48,8 +53,15 @@ export let createEstimate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
+
+    if (ctx.input.reference !== undefined) {
+      throw createApiServiceError(
+        'Elorus has no general estimate reference field. Use customId for an external reference.',
+        { reason: 'unsupported_estimate_reference' }
+      );
+    }
 
     let body: any = {
       client: ctx.input.clientId,
@@ -61,16 +73,15 @@ export let createEstimate = SlateTool.create(spec, {
         if (item.quantity) lineItem.quantity = item.quantity;
         if (item.unitTotal) lineItem.unit_total = item.unitTotal;
         if (item.unitValue) lineItem.unit_value = item.unitValue;
-        if (item.unit) lineItem.unit = item.unit;
+        if (item.unit) lineItem.unit_measure = item.unit;
         if (item.productId) lineItem.product = item.productId;
-        if (item.taxes) lineItem.taxes = item.taxes;
+        if (item.taxes) lineItem.taxes = item.taxes.map(tax => ({ tax }));
         return lineItem;
       })
     };
 
     if (ctx.input.date) body.date = ctx.input.date;
     if (ctx.input.currencyCode) body.currency_code = ctx.input.currencyCode;
-    if (ctx.input.reference) body.reference = ctx.input.reference;
     if (ctx.input.customId) body.custom_id = ctx.input.customId;
 
     let estimate = await client.createEstimate(body);

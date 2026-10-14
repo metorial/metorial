@@ -1,9 +1,29 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { apaleoApiError } from './lib/errors';
 
-let identityAxios = createAxios({
-  baseURL: 'https://identity.apaleo.com'
+type AuthOutput = { token: string; refreshToken?: string; expiresAt?: string };
+
+let identityAxios = createAuthenticatedAxios({
+  baseURL: 'https://identity.apaleo.com',
+  contentType: 'application/x-www-form-urlencoded',
+  timeout: 30000,
+  errorAdapter: apaleoApiError
 });
+
+let getClientCredentialsToken = async (input: { clientId: string; clientSecret: string }) => {
+  let response = await identityAxios.post(
+    '/connect/token',
+    new URLSearchParams({ grant_type: 'client_credentials' }).toString(),
+    { auth: { username: input.clientId, password: input.clientSecret } }
+  );
+  return normalizeOAuthTokenResponse(response.data, { providerLabel: 'Apaleo' });
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -35,140 +55,53 @@ export let auth = SlateAuth.create()
       { title: 'Profile', description: 'User profile information', scope: 'profile' },
       {
         title: 'Offline Access',
-        description: 'Obtain refresh tokens for long-lived access',
+        description: 'Renew access without signing in again',
         scope: 'offline_access'
       },
       {
-        title: 'Reservations Read',
-        description: 'Read reservation data',
-        scope: 'reservations.read'
-      },
-      {
         title: 'Reservations Manage',
-        description: 'Create, modify, and cancel reservations',
+        description: 'Read, create, and manage bookings and reservations, and search offers',
         scope: 'reservations.manage'
       },
       {
-        title: 'Availability Read',
-        description: 'Read availability information',
-        scope: 'availability.read'
-      },
-      {
-        title: 'Availability Manage',
-        description: 'Manage availability',
-        scope: 'availability.manage'
-      },
-      { title: 'Offers Read', description: 'Read offers', scope: 'offers.read' },
-      {
-        title: 'Offer Index Read',
-        description: 'Read offer index',
-        scope: 'offer-index.read'
-      },
-      { title: 'Rates Read', description: 'Read rate information', scope: 'rates.read' },
-      { title: 'Rates Manage', description: 'Manage rates', scope: 'rates.manage' },
-      {
-        title: 'Rate Plans Read Corporate',
-        description: 'Read corporate rate plans',
-        scope: 'rateplans.read-corporate'
-      },
-      {
         title: 'Setup Read',
-        description: 'Read property setup and configuration',
+        description: 'Read rooms, room types, and rate plans',
         scope: 'setup.read'
       },
       {
-        title: 'Setup Manage',
-        description: 'Manage property setup and configuration',
-        scope: 'setup.manage'
+        title: 'Corporate Rate Plans',
+        description: 'Include corporate rate plans',
+        scope: 'rateplans.read-corporate'
       },
-      { title: 'Folios Read', description: 'Read folio data', scope: 'folios.read' },
       {
         title: 'Folios Manage',
-        description: 'Manage folios, post charges and payments',
+        description: 'Read folios and post charges, payments, and refunds',
         scope: 'folios.manage'
       },
-      { title: 'Invoices Read', description: 'Read invoice data', scope: 'invoices.read' },
+      {
+        title: 'Invoices Read',
+        description: 'Retrieve invoice details',
+        scope: 'invoices.read'
+      },
       {
         title: 'Invoices Manage',
-        description: 'Create and manage invoices',
+        description: 'Create, cancel, and pay invoices',
         scope: 'invoices.manage'
       },
       {
-        title: 'Companies Read',
-        description: 'Read company profiles',
-        scope: 'companies.read'
-      },
-      {
         title: 'Companies Manage',
-        description: 'Create and manage company profiles',
+        description: 'Read and manage company profiles',
         scope: 'companies.manage'
-      },
-      { title: 'Reports Read', description: 'Read report data', scope: 'reports.read' },
-      { title: 'Logs Read', description: 'Read log data', scope: 'logs.read' },
-      {
-        title: 'Account Manage',
-        description: 'Manage account settings',
-        scope: 'account.manage'
-      },
-      {
-        title: 'Accounting Read',
-        description: 'Read accounting transaction data',
-        scope: 'accounting.read'
-      },
-      {
-        title: 'Maintenances Read',
-        description: 'Read maintenance data',
-        scope: 'maintenances.read'
-      },
-      {
-        title: 'Maintenances Manage',
-        description: 'Manage maintenance windows',
-        scope: 'maintenances.manage'
       },
       {
         title: 'Night Audit',
-        description: 'Trigger night audit operations',
+        description: 'Run night audit operations',
         scope: 'operations.trigger-night-audit'
       },
       {
         title: 'Change Room State',
-        description: 'Change room/unit states',
+        description: 'Change room conditions',
         scope: 'operations.change-room-state'
-      },
-      {
-        title: 'Authorizations Read',
-        description: 'Read payment authorizations',
-        scope: 'authorizations.read'
-      },
-      {
-        title: 'Authorizations Manage',
-        description: 'Manage payment authorizations',
-        scope: 'authorizations.manage'
-      },
-      {
-        title: 'Payment Accounts Read',
-        description: 'Read payment account data',
-        scope: 'payment-accounts.read'
-      },
-      {
-        title: 'Payment Accounts Manage',
-        description: 'Manage payment accounts',
-        scope: 'payment-accounts.manage'
-      },
-      {
-        title: 'Account Users Read',
-        description: 'Read account user information',
-        scope: 'identity:account-users.read'
-      },
-      {
-        title: 'Account Users Manage',
-        description: 'Manage account users',
-        scope: 'identity:account-users.manage'
-      },
-      {
-        title: 'UI Integrations Manage',
-        description: 'Manage UI integrations',
-        scope: 'integration:ui-integrations.manage'
       }
     ],
 
@@ -203,25 +136,18 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, { providerLabel: 'Apaleo' })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: AuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error(
+        throw createApiServiceError(
           'No refresh token available. Re-authenticate with the offline_access scope.'
         );
       }
@@ -241,27 +167,16 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Apaleo',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
-    }) => {
+    getProfile: async (ctx: { output: AuthOutput }) => {
       let response = await identityAxios.get('/connect/userinfo', {
         headers: {
           Authorization: `Bearer ${ctx.output.token}`
@@ -292,36 +207,15 @@ export let auth = SlateAuth.create()
       clientSecret: z.string().describe('Client secret for the simple client')
     }),
 
-    getOutput: async ctx => {
-      let credentials = Buffer.from(
-        `${ctx.input.clientId}:${ctx.input.clientSecret}`
-      ).toString('base64');
-
-      let response = await identityAxios.post(
-        '/connect/token',
-        new URLSearchParams({
-          grant_type: 'client_credentials'
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: `Basic ${credentials}`
-          }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+    docs: [
+      {
+        type: 'docs.auth.custom',
+        name: 'Client credentials documentation',
+        url: 'https://apaleo.dev/guides/oauth-connection/simple-client.html'
       }
-
-      return {
-        output: {
-          token: data.access_token,
-          expiresAt
-        }
-      };
-    }
+    ],
+    getOutput: async ctx => ({ output: await getClientCredentialsToken(ctx.input) }),
+    handleTokenRefresh: async (ctx: {
+      input: { clientId: string; clientSecret: string };
+    }) => ({ output: await getClientCredentialsToken(ctx.input) })
   });

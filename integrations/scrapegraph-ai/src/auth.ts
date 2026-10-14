@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,10 +15,15 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'ScrapeGraphAI API key from your dashboard at https://dashboard.scrapegraphai.com'
+          'ScrapeGraphAI API key. Current API tools require a key from https://scrapegraphai.com; legacy tools require a compatible v1 key.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a non-empty ScrapeGraphAI API key.', {
+          reason: 'invalid_auth'
+        });
+      }
       return {
         output: {
           token: ctx.input.apiKey

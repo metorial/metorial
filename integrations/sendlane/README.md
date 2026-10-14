@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Sendlane
 
-Manage contacts, lists, tags, and segments for email and SMS marketing automation focused on eCommerce. Create and update contacts, subscribe/unsubscribe contacts to lists, apply tags, and manage custom fields. Retrieve campaign details and sender profiles. Track eCommerce events such as product viewed, added to cart, checkout started, placed order, and fulfilled order via server-side and client-side APIs. Configure automation-based webhooks to broadcast contact data when triggered by subscriber actions or eCommerce behaviors.
+Manage email and SMS marketing contacts, list membership, tags, custom field values, consent, and email suppression in Sendlane. Retrieve contacts, lists, campaigns, custom fields, and sender profiles. Track order, checkout, fulfillment, and custom events with a separate custom integration token.
 
 ## License
 

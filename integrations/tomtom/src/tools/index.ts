@@ -8,6 +8,7 @@ export * from './manage-notifications';
 export * from './matrix-routing';
 export * from './reachable-range';
 export * from './reverse-geocode';
+export * from './search-discovery';
 export * from './search-geocode';
 export * from './snap-to-roads';
 export * from './traffic-info';

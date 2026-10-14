@@ -1,17 +1,14 @@
 {
   "name": "@metorial/grafbase",
-  "description": "Manage GraphQL federation infrastructure through the Grafbase Management API. Create and configure federated graphs, publish and compose subgraph schemas via the schema registry, run schema checks to detect breaking changes, and manage schema proposals for collaborative governance. Manage organizations, memberships, and access tokens programmatically. Access audit logs for compliance tracking and retrieve observability data including traces, metrics, and operation analytics for federated graphs.",
+  "description": "Discover Grafbase accounts and graphs, manage federated graphs and branches, publish subgraph schemas, run schema checks, retrieve schema SDL, and execute custom GraphQL operations.",
   "categories": ["apis-and-http-requests"],
   "skills": [
+    "discover accounts and graphs",
     "manage federated graphs",
     "publish subgraph schemas",
     "run schema checks",
-    "manage schema proposals",
-    "manage organizations and memberships",
-    "create and revoke access tokens",
-    "access audit logs",
-    "retrieve observability metrics",
-    "compose unified supergraph",
-    "manage branch environments"
+    "retrieve graph schemas",
+    "manage branch environments",
+    "execute GraphQL operations"
   ]
 }

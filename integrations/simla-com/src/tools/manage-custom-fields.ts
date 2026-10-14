@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -123,7 +123,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'getField') {
       if (!ctx.input.entity || !ctx.input.fieldCode)
-        throw new Error('entity and fieldCode are required.');
+        throw createApiServiceError('entity and fieldCode are required.');
       let field = await client.getCustomField(ctx.input.entity, ctx.input.fieldCode);
       return {
         output: { field },
@@ -133,8 +133,15 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'createField') {
       if (!ctx.input.entity || !ctx.input.fieldDefinition)
-        throw new Error('entity and fieldDefinition are required.');
-      let result = await client.createCustomField(ctx.input.entity, ctx.input.fieldDefinition);
+        throw createApiServiceError('entity and fieldDefinition are required.');
+      let { dictionaryCode, ...definition } = ctx.input.fieldDefinition;
+      if (definition.type === 'dictionary' && !dictionaryCode) {
+        throw createApiServiceError('dictionaryCode is required for dictionary fields.');
+      }
+      let result = await client.createCustomField(ctx.input.entity, {
+        ...definition,
+        dictionary: dictionaryCode
+      });
       return {
         output: { createdCode: result.code },
         message: `Created custom field **${result.code}**.`
@@ -143,7 +150,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'editField') {
       if (!ctx.input.entity || !ctx.input.fieldCode || !ctx.input.fieldDefinition) {
-        throw new Error('entity, fieldCode, and fieldDefinition are required.');
+        throw createApiServiceError('entity, fieldCode, and fieldDefinition are required.');
       }
       await client.editCustomField(
         ctx.input.entity,
@@ -174,7 +181,8 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'getDictionary') {
-      if (!ctx.input.dictionaryCode) throw new Error('dictionaryCode is required.');
+      if (!ctx.input.dictionaryCode)
+        throw createApiServiceError('dictionaryCode is required.');
       let dictionary = await client.getCustomDictionary(ctx.input.dictionaryCode);
       return {
         output: { dictionary },
@@ -184,7 +192,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'createDictionary') {
       if (!ctx.input.dictionaryDefinition)
-        throw new Error('dictionaryDefinition is required.');
+        throw createApiServiceError('dictionaryDefinition is required.');
       let result = await client.createCustomDictionary(ctx.input.dictionaryDefinition);
       return {
         output: { createdCode: result.code },
@@ -194,7 +202,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'editDictionary') {
       if (!ctx.input.dictionaryCode || !ctx.input.dictionaryDefinition) {
-        throw new Error('dictionaryCode and dictionaryDefinition are required.');
+        throw createApiServiceError('dictionaryCode and dictionaryDefinition are required.');
       }
       await client.editCustomDictionary(
         ctx.input.dictionaryCode,
@@ -206,6 +214,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

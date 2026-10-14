@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listConversations = SlateTool.create(spec, {
   name: 'List Conversations',
   key: 'list_conversations',
-  description: `Retrieve conversations (threads) from your Helpwise mailboxes. Filter by mailbox, status, tag, or search query to find specific conversations.`,
+  description: `Retrieve conversations (threads) from your Helpwise mailboxes. Provide mailboxId for the current API, with labelId and pageToken to select a folder and continue pagination. Status, tag, query, and numbered pages retain legacy behavior.`,
   tags: {
     readOnly: true
   }
@@ -20,12 +20,35 @@ export let listConversations = SlateTool.create(spec, {
         .describe('Filter by conversation status (e.g., open, closed)'),
       tagId: z.string().optional().describe('Filter by tag ID'),
       query: z.string().optional().describe('Search query to filter conversations'),
-      limit: z.number().optional().describe('Maximum number of conversations to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Maximum number of conversations to return'),
+      page: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Legacy page number; use pageToken with mailboxId for the current API'),
+      pageToken: z
+        .string()
+        .optional()
+        .describe('nextPageToken from the preceding response; requires mailboxId'),
+      labelId: z
+        .number()
+        .nonnegative()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe(
+          'Folder ID: 14 all, 0 assigned, 10 unassigned, 11 starred, 9 snoozed, 2 draft, 1 sent, 7 closed, 8 spam, 5 trash, 6 scheduled'
+        )
     })
   )
   .output(
     z.object({
+      nextPageToken: z.string().nullable().optional().describe('Token for the next page'),
       conversations: z.array(z.record(z.string(), z.any())).describe('List of conversations')
     })
   )
@@ -38,7 +61,9 @@ export let listConversations = SlateTool.create(spec, {
       tag_id: ctx.input.tagId,
       query: ctx.input.query,
       limit: ctx.input.limit,
-      page: ctx.input.page
+      page: ctx.input.page,
+      pageToken: ctx.input.pageToken,
+      labelId: ctx.input.labelId
     });
 
     let conversations = Array.isArray(result)
@@ -46,7 +71,7 @@ export let listConversations = SlateTool.create(spec, {
       : (result.conversations ?? result.threads ?? result.data ?? []);
 
     return {
-      output: { conversations },
+      output: { conversations, nextPageToken: result.nextPageToken },
       message: `Retrieved ${conversations.length} conversation(s).`
     };
   })

@@ -1,49 +1,39 @@
-Let me look for more current information about Doodle's API, as the old public API was shut down around 2013.Let me check the Doodle API deprecation page and the Postman documentation for more details.Based on my research, Doodle has officially deprecated its API. Let me confirm this is still the case and check if there's any newer development.The research clearly shows that Doodle has deprecated its API. Here's the specification based on the findings:
+# Doodle integration specification
 
-# Slates Specification for Doodle
+This integration retains legacy Doodle group-poll operations for existing Enterprise API connections. It exposes nine tools for polls, participant votes, comments, and the connected user's identity.
 
-## Overview
+## API availability
 
-Doodle is an online scheduling platform that helps users find suitable times for group meetings through polls, booking pages, sign-up sheets, and 1:1 scheduling. It integrates with calendar providers (Google, Outlook, iCloud) and video conferencing tools (Zoom, Google Meet, Webex).
+[Doodle's API deprecation notice](https://help.doodle.com/en/articles/9457023-doodle-api-deprecation), dated June 11, 2024, states that new API access is no longer supported and directs existing Enterprise API customers to support. It does not confirm that all legacy connections or endpoints have stopped working.
+
+A current public reference for the retained API request and response contracts was unavailable during this refresh. The legacy endpoint, scope, and payload choices below describe the implementation; they have not been verified against current official API documentation or an authenticated Enterprise account. Contact Doodle support to establish whether an existing connection remains available.
 
 ## Authentication
 
-Doodle no longer supports new API. If you have already set up API with your Doodle Enterprise account and have any questions, you should contact their support team.
+The implementation retains OAuth 2.0 authorization-code exchange and refresh through `https://doodle.com/oauth2/authorize` and `https://doodle.com/oauth2/token`. Its declared scopes are `name`, `eMailAddress`, `initiatedPolls`, and `participatedPolls`.
 
-Historically, Doodle used the following authentication methods:
+It stores the access token, optional refresh token, and optional expiration timestamp. Refresh retains the previous refresh token when no replacement is returned. Connection profiles and the current-user tool use the existing `/api/v2.0/users/me` route. Current provider acceptance of these routes, scopes, and identity fields remains unverified.
 
-- **OAuth 2.0**: Doodle's API used OAuth 2.0 for authentication and authorization. This required a Client ID and Secret from a Doodle OAuth application, with scopes configured as required by the application. Historical scopes included `name`, `eMailAddress`, `initiatedPolls`, and `participatedPolls`.
+## Tools
 
-**Important**: Since Doodle has deprecated its API, new integrations cannot be set up. Existing Enterprise customers who previously configured API access may still have legacy access, but this is not guaranteed.
+| Tool key | Implemented operation |
+| --- | --- |
+| `get_current_user` | Retrieve the connected user's identifier, name, and email address when available. |
+| `create_poll` | Create a legacy TEXT or DATE poll with options, creator information, and optional voting and participant settings. |
+| `get_poll` | Retrieve poll details, options, participants, and submitted votes. |
+| `list_polls` | Retrieve polls created by or participated in by the connected user. |
+| `delete_poll` | Delete a poll using its identifier and admin key. |
+| `participate_in_poll` | Submit a participant's name, optional email address, and preferences for the ordered poll options. |
+| `remove_participant` | Remove a participant and their votes using poll and participant identifiers and the poll's admin key. |
+| `add_comment` | Add an author name and comment text to a poll. |
+| `get_comments` | Retrieve poll comments with author names and available timestamps. |
 
-## Features
+The retained date-option fields use `YYYYMMDD` dates and optional `HHmm` start/end times. The retained preference convention is `0` for No, `1` for Yes, and `2` for If need be. These are existing implementation contracts, not freshly verified provider guarantees. Poll creation rejects missing selected options or non-empty options for an incompatible poll type; participation rejects empty preferences or values outside 0/1/2.
 
-**⚠️ Doodle's API has been officially deprecated. The features below describe capabilities that were historically available and may still function for legacy Enterprise integrations, but are no longer supported for new setups.**
+Poll and comment collection reads retain their existing direct-array and `polls`/`comments` response-envelope handling. Dashboard requests retain `fullList: true`; completeness is not verified. Poll deletion and participant removal retain admin-key query authorization, whose current provider behavior is also unverified.
 
-### Group Poll Management
+## Events and verification limits
 
-Create and manage scheduling polls where multiple participants can vote on preferred meeting times. Polls support different voting modes (YES/NO or YES/NO/MAYBE) and can be configured as date-based or text-based polls. Participants can add comments to polls.
+This package registers no triggers. Provider webhook or event-subscription availability has not been verified.
 
-### Booking Pages
-
-Personal scheduling pages that allow others to book available time slots directly. Availability is determined by connected calendars. Supports custom branding (paid plans), custom questions, minimum notice periods, and daily booking limits.
-
-### Sign-up Sheets
-
-Allow organizers to offer multiple event slots that participants can sign up for independently, useful for workshops, office hours, or group events.
-
-### Calendar Integration
-
-Sync with Google Calendar, Microsoft Outlook/Office 365, and Apple iCloud calendars. Only availability is shared with external participants, not full calendar details.
-
-### Video Conferencing
-
-Automatically attach video conferencing links (Zoom, Google Meet, Webex) to scheduled meetings.
-
-### Payments
-
-With payments powered by Stripe, you can require customers to pay to book time with you.
-
-## Events
-
-The provider does not support events. Doodle no longer supports new API, and there is no documented webhook or event subscription mechanism. Doodle connects to Zapier for workflow automation, but this is a third-party integration rather than a native event system.
+Local build and formatting checks establish that the package compiles and meets local checks. No authenticated provider calls or live E2E runs were performed. Legacy OAuth behavior, payload compatibility, identity fields, pagination completeness, deletion semantics, and account availability remain unverified.

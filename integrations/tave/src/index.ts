@@ -5,8 +5,11 @@ import {
   createJob,
   createLead,
   getBrands,
+  getJobs,
+  getJobTypes,
   getOrders,
   getPayments,
+  getStudio,
   searchContacts
 } from './tools';
 export let provider = Slate.create({
@@ -18,7 +21,10 @@ export let provider = Slate.create({
     searchContacts,
     getBrands,
     getOrders,
-    getPayments
+    getPayments,
+    getStudio,
+    getJobTypes,
+    getJobs
   ],
   triggers: []
 });

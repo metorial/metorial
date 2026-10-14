@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,12 @@ export let manageScheduler = SlateTool.create(spec, {
           'delete_unavailability'
         ])
         .describe('Scheduler action to perform'),
-      schedulerId: z.number().optional().describe('Scheduler ID (required for most actions)'),
+      schedulerId: z
+        .number()
+        .optional()
+        .describe(
+          'Scheduler ID. Use list_schedulers to discover IDs. Required for most actions.'
+        ),
       shiftId: z.string().optional().describe('Shift ID (for get_shift, delete_shift)'),
       unavailabilityId: z
         .string()
@@ -55,11 +60,15 @@ export let manageScheduler = SlateTool.create(spec, {
       shifts: z
         .array(z.any())
         .optional()
-        .describe('Array of shift objects for create_shifts or update_shifts'),
+        .describe(
+          'Shift objects: create requires startTime, endTime, and title or jobId; update requires shiftId. Times are Unix seconds.'
+        ),
       unavailabilityBody: z
         .any()
         .optional()
-        .describe('Unavailability data for create_unavailability'),
+        .describe(
+          'For create_unavailability: userId, isAllDay, unavailabilityDate (YYYY-MM-DD), and startTime/endTime (HH:MM:SS) when not all day.'
+        ),
       notifyUsers: z.boolean().optional().describe('Whether to notify users of shift changes'),
       isOpenShift: z.boolean().optional().describe('Filter for open shifts'),
       isPublished: z.boolean().optional().describe('Filter for published shifts'),
@@ -82,8 +91,8 @@ export let manageScheduler = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action, schedulerId } = ctx.input;
@@ -96,11 +105,11 @@ export let manageScheduler = SlateTool.create(spec, {
       };
     }
 
-    if (!schedulerId) throw new Error('schedulerId is required for this action.');
+    if (!schedulerId) throw createApiServiceError('schedulerId is required for this action.');
 
     if (action === 'get_shifts') {
-      if (!ctx.input.startTime || !ctx.input.endTime) {
-        throw new Error('startTime and endTime are required for get_shifts.');
+      if (ctx.input.startTime === undefined || ctx.input.endTime === undefined) {
+        throw createApiServiceError('startTime and endTime are required for get_shifts.');
       }
       let result = await client.getShifts(schedulerId, {
         startTime: ctx.input.startTime,
@@ -122,7 +131,7 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'get_shift') {
-      if (!ctx.input.shiftId) throw new Error('shiftId is required.');
+      if (!ctx.input.shiftId) throw createApiServiceError('shiftId is required.');
       let result = await client.getShift(schedulerId, ctx.input.shiftId);
       return {
         output: { result },
@@ -131,7 +140,22 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'create_shifts') {
-      if (!ctx.input.shifts) throw new Error('shifts array is required.');
+      if (!ctx.input.shifts?.length || ctx.input.shifts.length > 500) {
+        throw createApiServiceError('Provide between 1 and 500 shifts to create.');
+      }
+      if (
+        ctx.input.shifts.some(
+          shift =>
+            !shift ||
+            typeof shift.startTime !== 'number' ||
+            typeof shift.endTime !== 'number' ||
+            (!shift.title && !shift.jobId)
+        )
+      ) {
+        throw createApiServiceError(
+          'Each new shift requires numeric startTime and endTime, and title or jobId.'
+        );
+      }
       let result = await client.createShifts(
         schedulerId,
         ctx.input.shifts,
@@ -144,7 +168,12 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'update_shifts') {
-      if (!ctx.input.shifts) throw new Error('shifts array is required.');
+      if (
+        !ctx.input.shifts?.length ||
+        ctx.input.shifts.some(shift => typeof shift?.shiftId !== 'string' || !shift.shiftId)
+      ) {
+        throw createApiServiceError('Provide shifts with a shiftId for each update.');
+      }
       let result = await client.updateShifts(
         schedulerId,
         ctx.input.shifts,
@@ -157,7 +186,7 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'delete_shift') {
-      if (!ctx.input.shiftId) throw new Error('shiftId is required.');
+      if (!ctx.input.shiftId) throw createApiServiceError('shiftId is required.');
       let result = await client.deleteShift(
         schedulerId,
         ctx.input.shiftId,
@@ -189,8 +218,8 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'get_unavailabilities') {
-      if (!ctx.input.startTime || !ctx.input.endTime) {
-        throw new Error('startTime and endTime are required.');
+      if (ctx.input.startTime === undefined || ctx.input.endTime === undefined) {
+        throw createApiServiceError('startTime and endTime are required.');
       }
       let result = await client.getScheduleUnavailabilities(schedulerId, {
         startTime: ctx.input.startTime,
@@ -205,6 +234,22 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'create_unavailability') {
+      let body = ctx.input.unavailabilityBody;
+      if (
+        !body ||
+        typeof body.userId !== 'number' ||
+        typeof body.isAllDay !== 'boolean' ||
+        typeof body.unavailabilityDate !== 'string'
+      ) {
+        throw createApiServiceError(
+          'unavailabilityBody requires userId, isAllDay, and unavailabilityDate.'
+        );
+      }
+      if (body.isAllDay === false && (!body.startTime || !body.endTime)) {
+        throw createApiServiceError(
+          'Partial-day unavailability requires startTime and endTime in HH:MM:SS format.'
+        );
+      }
       let result = await client.createUnavailability(
         schedulerId,
         ctx.input.unavailabilityBody
@@ -216,7 +261,8 @@ export let manageScheduler = SlateTool.create(spec, {
     }
 
     if (action === 'delete_unavailability') {
-      if (!ctx.input.unavailabilityId) throw new Error('unavailabilityId is required.');
+      if (!ctx.input.unavailabilityId)
+        throw createApiServiceError('unavailabilityId is required.');
       let result = await client.deleteUnavailability(schedulerId, ctx.input.unavailabilityId);
       return {
         output: { result },
@@ -224,6 +270,6 @@ export let manageScheduler = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

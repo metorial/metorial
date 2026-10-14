@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export interface DialerCallFilters {
   dayFrom: string;
@@ -27,23 +32,40 @@ export interface DialerCallFilters {
 
 export class DialerClient {
   private axios;
-  private apiKey: string;
 
   constructor(config: { apiKey: string }) {
-    this.apiKey = config.apiKey;
+    if (!config.apiKey) {
+      throw createApiServiceError(
+        'A Power Dialer API key is required. Configure it in your authentication settings.'
+      );
+    }
 
-    this.axios = createAxios({
-      baseURL: 'https://api.dialer.brightcall.ai/api/v3'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.dialer.brightcall.ai/api/v3',
+      params: { 'api-key': config.apiKey },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Brightcall Power Dialer',
+          reason: 'convolo_ai_dialer_api_error'
+        })
     });
   }
 
   async getCallsList(filters: DialerCallFilters): Promise<any> {
     let body = this.buildFilterBody(filters);
 
-    let response = await this.axios.post('/stat/calls/list', body, {
-      params: { 'api-key': this.apiKey },
-      headers: { 'Content-Type': 'application/json' }
-    });
+    let response = await this.axios.post('/stat/calls/list', body);
+
+    if (response.data?.success === false || !Array.isArray(response.data?.calls)) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Power Dialer',
+          reason: 'convolo_ai_dialer_api_error',
+          operation: 'retrieve call reports'
+        }
+      );
+    }
 
     return response.data;
   }
@@ -51,10 +73,18 @@ export class DialerClient {
   async getCallStatistics(filters: DialerCallFilters): Promise<any> {
     let body = this.buildFilterBody(filters);
 
-    let response = await this.axios.post('/stat/calls-detailed-e-chart', body, {
-      params: { 'api-key': this.apiKey },
-      headers: { 'Content-Type': 'application/json' }
-    });
+    let response = await this.axios.post('/stat/calls-detailed-e-chart', body);
+
+    if (response.data?.success === false || !response.data?.detailedStat) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Power Dialer',
+          reason: 'convolo_ai_dialer_api_error',
+          operation: 'retrieve call statistics'
+        }
+      );
+    }
 
     return response.data;
   }
@@ -62,41 +92,58 @@ export class DialerClient {
   async getCallsCount(filters: DialerCallFilters): Promise<any> {
     let body = this.buildFilterBody(filters);
 
-    let response = await this.axios.post('/stat/calls/count', body, {
-      params: { 'api-key': this.apiKey },
-      headers: { 'Content-Type': 'application/json' }
-    });
+    let response = await this.axios.post('/stat/calls/count', body);
+
+    if (response.data?.success === false || typeof response.data?.totalItems !== 'number') {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Power Dialer',
+          reason: 'convolo_ai_dialer_api_error',
+          operation: 'count calls'
+        }
+      );
+    }
 
     return response.data;
   }
 
-  private buildFilterBody(filters: DialerCallFilters): Record<string, any> {
-    let body: Record<string, any> = {
-      dayFrom: filters.dayFrom,
-      dayTo: filters.dayTo
-    };
+  async getAgents(filters: {
+    page?: number;
+    itemsPerPage?: number;
+    searchString?: string;
+    showDeleted?: boolean;
+  }): Promise<any> {
+    this.validatePagination(filters);
+    let response = await this.axios.get('https://api.dialer.brightcall.ai/api/v1/agents', {
+      params: pickDefined(filters)
+    });
 
-    if (filters.dateInterval) body.dateInterval = filters.dateInterval;
-    if (filters.searchString) body.searchString = filters.searchString;
-    if (filters.timezone) body.timezone = filters.timezone;
-    if (filters.types) body.types = filters.types;
-    if (filters.states) body.states = filters.states;
-    if (filters.categories) body.categories = filters.categories;
-    if (filters.agentIds) body.agentIds = filters.agentIds;
-    if (filters.teamIds) body.teamIds = filters.teamIds;
-    if (filters.projectIds) body.projectIds = filters.projectIds;
-    if (filters.tags) body.tags = filters.tags;
-    if (filters.outcomes) body.outcomes = filters.outcomes;
-    if (filters.outcomeTypes) body.outcomeTypes = filters.outcomeTypes;
-    if (filters.talkTimeFrom !== undefined) body.talkTimeFrom = filters.talkTimeFrom;
-    if (filters.talkTimeTo !== undefined) body.talkTimeTo = filters.talkTimeTo;
-    if (filters.answerTimeFrom !== undefined) body.answerTimeFrom = filters.answerTimeFrom;
-    if (filters.answerTimeTo !== undefined) body.answerTimeTo = filters.answerTimeTo;
-    if (filters.page !== undefined) body.page = filters.page;
-    if (filters.itemsPerPage !== undefined) body.itemsPerPage = filters.itemsPerPage;
-    if (filters.sortBy) body.sortBy = filters.sortBy;
-    if (filters.sortDirection) body.sortDirection = filters.sortDirection;
+    if (response.data?.success === false || !Array.isArray(response.data?.agents)) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Power Dialer',
+          reason: 'convolo_ai_dialer_api_error',
+          operation: 'retrieve agents'
+        }
+      );
+    }
 
-    return body;
+    return response.data;
+  }
+
+  private validatePagination(filters: { page?: number; itemsPerPage?: number }) {
+    for (let field of ['page', 'itemsPerPage'] as const) {
+      let value = filters[field];
+      if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+        throw createApiServiceError(`${field} must be a positive whole number.`);
+      }
+    }
+  }
+
+  private buildFilterBody(filters: DialerCallFilters): Record<string, unknown> {
+    this.validatePagination(filters);
+    return pickDefined(filters);
   }
 }

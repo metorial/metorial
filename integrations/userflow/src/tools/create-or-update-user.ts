@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,9 +15,10 @@ let attributeOperationSchema = z
       set_once: z.unknown().optional(),
       add: z.number().optional(),
       subtract: z.number().optional(),
-      append: z.array(z.unknown()).optional(),
-      prepend: z.array(z.unknown()).optional(),
-      remove: z.array(z.unknown()).optional()
+      append: z.union([z.string(), z.array(z.unknown())]).optional(),
+      prepend: z.union([z.string(), z.array(z.unknown())]).optional(),
+      remove: z.union([z.string(), z.array(z.unknown())]).optional(),
+      data_type: z.enum(['string', 'number', 'boolean', 'datetime', 'list']).optional()
     })
   ])
   .describe(
@@ -97,6 +98,18 @@ export let createOrUpdateUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.groups !== undefined && ctx.input.memberships !== undefined) {
+      throw createApiServiceError('Provide groups or memberships, not both.');
+    }
+    if (
+      ctx.input.pruneMemberships &&
+      ctx.input.groups === undefined &&
+      ctx.input.memberships === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide the complete groups or memberships list when pruning memberships.'
+      );
+    }
     let client = new Client({
       token: ctx.auth.token,
       apiVersion: ctx.config.apiVersion

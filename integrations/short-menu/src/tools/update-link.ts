@@ -16,7 +16,7 @@ let tagSchema = z.object({
 export let updateLink = SlateTool.create(spec, {
   name: 'Update Short Link',
   key: 'update_link',
-  description: `Update an existing short link's destination URL or tags. The short URL itself remains unchanged, allowing you to redirect it to a new destination without breaking existing links. You can also reassign tags for organizational purposes.`,
+  description: `Update an existing short link's destination URL or tags. Provide at least one change. The short URL itself remains unchanged, allowing you to redirect it to a new destination without breaking existing links. You can also reassign tags for organizational purposes.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -56,7 +56,7 @@ export let updateLink = SlateTool.create(spec, {
       tags: z
         .array(
           z.object({
-            tagId: z.string().describe('Identifier of the tag.'),
+            tagId: z.string().optional().describe('Identifier of the tag, when returned.'),
             tagName: z.string().describe('Name of the tag.')
           })
         )

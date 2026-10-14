@@ -1,10 +1,12 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.lob.com/v1';
 
 export interface LobListParams {
   limit?: number;
   offset?: number;
+  before?: string;
+  after?: string;
   include?: string[];
   dateCreated?: Record<string, string>;
   metadata?: Record<string, string>;
@@ -30,13 +32,20 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Lob API key is required. Reconnect with your API key.');
+    }
     let encoded = Buffer.from(`${config.token}:`).toString('base64');
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Basic ${encoded}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Basic ${encoded}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Lob',
+          reason: 'lob_api_error',
+          operation: 'API request',
+          nestedKeys: ['error', 'errors']
+        })
     });
   }
 
@@ -109,7 +118,8 @@ export class Client {
     let body: Record<string, any> = {
       to: params.to,
       front: params.front,
-      back: params.back
+      back: params.back,
+      use_type: params.useType ?? null
     };
     if (params.from) body.from = params.from;
     if (params.size) body.size = params.size;
@@ -163,11 +173,21 @@ export class Client {
     useType?: string;
     cards?: string[];
   }) {
+    if (
+      params.perforatedPage !== undefined &&
+      (!Number.isInteger(params.perforatedPage) || params.perforatedPage < 1)
+    ) {
+      throw createApiServiceError('perforatedPage must be a whole page number of at least 1.');
+    }
+    if (params.returnEnvelope === true && params.perforatedPage === undefined) {
+      throw createApiServiceError('Provide perforatedPage when returnEnvelope is true.');
+    }
     let body: Record<string, any> = {
       to: params.to,
       from: params.from,
       file: params.file,
-      color: params.color
+      color: params.color,
+      use_type: params.useType ?? null
     };
     if (params.description) body.description = params.description;
     if (params.metadata) body.metadata = params.metadata;
@@ -223,7 +243,8 @@ export class Client {
     let body: Record<string, any> = {
       to: params.to,
       inside: params.inside,
-      outside: params.outside
+      outside: params.outside,
+      use_type: params.useType ?? null
     };
     if (params.from) body.from = params.from;
     if (params.size) body.size = params.size;
@@ -275,11 +296,30 @@ export class Client {
     attachment?: string;
     useType?: string;
   }) {
+    if (!params.message && !params.checkBottom) {
+      throw createApiServiceError(
+        'Provide message or checkBottom for the bottom of the check.'
+      );
+    }
+    if (
+      params.checkNumber !== undefined &&
+      (!Number.isInteger(params.checkNumber) ||
+        params.checkNumber < 1 ||
+        params.checkNumber > 500000000)
+    ) {
+      throw createApiServiceError(
+        'checkNumber must be a whole number between 1 and 500000000.'
+      );
+    }
+    if (params.mailType !== undefined && params.mailType !== 'usps_first_class') {
+      throw createApiServiceError('Checks require usps_first_class mailType.');
+    }
     let body: Record<string, any> = {
       to: params.to,
       from: params.from,
       bank_account: params.bankAccountId,
-      amount: params.amount
+      amount: params.amount,
+      use_type: params.useType ?? null
     };
     if (params.memo) body.memo = params.memo;
     if (params.checkNumber) body.check_number = params.checkNumber;
@@ -431,10 +471,31 @@ export class Client {
     return res.data;
   }
 
-  async verifyBankAccount(bankAccountId: string, amounts: [number, number]) {
-    let res = await this.axios.post(`/bank_accounts/${bankAccountId}/verify`, {
-      amounts
-    });
+  async verifyBankAccount(
+    bankAccountId: string,
+    params: { amounts?: [number, number]; descriptorCode?: string }
+  ) {
+    if (Boolean(params.amounts) === Boolean(params.descriptorCode)) {
+      throw createApiServiceError(
+        'Provide either two micro-deposit amounts or descriptorCode.'
+      );
+    }
+    if (
+      params.amounts?.some(amount => !Number.isInteger(amount) || amount < 1 || amount > 100)
+    ) {
+      throw createApiServiceError(
+        'Micro-deposit amounts must be whole cents between 1 and 100.'
+      );
+    }
+    if (params.descriptorCode && !/^[Ss][Mm][A-Za-z0-9]{4}$/.test(params.descriptorCode)) {
+      throw createApiServiceError(
+        'descriptorCode must be the six-character bank statement code starting with SM.'
+      );
+    }
+    let res = await this.axios.post(
+      `/bank_accounts/${bankAccountId}/verify`,
+      params.amounts ? { amounts: params.amounts } : { descriptor_code: params.descriptorCode }
+    );
     return res.data;
   }
 
@@ -465,6 +526,28 @@ export class Client {
     urbanization?: string;
     address?: string;
   }) {
+    let hasComponents = [
+      params.primaryLine,
+      params.secondaryLine,
+      params.city,
+      params.state,
+      params.zipCode,
+      params.recipient,
+      params.urbanization
+    ].some(value => value !== undefined);
+    if (params.address && hasComponents) {
+      throw createApiServiceError(
+        'Provide a freeform address or structured address fields, not both.'
+      );
+    }
+    if (
+      !params.address &&
+      (!params.primaryLine || !(params.zipCode || (params.city && params.state)))
+    ) {
+      throw createApiServiceError(
+        'Provide address, or primaryLine with zipCode or both city and state.'
+      );
+    }
     let body: Record<string, any> = {};
     if (params.primaryLine) body.primary_line = params.primaryLine;
     if (params.secondaryLine) body.secondary_line = params.secondaryLine;
@@ -531,7 +614,7 @@ export class Client {
   }
 
   async zipCodeLookup(params: { zipCode: string }) {
-    let res = await this.axios.get(`/us_zip_lookups/${params.zipCode}`);
+    let res = await this.axios.post('/us_zip_lookups', { zip_code: params.zipCode });
     return res.data;
   }
 
@@ -547,6 +630,24 @@ export class Client {
     recipient?: string;
     address?: string;
   }) {
+    let hasComponents = [
+      params.primaryLine,
+      params.secondaryLine,
+      params.city,
+      params.state,
+      params.postalCode,
+      params.recipient
+    ].some(value => value !== undefined);
+    if (params.address && hasComponents) {
+      throw createApiServiceError(
+        'Provide a freeform address or structured address fields, not both.'
+      );
+    }
+    if (!params.address && !params.primaryLine) {
+      throw createApiServiceError(
+        'Provide address or primaryLine for international verification.'
+      );
+    }
     let body: Record<string, any> = {
       country: params.country
     };
@@ -569,11 +670,17 @@ export class Client {
     scheduleSendDate?: string;
     useType?: string;
   }) {
+    if (params.scheduleSendDate) {
+      throw createApiServiceError(
+        'Campaign date scheduling is not supported by the documented Lob API. Omit scheduleSendDate and use immediate sending.'
+      );
+    }
     let body: Record<string, any> = {
-      name: params.name
+      name: params.name,
+      schedule_type: 'immediate',
+      use_type: params.useType ?? null
     };
     if (params.description) body.description = params.description;
-    if (params.scheduleSendDate) body.schedule_send_date = params.scheduleSendDate;
     if (params.useType) body.use_type = params.useType;
     let res = await this.axios.post('/campaigns', body);
     return res.data;
@@ -597,10 +704,14 @@ export class Client {
       scheduleSendDate?: string;
     }
   ) {
+    if (params.scheduleSendDate) {
+      throw createApiServiceError(
+        'Campaign date scheduling is not supported by the documented Lob API. Omit scheduleSendDate and update the name or description.'
+      );
+    }
     let body: Record<string, any> = {};
     if (params.name) body.name = params.name;
     if (params.description) body.description = params.description;
-    if (params.scheduleSendDate) body.schedule_send_date = params.scheduleSendDate;
     let res = await this.axios.patch(`/campaigns/${campaignId}`, body);
     return res.data;
   }
@@ -719,7 +830,24 @@ export class Client {
 
   private buildListParams(params?: Record<string, any>): Record<string, any> {
     if (!params) return {};
+    if (
+      params.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 100.');
+    }
+    if (
+      params.offset !== undefined &&
+      (!Number.isInteger(params.offset) || params.offset < 0)
+    ) {
+      throw createApiServiceError('offset must be a non-negative whole number.');
+    }
+    if (params.before && params.after) {
+      throw createApiServiceError('Provide before or after for cursor pagination, not both.');
+    }
     let result: Record<string, any> = {};
+    if (params.before) result.before = params.before;
+    if (params.after) result.after = params.after;
     if (params.limit) result.limit = params.limit;
     if (params.offset) result.offset = params.offset;
     if (params.include) result['include[]'] = params.include;

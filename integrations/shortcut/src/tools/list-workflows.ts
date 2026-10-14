@@ -19,7 +19,7 @@ export let listWorkflows = SlateTool.create(spec, {
           z.object({
             workflowId: z.number().describe('Workflow ID'),
             name: z.string().describe('Workflow name'),
-            teamId: z.string().describe('UUID of the team this workflow belongs to'),
+            teamId: z.string().describe('Provider team ID associated with this workflow'),
             defaultStateId: z.number().describe('Default state ID for new stories'),
             states: z
               .array(
@@ -43,7 +43,7 @@ export let listWorkflows = SlateTool.create(spec, {
     let mapped = workflows.map((wf: any) => ({
       workflowId: wf.id,
       name: wf.name,
-      teamId: wf.team_id || '',
+      teamId: String(wf.team_id ?? ''),
       defaultStateId: wf.default_state_id,
       states: (wf.states || []).map((s: any) => ({
         stateId: s.id,

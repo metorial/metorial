@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listServices = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listServices = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       projectId: z.string().describe('Project ID to list services for'),
       page: z.number().optional().describe('Page number for pagination'),
       perPage: z.number().optional().describe('Results per page (max 100)'),
@@ -38,7 +40,9 @@ export let listServices = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let result = await client.listServices(ctx.input.projectId, {

@@ -1,6 +1,8 @@
-# Desk Time
+# DeskTime
 
-Retrieve employee time tracking and productivity data from DeskTime. Access company settings, employee work hours, attendance records, and productivity breakdowns (productive, neutral, unproductive time). Look up employees by ID or email and retrieve app/website usage data for specific dates or monthly periods. Create projects and tasks, and start or stop project time tracking for integration with external tools. Useful for compiling attendance reports, monitoring team productivity, and integrating with payroll or invoicing systems.
+Retrieve employee time tracking and productivity data from DeskTime. Identify the connected employee, access company settings, retrieve employee work hours and productivity data, and inspect tracked project activity. Discover active projects and tasks, create projects with an optional task, and start or stop project time tracking.
+
+Connect with an API key from [DeskTime API settings](https://desktime.com/app/api). Call `get_employees` to discover employee IDs and `get_projects` to find project and task names. Dates use `YYYY-MM-DD`; access depends on the connected account's permissions.
 
 ## License
 

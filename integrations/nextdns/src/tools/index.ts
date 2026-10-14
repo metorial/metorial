@@ -10,5 +10,6 @@ export * from './manage-allowlist-denylist';
 export * from './manage-rewrites';
 export * from './update-parental-control';
 export * from './update-privacy';
+export * from './update-profile';
 export * from './update-security';
 export * from './update-settings';

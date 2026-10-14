@@ -56,11 +56,11 @@ export let checkAvailability = SlateTool.create(spec, {
         isAvailable,
         reason: result.reason,
         problemTime: result.problem_time ? String(result.problem_time) : undefined,
-        totalPrice: result.total != null ? Number(result.total) : undefined,
+        totalPrice: result.price != null ? Number(result.price) : undefined,
         currency: result.currency
       },
       message: isAvailable
-        ? `Resource ${ctx.input.resourceId} **is available** for ${ctx.input.startTime} to ${ctx.input.endTime}.${result.total != null ? ` Price: ${result.currency || ''} ${result.total}` : ''}`
+        ? `Resource ${ctx.input.resourceId} **is available** for ${ctx.input.startTime} to ${ctx.input.endTime}.${result.price != null ? ` Price: ${result.currency || ''} ${result.price}` : ''}`
         : `Resource ${ctx.input.resourceId} **is not available**: ${result.reason || 'unavailable'}`
     };
   })

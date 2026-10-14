@@ -62,15 +62,15 @@ export let getProject = SlateTool.create(spec, {
       number: p.number,
       status: p.status,
       projectType: p.project_type,
-      location: p.location,
+      location: p.location ?? undefined,
       inDate: p.equipment_period_from || p.in,
       outDate: p.equipment_period_to || p.out,
-      planPeriodFrom: p.planperiod_start,
-      planPeriodTo: p.planperiod_end,
-      contact: p.contact,
+      planPeriodFrom: p.planperiod_start ?? undefined,
+      planPeriodTo: p.planperiod_end ?? undefined,
+      contact: p.contact ?? p.customer ?? undefined,
       memo: p.memo,
-      createdAt: p.created,
-      updatedAt: p.modified
+      createdAt: p.created ?? undefined,
+      updatedAt: p.modified ?? undefined
     };
 
     if (ctx.input.includeSubprojects) {
@@ -88,7 +88,7 @@ export let getProject = SlateTool.create(spec, {
     }
 
     if (ctx.input.includeCrew) {
-      let crew = await client.listNested('projects', ctx.input.projectId, 'crew');
+      let crew = await client.listNested('projects', ctx.input.projectId, 'projectcrew');
       output.crewAssignments = crew.data;
     }
 

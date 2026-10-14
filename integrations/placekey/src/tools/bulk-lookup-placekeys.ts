@@ -58,7 +58,13 @@ let resultSchema = z.object({
   confidenceScore: z
     .number()
     .optional()
-    .describe('Confidence level of the Placekey match (0-1)'),
+    .describe(
+      'Numeric confidence score when provided; categorical confidence is returned as confidenceLevel'
+    ),
+  confidenceLevel: z
+    .enum(['HIGH', 'MEDIUM', 'LOW'])
+    .optional()
+    .describe('Match confidence returned by the current API'),
   normalizedAddress: z
     .record(z.string(), z.unknown())
     .optional()
@@ -73,22 +79,25 @@ let resultSchema = z.object({
   gers: z
     .string()
     .optional()
-    .describe('Global Entity Reference System identifier (Overture Maps)'),
+    .describe(
+      'Global Entity Reference System identifier (Overture Maps), omitted when unavailable'
+    ),
   error: z.string().optional().describe('Error message if the lookup failed for this query')
 });
 
 export let bulkLookupPlacekeys = SlateTool.create(spec, {
   name: 'Bulk Lookup Placekeys',
   key: 'bulk_lookup_placekeys',
-  description: `Look up Placekey identifiers for multiple locations in a single batch request. Each location can be specified by address, coordinates, or place name. Use custom query IDs to correlate results with your input data. Optionally request additional fields like confidence scores, normalized addresses, and geocodes.`,
+  description: `Look up Placekey identifiers for multiple locations in a single batch request using addresses or coordinates. Add place names to addresses to match specific points of interest. Use custom query IDs to correlate results with your input data. Optionally request confidence levels, normalized addresses, and geocodes.`,
   instructions: [
-    'All queries in a batch must share the same iso_country_code.',
-    'Use queryId on each query to correlate results back to your input data.',
-    'For more than 100 locations, split into multiple batches of up to 100 each.'
+    'All supplied country codes in a batch must be the same. Coordinate-only queries may omit a country code.',
+    'Use a unique queryId on each query to correlate results back to your input data.',
+    'Each query needs latitude and longitude, or a street address, region, country code, and either city or postal code.',
+    'For more than 100 locations, split into multiple batches of up to 100 each. Each geocode consumes an additional lookup.'
   ],
   constraints: [
     'Maximum batch size is 100 queries per request.',
-    'All queries in a single batch must have the same iso_country_code.',
+    'All country codes supplied in a single batch must be the same.',
     'Rate limited to 100 requests per 60 seconds.'
   ],
   tags: {

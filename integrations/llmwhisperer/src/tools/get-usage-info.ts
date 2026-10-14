@@ -22,7 +22,7 @@ export let getUsageInfo = SlateTool.create(spec, {
       currentPageCount: z
         .any()
         .describe(
-          'Pages processed this month, broken down by mode (native_text, low_cost, high_quality, form).'
+          'Total pages processed this month. -1 when not applicable to the subscription plan.'
         ),
       overagePageCount: z
         .number()

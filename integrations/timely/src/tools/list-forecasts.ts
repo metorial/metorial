@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let forecastSchema = z.object({
@@ -22,15 +23,29 @@ let forecastSchema = z.object({
 export let listForecasts = SlateTool.create(spec, {
   name: 'List Forecasts',
   key: 'list_forecasts',
-  description: `Retrieve forecasts (planned tasks) from Timely. Filter by date range, project, or user. Compare planned vs. actual logged time.`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve forecasts (planned tasks) from Timely. Filter by date range, project, or user. Compare planned vs. actual logged time.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       since: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
       upto: z.string().optional().describe('End date filter (YYYY-MM-DD)'),
       projectId: z.string().optional().describe('Filter by project ID'),
       userId: z.string().optional().describe('Filter by user ID'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Page number (1-based). Use page/perPage or legacy limit/offset, not both'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(5000)
+        .optional()
+        .describe('Results per page, up to 5000'),
       limit: z.number().optional().describe('Max forecasts to return'),
       offset: z.number().optional().describe('Offset for pagination')
     })
@@ -42,16 +57,15 @@ export let listForecasts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let forecasts = await client.listForecasts({
       since: ctx.input.since,
       upto: ctx.input.upto,
       projectId: ctx.input.projectId,
       userId: ctx.input.userId,
+      page: ctx.input.page,
+      perPage: ctx.input.perPage,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -66,7 +80,7 @@ export let listForecasts = SlateTool.create(spec, {
       from: f.from ?? null,
       to: f.to ?? null,
       note: f.note ?? null,
-      durationFormatted: f.duration?.formatted ?? null,
+      durationFormatted: f.logged_duration?.formatted ?? f.duration?.formatted ?? null,
       estimatedDurationFormatted: f.estimated_duration?.formatted ?? null,
       labelIds: f.label_ids ?? [],
       updatedAt: f.updated_at ?? null

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, contactOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -20,7 +20,12 @@ export let createContact = SlateTool.create(spec, {
       identifierValue: z
         .string()
         .describe('Value of the identifier (phone number or email address)'),
-      firstName: z.string().optional().describe('First name of the contact'),
+      firstName: z
+        .string()
+        .optional()
+        .describe(
+          'First name of the contact. Required by Respond.io when creating a contact.'
+        ),
       lastName: z.string().optional().describe('Last name of the contact'),
       phone: z
         .string()
@@ -56,7 +61,11 @@ export let createContact = SlateTool.create(spec, {
     if (ctx.input.language) fields.language = ctx.input.language;
     if (ctx.input.countryCode) fields.countryCode = ctx.input.countryCode;
     if (ctx.input.profilePicUrl) fields.profilePic = ctx.input.profilePicUrl;
-    if (ctx.input.customFields) fields.custom_fields = ctx.input.customFields;
+    if (ctx.input.customFields)
+      fields.custom_fields = Object.entries(ctx.input.customFields).map(([name, value]) => ({
+        name,
+        value
+      }));
 
     let result = await client.createContact(
       ctx.input.identifierType,
@@ -67,13 +76,7 @@ export let createContact = SlateTool.create(spec, {
     let contact = result?.data || result;
 
     return {
-      output: {
-        contactId: String(contact.id || contact.contactId || ''),
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        email: contact.email,
-        phone: contact.phone
-      },
+      output: contactOutput(contact),
       message: `Created contact **${contact.firstName || ''} ${contact.lastName || ''}** (${ctx.input.identifierType}: ${ctx.input.identifierValue}).`
     };
   })

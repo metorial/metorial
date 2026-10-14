@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { XForceClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,19 @@ You can search by exact application name or do a full-text search to discover ap
       let app = data.application || data;
 
       let riskFactors: string[] = [];
-      if (app.riskfactors) {
+      if (app.rlfs) {
+        for (let [key, factor] of Object.entries(app.rlfs)) {
+          if (
+            typeof factor === 'object' &&
+            factor !== null &&
+            'value' in factor &&
+            typeof factor.value === 'number' &&
+            factor.value !== 0
+          ) {
+            riskFactors.push(key);
+          }
+        }
+      } else if (app.riskfactors) {
         for (let [key, val] of Object.entries(app.riskfactors)) {
           if (val) riskFactors.push(key);
         }
@@ -69,7 +81,7 @@ You can search by exact application name or do a full-text search to discover ap
             name: app.name,
             description: app.description || app.desc,
             categories: app.categories,
-            riskRating: app.score || app.riskRating,
+            riskRating: app.score ?? app.riskRating,
             riskFactors: riskFactors.length > 0 ? riskFactors : undefined,
             actions: app.actions
               ? Object.keys(app.actions).filter(k => app.actions[k])
@@ -77,19 +89,19 @@ You can search by exact application name or do a full-text search to discover ap
             urls: app.urls
           }
         },
-        message: `Application **${app.name || ctx.input.appName}** — risk rating: ${app.score || 'N/A'}`
+        message: `Application **${app.name || ctx.input.appName}** — risk rating: ${app.score ?? 'N/A'}`
       };
     }
 
     if (ctx.input.searchQuery) {
       ctx.progress('Searching applications...');
       let data = await client.searchAppProfiles(ctx.input.searchQuery);
-      let rows = data.rows || data || [];
+      let rows = data.applications || data.rows || data || [];
 
       let results = rows.map((r: any) => ({
         name: r.name,
         description: r.description || r.desc,
-        riskRating: r.score || r.riskRating,
+        riskRating: r.score ?? r.riskRating,
         categories: r.categories
       }));
 
@@ -99,6 +111,6 @@ You can search by exact application name or do a full-text search to discover ap
       };
     }
 
-    throw new Error('Provide either appName or searchQuery');
+    throw createApiServiceError('Provide either appName or searchQuery.');
   })
   .build();

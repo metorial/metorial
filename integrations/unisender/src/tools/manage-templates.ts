@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,7 +43,10 @@ Use **action** to specify the operation.`,
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.title) throw new Error('Title is required when creating a template');
+      if (!ctx.input.title)
+        throw createApiServiceError('Title is required when creating a template');
+      if (!ctx.input.subject || !ctx.input.body)
+        throw createApiServiceError('subject and body are required when creating a template');
       let result = await client.createEmailTemplate({
         title: ctx.input.title,
         subject: ctx.input.subject,
@@ -61,7 +64,7 @@ Use **action** to specify the operation.`,
 
     if (action === 'update') {
       if (!ctx.input.templateId)
-        throw new Error('templateId is required when updating a template');
+        throw createApiServiceError('templateId is required when updating a template');
       await client.updateEmailTemplate({
         template_id: ctx.input.templateId,
         title: ctx.input.title,
@@ -80,7 +83,7 @@ Use **action** to specify the operation.`,
 
     if (action === 'delete') {
       if (!ctx.input.templateId)
-        throw new Error('templateId is required when deleting a template');
+        throw createApiServiceError('templateId is required when deleting a template');
       await client.deleteTemplate(ctx.input.templateId);
       return {
         output: { templateId: ctx.input.templateId, success: true },
@@ -88,6 +91,6 @@ Use **action** to specify the operation.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

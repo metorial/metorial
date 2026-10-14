@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getVerification = SlateTool.create(spec, {
   name: 'Get Verification',
   key: 'get_verification',
-  description: `Retrieves the details and current status of an identity verification request. Returns the verification outcome (positive or negative), document details, and any associated report links. Use this to check whether a previously requested verification has been completed and its result.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Retrieves the details and current status of an identity verification request. Returns the verification outcome (positive or negative), document details, and any associated report links. Use this to check whether a previously requested verification has been completed and its result.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -65,7 +65,7 @@ export let getVerification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.getVerification(ctx.input.verificationId);
 

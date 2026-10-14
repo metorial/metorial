@@ -1,205 +1,223 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  isApiErrorRecord,
+  requestAxiosData
+} from 'slates';
+
+type BulkUpload = {
+  fileContent: string;
+  fileName: string;
+  ignoreDuplicateFile?: boolean;
+  optimize?: 'highest_accuracy' | 'fastest_turnaround';
+};
 
 export class ClearoutClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; baseUrl: string }) {
-    this.axios = createAxios({
+    let token = config.token.trim().replace(/^Bearer\s+/i, '');
+    if (!token) throw createApiServiceError('A Clearout API token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: config.baseUrl,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 190000
     });
   }
 
-  // ──────────────────────────────────────────
-  // Email Verification
-  // ──────────────────────────────────────────
-
-  async verifyEmail(params: {
-    email: string;
-    timeout?: number;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = { email: params.email };
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-    let response = await this.axios.post('/v2/email_verify/instant', body);
-    return response.data;
-  }
-
-  async bulkVerifyUpload(params: {
-    fileContent: string;
-    fileName: string;
-    ignoreDuplicateFile?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let boundary = `----SlatesBoundary${Date.now()}`;
-    let bodyParts: string[] = [];
-
-    bodyParts.push(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${params.fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n${params.fileContent}\r\n`
-    );
-
-    if (params.ignoreDuplicateFile !== undefined) {
-      bodyParts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="ignore_duplicate_file"\r\n\r\n${params.ignoreDuplicateFile}\r\n`
+  private validateResponse(result: unknown): Record<string, unknown> {
+    if (!isApiErrorRecord(result)) {
+      throw createApiServiceError('Clearout returned an invalid API response.');
+    }
+    if (result.status === 'failed' || result.status === 'error' || result.error) {
+      let error = isApiErrorRecord(result.error) ? result.error : result;
+      throw createApiServiceError(
+        `Clearout API request failed: ${extractApiErrorMessage(error, {
+          response: { data: error },
+          nestedKeys: ['reasons'],
+          detailKeys: ['message', 'messages', 'code'],
+          fallbackMessage: 'Request rejected by Clearout.'
+        })}`,
+        {
+          reason: 'clearout_api_error',
+          upstreamCode: error.code === undefined ? undefined : String(error.code)
+        }
       );
     }
+    return result;
+  }
 
-    bodyParts.push(`--${boundary}--\r\n`);
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    data?: Record<string, unknown> | FormData,
+    params?: Record<string, string>
+  ) {
+    let result = await requestAxiosData<unknown>(
+      `${method} ${path}`,
+      () =>
+        this.axios.request({
+          method,
+          url: path,
+          data,
+          params,
+          ...(data instanceof FormData
+            ? { headers: { 'Content-Type': 'multipart/form-data' } }
+            : {})
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Clearout',
+          reason: 'clearout_api_error',
+          operation,
+          nestedKeys: ['error', 'reasons'],
+          detailKeys: ['message', 'messages', 'code']
+        })
+    );
+    return this.validateResponse(result);
+  }
 
-    let response = await this.axios.post('/v2/email_verify/bulk', bodyParts.join(''), {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      }
+  async verifyEmail(params: { email: string; timeout?: number }) {
+    return this.request('POST', '/v2/email_verify/instant', params);
+  }
+
+  private bulkUpload(path: string, params: BulkUpload) {
+    let form = new FormData();
+    form.append('file', new Blob([params.fileContent], { type: 'text/csv' }), params.fileName);
+    if (params.ignoreDuplicateFile !== undefined) {
+      form.append('ignore_duplicate_file', String(params.ignoreDuplicateFile));
+    }
+    if (params.optimize !== undefined) form.append('optimize', params.optimize);
+    return this.request('POST', path, form);
+  }
+
+  async bulkVerifyUpload(params: BulkUpload) {
+    return this.bulkUpload('/v2/email_verify/bulk', params);
+  }
+
+  async bulkVerifyProgress(listId: string) {
+    return this.request('GET', '/v2/email_verify/bulk/progress_status', undefined, {
+      list_id: listId
     });
-    return response.data;
   }
 
-  async bulkVerifyProgress(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/email_verify/bulk/progress_status', {
-      params: { list_id: listId }
+  async downloadResult(listId: string) {
+    return this.request('POST', '/v2/download/result', { list_id: listId });
+  }
+
+  async cancelVerifyList(listId: string) {
+    return this.request('POST', '/v2/email_verify/list/cancel', { list_id: listId });
+  }
+
+  async removeVerifyList(listId: string, ignoreResult?: boolean) {
+    return this.request('POST', '/v2/email_verify/list/remove', {
+      list_id: listId,
+      ...(ignoreResult === undefined ? {} : { ignore_result: ignoreResult })
     });
-    return response.data;
   }
-
-  async downloadResult(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/download/result', { list_id: listId });
-    return response.data;
-  }
-
-  async cancelVerifyList(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/email_verify/list/cancel', { list_id: listId });
-    return response.data;
-  }
-
-  async removeVerifyList(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/email_verify/list/remove', { list_id: listId });
-    return response.data;
-  }
-
-  // ──────────────────────────────────────────
-  // Email Finder
-  // ──────────────────────────────────────────
 
   async findEmail(params: {
     name: string;
     domain: string;
     timeout?: number;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      name: params.name,
-      domain: params.domain
-    };
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-    let response = await this.axios.post('/v2/email_finder/instant', body);
-    return response.data;
-  }
-
-  async findEmailQueueStatus(queueId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/email_finder/instant/queue_status', {
-      params: { qid: queueId }
-    });
-    return response.data;
-  }
-
-  async bulkFinderUpload(params: {
-    fileContent: string;
-    fileName: string;
-    ignoreDuplicateFile?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let boundary = `----SlatesBoundary${Date.now()}`;
-    let bodyParts: string[] = [];
-
-    bodyParts.push(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${params.fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n${params.fileContent}\r\n`
-    );
-
-    if (params.ignoreDuplicateFile !== undefined) {
-      bodyParts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="ignore_duplicate_file"\r\n\r\n${params.ignoreDuplicateFile}\r\n`
-      );
-    }
-
-    bodyParts.push(`--${boundary}--\r\n`);
-
-    let response = await this.axios.post('/v2/email_finder/bulk', bodyParts.join(''), {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
+    queue?: boolean;
+  }) {
+    try {
+      let result = await this.axios.post('/v2/email_finder/instant', params, {
+        validateStatus: status => (status >= 200 && status < 300) || status === 524
+      });
+      if (result.status === 524) {
+        let body = isApiErrorRecord(result.data) ? result.data : undefined;
+        let details = isApiErrorRecord(body?.error) ? body.error : undefined;
+        let info = isApiErrorRecord(details?.additional_info)
+          ? details.additional_info
+          : undefined;
+        if (typeof info?.queue_id === 'string' && info.queue_id) {
+          return { status: 'queued', data: { queue_id: info.queue_id } };
+        }
+        throw buildApiServiceError(
+          { response: { status: result.status, data: result.data } },
+          {
+            providerLabel: 'Clearout',
+            reason: 'clearout_api_error',
+            operation: 'find email',
+            nestedKeys: ['error', 'reasons'],
+            detailKeys: ['message', 'messages', 'code']
+          }
+        );
       }
-    });
-    return response.data;
+      return this.validateResponse(result.data);
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Clearout',
+        reason: 'clearout_api_error',
+        operation: 'find email',
+        nestedKeys: ['error', 'reasons'],
+        detailKeys: ['message', 'messages', 'code']
+      });
+    }
   }
 
-  async bulkFinderProgress(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/email_finder/bulk/progress_status', {
-      params: { list_id: listId }
+  async findEmailQueueStatus(queueId: string) {
+    return this.request('GET', '/v2/email_finder/instant/queue_status', undefined, {
+      qid: queueId
     });
-    return response.data;
   }
 
-  async downloadFinderResult(listId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/email_finder/download/result', {
+  async bulkFinderUpload(params: BulkUpload) {
+    return this.bulkUpload('/v2/email_finder/bulk', params);
+  }
+
+  async bulkFinderProgress(listId: string) {
+    return this.request('GET', '/v2/email_finder/bulk/progress_status', undefined, {
       list_id: listId
     });
-    return response.data;
   }
 
-  // ──────────────────────────────────────────
-  // Reverse Lookup
-  // ──────────────────────────────────────────
+  async downloadFinderResult(listId: string) {
+    return this.request('POST', '/v2/email_finder/download/result', { list_id: listId });
+  }
 
-  async reverseLookupLinkedIn(linkedinUrl: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/reverse_lookup/linkedin', {
-      params: { url: linkedinUrl }
+  async cancelFinderList(listId: string) {
+    return this.request('POST', '/v2/email_finder/list/cancel', { list_id: listId });
+  }
+
+  async removeFinderList(listId: string, ignoreResult?: boolean) {
+    return this.request('POST', '/v2/email_finder/list/remove', {
+      list_id: listId,
+      ...(ignoreResult === undefined ? {} : { ignore_result: ignoreResult })
     });
-    return response.data;
   }
 
-  async reverseLookupEmail(emailAddress: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/reverse_lookup/email', {
-      params: { email_address: emailAddress }
+  async reverseLookupLinkedIn(linkedinUrl: string) {
+    return this.request('GET', '/v2/reverse_lookup/linkedin', undefined, { url: linkedinUrl });
+  }
+
+  async reverseLookupEmail(emailAddress: string) {
+    return this.request('GET', '/v2/reverse_lookup/email', undefined, {
+      email_address: emailAddress
     });
-    return response.data;
   }
 
-  async reverseLookupDomain(domain: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/reverse_lookup/domain', {
-      params: { name: domain }
-    });
-    return response.data;
+  async reverseLookupDomain(domain: string) {
+    return this.request('GET', '/v2/reverse_lookup/domain', undefined, { name: domain });
   }
 
-  // ──────────────────────────────────────────
-  // Domain Utilities
-  // ──────────────────────────────────────────
-
-  async mxLookup(domain: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/domain/resolve/mx', { domain });
-    return response.data;
+  async mxLookup(domain: string) {
+    return this.request('POST', '/v2/domain/resolve/mx', { domain });
   }
 
-  async whoisLookup(domain: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/v2/domain/resolve/whois', { domain });
-    return response.data;
+  async whoisLookup(domain: string) {
+    return this.request('POST', '/v2/domain/resolve/whois', { domain });
   }
 
-  // ──────────────────────────────────────────
-  // Autocomplete (Company to Domain)
-  // ──────────────────────────────────────────
-
-  async autocompleteCompany(query: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/public/companies/autocomplete', {
-      params: { query }
-    });
-    return response.data;
+  async autocompleteCompany(query: string) {
+    return this.request('GET', '/public/companies/autocomplete', undefined, { query });
   }
 
-  // ──────────────────────────────────────────
-  // Credits
-  // ──────────────────────────────────────────
-
-  async getCredits(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/v2/email_verify/getcredits');
-    return response.data;
+  async getCredits() {
+    return this.request('GET', '/v2/email_verify/getcredits');
   }
 }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageArticle = SlateTool.create(spec, {
   key: 'manage_article',
   description: `Create, update, or delete a help center article within a collection. Articles can be published or saved as drafts.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -40,12 +40,13 @@ export let manageArticle = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title) {
-        throw new Error('Title is required when creating an article');
+        throw createApiServiceError('Title is required when creating an article');
       }
       let article = await client.createArticle(ctx.input.collectionId, {
         title: ctx.input.title,
@@ -64,7 +65,7 @@ export let manageArticle = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.articleId) {
-        throw new Error('articleId is required when updating an article');
+        throw createApiServiceError('articleId is required when updating an article');
       }
       let article = await client.updateArticle(ctx.input.collectionId, ctx.input.articleId, {
         title: ctx.input.title,
@@ -83,7 +84,7 @@ export let manageArticle = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.articleId) {
-        throw new Error('articleId is required when deleting an article');
+        throw createApiServiceError('articleId is required when deleting an article');
       }
       await client.deleteArticle(ctx.input.collectionId, ctx.input.articleId);
       return {
@@ -92,6 +93,6 @@ export let manageArticle = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

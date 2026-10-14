@@ -13,7 +13,11 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      token: z.string().describe('JigsawStack API key (secret or public) from your dashboard')
+      token: z
+        .string()
+        .describe(
+          'JigsawStack API key from your dashboard. Use a secret key for full API access; public keys may have API or domain restrictions.'
+        )
     }),
 
     getOutput: async ctx => {

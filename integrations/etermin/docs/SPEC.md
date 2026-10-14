@@ -1,4 +1,4 @@
-# Slates Specification for eTermin
+# eTermin Integration Specification
 
 ## Overview
 
@@ -33,7 +33,7 @@ Every API request must include three HTTP headers:
 
 ### Appointment Management
 
-Create, read, update, and delete appointments in your eTermin account. Triggers are available when a new appointment is booked through the appointment booking page or an appointment was manually created in the eTermin calendar. Appointments include details such as start/end times, booker contact information, selected services, calendar assignment, notes, and custom fields.
+Create, read, update, and delete appointments in your eTermin account. This integration exposes appointment tools; it does not register webhook triggers. Appointments include details such as start/end times, booker contact information, selected services, calendar assignment, notes, and custom fields.
 
 ### Contact Management
 
@@ -41,7 +41,7 @@ Almost every object in eTermin, including contacts, can be manipulated using the
 
 ### Calendar Management
 
-List and manage calendars within the eTermin account. You can list all available calendars and then look up available time slots on a certain date in different calendars. Calendars can be filtered by Panel ID.
+List calendars within the eTermin account. List, create, and delete calendar absences to control booking availability. You can list all available calendars and then look up available time slots on a certain date in different calendars.
 
 ### Available Time Slots
 
@@ -69,9 +69,9 @@ eTermin has the Single Sign On function for making login easier and more secure 
 
 - The SSO function is only available for eTermin Enterprise customers.
 
-## Events
+## Provider Events
 
-eTermin supports webhooks (referred to as "Web Push") for appointment-related events.
+eTermin supports webhooks (referred to as "Web Push") for appointment-related events. This integration does not register webhook triggers.
 
 ### Appointment Events
 

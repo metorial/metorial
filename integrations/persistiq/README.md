@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Persistiq
+# <img src="logo.png" height="20"> PersistIQ
 
-Manage sales outreach leads, campaigns, and engagement workflows. Create, list, and update leads (prospects) with custom fields, statuses, and ownership assignments. Create and delete outreach campaigns, add or remove leads from campaigns, and specify sending mailboxes. List team users for lead assignment. Manage Do Not Contact domain lists to maintain compliance. Retrieve lead statuses, lead fields, and prospect metadata including bounce, opt-out, reply counts, and sent history.
+Manage sales outreach prospects, campaigns, and sending mailboxes. Create leads with explicit duplicate handling, retrieve prospects by ID or email, filter and update contact data, statuses, ownership, bounce state, and opt-outs. Create campaigns for a selected owner, duplicate outreach sequences, inspect campaign memberships, and add or remove prospects with an optional sending mailbox. List team users, configured prospect fields and statuses, and Do Not Contact domains.
+
+Campaign deletion remains a compatibility tool; the current public API reference does not document that endpoint. Its provider support is unverified.
 
 ## License
 

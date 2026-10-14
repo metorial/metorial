@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.parallel.ai';
 
@@ -144,6 +149,7 @@ export interface CreateFindAllRunParams {
 export interface FindAllRun {
   findallId: string;
   status: string;
+  isActive: boolean;
   metrics: {
     generatedCandidatesCount: number;
     matchedCandidatesCount: number;
@@ -159,6 +165,7 @@ export interface FindAllCandidate {
   description: string;
   matchStatus: string;
   output: Record<string, { value: string; isMatched: boolean }>;
+  rawOutput: Record<string, unknown>;
   basis: Array<{
     field: string;
     citations: Array<{ url: string; excerpts: string[] }>;
@@ -199,6 +206,8 @@ export interface MonitorEvent {
   output: unknown;
   eventDate: string;
   sourceUrls: string[];
+  executionId?: string;
+  result?: unknown;
 }
 
 export interface UpdateMonitorParams {
@@ -220,27 +229,105 @@ export interface EnrichFindAllParams {
   outputSchema: Record<string, unknown>;
 }
 
+export interface FindAllSchema {
+  objective: string;
+  entityType: string;
+  matchConditions: Array<{ name: string; description: string }>;
+  generator: string;
+  matchLimit: number | null;
+  enrichments: Array<{ processor: string; outputSchema: Record<string, unknown> }>;
+}
+
+interface ProviderBasis {
+  field: string;
+  citations?: Array<{ url: string; excerpts?: string[] | null }> | null;
+  reasoning: string;
+  confidence?: string | null;
+}
+
+let mapBasis = (basis: ProviderBasis[] | null | undefined) =>
+  (basis ?? []).map(b => ({
+    field: b.field,
+    citations: (b.citations ?? []).map(c => ({ url: c.url, excerpts: c.excerpts ?? [] })),
+    reasoning: b.reasoning,
+    confidence: b.confidence ?? 'unknown'
+  }));
+
+let normalizeWarnings = (warnings: Array<string | { message: string }> | null | undefined) =>
+  warnings?.map(warning => (typeof warning === 'string' ? warning : warning.message)) ?? null;
+
+let normalizeJsonSchema = (schema: Record<string, unknown>): Record<string, unknown> => {
+  if (schema.type === 'json' || 'json_schema' in schema) {
+    if (!isApiErrorRecord(schema.json_schema)) {
+      throw createApiServiceError('A JSON schema envelope must contain a json_schema object.');
+    }
+    return { ...schema, type: 'json' };
+  }
+  return { type: 'json', json_schema: schema };
+};
+
+let normalizeTaskSchema = (schema: string | Record<string, unknown>) => {
+  if (typeof schema === 'string') return schema === 'auto' ? { type: 'auto' } : schema;
+  if (schema.type === 'text' || schema.type === 'auto') return schema;
+  return normalizeJsonSchema(schema);
+};
+
+let mapFindAllOutput = (output: Record<string, unknown>) => {
+  let conditions: Record<string, { value: string; isMatched: boolean }> = {};
+  for (let [field, entry] of Object.entries(output)) {
+    if (isApiErrorRecord(entry)) {
+      let matched = entry.is_matched ?? entry.isMatched;
+      if (typeof matched !== 'boolean') continue;
+      conditions[field] = {
+        value:
+          typeof entry.value === 'string' ? entry.value : (JSON.stringify(entry.value) ?? ''),
+        isMatched: matched
+      };
+    } else if (entry === 'yes' || entry === 'no' || typeof entry === 'boolean') {
+      conditions[field] = {
+        value: String(entry),
+        isMatched: entry === 'yes' || entry === true
+      };
+    }
+  }
+  return conditions;
+};
+
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(private token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) throw createApiServiceError('A Parallel API key is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'x-api-key': token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'x-api-key', value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Parallel',
+          reason: 'parallel_api_error'
+        })
     });
   }
 
   // ─── Search API ───
 
   async search(params: SearchParams): Promise<SearchResponse> {
+    if (!params.objective?.trim() && !params.searchQueries?.some(query => query.trim())) {
+      throw createApiServiceError(
+        'Provide an objective or at least one non-empty search query.'
+      );
+    }
+    if (
+      params.maxResults !== undefined &&
+      (!Number.isInteger(params.maxResults) || params.maxResults <= 0)
+    ) {
+      throw createApiServiceError('maxResults must be a positive whole number.');
+    }
     let body: Record<string, unknown> = {};
     if (params.objective) body.objective = params.objective;
     if (params.searchQueries) body.search_queries = params.searchQueries;
     if (params.mode) body.mode = params.mode;
-    if (params.maxResults) body.max_results = params.maxResults;
+    if (params.maxResults !== undefined) body.max_results = params.maxResults;
     if (params.excerpts) {
       body.excerpts = {
         max_chars_per_result: params.excerpts.maxCharsPerResult,
@@ -261,17 +348,20 @@ export class Client {
       searchId: d.search_id,
       results: (d.results || []).map((r: any) => ({
         url: r.url,
-        title: r.title,
+        title: r.title ?? '',
         publishDate: r.publish_date ?? null,
         excerpts: r.excerpts || []
       })),
-      warnings: d.warnings ?? null
+      warnings: normalizeWarnings(d.warnings)
     };
   }
 
   // ─── Extract API ───
 
   async extract(params: ExtractParams): Promise<ExtractResponse> {
+    if (params.urls.length === 0 || params.urls.length > 10) {
+      throw createApiServiceError('Provide between 1 and 10 URLs to extract.');
+    }
     let body: Record<string, unknown> = {
       urls: params.urls
     };
@@ -315,7 +405,7 @@ export class Client {
         httpStatusCode: e.http_status_code ?? null,
         content: e.content ?? null
       })),
-      warnings: d.warnings ?? null
+      warnings: normalizeWarnings(d.warnings)
     };
   }
 
@@ -328,8 +418,10 @@ export class Client {
     };
     if (params.taskSpec) {
       let taskSpec: Record<string, unknown> = {};
-      if (params.taskSpec.outputSchema) taskSpec.output_schema = params.taskSpec.outputSchema;
-      if (params.taskSpec.inputSchema) taskSpec.input_schema = params.taskSpec.inputSchema;
+      taskSpec.output_schema = normalizeTaskSchema(params.taskSpec.outputSchema ?? 'auto');
+      if (params.taskSpec.inputSchema) {
+        taskSpec.input_schema = normalizeTaskSchema(params.taskSpec.inputSchema);
+      }
       body.task_spec = taskSpec;
     }
     if (params.metadata) body.metadata = params.metadata;
@@ -357,24 +449,16 @@ export class Client {
   }
 
   async getTaskRun(runId: string): Promise<TaskRun> {
-    let resp = await this.axios.get(`/v1/tasks/runs/${runId}`);
+    let resp = await this.axios.get(`/v1/tasks/runs/${encodeURIComponent(runId)}`);
     return this.mapTaskRun(resp.data);
   }
 
   async getTaskRunResult(runId: string): Promise<TaskRunResult> {
-    let resp = await this.axios.get(`/v1/tasks/runs/${runId}/result`);
+    let resp = await this.axios.get(`/v1/tasks/runs/${encodeURIComponent(runId)}/result`);
     let d = resp.data;
     return {
       output: d.output,
-      basis: (d.basis || []).map((b: any) => ({
-        field: b.field,
-        citations: (b.citations || []).map((c: any) => ({
-          url: c.url,
-          excerpts: c.excerpts || []
-        })),
-        reasoning: b.reasoning,
-        confidence: b.confidence
-      }))
+      basis: mapBasis(d.basis ?? d.output?.basis)
     };
   }
 
@@ -386,8 +470,8 @@ export class Client {
       isActive: d.is_active,
       processor: d.processor,
       metadata: d.metadata ?? null,
-      createdAt: d.created_at,
-      modifiedAt: d.modified_at
+      createdAt: d.created_at ?? '',
+      modifiedAt: d.modified_at ?? ''
     };
   }
 
@@ -399,7 +483,16 @@ export class Client {
       messages: params.messages,
       stream: false
     };
-    if (params.responseFormat) body.response_format = params.responseFormat;
+    if (params.responseFormat) {
+      body.response_format = ['text', 'json_object', 'json_schema'].includes(
+        String(params.responseFormat.type)
+      )
+        ? params.responseFormat
+        : {
+            type: 'json_schema',
+            json_schema: { name: 'response', schema: params.responseFormat }
+          };
+    }
     if (params.previousInteractionId)
       body.previous_interaction_id = params.previousInteractionId;
 
@@ -426,17 +519,8 @@ export class Client {
         completionTokens: d.usage?.completion_tokens ?? 0,
         totalTokens: d.usage?.total_tokens ?? 0
       },
-      basis: d.basis
-        ? d.basis.map((b: any) => ({
-            citations: (b.citations || []).map((c: any) => ({
-              url: c.url,
-              excerpts: c.excerpts || []
-            })),
-            reasoning: b.reasoning,
-            confidence: b.confidence
-          }))
-        : null,
-      interactionId: d.interaction_id
+      basis: d.basis ? mapBasis(d.basis) : null,
+      interactionId: d.interaction_id ?? ''
     };
   }
 
@@ -461,6 +545,13 @@ export class Client {
   }
 
   async createFindAllRun(params: CreateFindAllRunParams): Promise<{ findallId: string }> {
+    if (
+      !Number.isInteger(params.matchLimit) ||
+      params.matchLimit < 5 ||
+      params.matchLimit > 1000
+    ) {
+      throw createApiServiceError('matchLimit must be a whole number between 5 and 1000.');
+    }
     let body: Record<string, unknown> = {
       objective: params.objective,
       entity_type: params.entityType,
@@ -492,54 +583,57 @@ export class Client {
   }
 
   async getFindAllRun(findallId: string): Promise<FindAllRun> {
-    let resp = await this.axios.get(`/v1beta/findall/runs/${findallId}`, {
+    let resp = await this.axios.get(`/v1beta/findall/runs/${encodeURIComponent(findallId)}`, {
       headers: { 'parallel-beta': 'findall-2025-09-15' }
     });
     let d = resp.data;
     return {
       findallId: d.findall_id,
-      status: d.status,
+      status: typeof d.status === 'string' ? d.status : d.status.status,
+      isActive: d.status?.is_active ?? d.is_active ?? ['queued', 'running'].includes(d.status),
       metrics: {
-        generatedCandidatesCount: d.metrics?.generated_candidates_count ?? 0,
-        matchedCandidatesCount: d.metrics?.matched_candidates_count ?? 0
+        generatedCandidatesCount:
+          d.status?.metrics?.generated_candidates_count ??
+          d.metrics?.generated_candidates_count ??
+          0,
+        matchedCandidatesCount:
+          d.status?.metrics?.matched_candidates_count ??
+          d.metrics?.matched_candidates_count ??
+          0
       },
-      createdAt: d.created_at,
-      modifiedAt: d.modified_at
+      createdAt: d.created_at ?? '',
+      modifiedAt: d.modified_at ?? ''
     };
   }
 
   async getFindAllResults(findallId: string): Promise<FindAllResultResponse> {
-    let resp = await this.axios.get(`/v1beta/findall/runs/${findallId}/result`, {
-      headers: { 'parallel-beta': 'findall-2025-09-15' }
-    });
+    let resp = await this.axios.get(
+      `/v1beta/findall/runs/${encodeURIComponent(findallId)}/result`,
+      {
+        headers: { 'parallel-beta': 'findall-2025-09-15' }
+      }
+    );
     let d = resp.data;
     return {
       candidates: (d.candidates || []).map((c: any) => ({
         candidateId: c.candidate_id,
         name: c.name,
         url: c.url,
-        description: c.description,
+        description: c.description ?? '',
         matchStatus: c.match_status,
-        output: c.output ?? {},
-        basis: (c.basis || []).map((b: any) => ({
-          field: b.field,
-          citations: (b.citations || []).map((ci: any) => ({
-            url: ci.url,
-            excerpts: ci.excerpts || []
-          })),
-          reasoning: b.reasoning,
-          confidence: b.confidence
-        }))
+        output: mapFindAllOutput(c.output ?? {}),
+        rawOutput: c.output ?? {},
+        basis: mapBasis(c.basis)
       }))
     };
   }
 
   async enrichFindAll(findallId: string, params: EnrichFindAllParams): Promise<void> {
     await this.axios.post(
-      `/v1beta/findall/runs/${findallId}/enrich`,
+      `/v1beta/findall/runs/${encodeURIComponent(findallId)}/enrich`,
       {
         processor: params.processor,
-        output_schema: params.outputSchema
+        output_schema: normalizeJsonSchema(params.outputSchema)
       },
       {
         headers: { 'parallel-beta': 'findall-2025-09-15' }
@@ -549,12 +643,54 @@ export class Client {
 
   async cancelFindAll(findallId: string): Promise<void> {
     await this.axios.post(
-      `/v1beta/findall/runs/${findallId}/cancel`,
+      `/v1beta/findall/runs/${encodeURIComponent(findallId)}/cancel`,
       {},
       {
         headers: { 'parallel-beta': 'findall-2025-09-15' }
       }
     );
+  }
+
+  async extendFindAll(
+    findallId: string,
+    additionalMatchLimit: number
+  ): Promise<FindAllSchema> {
+    if (!Number.isInteger(additionalMatchLimit) || additionalMatchLimit <= 0) {
+      throw createApiServiceError('additionalMatchLimit must be a positive whole number.');
+    }
+    let resp = await this.axios.post(
+      `/v1beta/findall/runs/${encodeURIComponent(findallId)}/extend`,
+      { additional_match_limit: additionalMatchLimit }
+    );
+    return this.mapFindAllSchema(resp.data);
+  }
+
+  async getFindAllSchema(findallId: string): Promise<FindAllSchema> {
+    let resp = await this.axios.get(
+      `/v1beta/findall/runs/${encodeURIComponent(findallId)}/schema`
+    );
+    return this.mapFindAllSchema(resp.data);
+  }
+
+  private mapFindAllSchema(d: {
+    objective: string;
+    entity_type: string;
+    match_conditions: Array<{ name: string; description: string }>;
+    generator?: string;
+    match_limit?: number | null;
+    enrichments?: Array<{ processor?: string; output_schema: Record<string, unknown> }> | null;
+  }): FindAllSchema {
+    return {
+      objective: d.objective,
+      entityType: d.entity_type,
+      matchConditions: d.match_conditions,
+      generator: d.generator ?? 'core',
+      matchLimit: d.match_limit ?? null,
+      enrichments: (d.enrichments ?? []).map(enrichment => ({
+        processor: enrichment.processor ?? 'core',
+        outputSchema: enrichment.output_schema
+      }))
+    };
   }
 
   // ─── Monitor API ───
@@ -571,19 +707,19 @@ export class Client {
       };
     }
     if (params.metadata) body.metadata = params.metadata;
-    if (params.outputSchema) body.output_schema = params.outputSchema;
+    if (params.outputSchema) body.output_schema = normalizeJsonSchema(params.outputSchema);
 
     let resp = await this.axios.post('/v1alpha/monitors', body);
     return this.mapMonitor(resp.data);
   }
 
   async getMonitor(monitorId: string): Promise<Monitor> {
-    let resp = await this.axios.get(`/v1alpha/monitors/${monitorId}`);
+    let resp = await this.axios.get(`/v1alpha/monitors/${encodeURIComponent(monitorId)}`);
     return this.mapMonitor(resp.data);
   }
 
   async listMonitors(): Promise<Monitor[]> {
-    let resp = await this.axios.get('/v1alpha/monitors/list');
+    let resp = await this.axios.get('/v1alpha/monitors');
     let items = resp.data?.monitors ?? resp.data ?? [];
     if (!Array.isArray(items)) items = [];
     return items.map((d: any) => this.mapMonitor(d));
@@ -600,24 +736,31 @@ export class Client {
     }
     if (params.metadata) body.metadata = params.metadata;
 
-    let resp = await this.axios.post(`/v1alpha/monitors/${monitorId}`, body);
+    let resp = await this.axios.post(
+      `/v1alpha/monitors/${encodeURIComponent(monitorId)}`,
+      body
+    );
     return this.mapMonitor(resp.data);
   }
 
   async deleteMonitor(monitorId: string): Promise<void> {
-    await this.axios.delete(`/v1alpha/monitors/${monitorId}`);
+    await this.axios.delete(`/v1alpha/monitors/${encodeURIComponent(monitorId)}`);
   }
 
   async getMonitorEvents(monitorId: string): Promise<MonitorEvent[]> {
-    let resp = await this.axios.get(`/v1alpha/monitors/${monitorId}/events`);
+    let resp = await this.axios.get(
+      `/v1alpha/monitors/${encodeURIComponent(monitorId)}/events`
+    );
     let items = resp.data?.events ?? resp.data ?? [];
     if (!Array.isArray(items)) items = [];
     return items.map((e: any) => ({
       type: e.type,
-      eventGroupId: e.event_group_id,
-      output: e.output,
-      eventDate: e.event_date,
-      sourceUrls: e.source_urls || []
+      eventGroupId: e.event_group_id ?? '',
+      output: e.output ?? e.result?.content ?? e.error ?? null,
+      eventDate: e.event_date ?? e.date ?? e.monitor_ts?.replace(/^completed_/, '') ?? '',
+      sourceUrls: e.source_urls || [],
+      executionId: e.id ?? e.monitor_ts,
+      result: e.result
     }));
   }
 
@@ -626,7 +769,7 @@ export class Client {
     eventGroupId: string
   ): Promise<MonitorEvent[]> {
     let resp = await this.axios.get(
-      `/v1alpha/monitors/${monitorId}/event_groups/${eventGroupId}`
+      `/v1alpha/monitors/${encodeURIComponent(monitorId)}/event_groups/${encodeURIComponent(eventGroupId)}`
     );
     let items = resp.data?.events ?? resp.data ?? [];
     if (!Array.isArray(items)) {

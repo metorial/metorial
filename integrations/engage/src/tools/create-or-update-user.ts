@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { EngageUser } from '../lib/types';
 import { spec } from '../spec';
 
 let metaValue = z.union([z.string(), z.number(), z.boolean()]);
@@ -51,7 +52,7 @@ export let createOrUpdateUser = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Accounts to associate the user with')
+        .describe('Accounts to associate the user with (only on create)')
     })
   )
   .output(
@@ -75,17 +76,22 @@ export let createOrUpdateUser = SlateTool.create(spec, {
 
     let input = ctx.input;
 
-    let metaObj = input.meta as Record<string, string | number | boolean> | undefined;
+    let metaObj = input.meta;
 
-    // Try to get existing user first
-    let existingUser: unknown = null;
+    let existingUser: EngageUser | undefined;
     try {
       existingUser = await client.getUser(input.uid);
-    } catch {
-      // User doesn't exist, we'll create
+    } catch (error) {
+      if (
+        !isApiErrorRecord(error) ||
+        !isApiErrorRecord(error.data) ||
+        String(error.data.upstreamStatus) !== '404'
+      ) {
+        throw error;
+      }
     }
 
-    let user: any;
+    let user: EngageUser;
 
     if (existingUser) {
       user = await client.updateUser(input.uid, {
@@ -126,7 +132,7 @@ export let createOrUpdateUser = SlateTool.create(spec, {
         phone: user.number,
         isAccount: user.is_account,
         createdAt: user.created_at,
-        meta: (user.meta || {}) as Record<string, string | number | boolean>
+        meta: user.meta || {}
       },
       message: existingUser
         ? `Updated user **${user.uid}** successfully.`

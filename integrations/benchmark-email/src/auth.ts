@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -9,7 +10,7 @@ export let auth = SlateAuth.create()
   )
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
+    name: 'Classic API Token',
     key: 'api_token',
 
     inputSchema: z.object({
@@ -25,25 +26,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://clientapi.benchmarkemail.com'
-      });
-
-      let response = await axios.get('/Client/ProfileDetails', {
-        headers: {
-          AuthToken: ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let data = response.data?.Response?.Data;
-
+      let client = new Client({ token: ctx.output.token });
+      let data = await client.getProfile();
       return {
         profile: {
-          id: data?.['Client ID'] ?? undefined,
-          email: data?.Email ?? undefined,
-          name:
-            [data?.['First Name'], data?.['Last Name']].filter(Boolean).join(' ') || undefined
+          id: data.clientId,
+          email: data.email || undefined,
+          name: [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined
         }
       };
     }

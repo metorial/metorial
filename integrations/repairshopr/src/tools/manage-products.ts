@@ -20,17 +20,17 @@ let productSchema = z.object({
 
 let mapProduct = (p: any) => ({
   productId: p.id,
-  name: p.name,
-  description: p.description,
-  cost: p.cost ? Number(p.cost) : undefined,
-  price: p.price_retail ? Number(p.price_retail) : undefined,
-  sku: p.sku,
-  upc: p.upc_code,
-  quantity: p.quantity,
-  categoryId: p.category_id,
-  location: p.location,
-  createdAt: p.created_at,
-  updatedAt: p.updated_at
+  name: p.name ?? undefined,
+  description: p.description ?? undefined,
+  cost: (p.price_cost ?? p.cost) == null ? undefined : Number(p.price_cost ?? p.cost),
+  price: p.price_retail == null ? undefined : Number(p.price_retail),
+  sku: p.sku ?? p.product_skus?.[0]?.value ?? undefined,
+  upc: p.upc_code ?? undefined,
+  quantity: p.quantity ?? undefined,
+  categoryId: p.category_id ?? undefined,
+  location: p.physical_location ?? p.location ?? undefined,
+  createdAt: p.created_at ?? undefined,
+  updatedAt: p.updated_at ?? undefined
 });
 
 export let searchProducts = SlateTool.create(spec, {

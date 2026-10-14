@@ -14,7 +14,11 @@ export let addMember = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamsId: z.array(z.string()).describe('Team ID(s) to assign the member to'),
+      teamsId: z
+        .array(z.string())
+        .describe(
+          'Team IDs to assign the member to. Call list_teams to discover available teams.'
+        ),
       name: z.string().describe('Full name of the member'),
       username: z.string().describe('Login username for the member'),
       password: z.string().describe('Login password for the member'),

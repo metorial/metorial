@@ -25,6 +25,8 @@ For **domain-search**: each row should be \`[domainOrCompany]\`.`,
         .describe('Type of bulk search to perform'),
       rows: z
         .array(z.array(z.string()))
+        .min(1)
+        .max(5000)
         .describe('Array of rows to process. Format depends on task type.')
     })
   )
@@ -43,16 +45,17 @@ For **domain-search**: each row should be \`[domainOrCompany]\`.`,
       task: ctx.input.task,
       data: ctx.input.rows
     });
+    let fileId = result.file || result._id || result.id || result.fileId;
 
     return {
       output: {
         success: result.success ?? true,
-        fileId: result._id || result.id || result.fileId,
+        fileId,
         raw: result
       },
       message:
         result.success !== false
-          ? `Bulk **${ctx.input.task}** search created with **${ctx.input.rows.length}** items. File ID: \`${result._id || result.id || result.fileId}\``
+          ? `Bulk **${ctx.input.task}** search created with **${ctx.input.rows.length}** items. File ID: \`${fileId}\``
           : `Bulk search creation failed: ${JSON.stringify(result)}`
     };
   })

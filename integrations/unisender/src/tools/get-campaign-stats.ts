@@ -65,8 +65,10 @@ export let getCampaignStats = SlateTool.create(spec, {
         unsubscribed: commonStats.unsubscribed,
         spam: commonStats.spam
       };
-    } catch (_e) {
-      ctx.warn('Could not fetch common stats — campaign may not have started yet');
+    } catch (error) {
+      ctx.warn(
+        `Could not fetch common stats: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     let visitedLinks: any;
@@ -76,8 +78,10 @@ export let getCampaignStats = SlateTool.create(spec, {
           campaign_id: ctx.input.campaignId,
           group: ctx.input.groupLinks ? 1 : 0
         });
-      } catch (_e) {
-        ctx.warn('Could not fetch visited links');
+      } catch (error) {
+        ctx.warn(
+          `Could not fetch visited links: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
 

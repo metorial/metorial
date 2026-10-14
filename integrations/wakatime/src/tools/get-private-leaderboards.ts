@@ -34,16 +34,16 @@ export let getPrivateLeaderboards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let leaderboards = await client.getPrivateLeaderboards();
 
     let mapped = (leaderboards || []).map((lb: any) => ({
       leaderboardId: lb.id ?? '',
       name: lb.name ?? '',
-      membersCount: lb.members_count,
-      createdAt: lb.created_at,
-      modifiedAt: lb.modified_at
+      membersCount: lb.members_count ?? undefined,
+      createdAt: lb.created_at ?? undefined,
+      modifiedAt: lb.modified_at ?? undefined
     }));
 
     return {

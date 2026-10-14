@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,19 +26,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://callerapi.com'
-      });
-
-      let response = await axios.get('/api/me', {
-        headers: {
-          'X-Auth': ctx.output.token
-        }
-      });
+      let client = new Client(ctx.output);
+      let result = await client.getAccountInfo();
 
       return {
         profile: {
-          email: response.data.email
+          email: result.email
         }
       };
     }

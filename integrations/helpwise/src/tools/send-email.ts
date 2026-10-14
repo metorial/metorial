@@ -20,6 +20,12 @@ export let sendEmail = SlateTool.create(spec, {
       body: z.string().describe('Email body content (HTML supported)'),
       cc: z.string().optional().describe('CC recipient email address(es), comma-separated'),
       bcc: z.string().optional().describe('BCC recipient email address(es), comma-separated'),
+      replyTo: z
+        .string()
+        .optional()
+        .describe(
+          'Email address to receive replies; only for new emails without bcc or conversationId'
+        ),
       conversationId: z
         .string()
         .optional()
@@ -41,6 +47,7 @@ export let sendEmail = SlateTool.create(spec, {
       body: ctx.input.body,
       cc: ctx.input.cc,
       bcc: ctx.input.bcc,
+      reply_to: ctx.input.replyTo,
       thread_id: ctx.input.conversationId
     });
 

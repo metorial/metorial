@@ -1,6 +1,6 @@
 {
   "name": "@metorial/harvest",
-  "description": "Track time, manage projects, and handle invoicing for businesses and freelancers. Create and manage time entries with duration or start/stop timers, log expenses with receipt attachments, and create invoices and estimates. Manage clients, projects, tasks, users, and roles. Configure project billing methods, budgets, and assignments. Generate reports on time tracked, expenses, uninvoiced amounts, and project budgets. Send invoices and estimates to clients via email.",
+  "description": "Track time, manage projects, clients, tasks, users, expenses, invoices, and estimates. Discover authorized accounts and your current profile, browse business records, generate structured reports, email invoices, and record invoice lifecycle events.",
   "categories": ["financial-data-and-stock-market", "task-and-project-management"],
   "skills": [
     "track time entries",

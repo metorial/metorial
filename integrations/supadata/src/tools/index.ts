@@ -1,6 +1,7 @@
 export * from './crawl-website';
 export * from './extract-structured-data';
 export * from './get-crawl-job-result';
+export * from './get-current-account';
 export * from './get-extraction-job-result';
 export * from './get-media-metadata';
 export * from './get-transcript';

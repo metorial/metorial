@@ -1,14 +1,16 @@
-Now I can see that "Project Bubble" is also known as "ProProfs Project" — it's a project management tool. Let me find more details about its API.Now let me get the full API documentation from the Project Bubble help site.Now I have enough information to write the specification. Let me compile everything.
-
-# Slates Specification for Project Bubble
+# Project Bubble API Specification
 
 ## Overview
 
 Project Bubble (now known as ProProfs Project) is a project management and collaboration platform designed for small to mid-sized teams. It provides a visual interface for managing projects, tasks, time tracking, file sharing, and team collaboration. It offers a RESTful API (v2) that returns responses in JSON format, with support for CSV and HTML output.
 
+The existing connector targets Project Bubble. Its public registration remains named Bubble Plan for compatibility, while [Bubble Plan](https://bubbleplan.net/) is a separate product whose API is not implemented here. [Project Bubble's login page](https://projectbubble.com/login) is branded ProProfs Project, and the [official API overview](https://help.proprofsproject.com/api-for-developers) documents the existing `api.projectbubble.com/v2` host.
+
 ## Authentication
 
 Project Bubble uses API key authentication. To authenticate, you need your API key (found on the My Account page) and your account domain. Both must be sent as HTTP headers with every request.
+
+New connections provide both values during authentication. Tools use the domain saved with authentication and fall back to the legacy configured domain for existing connections. The legacy configuration value survives configuration parsing.
 
 Required headers:
 
@@ -31,6 +33,8 @@ There is no OAuth or token-based authentication; the API key and domain header c
 
 Retrieve company details, users, and teams. Allows reading organizational data including company settings, user profiles, and team membership.
 
+`who_am_i` reads `/user` to identify the user connected by the API key.
+
 ### Project Management
 
 Create and manage projects. Projects serve as the top-level container for organizing tasks, files, and collaboration.
@@ -44,6 +48,8 @@ Full task lifecycle management including task lists, subtasks. Tasks can be crea
 ### Time Tracking
 
 Track time, budget, and resources. Time entries can be managed via the API, allowing logging and retrieval of time spent on tasks.
+
+`delete_time_entry` deletes a discovered entry through `DELETE /time_entries/{entry_id}`. Numeric response strings such as `seconds` are normalized to numeric tool outputs.
 
 ### Comments
 
@@ -60,6 +66,8 @@ Manage calendar events. The Events API allows reading and managing calendar even
 ### Client Management
 
 Manage client records and contacts. Clients can be associated with projects, and contact information can be managed through dedicated API resources.
+
+`create_client` sends documented fields to `POST /clients` and returns the created client ID and name.
 
 ## Events
 

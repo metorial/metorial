@@ -43,7 +43,7 @@ export let removePlayer = SlateTool.create(spec, {
       ctx.input.playerName || ctx.input.playerEmail || ctx.input.playerExternalId || 'unknown';
     return {
       output: { result },
-      message: `Removed player **${identifier}** (soft-deleted).`
+      message: `Submitted a soft-deletion request for player **${identifier}**. Admin players cannot be removed; check the API result and list_players to confirm.`
     };
   })
   .build();

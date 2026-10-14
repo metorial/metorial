@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,17 +25,11 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://public-api.process.st/api/v1.1',
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/testAuth');
+      let client = new Client({ token: ctx.output.token });
+      let result = await client.testAuth();
       return {
         profile: {
-          name: response.data.apiKeyLabel
+          name: result.apiKeyLabel
         }
       };
     }

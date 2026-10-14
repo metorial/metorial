@@ -47,9 +47,9 @@ export let getVerification = SlateTool.create(spec, {
         verificationId: result.data?.id,
         verificationType: result.data?.type,
         status: n.status,
-        createdAt: n['created-at'] || n.created_at,
-        completedAt: n['completed-at'] || n.completed_at,
-        checks: n.checks,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
+        completedAt: n['completed-at'] ?? n.completed_at ?? undefined,
+        checks: n.checks ?? undefined,
         attributes: n
       },
       message: `Verification **${result.data?.id}** (${result.data?.type}) is **${n.status}**.`
@@ -106,7 +106,7 @@ export let listVerifications = SlateTool.create(spec, {
         verificationId: item.id,
         verificationType: item.type,
         status: n.status,
-        createdAt: n['created-at'] || n.created_at
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 

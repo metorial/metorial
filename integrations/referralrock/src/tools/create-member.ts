@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseEntity, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createMember = SlateTool.create(spec, {
@@ -14,7 +14,11 @@ export let createMember = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('Program ID to add the member to'),
+      programId: z
+        .string()
+        .describe(
+          'Program ID to add the member to. Use list_programs to discover program IDs.'
+        ),
       firstName: z.string().describe('First name of the member'),
       email: z.string().describe('Email address of the member'),
       lastName: z.string().optional().describe('Last name'),
@@ -32,7 +36,11 @@ export let createMember = SlateTool.create(spec, {
       country: z.string().optional().describe('Country (ISO 3166-2 code)'),
       postalCode: z.string().optional().describe('Postal code'),
       disabledFlag: z.boolean().optional().describe('Create as disabled'),
-      customOverrideURL: z.string().optional().describe('Custom override URL')
+      customOverrideURL: z.string().optional().describe('Custom override URL'),
+      shouldSendEmail: z
+        .boolean()
+        .optional()
+        .describe('Send the program confirmation email (default false)')
     })
   )
   .output(
@@ -48,8 +56,9 @@ export let createMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
-    let result = await client.createMember(ctx.input);
-    let member = (result.member || result) as Record<string, unknown>;
+    let { shouldSendEmail, ...memberInput } = ctx.input;
+    let result = await client.createMember(memberInput, shouldSendEmail);
+    let member = getResponseEntity(result, 'member');
 
     return {
       output: {

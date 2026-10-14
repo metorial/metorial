@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getSerpResult = SlateTool.create(spec, {
   name: 'Get SERP Task Result',
   key: 'get_serp_result',
-  description: `Retrieve the results of a completed scheduled SERP search task by its unique ID. Returns structured JSON search results or raw HTML depending on the response type requested.`,
+  description: `Retrieve the results of a completed scheduled SERP search task by its unique ID. Returns structured JSON search results or a downloadable HTML file depending on the response type requested.`,
   instructions: [
     'Use "check_serp_task" first to verify the task is complete before retrieving results.'
   ],
@@ -38,14 +38,28 @@ export let getSerpResult = SlateTool.create(spec, {
     });
 
     let resultsData = response?.results;
+    if (ctx.input.responseType === 'html') {
+      await ctx.addAttachment({
+        type: 'url',
+        url: 'https://api.serphouse.com/serp/get/html',
+        query: { id: ctx.input.taskId },
+        headers: { Authorization: `Bearer ${ctx.auth.token}` },
+        mimeType: 'text/html'
+      });
+    }
 
     return {
       output: {
-        status: response?.status ?? 'unknown',
+        status: response?.status ?? (typeof response === 'string' ? 'success' : 'unknown'),
         message: response?.msg ?? '',
         searchMetadata: resultsData?.search_metadata,
         searchParameters: resultsData?.search_parameters,
-        results: resultsData?.results
+        results:
+          typeof response === 'string'
+            ? response
+            : typeof resultsData === 'string'
+              ? resultsData
+              : resultsData?.results
       },
       message: `Retrieved SERP results for task **${ctx.input.taskId}**.`
     };

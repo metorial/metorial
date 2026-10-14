@@ -1,4 +1,4 @@
-Now let me get the actual API documentation to understand all the endpoints and features:# Slates Specification for WebScraping.AI
+# WebScraping.AI Integration Specification
 
 ## Overview
 
@@ -8,7 +8,7 @@ WebScraping.AI is a web scraping API that fetches and extracts data from any web
 
 WebScraping.AI uses **API key authentication**. All requests require an `api_key` query parameter.
 
-- **Obtaining an API key:** Sign up at [webscraping.ai](https://webscraping.ai/auth/sign_up) to receive an API key. A free tier provides 2,000 API credits per month.
+- **Obtaining an API key:** Sign up at [webscraping.ai](https://webscraping.ai/auth/sign_up) to receive an API key. A free trial provides 2,000 API credits.
 - **Usage:** Pass the API key as a query parameter on every request:
   ```
   GET https://api.webscraping.ai/html?url=https://example.com&api_key=YOUR_API_KEY
@@ -33,7 +33,7 @@ Fetch the full rendered HTML of any webpage. Supports both GET and POST requests
 
 ### Text Extraction
 
-Extract only the visible text content from a webpage, stripped of HTML. Output can be returned as plain text, JSON (with title, description, and content fields), or XML. Optionally includes links found on the page. Ideal for feeding content into LLMs or text analysis pipelines.
+Extract only the visible text content from a webpage, stripped of HTML. Output can be returned as Markdown, JSON (with title, description, and text fields), or XML. Optionally includes links found on the page. Ideal for feeding content into LLMs or text analysis pipelines.
 
 ### CSS Selector-Based Extraction
 
@@ -45,7 +45,7 @@ Execute custom JavaScript on the target page after it loads. Supports clicking b
 
 ### Proxy and Geo-Targeting
 
-Requests are routed through rotating proxies automatically. Two proxy types are available: datacenter (default, faster) and residential (for anti-bot protected sites). Geo-targeting is supported with proxy locations in many countries (US, UK, Germany, France, Japan, etc.). Users can also supply their own custom proxy URL.
+Requests are routed through rotating proxies automatically. Proxy options include datacenter (default), residential, stealth, and auto escalation. Geo-targeting is supported with proxy locations in many countries (US, UK, Germany, France, Japan, etc.). Users can also supply their own custom proxy URL.
 
 ### Device Emulation
 
@@ -61,7 +61,24 @@ WebScraping.AI can be used as an HTTP proxy server (`proxy.webscraping.ai:8888`)
 
 ### Account Information
 
-Retrieve current account status including remaining API credits, credit reset time, and concurrency limits.
+Retrieve current account status including remaining API credits, monthly and pay-as-you-go balances when available, credit reset time, and concurrency limits. Numeric reset timestamps are normalized to ISO strings.
+
+### Google Search
+
+The `search_google` tool calls GET `/serp` with the query in `q`, plus optional country (`gl`), language (`hl`), and page. It preserves organic results, search metadata, related searches, and pagination. Only Google is supported; page must be a whole number from 1 to 100.
+
+### Structured Page Data
+
+The `get_structured_data` tool calls GET `/data` for supported public site URLs, with optional country and YouTube transcript options. It preserves `request_parameters`, `parse_status`, and nullable or partial `data`. A `parse_failed` or `not_found` response is still a successful billed request.
+
+### Compatibility
+
+Existing HTML and text output strings remain available. Multiple-selector results preserve one HTML string per selector by joining all matching fragments with newlines. Existing numeric timeout inputs remain JSON Schema numbers and validate whole-number values at runtime. POST requests send the body unchanged with the requested content type; form bodies use a raw text API request with the target content type in forwarded headers.
+
+## API Sources
+
+- [Official API documentation](https://webscraping.ai/docs)
+- [Official JavaScript SDK response-shape notes](https://github.com/webscraping-ai/webscraping-ai-js)
 
 ## Events
 

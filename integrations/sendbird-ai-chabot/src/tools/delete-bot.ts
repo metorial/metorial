@@ -17,7 +17,7 @@ export let deleteBot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the bot to delete')
+      botUserId: z.string().min(1).max(80).describe('User ID of the bot to delete')
     })
   )
   .output(
@@ -28,7 +28,7 @@ export let deleteBot = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     await client.deleteBot(ctx.input.botUserId);

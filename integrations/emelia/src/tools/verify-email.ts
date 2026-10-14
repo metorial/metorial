@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,10 @@ export let verifyEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      email: z.string().describe('Email address to verify'),
+      email: z
+        .string()
+        .optional()
+        .describe('Email address required for submission; omitted when polling jobId'),
       submitOnly: z
         .boolean()
         .optional()
@@ -37,13 +40,24 @@ export let verifyEmail = SlateTool.create(spec, {
         output: {
           jobId,
           status: result?.status || 'unknown',
-          verified: result?.verified ?? result?.valid,
+          verified:
+            result?.verified ??
+            result?.valid ??
+            (result?.status === 'done'
+              ? result?.qualification === 'valid'
+                ? true
+                : result?.qualification === 'invalid'
+                  ? false
+                  : undefined
+              : undefined),
           result
         },
         message: `Verification job **${jobId}**: **${result?.status || 'pending'}**.`
       };
     }
 
+    if (!email)
+      throw createApiServiceError('Email address is required to submit verification.');
     let job = await client.verifyEmail({ email });
     let submittedJobId = job?.jobId || job?._id || job?.id;
 
@@ -64,7 +78,14 @@ export let verifyEmail = SlateTool.create(spec, {
         result?.verified !== undefined ||
         result?.valid !== undefined
       ) {
-        let isValid = result.verified ?? result.valid;
+        let isValid =
+          result.verified ??
+          result.valid ??
+          (result.qualification === 'valid'
+            ? true
+            : result.qualification === 'invalid'
+              ? false
+              : undefined);
         return {
           output: {
             jobId: submittedJobId,
@@ -72,7 +93,7 @@ export let verifyEmail = SlateTool.create(spec, {
             verified: isValid,
             result
           },
-          message: `Email **${email}** is **${isValid ? 'valid' : 'invalid'}**.`
+          message: `Email **${email}** verification: **${result.qualification ?? (isValid === undefined ? 'unknown' : isValid ? 'valid' : 'invalid')}**.`
         };
       }
       if (result?.status === 'failed' || result?.status === 'error') {

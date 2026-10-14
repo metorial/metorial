@@ -18,7 +18,7 @@ export let resendOtp = SlateTool.create(spec, {
       retryType: z
         .enum(['text', 'voice'])
         .optional()
-        .describe('Resend method: "text" for SMS, "voice" for voice call')
+        .describe('Resend method: "text" for SMS, "voice" for voice call (default)')
     })
   )
   .output(
@@ -40,7 +40,7 @@ export let resendOtp = SlateTool.create(spec, {
         type: result.type || 'success',
         message: result.message || ''
       },
-      message: `OTP resent to **${ctx.input.mobile}** via ${ctx.input.retryType || 'text'}.`
+      message: `OTP resent to **${ctx.input.mobile}** via ${ctx.input.retryType || 'voice'}.`
     };
   })
   .build();

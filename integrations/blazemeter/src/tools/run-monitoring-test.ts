@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunscopeClient } from '../lib/runscope-client';
 import { spec } from '../spec';
@@ -49,8 +49,14 @@ export let runMonitoringTest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.runscopeToken && !ctx.auth.token) {
-      throw new Error('Runscope OAuth token is required for API Monitoring operations');
+    if (
+      ctx.auth.apiKeyId ||
+      ctx.auth.apiKeySecret ||
+      (!ctx.auth.runscopeToken && !ctx.auth.token)
+    ) {
+      throw createApiServiceError(
+        'Runscope OAuth token is required for API Monitoring operations'
+      );
     }
     let client = new RunscopeClient({ token: ctx.auth.runscopeToken || ctx.auth.token });
 
@@ -74,10 +80,10 @@ export let runMonitoringTest = SlateTool.create(spec, {
       );
       let mapped = runs.map((r: any) => ({
         testRunId: r.test_run_id || r.id,
-        result: r.result,
-        createdAt: r.created_at ? String(r.created_at) : undefined,
-        finishedAt: r.finished_at ? String(r.finished_at) : undefined,
-        region: r.region
+        result: r.result ?? undefined,
+        createdAt: r.started_at != null ? String(r.started_at) : undefined,
+        finishedAt: r.finished_at != null ? String(r.finished_at) : undefined,
+        region: r.region ?? undefined
       }));
       return {
         output: { runs: mapped },

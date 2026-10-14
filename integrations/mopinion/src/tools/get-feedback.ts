@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let getFeedback = SlateTool.create(spec, {
   instructions: [
     'Provide either a reportId or datasetId to fetch feedback from.',
     'Filter values use Mopinion filter syntax - e.g., for NPS use values like ">8" for promoters.',
-    'Maximum limit is 100 results per request. Use page parameter for pagination.'
+    'Maximum limit is 1000 results per request. Use page parameter for pagination.'
   ],
   tags: {
     readOnly: true
@@ -18,10 +18,38 @@ export let getFeedback = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      reportId: z.number().optional().describe('Report ID to retrieve feedback from'),
-      datasetId: z.number().optional().describe('Dataset ID to retrieve feedback from'),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      limit: z.number().optional().describe('Maximum number of results per page (max 100)'),
+      reportId: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .positive()
+        .optional()
+        .describe('Report ID to retrieve feedback from'),
+      datasetId: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .positive()
+        .optional()
+        .describe('Dataset ID to retrieve feedback from'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(1)
+        .optional()
+        .describe('Page number for pagination (starts at 1)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum number of results per page (max 1000)'),
+      feedbackId: z
+        .string()
+        .regex(/^\d+(,\d+)*$/)
+        .optional()
+        .describe(
+          'Feedback ID or comma-separated feedback IDs to retrieve from the selected report or dataset'
+        ),
       filterDate: z.string().optional().describe('Filter by date (e.g., "2024-01-01")'),
       filterRating: z.string().optional().describe('Filter by numeric rating'),
       filterNps: z.string().optional().describe('Filter by NPS score (0-10)'),
@@ -64,8 +92,8 @@ export let getFeedback = SlateTool.create(spec, {
       signatureToken: ctx.auth.signatureToken
     });
 
-    if (!ctx.input.reportId && !ctx.input.datasetId) {
-      throw new Error('Either reportId or datasetId must be provided');
+    if ((ctx.input.reportId === undefined) === (ctx.input.datasetId === undefined)) {
+      throw createApiServiceError('Provide exactly one of reportId or datasetId.');
     }
 
     let pagination = {
@@ -86,16 +114,35 @@ export let getFeedback = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.reportId) {
-      result = await client.getReportFeedback(ctx.input.reportId, pagination, filters);
+      result = await client.getReportFeedback(
+        ctx.input.reportId,
+        pagination,
+        filters,
+        ctx.input.feedbackId
+      );
     } else {
-      result = await client.getDatasetFeedback(ctx.input.datasetId!, pagination, filters);
+      result = await client.getDatasetFeedback(
+        ctx.input.datasetId!,
+        pagination,
+        filters,
+        ctx.input.feedbackId
+      );
     }
 
-    let entries = Array.isArray(result) ? result : result.data || [];
+    let data = result.data ?? result;
+    let entries = Array.isArray(data) ? data : data.id !== undefined ? [data] : [];
     let meta = result._meta || {};
 
+    for (let entry of entries) {
+      if (!Number.isSafeInteger(Number(entry.id)) || Number(entry.id) < 1) {
+        throw createApiServiceError(
+          'Mopinion returned a feedback ID that cannot be represented as a number.'
+        );
+      }
+    }
+
     let feedbackEntries = entries.map((entry: any) => ({
-      feedbackId: entry.id,
+      feedbackId: Number(entry.id),
       created: entry.created || '',
       datasetId: entry.datasetId ?? entry.dataset_id,
       reportId: entry.reportId ?? entry.report_id,

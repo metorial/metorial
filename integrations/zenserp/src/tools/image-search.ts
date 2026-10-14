@@ -30,7 +30,7 @@ export let imageSearch = SlateTool.create(spec, {
     'Set `filterSize` to filter by image dimensions: "m" (medium), "l" (large), "i" (icon).',
     'Set `filterColor` to filter by color: "color", "gray", "trans" (transparent), or specific colors like "red", "blue", etc.',
     'Set `filterType` to filter by image type: "clipart", "lineart", "gif".',
-    'Use `start` for pagination to retrieve additional results beyond the first page.'
+    'Use `page` for image pagination (1 for the first page, 2 for images 101–200). Zenserp does not support result-offset `start` for image search.'
   ],
   tags: {
     readOnly: true
@@ -47,6 +47,12 @@ export let imageSearch = SlateTool.create(spec, {
         .optional()
         .describe('Number of results to return (max 100 per page)'),
       start: z.number().optional().describe('Result offset for pagination'),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Image page number (1 for the first page, 2 for images 101–200); use this instead of start'
+        ),
       filterSize: z
         .enum(['m', 'l', 'i'])
         .optional()
@@ -85,6 +91,7 @@ export let imageSearch = SlateTool.create(spec, {
       gl: ctx.input.country,
       num: ctx.input.numResults,
       start: ctx.input.start,
+      imagePage: ctx.input.page,
       tbs: tbsFilters.length > 0 ? tbsFilters.join(',') : undefined
     });
 

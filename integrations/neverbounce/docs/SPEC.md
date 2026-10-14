@@ -1,6 +1,4 @@
-Now let me check the job callbacks documentation to understand webhook/event support better.The page content was minimal. Let me search for more details on job callbacks.I now have enough information to write the specification.
-
-# Slates Specification for NeverBounce
+# NeverBounce Integration Specification
 
 ## Overview
 
@@ -44,7 +42,7 @@ NeverBounce offers a free analysis feature to assess your list's overall health.
 
 ### Job Management
 
-Search, list, and delete existing verification jobs. You can use the status endpoint to retrieve real-time statistics about a bulk job in progress. Results can be downloaded once the job has completed.
+Search, list, and delete existing verification jobs. You can use the status endpoint to retrieve real-time statistics about a bulk job in progress. Results can be downloaded once the job has completed with `download_job_results`, optionally selecting result categories and including duplicates.
 
 ### Account Information
 

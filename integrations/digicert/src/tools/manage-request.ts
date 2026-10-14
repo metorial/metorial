@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CertCentralClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageRequest = SlateTool.create(spec, {
   key: 'manage_request',
   description: `List, view, approve, or reject certificate order requests in DigiCert CertCentral. Requests are created when an order requires admin approval before issuance.`,
   instructions: [
-    'Use action "list" to get all pending requests.',
+    'Use action "list" to get requests. Set status to "pending" to list requests awaiting approval.',
     'Use action "get" to view a specific request by ID.',
     'Use action "approve" or "reject" to process a pending request.'
   ],
@@ -25,12 +25,23 @@ export let manageRequest = SlateTool.create(spec, {
         .optional()
         .describe('Request ID (required for get, approve, reject)'),
       status: z
-        .enum(['pending', 'approved', 'rejected'])
+        .enum(['pending', 'approved', 'rejected', 'submitted'])
         .optional()
         .describe('Filter requests by status (for list action)'),
       comment: z.string().optional().describe('Comment when approving or rejecting'),
-      offset: z.number().optional().describe('Pagination offset for list'),
-      limit: z.number().optional().describe('Number of results for list')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .nonnegative()
+        .optional()
+        .describe('Pagination offset for list'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .nonnegative()
+        .max(1000)
+        .optional()
+        .describe('Number of results for list (maximum 1000)')
     })
   )
   .output(
@@ -95,7 +106,12 @@ export let manageRequest = SlateTool.create(spec, {
     }
 
     if (!ctx.input.requestId) {
-      throw new Error('requestId is required for this action');
+      throw createApiServiceError('requestId is required for this action');
+    }
+    if (!/^\d+$/.test(ctx.input.requestId) || Number(ctx.input.requestId) < 1) {
+      throw createApiServiceError(
+        'requestId must be a positive numeric ID. Use the list action to find the request.'
+      );
     }
 
     if (action === 'get') {
@@ -146,6 +162,6 @@ export let manageRequest = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

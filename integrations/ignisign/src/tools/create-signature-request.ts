@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IgnisignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -62,47 +62,51 @@ export let createSignatureRequest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     let initResult = await client.initSignatureRequest(ctx.input.signatureProfileId);
     let signatureRequestId = initResult.signatureRequestId;
+    if (!signatureRequestId)
+      throw createApiServiceError('IgniSign did not return a signature request ID.');
 
-    let hasUpdateData =
-      ctx.input.title ||
-      ctx.input.description ||
-      ctx.input.externalId ||
-      ctx.input.documentIds ||
-      ctx.input.signerIds ||
-      ctx.input.language ||
-      ctx.input.expirationDate ||
-      ctx.input.expirationDateIsActivated !== undefined;
+    let hasUpdateData = [
+      ctx.input.title,
+      ctx.input.description,
+      ctx.input.externalId,
+      ctx.input.documentIds,
+      ctx.input.signerIds,
+      ctx.input.language,
+      ctx.input.expirationDate,
+      ctx.input.expirationDateIsActivated
+    ].some(value => value !== undefined);
 
     let context: any;
 
     if (hasUpdateData) {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.title) updateData.title = ctx.input.title;
-      if (ctx.input.description) updateData.description = ctx.input.description;
-      if (ctx.input.externalId) updateData.externalId = ctx.input.externalId;
-      if (ctx.input.documentIds) updateData.documentIds = ctx.input.documentIds;
-      if (ctx.input.signerIds) updateData.signerIds = ctx.input.signerIds;
-      if (ctx.input.language) updateData.language = ctx.input.language;
-      if (ctx.input.expirationDate) updateData.expirationDate = ctx.input.expirationDate;
-      if (ctx.input.expirationDateIsActivated !== undefined)
-        updateData.expirationDateIsActivated = ctx.input.expirationDateIsActivated;
+      let updateData = pickDefined({
+        title: ctx.input.title,
+        description: ctx.input.description,
+        externalId: ctx.input.externalId,
+        documentIds: ctx.input.documentIds,
+        signerIds: ctx.input.signerIds,
+        language: ctx.input.language,
+        expirationDate: ctx.input.expirationDate,
+        expirationDateIsActivated: ctx.input.expirationDateIsActivated
+      });
 
       context = await client.updateSignatureRequest(signatureRequestId, updateData);
     }
 
-    let status = 'DRAFT';
+    let status: string | undefined;
 
     if (ctx.input.publish) {
-      let publishResult = await client.publishSignatureRequest(signatureRequestId);
-      context = publishResult;
-      status = 'PUBLISHED';
+      await client.publishSignatureRequest(signatureRequestId);
     }
+
+    context = await client.getSignatureRequestContext(signatureRequestId);
+    status = context.status;
 
     return {
       output: {
@@ -112,7 +116,7 @@ export let createSignatureRequest = SlateTool.create(spec, {
       },
       message: ctx.input.publish
         ? `Signature request **${signatureRequestId}** created and published.`
-        : `Signature request **${signatureRequestId}** initialized${hasUpdateData ? ' and configured' : ''} in DRAFT status.`
+        : `Signature request **${signatureRequestId}** initialized${hasUpdateData ? ' and configured' : ''}.`
     };
   })
   .build();

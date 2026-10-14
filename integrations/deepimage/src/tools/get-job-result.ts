@@ -33,6 +33,10 @@ export let getJobResult = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getResult(ctx.input.jobId);
 
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
+
     let message =
       result.status === 'complete'
         ? `Job complete. Result: ${result.resultUrl}`

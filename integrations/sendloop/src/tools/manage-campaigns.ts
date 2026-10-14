@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageCampaigns = SlateTool.create(spec, {
   name: 'Manage Campaigns',
   key: 'manage_campaigns',
-  description: `Create, update, or delete email campaigns. Supports setting campaign name, sender info, subject, HTML/plain text content, target lists, and scheduling. Use this to prepare campaigns before sending.`,
+  description: `Create, update, or delete email campaigns. Set campaign name, sender info, subject, and target lists; provide HTML/plain text content when creating. Use send_campaign to send or schedule a prepared campaign.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -33,17 +33,23 @@ export let manageCampaigns = SlateTool.create(spec, {
       replyToName: z.string().optional().describe('Reply-to name'),
       replyToEmail: z.string().optional().describe('Reply-to email address'),
       subject: z.string().optional().describe('Email subject line (required for create)'),
-      htmlContent: z.string().optional().describe('HTML content of the email'),
-      plainTextContent: z.string().optional().describe('Plain text content of the email'),
+      htmlContent: z.string().optional().describe('HTML content of the email (create action)'),
+      plainTextContent: z
+        .string()
+        .optional()
+        .describe('Plain text content of the email (create action)'),
       targetListIds: z
         .string()
         .optional()
         .describe('Comma-separated list of target subscriber list IDs'),
-      scheduleType: z.string().optional().describe('Schedule type for the campaign'),
+      scheduleType: z
+        .string()
+        .optional()
+        .describe('Legacy scheduling input; use send_campaign with sendDate instead'),
       scheduleDateTime: z
         .string()
         .optional()
-        .describe('Scheduled date/time to send the campaign (ISO 8601 format)')
+        .describe('Legacy scheduling input; use send_campaign with sendDate instead')
     })
   )
   .output(
@@ -55,10 +61,15 @@ export let manageCampaigns = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let { action, campaignId } = ctx.input;
+    if (ctx.input.scheduleType !== undefined || ctx.input.scheduleDateTime !== undefined) {
+      throw createApiServiceError(
+        'Create or update the campaign first, then use send_campaign with sendDate to schedule delivery.'
+      );
+    }
 
     if (action === 'create') {
       if (
@@ -67,7 +78,7 @@ export let manageCampaigns = SlateTool.create(spec, {
         !ctx.input.fromEmail ||
         !ctx.input.subject
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'campaignName, fromName, fromEmail, and subject are required for creating a campaign'
         );
       }
@@ -96,7 +107,13 @@ export let manageCampaigns = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!campaignId) throw new Error('Campaign ID is required for update action');
+      if (ctx.input.htmlContent !== undefined || ctx.input.plainTextContent !== undefined) {
+        throw createApiServiceError(
+          'The campaign update API supports campaign settings only. Set email content when creating a campaign or edit content in Sendloop.'
+        );
+      }
+      if (!campaignId)
+        throw createApiServiceError('Campaign ID is required for update action');
 
       await client.updateCampaign(campaignId, {
         campaignName: ctx.input.campaignName,
@@ -117,7 +134,8 @@ export let manageCampaigns = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!campaignId) throw new Error('Campaign ID is required for delete action');
+      if (!campaignId)
+        throw createApiServiceError('Campaign ID is required for delete action');
       await client.deleteCampaign(campaignId);
 
       return {
@@ -126,6 +144,6 @@ export let manageCampaigns = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

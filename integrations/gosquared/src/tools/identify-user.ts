@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GoSquaredClient } from '../lib/client';
 import { spec } from '../spec';
@@ -50,9 +50,12 @@ export let identifyUser = SlateTool.create(spec, {
     if (ctx.input.phone) properties.phone = ctx.input.phone;
     if (ctx.input.username) properties.username = ctx.input.username;
     if (ctx.input.createdAt) properties.created_at = ctx.input.createdAt;
-    if (ctx.input.companyName) properties.company_name = ctx.input.companyName;
-    if (ctx.input.companyIndustry) properties.company_industry = ctx.input.companyIndustry;
-    if (ctx.input.companySize !== undefined) properties.company_size = ctx.input.companySize;
+    let company = pickDefined({
+      name: ctx.input.companyName,
+      industry: ctx.input.companyIndustry,
+      size: ctx.input.companySize
+    });
+    if (Object.keys(company).length > 0) properties.company = company;
     if (ctx.input.customProperties) properties.custom = ctx.input.customProperties;
 
     await client.identify(ctx.input.personId, properties);

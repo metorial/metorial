@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { XForceClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -36,18 +37,13 @@ export let auth = SlateAuth.create()
       output: { token: string; password: string };
       input: { apiKey: string; password: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.xforce.ibmcloud.com',
-        auth: {
-          username: ctx.output.token,
-          password: ctx.output.password
-        }
-      });
-
-      await http.get('/api/usage');
+      let client = new XForceClient(ctx.output);
+      let data = await client.getUserProfile();
       return {
         profile: {
-          id: ctx.output.token
+          id: data.connectionsProfile?.email || ctx.output.token,
+          name: data.connectionsProfile?.fn ?? undefined,
+          email: data.connectionsProfile?.email ?? undefined
         }
       };
     }

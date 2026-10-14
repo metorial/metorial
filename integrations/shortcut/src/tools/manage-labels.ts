@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,7 @@ export let manageLabels = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a label');
+      if (!ctx.input.name) throw createApiServiceError('Name is required to create a label');
       let params: Record<string, any> = { name: ctx.input.name };
       if (ctx.input.description !== undefined) params.description = ctx.input.description;
       if (ctx.input.color !== undefined) params.color = ctx.input.color;
@@ -51,7 +51,7 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.labelId) throw new Error('Label ID is required for update');
+      if (!ctx.input.labelId) throw createApiServiceError('Label ID is required for update');
       let params: Record<string, any> = {};
       if (ctx.input.name !== undefined) params.name = ctx.input.name;
       if (ctx.input.description !== undefined) params.description = ctx.input.description;
@@ -70,7 +70,7 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.labelId) throw new Error('Label ID is required for delete');
+    if (!ctx.input.labelId) throw createApiServiceError('Label ID is required for delete');
     await client.deleteLabel(ctx.input.labelId);
 
     return {

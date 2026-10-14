@@ -9,7 +9,7 @@ export let createEventTool = SlateTool.create(spec, {
   description: `Schedule a new event through a SavvyCal scheduling link. The time slot must match the link's available slots. Provide attendee details and optionally custom field values and metadata.`,
   instructions: [
     'The startAt and endAt times must correspond to an available slot on the scheduling link.',
-    'Use the List Scheduling Links tool to find the link ID.'
+    'Use list_links to find the link ID and custom fields, then list_link_slots to discover available startAt and endAt values.'
   ],
   constraints: ['Only available time slots on the link can be booked.']
 })
@@ -30,7 +30,15 @@ export let createEventTool = SlateTool.create(spec, {
         .array(
           z.object({
             fieldId: z.string().describe('Custom field ID'),
-            value: z.string().describe('Value for the custom field')
+            value: z.string().describe('Value for the custom field'),
+            label: z
+              .string()
+              .optional()
+              .describe('Field label from list_links; resolved from the link when omitted'),
+            type: z
+              .string()
+              .optional()
+              .describe('Field type from list_links; resolved from the link when omitted')
           })
         )
         .optional()

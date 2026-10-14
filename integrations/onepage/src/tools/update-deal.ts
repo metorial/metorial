@@ -25,7 +25,10 @@ export let updateDeal = SlateTool.create(spec, {
       closeDate: z.string().optional().describe('Actual close date (YYYY-MM-DD)'),
       text: z.string().optional().describe('Deal description or notes'),
       ownerId: z.string().optional().describe('ID of the user to own this deal'),
-      contactId: z.string().optional().describe('ID of the associated contact'),
+      contactId: z
+        .string()
+        .optional()
+        .describe('Existing contact ID; deals cannot be moved to a different contact'),
       customFields: z.array(customFieldValueSchema).optional().describe('Custom field values')
     })
   )

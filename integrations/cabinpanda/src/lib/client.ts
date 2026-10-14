@@ -1,35 +1,73 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class CabinPandaClient {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError('A CabinPanda API token is required.', {
+        reason: 'cabinpanda_missing_token'
+      });
+    }
+
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.cabinpanda.com/api/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CabinPanda',
+          reason: 'cabinpanda_api_error'
+        })
     });
+  }
+
+  private getPathId(value: string, label: string) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw createApiServiceError(`${label} must not be empty.`, {
+        reason: 'cabinpanda_invalid_id'
+      });
+    }
+    return encodeURIComponent(value);
+  }
+
+  private getList(data: any, label: string): any[] {
+    let items = data?.data ?? data;
+    if (!Array.isArray(items)) {
+      throw createApiServiceError(`CabinPanda returned an unexpected ${label} response.`, {
+        reason: 'cabinpanda_invalid_response'
+      });
+    }
+    return items;
   }
 
   // Profile
 
   async getProfile(): Promise<any> {
     let response = await this.http.get('/profile');
-    return response.data?.data ?? response.data;
+    let profile = response.data?.data ?? response.data;
+    if (
+      !profile ||
+      typeof profile !== 'object' ||
+      Array.isArray(profile) ||
+      (profile.id == null && profile.name == null && profile.email == null)
+    ) {
+      throw createApiServiceError('CabinPanda returned an unexpected profile response.', {
+        reason: 'cabinpanda_invalid_response'
+      });
+    }
+    return profile;
   }
 
   // Forms
 
   async listForms(): Promise<any[]> {
     let response = await this.http.get('/forms');
-    return response.data?.data ?? response.data ?? [];
+    return this.getList(response.data, 'forms');
   }
 
   async getForm(formId: string): Promise<any> {
-    let response = await this.http.get(`/forms/${formId}`);
+    let response = await this.http.get(`/forms/${this.getPathId(formId, 'Form ID')}`);
     return response.data?.data ?? response.data;
   }
 
@@ -80,36 +118,42 @@ export class CabinPandaClient {
     if (params.submitButtonLabel !== undefined)
       body.submit_button_label = params.submitButtonLabel;
 
-    let response = await this.http.put(`/forms/${formId}`, body);
+    let response = await this.http.put(`/forms/${this.getPathId(formId, 'Form ID')}`, body);
     return response.data?.data ?? response.data;
   }
 
   async deleteForm(formId: string): Promise<any> {
-    let response = await this.http.delete(`/forms/${formId}`);
+    let response = await this.http.delete(`/forms/${this.getPathId(formId, 'Form ID')}`);
     return response.data?.data ?? response.data;
   }
 
   // Submissions
 
   async listSubmissions(formId: string): Promise<any[]> {
-    let response = await this.http.get(`/forms/${formId}/submissions`);
-    return response.data?.data ?? response.data ?? [];
+    let response = await this.http.get(
+      `/forms/${this.getPathId(formId, 'Form ID')}/submissions`
+    );
+    return this.getList(response.data, 'submissions');
   }
 
   // Integrations
 
   async listIntegrations(): Promise<any[]> {
     let response = await this.http.get('/integrations');
-    return response.data?.data ?? response.data ?? [];
+    return this.getList(response.data, 'integrations');
   }
 
   async getIntegration(integrationId: string): Promise<any> {
-    let response = await this.http.get(`/integrations/${integrationId}`);
+    let response = await this.http.get(
+      `/integrations/${this.getPathId(integrationId, 'Integration ID')}`
+    );
     return response.data?.data ?? response.data;
   }
 
   async deleteIntegration(integrationId: string): Promise<any> {
-    let response = await this.http.delete(`/integrations/${integrationId}`);
+    let response = await this.http.delete(
+      `/integrations/${this.getPathId(integrationId, 'Integration ID')}`
+    );
     return response.data?.data ?? response.data;
   }
 
@@ -117,6 +161,6 @@ export class CabinPandaClient {
 
   async listUsers(): Promise<any[]> {
     let response = await this.http.get('/users');
-    return response.data?.data ?? response.data ?? [];
+    return this.getList(response.data, 'users');
   }
 }

@@ -26,7 +26,11 @@ export let updateProspectStatus = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      updatedCount: z.number().describe('Number of prospects updated')
+      updatedCount: z.number().describe('Number of prospects updated'),
+      results: z
+        .array(z.any())
+        .optional()
+        .describe('Per-prospect IDs and provider results, including any failures')
     })
   )
   .handleInvocation(async ctx => {
@@ -37,14 +41,16 @@ export let updateProspectStatus = SlateTool.create(spec, {
 
     let mapped = ctx.input.prospects.map(p => ({
       email: p.email,
-      interest: p.interestLevel
+      interested: p.interestLevel
     }));
 
-    await client.updateProspectInCampaign(ctx.input.campaignId, mapped);
+    let result = await client.updateProspectInCampaign(ctx.input.campaignId, mapped);
+    let results: any[] = result?.prospects ?? [];
+    let updatedCount = results.filter(p => p.id != null && p.status !== 'ERROR').length;
 
     return {
-      output: { updatedCount: ctx.input.prospects.length },
-      message: `Updated interest level for **${ctx.input.prospects.length}** prospect(s) in campaign ${ctx.input.campaignId}.`
+      output: { updatedCount, results },
+      message: `Updated interest level for **${updatedCount}** prospect(s) in campaign ${ctx.input.campaignId}.`
     };
   })
   .build();

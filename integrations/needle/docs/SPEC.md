@@ -1,63 +1,40 @@
-Now let me check the search collection and workflow-related docs for more detail on features:Now I have a comprehensive understanding of Needle (needle.app). Let me compile the specification.
+# Needle Integration
 
-# Slates Specification for Needle
-
-## Overview
-
-Needle is a knowledge management and RAG (Retrieval-Augmented Generation) platform that allows users to index documents into searchable collections and perform AI-powered semantic search across them. It supports 20+ data source connectors (Google Drive, SharePoint, Notion, Slack, etc.), handles multiple file types (PDF, Word, Excel, CSV, Markdown, etc.), and provides a RAG API for building AI-powered applications and workflow automations.
+The integration targets Needle's document collection and retrieval-augmented generation API.
 
 ## Authentication
 
-Needle uses API key authentication. An API key can be obtained from the [Settings](https://needle.app/dashboard/settings) page in the Needle dashboard.
+Use an API key from Needle Developer Settings. Requests send the key in the `x-api-key` header. The official SDK states that keys remain valid until revoked; no OAuth token refresh applies.
 
-- **Method:** API Key
-- **Header:** `x-api-key`
-- **How to obtain:** Navigate to Developer Settings in the Needle dashboard to generate an API key.
-- **Key management:** If compromised, the key can be revoked and regenerated from the settings page.
+## Tools
 
-Example header:
+| Tool | Request | Response |
+| --- | --- | --- |
+| `list_collections` | `GET /api/v1/collections` | Accessible collection IDs, names, creation times, and search query counts. |
+| `get_collection` | Collection details and `/stats` | Collection details and statistics; maps API `files` and `bytes` to the existing `count` and `size` fields. |
+| `get_collection_stats` | `GET /api/v1/collections/{id}/stats` | Indexing status, file counts, bytes, chunks, characters, and users. Unknown bytes are null. |
+| `create_collection` | `POST /api/v1/collections` | Created collection ID, name, and creation time. Optional `fileIds` and `model` are supported. |
+| `delete_collection` | `DELETE /api/v1/collections/{id}` | Confirmation after a successful response. |
+| `search_collection` | `POST https://search.needle.app/api/v1/collections/{id}/search` | Ranked passage IDs, content, and source file IDs. |
+| `list_collection_files` | `GET /api/v1/collections/{id}/files` | File metadata with optional offset and limit. |
+| `add_files_to_collection` | `POST /api/v1/collections/{id}/files` | Per-file IDs, source URLs, indexing status, and errors. |
+| `delete_files_from_collection` | `DELETE /api/v1/collections/{id}/files` | Confirmation after deletion; 1–100 file IDs. |
+| `get_file_upload_url` | `GET /api/v1/files/upload_url` | Upload/reference URL pairs; each MIME type is sent as a repeated `content_type` parameter. |
+| `get_file_download_url` | `GET /api/v1/files/{id}/download_url` | A downloadable file and the existing signed URL field. |
+| `list_connectors` | `GET /api/v1/connectors` | Connector IDs, names, types, collection assignments, and available metadata. |
+| `list_connector_files` | `GET /api/v1/connectors/{id}/files` | Source file IDs, URLs, types, ownership, sizes, hashes, and timestamps. |
 
-```
-x-api-key: your-api-key-here
-```
+File listing limits are 0–500 and offsets are non-negative whole numbers. Upload URLs expire quickly; upload immediately with a PUT and the requested Content-Type header, then use the reference URL to add the file. Download links are renewed when a downloadable file is requested again.
 
-## Features
+## Compatibility and evidence limits
 
-### Collection Management
+Existing tool keys, field types, optionality, and output meanings remain unchanged. If Needle does not report a numeric byte size, `get_collection` cannot satisfy its existing numeric `size` output and directs the caller to `get_collection_stats`. The official generic connector SDK schema does not describe `collection_id`; `list_connectors` preserves that field when supplied and reports an actionable error when it is absent. This omission does not establish that the API removed the field.
 
-Create, list, update, and delete collections, which are the primary organizational unit in Needle (equivalent to document stores). Collections hold indexed files that can be searched semantically. You can retrieve collection details and statistics such as file counts.
+Official RAG documentation has become inconsistently accessible and some pages redirect to Needle's outreach product. The official RAG SDK remains the source for collection, file, search, and connector payloads. The SDK and indexed reference do not establish current availability of the existing collection deletion endpoint or a RAG current-user endpoint. The deletion tool is retained for compatibility; no identity endpoint is invented.
 
-- Collections can be owned, edited, or viewed depending on user permissions.
+## Official sources
 
-### File Management
-
-Add files to collections by providing URLs (public or private). For private/local files, Needle provides a signed upload URL mechanism — you first request an upload URL, upload the file to it, then reference that URL when adding the file to a collection. Files can also be downloaded via signed download URLs.
-
-- Supported file types include Plain Text, Markdown, CSV, HTML, Video Transcripts, Excel Spreadsheets, PowerPoint Presentations, Word Documents, PDFs, and more.
-- OCR is supported for extracting text from images and scanned documents.
-- Charts and tables in Excel, PowerPoint, and PDF files can be processed.
-- Files managed by connectors (e.g., Google Drive sync) cannot be manually deleted.
-
-### Semantic Search
-
-Perform AI-powered semantic search across documents in a collection. Needle handles chunking, embedding, and reranking automatically to return the most relevant results for a given query.
-
-- Search is scoped to a specific collection.
-
-### Connectors
-
-Needle provides 25+ native connectors to external data sources such as Gmail, GitHub, Slack, Salesforce, Google Drive, SharePoint, and Notion. Connectors automatically sync and reindex content from these sources into collections.
-
-- Connector-managed files are automatically kept up to date.
-
-### Workflow Automation
-
-Needle offers a visual workflow builder for creating AI-powered automations. Workflows can include AI agent nodes that reason over data, use tools (collection search, internet search, web browsing), and interact with external services like Google Sheets, Airtable, and more.
-
-- Workflows support loop, wait, and conditional logic nodes.
-- An AI Agent node can call up to 40 tool-call steps per run.
-- Workflows run server-side.
-
-## Events
-
-The provider does not support events. The Needle API does not offer webhooks or event subscription mechanisms for external consumers.
+- [Official TypeScript SDK](https://github.com/needle-ai/needle-typescript/tree/704a2d3506b38cab538e4a30380383393dad14fb/src/v1)
+- [Collections reference](https://docs.needle-ai.com/docs/api-reference/collections/)
+- [Upload URL reference](https://docs.needle-ai.com/docs/api-reference/get-upload-url/)
+- [Official Python SDK](https://github.com/needle-ai/needle-python/tree/6fa1b745b8b1ac58f1c8166d883f7705ee39d7ce/needle/v1)

@@ -1,6 +1,6 @@
-import crypto from 'crypto';
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { type AuthConfig, Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -13,105 +13,43 @@ export let auth = SlateAuth.create()
   )
   .addCustomAuth({
     type: 'auth.custom',
-    name: 'API Key (HMAC)',
+    name: 'API Key',
     key: 'hmac_api_key',
-
     inputSchema: z.object({
       publicKey: z.string().describe('ForceManager API Public Key'),
       privateKey: z.string().describe('ForceManager API Private Key')
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: '',
-          publicKey: ctx.input.publicKey,
-          privateKey: ctx.input.privateKey,
-          authMethod: 'hmac' as const
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let ax = createAxios({ baseURL: 'https://api.forcemanager.com/api/v4' });
-      let timestamp = Math.floor(Date.now() / 1000).toString();
-      let signature = crypto
-        .createHash('sha1')
-        .update(timestamp + ctx.output.publicKey + ctx.output.privateKey)
-        .digest('hex');
-
-      let response = await ax.get('/users', {
-        headers: {
-          'X-FM-PublicKey': ctx.output.publicKey,
-          'X-FM-UnixTimestamp': timestamp,
-          'X-FM-Signature': signature,
-          'X-FM-API-Version': '4'
-        },
-        params: { count: 1 }
-      });
-
-      let user =
-        Array.isArray(response.data) && response.data.length > 0 ? response.data[0] : null;
-
-      return {
-        profile: {
-          id: user?.id?.toString(),
-          name: user ? `${user.name || ''} ${user.lastName || ''}`.trim() : undefined,
-          email: user?.email
-        }
-      };
+    getOutput: async ctx => ({
+      output: {
+        token: await Client.login(ctx.input.publicKey, ctx.input.privateKey),
+        publicKey: ctx.input.publicKey,
+        privateKey: ctx.input.privateKey,
+        authMethod: 'hmac' as const
+      }
+    }),
+    getProfile: async (ctx: { output: AuthConfig }) => {
+      await new Client(ctx.output).listUsers({ count: 1 });
+      return { profile: { name: 'ForceManager API connection' } };
     }
   })
   .addCustomAuth({
     type: 'auth.custom',
     name: 'Session Key',
     key: 'session_key',
-
     inputSchema: z.object({
-      publicKey: z.string().describe('ForceManager API Public Key (username)'),
-      privateKey: z.string().describe('ForceManager API Private Key (password)')
+      publicKey: z.string().describe('ForceManager API Public Key (login username)'),
+      privateKey: z.string().describe('ForceManager API Private Key (login password)')
     }),
-
-    getOutput: async ctx => {
-      let ax = createAxios({ baseURL: 'https://api.forcemanager.com/api/v4' });
-
-      let response = await ax.post('/login', {
-        username: ctx.input.publicKey,
-        password: ctx.input.privateKey
-      });
-
-      let sessionKey = response.data?.token || response.data?.sessionKey || response.data;
-
-      return {
-        output: {
-          token: typeof sessionKey === 'string' ? sessionKey : JSON.stringify(sessionKey),
-          publicKey: ctx.input.publicKey,
-          privateKey: ctx.input.privateKey,
-          authMethod: 'session_key' as const
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let ax = createAxios({ baseURL: 'https://api.forcemanager.com/api/v4' });
-
-      let response = await ax.get('/users', {
-        headers: {
-          'X-Session-Key': ctx.output.token,
-          'X-FM-API-Version': '4'
-        },
-        params: { count: 1 }
-      });
-
-      let user =
-        Array.isArray(response.data) && response.data.length > 0 ? response.data[0] : null;
-
-      return {
-        profile: {
-          id: user?.id?.toString(),
-          name: user ? `${user.name || ''} ${user.lastName || ''}`.trim() : undefined,
-          email: user?.email
-        }
-      };
+    getOutput: async ctx => ({
+      output: {
+        token: await Client.login(ctx.input.publicKey, ctx.input.privateKey),
+        publicKey: ctx.input.publicKey,
+        privateKey: ctx.input.privateKey,
+        authMethod: 'session_key' as const
+      }
+    }),
+    getProfile: async (ctx: { output: AuthConfig }) => {
+      await new Client(ctx.output).listUsers({ count: 1 });
+      return { profile: { name: 'ForceManager API connection' } };
     }
   });

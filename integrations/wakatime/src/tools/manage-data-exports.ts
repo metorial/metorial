@@ -22,7 +22,11 @@ export let manageDataExports = SlateTool.create(spec, {
         .default('daily')
         .describe(
           'Export format: "daily" for daily summaries, "heartbeats" for raw heartbeat data (only used with "create")'
-        )
+        ),
+      emailWhenFinished: z
+        .boolean()
+        .optional()
+        .describe('Whether to email when a new export completes (defaults to true)')
     })
   )
   .output(
@@ -53,50 +57,53 @@ export let manageDataExports = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
-    if (ctx.input.action === 'create') {
-      let result = await client.requestDataExport(ctx.input.exportType);
+    let created = ctx.input.action === 'create';
+    let exports = created
+      ? [
+          (await client.requestDataExport(ctx.input.exportType, ctx.input.emailWhenFinished))
+            .data
+        ]
+      : await client.getDataExports();
 
-      return {
-        output: {
-          created: true,
-          exports: result.data
-            ? [
-                {
-                  exportId: result.data.id ?? '',
-                  type: result.data.type,
-                  status: result.data.status || 'pending',
-                  percentComplete: result.data.percent_complete,
-                  downloadUrl: result.data.download_url,
-                  createdAt: result.data.created_at,
-                  expiresAt: result.data.expires_at
-                }
-              ]
-            : []
-        },
-        message: `Requested new **${ctx.input.exportType}** data export. It will be processed in the background.`
-      };
-    }
-
-    let exports = await client.getDataExports();
-
-    let mapped = (exports || []).map((e: any) => ({
+    let mapped = (exports || []).map(e => ({
       exportId: e.id ?? '',
-      type: e.type,
-      status: e.status,
-      percentComplete: e.percent_complete,
-      downloadUrl: e.download_url,
-      createdAt: e.created_at,
-      expiresAt: e.expires_at
+      type: e.type ?? undefined,
+      status: e.status ?? undefined,
+      percentComplete: e.percent_complete ?? undefined,
+      downloadUrl: e.download_url ?? undefined,
+      createdAt: e.created_at ?? undefined,
+      expiresAt: e.expires ?? undefined
     }));
+
+    let availableDownloads = 0;
+    for (let dataExport of mapped) {
+      if (!dataExport.downloadUrl || dataExport.percentComplete !== 100) continue;
+      let expiresMs = dataExport.expiresAt ? Date.parse(dataExport.expiresAt) : undefined;
+      if (expiresMs !== undefined && (!Number.isFinite(expiresMs) || expiresMs <= Date.now()))
+        continue;
+      await ctx.addAttachment({
+        type: 'url',
+        url: dataExport.downloadUrl,
+        ...(expiresMs !== undefined
+          ? {
+              refreshReference: { exportId: dataExport.exportId },
+              refreshAt: new Date(expiresMs).toISOString()
+            }
+          : {})
+      });
+      availableDownloads++;
+    }
 
     return {
       output: {
         exports: mapped,
-        created: false
+        created
       },
-      message: `Found **${mapped.length}** data export(s).`
+      message: created
+        ? `Requested new **${ctx.input.exportType}** data export. Call this tool with action "list" after processing completes to download it.`
+        : `Found **${mapped.length}** data export(s), with **${availableDownloads}** completed export(s) available for download.`
     };
   })
   .build();

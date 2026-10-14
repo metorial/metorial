@@ -28,7 +28,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let _result = await client.updateTimeEntry({
+    await client.updateTimeEntry({
       entryId: ctx.input.entryId,
       date: ctx.input.date,
       duration: ctx.input.duration,
@@ -36,7 +36,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
       endTime: ctx.input.endTime,
       note: ctx.input.note,
       taskId: ctx.input.taskId,
-      billable: ctx.input.billable !== undefined ? (ctx.input.billable ? 1 : 0) : undefined
+      billable: ctx.input.billable
     });
 
     return {

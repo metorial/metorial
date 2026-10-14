@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Aeroleads
 
-Look up LinkedIn profiles and find business email addresses for B2B lead generation. Retrieve detailed prospect information from LinkedIn URLs including names, job titles, companies, education, skills, emails, and phone numbers. Find verified business emails by providing a prospect's first name, last name, and company domain, with confidence scoring for email accuracy.
+Look up LinkedIn profiles and find business email addresses for B2B lead generation. Retrieve available prospect names, job titles, company websites, locations, education, skills, emails, and phone numbers. Find business emails by providing a prospect's first name, last name, and company domain, with verification status and confidence when supplied by AeroLeads.
+
+Authenticate with an API key from [AeroLeads account settings](https://aeroleads.com/users/settings#api_key). Lookups may consume account credits. Both tools use the endpoints documented in the [AeroLeads API guide](https://aeroleads.com/api).
 
 ## License
 

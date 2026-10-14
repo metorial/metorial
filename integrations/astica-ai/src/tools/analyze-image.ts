@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AsticaVisionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,16 +9,17 @@ export let analyzeImageTool = SlateTool.create(spec, {
   description: `Analyze an image using Astica's computer vision AI. Supports image captioning, object detection, face detection, OCR text reading, content moderation, tagging, GPT-powered descriptions, brand detection, celebrity recognition, and landmark detection.
 Provide an image via HTTPS URL or Base64-encoded string, and select which vision capabilities to apply.`,
   instructions: [
-    'Provide the image as an HTTPS URL or a Base64-encoded string (PNG or JPG only).',
+    'Provide the image as an HTTPS URL or a Base64-encoded string. PNG/JPG are supported; model 2.5 also supports BMP/JIFF.',
     'Use the visionFeatures array to select which analysis capabilities to apply.',
     'For GPT-powered descriptions, include "gpt" or "gptDetailed" in visionFeatures and optionally set gptPrompt and promptLength.',
     'For custom object detection, include "customObjects" in visionFeatures and provide customObjectKeywords.'
   ],
   constraints: [
-    'Only PNG and JPG image formats are supported.',
+    'PNG and JPG images are supported; model 2.5 also supports BMP and JIFF.',
     'Maximum image size is 20MB and 16000x16000 pixels.',
-    'GPT prompt must be 8-325 characters if provided.',
-    'Prompt length must be 8-250 words if provided.'
+    'GPT prompt must be 8-325 characters for model 2.5, or 8-150 for older models, if provided.',
+    'Prompt length must be 8-250 words for model 2.5, or 8-125 for older models, if provided.',
+    'Custom object keywords are limited to 245 characters and require model 2.5.'
   ],
   tags: {
     readOnly: true
@@ -159,6 +160,7 @@ Provide an image via HTTPS URL or Base64-encoded string, and select which vision
       celebrities: z.array(z.any()).optional().describe('Recognized celebrities'),
       landmarks: z.array(z.any()).optional().describe('Detected landmarks'),
       colors: z.any().optional().describe('Color analysis results'),
+      objectColors: z.any().optional().describe('Color analysis for detected objects'),
       metadata: z
         .object({
           width: z.number().optional(),
@@ -191,6 +193,54 @@ Provide an image via HTTPS URL or Base64-encoded string, and select which vision
 
     let features = ctx.input.visionFeatures || ['describe', 'tags', 'objects'];
     let visionParams = features.map(f => featureMap[f] || f).join(',');
+    let hasGpt = features.includes('gpt') || features.includes('gptDetailed');
+    let isCurrentModel = !ctx.input.modelVersion || ctx.input.modelVersion === '2.5_full';
+
+    if (ctx.input.gptPrompt) {
+      let maxLength = isCurrentModel ? 325 : 150;
+      if (
+        !hasGpt ||
+        ctx.input.gptPrompt.length < 8 ||
+        ctx.input.gptPrompt.length > maxLength
+      ) {
+        throw createApiServiceError(
+          `A GPT prompt requires gpt or gptDetailed and must contain 8-${maxLength} characters for the selected model.`
+        );
+      }
+    }
+    if (ctx.input.promptLength !== undefined) {
+      let maxWords = isCurrentModel ? 250 : 125;
+      if (
+        !hasGpt ||
+        !Number.isInteger(ctx.input.promptLength) ||
+        ctx.input.promptLength < 8 ||
+        ctx.input.promptLength > maxWords
+      ) {
+        throw createApiServiceError(
+          `promptLength requires gpt or gptDetailed and must be a whole number from 8 to ${maxWords} for the selected model.`
+        );
+      }
+    }
+    if (features.includes('customObjects') || features.includes('objectColors')) {
+      if (!isCurrentModel) {
+        throw createApiServiceError(
+          'Custom object detection and object colors require model 2.5_full.'
+        );
+      }
+    }
+    if (features.includes('customObjects') && !ctx.input.customObjectKeywords?.trim()) {
+      throw createApiServiceError(
+        'Provide customObjectKeywords when requesting customObjects.'
+      );
+    }
+    if (
+      ctx.input.customObjectKeywords &&
+      (!features.includes('customObjects') || ctx.input.customObjectKeywords.length > 245)
+    ) {
+      throw createApiServiceError(
+        'Custom object keywords require customObjects and must be at most 245 characters.'
+      );
+    }
 
     ctx.info(`Analyzing image with features: ${visionParams}`);
 
@@ -206,12 +256,27 @@ Provide an image via HTTPS URL or Base64-encoded string, and select which vision
     let output = {
       status: result.status || 'unknown',
       caption: result.caption,
-      captionList: result.caption_list,
+      captionList: result.caption_list?.map((caption: any) => ({
+        ...caption,
+        confidence: caption.confidence ?? caption.conf
+      })),
       gptDescription: result.caption_GPTS,
       tags: result.tags,
       objects: result.objects,
       customObjects: result.objects_custom,
-      faces: result.faces,
+      faces: result.faces?.map((face: any) => ({
+        ...face,
+        rectangle:
+          face.rectangle ??
+          (face.faceRectangle
+            ? {
+                x: face.faceRectangle.left,
+                y: face.faceRectangle.top,
+                w: face.faceRectangle.width,
+                h: face.faceRectangle.height
+              }
+            : undefined)
+      })),
       textRead: result.readResult,
       moderate: result.moderate,
       categories: result.categories,
@@ -219,6 +284,7 @@ Provide an image via HTTPS URL or Base64-encoded string, and select which vision
       celebrities: result.celebrities,
       landmarks: result.landmarks,
       colors: result.colors,
+      objectColors: result.colors_object,
       metadata: result.metadata
     };
 

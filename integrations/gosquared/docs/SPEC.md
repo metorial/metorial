@@ -1,4 +1,4 @@
-Now let me fetch the configuration page to get more details on API key scopes:# Slates Specification for Gosquared
+# GoSquared Integration Specification
 
 ## Overview
 
@@ -6,12 +6,14 @@ GoSquared is a web analytics and customer engagement platform that provides real
 
 ## Authentication
 
-GoSquared uses API key-based authentication. Two credentials are required for most API operations:
+GoSquared uses API key-based authentication. Most API operations require an API key and project token:
 
 - **API Key** (`api_key`): A key associated with your user account. Generated from Settings > Your Account > API Access in the GoSquared dashboard. API Keys are associated to Users, not to projects.
 - **Site Token** (`site_token`): The project token identifying the specific GoSquared project you are working with. Found under Settings > Current Project > General. It should look something like `GSN-123456-A`.
 
 Both parameters are passed as query parameters on API requests (e.g., `?api_key=YOUR_KEY&site_token=YOUR_TOKEN`).
+
+The project token is optional when creating a connection. `list_sites` discovers owned and shared projects using only the API key; `get_token_info` returns the key's granted scopes. Set a project token in the connection settings before using project-specific operations. Project operations fail with a clear setup message if no token is configured.
 
 ### API Key Scopes
 
@@ -50,6 +52,7 @@ The People API provides the data for People and powers its searching and groupin
 
 - The `/people` endpoint gives you access to all of your tracked users. You can filter and search through them as well as access them individually via their ID.
 - Retrieve all the information and data about a specific user, including their full timeline of activity, as well as all the properties stored against that user.
+- `get_person_activity` retrieves the activity feed with event-name search, event-type selection, date range, sorting, and `offset,count` pagination (up to 250 results per request).
 - Create and retrieve Smart Groups.
 - Retrieve tracked devices, event types, and custom property types.
 
@@ -59,7 +62,7 @@ You can use the Chat API to take control of the GoSquared Assistant as well as r
 
 ### Account Management (Account API)
 
-Read account related data from the Account API. Write to the Account API, such as creating new sites or adding new shared users. You can also manage blocked visitors, tagged visitors, trigger types, and webhooks programmatically.
+The integration lists owned and shared sites using the Account API's flat presentation. The provider also offers other account-management endpoints; they are not exposed as tools in this integration.
 
 ## Events
 

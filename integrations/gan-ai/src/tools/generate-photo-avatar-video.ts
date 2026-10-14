@@ -55,7 +55,7 @@ export let generatePhotoAvatarVideo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.createPhotoAvatarInference({
       photoAvatarId: ctx.input.photoAvatarId,
       title: ctx.input.title,

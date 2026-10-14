@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let sendMessageTool = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a WhatsApp message to a recipient. Supports sending plain text, images, links with rich preview, and media files (documents, PDFs, etc.).
+  description: `Submit a WhatsApp message for delivery to a recipient. Supports sending plain text, images, links with rich preview, and media files (documents, PDFs, etc.).
 Set the **messageType** to choose the content type. Text messages require the **text** field; image, link, and media messages require the **url** field and support optional preview metadata.`,
   instructions: [
     'Phone numbers must include the international country code without the + prefix (e.g., 34666123456 for Spain).',
@@ -63,23 +63,49 @@ Set the **messageType** to choose the content type. Text messages require the **
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the message was sent successfully.'),
+      success: z.boolean().describe('Whether Waboxapp accepted the message for delivery.'),
+      customMessageId: z.string().optional().describe('Tracking ID returned by Waboxapp.'),
       response: z.any().describe('Raw response from the Waboxapp API.')
     })
   )
   .handleInvocation(async ctx => {
+    if (!/^\d+$/.test(ctx.input.recipientPhone)) {
+      throw createApiServiceError(
+        'The recipient phone number must include the country code and contain digits only, without a + prefix.'
+      );
+    }
+    if (!ctx.input.customMessageId.trim()) {
+      throw createApiServiceError('A non-empty unique customMessageId is required.');
+    }
+    if (
+      ['link', 'media'].includes(ctx.input.messageType) &&
+      ctx.input.thumbnailUrl !== undefined
+    ) {
+      let thumbnail = URL.parse(ctx.input.thumbnailUrl);
+      if (!thumbnail || !['http:', 'https:'].includes(thumbnail.protocol)) {
+        throw createApiServiceError(
+          'thumbnailUrl must be a publicly accessible HTTP or HTTPS URL.'
+        );
+      }
+    }
+    if (ctx.input.messageType !== 'text' && ctx.input.url) {
+      let url = URL.parse(ctx.input.url);
+      if (!url || !['http:', 'https:'].includes(url.protocol)) {
+        throw createApiServiceError('url must be a publicly accessible HTTP or HTTPS URL.');
+      }
+    }
     let client = new Client({
       token: ctx.auth.token,
       phoneNumber: ctx.auth.phoneNumber
     });
 
-    let result: any;
+    let result: Record<string, unknown>;
     let messageType = ctx.input.messageType;
 
     switch (messageType) {
       case 'text': {
         if (!ctx.input.text) {
-          throw new Error('Text content is required for text messages.');
+          throw createApiServiceError('Text content is required for text messages.');
         }
         result = await client.sendChat({
           to: ctx.input.recipientPhone,
@@ -90,7 +116,7 @@ Set the **messageType** to choose the content type. Text messages require the **
       }
       case 'image': {
         if (!ctx.input.url) {
-          throw new Error('Image URL is required for image messages.');
+          throw createApiServiceError('Image URL is required for image messages.');
         }
         result = await client.sendImage({
           to: ctx.input.recipientPhone,
@@ -103,7 +129,7 @@ Set the **messageType** to choose the content type. Text messages require the **
       }
       case 'link': {
         if (!ctx.input.url) {
-          throw new Error('Link URL is required for link messages.');
+          throw createApiServiceError('Link URL is required for link messages.');
         }
         result = await client.sendLink({
           to: ctx.input.recipientPhone,
@@ -117,7 +143,7 @@ Set the **messageType** to choose the content type. Text messages require the **
       }
       case 'media': {
         if (!ctx.input.url) {
-          throw new Error('File URL is required for media messages.');
+          throw createApiServiceError('File URL is required for media messages.');
         }
         result = await client.sendMedia({
           to: ctx.input.recipientPhone,
@@ -134,9 +160,10 @@ Set the **messageType** to choose the content type. Text messages require the **
     return {
       output: {
         success: true,
+        customMessageId: typeof result.custom_uid === 'string' ? result.custom_uid : undefined,
         response: result
       },
-      message: `Sent **${messageType}** message to **${ctx.input.recipientPhone}** (tracking ID: ${ctx.input.customMessageId}).`
+      message: `Waboxapp accepted the **${messageType}** message for **${ctx.input.recipientPhone}** (tracking ID: ${ctx.input.customMessageId}).`
     };
   })
   .build();

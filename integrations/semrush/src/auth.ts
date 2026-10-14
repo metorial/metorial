@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -69,8 +75,14 @@ export let auth = SlateAuth.create()
       };
     },
     handleCallback: async ctx => {
-      let axios = createAxios({
-        baseURL: 'https://oauth.semrush.com'
+      let axios = createAuthenticatedAxios({
+        baseURL: 'https://oauth.semrush.com',
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Semrush OAuth',
+            reason: 'oauth_request_failed'
+          })
       });
 
       let response = await axios.post(
@@ -87,27 +99,37 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let data = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Semrush',
+        operation: 'token exchange'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...data,
           authType: 'oauth' as const
         }
       };
     },
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No refresh token is available. Reconnect with OAuth 2.0.'
+        );
       }
 
-      let axios = createAxios({
-        baseURL: 'https://oauth.semrush.com'
+      let axios = createAuthenticatedAxios({
+        baseURL: 'https://oauth.semrush.com',
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Semrush OAuth',
+            reason: 'oauth_request_failed'
+          })
       });
 
       let response = await axios.post(
@@ -123,16 +145,16 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let data = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Semrush',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
+          ...data,
           authType: 'oauth' as const
         }
       };

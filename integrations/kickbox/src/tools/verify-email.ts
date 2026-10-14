@@ -50,20 +50,24 @@ export let verifyEmail = SlateTool.create(spec, {
         .nullable()
         .describe('Suggested correction if a typo was detected in the email domain.'),
       user: z.string().describe('The local part of the email address (before the @).'),
-      domain: z.string().describe('The domain part of the email address (after the @).')
+      domain: z.string().describe('The domain part of the email address (after the @).'),
+      remainingCredits: z
+        .number()
+        .optional()
+        .describe('Remaining verification credits reported by Kickbox.'),
+      responseTimeMs: z
+        .number()
+        .optional()
+        .describe('Time Kickbox took to process the request, in milliseconds.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, sandbox: ctx.config.sandbox });
 
     let result = await client.verifyEmail({
       email: ctx.input.email,
       timeout: ctx.input.timeout
     });
-
-    if (!result.success) {
-      throw new Error(result.message || 'Email verification failed.');
-    }
 
     let output = {
       email: result.email,
@@ -76,7 +80,9 @@ export let verifyEmail = SlateTool.create(spec, {
       sendexScore: result.sendex,
       suggestedCorrection: result.did_you_mean,
       user: result.user,
-      domain: result.domain
+      domain: result.domain,
+      remainingCredits: result.remainingCredits,
+      responseTimeMs: result.responseTimeMs
     };
 
     let summaryParts = [`**${result.email}** is **${result.result}**`];

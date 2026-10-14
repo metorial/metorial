@@ -2,6 +2,8 @@ export * from './create-project';
 export * from './create-task';
 export * from './delete-project';
 export * from './delete-task';
+export * from './get-company';
+export * from './get-phase';
 export * from './get-project';
 export * from './get-task';
 export * from './list-projects';

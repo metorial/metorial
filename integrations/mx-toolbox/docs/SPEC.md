@@ -1,57 +1,26 @@
-# Slates Specification for MXToolbox
+# MXToolbox Integration
 
-## Overview
-
-MXToolbox is a network diagnostic and DNS lookup platform that provides tools for checking domain health, DNS records, blacklist status, email authentication (SPF, DKIM, DMARC, BIMI, MTA-STS), and server monitoring. It is a RESTful Web Service allowing customers to query the status of their monitors and run lookups (e.g., blocklist, SMTP, MX, etc.). It provides an API to paid and free customers that allows them to perform lookups, control and poll monitors, and check API status.
+Run DNS, email authentication, blacklist, and network diagnostics; retrieve monitor status and tags; create or delete monitors; and inspect API quotas.
 
 ## Authentication
 
-MXToolbox uses **API key** authentication.
+Use an API key from Settings > API in your MXToolbox account. The client sends the key as the plain `Authorization` value without a Bearer prefix. The canonical API base is `https://api.mxtoolbox.com/api/v1/`. Configuration has no account or resource ID fields.
 
-- MXToolbox uses API keys for authentication.
-- In order to regulate usage, you are required to request an API key. The API key is associated with your account.
-- To obtain your API key: Log in to your account, click your username in the top right corner to access the dropdown menu, click "Settings", then click the "API" tab in the main header section. Use the available API methods listed (e.g., Lookup, Monitor, Monitor Tags, Usage) as needed.
-- The API key is passed in the `Authorization` header of each request. Example: `Authorization: {your-api-key}`
-- The base URL is `https://mxtoolbox.com/api/v1/` (e.g., `https://mxtoolbox.com/api/v1/lookup/dns/{hostname}`).
-- If you think your API key has been compromised, you can click "Revoke API Key" on the API settings page. Once revoked, an API key cannot be reactivated, meaning you need to generate a new one.
-- A paid subscription is required to access the full power of the API. Free accounts can test using lookups against `example.com` only.
+## Tools
 
-## Features
+- `run_lookup` supports documented DNS and network commands, including blacklist, SMTP, HTTP, HTTPS, TCP, and TLS reporting. The legacy `aa` value maps to `aaaa`. DKIM requires a selector, either as `selector` or in the `hostname` value `domain:selector`. TCP requires `port`.
+- `list_monitors` returns monitor UIDs, status, check summaries and structured details, history URLs, and tags. Tag, command, and target name filters can be combined.
+- `get_monitor` retrieves the monitor matching a UID from `list_monitors`, returning null when the API returns no matching monitor.
+- `list_monitor_tags` retrieves tag names and UIDs for a monitor; returned names can be used to filter `list_monitors`.
+- `create_monitor` and `delete_monitor` retain their existing write requests. Monitor access depends on the subscription plan.
+- `get_usage` exposes separate DNS and network request counts and limits. The original `used`, `limit`, `remaining`, and `usagePercentage` fields are retained as combined totals. Quotas are independent and cannot be transferred between lookup types.
 
-### DNS and Email Lookups
+The public reference documents lookup, monitor retrieval, tag retrieval, and usage routes. Detailed write payloads are available through account-specific documentation; existing create/delete request shapes are preserved.
 
-Run lookups using the same engine as the MXToolbox SuperTool. Supported lookup commands include:
+## API References
 
-- **DNS** — General DNS record lookups (A, AA, DNS, TXT, PTR, MX records).
-- **Email Authentication** — SPF, DKIM (with configurable selector parameter), DMARC, BIMI, and MTA-STS lookups.
-- Each lookup takes a domain name or IP address as an argument and returns categorized results (Failed, Warnings, Passed, Timeouts) with diagnostic details.
-- Depending on your account tier (Free, Basic, or Pro), you may have different access to Local or Network lookups.
+- [Current REST API reference](https://api.mxtoolbox.com/api/api-reference)
+- [API methods](https://knowledgebase.mxtoolbox.com/home/api-methods)
+- [Authentication and account documentation access](https://knowledgebase.mxtoolbox.com/home/about-api)
 
-### Monitor Management
-
-View the current status of all subscribed monitors and perform CRUD operations. Monitors track the health of your infrastructure including blacklist status, SMTP availability, HTTP, TCP, DNS, and mail flow performance.
-
-- Query the real-time status of existing monitors.
-- Create, update, and delete monitors programmatically.
-- Quickwatch enables you to set a short-term (1 to 3 day) monitor that automatically expires. During that time if the monitor detects a change, it alerts you.
-
-### Monitor Tag Management
-
-Tag management and CRUD operations for tags of a given monitor. Tags allow you to organize and group monitors (similar to labels or folders) for filtering and notification management.
-
-### API Usage Tracking
-
-Query the number of consumed and maximum allowed API requests to monitor your API consumption against your plan limits.
-
-## Events
-
-MXToolbox supports **Callback Hooks** for monitor-based notifications. Customers can utilize Callback Hooks to connect to their network monitoring servers. When one of their customers is blacklisted, the monitors call their systems, where they connect it to their customer's account.
-
-### Monitor Status Changes
-
-Callback hooks fire when a monitored resource changes status (e.g., a server gets blacklisted, an SMTP server goes down, a DNS record changes).
-
-- Can be configured per monitor to call an external URL when an alert condition is triggered.
-- Supports blacklist alerts, server up/down notifications, DNS change detection, and mail flow issues.
-
-**Note:** Detailed documentation on configuring callback hooks is limited in MXToolbox's public documentation. The feature is referenced in blog posts and customer examples but may require contacting MXToolbox support for setup assistance.
+Monitor access and network lookups depend on the API plan. The `example.com` domain is available for testing. Quota and rate errors are reported as API failures. No account/profile endpoint is documented in the public reference.

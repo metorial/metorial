@@ -27,15 +27,11 @@ export let addIssueRelationTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.addIssueRelation({
+    await client.addIssueRelation({
       sourceIssueId: ctx.input.sourceIssueId,
       destinationIssueId: ctx.input.destinationIssueId,
       relationType: ctx.input.relationType
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to add issue relation');
-    }
 
     return {
       output: { success: true },
@@ -67,15 +63,11 @@ export let removeIssueRelationTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.removeIssueRelation({
+    await client.removeIssueRelation({
       sourceIssueId: ctx.input.sourceIssueId,
       destinationIssueId: ctx.input.destinationIssueId,
       relationType: ctx.input.relationType
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to remove issue relation');
-    }
 
     return {
       output: { success: true },

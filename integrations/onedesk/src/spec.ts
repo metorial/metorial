@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'onedesk',
   name: 'OneDesk',
   description:
-    'A combined help desk and project management platform. Create and manage tickets, tasks, projects, timesheets, invoices, users, and conversations.',
+    'A combined help desk and project management platform. Create, update, and search tickets, tasks, and projects; post conversation messages; create users; and discover organization settings, users, and teams.',
   metadata: {},
   config,
   auth

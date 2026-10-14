@@ -8,7 +8,8 @@ import {
   getCallerId,
   getCallerPicture,
   getPortingHistory,
-  lookupPhoneNumber
+  lookupPhoneNumber,
+  verifyIdentity
 } from './tools';
 
 export let provider = Slate.create({
@@ -21,7 +22,8 @@ export let provider = Slate.create({
     getPortingHistory,
     assessPortFraudRisk,
     checkOnlinePresence,
-    getAccountInfo
+    getAccountInfo,
+    verifyIdentity
   ],
   triggers: []
 });

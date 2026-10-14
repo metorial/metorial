@@ -6,11 +6,14 @@ import {
   createProject,
   createTask,
   createTasksFromTemplate,
+  getTask,
   listClients,
   listDeals,
   listProjects,
+  listTaskStatuses,
   listTasks,
-  listTaskTemplates
+  listTaskTemplates,
+  listTeamMembers
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     listProjects,
     listTasks,
     listDeals,
-    listTaskTemplates
+    listTaskTemplates,
+    getTask,
+    listTaskStatuses,
+    listTeamMembers
   ],
   triggers: []
 });

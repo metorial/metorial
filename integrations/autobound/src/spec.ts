@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'autobound',
   name: 'Autobound',
-  description: undefined,
+  description:
+    'Generate personalized sales content and retrieve company and contact buying signals.',
   metadata: {},
   config,
   auth

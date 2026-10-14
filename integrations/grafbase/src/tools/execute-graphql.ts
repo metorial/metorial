@@ -34,7 +34,7 @@ The Grafbase API has introspection enabled, so you can use this to explore the s
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let result = await client.executeGraphQL(ctx.input.query, ctx.input.variables);

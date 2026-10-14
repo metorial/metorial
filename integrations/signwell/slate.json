@@ -1,17 +1,15 @@
 {
   "name": "@metorial/signwell",
-  "description": "Create, send, and manage electronic signature documents. Upload files, define signature fields, configure multi-signer workflows, and send documents for legally binding e-signatures. Create reusable templates with pre-defined fields and generate documents from them with dynamic recipient data. Support embedded signing experiences within third-party websites via iFrame. Bulk send template-based documents to many recipients using CSV data. Manage document lifecycle including sending reminders, updating recipients, downloading signed PDFs, and tracking status. Configure webhooks for real-time notifications on document events such as created, sent, viewed, signed, completed, declined, and expired.",
+  "description": "Create and send electronic signature documents, manage reusable templates, inspect signing status and recipients, send reminders, update recipient details, and download completed signed PDFs. Supports drafts, ordered signing, text tags, and embedded signing URLs.",
   "categories": ["document-processing", "legal-and-compliance"],
   "skills": [
     "create signature documents",
     "send documents for signing",
     "manage document templates",
     "embed signing experience",
-    "bulk send documents",
     "download signed PDFs",
     "track document status",
     "send signing reminders",
-    "manage webhooks",
     "configure signing workflows"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/ascora",
-  "description": "Manage field service jobs, customers, quotes, invoices, and payments for trade businesses. Submit enquiries with contact details and custom fields, retrieve customer records, pull quotation and inventory data, and integrate with accounting systems. Retrieve unpaid invoices and payments, then mark them as processed once pushed to external accounting packages. Supports the full job lifecycle from enquiry through quoting, job management, and invoicing.",
+  "description": "Search and retrieve customers and jobs, submit enquiries with contact details and custom fields, and retrieve invoices and payments for accounting synchronisation. Mark invoices and payments as sent after successfully processing them in an external accounting system.",
   "categories": [
     "crm-and-sales-tools",
     "financial-data-and-stock-market",
@@ -9,13 +9,13 @@
   "skills": [
     "submit service enquiries",
     "retrieve customer details",
-    "pull quotation data",
-    "retrieve inventory details",
+    "search jobs",
+    "retrieve job details",
     "retrieve invoices",
     "mark invoices as processed",
     "retrieve payments",
     "mark payments as processed",
-    "manage custom fields"
+    "submit enquiry custom fields"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/ascora.png"
 }

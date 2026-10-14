@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClearoutClient } from '../lib/client';
 import { spec } from '../spec';
@@ -76,18 +76,19 @@ export let reverseLookup = SlateTool.create(spec, {
     switch (ctx.input.lookupType) {
       case 'linkedin': {
         if (!ctx.input.linkedinUrl)
-          throw new Error('linkedinUrl is required for LinkedIn lookup');
+          throw createApiServiceError('linkedinUrl is required for LinkedIn lookup');
         result = await client.reverseLookupLinkedIn(ctx.input.linkedinUrl);
         break;
       }
       case 'email': {
         if (!ctx.input.emailAddress)
-          throw new Error('emailAddress is required for email lookup');
+          throw createApiServiceError('emailAddress is required for email lookup');
         result = await client.reverseLookupEmail(ctx.input.emailAddress);
         break;
       }
       case 'domain': {
-        if (!ctx.input.domain) throw new Error('domain is required for domain lookup');
+        if (!ctx.input.domain)
+          throw createApiServiceError('domain is required for domain lookup');
         result = await client.reverseLookupDomain(ctx.input.domain);
         break;
       }

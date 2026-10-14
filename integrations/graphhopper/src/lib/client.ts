@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://graphhopper.com/api/1';
 
@@ -7,9 +7,17 @@ export class GraphHopperClient {
   private axios;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Connect a GraphHopper API key before making requests.');
+    }
     this.token = config.token;
-    this.axios = createAxios({
-      baseURL: BASE_URL
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'GraphHopper',
+          reason: 'graphhopper_api_error'
+        })
     });
   }
 
@@ -37,6 +45,14 @@ export class GraphHopperClient {
     roundTripSeed?: number;
     customModel?: Record<string, unknown>;
   }) {
+    if (params.algorithm !== 'round_trip' && params.points.length < 2) {
+      throw createApiServiceError(
+        'Provide at least two points for a standard or alternative route.'
+      );
+    }
+    if (params.algorithm === 'round_trip' && params.points.length !== 1) {
+      throw createApiServiceError('Provide exactly one starting point for a round trip.');
+    }
     let body: Record<string, unknown> = {
       points: params.points,
       profile: params.profile,
@@ -72,12 +88,10 @@ export class GraphHopperClient {
       body['alternative_route.max_share_factor'] = params.alternativeRouteMaxShareFactor;
     }
     if (params.roundTripDistance !== undefined) {
-      body.round_trip = body.round_trip || {};
-      (body.round_trip as Record<string, unknown>).distance = params.roundTripDistance;
+      body['round_trip.distance'] = params.roundTripDistance;
     }
     if (params.roundTripSeed !== undefined) {
-      body.round_trip = body.round_trip || {};
-      (body.round_trip as Record<string, unknown>).seed = params.roundTripSeed;
+      body['round_trip.seed'] = params.roundTripSeed;
     }
 
     let response = await this.axios.post('/route', body, {
@@ -96,6 +110,17 @@ export class GraphHopperClient {
     outArrays?: string[];
     failFast?: boolean;
   }) {
+    if (params.points) {
+      if (!params.points.length || params.fromPoints || params.toPoints) {
+        throw createApiServiceError(
+          'Provide non-empty points alone, or fromPoints and toPoints together.'
+        );
+      }
+    } else if (!params.fromPoints?.length || !params.toPoints?.length) {
+      throw createApiServiceError(
+        'Provide non-empty points, or both fromPoints and toPoints.'
+      );
+    }
     let body: Record<string, unknown> = {
       profile: params.profile,
       fail_fast: params.failFast ?? false
@@ -129,6 +154,13 @@ export class GraphHopperClient {
     bounds?: string;
     osmTag?: string[];
   }) {
+    if (params.reverse ? !params.point?.trim() : !params.query?.trim()) {
+      throw createApiServiceError(
+        params.reverse
+          ? 'Provide a latitude,longitude point for reverse geocoding.'
+          : 'Provide a query for forward geocoding.'
+      );
+    }
     let queryParams: Record<string, unknown> = {
       key: this.token
     };
@@ -241,7 +273,6 @@ export class GraphHopperClient {
     if (params.relations) body.relations = params.relations;
     if (params.configuration) body.configuration = params.configuration;
 
-    // Use synchronous endpoint for simplicity; falls back to async if needed
     let response = await this.axios.post('/vrp', body, {
       params: { key: this.token }
     });
@@ -275,7 +306,10 @@ export class GraphHopperClient {
   }
 
   async getOptimizationSolution(jobId: string) {
-    let response = await this.axios.get(`/vrp/solution/${jobId}`, {
+    if (!jobId.trim()) {
+      throw createApiServiceError('Provide a GraphHopper optimization job ID.');
+    }
+    let response = await this.axios.get(`/vrp/solution/${encodeURIComponent(jobId)}`, {
       params: { key: this.token }
     });
     return response.data;
@@ -286,14 +320,27 @@ export class GraphHopperClient {
     maxAttempts: number = 60,
     intervalMs: number = 2000
   ): Promise<Record<string, unknown>> {
+    let status: string | undefined;
     for (let i = 0; i < maxAttempts; i++) {
       let result = await this.getOptimizationSolution(jobId);
+      status = typeof result.status === 'string' ? result.status : undefined;
       if (result.status === 'finished') {
         return result;
       }
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
+      if (status !== 'waiting_in_queue' && status !== 'processing') {
+        throw createApiServiceError(
+          `GraphHopper optimization job ${jobId} returned an unexpected status.`,
+          { upstreamStatus: status, reason: 'unexpected_optimization_status' }
+        );
+      }
+      if (i + 1 < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      }
     }
-    throw new Error(`Optimization job ${jobId} did not finish within the timeout period`);
+    throw createApiServiceError(
+      `Optimization job ${jobId} is still running. Use get_optimization_solution with this job ID to retrieve its result.`,
+      { upstreamStatus: status, reason: 'optimization_poll_timeout' }
+    );
   }
 
   // ─── Clustering ────────────────────────────────────────────────────

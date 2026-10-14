@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageSources = SlateTool.create(spec, {
   description: `Add, list, delete, or sync data sources that power an agent's knowledge base. Sources can include sitemaps, URLs, helpdesks, and more. Syncing refreshes the source data.`,
   instructions: [
     'Use action "list" to see all sources for an agent.',
-    'Use action "add" to add a new source — provide sourceType and sourceUrl.',
+    'Use action "add" to add a new source — provide sourceUrl; the source type is detected automatically.',
     'Use action "delete" to remove a source by its ID.',
     'Use action "sync" to trigger an immediate re-sync of a source.'
   ],
@@ -20,12 +20,25 @@ export let manageSources = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['list', 'add', 'delete', 'sync']).describe('Action to perform'),
-      projectId: z.number().describe('ID of the agent'),
-      sourceId: z.number().optional().describe('Source ID (required for delete, sync)'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
+      sourceId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Source ID (required for delete, sync)'),
       sourceType: z
         .string()
         .optional()
-        .describe('Type of source to add (e.g. "sitemap", "url", "file")'),
+        .describe('Optional source type hint; URL sources are detected automatically'),
       sourceName: z.string().optional().describe('Name for the source'),
       sourceUrl: z
         .string()
@@ -86,11 +99,13 @@ export let manageSources = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!ctx.input.sourceType) {
-        throw new Error('sourceType is required when adding a source');
+      if (!ctx.input.sourceUrl) {
+        throw createApiServiceError(
+          'sourceUrl is required when adding a URL or sitemap source'
+        );
       }
       let source = await client.addSource(projectId, {
-        sourceType: ctx.input.sourceType,
+        sourceType: ctx.input.sourceType ?? 'url',
         sourceName: ctx.input.sourceName,
         sourceUrl: ctx.input.sourceUrl,
         isOcrEnabled: ctx.input.isOcrEnabled,
@@ -109,7 +124,7 @@ export let manageSources = SlateTool.create(spec, {
     }
 
     if (!ctx.input.sourceId) {
-      throw new Error('sourceId is required for delete and sync actions');
+      throw createApiServiceError('sourceId is required for delete and sync actions');
     }
 
     if (action === 'delete') {

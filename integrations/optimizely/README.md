@@ -52,6 +52,20 @@ Create, retrieve, or list recipient lists and manage recipients in Optimizely Ca
 
 Send one or more customer events to Optimizely Data Platform (ODP). Events track customer actions and behaviors that feed into segmentation, analytics, and personalization. Also supports querying historical events for a customer.
 
+### Get Current User
+
+Retrieve the connected Experimentation, CMP, or Campaign user profile and account information.
+
+### List Environments
+
+Discover Feature Experimentation environment names and keys before managing flag rulesets.
+
+### List Experimentation Events
+
+Discover project event IDs for experiment metrics.
+
+Campaign mailing operations support Smart Campaign messages when `campaignId` is provided. CMS content operations use the current versioned API; provide `parentKey` for container listings and an explicit `version` when several versions exist. ODP connections can select the US, Europe, or APAC account region.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

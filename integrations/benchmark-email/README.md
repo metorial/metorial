@@ -1,6 +1,8 @@
-# <img src="logo.jpeg" height="20"> Benchmark Email
+# <img src="logo.svg" height="20"> Benchmark Email
 
-Create, schedule, and send email marketing campaigns. Manage contact lists by adding, updating, and removing subscribers in bulk or individually. Track campaign performance metrics including opens, clicks, bounces, and unsubscribes. Upload and manage images for use in campaigns. Create and configure signup forms, surveys, and autoresponders. Set up webhooks on contact lists to receive real-time notifications for subscribes, unsubscribes, profile updates, and cleaned addresses.
+Manage campaigns and subscribers in Benchmark Email Classic using its REST API v3 and an Admin API token. Create and update campaign content, schedule delivery, duplicate campaigns, manage contact lists and individual contacts, and read aggregate and contact-level campaign reports. Discover custom-field labels with `get_contact_list` and inspect the connected account with `who_am_i`.
+
+This connection uses `https://clientapi.benchmarkemail.com` and the `AuthToken` header. The newer Benchmark Email platform at `benchmarkemail.io` uses a separate API and API-key format.
 
 ## License
 

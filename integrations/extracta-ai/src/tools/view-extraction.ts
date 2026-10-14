@@ -36,7 +36,10 @@ export let viewExtractionTool = SlateTool.create(spec, {
           z.object({
             key: z.string(),
             description: z.string().optional(),
-            example: z.string().optional()
+            example: z.string().optional(),
+            type: z.enum(['string', 'object', 'array']).optional(),
+            properties: z.array(z.record(z.string(), z.unknown())).optional(),
+            items: z.record(z.string(), z.unknown()).optional()
           })
         )
         .optional()

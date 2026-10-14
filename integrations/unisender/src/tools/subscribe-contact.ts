@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,13 +24,17 @@ Set **doubleOptin** to \`3\` to add contacts without sending a confirmation emai
         ),
       tags: z.string().optional().describe('Comma-separated tags to assign to the contact'),
       doubleOptin: z
-        .enum(['0', '1', '3'])
+        .enum(['0', '1', '3', '4'])
         .optional()
-        .describe('0=use list default, 1=force double opt-in, 3=skip confirmation'),
+        .describe(
+          '0=send confirmation, 1=legacy confirmation value, 3=add without confirmation, 4=confirm only contacts not already active'
+        ),
       overwrite: z
         .enum(['0', '1', '2'])
         .optional()
-        .describe('0=do not overwrite, 1=overwrite fields, 2=append to lists'),
+        .describe(
+          '0=add missing fields and tags, 1=replace fields, tags and lists, 2=replace supplied fields and tags while keeping other fields'
+        ),
       requestIp: z.string().optional().describe('IP address of the subscriber'),
       requestTime: z
         .string()
@@ -48,6 +52,11 @@ Set **doubleOptin** to \`3\` to add contacts without sending a confirmation emai
       token: ctx.auth.token,
       locale: ctx.config.locale
     });
+
+    if (!ctx.input.fields.email || ctx.input.listIds.length === 0)
+      throw createApiServiceError(
+        'Provide fields.email and at least one list ID from get_lists.'
+      );
 
     let result = await client.subscribe({
       list_ids: ctx.input.listIds.join(','),

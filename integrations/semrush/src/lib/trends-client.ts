@@ -1,14 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import { parseCsvResponse } from './csv-parser';
 
 export class SemrushTrendsClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private token: string;
 
-  constructor(config: { token: string }) {
+  constructor(config: { token: string; authType: 'api_key' | 'oauth' }) {
+    if (config.authType !== 'api_key') {
+      throw createApiServiceError('Traffic Analytics reports require an API Key connection.');
+    }
     this.token = config.token;
-    this.axios = createAxios({
-      baseURL: 'https://api.semrush.com'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.semrush.com',
+      contentType: false,
+      responseType: 'text',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Semrush Trends',
+          reason: 'upstream_http_error'
+        })
     });
   }
 

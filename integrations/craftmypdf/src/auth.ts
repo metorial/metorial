@@ -14,6 +14,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
           'CraftMyPDF API key. Found in the API Integration tab of your CraftMyPDF dashboard.'
         )
@@ -21,7 +22,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let addMediaFromUrlTool = SlateTool.create(spec, {
@@ -30,7 +30,7 @@ export let addMediaFromUrlTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let result = await client.createFileMediaObjectFromUrl(
       ctx.input.fileId,
       ctx.input.url,

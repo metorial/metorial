@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listMeters = SlateTool.create(spec, {
   name: 'List Meters',
   key: 'list_meters',
-  description: `Lists meters from MaintainX, optionally filtered by asset. Meters track equipment performance metrics like runtime hours, mileage, and pressure for condition-based maintenance.`,
+  description: `Lists meters from MaintainX, optionally filtered by asset. Meters track equipment performance metrics like runtime hours, mileage, and pressure for condition-based maintenance. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,8 +15,15 @@ export let listMeters = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       assetId: z.number().optional().describe('Filter meters by asset ID'),
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -37,10 +45,7 @@ export let listMeters = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listMeters({
       assetId: ctx.input.assetId,
@@ -49,12 +54,12 @@ export let listMeters = SlateTool.create(spec, {
     });
 
     let meters = (result.meters ?? []).map((m: any) => ({
-      meterId: m.id,
-      name: m.name,
-      units: m.units,
-      assetId: m.assetId,
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt
+      meterId: m.id ?? undefined,
+      name: m.name ?? undefined,
+      units: m.unit ?? undefined,
+      assetId: m.asset?.id ?? undefined,
+      createdAt: m.createdAt ?? undefined,
+      updatedAt: m.updatedAt ?? undefined
     }));
 
     return {

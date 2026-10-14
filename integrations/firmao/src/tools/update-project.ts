@@ -34,10 +34,10 @@ export let updateProject = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.startDate) body.startDate = ctx.input.startDate;
-    if (ctx.input.endDate) body.endDate = ctx.input.endDate;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.startDate !== undefined) body.startDate = ctx.input.startDate;
+    if (ctx.input.endDate !== undefined) body.endDate = ctx.input.endDate;
     if (ctx.input.teamMemberIds)
       body.teamMembers = ctx.input.teamMemberIds.map(id => ({ id }));
     if (ctx.input.managerIds) body.managers = ctx.input.managerIds.map(id => ({ id }));

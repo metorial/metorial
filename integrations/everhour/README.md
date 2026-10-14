@@ -1,6 +1,8 @@
 # Everhour
 
-Track time against tasks and projects, manage budgets, and generate reports. Create and manage clients, projects, tasks, and custom fields. Log time records manually or use real-time timers. Track clock-in/out timecards and manage timesheet approval workflows. Record project expenses with file attachments and categorization. Create and manage invoices with tax, discount, and line item configuration, and export to Xero, QuickBooks, or FreshBooks. Plan resources with team scheduling and assignments. Manage time-off requests, allocations, and accrual balances. Generate aggregated reports by project, client, or user covering billable time, costs, profit, and expenses. Configure webhooks to receive notifications for changes to projects, tasks, time records, timers, sections, clients, and estimates.
+Track time against tasks and projects with manual time records and running timers. Discover team members, clients, projects, tasks, sections, expense categories, and time-off types. Create and update projects, tasks, clients, expenses, invoices, and resource planner assignments. Configure budgets and billing, update task estimates, change invoice status, and retrieve aggregated reports by project, client, or user. Sync projects from connected project management platforms into Everhour immediately.
+
+Connect with the API key from your [Everhour profile](https://app.everhour.com/#/account/profile). API access requires a paid Everhour plan. Requests use API version 1.2.
 
 ## License
 

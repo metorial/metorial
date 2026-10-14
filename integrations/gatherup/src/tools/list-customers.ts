@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -69,26 +69,26 @@ export let listCustomers = SlateTool.create(spec, {
 
     for (let i = 1; i <= count; i++) {
       customers.push({
-        customerId: data[`id${i}`],
-        businessId: data[`businessId${i}`],
-        firstName: data[`firstName${i}`],
-        lastName: data[`lastName${i}`],
-        email: data[`email${i}`],
-        phone: data[`phone${i}`],
-        jobId: data[`jobId${i}`],
-        customId: data[`customId${i}`],
+        customerId: readOptionalNumber(data[`id${i}`]),
+        businessId: readOptionalNumber(data[`businessId${i}`]),
+        firstName: data[`firstName${i}`] ?? undefined,
+        lastName: data[`lastName${i}`] ?? undefined,
+        email: data[`email${i}`] ?? undefined,
+        phone: data[`phone${i}`] ?? undefined,
+        jobId: data[`jobId${i}`] ?? undefined,
+        customId: data[`customId${i}`] ?? undefined,
         rating: data[`rating${i}`],
-        review: data[`review${i}`],
+        review: data[`review${i}`] ?? undefined,
         subscription: data[`subscription${i}`],
-        createdAt: data[`createdAt${i}`]
+        createdAt: data[`createdAt${i}`] ?? undefined
       });
     }
 
     return {
       output: {
         customers,
-        page: data.page ?? 1,
-        pages: data.pages ?? 1,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1,
         totalCount: count
       } as any,
       message: `Found **${count}** customer(s) (page ${data.page ?? 1} of ${data.pages ?? 1}).`

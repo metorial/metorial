@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushV4Client } from '../lib/v4-client';
 import { spec } from '../spec';
@@ -68,7 +68,7 @@ Available to all Semrush users without consuming API units. Requires OAuth 2.0 a
 
       case 'campaign_details': {
         if (!ctx.input.campaignId)
-          throw new Error('campaignId is required for campaign_details.');
+          throw createApiServiceError('campaignId is required for campaign_details.');
         let campaign = await client.getMapRankTrackerCampaign(ctx.input.campaignId);
         return {
           output: { campaign },
@@ -77,7 +77,8 @@ Available to all Semrush users without consuming API units. Requires OAuth 2.0 a
       }
 
       case 'keywords': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for keywords.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for keywords.');
         let keywords = await client.getMapRankTrackerKeywords(ctx.input.campaignId, {
           limit: ctx.input.limit,
           offset: ctx.input.offset
@@ -89,8 +90,10 @@ Available to all Semrush users without consuming API units. Requires OAuth 2.0 a
       }
 
       case 'heatmap': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for heatmap.');
-        if (!ctx.input.keywordId) throw new Error('keywordId is required for heatmap.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for heatmap.');
+        if (!ctx.input.keywordId)
+          throw createApiServiceError('keywordId is required for heatmap.');
         let heatmap = await client.getMapRankTrackerHeatmap(
           ctx.input.campaignId,
           ctx.input.keywordId
@@ -102,7 +105,8 @@ Available to all Semrush users without consuming API units. Requires OAuth 2.0 a
       }
 
       case 'competitors': {
-        if (!ctx.input.campaignId) throw new Error('campaignId is required for competitors.');
+        if (!ctx.input.campaignId)
+          throw createApiServiceError('campaignId is required for competitors.');
         let competitors = await client.getMapRankTrackerCompetitors(ctx.input.campaignId, {
           limit: ctx.input.limit,
           offset: ctx.input.offset
@@ -114,7 +118,7 @@ Available to all Semrush users without consuming API units. Requires OAuth 2.0 a
       }
 
       default:
-        throw new Error(`Unknown report type: ${ctx.input.reportType}`);
+        throw createApiServiceError(`Unknown report type: ${ctx.input.reportType}`);
     }
   })
   .build();

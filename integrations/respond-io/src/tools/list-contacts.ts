@@ -1,13 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, contactOutput, nextCursorId } from '../lib/client';
 import { spec } from '../spec';
 
 let filterConditionSchema = z.object({
   field: z
     .string()
     .describe('Contact field name to filter on (e.g. firstName, email, phone, tag)'),
-  operator: z.string().describe('Filter operator (e.g. eq, contains, starts_with)'),
+  operator: z
+    .string()
+    .describe(
+      'Respond.io filter operator, such as isEqualTo, exists, hasAnyOf, or isGreaterThan. eq and ne are also accepted.'
+    ),
+  category: z
+    .enum(['contactField', 'contactTag', 'lifecycle'])
+    .optional()
+    .describe('Filter category. Defaults to contactField, or contactTag for the tag field.'),
   value: z.any().describe('Value to compare against')
 });
 
@@ -17,7 +25,7 @@ export let listContacts = SlateTool.create(spec, {
   description: `Search and list contacts in the workspace with optional filtering. Supports AND/OR filter conditions on any contact field. Results are paginated with cursor-based navigation.`,
   instructions: [
     'Use the cursorId from a previous response to fetch the next page of results.',
-    'Filters use AND/OR conditions with field, operator, and value.'
+    'Filters use AND/OR conditions with field, operator, and value. Tag and lifecycle conditions use their matching category.'
   ],
   tags: {
     readOnly: true
@@ -25,6 +33,11 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      search: z
+        .string()
+        .optional()
+        .describe('Text to search for in contact names and identifiers'),
+      timezone: z.string().optional().describe('Timezone for date filters (default: UTC)'),
       filters: z
         .object({
           and: z.array(filterConditionSchema).optional().describe('All conditions must match'),
@@ -69,26 +82,21 @@ export let listContacts = SlateTool.create(spec, {
     let result = await client.listContacts(
       ctx.input.filters,
       ctx.input.limit,
-      ctx.input.cursorId
+      ctx.input.cursorId,
+      ctx.input.search,
+      ctx.input.timezone
     );
     let data = result?.data || result;
-    let contactsList = Array.isArray(data) ? data : data?.contacts || data?.data || [];
+    let contactsList = Array.isArray(data)
+      ? data
+      : data?.items || data?.contacts || data?.data || [];
 
-    let contacts = contactsList.map((c: any) => ({
-      contactId: String(c.id || ''),
-      firstName: c.firstName,
-      lastName: c.lastName,
-      email: c.email,
-      phone: c.phone,
-      tags: c.tags,
-      status: c.status,
-      createdAt: c.createdAt
-    }));
+    let contacts = contactsList.map(contactOutput);
 
     return {
       output: {
         contacts,
-        nextCursorId: data?.cursorId || data?.nextCursorId
+        nextCursorId: nextCursorId(data)
       },
       message: `Found **${contacts.length}** contact(s).`
     };

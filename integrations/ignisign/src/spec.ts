@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'ignisign',
   name: 'Ignisign',
   description:
-    'Electronic and digital signature platform providing legally binding signatures (eIDAS, ESIGN, UETA compliant) with support for Simple, Advanced, and Qualified signature levels, document sealing, and signature proofs.',
+    'Electronic signature platform for signature requests, signer identities, document sealing, and downloadable signature proofs.',
   metadata: {},
   config,
   auth

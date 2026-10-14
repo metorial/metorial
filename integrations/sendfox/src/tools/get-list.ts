@@ -36,8 +36,14 @@ export let getList = SlateTool.create(spec, {
         listId: list.id,
         name: list.name,
         subscribedContactsCount: list.subscribed_contacts_count,
-        averageEmailOpenPercent: list.average_email_open_percent,
-        averageEmailClickPercent: list.average_email_click_percent,
+        averageEmailOpenPercent:
+          list.average_email_open_percent == null
+            ? undefined
+            : String(list.average_email_open_percent),
+        averageEmailClickPercent:
+          list.average_email_click_percent == null
+            ? undefined
+            : String(list.average_email_click_percent),
         createdAt: list.created_at
       },
       message: `Retrieved list **${list.name}** (ID: ${list.id}, ${list.subscribed_contacts_count ?? 0} subscribers).`

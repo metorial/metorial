@@ -1,4 +1,54 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import type { FieldOptionColor } from './schemas';
+
+type PageInput = { offset?: number; limit?: number; pageToken?: string };
+type UserReference = { emailId?: string; userId?: number; role?: string };
+type UserCollection = { members?: UserReference[]; placeholders?: unknown[] };
+type TaskResponse = {
+  taskId: number;
+  taskName: string;
+  project?: { projectId?: number } | null;
+  phase?: { phaseId?: number } | null;
+  parent?: { taskId?: number } | null;
+  projectId?: number;
+  phaseId?: number;
+  parentTaskId?: number | null;
+  taskDescription?: string | null;
+  description?: string | null;
+  effortInMinutes?: number;
+  effort?: number;
+  assignees?: UserReference[] | UserCollection | null;
+  followers?: UserReference[] | UserCollection | null;
+};
+type TimeEntryResponse = {
+  timeEntryId: number;
+  project?: { projectId?: number } | null;
+  task?: { taskId?: number } | null;
+  projectId?: number;
+  taskId?: number | null;
+  minutes?: number;
+  duration?: number;
+  notes?: string | null;
+  description?: string | null;
+  date?: string;
+};
+type UserResponse = { userId: number; email?: string; emailId?: string };
+type FieldResponse = { fieldId: number; fieldOptions?: unknown[]; options?: unknown[] };
+type AllocationResponse = {
+  allocationId?: number;
+  project?: { projectId?: number } | null;
+  member?: { userId?: number } | null;
+  duration?: { hours?: number } | null;
+  projectId?: number;
+  userId?: number;
+  hours?: number;
+};
+type InvoiceResponse = { projects?: { projectId: number }[] };
 
 let BASE_URL = 'https://api.rocketlane.com/api/1.0';
 
@@ -6,25 +56,130 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('Reconnect Rocketlane with a non-empty API key.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
       headers: {
-        'api-key': config.token,
+        'api-key': config.token.trim(),
         accept: 'application/json',
         'content-type': 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Rocketlane',
+          reason: 'Rocketlane API request failed'
+        })
     });
+  }
+
+  private normalizeTask(task: TaskResponse) {
+    return {
+      ...task,
+      projectId: task.project?.projectId ?? task.projectId,
+      phaseId: task.phase?.phaseId ?? task.phaseId,
+      parentTaskId: task.parent?.taskId ?? task.parentTaskId,
+      description: task.taskDescription ?? task.description,
+      effort: task.effortInMinutes ?? task.effort,
+      assignees: Array.isArray(task.assignees)
+        ? task.assignees
+        : [...(task.assignees?.members ?? []), ...(task.assignees?.placeholders ?? [])],
+      followers: Array.isArray(task.followers)
+        ? task.followers
+        : [...(task.followers?.members ?? []), ...(task.followers?.placeholders ?? [])]
+    };
+  }
+
+  private normalizeTimeEntry(entry: TimeEntryResponse) {
+    return {
+      ...entry,
+      projectId: entry.project?.projectId ?? entry.projectId,
+      taskId: entry.task?.taskId ?? entry.taskId,
+      duration: entry.minutes ?? entry.duration,
+      description: entry.notes ?? entry.description
+    };
+  }
+
+  private async listPage(
+    path: string,
+    input: PageInput = {},
+    filters: Record<string, unknown> = {}
+  ) {
+    let offset = input.offset ?? 0;
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      throw createApiServiceError('Pagination offset must be a non-negative integer.');
+    }
+    if (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit < 1)) {
+      throw createApiServiceError('Pagination limit must be a positive integer.');
+    }
+    if (input.pageToken && offset) {
+      throw createApiServiceError('Use either pageToken or a non-zero offset, not both.');
+    }
+    let pageToken = input.pageToken;
+    let seenTokens = new Set<string>();
+    for (let page = 0; page < 100; page++) {
+      let result = (
+        await this.axios.get(path, {
+          params: pickDefined({
+            ...filters,
+            pageSize: offset ? Math.min(offset, 100) : input.limit,
+            pageToken
+          })
+        })
+      ).data;
+      if (!Array.isArray(result.data)) {
+        throw createApiServiceError(
+          `Rocketlane returned an invalid paginated response for ${path}.`
+        );
+      }
+      if (!offset) return result;
+      offset -= result.data.length;
+      if (!result.pagination?.hasMore) return { ...result, data: [] };
+      let nextToken = result.pagination.nextPageToken;
+      if (!nextToken || seenTokens.has(nextToken)) {
+        throw createApiServiceError(
+          'Rocketlane returned a missing or repeated pagination token.'
+        );
+      }
+      seenTokens.add(nextToken);
+      pageToken = nextToken;
+    }
+    throw createApiServiceError(
+      'Pagination offset exceeds 100 API pages. Use the returned pageToken to continue.'
+    );
+  }
+
+  private statusValue(status?: string) {
+    if (status === undefined) return undefined;
+    if (!/^\d+$/.test(status) || !Number.isSafeInteger(Number(status))) {
+      throw createApiServiceError(
+        'Task status must be a numeric option ID string. Call list_custom_fields for task status options.'
+      );
+    }
+    return { value: Number(status) };
+  }
+
+  private validateUsers(users?: UserReference[]) {
+    for (let user of users ?? []) {
+      if (!user.emailId && user.userId === undefined) {
+        throw createApiServiceError(
+          'Each user reference must include emailId or userId. Call list_users to discover users.'
+        );
+      }
+    }
   }
 
   // ─── Projects ────────────────────────────────────────────
 
-  async listProjects(params?: { offset?: number; limit?: number }) {
-    let res = await this.axios.get('/projects', { params });
-    return res.data;
+  async listProjects(params?: PageInput) {
+    return this.listPage('/projects', params, { includeAllFields: true });
   }
 
   async getProject(projectId: number) {
-    let res = await this.axios.get(`/projects/${projectId}`);
+    let res = await this.axios.get(`/projects/${projectId}`, {
+      params: { includeAllFields: true }
+    });
     return res.data;
   }
 
@@ -37,10 +192,40 @@ export class Client {
     projectDescription?: string;
     templateId?: number;
     visibility?: string;
-    fields?: Array<{ fieldId: number; fieldValue: any }>;
+    fields?: Array<{ fieldId: number; fieldValue: unknown }>;
     members?: Array<{ emailId?: string; userId?: number; role?: string }>;
   }) {
-    let res = await this.axios.post('/projects', data);
+    if (
+      !data.customer ||
+      (!data.customer.companyName && data.customer.companyId === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide customerCompanyId or customerCompanyName. Call list_companies to discover customers.'
+      );
+    }
+    if (!data.owner || (!data.owner.emailId && data.owner.userId === undefined)) {
+      throw createApiServiceError(
+        'Provide ownerId or ownerEmail. Call list_users to discover project owners.'
+      );
+    }
+    if (data.templateId !== undefined && !data.startDate) {
+      throw createApiServiceError('Provide startDate when applying a project template.');
+    }
+    this.validateUsers(data.members);
+    let { templateId, members, ...project } = data;
+    let res = await this.axios.post(
+      '/projects',
+      pickDefined({
+        ...project,
+        sources:
+          templateId === undefined ? undefined : [{ templateId, startDate: data.startDate }],
+        teamMembers:
+          members === undefined
+            ? undefined
+            : { members: members.map(({ role: _role, ...user }) => user) }
+      }),
+      { params: { includeAllFields: true } }
+    );
     return res.data;
   }
 
@@ -53,7 +238,7 @@ export class Client {
       projectDescription?: string;
       visibility?: string;
       owner?: { emailId?: string; userId?: number };
-      fields?: Array<{ fieldId: number; fieldValue: any }>;
+      fields?: Array<{ fieldId: number; fieldValue: unknown }>;
     }
   ) {
     let res = await this.axios.put(`/projects/${projectId}`, data);
@@ -70,34 +255,38 @@ export class Client {
     return res.data;
   }
 
-  async addProjectMembers(
-    projectId: number,
-    members: Array<{ emailId?: string; userId?: number; role?: string }>
-  ) {
-    let res = await this.axios.post(`/projects/${projectId}/members`, { members });
+  async addProjectMembers(projectId: number, members: UserReference[]) {
+    this.validateUsers(members);
+    let res = await this.axios.post(`/projects/${projectId}/add-members`, {
+      members: members.map(({ role: _role, ...user }) => user)
+    });
     return res.data;
   }
 
   async removeProjectMember(projectId: number, userId: number) {
-    let res = await this.axios.delete(`/projects/${projectId}/members/${userId}`);
+    let res = await this.axios.post(`/projects/${projectId}/remove-members`, {
+      members: [{ userId }]
+    });
     return res.data;
   }
 
   // ─── Tasks ───────────────────────────────────────────────
 
-  async listTasks(params?: {
-    projectId?: number;
-    phaseId?: number;
-    offset?: number;
-    limit?: number;
-  }) {
-    let res = await this.axios.get('/tasks', { params });
-    return res.data;
+  async listTasks(params: PageInput & { projectId?: number; phaseId?: number } = {}) {
+    let result = await this.listPage('/tasks', params, {
+      'projectId.eq': params.projectId,
+      'phaseId.eq': params.phaseId,
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((task: TaskResponse) => this.normalizeTask(task))
+    };
   }
 
   async getTask(taskId: number) {
-    let res = await this.axios.get(`/tasks/${taskId}`);
-    return res.data;
+    let res = await this.axios.get(`/tasks/${taskId}`, { params: { includeAllFields: true } });
+    return this.normalizeTask(res.data);
   }
 
   async createTask(data: {
@@ -114,10 +303,37 @@ export class Client {
     description?: string;
     status?: string;
     priority?: string;
-    fields?: Array<{ fieldId: number; fieldValue: any }>;
+    fields?: Array<{ fieldId: number; fieldValue: unknown }>;
   }) {
-    let res = await this.axios.post('/tasks', data);
-    return res.data;
+    this.validateUsers(data.assignees);
+    this.validateUsers(data.followers);
+    let {
+      projectId,
+      phaseId,
+      parentTaskId,
+      effort,
+      description,
+      status,
+      assignees,
+      followers,
+      ...task
+    } = data;
+    let res = await this.axios.post(
+      '/tasks',
+      pickDefined({
+        ...task,
+        project: { projectId },
+        phase: phaseId === undefined ? undefined : { phaseId },
+        parent: parentTaskId === undefined ? undefined : { taskId: parentTaskId },
+        effortInMinutes: effort,
+        taskDescription: description,
+        status: this.statusValue(status),
+        assignees: assignees === undefined ? undefined : { members: assignees },
+        followers: followers === undefined ? undefined : { members: followers }
+      }),
+      { params: { includeAllFields: true } }
+    );
+    return this.normalizeTask(res.data);
   }
 
   async updateTask(
@@ -134,11 +350,42 @@ export class Client {
       status?: string;
       priority?: string;
       atRisk?: boolean;
-      fields?: Array<{ fieldId: number; fieldValue: any }>;
+      fields?: Array<{ fieldId: number; fieldValue: unknown }>;
     }
   ) {
-    let res = await this.axios.put(`/tasks/${taskId}`, data);
-    return res.data;
+    this.validateUsers(data.assignees);
+    this.validateUsers(data.followers);
+    let { effort, description, status, assignees, followers, ...task } = data;
+    let current =
+      assignees !== undefined || followers !== undefined
+        ? (await this.axios.get(`/tasks/${taskId}`, { params: { includeAllFields: true } }))
+            .data
+        : undefined;
+    await this.axios.put(
+      `/tasks/${taskId}`,
+      pickDefined({
+        ...task,
+        effortInMinutes: effort,
+        taskDescription: description,
+        status: this.statusValue(status)
+      })
+    );
+    for (let [kind, desired] of [
+      ['assignees', assignees],
+      ['followers', followers]
+    ] as const) {
+      if (desired === undefined) continue;
+      let existing: UserReference[] = current?.[kind]?.members ?? [];
+      let matches = (left: UserReference, right: UserReference) =>
+        (left.userId !== undefined && left.userId === right.userId) ||
+        (left.emailId !== undefined && left.emailId === right.emailId);
+      let remove = existing.filter(user => !desired.some(other => matches(user, other)));
+      let add = desired.filter(user => !existing.some(other => matches(user, other)));
+      if (remove.length)
+        await this.axios.post(`/tasks/${taskId}/remove-${kind}`, { members: remove });
+      if (add.length) await this.axios.post(`/tasks/${taskId}/add-${kind}`, { members: add });
+    }
+    return this.getTask(taskId);
   }
 
   async deleteTask(taskId: number) {
@@ -147,19 +394,31 @@ export class Client {
   }
 
   async moveTask(taskId: number, data: { phaseId: number; position?: number }) {
-    let res = await this.axios.post(`/tasks/${taskId}/move`, data);
-    return res.data;
+    let res = await this.axios.post(
+      `/tasks/${taskId}/move-phase`,
+      pickDefined({ phase: { phaseId: data.phaseId }, position: data.position })
+    );
+    return this.normalizeTask(res.data);
   }
 
   // ─── Phases ──────────────────────────────────────────────
 
-  async listPhases(params?: { projectId?: number; offset?: number; limit?: number }) {
-    let res = await this.axios.get('/phases', { params });
-    return res.data;
+  async listPhases(params: PageInput & { projectId?: number } = {}) {
+    if (params.projectId === undefined) {
+      throw createApiServiceError(
+        'Provide projectId. Call list_projects to discover projects.'
+      );
+    }
+    return this.listPage('/phases', params, {
+      projectId: params.projectId,
+      includeAllFields: true
+    });
   }
 
   async getPhase(phaseId: number) {
-    let res = await this.axios.get(`/phases/${phaseId}`);
+    let res = await this.axios.get(`/phases/${phaseId}`, {
+      params: { includeAllFields: true }
+    });
     return res.data;
   }
 
@@ -170,7 +429,8 @@ export class Client {
     dueDate: string;
     private?: boolean;
   }) {
-    let res = await this.axios.post('/phases', data);
+    let { projectId, ...phase } = data;
+    let res = await this.axios.post('/phases', { ...phase, project: { projectId } });
     return res.data;
   }
 
@@ -194,20 +454,21 @@ export class Client {
 
   // ─── Companies ───────────────────────────────────────────
 
-  async listCompanies(params?: { offset?: number; limit?: number }) {
-    let res = await this.axios.get('/companies', { params });
-    return res.data;
+  async listCompanies(params?: PageInput) {
+    return this.listPage('/companies', params, { includeAllFields: true });
   }
 
   async getCompany(companyId: number) {
-    let res = await this.axios.get(`/companies/${companyId}`);
+    let res = await this.axios.get(`/companies/${companyId}`, {
+      params: { includeAllFields: true }
+    });
     return res.data;
   }
 
   async createCompany(data: {
     companyName: string;
     companyUrl?: string;
-    fields?: Array<{ fieldId: number; fieldValue: any }>;
+    fields?: Array<{ fieldId: number; fieldValue: unknown }>;
   }) {
     let res = await this.axios.post('/companies', data);
     return res.data;
@@ -218,7 +479,7 @@ export class Client {
     data: {
       companyName?: string;
       companyUrl?: string;
-      fields?: Array<{ fieldId: number; fieldValue: any }>;
+      fields?: Array<{ fieldId: number; fieldValue: unknown }>;
     }
   ) {
     let res = await this.axios.put(`/companies/${companyId}`, data);
@@ -227,41 +488,50 @@ export class Client {
 
   // ─── Users ───────────────────────────────────────────────
 
-  async listUsers(params?: { offset?: number; limit?: number }) {
-    let res = await this.axios.get('/users', { params });
-    return res.data;
+  async listUsers(params: PageInput & { userType?: string; emailId?: string } = {}) {
+    let result = await this.listPage('/users', params, {
+      'type.eq': params.userType,
+      'email.eq': params.emailId,
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((user: UserResponse) => ({
+        ...user,
+        emailId: user.email ?? user.emailId
+      }))
+    };
   }
 
   async getUser(userId: number) {
-    let res = await this.axios.get(`/users/${userId}`);
-    return res.data;
+    let res = await this.axios.get(`/users/${userId}`, { params: { includeAllFields: true } });
+    return { ...res.data, emailId: res.data.email ?? res.data.emailId };
   }
 
-  async getUserByEmail(emailId: string) {
-    let res = await this.axios.get('/users', { params: { emailId } });
-    return res.data;
+  async getUserByEmail(emailId: string, params?: PageInput) {
+    return this.listUsers({ ...params, emailId });
   }
 
-  async listCustomerUsers(params?: { offset?: number; limit?: number }) {
-    let res = await this.axios.get('/users/customers', { params });
-    return res.data;
+  async listCustomerUsers(params?: PageInput) {
+    return this.listUsers({ ...params, userType: 'CUSTOMER' });
   }
 
-  async listVendorUsers(params?: { offset?: number; limit?: number }) {
-    let res = await this.axios.get('/users/vendors', { params });
-    return res.data;
+  async listVendorUsers(params?: PageInput) {
+    return this.listUsers({ ...params, userType: 'TEAM_MEMBER' });
   }
 
   // ─── Time Entries ────────────────────────────────────────
 
-  async listTimeEntries(params?: {
-    projectId?: number;
-    userId?: number;
-    offset?: number;
-    limit?: number;
-  }) {
-    let res = await this.axios.get('/time-entries', { params });
-    return res.data;
+  async listTimeEntries(params: PageInput & { projectId?: number; userId?: number } = {}) {
+    let result = await this.listPage('/time-entries', params, {
+      'projectId.eq': params.projectId,
+      'user.eq': params.userId,
+      includeFields: 'notes'
+    });
+    return {
+      ...result,
+      data: result.data.map((entry: TimeEntryResponse) => this.normalizeTimeEntry(entry))
+    };
   }
 
   async getTimeEntry(timeEntryId: number) {
@@ -278,8 +548,21 @@ export class Client {
     description?: string;
     categoryId?: number;
   }) {
-    let res = await this.axios.post('/time-entries', data);
-    return res.data;
+    let { projectId, taskId, userId, duration, description, categoryId, ...entry } = data;
+    let res = await this.axios.post(
+      '/time-entries',
+      pickDefined({
+        ...entry,
+        project: taskId === undefined ? { projectId } : undefined,
+        task: taskId === undefined ? undefined : { taskId },
+        user: userId === undefined ? undefined : { userId },
+        minutes: duration,
+        notes: description,
+        category: categoryId === undefined ? undefined : { categoryId }
+      }),
+      { params: { includeAllFields: true } }
+    );
+    return this.normalizeTimeEntry(res.data);
   }
 
   async updateTimeEntry(
@@ -291,8 +574,23 @@ export class Client {
       categoryId?: number;
     }
   ) {
-    let res = await this.axios.put(`/time-entries/${timeEntryId}`, data);
-    return res.data;
+    let { duration, description, categoryId, ...entry } = data;
+    let current =
+      data.date === undefined || duration === undefined
+        ? await this.getTimeEntry(timeEntryId)
+        : undefined;
+    let res = await this.axios.put(
+      `/time-entries/${timeEntryId}`,
+      pickDefined({
+        ...entry,
+        date: entry.date ?? current?.date,
+        minutes: duration ?? current?.minutes,
+        notes: description,
+        category: categoryId === undefined ? undefined : { categoryId }
+      }),
+      { params: { includeAllFields: true } }
+    );
+    return this.normalizeTimeEntry(res.data);
   }
 
   async deleteTimeEntry(timeEntryId: number) {
@@ -300,16 +598,19 @@ export class Client {
     return res.data;
   }
 
-  async listTimeEntryCategories() {
-    let res = await this.axios.get('/time-entries/categories');
-    return res.data;
+  async listTimeEntryCategories(params?: PageInput) {
+    return this.listPage('/time-entries/categories', params);
   }
 
   // ─── Spaces & Documents ──────────────────────────────────
 
-  async listSpaces(params?: { projectId?: number; offset?: number; limit?: number }) {
-    let res = await this.axios.get('/spaces', { params });
-    return res.data;
+  async listSpaces(params: PageInput & { projectId?: number } = {}) {
+    if (params.projectId === undefined) {
+      throw createApiServiceError(
+        'Provide projectId. Call list_projects to discover projects.'
+      );
+    }
+    return this.listPage('/spaces', params, { projectId: params.projectId });
   }
 
   async getSpace(spaceId: number) {
@@ -318,7 +619,8 @@ export class Client {
   }
 
   async createSpace(data: { spaceName: string; projectId: number; description?: string }) {
-    let res = await this.axios.post('/spaces', data);
+    let { projectId, ...space } = data;
+    let res = await this.axios.post('/spaces', { ...space, project: { projectId } });
     return res.data;
   }
 
@@ -338,9 +640,17 @@ export class Client {
     return res.data;
   }
 
-  async listSpaceDocuments(spaceId: number) {
-    let res = await this.axios.get(`/spaces/${spaceId}/documents`);
-    return res.data;
+  async listSpaceDocuments(spaceId: number, projectId?: number) {
+    let project = projectId ?? (await this.getSpace(spaceId)).project?.projectId;
+    if (project === undefined)
+      throw createApiServiceError(
+        'Rocketlane did not return the project ID for this space. Provide projectId.'
+      );
+    return this.listPage(
+      '/space-documents',
+      {},
+      { projectId: project, 'spaceId.eq': spaceId }
+    );
   }
 
   // ─── Conversations & Comments ────────────────────────────
@@ -382,29 +692,77 @@ export class Client {
 
   // ─── Custom Fields ───────────────────────────────────────
 
-  async listProjectFields() {
-    let res = await this.axios.get('/fields', { params: { type: 'project' } });
-    return res.data;
+  async listProjectFields(params?: PageInput) {
+    let result = await this.listPage('/fields', params, {
+      'objectType.eq': 'PROJECT',
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((field: FieldResponse) => ({
+        ...field,
+        options: field.fieldOptions ?? field.options
+      }))
+    };
   }
 
-  async listTaskFields() {
-    let res = await this.axios.get('/fields', { params: { type: 'task' } });
-    return res.data;
+  async listTaskFields(params?: PageInput) {
+    let result = await this.listPage('/fields', params, {
+      'objectType.eq': 'TASK',
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((field: FieldResponse) => ({
+        ...field,
+        options: field.fieldOptions ?? field.options
+      }))
+    };
   }
 
-  async listCompanyFields() {
-    let res = await this.axios.get('/fields', { params: { type: 'company' } });
-    return res.data;
+  async listCompanyFields(params?: PageInput) {
+    let result = await this.listPage('/fields', params, {
+      'objectType.eq': 'COMPANY',
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((field: FieldResponse) => ({
+        ...field,
+        options: field.fieldOptions ?? field.options
+      }))
+    };
   }
 
   async createField(data: {
     fieldLabel: string;
     fieldType: string;
+    ratingScale?: 'THREE' | 'FIVE' | 'SEVEN' | 'TEN';
     entityType: string;
-    options?: Array<{ label: string; value: string }>;
+    options?: Array<{ label: string; value: string; color?: FieldOptionColor }>;
   }) {
-    let res = await this.axios.post('/fields', data);
-    return res.data;
+    let { entityType, options, fieldType, ...field } = data;
+    if (fieldType.toUpperCase() === 'RATING' && !data.ratingScale) {
+      throw createApiServiceError('Provide ratingScale when creating a RATING field.');
+    }
+    let aliases: Record<string, string> = {
+      TEXT: 'TEXT',
+      DROPDOWN: 'SINGLE_CHOICE',
+      CHECKBOX: 'YES_OR_NO'
+    };
+    let res = await this.axios.post(
+      '/fields',
+      pickDefined({
+        ...field,
+        fieldType: aliases[fieldType.toUpperCase()] ?? fieldType.toUpperCase(),
+        objectType: entityType.toUpperCase(),
+        fieldOptions: options?.map(option => ({
+          optionLabel: option.label,
+          optionColor: option.color ?? 'GRAY'
+        }))
+      })
+    );
+    return { ...res.data, entityType: res.data.objectType };
   }
 
   async updateField(
@@ -437,26 +795,54 @@ export class Client {
 
   // ─── Resource Allocations ────────────────────────────────
 
-  async listResourceAllocations(params?: {
-    projectId?: number;
-    userId?: number;
-    offset?: number;
-    limit?: number;
-  }) {
-    let res = await this.axios.get('/resource-allocations', { params });
-    return res.data;
+  async listResourceAllocations(
+    params: PageInput & {
+      projectId?: number;
+      userId?: number;
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ) {
+    if (!params.startDate || !params.endDate) {
+      throw createApiServiceError(
+        'Provide startDate and endDate in YYYY-MM-DD format for resource allocations.'
+      );
+    }
+    let result = await this.listPage('/resource-allocations', params, {
+      startDate: params.startDate,
+      endDate: params.endDate,
+      'projectId.eq': params.projectId,
+      'memberId.eq': params.userId,
+      includeAllFields: true
+    });
+    return {
+      ...result,
+      data: result.data.map((allocation: AllocationResponse) => ({
+        ...allocation,
+        projectId: allocation.project?.projectId ?? allocation.projectId,
+        userId: allocation.member?.userId ?? allocation.userId,
+        hours: allocation.duration?.hours ?? allocation.hours
+      }))
+    };
   }
 
   // ─── Financials ──────────────────────────────────────────
 
-  async searchInvoices(params?: {
-    projectId?: number;
-    status?: string;
-    offset?: number;
-    limit?: number;
-  }) {
-    let res = await this.axios.get('/invoices', { params });
-    return res.data;
+  async searchInvoices(params: PageInput & { projectId?: number; status?: string } = {}) {
+    let result = await this.listPage('/invoices', params, {
+      'status.eq': params.status,
+      includeAllFields: true
+    });
+    if (params.projectId === undefined) return result;
+    return {
+      ...result,
+      data: result.data.filter((invoice: InvoiceResponse) =>
+        invoice.projects?.some(
+          (project: { projectId: number }) => project.projectId === params.projectId
+        )
+      ),
+      pagination: { ...result.pagination, totalRecordCount: undefined }
+    };
   }
 
   async listCurrencies() {

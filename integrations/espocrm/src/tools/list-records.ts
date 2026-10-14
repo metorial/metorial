@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -33,7 +33,18 @@ export let listRecords = SlateTool.create(spec, {
       entityType: z
         .string()
         .describe('Entity type to list (e.g., Contact, Account, Lead, Opportunity, Case)'),
-      textFilter: z.string().optional().describe('Full-text search query'),
+      textFilter: z
+        .string()
+        .optional()
+        .describe("Text search query for the entity's configured text-search fields"),
+      primaryFilter: z
+        .string()
+        .optional()
+        .describe('Instance-supported primary filter, such as open for Cases'),
+      boolFilterList: z
+        .array(z.string())
+        .optional()
+        .describe('Instance-supported boolean filters, such as onlyMy or followed'),
       where: z
         .array(whereClauseSchema)
         .optional()
@@ -54,18 +65,30 @@ export let listRecords = SlateTool.create(spec, {
   .output(
     z.object({
       records: z.array(z.record(z.string(), z.any())).describe('Array of matching records'),
-      total: z.number().describe('Total number of matching records'),
+      total: z
+        .number()
+        .describe(
+          'Total number of matching records; -1 means more records exist and -2 means the last page when record counting is disabled'
+        ),
       hasMore: z.boolean().describe('Whether more records are available beyond this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let maxSize = Math.min(ctx.input.maxSize || 20, 200);
-    let offset = ctx.input.offset || 0;
+    let maxSize = ctx.input.maxSize ?? 20;
+    let offset = ctx.input.offset ?? 0;
+    if (!Number.isInteger(maxSize) || maxSize < 1 || !Number.isInteger(offset) || offset < 0) {
+      throw createApiServiceError(
+        'maxSize must be a positive integer and offset must be a non-negative integer.'
+      );
+    }
+    maxSize = Math.min(maxSize, 200);
 
     let result = await client.listRecords(ctx.input.entityType, {
       textFilter: ctx.input.textFilter,
+      primaryFilter: ctx.input.primaryFilter,
+      boolFilterList: ctx.input.boolFilterList,
       where: ctx.input.where,
       select: ctx.input.select,
       orderBy: ctx.input.orderBy,
@@ -78,7 +101,9 @@ export let listRecords = SlateTool.create(spec, {
       output: {
         records: result.list,
         total: result.total,
-        hasMore: offset + result.list.length < result.total
+        hasMore:
+          result.total === -1 ||
+          (result.total >= 0 && offset + result.list.length < result.total)
       },
       message: `Retrieved **${result.list.length}** of **${result.total}** ${ctx.input.entityType} records.`
     };

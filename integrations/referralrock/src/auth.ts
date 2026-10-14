@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -18,6 +18,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.publicKey.trim() || !ctx.input.privateKey.trim()) {
+        throw createApiServiceError(
+          'Provide both the public and private Referral Rock API keys.'
+        );
+      }
       let encoded = Buffer.from(`${ctx.input.publicKey}:${ctx.input.privateKey}`).toString(
         'base64'
       );

@@ -10,6 +10,7 @@ import {
   manageCachedDatasets,
   manageSavedQueries,
   recordEvents,
+  runMultiAnalysis,
   runQuery
 } from './tools';
 
@@ -18,6 +19,7 @@ export let provider = Slate.create({
   tools: [
     recordEvents,
     runQuery,
+    runMultiAnalysis,
     funnelAnalysis,
     extractEvents,
     manageSavedQueries,

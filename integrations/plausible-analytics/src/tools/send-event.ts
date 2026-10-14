@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let sendEvent = SlateTool.create(spec, {
   name: 'Send Event',
   key: 'send_event',
-  description: `Send a pageview or custom event to Plausible Analytics. Useful for server-side tracking, mobile apps, or environments where the JavaScript tracker cannot be used. No API key is required — authentication is based on the domain matching a registered site.`,
+  description: `Send a pageview or custom event to Plausible Analytics. Useful for server-side tracking, mobile apps, or environments where the JavaScript tracker cannot be used. The Events API requires no API key. HTTP acceptance does not guarantee recording; inspect dropped for bot-filtering rejection.`,
   instructions: [
     'Use name "pageview" for standard pageviews, or any custom string for custom events.',
     'The url must be a full URL including protocol (e.g., "https://example.com/page").',
@@ -50,12 +50,26 @@ export let sendEvent = SlateTool.create(spec, {
       ipAddress: z
         .string()
         .optional()
-        .describe('Client IP address for geolocation when sending from a server')
+        .describe(
+          'Actual visitor IP address for identification and geolocation when sending from a server; server or CDN addresses may be filtered'
+        ),
+      interactive: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether this event affects bounce detection. Defaults to true; set false for non-interactive custom events.'
+        )
     })
   )
   .output(
     z.object({
-      accepted: z.boolean().describe('Whether the event was accepted by Plausible')
+      accepted: z.boolean().describe('Whether the event was accepted by Plausible'),
+      dropped: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether Plausible explicitly reported dropping the event through bot filtering'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -71,7 +85,7 @@ export let sendEvent = SlateTool.create(spec, {
           }
         : undefined;
 
-    let status = await client.sendEvent({
+    let result = await client.sendEvent({
       domain: ctx.input.domain,
       name: ctx.input.name,
       url: ctx.input.url,
@@ -79,18 +93,22 @@ export let sendEvent = SlateTool.create(spec, {
       props: ctx.input.props,
       revenue,
       userAgent: ctx.input.userAgent,
-      ipAddress: ctx.input.ipAddress
+      ipAddress: ctx.input.ipAddress,
+      interactive: ctx.input.interactive
     });
 
-    let accepted = status === 202 || status === 200;
+    let accepted = result.status === 202 || result.status === 200;
 
     return {
       output: {
-        accepted
+        accepted,
+        dropped: result.dropped
       },
-      message: accepted
-        ? `Event **${ctx.input.name}** was accepted for **${ctx.input.domain}** at ${ctx.input.url}.`
-        : `Event **${ctx.input.name}** was not accepted (status: ${status}).`
+      message: result.dropped
+        ? `Plausible received event **${ctx.input.name}** for **${ctx.input.domain}**, but bot filtering dropped it. Verify the actual visitor IP address and User-Agent.`
+        : accepted
+          ? `Event **${ctx.input.name}** was accepted for **${ctx.input.domain}** at ${ctx.input.url}.`
+          : `Event **${ctx.input.name}** was not accepted (status: ${result.status}).`
     };
   })
   .build();

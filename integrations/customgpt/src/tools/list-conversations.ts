@@ -13,8 +13,21 @@ export let listConversations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the agent'),
-      page: z.number().optional().describe('Page number (default: 1)'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
+      page: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Page number (default: 1)'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       orderBy: z.enum(['id', 'created_at']).optional().describe('Field to sort by')
     })

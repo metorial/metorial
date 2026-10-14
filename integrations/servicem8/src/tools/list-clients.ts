@@ -49,7 +49,7 @@ export let listClients = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let companies = await client.listCompanies({ filter: ctx.input.filter });
 
     let mapped = companies.map((c: any) => ({

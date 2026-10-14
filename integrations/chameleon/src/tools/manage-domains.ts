@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChameleonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,6 +8,10 @@ let domainSchema = z.object({
   host: z.string().optional().describe('Domain hostname'),
   domain: z.string().optional().describe('Domain name'),
   enabled: z.boolean().optional().describe('Whether the domain is enabled'),
+  enabledState: z
+    .enum(['on', 'off', 'subdomain'])
+    .optional()
+    .describe('Domain authorization state'),
   urlGroupId: z.string().optional().describe('Associated environment ID'),
   installedAt: z.string().nullable().optional().describe('Installation timestamp'),
   firstSeenAt: z.string().nullable().optional().describe('First seen timestamp'),
@@ -21,8 +25,10 @@ let mapDomain = (d: Record<string, unknown>) => ({
   domainId: d.id as string,
   host: d.host as string | undefined,
   domain: d.domain as string | undefined,
-  enabled: d.enabled as boolean | undefined,
-  urlGroupId: d.url_group_id as string | undefined,
+  enabled: d.enabled === undefined ? undefined : d.enabled !== 'off' && d.enabled !== false,
+  enabledState:
+    typeof d.enabled === 'string' ? (d.enabled as 'on' | 'off' | 'subdomain') : undefined,
+  urlGroupId: (d.url_group_id ?? undefined) as string | undefined,
   installedAt: d.installed_at as string | null | undefined,
   firstSeenAt: d.first_seen_at as string | null | undefined,
   lastSeenAt: d.last_seen_at as string | null | undefined,
@@ -48,6 +54,12 @@ Domains must be approved before Chameleon content appears on them.`
       // Create params
       host: z.string().optional().describe('Hostname to approve (for create)'),
       enabled: z.boolean().optional().describe('Whether the domain is enabled'),
+      enabledState: z
+        .enum(['on', 'off', 'subdomain'])
+        .optional()
+        .describe(
+          'Authorization state. Overrides enabled when provided; subdomain also enables future subdomains.'
+        ),
       // Update params
       domainId: z.string().optional().describe('Domain ID to update'),
       urlGroupId: z.string().optional().describe('Environment ID to assign'),
@@ -74,9 +86,11 @@ Domains must be approved before Chameleon content appears on them.`
     let client = new ChameleonClient(ctx.auth.token);
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.host) throw createApiServiceError('Provide host to create a domain.');
       let result = await client.createUrl({
         host: ctx.input.host!,
-        enabled: ctx.input.enabled !== false
+        enabled: ctx.input.enabled !== false,
+        enabledState: ctx.input.enabledState
       });
       return {
         output: { domain: mapDomain(result) },
@@ -85,8 +99,11 @@ Domains must be approved before Chameleon content appears on them.`
     }
 
     if (ctx.input.action === 'update') {
+      if (!ctx.input.domainId)
+        throw createApiServiceError('Provide domainId to update a domain.');
       let result = await client.updateUrl(ctx.input.domainId!, {
         enabled: ctx.input.enabled,
+        enabledState: ctx.input.enabledState,
         urlGroupId: ctx.input.urlGroupId,
         archivedAt: ctx.input.archivedAt
       });

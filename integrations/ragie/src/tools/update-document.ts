@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -70,7 +70,7 @@ Metadata updates are applied without re-processing the document. Content updates
       updatedFields.push('content (from URL)');
     }
 
-    if (ctx.input.updateRawData) {
+    if (ctx.input.updateRawData !== undefined) {
       await client.updateDocumentRaw(ctx.input.documentId, {
         data: ctx.input.updateRawData,
         partition
@@ -79,7 +79,7 @@ Metadata updates are applied without re-processing the document. Content updates
     }
 
     if (updatedFields.length === 0) {
-      throw new Error(
+      throw createApiServiceError(
         'No update fields provided. Specify at least one of: metadata, updateUrl, or updateRawData.'
       );
     }

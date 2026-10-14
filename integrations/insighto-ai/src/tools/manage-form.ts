@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageForm = SlateTool.create(spec, {
@@ -18,6 +18,14 @@ export let manageForm = SlateTool.create(spec, {
       formId: z.string().optional().describe('Form ID (required for update/delete)'),
       name: z.string().optional().describe('Form name'),
       description: z.string().optional().describe('Form description'),
+      triggerInstructions: z
+        .string()
+        .optional()
+        .describe('Instructions describing when the assistant should collect this form'),
+      formType: z
+        .enum(['natural', 'simple'])
+        .optional()
+        .describe('Collection style. Defaults to natural when creating a form.'),
       fields: z
         .array(
           z.object({
@@ -44,16 +52,18 @@ export let manageForm = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       let result = await client.createForm({
-        name: ctx.input.name,
+        name: ctx.input.name ?? null,
         description: ctx.input.description,
+        trigger_instructions: ctx.input.triggerInstructions ?? null,
+        form_type: ctx.input.formType ?? 'natural',
         fields: ctx.input.fields,
         webhook_id: ctx.input.webhookId
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          formId: data.id,
-          name: data.name
+          formId: data.id ?? ctx.input.formId,
+          name: data.name ?? undefined
         },
         message: `Created form **${data.name || data.id}**.`
       };
@@ -63,14 +73,16 @@ export let manageForm = SlateTool.create(spec, {
       let result = await client.updateForm(ctx.input.formId!, {
         name: ctx.input.name,
         description: ctx.input.description,
+        trigger_instructions: ctx.input.triggerInstructions,
+        form_type: ctx.input.formType,
         fields: ctx.input.fields,
         webhook_id: ctx.input.webhookId
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          formId: data.id,
-          name: data.name
+          formId: data.id ?? ctx.input.formId,
+          name: data.name ?? undefined
         },
         message: `Updated form **${data.name || ctx.input.formId}**.`
       };

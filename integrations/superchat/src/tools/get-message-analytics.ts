@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getMessageAnalytics = SlateTool.create(spec, {
   name: 'Get Message Analytics',
   key: 'get_message_analytics',
-  description: `Fetch engagement analytics for one or more messages. Returns delivery and interaction metrics such as sent, received, read, and clicked timestamps.`,
+  description: `Fetch engagement analytics for up to 100 messages. Returns delivery and interaction metrics such as sent, received, read, and clicked timestamps.`,
   tags: {
     readOnly: true
   }
@@ -17,9 +17,20 @@ export let getMessageAnalytics = SlateTool.create(spec, {
         .array(z.string())
         .min(1)
         .describe('IDs of the messages to fetch analytics for'),
-      limit: z.number().optional().describe('Maximum number of results per page'),
-      after: z.string().optional().describe('Cursor for forward pagination'),
-      before: z.string().optional().describe('Cursor for backward pagination')
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy pagination option; this analytics endpoint returns all requested accessible IDs'
+        ),
+      after: z
+        .string()
+        .optional()
+        .describe('Legacy pagination option; not used by this analytics endpoint'),
+      before: z
+        .string()
+        .optional()
+        .describe('Legacy pagination option; not used by this analytics endpoint')
     })
   )
   .output(
@@ -30,11 +41,7 @@ export let getMessageAnalytics = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SuperchatClient({ token: ctx.auth.token });
 
-    let result = await client.getMessageAnalytics(ctx.input.messageIds, {
-      limit: ctx.input.limit,
-      after: ctx.input.after,
-      before: ctx.input.before
-    });
+    let result = await client.getMessageAnalytics(ctx.input.messageIds);
 
     return {
       output: {

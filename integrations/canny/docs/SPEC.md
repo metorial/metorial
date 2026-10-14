@@ -1,4 +1,4 @@
-# Slates Specification for Canny
+# Canny API Specification
 
 ## Overview
 

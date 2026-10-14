@@ -48,12 +48,20 @@ export let transcribeAudio = SlateTool.create(spec, {
       chunkDuration: z
         .number()
         .optional()
-        .describe('Duration per audio chunk in seconds (default: 3, max: 15)')
+        .describe('Duration per audio chunk in seconds (default: 3, max: 15)'),
+      wordTimestamps: z
+        .boolean()
+        .optional()
+        .describe('Return individual words with precise timestamps')
     })
   )
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       text: z.string().optional().describe('Complete transcription text'),
       chunks: z
         .array(
@@ -94,14 +102,16 @@ export let transcribeAudio = SlateTool.create(spec, {
       bySpeaker: ctx.input.bySpeaker,
       webhookUrl: ctx.input.webhookUrl,
       batchSize: ctx.input.batchSize,
-      chunkDuration: ctx.input.chunkDuration
+      chunkDuration: ctx.input.chunkDuration,
+      wordTimestamps: ctx.input.wordTimestamps
     });
 
     let isAsync = !!ctx.input.webhookUrl;
 
     return {
       output: {
-        success: result.success ?? !isAsync,
+        success: result.success,
+        rawResponse: result,
         text: result.text,
         chunks: result.chunks,
         speakers: result.speakers,

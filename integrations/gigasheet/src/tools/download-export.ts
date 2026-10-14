@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
+import { getExportDownload } from '../lib/files';
 import { spec } from '../spec';
 
 export let downloadExport = SlateTool.create(spec, {
   name: 'Download Export',
   key: 'download_export',
-  description: `Get the download URL for a completed export. Returns a pre-signed S3 URL that can be used to download the exported file (ZIP containing CSV). Also supports checking operation status before downloading.`,
+  description: `Prepare a downloadable CSV export. The export must have finished processing. Optionally checks the export status before downloading.`,
   instructions: [
     'Use this after creating an export with the Export Sheet tool.',
     'If checkStatus is true, the tool will first verify the export is ready before attempting download.'
@@ -14,13 +15,17 @@ export let downloadExport = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      sheetHandle: z.string().describe('Handle of the sheet the export belongs to'),
-      exportHandle: z.string().describe('Handle of the export to download'),
+      sheetHandle: z
+        .string()
+        .describe('Handle of the source sheet. Downloads use exportHandle.'),
+      exportHandle: z
+        .string()
+        .describe('Handle of the export to download. Discover exports with list_exports.'),
       checkStatus: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to check the operation status before downloading')
+        .describe('Whether to check that the export state is processed before downloading')
     })
   )
   .output(
@@ -32,7 +37,7 @@ export let downloadExport = SlateTool.create(spec, {
       status: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Operation status if checked'),
+        .describe('Export metadata and processing status if checked'),
       downloadResult: z.record(z.string(), z.unknown()).describe('Full download response')
     })
   )
@@ -42,14 +47,26 @@ export let downloadExport = SlateTool.create(spec, {
     let status: Record<string, unknown> | undefined;
 
     if (ctx.input.checkStatus) {
-      status = await client.getOperationStatus(ctx.input.sheetHandle);
+      status = await client.describeDataset(ctx.input.exportHandle);
+      let state = status.Status ?? status.status;
+      if (state !== 'processed')
+        throw createApiServiceError(
+          `The export is not ready for download (state: ${typeof state === 'string' ? state : 'unknown'}). Check again after processing finishes.`
+        );
     }
 
     let downloadResult = await client.downloadExport(
       ctx.input.sheetHandle,
       ctx.input.exportHandle
     );
-    let downloadUrl = typeof downloadResult?.url === 'string' ? downloadResult.url : undefined;
+    let download = getExportDownload(downloadResult);
+    let downloadUrl = download.url;
+    await ctx.addAttachment({
+      type: 'url',
+      url: download.url,
+      refreshAt: download.expiresAt,
+      refreshReference: { exportHandle: ctx.input.exportHandle }
+    });
 
     return {
       output: {

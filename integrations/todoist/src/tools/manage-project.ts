@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,9 @@ let projectOutputSchema = z.object({
   name: z.string().describe('Project name'),
   color: z.string().describe('Project color'),
   parentId: z.string().nullable().describe('Parent project ID'),
-  commentCount: z.number().describe('Number of comments'),
+  commentCount: z
+    .number()
+    .describe('Legacy comment count; current API returns 0 when unavailable'),
   isShared: z.boolean().describe('Whether project is shared'),
   isFavorite: z.boolean().describe('Whether project is favorited'),
   viewStyle: z.string().describe('View style (list, board, calendar)'),
@@ -85,6 +87,14 @@ export let updateProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let { projectId, archive, ...updateData } = ctx.input;
+    if (
+      archive !== undefined &&
+      Object.values(updateData).some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Archive or unarchive separately from changing project properties.'
+      );
+    }
 
     if (archive === true) {
       await client.archiveProject(projectId);

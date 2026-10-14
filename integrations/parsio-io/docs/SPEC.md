@@ -1,75 +1,47 @@
-Now let me get more details on the webhook events and full API:# Slates Specification for Parsio.io
-
-## Overview
-
-Parsio.io is a no-code document parsing and data extraction platform. It extracts structured data from emails, PDFs, images, and other document formats (HTML, CSV, DOCX, XLSX, XML, TXT, RTF) using template-based, OCR, and GPT-powered parsing engines. Extracted data can be exported as JSON, CSV, or Excel, or sent to external applications via webhooks and integrations.
+# Parsio.io Specification
 
 ## Authentication
 
-Parsio.io uses **API key** authentication.
+API-key authentication uses the `X-API-Key` header with the key from
+https://app.parsio.io/account. API base: `https://api.parsio.io`. Missing or malformed
+keys fail locally; upstream HTTP failures surface structured service errors.
 
-- The API key can be found in the user's account settings at `https://app.parsio.io/account`.
-- The API key must be included in the `X-API-Key` HTTP header with each request.
-- Unauthenticated responses return an HTTP 401 Unauthorized code.
-- Base URL: `https://api.parsio.io`
+## Capabilities
 
-Example:
+- Mailboxes: list, inspect settings/table fields, create, update, and delete.
+  Optional parser/model settings follow the provider's `preset`, `ml_model`,
+  `has_raw_data`, `parse_sig`, and `receive_email` parameters.
+- Documents: list/search one page, fetch extracted JSON, submit HTML/text
+  asynchronously, synchronously parse HTML/text, reprocess, and skip in bulk.
+  Existing `limit` maps to `per_page` (1–500), and the existing single `status`
+  filter is serialized as a one-element query array. Dates use `YYYY-MM-DD`.
+- Parsed data: retrieve a page of extracted records and collected email addresses.
+- Templates: list a page, inspect, enable, disable, delete, and clone existing
+  templates into another mailbox. Use list_templates on the target to discover
+  cloned template IDs.
+- Webhooks: list, inspect, create, and delete. Supported events are `doc.parsed`,
+  `doc.parsed.flat`, `doc.fail`, `doc.received`, and `table.parsed`; the last requires
+  a table ID from get_mailbox. Optional creation settings include name/enabled.
 
-```
-curl -X GET https://api.parsio.io/mailboxes/ -H "X-API-Key: <YOUR_API_KEY>"
-```
+## Parsing behavior
 
-## Features
+`submit_document` remains asynchronous at `POST /mailboxes/<id>/doc`.
+`parse_document_sync` uses `POST /mailboxes/<id>/doc-sync`. Both require non-empty
+HTML or text; HTML takes precedence, and legacy subject input supplies the name
+when a name is absent. These endpoints support template-based and GPT-powered
+parsers. AI-powered parsers and OCR converters require file upload workflows.
 
-### Mailbox Management
+The synchronous response provides doc_id, parsing_in_progress, status, metadata,
+and extracted json. Nullable metadata is omitted from optional fields. When
+parsing_in_progress is true, fetch the document later with get_document.
 
-Mailboxes are the core organizational unit in Parsio. Each mailbox has a unique email address where documents can be forwarded for parsing. You can create, update, list, and delete mailboxes. Mailbox settings include configuring the email prefix, whether to process attachments, whether to automatically collect email addresses, and alert frequency.
+## Sources
 
-### Document Submission and Parsing
+- https://help.parsio.io/public-api/parsio-public-api
+- https://help.parsio.io/public-api/parse-html-and-text-documents-using-api-1
+- https://help.parsio.io/public-api/parse-pdf-and-files-using-api-1
+- Public Postman collection linked from the API reference:
+  https://help.parsio.io/file/90921d2e-8d34-431e-8072-d43f93114c0c
 
-Submit documents for parsing in two ways:
-
-- **File upload**: Upload files (PDF, HTML, CSV, TXT, DOCX, RTF, XML) to a mailbox for parsing. Supported formats include PDF, HTML, CSV, TXT, DOCX, RTF, or XML, with a max file size of 20MB.
-- **HTML/Text submission**: Send HTML or text content directly via API, optionally including email metadata (from, to, subject). If both HTML and text are provided, HTML takes priority.
-
-You can also attach custom metadata to documents for linking with external systems. Documents can be re-parsed or skipped in bulk.
-
-### Document Retrieval
-
-List and search documents within a mailbox with filters for date range, search query, and document status (parsed, fail, skipped, new, quota, parsing, exception). Retrieve individual documents with their parsed data as JSON.
-
-### Parsed Data Retrieval
-
-Retrieve structured parsed data from a mailbox, filterable by date range. Also supports listing automatically collected email addresses from a mailbox.
-
-### Template Management
-
-Templates define the extraction rules for documents. You can list, view, enable, disable, and delete parsing templates for a mailbox. Templates can be managed in bulk (enable/disable/delete multiple at once).
-
-### Webhook Management
-
-Create and manage webhooks to receive real-time notifications when documents are processed. Webhooks can be created, updated, listed, and deleted. Each webhook is scoped to a mailbox and a specific trigger event.
-
-## Events
-
-Parsio supports **webhooks** for real-time event notifications. Webhooks are configured with a trigger event per mailbox. The following event types are available:
-
-### Document Parsed (`doc.parsed`)
-
-Fires when a document has been successfully parsed. The webhook payload contains the extracted structured data in a nested format.
-
-### Document Parsed Flat (`doc.parsed.flat`)
-
-Fires when a document has been successfully parsed. The payload contains the extracted data in a flattened (non-nested) format, which can be easier to consume for simple integrations.
-
-### Document Failed (`doc.fail`)
-
-Fires when a document fails to parse, allowing you to handle errors or trigger fallback workflows.
-
-### Document Received (`doc.received`)
-
-Fires when a new document is received in the mailbox, before any parsing occurs.
-
-### Table Parsed (`table.parsed`)
-
-Fires when tabular data within a document has been parsed. Requires specifying a `table_id` parameter to indicate which table field to listen to.
+No account/self endpoint is documented. File upload, download/export, template
+creation, and webhook callback processing are outside this package's tool coverage.

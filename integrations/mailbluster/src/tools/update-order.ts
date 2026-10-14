@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type OrderInput } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateOrder = SlateTool.create(spec, {
@@ -53,7 +53,7 @@ export let updateOrder = SlateTool.create(spec, {
 
     let { orderId, items, ...rest } = ctx.input;
 
-    let updateInput: Record<string, any> = { ...rest };
+    let updateInput: Partial<Omit<OrderInput, 'id'>> = { ...rest };
     if (items) {
       updateInput.items = items.map(item => ({
         id: item.productId,

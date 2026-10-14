@@ -40,7 +40,7 @@ export let createGoal = SlateTool.create(spec, {
         .record(z.string(), z.array(z.string()))
         .optional()
         .describe(
-          'Custom property constraints. Keys are property names, values are arrays of allowed values.'
+          'Custom property constraints. Keys are property names, values are arrays of allowed values. Plausible supports exactly one value per property.'
         )
     })
   )
@@ -72,9 +72,9 @@ export let createGoal = SlateTool.create(spec, {
       output: {
         goalId: String(result.id ?? result.goal_id),
         goalType: result.goal_type ?? ctx.input.goalType,
-        displayName: result.display_name,
-        eventName: result.event_name,
-        pagePath: result.page_path
+        displayName: result.display_name ?? undefined,
+        eventName: result.event_name ?? undefined,
+        pagePath: result.page_path ?? undefined
       },
       message: `Goal **${result.display_name || result.event_name || result.page_path}** created/found for site **${ctx.input.siteId}**.`
     };
@@ -84,7 +84,7 @@ export let createGoal = SlateTool.create(spec, {
 export let listGoals = SlateTool.create(spec, {
   name: 'List Goals',
   key: 'list_goals',
-  description: `List all conversion goals configured for a site. Returns both pageview and custom event goals. Requires a Sites API key (Enterprise plan).`,
+  description: `List all conversion goals configured for a site. Returns both pageview and custom event goals. Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }
@@ -128,9 +128,9 @@ export let listGoals = SlateTool.create(spec, {
     let goals = (result.goals ?? result ?? []).map((g: any) => ({
       goalId: String(g.id ?? g.goal_id),
       goalType: g.goal_type,
-      displayName: g.display_name,
-      eventName: g.event_name,
-      pagePath: g.page_path
+      displayName: g.display_name ?? undefined,
+      eventName: g.event_name ?? undefined,
+      pagePath: g.page_path ?? undefined
     }));
 
     return {

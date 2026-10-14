@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let formFieldValueSchema = z.object({
@@ -32,6 +33,7 @@ export let manageFormFields = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       workflowRunId: z.string().describe('ID of the workflow run'),
       action: z.enum(['list', 'update']).describe('Action to perform'),
       taskId: z
@@ -52,11 +54,14 @@ export let manageFormFields = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Fields to update (required for update action)')
+        .describe(
+          'Fields to update (required for update action; file upload fields require a separate upload API)'
+        )
     })
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       formFields: z
         .array(formFieldValueSchema)
         .optional()
@@ -71,11 +76,11 @@ export let manageFormFields = SlateTool.create(spec, {
     if (action === 'list') {
       let data: any;
       if (taskId) {
-        data = await client.listTaskFormFieldValues(workflowRunId, taskId);
+        data = await client.listTaskFormFieldValues(workflowRunId, taskId, ctx.input.cursor);
       } else {
-        data = await client.listFormFieldValues(workflowRunId);
+        data = await client.listFormFieldValues(workflowRunId, ctx.input.cursor);
       }
-      let formFields = (data.formFieldValues || []).map((f: any) => ({
+      let formFields = (data.fields || data.formFieldValues || []).map((f: any) => ({
         formFieldId: f.id,
         workflowRunId: f.workflowRunId,
         taskId: f.taskId,
@@ -85,13 +90,13 @@ export let manageFormFields = SlateTool.create(spec, {
         value: f.data
       }));
       return {
-        output: { formFields, success: true },
+        output: { formFields, nextCursor: getNextCursor(data), success: true },
         message: `Found **${formFields.length}** form field(s).`
       };
     }
 
     if (!fields || fields.length === 0) {
-      throw new Error('Fields array is required for update action');
+      throw createApiServiceError('Fields array is required for update action');
     }
 
     let updatePayload = fields.map(f => ({

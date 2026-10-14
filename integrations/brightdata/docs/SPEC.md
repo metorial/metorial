@@ -1,4 +1,4 @@
-# Slates Specification for Bright Data
+# Bright Data Integration Specification
 
 ## Overview
 

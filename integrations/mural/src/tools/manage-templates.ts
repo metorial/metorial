@@ -23,7 +23,12 @@ export let listTemplatesTool = SlateTool.create(spec, {
   .input(
     z.object({
       workspaceId: z.string().describe('ID of the workspace to list templates from'),
-      limit: z.number().optional().describe('Maximum number of templates to return'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a whole number.')
+        .min(1)
+        .optional()
+        .describe('Maximum number of templates to return'),
       nextToken: z.string().optional().describe('Pagination token from a previous request')
     })
   )
@@ -34,7 +39,7 @@ export let listTemplatesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listTemplates(ctx.input.workspaceId, {
       limit: ctx.input.limit,
       next: ctx.input.nextToken
@@ -70,7 +75,7 @@ export let createTemplateFromMuralTool = SlateTool.create(spec, {
   )
   .output(templateOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let t = await client.createTemplateFromMural(ctx.input.muralId, {
       name: ctx.input.name,
       description: ctx.input.description
@@ -98,9 +103,15 @@ export let createMuralFromTemplateTool = SlateTool.create(spec, {
   .input(
     z.object({
       templateId: z.string().describe('ID of the template to use'),
-      workspaceId: z.string().describe('ID of the workspace to create the mural in'),
-      roomId: z.string().optional().describe('ID of the room to place the mural in'),
-      title: z.string().optional().describe('Title for the new mural')
+      workspaceId: z
+        .string()
+        .optional()
+        .describe('Workspace containing the destination room; retained for compatibility'),
+      roomId: z
+        .string()
+        .optional()
+        .describe('Required destination room ID. Call list_rooms to discover room IDs.'),
+      title: z.string().optional().describe('Required title for the new mural')
     })
   )
   .output(
@@ -113,7 +124,7 @@ export let createMuralFromTemplateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let m = await client.createMuralFromTemplate(ctx.input.templateId, {
       workspaceId: ctx.input.workspaceId,
       roomId: ctx.input.roomId,
@@ -152,7 +163,7 @@ export let deleteTemplateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteTemplate(ctx.input.templateId);
 
     return {

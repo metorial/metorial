@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FormsiteClient } from '../lib/client';
+import { formDirSchema, resultSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getFormResults = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ export let getFormResults = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formDir: z.string().describe('Form directory identifier'),
+      formDir: formDirSchema,
       afterDate: z
         .string()
         .optional()
@@ -89,38 +90,7 @@ export let getFormResults = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      results: z
-        .array(
-          z.object({
-            resultId: z.string().describe('Unique result/submission identifier'),
-            dateStart: z.string().describe('When the user started filling out the form'),
-            dateFinish: z.string().describe('When the user submitted the form'),
-            dateUpdate: z.string().describe('When the result was last updated'),
-            userIp: z.string().describe('IP address of the submitter'),
-            userBrowser: z.string().describe('Browser used by the submitter'),
-            userDevice: z.string().describe('Device type used by the submitter'),
-            userReferrer: z.string().describe('Referrer URL'),
-            resultStatus: z.string().describe('Result status'),
-            loginUsername: z
-              .string()
-              .optional()
-              .describe('Save & Return username if applicable'),
-            loginEmail: z.string().optional().describe('Save & Return email if applicable'),
-            paymentStatus: z.string().optional().describe('Payment status if applicable'),
-            paymentAmount: z.string().optional().describe('Payment amount if applicable'),
-            items: z
-              .array(
-                z.object({
-                  itemId: z
-                    .string()
-                    .describe('Item/field ID matching the form item definitions'),
-                  value: z.string().describe('Submitted value for this item')
-                })
-              )
-              .describe('Submitted field values')
-          })
-        )
-        .describe('List of form submission results'),
+      results: z.array(resultSchema).describe('List of form submission results'),
       pagination: z
         .object({
           limit: z.number().describe('Results per page'),

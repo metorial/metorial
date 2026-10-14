@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -59,7 +59,7 @@ Provide a dealId to update an existing deal, or omit it to create a new one.`,
       });
     } else {
       if (!ctx.input.name) {
-        throw new Error('Deal name is required when creating a new deal.');
+        throw createApiServiceError('Deal name is required when creating a new deal.');
       }
       ctx.info(`Creating deal "${ctx.input.name}"`);
       result = await client.createDeal({

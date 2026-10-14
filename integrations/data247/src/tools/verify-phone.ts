@@ -4,12 +4,14 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let phoneResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   active: z.string().optional().describe('Whether the phone number is active'),
   confidence: z.string().optional().describe('Confidence level of the verification')
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   active: raw.active,
   confidence: raw.confidence

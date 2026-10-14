@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RadarClient } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,7 @@ export let geocodeTool = SlateTool.create(spec, {
   name: 'Geocode',
   key: 'geocode',
   description: `Convert between addresses and coordinates. Supports **forward geocoding** (address → coordinates), **reverse geocoding** (coordinates → address), and **IP geocoding** (IP → approximate location). Specify the geocoding mode and provide the appropriate input.`,
-  constraints: ['Rate limited to 10 requests per second for forward and reverse geocoding.'],
+  constraints: ['Default rate limit is 100 requests per second for geocoding.'],
   tags: {
     readOnly: true
   }
@@ -69,7 +69,8 @@ export let geocodeTool = SlateTool.create(spec, {
     let addresses: any[] = [];
 
     if (ctx.input.mode === 'forward') {
-      if (!ctx.input.query) throw new Error('Query is required for forward geocoding.');
+      if (!ctx.input.query)
+        throw createApiServiceError('Query is required for forward geocoding.');
       let result = await client.forwardGeocode({
         query: ctx.input.query,
         layers: ctx.input.layers,
@@ -79,7 +80,9 @@ export let geocodeTool = SlateTool.create(spec, {
       addresses = result.addresses || [];
     } else if (ctx.input.mode === 'reverse') {
       if (ctx.input.latitude === undefined || ctx.input.longitude === undefined) {
-        throw new Error('Latitude and longitude are required for reverse geocoding.');
+        throw createApiServiceError(
+          'Latitude and longitude are required for reverse geocoding.'
+        );
       }
       let result = await client.reverseGeocode({
         coordinates: `${ctx.input.latitude},${ctx.input.longitude}`,

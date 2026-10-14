@@ -24,6 +24,12 @@ Also supports conversation actions (close, label, assign) as part of message cre
 })
   .input(
     z.object({
+      channelType: z
+        .enum(['email', 'text', 'html'])
+        .optional()
+        .describe(
+          'Custom channel message type. Use text or html to send address values as external participant IDs.'
+        ),
       account: z.string().describe('Custom channel account ID'),
       body: z.string().describe('Message body (text or HTML depending on channel type)'),
       fromField: addressFieldSchema.describe('Sender address'),
@@ -73,17 +79,21 @@ Also supports conversation actions (close, label, assign) as part of message cre
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let mapParticipant = (field: z.infer<typeof addressFieldSchema>) =>
+      ctx.input.channelType && ctx.input.channelType !== 'email'
+        ? { id: field.address, name: field.name }
+        : field;
     let message: Record<string, any> = {
       account: ctx.input.account,
       body: ctx.input.body,
-      from_field: ctx.input.fromField,
-      to_fields: ctx.input.toFields
+      from_field: mapParticipant(ctx.input.fromField),
+      to_fields: ctx.input.toFields.map(mapParticipant)
     };
 
     if (ctx.input.subject) message.subject = ctx.input.subject;
     if (ctx.input.ccFields) message.cc_fields = ctx.input.ccFields;
     if (ctx.input.bccFields) message.bcc_fields = ctx.input.bccFields;
-    if (ctx.input.deliveredAt) message.delivered_at = ctx.input.deliveredAt;
+    if (ctx.input.deliveredAt !== undefined) message.delivered_at = ctx.input.deliveredAt;
     if (ctx.input.externalId) message.external_id = ctx.input.externalId;
     if (ctx.input.conversationId) message.conversation = ctx.input.conversationId;
     if (ctx.input.references) message.references = ctx.input.references;
@@ -112,7 +122,7 @@ Also supports conversation actions (close, label, assign) as part of message cre
     return {
       output: {
         messageId: data.messages?.id,
-        conversationId: data.conversations?.[0]?.id
+        conversationId: data.messages?.conversation ?? data.conversations?.[0]?.id
       },
       message: `Created custom channel message.`
     };

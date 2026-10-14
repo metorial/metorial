@@ -28,9 +28,12 @@ export let listSuites = SlateTool.create(spec, {
       suites: z.array(
         z.object({
           suiteId: z.string().describe('Unique identifier of the suite'),
-          name: z.string().describe('Name of the suite'),
-          created: z.string().describe('ISO timestamp when the suite was created'),
-          lastModified: z.string().describe('ISO timestamp when the suite was last modified'),
+          name: z.string().nullable().describe('Name of the suite'),
+          created: z.string().optional().describe('ISO timestamp when the suite was created'),
+          lastModified: z
+            .string()
+            .optional()
+            .describe('ISO timestamp when the suite was last modified'),
           lastRunStatus: z.string().nullable().describe('Status of the most recent run'),
           testsCount: z.number().describe('Number of tests in the suite')
         })
@@ -53,7 +56,7 @@ export let listSuites = SlateTool.create(spec, {
       name: s.name,
       created: s.created,
       lastModified: s.lastModified,
-      lastRunStatus: s.lastRunStatus,
+      lastRunStatus: s.latestRun?.status ?? s.lastRunStatus ?? null,
       testsCount: s.testsCount
     }));
 
@@ -61,7 +64,7 @@ export let listSuites = SlateTool.create(spec, {
       output: {
         totalCount: result.count,
         suites,
-        hasMore: result.next !== null
+        hasMore: Boolean(result.next)
       },
       message: `Found **${result.count}** suite(s). Returned ${suites.length} on this page.`
     };

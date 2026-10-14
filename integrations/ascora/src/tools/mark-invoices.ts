@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AscoraAccountingClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,7 @@ Use this after you have successfully processed and pushed invoices to your accou
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.username || !ctx.auth.password) {
-      throw new Error(
+      throw createApiServiceError(
         'Basic Authentication credentials (username and password) are required for the Accounting API. Please use the Basic Authentication method.'
       );
     }

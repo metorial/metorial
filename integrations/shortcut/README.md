@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/shortcut.svg" height="20"> Shortcut
 
-Create, read, update, delete, and search stories, epics, objectives, and iterations for software project management. Manage workflows, teams, labels, custom fields, and documents. Assign stories to sprints, set deadlines and estimates, track workflow state changes, manage story relationships (blockers/blocked), and add comments and checklists. Upload files, link external files, and search across all work items with rich query operators.
+Create, read, update, delete, and search stories and epics. Plan iterations, manage objectives, labels, comments, and checklists, create and edit documents, and discover workspace members, teams, workflows, and custom fields.
 
 ## Tools
 
@@ -32,9 +32,13 @@ Permanently deletes an epic by its ID. Stories within the epic are not deleted, 
 
 Permanently deletes a story by its public ID. This action cannot be undone.
 
+### Get Current Member
+
+Retrieves the authenticated member and current workspace, role, and default workflow.
+
 ### Get Document
 
-Retrieves a document by its ID, including its full content.
+Retrieves document content by UUID in Markdown (default) or HTML. Call `list_documents` to discover accessible document UUIDs.
 
 ### Get Epic
 
@@ -47,6 +51,10 @@ Retrieves full details of a story by its public ID, including description, comme
 ### List Custom Fields
 
 Lists all custom field definitions in the workspace. Custom fields allow organizing stories by Priority, Severity, Technical Area, and more. Returns field IDs and their possible values, which are needed when setting custom fields on stories.
+
+### List Documents
+
+Lists readable documents with UUIDs, titles, and Shortcut URLs.
 
 ### List Epics
 
@@ -68,6 +76,10 @@ Lists all members of the workspace. Use this to look up member UUIDs for assigni
 
 Lists all objectives (formerly milestones) in the workspace. Objectives are top-level strategic goals that epics can be linked to.
 
+### List Story Comments
+
+Lists comment IDs, authors, timestamps, URLs, and reply relationships. Use the IDs with `manage_story_comments`.
+
 ### List Teams
 
 Lists all teams (called "groups" in the API) in the workspace. Use this to look up team UUIDs for assigning stories, epics, or iterations to teams.
@@ -82,23 +94,23 @@ Create, update, or delete labels. Labels are used to organize and filter stories
 
 ### Manage Story Comments
 
-Create, update, or delete comments on a story. Use the \
+Create, update, or delete comments on a story. Provide text for create and update, and a comment ID for update and delete.
 
 ### Manage Story Tasks
 
-Create, update, or delete checklist tasks on a story. Tasks are sub-items within a story that can be individually assigned and completed. Use the \
+Create, update, or delete checklist tasks on a story. Tasks can be individually assigned and completed.
 
 ### Search Stories
 
-Searches for stories using Shortcut's query syntax. Supports operators like \
+Searches stories using Shortcut query operators and free text. Pass the returned `nextCursor` to retrieve the next page. Page size supports 1 to 250 results.
 
 ### Update Document
 
-Updates an existing document's title or content.
+Updates a document's title or content by UUID. Set `contentFormat: markdown` when writing back Markdown from `get_document`; input otherwise defaults to HTML.
 
 ### Update Epic
 
-Updates an existing epic's attributes including name, description, state, owners, teams, objectives, labels, deadlines, and archived status. Pass \
+Updates an existing epic's attributes including name, description, state, owners, teams, objectives, labels, deadlines, and archived status.
 
 ### Update Iteration
 
@@ -110,7 +122,11 @@ Updates an existing objective's name, description, state, or categories.
 
 ### Update Story
 
-Updates an existing story's attributes. You can change the name, description, type, workflow state, epic, iteration, team, owners, labels, estimate, deadline, custom fields, and archived status. Pass \
+Updates an existing story's attributes. You can change the name, description, type, workflow state, epic, iteration, team, owners, labels, estimate, deadline, custom fields, and archived status.
+
+## Document IDs
+
+Shortcut documents use UUIDs. `create_document` and `list_documents` return `documentUuid`; pass it to `get_document` or `update_document`. The legacy numeric `documentId` input remains available, but current documents require `documentUuid`. Creation timestamps are omitted when the create response does not provide one.
 
 ## License
 

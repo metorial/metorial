@@ -7,6 +7,7 @@ import {
   createBriefcase,
   createEditorExpress,
   createSignExpress,
+  downloadDocument,
   getAccountInfo,
   getAuditTrail,
   getBriefcase,
@@ -17,6 +18,7 @@ import {
   getSignExpress,
   listActiveDocuments,
   listContacts,
+  listSignedDocuments,
   removeBriefcase,
   removeContact,
   removeDocument,
@@ -54,7 +56,9 @@ export let provider = Slate.create({
     listActiveDocuments,
     calculateSignerId,
     updateTokenConfig,
-    getAuditTrail
+    getAuditTrail,
+    downloadDocument,
+    listSignedDocuments
   ],
   triggers: []
 });

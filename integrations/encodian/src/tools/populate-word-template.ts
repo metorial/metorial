@@ -38,11 +38,13 @@ Templates use Encodian's syntax supporting conditional expressions, repeating co
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded populated Word document'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let body: Record<string, any> = {
       fileContent: ctx.input.fileContent,
@@ -61,9 +63,13 @@ Templates use Encodian's syntax supporting conditional expressions, repeating co
       output: {
         fileName: result.Filename,
         fileContent: result.FileContent,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId
       },
-      message: `Successfully populated Word template. Output: **${result.Filename}**`
+      message: client.message(
+        `Successfully populated Word template. Output: **${result.Filename}**`
+      )
     };
   })
   .build();

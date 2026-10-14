@@ -2,12 +2,15 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   addFact,
+  addGraphData,
   addMessages,
   cloneGraph,
   deleteEpisode,
   exploreGraph,
   getContext,
+  getProject,
   getUserThreads,
+  listUsers,
   manageOntology,
   manageThread,
   manageUser,
@@ -28,7 +31,10 @@ export let provider = Slate.create({
     deleteEpisode,
     cloneGraph,
     setUserSummaryInstructions,
-    getUserThreads
+    getUserThreads,
+    addGraphData,
+    listUsers,
+    getProject
   ],
   triggers: []
 });

@@ -24,9 +24,7 @@ export let getJobStatus = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe(
-          'Current job status (e.g., "pending", "processing", "completed", "failed").'
-        ),
+        .describe('Current job status (waiting, active, completed, or failed).'),
       pdfUrl: z
         .string()
         .optional()
@@ -44,7 +42,11 @@ export let getJobStatus = SlateTool.create(spec, {
         .optional()
         .describe('Google Drive file ID of the saved PDF.'),
       progress: z.number().optional().describe('Processing progress percentage.'),
-      error: z.string().optional().describe('Error message if the job failed.')
+      error: z.string().optional().describe('Error message if the job failed.'),
+      signingSessionId: z
+        .string()
+        .optional()
+        .describe('Signing session ID when the completed job starts an e-signature workflow.')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,21 +54,29 @@ export let getJobStatus = SlateTool.create(spec, {
 
     let result = await client.getJobStatus(ctx.input.jobId);
 
-    let output: Record<string, unknown> = {};
+    let document = result.result ?? result;
+    let output = {
+      status: result.status ?? undefined,
+      pdfUrl: document.pdfUrl ?? undefined,
+      googleDocUrl: document.googleDocUrl ?? undefined,
+      googleDriveFolderId: document.savePdfGoogleDriveFolderId ?? undefined,
+      googleDriveFileId: document.savePdfGoogleDriveFileId ?? undefined,
+      progress: result.progress ?? undefined,
+      error: result.error ?? undefined,
+      signingSessionId: document.signingSessionId ?? undefined
+    };
 
-    if (result.status) output.status = result.status;
-    if (result.pdfUrl) output.pdfUrl = result.pdfUrl;
-    if (result.googleDocUrl) output.googleDocUrl = result.googleDocUrl;
-    if (result.savePdfGoogleDriveFolderId)
-      output.googleDriveFolderId = result.savePdfGoogleDriveFolderId;
-    if (result.savePdfGoogleDriveFileId)
-      output.googleDriveFileId = result.savePdfGoogleDriveFileId;
-    if (result.progress !== undefined) output.progress = result.progress;
-    if (result.error) output.error = result.error;
+    if (document.pdfUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: document.pdfUrl,
+        mimeType: 'application/pdf'
+      });
+    }
 
     return {
-      output: output as any,
-      message: `Job **${ctx.input.jobId}** status: **${result.status || 'unknown'}**${result.pdfUrl ? `. [Download PDF](${result.pdfUrl})` : ''}`
+      output,
+      message: `Job **${ctx.input.jobId}** status: **${result.status || 'unknown'}**${document.pdfUrl ? `. [Download PDF](${document.pdfUrl})` : ''}`
     };
   })
   .build();

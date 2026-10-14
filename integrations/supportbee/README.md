@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Supportbee
 
-Create, retrieve, search, and manage customer support tickets. Assign tickets to users or teams, add labels, archive, trash, star, and delete tickets. Post replies to customers and add internal comments for agents. Manage saved response snippets for common replies. Set up automation filters with rules and consequences to auto-label, assign, archive, or spam tickets. Retrieve agents, teams, and groups. Upload attachments to tickets. Manage forwarding email addresses. Access support performance reports.
+Create, search, and manage customer support tickets. Assign tickets to agents and teams, manage labels and ticket status, send customer replies, and add internal comments. Manage saved response snippets, discover users and forwarding addresses, inspect ticket audit history, and access support performance reports.
 
 ## License
 

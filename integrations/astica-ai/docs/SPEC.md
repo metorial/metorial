@@ -1,4 +1,4 @@
-# Slates Specification for Astica AI
+# Astica AI Integration Specification
 
 ## Overview
 
@@ -26,10 +26,11 @@ asticaVision is a general-purpose computer vision model that allows you to incor
 - **OCR / Text Reading**: Returns the results of OCR with positional coordinates.
 - **Image Moderation**: Detects adult or inappropriate content for content moderation.
 - **Tagging & Categorization**: Automatically generates descriptive tags and assigns categories to images based on visual content.
-- **GPT-powered Descriptions**: Uses vision results to create GPT or GPT-4 level detailed descriptions of images. Custom prompts and output length can be specified via `gpt_prompt` and `gpt_length` parameters.
+- **GPT-powered Descriptions**: Uses vision results to create detailed descriptions of images. Custom prompts and output length use `gpt_prompt` and `prompt_length`.
 - **Additional parameters**: color analysis, brand detection, celebrity recognition, landmark detection.
 - **Model versions**: Supports multiple model versions (1.0_full, 2.0_full, 2.1_full, 2.5_full).
-- Vision AI supports PNG and JPG file types only.
+- PNG and JPG are supported; model 2.5 additionally supports BMP and JIFF.
+- The integration maps auxiliary caption `conf` to `captionList[].confidence`, face bounding boxes to `faces[].rectangle`, and object colors to `objectColors`.
 
 ### AI Image Generation (asticaDesign)
 
@@ -37,16 +38,17 @@ The asticaDesign image generation API provides the ability to generate realistic
 
 - **Parameters**: prompt, negative prompt, quality setting (standard/high), lossless output, seed for reproducibility.
 - **Low priority mode**: Supports a low priority mode for generating larger batches of images (non-realtime).
-- Generated images are returned as URLs with temporary cloud storage.
+- Synchronous generated images are provided as downloadable files and URLs. Low-priority calls retain the provider's result URL; the public reference does not specify its polling response contract.
 
 ### Text-to-Speech (asticaVoice)
 
 The asticaVoice API allows developers to integrate natural-sounding voice outputs into their applications, offering a wide selection of voices and multilanguage support.
 
 - **Voice selection**: Choose from expressive voices, programmable voices shaped with natural-language prompts, neural voices for narration, or instant voice clones. Offers 500+ voices across multiple speaker types, plus multi-language support.
-- **Voice cloning**: Users can upload WAV audio files to create custom voice clones.
-- **Parameters**: voice ID, language/locale (e.g., `en-US`), model version.
-- **Streaming**: Supports a Streaming REST API and WebSocket API for low-latency playback with word-level timestamps.
+- **Private clones**: `list_voices` optionally includes existing private voice clones. Clone creation is not exposed by this integration.
+- **Parameters**: voice identifier, timestamps for expressive voices, persona prompt for programmable voices, and low-priority queueing for expressive voices or clones.
+- **Audio**: This integration uses non-streaming REST responses and provides downloadable WAV audio. The existing `audioBase64` output continues to contain the original audio value.
+- **Queued speech**: `text_to_speech` returns an optional `taskId`; `get_speech_task` calls `POST /api/tts/task` with `tkn` and `task_id`. Pending responses expose task state, and completed responses deliver audio from the nested `result` object. Failed or cancelled tasks raise a provider error.
 
 ### Speech-to-Text (asticaListen)
 
@@ -64,19 +66,16 @@ The developer API provides access to astica GPT-S, a powerful natural language p
 - **Parameters**: temperature, top_p, max tokens, stop sequence, instruction, think_pass, and stream_output.
 - **Low priority mode**: Offers a low priority API, allowing users to save on usage costs by sending a request and receiving the output when it becomes available at a later time.
 
-### Image Upscaling (asticaEnhance)
-
-The asticaEnhance upscaling API allows users to upscale images using AI. Billing is based on the size of the output image.
-
-### Custom Model Training
-
-The custom model training API provides a straightforward approach for training unique AI models, including vision AI and natural language processing. It provides developers with a way to generate, handle, and retrieve the dataset necessary for the training process.
-
-- Create, train, and run custom models. The API allows building customized interfaces and integrating custom model capabilities into any project.
-- Training and inference use separate endpoints (`train.astica.ai` and `detect.astica.ai`).
-- Training data can be uploaded via web interface or REST API, with storage limits based on account tier.
-- Custom model training is available for private access only and requires requesting access with an organization name and use case.
-
 ## Events
 
-The provider does not support events. Astica AI is a stateless inference API platform and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+This integration exposes no triggers. Low-priority speech task polling is an explicit tool operation.
+
+## Official API References
+
+- [Vision](https://astica.ai/vision/documentation/)
+- [Image generation](https://astica.ai/design/documentation/)
+- [Voice, private clones, speech tasks, and errors](https://astica.ai/voice/documentation/)
+- [Hearing](https://astica.ai/hearing/documentation/)
+- [Text generation](https://astica.ai/nlp/documentation/)
+
+No public account identity endpoint was found in these API references. Image and text low-priority polling contracts are incomplete in the public documentation, so this integration does not invent additional polling endpoints.

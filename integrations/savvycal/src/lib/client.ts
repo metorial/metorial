@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -23,7 +23,7 @@ export interface CreateEventParams {
   timeZone: string;
   phoneNumber?: string;
   metadata?: Record<string, string>;
-  fields?: Array<{ fieldId: string; value: string }>;
+  fields?: Array<{ fieldId: string; value: string; label?: string; type?: string }>;
 }
 
 export interface CancelEventParams {
@@ -57,15 +57,17 @@ export interface CreateWebhookParams {
 }
 
 export class Client {
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.savvycal.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SavvyCal',
+          reason: 'savvycal_api_error'
+        })
     });
   }
 
@@ -105,10 +107,24 @@ export class Client {
     if (params.phoneNumber) body.phone_number = params.phoneNumber;
     if (params.metadata) body.metadata = params.metadata;
     if (params.fields) {
-      body.fields = params.fields.map(f => ({
-        id: f.fieldId,
-        value: f.value
-      }));
+      let link = params.fields.some(f => f.label === undefined || f.type === undefined)
+        ? await this.getLink(linkId)
+        : undefined;
+      let linkFields: Array<{ id: string; label: string; type: string }> = link?.fields ?? [];
+
+      body.fields = params.fields.map(f => {
+        let definition = linkFields.find(field => field.id === f.fieldId);
+        let label = f.label ?? definition?.label;
+        let type = f.type ?? definition?.type;
+
+        if (label === undefined || type === undefined) {
+          throw createApiServiceError(
+            `Custom field ${f.fieldId} is missing its label or type. Call list_links to discover the fields configured on this scheduling link.`
+          );
+        }
+
+        return { id: f.fieldId, label, type, value: f.value };
+      });
     }
 
     let response = await this.api.post(`/links/${linkId}/events`, body);

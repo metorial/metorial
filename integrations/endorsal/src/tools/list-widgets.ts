@@ -14,7 +14,12 @@ export let listWidgets = SlateTool.create(spec, {
   .input(
     z.object({
       limit: z.number().optional().describe('Maximum number of widgets to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Positive whole-number page, starting at 1. Pagination is applied to the complete API response.'
+        )
     })
   )
   .output(

@@ -4,6 +4,8 @@ import {
   checkLinkStatusTool,
   findLinkIntersectTool,
   getAnchorTextTool,
+  getApiQuotaTool,
+  getFinalRedirectTool,
   getGlobalTopTool,
   getKeywordMetricsTool,
   getKeywordSuggestionsTool,
@@ -32,7 +34,9 @@ export let provider = Slate.create({
     getRankingKeywordsTool,
     findLinkIntersectTool,
     checkLinkStatusTool,
-    getUsageAndIndexTool
+    getUsageAndIndexTool,
+    getApiQuotaTool,
+    getFinalRedirectTool
   ],
   triggers: []
 });

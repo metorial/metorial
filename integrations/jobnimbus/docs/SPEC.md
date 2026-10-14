@@ -1,4 +1,4 @@
-# Slates Specification for JobNimbus
+# JobNimbus Integration Specification
 
 ## Overview
 
@@ -27,7 +27,7 @@ Each API key can be assigned an Access Profile, which gives the integration the 
 
 ### Contact Management
 
-Create, retrieve, update, and delete contacts. Search for contacts based on various criteria. Retrieve contact-related activities, add notes to contacts, and attach files to contacts. Contacts include fields like name, email, phone, address, status, workflow type, tags, sales rep, and custom fields.
+Create, retrieve, update, and delete contacts by marking them inactive. Search for contacts based on various criteria. Retrieve contact-related activities, add notes to contacts, and attach files to contacts. Exposed fields include name, email, phone, address, status, workflow type, tags, and sales rep.
 
 ### Job Management
 
@@ -39,11 +39,19 @@ The API provides a `/tasks` endpoint for managing tasks. Tasks can be associated
 
 ### Financial Documents
 
-The API exposes endpoints for estimates (`/estimates`) and invoices (`/invoices`). Work orders and material orders are also supported as record types, with fields like customer notes, internal notes, status, dates, and sales rep.
+The integration uses the documented `/v2/estimates` and `/v2/invoices` endpoints. Creation requires a numeric status and line items, associates contacts/jobs through `related` objects, and maps customer notes to `note`. The estimate API is labeled legacy in the provider documentation.
 
 ### Attachments / File Management
 
-The API supports creating attachments associated with contacts or jobs. Files can be uploaded with a type, filename, and description.
+The integration's `create_file` tool uploads base64 content to contacts using the documented deprecated endpoint. Its request includes numeric file type, `related` contact IDs, `subtype: "contact"`, filename, and `persist: true`.
+
+### Account Discovery
+
+`get_account_settings` retrieves workflows, statuses, task types, activity types, and lead sources from `/account/settings`. `list_users` retrieves team members and assignment IDs from `/account/users`. No dedicated current-user identity endpoint is documented in the public collection.
+
+### API References
+
+See the [official Open API guide](https://support.jobnimbus.com/how-do-i-create-an-integration-using-jobnimbuss-open-api) and its linked [public API collection](https://documenter.getpostman.com/view/3919598/S11PpG4x).
 
 ### Activities
 

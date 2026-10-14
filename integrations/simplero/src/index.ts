@@ -1,8 +1,11 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getAccountInfo,
   getCourseCompletions,
+  getRequestStatus,
   listInvoices,
+  listSegments,
   listTags,
   manageAdministrator,
   manageBroadcast,
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     manageBroadcast,
     getCourseCompletions,
     startAutomation,
-    listTags
+    listTags,
+    getAccountInfo,
+    getRequestStatus,
+    listSegments
   ],
   triggers: []
 });

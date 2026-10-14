@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageMemoryTool = SlateTool.create(spec, {
@@ -56,22 +57,22 @@ export let manageMemoryTool = SlateTool.create(spec, {
     let { action, memoryId, text, botId, contactId, searchQuery, meta } = ctx.input;
 
     if (action === 'create') {
-      if (!text) throw new Error('text is required to create a memory');
+      if (!text) throw createApiServiceError('text is required to create a memory');
       let result = await client.createMemory({ text, botId, contactId, meta });
       return {
         output: {
           memoryId: result.id,
-          text: result.text,
-          botId: result.botId,
-          contactId: result.contactId,
-          createdAt: result.createdAt
+          text: result.text ?? text,
+          botId: result.botId ?? botId,
+          contactId: result.contactId ?? contactId,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Memory **${result.id}** created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!memoryId) throw new Error('memoryId is required for fetch');
+      if (!memoryId) throw createApiServiceError('memoryId is required for fetch');
       let result = await client.fetchMemory(memoryId);
       return {
         output: {
@@ -79,14 +80,14 @@ export let manageMemoryTool = SlateTool.create(spec, {
           text: result.text,
           botId: result.botId,
           contactId: result.contactId,
-          createdAt: result.createdAt
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Fetched memory **${result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!memoryId) throw new Error('memoryId is required for update');
+      if (!memoryId) throw createApiServiceError('memoryId is required for update');
       let updateData: Record<string, any> = {};
       if (text !== undefined) updateData.text = text;
       if (meta !== undefined) updateData.meta = meta;
@@ -98,7 +99,7 @@ export let manageMemoryTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!memoryId) throw new Error('memoryId is required for delete');
+      if (!memoryId) throw createApiServiceError('memoryId is required for delete');
       await client.deleteMemory(memoryId);
       return {
         output: { memoryId },
@@ -107,8 +108,8 @@ export let manageMemoryTool = SlateTool.create(spec, {
     }
 
     if (action === 'search_bot') {
-      if (!botId) throw new Error('botId is required for search_bot');
-      if (!searchQuery) throw new Error('searchQuery is required for search');
+      if (!botId) throw createApiServiceError('botId is required for search_bot');
+      if (!searchQuery) throw createApiServiceError('searchQuery is required for search');
       let result = await client.searchBotMemories(botId, searchQuery);
       let items = result.items || result.memories || [];
       return {
@@ -118,8 +119,8 @@ export let manageMemoryTool = SlateTool.create(spec, {
     }
 
     if (action === 'search_contact') {
-      if (!contactId) throw new Error('contactId is required for search_contact');
-      if (!searchQuery) throw new Error('searchQuery is required for search');
+      if (!contactId) throw createApiServiceError('contactId is required for search_contact');
+      if (!searchQuery) throw createApiServiceError('searchQuery is required for search');
       let result = await client.searchContactMemories(contactId, searchQuery);
       let items = result.items || result.memories || [];
       return {
@@ -128,6 +129,6 @@ export let manageMemoryTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

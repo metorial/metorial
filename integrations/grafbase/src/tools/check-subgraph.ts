@@ -14,12 +14,12 @@ Detects breaking changes including: field removals, type changes, removed argume
     'A non-empty breakingChanges array indicates the schema may break existing clients.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the federated graph'),
+      graphId: z.string().describe('Graph ID. Call list_graphs to discover graph IDs.'),
       subgraphName: z.string().describe('Identifier for the subgraph to check'),
       schema: z.string().describe('GraphQL SDL schema to validate'),
       branch: z
@@ -53,13 +53,21 @@ Detects breaking changes including: field removals, type changes, removed argume
           })
         )
         .optional()
-        .describe('Lint rule violations found in the schema')
+        .describe('Lint rule violations found in the schema'),
+      checkId: z.string().optional().describe('ID of the recorded schema check'),
+      errorCount: z.number().optional().describe('Number of errors reported by Grafbase'),
+      diagnostics: z
+        .array(z.object({ message: z.string(), severity: z.string(), step: z.string() }))
+        .optional()
+        .describe(
+          'All diagnostics, including validation, composition, operation, lint, and proposal checks'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let result = await client.checkSubgraph({
@@ -69,21 +77,32 @@ Detects breaking changes including: field removals, type changes, removed argume
       branch: ctx.input.branch
     });
 
-    let compositionErrors = result.compositionErrors || [];
-    let breakingChanges = result.breakingChanges || [];
-    let lintErrors = result.lintErrors || [];
-    let passed = compositionErrors.length === 0 && breakingChanges.length === 0;
+    let compositionErrors = result.diagnostics
+      .filter(diagnostic => diagnostic.step === 'COMPOSITION')
+      .map(diagnostic => diagnostic.message);
+    let breakingChanges = result.diagnostics
+      .filter(diagnostic => diagnostic.step === 'OPERATION')
+      .map(diagnostic => ({ severity: diagnostic.severity, message: diagnostic.message }));
+    let lintErrors = result.diagnostics
+      .filter(diagnostic => diagnostic.step === 'LINT')
+      .map(diagnostic => ({ severity: diagnostic.severity, message: diagnostic.message }));
+    let passed =
+      result.errorCount === 0 &&
+      !result.diagnostics.some(diagnostic => diagnostic.severity === 'ERROR');
 
     return {
       output: {
         passed,
+        checkId: result.id,
+        errorCount: result.errorCount,
+        diagnostics: result.diagnostics,
         compositionErrors: compositionErrors.length > 0 ? compositionErrors : undefined,
         breakingChanges: breakingChanges.length > 0 ? breakingChanges : undefined,
         lintErrors: lintErrors.length > 0 ? lintErrors : undefined
       },
       message: passed
-        ? `Schema check **passed** for subgraph **${ctx.input.subgraphName}**. No breaking changes or composition errors detected.`
-        : `Schema check completed for **${ctx.input.subgraphName}**: ${compositionErrors.length} composition error(s), ${breakingChanges.length} breaking change(s), ${lintErrors.length} lint issue(s).`
+        ? `Schema check **passed** for subgraph **${ctx.input.subgraphName}**. No errors detected.`
+        : `Schema check completed for **${ctx.input.subgraphName}**: ${compositionErrors.length} composition error(s), ${breakingChanges.length} breaking change(s), ${lintErrors.length} lint issue(s), ${result.errorCount} total error(s).`
     };
   })
   .build();

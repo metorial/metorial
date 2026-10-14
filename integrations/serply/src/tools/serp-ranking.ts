@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeRankingDetails } from '../lib/responses';
 import { spec } from '../spec';
 
 let serpResultSchema = z.object({
@@ -57,7 +58,16 @@ export let serpRanking = SlateTool.create(spec, {
   .output(
     z.object({
       results: z.array(serpResultSchema).describe('SERP results for the domain'),
-      total: z.number().optional().describe('Total number of results')
+      total: z.number().optional().describe('Total number of results'),
+      position: z
+        .number()
+        .optional()
+        .describe('Domain rank, or -1 when the domain is not found'),
+      searchedResults: z
+        .number()
+        .optional()
+        .describe('Number of results scanned by the provider'),
+      website: z.string().optional().describe('Website checked by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -76,13 +86,15 @@ export let serpRanking = SlateTool.create(spec, {
     });
 
     let results = data.results || [];
+    let ranking = normalizeRankingDetails(data);
 
     return {
       output: {
         results,
-        total: data.total || 0
+        total: data.total || 0,
+        ...ranking
       },
-      message: `Tracked SERP ranking for **${ctx.input.domain}** on query "${ctx.input.query}". Found **${results.length}** matching results.`
+      message: `Tracked SERP ranking for **${ctx.input.domain}** on query "${ctx.input.query}".${ranking.position !== undefined ? ` Position: **${ranking.position}**.` : ` Found **${results.length}** matching results.`}`
     };
   })
   .build();

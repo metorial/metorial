@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let getProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let workspaceId = ctx.input.workspaceId || ctx.config.workspaceId;
     if (!workspaceId) {
-      throw new Error(
+      throw createApiServiceError(
         'workspaceId is required. Provide it in the input or set it in the config.'
       );
     }

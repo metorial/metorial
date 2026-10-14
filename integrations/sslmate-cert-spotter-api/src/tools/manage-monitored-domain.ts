@@ -30,8 +30,9 @@ Use this to configure which domains Cert Spotter watches for new certificate iss
       enabled: z
         .boolean()
         .optional()
-        .default(true)
-        .describe('Whether monitoring is active (only used for upsert)')
+        .describe(
+          'Whether monitoring is active (only used for upsert). Omit to preserve an existing setting; new domains default to enabled.'
+        )
     })
   )
   .output(

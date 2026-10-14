@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'keenio',
   name: 'Keen.io',
   description:
-    'Event streaming and analytics platform for collecting, storing, and analyzing custom event data via API. Built on Apache Kafka, Storm, and Cassandra.',
+    'Collect, store, and analyze custom event data with event recording, analytical queries, funnels, saved queries, and cached datasets.',
   metadata: {},
   config,
   auth

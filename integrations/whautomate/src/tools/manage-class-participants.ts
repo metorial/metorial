@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,16 @@ export let manageClassParticipants = SlateTool.create(spec, {
     z.object({
       action: z.enum(['add', 'cancel', 'list']).describe('Action to perform'),
       classId: z.string().describe('Class ID'),
-      clientId: z.string().optional().describe('Client ID (required for add and cancel)'),
+      clientId: z
+        .string()
+        .optional()
+        .describe(
+          'Client ID (required for add; resolves the booking when participantId is omitted for cancel)'
+        ),
+      participantId: z
+        .string()
+        .optional()
+        .describe('Booking ID from the list action (for cancel)'),
       status: z
         .enum(['BOOKED', 'WAITLISTED'])
         .optional()
@@ -46,7 +55,7 @@ export let manageClassParticipants = SlateTool.create(spec, {
     let { action, classId } = ctx.input;
 
     if (action === 'add') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for add');
+      if (!ctx.input.clientId) throw createApiServiceError('clientId is required for add');
       let result = await client.addClassParticipant(classId, {
         clientId: ctx.input.clientId,
         status: ctx.input.status
@@ -58,14 +67,16 @@ export let manageClassParticipants = SlateTool.create(spec, {
     }
 
     if (action === 'cancel') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for cancel');
+      if (!ctx.input.clientId && !ctx.input.participantId)
+        throw createApiServiceError('clientId or participantId is required for cancel');
       await client.cancelClassParticipant(classId, {
         clientId: ctx.input.clientId,
+        participantId: ctx.input.participantId,
         reason: ctx.input.reason
       });
       return {
         output: { success: true },
-        message: `Cancelled client **${ctx.input.clientId}** from class **${classId}**.`
+        message: `Cancelled participant **${ctx.input.participantId || ctx.input.clientId}** from class **${classId}**.`
       };
     }
 
@@ -80,6 +91,6 @@ export let manageClassParticipants = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,5 +1,6 @@
 export { addLeadsToCampaign } from './add-leads-to-campaign';
 export { addLeadsToList } from './add-leads-to-list';
+export { deleteLeadsFromList } from './delete-leads-from-list';
 export { getCampaign } from './get-campaign';
 export { getConversations } from './get-conversations';
 export { getLead } from './get-lead';
@@ -9,4 +10,5 @@ export { getStats } from './get-stats';
 export { listCampaigns } from './list-campaigns';
 export { createList, listLists } from './manage-lists';
 export { sendMessage } from './send-message';
+export { stopLeadInCampaign } from './stop-lead-in-campaign';
 export { toggleCampaignStatus } from './toggle-campaign-status';

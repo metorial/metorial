@@ -1,81 +1,56 @@
-Let me check the Campaign Management API and Recruitment API documentation.# Slates Specification for Hypeauditor
-
-## Overview
-
-HypeAuditor is an AI-powered influencer marketing platform that provides influencer discovery, analytics, fraud detection, and campaign management across Instagram, YouTube, TikTok, Twitter/X, Twitch, and Snapchat. It offers tools to analyze influencer audiences, detect fake followers, track campaign performance, and conduct competitor analysis.
+# HypeAuditor Integration Specification
 
 ## Authentication
 
-HypeAuditor uses a **Client ID + API Token** authentication scheme. Use your Client ID and API token values to access the API. Pass them via `X-Auth-Token` and `X-Auth-Id` headers, respectively.
+Use your HypeAuditor Client ID in `X-Auth-Id` and your API token in
+`X-Auth-Token`. No OAuth refresh is required. The API version defaults to `2`;
+the existing `1` option remains available for compatibility, although the
+provider no longer supports or maintains version 1 report responses.
 
-- **`X-Auth-Id`**: Your Client ID.
-- **`X-Auth-Token`**: Your API token.
+[Authentication and versioning](https://hypeauditor.readme.io/reference/basic)
 
-Reach out to [email protected] if you don't have them.
+## Available tools
 
-All API requests are made as POST requests to the base URL: `https://hypeauditor.com/api/method/{endpoint}`.
+| Tool | Behavior |
+| --- | --- |
+| `search_influencers` | Suggest accounts by name or username across supported social networks. |
+| `get_influencer_report` | Request or retrieve analytics reports, preserving asynchronous status and retry delays. |
+| `discover_influencers` | Search with account, audience, metric, and content filters. |
+| `get_account_media` | Retrieve Instagram, YouTube, or TikTok posts; YouTube supports pagination. TikTok requires a channel ID from a report. |
+| `get_metrics_history` | Retrieve Instagram, TikTok, Twitter/X, or Twitch historical metrics. |
+| `get_brand_mentions` | Retrieve YouTube or TikTok brand mention data. |
+| `get_report_connections` | Retrieve linked social accounts for an influencer. |
+| `export_report_pdf` | Request a PDF and provide the existing generated PDF for download when ready. The provider URL remains in the response and expires after 28 days. |
+| `manage_lists` | List existing lists, retrieve list reports, add reports, or remove reports from custom lists. |
+| `competitor_analysis` | Create an asynchronous Instagram competitor report, retrieve it, or paginate its posts. |
+| `get_my_network` | Retrieve creator profiles, optionally filter by creator IDs or social accounts, and paginate with a numeric cursor or an opaque `cursorToken`. |
+| `get_account_activity` | List unlocked reports with date filtering and pagination. |
+| `get_taxonomy` | Retrieve category, thematic, label, and interest IDs used by discovery and reports. |
+| `get_keyword_posts` | Retrieve posts identified by `discover_influencers` with `searchContent`. |
 
-An optional `v` parameter controls API versioning. The v=1 version has been deprecated since August 1st, 2024, and users are encouraged to migrate to v=2.
+## Workflow notes
 
-The Campaign Management API uses a separate Swagger-documented endpoint with the same authentication credentials.
+- Reports and PDFs can return a retry delay while generating. Do not report them
+  as ready before data or a PDF URL is returned.
+- Discovery returns 20 results per page, with a maximum of 500 pages. Niche
+  search cannot be combined with keyword, content, or description search.
+- Instagram and TikTok media maps are returned as arrays of complete media
+  objects. Existing IDs and nested metrics are retained.
+- The default Recent Searches list has ID `0`; the provider does not permit
+  removing reports from it.
+- My Network's terminal `null` cursor is omitted. String cursors are exposed as
+  `nextCursorToken`, preserving the original numeric cursor fields.
+- PDF downloads capture the existing file rather than requesting background
+  regeneration when a provider URL expires. The provider does not document a
+  separate operation for renewing an existing PDF URL without regeneration.
+- No suitable current-user identity endpoint is documented in the reviewed API.
 
-## Features
+## Official references
 
-### Influencer Search (Suggester)
-
-Find influencers by name and account name on Instagram, X (Twitter), TikTok, YouTube, and Twitch. Useful for quick lookups of specific creators.
-
-### Influencer Reports
-
-Get all the information you need about a social media creator's profile, activity, audience, content, and value. Reports are available for Instagram, YouTube, TikTok, Twitter/X, Twitch, and Snapchat. Each platform report includes metrics like audience quality score (AQS), engagement rate, follower demographics, authenticity analysis, and brand mentions. Reports also include:
-
-- **Account Media**: Retrieve recent posts/videos for an influencer on Instagram, YouTube, and TikTok.
-- **Metrics History**: Access historical performance data for Instagram, TikTok, Twitter, and Twitch accounts.
-- **Brand Mentions**: View brands mentioned by creators on YouTube and TikTok.
-- **Report Connections**: Find linked accounts across platforms for a given influencer.
-- **PDF Export**: Generate downloadable PDF versions of influencer reports.
-
-### Influencer Discovery
-
-The Discovery API's filters enable you to identify influencers in a particular niche with similar follower profiles to your target audience and high levels of engagement on their content. Supports Instagram, YouTube, TikTok, Twitter/X, and Twitch with extensive filtering options including:
-
-- Audience demographics (geography, age, gender, ethnicity, income, interests)
-- Account attributes (location, language, gender, age, type, verification status)
-- Performance metrics (engagement rate, quality scores, follower/subscriber counts, growth rates, views, likes)
-- Content and keyword search (search across bios, content, and descriptions)
-- Niche-based AI search using natural language phrases
-- Similar influencer lookup (find lookalikes for a given account)
-- Platform-specific filters (e.g., Twitch games and streaming hours, Twitter engagement metrics)
-- A sandbox endpoint is available for testing without consuming credits.
-
-### Post Searching by Keywords
-
-Search for specific content posts by keywords across supported social networks. Useful for finding content related to specific topics, brands, or hashtags.
-
-### Instagram Market Analysis (Competitor Analysis)
-
-Check out your competitors' Instagram Share of Voice. Monitor how frequently they're mentioned in a given period and understand who they're targeting, who they're working with, and what value their content has in terms of engagement rates and reach. Reports are generated asynchronously and retrieved by report ID. Configurable by date range and audience geography.
-
-### Campaign Management
-
-Create influencer marketing campaigns and measure their results by tracking posts, mentions, and hashtags. Additionally, manage some aspects of content collaboration with the Campaign Management API, such as content review. Available in v1.0 and v2.0 of the API.
-
-### Influencer Recruitment
-
-Create and manage influencer recruitment campaigns, including setting up landing pages for attracting creators to your brand.
-
-### Lists Management
-
-Organize influencers into lists for campaign planning. Supports creating lists, adding/removing influencer reports to/from lists, and retrieving all lists and their contents.
-
-### My Network (Creator Profile Info)
-
-A public API for the My Network section of your account, allowing you to pull in influencer data programmatically. The API supports filtering by report unlock date.
-
-### Account Activity
-
-Track API usage including unlocked reports and remaining report/request credits.
-
-## Events
-
-The provider does not support events. HypeAuditor's API is request-response based and does not offer webhooks or event subscription mechanisms.
+- [Report APIs](https://hypeauditor.readme.io/reference/report_instagram)
+- [Discovery](https://hypeauditor.readme.io/reference/general_discovery)
+- [Taxonomy](https://hypeauditor.readme.io/reference/taxonomy_v1)
+- [Keyword posts](https://hypeauditor.readme.io/reference/search_by_keywords)
+- [PDF export](https://hypeauditor.readme.io/reference/pdf_export)
+- [My Network](https://hypeauditor.readme.io/reference/creator-profile-info)
+- [Competitor analysis](https://hypeauditor.readme.io/reference/market_analysis_api)

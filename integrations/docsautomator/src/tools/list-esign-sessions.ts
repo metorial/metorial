@@ -43,28 +43,46 @@ export let listEsignSessions = SlateTool.create(spec, {
         .optional()
         .describe('Filter sessions by status.'),
       signerEmail: z.string().optional().describe('Filter sessions by signer email address.'),
-      page: z.number().optional().describe('Page number for pagination (default: 1).'),
+      page: z
+        .number()
+        .min(1)
+        .refine(Number.isInteger, 'The page must be a whole number.')
+        .optional()
+        .describe('Page number for pagination (default: 1).'),
       limit: z
         .number()
+        .min(1)
+        .max(250)
+        .refine(Number.isInteger, 'The limit must be a whole number.')
         .optional()
-        .describe('Number of results per page (default: 20, max: 100).')
+        .describe('Number of results per page (default: 20, max: 250).')
     })
   )
   .output(
     z.object({
-      sessions: z.array(sessionSchema).describe('List of e-signature sessions.')
+      sessions: z.array(sessionSchema).describe('List of e-signature sessions.'),
+      pagination: z
+        .object({
+          page: z.number().optional(),
+          limit: z.number().optional(),
+          total: z.number().optional(),
+          pages: z.number().optional()
+        })
+        .optional()
+        .describe(
+          'Current page and total pages. Request the next page while page is less than pages.'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let params: Record<string, unknown> = {};
-    if (ctx.input.status) params.status = ctx.input.status;
-    if (ctx.input.signerEmail) params.email = ctx.input.signerEmail;
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-
-    let result = await client.listEsignSessions(params as any);
+    let result = await client.listEsignSessions({
+      status: ctx.input.status,
+      email: ctx.input.signerEmail,
+      page: ctx.input.page,
+      limit: ctx.input.limit
+    });
 
     let sessions = Array.isArray(result) ? result : result.sessions || [];
 
@@ -72,17 +90,25 @@ export let listEsignSessions = SlateTool.create(spec, {
       output: {
         sessions: sessions.map((s: any) => ({
           sessionId: s.sessionId || s._id || s.id,
-          documentName: s.documentName,
-          status: s.status,
+          documentName: s.documentName ?? undefined,
+          status: s.status ?? undefined,
           signers: s.signers?.map((signer: any) => ({
-            email: signer.email,
-            name: signer.name,
-            status: signer.status,
-            signedAt: signer.signedAt
+            email: signer.email ?? undefined,
+            name: signer.name ?? undefined,
+            status: signer.status ?? undefined,
+            signedAt: signer.signedAt ?? undefined
           })),
-          createdAt: s.createdAt,
-          completedAt: s.completedAt
-        }))
+          createdAt: s.createdAt ?? undefined,
+          completedAt: s.completedAt ?? undefined
+        })),
+        pagination: result.pagination
+          ? {
+              page: result.pagination.page ?? undefined,
+              limit: result.pagination.limit ?? undefined,
+              total: result.pagination.total ?? undefined,
+              pages: result.pagination.pages ?? undefined
+            }
+          : undefined
       },
       message: `Found **${sessions.length}** e-signature session(s).`
     };

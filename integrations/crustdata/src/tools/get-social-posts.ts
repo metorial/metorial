@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CrustdataClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,6 +10,7 @@ export let getSocialPosts = SlateTool.create(spec, {
 Returns post content, engagement metrics (likes, comments, shares), and profile data of people who interacted.
 Supports three modes: person posts, company posts, or keyword-based post search.`,
   instructions: [
+    'Provide exactly one of personLinkedinUrl, companyLinkedinUrl, or keyword.',
     'For person posts: provide personLinkedinUrl.',
     'For company posts: provide companyLinkedinUrl.',
     'For keyword search: provide keyword with optional sortBy and datePosted filters.',
@@ -56,22 +57,32 @@ Supports three modes: person posts, company posts, or keyword-based post search.
     })
   )
   .handleInvocation(async ctx => {
+    let selectors = [
+      ctx.input.personLinkedinUrl,
+      ctx.input.companyLinkedinUrl,
+      ctx.input.keyword
+    ];
+    if (selectors.filter(value => value?.trim()).length !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one personLinkedinUrl, companyLinkedinUrl, or keyword.'
+      );
+    }
     let client = new CrustdataClient(ctx.auth.token);
     let posts: unknown[] = [];
 
-    if (ctx.input.personLinkedinUrl) {
+    if (ctx.input.personLinkedinUrl?.trim()) {
       let result = await client.getSocialPostsByPerson({
         personLinkedinUrl: ctx.input.personLinkedinUrl,
         page: ctx.input.page
       });
       posts = Array.isArray(result) ? result : (result.posts ?? result.data ?? []);
-    } else if (ctx.input.companyLinkedinUrl) {
+    } else if (ctx.input.companyLinkedinUrl?.trim()) {
       let result = await client.getLinkedinPostsByCompany({
         companyLinkedinUrl: ctx.input.companyLinkedinUrl,
         page: ctx.input.page
       });
       posts = Array.isArray(result) ? result : (result.posts ?? result.data ?? []);
-    } else if (ctx.input.keyword) {
+    } else if (ctx.input.keyword?.trim()) {
       let result = await client.searchLinkedinPostsByKeyword({
         keyword: ctx.input.keyword,
         page: ctx.input.page,

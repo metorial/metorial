@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,10 +17,7 @@ export let listGroups = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter groups by organization ID. If omitted, returns all groups.'),
-      searchText: z
-        .string()
-        .optional()
-        .describe('Search groups by name (organization filter required)'),
+      searchText: z.string().optional().describe('Search groups by name'),
       page: z
         .number()
         .optional()
@@ -60,7 +57,7 @@ export let listGroups = SlateTool.create(spec, {
       };
     }
 
-    let result = await client.listGroups();
+    let result = await client.listGroups(ctx.input.searchText);
 
     return {
       output: {
@@ -143,7 +140,7 @@ export let getGroupMembers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Provide either groupIds or both organizationId and groupId');
+    throw createApiServiceError('Provide either groupIds or both organizationId and groupId');
   })
   .build();
 

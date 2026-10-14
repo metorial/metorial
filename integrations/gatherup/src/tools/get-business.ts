@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getBusiness = SlateTool.create(spec, {
@@ -70,10 +70,10 @@ export let getBusiness = SlateTool.create(spec, {
         package: data.package,
         shortFeedbackUrl: data.shortFeedbackUrl,
         communicationMethod: data.communicationMethod,
-        communicationSendEmail: data.communicationSendEmail,
-        nps: data.nps,
-        feedbacksReceived: data.feedbacksReceived,
-        customersNotSent: data.customersNotSent,
+        communicationSendEmail: readOptionalNumber(data.communicationSendEmail),
+        nps: readOptionalNumber(data.nps),
+        feedbacksReceived: readOptionalNumber(data.feedbacksReceived),
+        customersNotSent: readOptionalNumber(data.customersNotSent),
         added: data.added
       },
       message: `Retrieved business **${data.name ?? ctx.input.businessId}**.`

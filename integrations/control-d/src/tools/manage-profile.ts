@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -27,6 +27,7 @@ export let manageProfile = SlateTool.create(spec, {
         .optional()
         .describe('Unix timestamp to disable profile until. Set to 0 to re-enable.'),
       lockStatus: z.number().optional().describe('1 to lock, 0 to unlock'),
+      password: z.string().optional().describe('Account password when unlocking a profile'),
       lockMessage: z
         .string()
         .optional()
@@ -42,11 +43,19 @@ export let manageProfile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let { operation, profileId, name, cloneProfileId, disableTtl, lockStatus, lockMessage } =
-      ctx.input;
+    let {
+      operation,
+      profileId,
+      name,
+      cloneProfileId,
+      disableTtl,
+      lockStatus,
+      lockMessage,
+      password
+    } = ctx.input;
 
     if (operation === 'create') {
-      if (!name) throw new Error('Name is required when creating a profile');
+      if (!name) throw createApiServiceError('Name is required when creating a profile');
       let profile = await client.createProfile({ name, cloneProfileId });
       return {
         output: { profileId: profile.PK, name: profile.name, updated: profile.updated },
@@ -54,7 +63,8 @@ export let manageProfile = SlateTool.create(spec, {
       };
     }
 
-    if (!profileId) throw new Error('Profile ID is required for update and delete operations');
+    if (!profileId)
+      throw createApiServiceError('Profile ID is required for update and delete operations');
 
     if (operation === 'delete') {
       await client.deleteProfile(profileId);
@@ -68,7 +78,8 @@ export let manageProfile = SlateTool.create(spec, {
       name,
       disableTtl,
       lockStatus,
-      lockMessage
+      lockMessage,
+      password
     });
     return {
       output: { profileId: profile.PK, name: profile.name, updated: profile.updated },

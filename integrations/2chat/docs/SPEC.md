@@ -1,4 +1,4 @@
-# Slates Specification for 2chat
+# 2Chat API Specification
 
 ## Overview
 
@@ -112,3 +112,12 @@ Send and receive high-quality documents and media files through the API. Manage 
 - **Call Status Update** (`call.status.update`): Triggers on every call status change during the call lifecycle (ringing, answered, ended) for both inbound and outbound calls.
 - **Incoming Call Completed** (`call.incoming.completed`): Triggers when an incoming phone call ends, whether answered or missed.
 - **Outbound Call Completed** (`call.outbound.completed`): Triggers when an outbound phone call ends, whether answered or failed.
+
+
+## Implemented tools
+
+This integration covers direct and group messaging, connected number discovery and detail, message retrieval and deletion, group membership and settings, contact creation/search/listing, and account information. Message reads and deletion expose or accept the provider session key. If omitted, single-message lookup searches only the latest 100 messages for the connected number. Pages are zero-based.
+
+The Contacts API uses PH, WAPH, E and A detail types; tool inputs map phone, whatsapp, email and address to those codes. Legacy url and note values remain in the schema for compatibility but produce a clear unsupported-input error. New read-only tools are get_account_info, get_whatsapp_number and list_contacts.
+
+API capabilities described above do not imply that every provider endpoint has a tool. Delivery, remote deletion, and live account access have not been verified against a connected account.

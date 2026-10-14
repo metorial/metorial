@@ -1,16 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FormsiteClient } from '../lib/client';
+import { FormsiteClient, type FormsiteItem } from '../lib/client';
+import { formDirSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
-let itemSchema: z.ZodType<any> = z.object({
+let itemSchema: z.ZodType<FormsiteItem> = z.object({
   itemId: z.string().describe('Unique item/field identifier used to match with result values'),
   position: z.number().describe('Position/order of the item in the form'),
   label: z.string().describe('Display label for the item'),
   children: z
     .array(z.lazy(() => itemSchema))
     .optional()
-    .describe('Child items for composite fields like Matrix or Multi Scale')
+    .describe('Child items for composite fields like Matrix or Multi Scale'),
+  childItemIds: z
+    .array(z.string())
+    .optional()
+    .describe('IDs of child items belonging to this composite field')
 });
 
 export let getFormItems = SlateTool.create(spec, {
@@ -28,9 +33,7 @@ export let getFormItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formDir: z
-        .string()
-        .describe('Form directory identifier for the form to retrieve items from'),
+      formDir: formDirSchema,
       resultsLabels: z
         .string()
         .optional()

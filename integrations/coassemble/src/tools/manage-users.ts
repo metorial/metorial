@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListItems } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -36,7 +36,7 @@ export let listUsers = SlateTool.create(spec, {
       length: ctx.input.length
     });
 
-    let users = Array.isArray(result) ? result : (result?.data ?? [result]);
+    let users = getListItems(result);
 
     return {
       output: { users },
@@ -57,7 +57,9 @@ export let updateUser = SlateTool.create(spec, {
       metadata: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Key-value metadata to set on the user (replaces existing metadata)')
+        .describe('Key-value metadata to set on the user (replaces existing metadata)'),
+      name: z.string().optional().describe('Display name for the user'),
+      avatar: z.string().optional().describe('Avatar URL for the user')
     })
   )
   .output(
@@ -74,7 +76,9 @@ export let updateUser = SlateTool.create(spec, {
 
     let result = await client.updateUser(ctx.input.identifier, {
       clientIdentifier: ctx.input.clientIdentifier,
-      metadata: ctx.input.metadata
+      metadata: ctx.input.metadata,
+      name: ctx.input.name,
+      avatar: ctx.input.avatar
     });
 
     return {
@@ -122,15 +126,18 @@ export let deleteUser = SlateTool.create(spec, {
       authScheme: ctx.auth.authScheme
     });
 
-    await client.deleteUser(ctx.input.identifier, {
+    let result = await client.deleteUser(ctx.input.identifier, {
       action: ctx.input.courseAction,
       reallocateTo: ctx.input.reallocateTo,
       clientIdentifier: ctx.input.clientIdentifier
     });
+    let success = result !== false;
 
     return {
-      output: { success: true },
-      message: `Deleted user \`${ctx.input.identifier}\` (courses: ${ctx.input.courseAction}).`
+      output: { success },
+      message: success
+        ? `Deleted user \`${ctx.input.identifier}\` (courses: ${ctx.input.courseAction}).`
+        : `Coassemble did not delete user \`${ctx.input.identifier}\`.`
     };
   })
   .build();

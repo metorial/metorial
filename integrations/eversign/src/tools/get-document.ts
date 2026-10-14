@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { asOptionalNumber, asOptionalString, createClient, isEnabled } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDocument = SlateTool.create(spec, {
   name: 'Get Document',
   key: 'get_document',
-  description: `Retrieve detailed information about a specific document by its hash, including status, signers, files, fields, and activity log. Also returns embedded signing URLs if embedded signing is enabled.`,
+  description: `Retrieve detailed information about a specific document by its hash, including status, signers, files, fields, and activity log. Also returns embedded signing URLs if embedded signing is enabled. Call list_businesses to discover the businessId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let getDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       documentHash: z.string().describe('Unique hash identifier of the document')
     })
   )
@@ -72,18 +74,18 @@ export let getDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
     let doc = await client.getDocument(ctx.input.documentHash);
 
     let signers = (doc.signers || []).map((s: any) => ({
-      signerId: s.id,
+      signerId: Number(s.id),
       name: s.name || '',
       email: s.email || '',
       role: s.role || undefined,
-      order: s.order ?? undefined,
-      signed: s.signed === 1 || s.signed === true,
-      signedTimestamp: s.signed_timestamp || undefined,
-      declined: s.declined === 1 || s.declined === true,
+      order: asOptionalNumber(s.order),
+      signed: isEnabled(s.signed),
+      signedTimestamp: asOptionalString(s.signed_timestamp),
+      declined: isEnabled(s.declined),
       embeddedSigningUrl: s.embedded_signing_url || undefined
     }));
 
@@ -94,8 +96,11 @@ export let getDocument = SlateTool.create(spec, {
 
     let activityLog = (doc.log || []).map((entry: any) => ({
       event: entry.event || undefined,
-      timestamp: entry.timestamp || undefined,
-      signerName: entry.signer_name || undefined
+      timestamp: asOptionalString(entry.timestamp),
+      signerName:
+        entry.signer_name ||
+        doc.signers?.find((signer: any) => String(signer.id) === String(entry.signer))?.name ||
+        undefined
     }));
 
     return {
@@ -103,16 +108,15 @@ export let getDocument = SlateTool.create(spec, {
         documentHash: doc.document_hash,
         title: doc.title || undefined,
         status: doc.status || undefined,
-        isDraft: doc.is_draft === 1 || doc.is_draft === true,
-        isCompleted: doc.is_completed === 1 || doc.is_completed === true,
-        isCancelled: doc.is_cancelled === 1 || doc.is_cancelled === true,
-        isDeleted: doc.is_deleted === 1 || doc.is_deleted === true,
-        isTrashed: doc.is_trashed === 1 || doc.is_trashed === true,
-        isExpired: doc.is_expired === 1 || doc.is_expired === true,
-        embeddedSigningEnabled:
-          doc.embedded_signing_enabled === 1 || doc.embedded_signing_enabled === true,
-        createdAt: doc.created ?? undefined,
-        expiresAt: doc.expires ?? undefined,
+        isDraft: isEnabled(doc.is_draft),
+        isCompleted: isEnabled(doc.is_completed),
+        isCancelled: isEnabled(doc.is_cancelled),
+        isDeleted: isEnabled(doc.is_deleted),
+        isTrashed: isEnabled(doc.is_trashed),
+        isExpired: isEnabled(doc.is_expired),
+        embeddedSigningEnabled: isEnabled(doc.embedded_signing_enabled),
+        createdAt: asOptionalString(doc.created),
+        expiresAt: asOptionalString(doc.expires),
         signers,
         recipients: recipients.length > 0 ? recipients : undefined,
         meta: doc.meta || undefined,

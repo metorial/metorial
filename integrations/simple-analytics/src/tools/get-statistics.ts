@@ -20,7 +20,8 @@ export let getStatisticsTool = SlateTool.create(spec, {
   ],
   constraints: [
     'The limit parameter ranges from 1 to 1000.',
-    'Histogram interval "hour" only works for date ranges of 1 day or less.'
+    'Histogram interval "hour" only works for date ranges of 1 day or less.',
+    'Contains page searches must use exactly one leading-and-trailing wildcard pattern with at least 12 non-slash characters, and only pageviews, visitors, or histogram fields.'
   ],
   tags: {
     readOnly: true
@@ -82,6 +83,18 @@ export let getStatisticsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter by page path. Supports wildcards (e.g. "/blog*").'),
+      pages: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Filter by multiple page paths or trailing wildcard patterns. Use either page or pages.'
+        ),
+      metadataFilters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe(
+          'Exact metadata filters joined with AND. Keys use letters, numbers, and underscores without storage type suffixes.'
+        ),
       country: z.string().optional().describe('Filter by country code (e.g. "NL", "US").'),
       referrer: z
         .string()
@@ -119,7 +132,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string().describe('Page path'),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -129,7 +146,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string().describe('Country code'),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -139,7 +160,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string().describe('Referrer domain'),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -149,7 +174,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -159,7 +188,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -169,7 +202,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -179,7 +216,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -189,7 +230,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -199,7 +244,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -209,7 +258,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -219,7 +272,11 @@ export let getStatisticsTool = SlateTool.create(spec, {
           z.object({
             value: z.string(),
             pageviews: z.number().optional(),
-            visitors: z.number().optional()
+            visitors: z.number().optional(),
+            seconds_on_page: z
+              .number()
+              .optional()
+              .describe('Median time on page in seconds for this dimension value')
           })
         )
         .optional()
@@ -239,6 +296,8 @@ export let getStatisticsTool = SlateTool.create(spec, {
         limit: ctx.input.limit,
         interval: ctx.input.interval,
         page: ctx.input.page,
+        pages: ctx.input.pages,
+        metadataFilters: ctx.input.metadataFilters,
         country: ctx.input.country,
         referrer: ctx.input.referrer,
         utmSource: ctx.input.utmSource,

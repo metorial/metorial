@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Geoapify
 
-Geocode addresses to coordinates and reverse geocode coordinates to addresses. Calculate routes between waypoints for multiple travel modes (drive, truck, bike, walk, transit). Generate isochrones and isodistances for reachability analysis. Search for places and points of interest by category, location, and filters. Compute route matrices and optimize multi-vehicle route plans (VRP). Look up postcodes, administrative boundaries, and IP geolocation. Perform geometry operations on GeoJSON data. Generate static map images and retrieve map tiles. Batch process up to 1000 geocoding requests. Supports address autocomplete, map matching, and place detail lookups.
+Geocode addresses, reverse geocode coordinates, and autocomplete addresses. Calculate routes and route matrices across multiple travel modes. Generate isochrones and isodistances, retrieve deferred isolines as downloadable GeoJSON, search places, and inspect place details. Look up postcodes, administrative boundaries, and IP geolocation, or match GPS traces to roads. Submit up to 1000 addresses or coordinates for batch geocoding and retrieve completed results as downloadable JSON.
+
+For a reverse batch, submit coordinates with `batch_reverse_geocode`, then pass its job ID to `check_batch_geocode` with `direction: "reverse"`. For a deferred isoline, pass the ID returned by `calculate_isoline` to `check_isoline`. Provider result IDs remain available for 24 hours.
 
 ## License
 

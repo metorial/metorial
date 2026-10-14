@@ -40,13 +40,14 @@ export let getResultDetails = SlateTool.create(spec, {
     });
 
     ctx.progress('Fetching result details...');
-    let result = await client.getResult(ctx.input.resultId, ctx.input.includeFiles);
+    let result = await client.getResult(ctx.input.resultId);
 
     let fields: Record<string, any> = {};
     let systemFields: Record<string, any> = {};
 
-    if (result && typeof result === 'object') {
-      for (let [key, value] of Object.entries(result)) {
+    let values = result?.result ?? result;
+    if (values && typeof values === 'object') {
+      for (let [key, value] of Object.entries(values)) {
         if (
           key.startsWith('_') ||
           ['id', 'status', 'created', 'changed', 'completed', 'visitor', 'ip'].includes(key)
@@ -57,6 +58,9 @@ export let getResultDetails = SlateTool.create(spec, {
         }
       }
     }
+
+    if (result?.meta) systemFields.meta = result.meta;
+    if (ctx.input.includeFiles && result?.files) systemFields.files = result.files;
 
     return {
       output: {

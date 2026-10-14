@@ -1,6 +1,4 @@
-Now let me check for more details on the API, especially around e-signatures and the webhook/output settings.Now I have enough information to write the specification.
-
-# Slates Specification for Docsautomator
+# DocsAutomator Integration
 
 ## Overview
 
@@ -24,6 +22,9 @@ Triggers document creation as a POST request. Multiple data source patterns are 
 - A `data` object contains key-value pairs mapping to template placeholders.
 - For one-off documents, provide `docTemplateLink` instead of `docId`.
 - Supports sync and async modes, webhook callbacks, and queue management.
+- Set `async` to return a job ID immediately; completed jobs expose document details from the API's `result` object.
+- Google Sheets requests send `googleSheetsRowNumber` as the API's `rowNumber` field.
+- Set `skipEsign` to generate a draft without sending signing invitations.
 - You can check job status and view queue stats.
 
 ### Automation Management
@@ -49,7 +50,12 @@ DocsAutomator supports collecting legally binding e-signatures on generated docu
 Documents can be output as PDFs, saved to Google Drive, sent via email, merged with existing PDFs, and trigger webhooks — all automated.
 
 - Generated documents return a download URL for the PDF.
+- Generated and signed PDFs are available as downloadable files. The automation's retention setting governs how long provider-hosted PDFs remain available; signing automations use no expiration.
 - Optionally keep a Google Doc version for further editing.
+
+### Email Checks
+
+Use `send_test_email` with an automation ID from `list_automations` and a recipient email address to test the automation's email settings. DocsAutomator limits this operation to 25 emails per hour per automation.
 
 ## Events
 

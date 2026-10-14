@@ -56,13 +56,13 @@ export let listTimeEntries = SlateTool.create(spec, {
 
     let timeEntries = result.data.map((t: any) => ({
       timeEntryId: t.id,
-      userId: typeof t.user === 'object' ? t.user?.id : t.user,
-      taskId: typeof t.task === 'object' ? t.task?.id : t.task,
-      dateTimeFrom: t.dateTimeFrom,
-      dateTimeTo: t.dateTimeTo,
-      description: t.description,
-      type: t.type,
-      creationDate: t.creationDate
+      userId: (typeof t.user === 'object' ? t.user?.id : t.user) ?? undefined,
+      taskId: (typeof t.task === 'object' ? t.task?.id : t.task) ?? undefined,
+      dateTimeFrom: t.dateTimeFrom ?? undefined,
+      dateTimeTo: t.dateTimeTo ?? undefined,
+      description: t.description ?? undefined,
+      type: t.type ?? undefined,
+      creationDate: t.creationDate ?? undefined
     }));
 
     return {

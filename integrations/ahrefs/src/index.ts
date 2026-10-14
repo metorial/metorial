@@ -8,6 +8,7 @@ import {
   getBrandRadar,
   getDomainHistory,
   getKeywordIdeas,
+  getLimitsAndUsage,
   getLinkedDomains,
   getMetricsByCountry,
   getOrganicCompetitors,
@@ -41,7 +42,8 @@ export let provider = Slate.create({
     batchAnalyze,
     manageRankTracker,
     getLinkedDomains,
-    getMetricsByCountry
+    getMetricsByCountry,
+    getLimitsAndUsage
   ],
   triggers: []
 });

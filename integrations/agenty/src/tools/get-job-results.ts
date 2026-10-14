@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getJobResults = SlateTool.create(spec, {
   name: 'Get Job Results',
   key: 'get_job_results',
-  description: `Retrieve the scraped data results from a completed or in-progress job. Results are returned in paginated JSON format, max 2500 rows per request. Use offset and limit for pagination through large result sets.`,
+  description: `Retrieve the scraped data results from a completed or in-progress job. Results are returned in paginated JSON format, max 1000 rows per request. Use offset and limit for pagination through large result sets.`,
   instructions: [
-    'Maximum 2500 rows per request. For larger datasets, use offset and limit to paginate.',
-    'Set modified=1 to get only new or changed rows since the last fetch.'
+    'Maximum 1000 rows per request. For larger datasets, use offset and limit to paginate.',
+    'Set modified=1 to use post-processed results when available, or modified=0 for the original results.'
   ],
   tags: {
     readOnly: true
@@ -18,13 +18,32 @@ export let getJobResults = SlateTool.create(spec, {
   .input(
     z.object({
       jobId: z.string().describe('The unique identifier of the job.'),
-      offset: z.number().optional().describe('Number of rows to skip. Defaults to 0.'),
-      limit: z.number().optional().describe('Maximum rows to return. Max 2500.'),
+      offset: z
+        .number()
+        .min(0)
+        .refine(Number.isInteger, 'Use a whole-number offset.')
+        .optional()
+        .describe('Number of rows to skip. Defaults to 0.'),
+      limit: z
+        .number()
+        .min(1)
+        .max(1000)
+        .refine(Number.isInteger, 'Use a whole-number limit.')
+        .optional()
+        .describe('Maximum rows to return. Max 1000.'),
       collection: z
         .number()
         .optional()
         .describe('Collection index to retrieve results from. Defaults to 1.'),
-      modified: z.number().optional().describe('Set to 1 to only get new/changed rows.')
+      modified: z
+        .number()
+        .min(0)
+        .max(1)
+        .refine(Number.isInteger, 'Use 0 or 1.')
+        .optional()
+        .describe(
+          'Use 1 for post-processed results when available, or 0 for original results.'
+        )
     })
   )
   .output(

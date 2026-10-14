@@ -1,4 +1,4 @@
-# Slates Specification for Wisepops
+# Wisepops API Specification
 
 ## Overview
 
@@ -22,9 +22,15 @@ The base URL for API requests is `https://app.wisepops.com/api2/`.
 
 Retrieve contacts (emails, phone numbers, and custom fields) collected through Wisepops campaigns. You can filter contacts by collection date (`collected_after`) and by specific popup (`wisepop_id`). Each contact record includes the collection timestamp, associated popup ID, IP address, country code, and all collected form fields.
 
+`list_contacts` returns the existing structured contact output. `export_contacts` downloads one API response as a JSON file and preserves the original response fields. Both accept `collectedAfter`, `wisepopId`, and `pageSize` (1-1000, default 100). The API documents no cursor or offset, so a batch is not a guaranteed complete historical export.
+
+The API contact example omits `form_session`, while webhook examples include it. The legacy `list_contacts` schema retains its required `formSession` string for compatibility; if it is absent, the tool returns a clear error directing callers to `export_contacts`. Availability through the contacts endpoint requires provider verification. JSON exports preserve whatever fields the provider actually returns.
+
 ### Campaign Reporting
 
 Retrieve a list of your Wisepops (campaigns) with display and conversion metrics, including display count, click count, email count, activation status, and creation date.
+
+Creation timestamps are returned unchanged in the provider's format, such as `2017-02-25 19:10:00`. Use `list_campaigns` to discover campaign IDs for contact filtering and webhook creation.
 
 ### Webhook Management
 
@@ -55,3 +61,10 @@ For all webhook event types:
 - The `event` parameter is required. Allowed values are `email`, `phone`, and `survey`, respectively for sign-up blocks, phone blocks, and survey blocks.
 - The `target_url` parameter is required — the URL that will receive collected forms.
 - The HTTP header `X-Wisepops-Signature` is included, containing the HMAC hex digest of the payload using your API key as a cryptographic key, letting you verify that Wisepops is the emitter.
+
+## Limits and official documentation
+
+API access is available on Custom plans. The standard limit is 1,500 calls within 30 days; webhook delivery does not consume API calls. The public API documentation does not expose a current-user or website-profile endpoint.
+
+- [Wisepops API documentation](https://support.wisepops.com/en/articles/9897479-wisepops-api-documentation)
+- [Webhook documentation](https://support.wisepops.com/en/articles/9897509-webhooks)

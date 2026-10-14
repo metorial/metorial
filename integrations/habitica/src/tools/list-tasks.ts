@@ -1,35 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
+import { mapTask, taskOutputSchema } from '../lib/task';
 import { spec } from '../spec';
-
-let taskOutputSchema = z.object({
-  taskId: z.string().describe('Unique ID of the task'),
-  type: z.string().describe('Task type: habit, daily, todo, or reward'),
-  text: z.string().describe('Title of the task'),
-  notes: z.string().optional().describe('Task notes'),
-  priority: z.number().optional().describe('Difficulty priority'),
-  completed: z
-    .boolean()
-    .optional()
-    .describe('Whether the task is completed (for To-Dos and Dailies)'),
-  isDue: z.boolean().optional().describe('Whether the Daily is due today'),
-  value: z.number().optional().describe('Task value/score'),
-  date: z.string().optional().describe('Due date for To-Dos'),
-  tags: z.array(z.string()).optional().describe('Tag IDs applied to the task'),
-  checklist: z
-    .array(
-      z.object({
-        checklistItemId: z.string().describe('Checklist item ID'),
-        text: z.string().describe('Checklist item text'),
-        completed: z.boolean().describe('Whether item is completed')
-      })
-    )
-    .optional()
-    .describe('Checklist items'),
-  createdAt: z.string().optional().describe('When the task was created'),
-  updatedAt: z.string().optional().describe('When the task was last updated')
-});
 
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
@@ -43,6 +16,10 @@ Returns task details including title, notes, difficulty, completion status, due 
 })
   .input(
     z.object({
+      dueDate: z
+        .string()
+        .optional()
+        .describe('Date used to compute whether each Daily is due, in ISO date format'),
       type: z
         .enum(['habits', 'dailys', 'todos', 'rewards'])
         .optional()
@@ -59,30 +36,14 @@ Returns task details including title, notes, difficulty, completion status, due 
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
-    let tasks = await client.getUserTasks(ctx.input.type);
+    let tasks = await client.getUserTasks(ctx.input.type, ctx.input.dueDate);
 
-    let mappedTasks = tasks.map((t: Record<string, any>) => ({
-      taskId: t.id || t._id,
-      type: t.type,
-      text: t.text,
-      notes: t.notes || undefined,
-      priority: t.priority,
-      completed: t.completed,
-      isDue: t.isDue,
-      value: t.value,
-      date: t.date || undefined,
-      tags: t.tags,
-      checklist: t.checklist?.map((c: any) => ({
-        checklistItemId: c.id,
-        text: c.text,
-        completed: c.completed
-      })),
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt
-    }));
+    let mappedTasks = tasks.map(mapTask);
 
     return {
       output: {

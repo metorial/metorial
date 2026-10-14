@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getFirstResult, ReferralRockClient } from '../lib/client';
+import { memberQuery } from '../lib/queries';
 import { spec } from '../spec';
 
 export let removeMember = SlateTool.create(spec, {
@@ -42,33 +43,11 @@ export let removeMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
-    let query: Record<string, unknown> = {};
-
-    if (ctx.input.memberId || ctx.input.referralCode) {
-      query = {
-        primaryInfo: {
-          ...(ctx.input.memberId && { memberId: ctx.input.memberId }),
-          ...(ctx.input.referralCode && { referralCode: ctx.input.referralCode })
-        }
-      };
-    } else {
-      query = {
-        secondaryInfo: {
-          ...(ctx.input.email && { email: ctx.input.email }),
-          ...(ctx.input.externalIdentifier && {
-            externalIdentifier: ctx.input.externalIdentifier
-          })
-        },
-        tertiaryInfo: {
-          ...(ctx.input.programId && { programId: ctx.input.programId })
-        }
-      };
-    }
+    let query = memberQuery(ctx.input);
 
     let result = await client.removeMembers([{ query }]);
 
-    let results = result as unknown as Record<string, unknown>[];
-    let first = Array.isArray(results) ? results[0] : result;
+    let first = getFirstResult(result);
     let resultInfo = (first?.resultInfo || {}) as Record<string, unknown>;
 
     return {
@@ -76,7 +55,7 @@ export let removeMember = SlateTool.create(spec, {
         status: resultInfo.Status as string | undefined,
         statusMessage: resultInfo.Message as string | undefined
       },
-      message: `Member removal: ${resultInfo.Message || 'Completed'}.`
+      message: `Member removal: ${resultInfo.Message || resultInfo.Status || 'Request processed'}.`
     };
   })
   .build();

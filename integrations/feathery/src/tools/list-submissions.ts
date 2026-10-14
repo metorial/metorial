@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FeatheryClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,13 @@ export let listSubmissions = SlateTool.create(spec, {
         .optional()
         .describe('Specific field IDs to include in the response'),
       sort: z.string().optional().describe('Sort order for results'),
-      pageSize: z.number().optional().describe('Number of results per page')
+      pageSize: z.number().optional().describe('Number of results per page, from 1 to 1000'),
+      pageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'nextPageUrl from a previous list_submissions result for this form. Uses the filters stored in that URL.'
+        )
     })
   )
   .output(
@@ -56,15 +62,35 @@ export let listSubmissions = SlateTool.create(spec, {
           })
         )
         .describe('List of submissions'),
-      count: z.number().optional().describe('Total number of matching submissions')
+      count: z.number().optional().describe('Total number of matching submissions'),
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to pass as pageUrl for the next page'),
+      previousPageUrl: z.string().nullable().optional().describe('URL of the previous page'),
+      currentPage: z.number().optional().describe('Current page number'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
+    if (
+      ctx.input.pageSize !== undefined &&
+      (!Number.isInteger(ctx.input.pageSize) ||
+        ctx.input.pageSize < 1 ||
+        ctx.input.pageSize > 1000)
+    ) {
+      throw createApiServiceError('pageSize must be a whole number from 1 to 1000.');
+    }
     let result = await client.listSubmissions({
       formId: ctx.input.formId,
       startTime: ctx.input.startTime,
@@ -75,7 +101,8 @@ export let listSubmissions = SlateTool.create(spec, {
       fieldSearch: ctx.input.fieldSearch,
       fields: ctx.input.fields,
       sort: ctx.input.sort,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      pageUrl: ctx.input.pageUrl
     });
 
     let submissions = Array.isArray(result) ? result : result.results || result.data || [];
@@ -84,13 +111,22 @@ export let listSubmissions = SlateTool.create(spec, {
     let mapped = submissions.map((s: any) => ({
       userId: s.user_id || s.feathery_user_id,
       completed: s.completed,
-      fieldValues: s.fields || s.field_values,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at
+      fieldValues: Array.isArray(s.values)
+        ? Object.fromEntries(s.values.map((field: any) => [field.id, field.value]))
+        : (s.fields ?? s.field_values),
+      createdAt: s.submission_start ?? s.created_at ?? undefined,
+      updatedAt: s.last_submitted ?? s.updated_at ?? undefined
     }));
 
     return {
-      output: { submissions: mapped, count },
+      output: {
+        submissions: mapped,
+        count,
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        currentPage: result.current_page,
+        totalPages: result.total_pages
+      },
       message: `Found **${count ?? mapped.length}** submission(s) for form **${ctx.input.formId}**.`
     };
   })

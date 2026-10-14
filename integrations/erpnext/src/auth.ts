@@ -1,10 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { createFrappeAxios } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      siteUrl: z.string().optional(),
+      authType: z.enum(['bearer', 'api_token', 'session']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -51,7 +54,7 @@ export let auth = SlateAuth.create()
 
     handleCallback: async ctx => {
       let baseUrl = ctx.input.siteUrl.replace(/\/+$/, '');
-      let http = createAxios({ baseURL: baseUrl });
+      let http = createFrappeAxios(baseUrl);
 
       let response = await http.post(
         '/api/method/frappe.integrations.oauth2.get_token',
@@ -69,30 +72,40 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'ERPNext',
+        operation: 'exchange authorization code'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...token,
+          siteUrl: baseUrl,
+          authType: 'bearer' as const
         },
         input: ctx.input
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      input: { siteUrl: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError('Reconnect ERPNext to obtain a refresh token.', {
+          reason: 'missing_refresh_token'
+        });
+      }
       let baseUrl = ctx.input.siteUrl.replace(/\/+$/, '');
-      let http = createAxios({ baseURL: baseUrl });
+      let http = createFrappeAxios(baseUrl);
 
       let response = await http.post(
         '/api/method/frappe.integrations.oauth2.get_token',
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || '',
+          refresh_token: ctx.output.refreshToken,
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret
         }).toString(),
@@ -103,16 +116,18 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'ERPNext',
+        operation: 'refresh access token',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...token,
+          siteUrl: baseUrl,
+          authType: 'bearer' as const
         },
         input: ctx.input
       };
@@ -124,7 +139,7 @@ export let auth = SlateAuth.create()
       scopes: string[];
     }) => {
       let baseUrl = ctx.input.siteUrl.replace(/\/+$/, '');
-      let http = createAxios({ baseURL: baseUrl });
+      let http = createFrappeAxios(baseUrl);
 
       let response = await http.get('/api/method/frappe.auth.get_logged_user', {
         headers: {
@@ -148,6 +163,9 @@ export let auth = SlateAuth.create()
     key: 'api_token',
 
     inputSchema: z.object({
+      siteUrl: z
+        .string()
+        .describe('Full ERPNext site URL (e.g., https://yoursite.erpnext.com)'),
       apiKey: z.string().describe('ERPNext API Key'),
       apiSecret: z.string().describe('ERPNext API Secret')
     }),
@@ -155,7 +173,9 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: `${ctx.input.apiKey}:${ctx.input.apiSecret}`
+          token: `${ctx.input.apiKey}:${ctx.input.apiSecret}`,
+          siteUrl: ctx.input.siteUrl.replace(/\/+$/, ''),
+          authType: 'api_token' as const
         }
       };
     },
@@ -186,7 +206,7 @@ export let auth = SlateAuth.create()
 
     getOutput: async ctx => {
       let baseUrl = ctx.input.siteUrl.replace(/\/+$/, '');
-      let http = createAxios({ baseURL: baseUrl });
+      let http = createFrappeAxios(baseUrl);
 
       let response = await http.post('/api/method/login', {
         usr: ctx.input.username,
@@ -206,9 +226,17 @@ export let auth = SlateAuth.create()
         }
       }
 
+      if (!sidCookie) {
+        throw createApiServiceError('ERPNext did not return a session cookie after login.', {
+          reason: 'missing_session_cookie'
+        });
+      }
+
       return {
         output: {
-          token: sidCookie || ''
+          token: sidCookie,
+          siteUrl: baseUrl,
+          authType: 'session' as const
         }
       };
     },

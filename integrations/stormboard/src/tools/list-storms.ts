@@ -31,16 +31,16 @@ export let listStorms = SlateTool.create(spec, {
     let client = new StormboardClient({ token: ctx.auth.token });
     let storms = await client.listStorms();
 
-    let result = Array.isArray(storms) ? storms : [];
+    let result = storms;
 
     return {
       output: {
         storms: result.map((s: any) => ({
           stormId: s.id,
-          key: s.key,
+          key: s.key ?? undefined,
           title: s.title,
-          goals: s.goals,
-          lastActivity: s.lastactivity
+          goals: s.goals ?? undefined,
+          lastActivity: s.lastactivity ?? undefined
         }))
       },
       message: `Found **${result.length}** Storm(s).`

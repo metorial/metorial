@@ -1,6 +1,13 @@
-Now let me get the full list of OAuth scopes:Now I have comprehensive information. Let me compile the specification.
+# Smartsheet API Specification
 
-# Slates Specification for Smartsheet
+## Integration refresh
+
+- `get_row` retrieves one row and its column definitions, structured cell values, formulas, hierarchy, and lock state using `GET /sheets/{sheetId}/rows/{rowId}`.
+- `share_resource` uses the current asset sharing API: `GET` and `POST /shares`, and `PATCH` and `DELETE /shares/{shareId}`, with `assetType` and `assetId` query parameters. Listings return `items` and an optional `lastKey`; callers pass that token to retrieve the next page.
+- Sharing supports users or groups. Add requires exactly one of `email` or `groupId`, plus `accessLevel`; update and remove require share IDs. Updates cannot transfer ownership.
+- OAuth requests only scopes used by the registered tools. Refresh preserves an existing refresh token if the provider omits its replacement; missing refresh state requires reconnection.
+
+Official references: [Rows](https://developers.smartsheet.com/api/smartsheet/openapi/rows/row-get), [Sharing](https://developers.smartsheet.com/api/smartsheet/openapi/sharing/get-asset-share), [OAuth](https://developers.smartsheet.com/api/smartsheet/guides/advanced-topics/oauth), and [API changelog](https://developers.smartsheet.com/api/smartsheet/changelog).
 
 ## Overview
 

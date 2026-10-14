@@ -82,7 +82,7 @@ export let updateTask = SlateTool.create(spec, {
     let data: Record<string, any> = {};
     if (ctx.input.title !== undefined) data.title = ctx.input.title;
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
-    if (ctx.input.complete !== undefined) data.complete = ctx.input.complete;
+    if (ctx.input.complete !== undefined) data.completed = ctx.input.complete;
     if (ctx.input.projectId !== undefined) data.project_id = ctx.input.projectId;
     if (ctx.input.assigneeId !== undefined) data.assignee_id = ctx.input.assigneeId;
     if (ctx.input.dueDate !== undefined) data.due_date = ctx.input.dueDate;
@@ -144,8 +144,8 @@ export let getTasks = SlateTool.create(spec, {
     return {
       output: {
         tasks,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${tasks.length} task(s).`
     };
@@ -185,13 +185,13 @@ export let deleteTask = SlateTool.create(spec, {
 let mapTask = (t: any) => ({
   taskId: t.id,
   title: t.title,
-  description: t.description,
-  complete: t.complete,
-  dueDate: t.due_date,
-  assigneeId: t.assignee_id,
-  projectId: t.project_id,
-  clientId: t.client_id,
-  completedAt: t.completed_at,
-  createdAt: t.created_at,
-  updatedAt: t.updated_at
+  description: t.description ?? undefined,
+  complete: t.complete ?? undefined,
+  dueDate: t.due_date ?? undefined,
+  assigneeId: t.assignee_id ?? undefined,
+  projectId: t.project_id ?? undefined,
+  clientId: t.client_id ?? undefined,
+  completedAt: t.completed_at ?? undefined,
+  createdAt: t.created_at ?? undefined,
+  updatedAt: t.updated_at ?? undefined
 });

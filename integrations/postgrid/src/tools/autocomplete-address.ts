@@ -37,13 +37,15 @@ export let autocompleteAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressVerificationClient(ctx.auth.token);
+    let client = new AddressVerificationClient(
+      ctx.auth.addressVerificationToken ?? ctx.auth.token
+    );
     let result = await client.autocompleteAddress(ctx.input.partialStreet);
 
     let suggestions = (result.data || []).map((s: any) => ({
-      address: s.address,
-      city: s.city,
-      postalCodePrefix: s.pc
+      address: (s.preview ?? s).address,
+      city: (s.preview ?? s).city,
+      postalCodePrefix: (s.preview ?? s).pc
     }));
 
     return {
@@ -93,7 +95,9 @@ export let autocompleteInternationalAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressVerificationClient(ctx.auth.token);
+    let client = new AddressVerificationClient(
+      ctx.auth.addressVerificationToken ?? ctx.auth.token
+    );
     let result = await client.autocompleteInternationalAddress(
       ctx.input.partialStreet,
       ctx.input.countriesFilter

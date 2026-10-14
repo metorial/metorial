@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
+import { cmsModelIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteCmsItem = SlateTool.create(spec, {
@@ -13,9 +14,7 @@ export let deleteCmsItem = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      modelId: z
-        .string()
-        .describe('Unique identifier of the CMS model/table containing the item'),
+      modelId: cmsModelIdSchema,
       rowId: z.string().describe('ID of the row/item to delete')
     })
   )
@@ -25,8 +24,8 @@ export let deleteCmsItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.cmsId || !ctx.auth.cmsPublicToken || !ctx.auth.cmsSecretToken) {
-      throw new Error('CMS ID, public token, and secret token are required to delete items');
+    if (!ctx.auth.cmsId || !ctx.auth.cmsSecretToken) {
+      throw createApiServiceError('CMS ID and secret token are required to delete items');
     }
 
     let client = new CmsClient({

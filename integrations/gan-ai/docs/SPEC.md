@@ -1,6 +1,4 @@
-Now let me also check the Studio API (docs.gan.ai) for the video personalization side and the webhook for that:Now I have comprehensive information about both Gan.AI APIs. Let me compile the specification.
-
-# Slates Specification for Gan.AI
+# Gan.AI API Capabilities
 
 ## Overview
 

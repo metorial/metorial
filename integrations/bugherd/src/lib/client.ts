@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   BugherdAttachment,
   BugherdColumn,
@@ -21,15 +21,20 @@ export class BugherdClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (typeof token !== 'string' || !token.trim()) {
+      throw createApiServiceError(
+        'A BugHerd API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://www.bugherd.com/api_v2',
       auth: {
         username: token,
         password: 'x'
       },
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'BugHerd', reason: 'bugherd_api_error' })
     });
   }
 
@@ -37,23 +42,35 @@ export class BugherdClient {
 
   async getOrganization(): Promise<BugherdOrganization> {
     let response = await this.axios.get('/organization.json');
-    return response.data.organization;
+    let organization = response.data.organization;
+    if (
+      !organization ||
+      typeof organization.id !== 'number' ||
+      typeof organization.name !== 'string'
+    ) {
+      throw createApiServiceError(
+        'BugHerd returned invalid organization details. Verify the API key and try again.'
+      );
+    }
+    return organization;
   }
 
   // ---- Users ----
 
-  async listUsers(): Promise<BugherdUser[]> {
-    let response = await this.axios.get('/users.json');
+  async listUsers(filters?: { page?: number; updatedSince?: string }): Promise<BugherdUser[]> {
+    let response = await this.axios.get('/users.json', {
+      params: { page: filters?.page, updated_since: filters?.updatedSince }
+    });
     return response.data.users ?? [];
   }
 
-  async listMembers(): Promise<BugherdUser[]> {
-    let response = await this.axios.get('/users/members.json');
+  async listMembers(page?: number): Promise<BugherdUser[]> {
+    let response = await this.axios.get('/users/members.json', { params: { page } });
     return response.data.users ?? [];
   }
 
-  async listGuests(): Promise<BugherdUser[]> {
-    let response = await this.axios.get('/users/guests.json');
+  async listGuests(page?: number): Promise<BugherdUser[]> {
+    let response = await this.axios.get('/users/guests.json', { params: { page } });
     return response.data.users ?? [];
   }
 
@@ -75,11 +92,12 @@ export class BugherdClient {
 
   async getUserProjects(
     userId: number,
-    filters?: { createdSince?: string; isActive?: boolean }
+    filters?: { createdSince?: string; isActive?: boolean; page?: number }
   ): Promise<BugherdProject[]> {
-    let params: Record<string, string | boolean> = {};
+    let params: Record<string, string | boolean | number> = {};
     if (filters?.createdSince) params.created_since = filters.createdSince;
     if (filters?.isActive !== undefined) params.is_active = filters.isActive;
+    if (filters?.page !== undefined) params.page = filters.page;
 
     let response = await this.axios.get(`/users/${userId}/projects.json`, { params });
     return response.data.projects ?? [];
@@ -87,13 +105,13 @@ export class BugherdClient {
 
   // ---- Projects ----
 
-  async listProjects(): Promise<BugherdProject[]> {
-    let response = await this.axios.get('/projects.json');
+  async listProjects(page?: number): Promise<BugherdProject[]> {
+    let response = await this.axios.get('/projects.json', { params: { page } });
     return response.data.projects ?? [];
   }
 
-  async listActiveProjects(): Promise<BugherdProject[]> {
-    let response = await this.axios.get('/projects/active.json');
+  async listActiveProjects(page?: number): Promise<BugherdProject[]> {
+    let response = await this.axios.get('/projects/active.json', { params: { page } });
     return response.data.projects ?? [];
   }
 
@@ -122,12 +140,14 @@ export class BugherdClient {
     projectId: number,
     params: UpdateProjectParams
   ): Promise<BugherdProject> {
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (params.name !== undefined) body.name = params.name;
     if (params.devurl !== undefined) body.devurl = params.devurl;
     if (params.isActive !== undefined) body.is_active = params.isActive;
     if (params.isPublic !== undefined) body.is_public = params.isPublic;
-    if (params.permission !== undefined) body.permission = params.permission;
+    if (params.permission !== undefined) {
+      body.guests_see_guests = params.permission === 'guests_see_guests';
+    }
 
     let response = await this.axios.put(`/projects/${projectId}.json`, { project: body });
     return response.data.project;
@@ -145,7 +165,7 @@ export class BugherdClient {
     projectId: number,
     params: { userId?: number; email?: string }
   ): Promise<void> {
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (params.userId) body.user_id = params.userId;
     if (params.email) body.email = params.email;
     await this.axios.post(`/projects/${projectId}/add_guest.json`, body);
@@ -200,13 +220,20 @@ export class BugherdClient {
     return response.data.task;
   }
 
+  async getTaskByLocalId(projectId: number, localTaskId: number): Promise<BugherdTask> {
+    let response = await this.axios.get(
+      `/projects/${projectId}/local_tasks/${localTaskId}.json`
+    );
+    return response.data.task;
+  }
+
   async getTaskGlobal(taskId: number): Promise<BugherdTask> {
     let response = await this.axios.get(`/tasks/${taskId}.json`);
     return response.data.task;
   }
 
   async createTask(projectId: number, params: CreateTaskParams): Promise<BugherdTask> {
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       description: params.description
     };
     if (params.priority) body.priority = params.priority;
@@ -227,7 +254,7 @@ export class BugherdClient {
     taskId: number,
     params: UpdateTaskParams
   ): Promise<BugherdTask> {
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (params.description !== undefined) body.description = params.description;
     if (params.priority !== undefined) body.priority = params.priority;
     if (params.status !== undefined) body.status = params.status;
@@ -249,9 +276,9 @@ export class BugherdClient {
     taskIds: number[],
     targetProjectId: number
   ): Promise<void> {
-    await this.axios.post(`/projects/${projectId}/tasks/move_tasks.json`, {
+    await this.axios.post(`/projects/${projectId}/move_tasks.json`, {
       task_ids: taskIds,
-      target_project_id: targetProjectId
+      destination_project_id: targetProjectId
     });
   }
 
@@ -269,7 +296,7 @@ export class BugherdClient {
     taskId: number,
     params: CreateCommentParams
   ): Promise<BugherdComment> {
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       text: params.text
     };
     if (params.userId) body.user_id = params.userId;

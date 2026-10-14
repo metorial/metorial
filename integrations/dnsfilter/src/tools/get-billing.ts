@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,8 @@ export let getBilling = SlateTool.create(spec, {
     let { type } = ctx.input;
 
     if (type === 'billing') {
-      if (!ctx.input.organizationId) throw new Error('organizationId is required for billing');
+      if (!ctx.input.organizationId)
+        throw createApiServiceError('organizationId is required for billing');
       let billing = await client.getBilling(ctx.input.organizationId);
       return {
         output: { billing },
@@ -47,7 +48,7 @@ export let getBilling = SlateTool.create(spec, {
 
     if (type === 'invoices') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for invoices');
+        throw createApiServiceError('organizationId is required for invoices');
       let invoices = await client.listInvoices(ctx.input.organizationId);
       return {
         output: { invoices },
@@ -63,7 +64,8 @@ export let getBilling = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.invoiceId) throw new Error('invoiceId is required for type "invoice"');
+    if (!ctx.input.invoiceId)
+      throw createApiServiceError('invoiceId is required for type "invoice"');
     let invoice = await client.getInvoice(ctx.input.invoiceId);
     return {
       output: { invoice },

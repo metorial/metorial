@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
   key: 'list_tasks',
-  description: `Retrieve all tasks and projects from TimeCamp. Projects are top-level tasks (level 1), and tasks are nested beneath them hierarchically. Optionally retrieve a single task by ID.`,
+  description: `Retrieve tasks and projects from TimeCamp. Projects are top-level tasks (level 1), and tasks are nested beneath them hierarchically. Optionally retrieve a single task by ID.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +16,11 @@ export let listTasks = SlateTool.create(spec, {
       taskId: z
         .number()
         .optional()
-        .describe('Specific task ID to retrieve. Omit to list all tasks.')
+        .describe('Specific task ID to retrieve. Omit to list tasks.'),
+      status: z
+        .enum(['active', 'archived', 'all'])
+        .optional()
+        .describe('Task status filter. Defaults to active.')
     })
   )
   .output(
@@ -40,18 +44,18 @@ export let listTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let tasks = await client.getTasks(ctx.input.taskId);
+    let tasks = await client.getTasks(ctx.input.taskId, ctx.input.status);
 
     let mapped = (tasks || []).map(t => ({
       taskId: String(t.task_id),
-      parentId: String(t.parent_id),
+      parentId: String(t.parent_id ?? 0),
       name: t.name || '',
-      level: String(t.level),
+      level: String(t.level ?? ''),
       archived: String(t.archived || '0'),
       tags: t.tags || '',
       billable: String(t.billable || '0'),
       note: t.note || '',
-      budgeted: t.budgeted || ''
+      budgeted: String(t.budgeted ?? '')
     }));
 
     return {

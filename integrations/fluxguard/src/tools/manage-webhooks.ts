@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FluxguardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,15 +32,20 @@ export let listWebhooks = SlateTool.create(spec, {
     let client = new FluxguardClient(ctx.auth.token);
 
     let result = await client.listWebhooks();
-
-    let webhooks: Array<{ webhookId: string; url?: string; secret?: string }> = [];
-    if (Array.isArray(result)) {
-      webhooks = result.map((w: any) => ({
-        webhookId: w.id ?? w.webhookId ?? '',
-        url: w.url ?? undefined,
-        secret: w.secret ?? undefined
-      }));
+    if (!Array.isArray(result)) {
+      throw createApiServiceError('Fluxguard returned an invalid webhook list.');
     }
+    let webhooks = result.map(w => {
+      let webhookId = w?.id ?? w?.webhookId;
+      if (typeof webhookId !== 'string' || !webhookId.trim()) {
+        throw createApiServiceError('Fluxguard returned a webhook without an identifier.');
+      }
+      return {
+        webhookId,
+        url: typeof w.url === 'string' ? w.url : undefined,
+        secret: typeof w.secret === 'string' ? w.secret : undefined
+      };
+    });
 
     return {
       output: { webhooks },
@@ -74,10 +79,16 @@ export let createWebhook = SlateTool.create(spec, {
     let client = new FluxguardClient(ctx.auth.token);
 
     let result = await client.createWebhook(ctx.input.url);
+    let webhookId = typeof result === 'string' ? result : (result?.id ?? result?.webhookId);
+    if (typeof webhookId !== 'string' || !webhookId.trim()) {
+      throw createApiServiceError(
+        'Fluxguard did not return an identifier for the created webhook. Call list_webhooks before retrying.'
+      );
+    }
 
     return {
       output: {
-        webhookId: result.id ?? result.webhookId ?? ''
+        webhookId
       },
       message: `Created webhook for **${ctx.input.url}**.`
     };

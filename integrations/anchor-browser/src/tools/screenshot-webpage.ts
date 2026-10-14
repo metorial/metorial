@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let screenshotWebpage = SlateTool.create(spec, {
   name: 'Screenshot Webpage',
   key: 'screenshot_webpage',
-  description: `Capture a screenshot of a webpage. Can be used standalone or within an existing session. Returns a base64-encoded image. Supports configurable viewport size, quality, full-page capture, and S3 upload.`,
+  description: `Capture a webpage as a downloadable PNG screenshot, standalone or within an existing session. Supports configurable viewport size, quality, full-page capture, and an optional S3 upload target.`,
   tags: {
     readOnly: true
   }
@@ -40,12 +40,19 @@ export let screenshotWebpage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      image: z.string().describe('Base64-encoded screenshot image or S3 reference')
+      image: z.string().optional().describe('Legacy image field; use the downloadable PNG'),
+      fileName: z.string(),
+      mimeType: z.string()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
+    if (!input.url && !input.sessionId) {
+      throw createApiServiceError(
+        'Provide a url or an existing sessionId to capture a screenshot.'
+      );
+    }
 
     let result = await client.screenshotWebpage(
       {
@@ -60,12 +67,19 @@ export let screenshotWebpage = SlateTool.create(spec, {
       },
       input.sessionId
     );
+    await ctx.addAttachment({
+      type: 'content',
+      content: result,
+      filename: 'screenshot.png',
+      mimeType: 'image/png'
+    });
 
     return {
       output: {
-        image: result.image
+        fileName: 'screenshot.png',
+        mimeType: 'image/png'
       },
-      message: `Screenshot captured${input.url ? ` for **${input.url}**` : ''}${input.s3TargetAddress ? ' and uploaded to S3' : ''}.`
+      message: `Screenshot captured${input.url ? ` for **${input.url}**` : ''}. Download the PNG to view it.`
     };
   })
   .build();

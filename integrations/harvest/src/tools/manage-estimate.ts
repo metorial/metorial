@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -23,7 +24,7 @@ let estimateLineItemSchema = z.object({
 export let manageEstimate = SlateTool.create(spec, {
   name: 'Manage Estimate',
   key: 'manage_estimate',
-  description: `Create, update, or delete an estimate in Harvest. Estimates include line items and can be sent to clients for approval.`,
+  description: `Create, update, or delete an estimate in Harvest. Estimates include line items and can be sent to clients for approval. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -31,6 +32,7 @@ export let manageEstimate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       estimateId: z.number().optional().describe('Estimate ID (required for update/delete)'),
       clientId: z.number().optional().describe('Client ID (required for create)'),
@@ -60,11 +62,32 @@ export let manageEstimate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
+    for (let item of ctx.input.lineItems ?? []) {
+      let createsItem =
+        ctx.input.action === 'create' ||
+        (ctx.input.action === 'update' && item.lineItemId === undefined);
+      if (createsItem && (!item.kind || item.unitPrice === undefined)) {
+        throw createApiServiceError('New line items require kind and unitPrice.');
+      }
+      if (
+        ctx.input.action === 'create' &&
+        (item.lineItemId !== undefined || item.destroy !== undefined)
+      ) {
+        throw createApiServiceError(
+          'lineItemId and destroy are only supported when updating line items.'
+        );
+      }
+      if (ctx.input.action === 'update' && item.destroy && item.lineItemId === undefined) {
+        throw createApiServiceError('lineItemId is required to delete an existing line item.');
+      }
+    }
+
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.estimateId) throw new Error('estimateId is required for delete');
+      if (!ctx.input.estimateId)
+        throw createApiServiceError('estimateId is required for delete');
       await client.deleteEstimate(ctx.input.estimateId);
       return {
         output: { estimateId: ctx.input.estimateId, deleted: true },
@@ -73,9 +96,9 @@ export let manageEstimate = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for create');
+      if (!ctx.input.clientId) throw createApiServiceError('clientId is required for create');
       let createLineItems = ctx.input.lineItems?.map(li => ({
-        kind: li.kind!,
+        kind: li.kind ?? '',
         description: li.description,
         quantity: li.quantity,
         unitPrice: li.unitPrice,
@@ -109,7 +132,8 @@ export let manageEstimate = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.estimateId) throw new Error('estimateId is required for update');
+    if (!ctx.input.estimateId)
+      throw createApiServiceError('estimateId is required for update');
     let est = await client.updateEstimate(ctx.input.estimateId, {
       clientId: ctx.input.clientId,
       number: ctx.input.number,

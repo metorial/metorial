@@ -1,6 +1,4 @@
-Let me get more details from the API documentation.Now let me look at the Swagger/OpenAPI spec to understand the full API features.Let me fetch the actual swagger.yaml to understand the full API.Now I have enough information to write the specification. Let me also check the swagger yaml for more details on the resources.Now I have comprehensive information. Let me compile the specification.
-
-# Slates Specification for OnePageCRM
+# OnePageCRM Integration Specification
 
 ## Overview
 
@@ -89,3 +87,16 @@ Triggered when a deal is created, updated, or deleted. Additional deal-specific 
 ### Note Events
 
 Triggered when a note is created, updated, or deleted.
+
+
+## Registered API additions
+
+- `get_current_user`: reads `GET /users/{user_id}` using the authenticated API user ID. Returns the user's identity and account rights.
+- `get_deal`: reads `GET /deals/{deal_id}` so a discovered deal can be inspected independently.
+- `delete_note`: calls `DELETE /notes/{note_id}`. The API permanently removes the note and its associated files; it does not support undo.
+
+## Compatibility details
+
+Contact addresses use the provider's `address_list`; the existing single `address` input replaces that list with one address. Contact starring uses the additive boolean `starred` input. The existing numeric `starValue` input is retained but rejected with guidance because the provider has no numeric star rating. Company and deal `customFields` retain their public shape and use `company_fields` and `deal_fields` upstream. Action completion and reopening use the documented `mark_as_done` and `undo_completion` endpoints; completion state and field edits must be submitted separately.
+
+Official API reference: https://developer.onepagecrm.com/api/reference/

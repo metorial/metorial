@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://productlane.com/api/v1';
 
@@ -6,12 +6,15 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Productlane',
+          reason: 'productlane_api_error',
+          nestedKeys: ['errors', 'issues']
+        })
     });
   }
 
@@ -28,12 +31,14 @@ export class Client {
   }
 
   async getCompany(companyId: string) {
-    let response = await this.axios.get(`/companies/${companyId}`);
+    let response = await this.axios.get(`/companies/${encodeURIComponent(companyId)}`);
     return response.data;
   }
 
   async createCompany(data: {
     name: string;
+    domain?: string;
+    segments?: string[];
     domains?: string[];
     autoAdd?: boolean;
     externalIds?: string[];
@@ -65,12 +70,12 @@ export class Client {
       statusColor?: string | null;
     }
   ) {
-    let response = await this.axios.patch(`/companies/${companyId}`, data);
+    let response = await this.axios.patch(`/companies/${encodeURIComponent(companyId)}`, data);
     return response.data;
   }
 
   async deleteCompany(companyId: string) {
-    let response = await this.axios.delete(`/companies/${companyId}`);
+    let response = await this.axios.delete(`/companies/${encodeURIComponent(companyId)}`);
     return response.data;
   }
 
@@ -87,7 +92,7 @@ export class Client {
   }
 
   async getContact(contactId: string) {
-    let response = await this.axios.get(`/contacts/${contactId}`);
+    let response = await this.axios.get(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data;
   }
 
@@ -112,12 +117,12 @@ export class Client {
       companyExternalId?: string;
     }
   ) {
-    let response = await this.axios.patch(`/contacts/${contactId}`, data);
+    let response = await this.axios.patch(`/contacts/${encodeURIComponent(contactId)}`, data);
     return response.data;
   }
 
   async deleteContact(contactId: string) {
-    let response = await this.axios.delete(`/contacts/${contactId}`);
+    let response = await this.axios.delete(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data;
   }
 
@@ -135,7 +140,7 @@ export class Client {
   }
 
   async getThread(threadId: string, includeConversation?: boolean) {
-    let response = await this.axios.get(`/threads/${threadId}`, {
+    let response = await this.axios.get(`/threads/${encodeURIComponent(threadId)}`, {
       params: includeConversation ? { includeConversation: 'true' } : undefined
     });
     return response.data;
@@ -177,7 +182,7 @@ export class Client {
       updatedAt?: string;
     }
   ) {
-    let response = await this.axios.patch(`/threads/${threadId}`, data);
+    let response = await this.axios.patch(`/threads/${encodeURIComponent(threadId)}`, data);
     return response.data;
   }
 
@@ -190,31 +195,54 @@ export class Client {
       channelId?: string;
     }
   ) {
-    let response = await this.axios.post(`/threads/${threadId}/messages`, data);
+    let response = await this.axios.post(
+      `/threads/${encodeURIComponent(threadId)}/messages`,
+      data
+    );
+    return response.data;
+  }
+
+  async createPortalFeedback(data: {
+    workspaceId: string;
+    text: string;
+    painLevel: 'UNKNOWN' | 'LOW' | 'MEDIUM' | 'HIGH';
+    email: string;
+    projectId?: string;
+    notify?: { slack?: boolean; email?: boolean };
+  }) {
+    let response = await this.axios.post('/feedback', data);
     return response.data;
   }
 
   // ── Portal: Projects ──
 
   async listProjects(workspaceId: string, params?: { language?: string }) {
-    let response = await this.axios.get(`/projects/${workspaceId}`, { params });
+    let response = await this.axios.get(`/projects/${encodeURIComponent(workspaceId)}`, {
+      params
+    });
     return response.data;
   }
 
   async getProject(workspaceId: string, projectId: string) {
-    let response = await this.axios.get(`/projects/${workspaceId}/${projectId}`);
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(workspaceId)}/${encodeURIComponent(projectId)}`
+    );
     return response.data;
   }
 
   // ── Portal: Issues ──
 
   async listIssues(workspaceId: string, params?: { language?: string }) {
-    let response = await this.axios.get(`/issues/${workspaceId}`, { params });
+    let response = await this.axios.get(`/issues/${encodeURIComponent(workspaceId)}`, {
+      params
+    });
     return response.data;
   }
 
   async getIssue(workspaceId: string, issueId: string) {
-    let response = await this.axios.get(`/issues/${workspaceId}/${issueId}`);
+    let response = await this.axios.get(
+      `/issues/${encodeURIComponent(workspaceId)}/${encodeURIComponent(issueId)}`
+    );
     return response.data;
   }
 
@@ -231,7 +259,7 @@ export class Client {
   }
 
   async deleteUpvote(upvoteId: string) {
-    let response = await this.axios.delete(`/portal/upvotes/${upvoteId}`);
+    let response = await this.axios.delete(`/portal/upvotes/${encodeURIComponent(upvoteId)}`);
     return response.data;
   }
 
@@ -241,12 +269,16 @@ export class Client {
     workspaceId: string,
     params?: { language?: string; skip?: number; take?: number }
   ) {
-    let response = await this.axios.get(`/changelogs/${workspaceId}`, { params });
+    let response = await this.axios.get(`/changelogs/${encodeURIComponent(workspaceId)}`, {
+      params
+    });
     return response.data;
   }
 
   async getChangelog(workspaceId: string, changelogId: string) {
-    let response = await this.axios.get(`/changelogs/${workspaceId}/${changelogId}`);
+    let response = await this.axios.get(
+      `/changelogs/${encodeURIComponent(workspaceId)}/${encodeURIComponent(changelogId)}`
+    );
     return response.data;
   }
 
@@ -271,19 +303,22 @@ export class Client {
       archived?: boolean;
     }
   ) {
-    let response = await this.axios.patch(`/changelogs/${changelogId}`, data);
+    let response = await this.axios.patch(
+      `/changelogs/${encodeURIComponent(changelogId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteChangelog(changelogId: string) {
-    let response = await this.axios.delete(`/changelogs/${changelogId}`);
+    let response = await this.axios.delete(`/changelogs/${encodeURIComponent(changelogId)}`);
     return response.data;
   }
 
   // ── Workspaces ──
 
   async getWorkspace(workspaceId: string) {
-    let response = await this.axios.get(`/workspaces/${workspaceId}`);
+    let response = await this.axios.get(`/workspaces/${encodeURIComponent(workspaceId)}`);
     return response.data;
   }
 
@@ -300,12 +335,16 @@ export class Client {
     workspaceId: string,
     params?: { language?: string; groupId?: string; skip?: number; take?: number }
   ) {
-    let response = await this.axios.get(`/docs/articles/${workspaceId}`, { params });
+    let response = await this.axios.get(`/docs/articles/${encodeURIComponent(workspaceId)}`, {
+      params
+    });
     return response.data;
   }
 
   async getArticle(workspaceId: string, articleId: string) {
-    let response = await this.axios.get(`/docs/articles/${workspaceId}/${articleId}`);
+    let response = await this.axios.get(
+      `/docs/articles/${encodeURIComponent(workspaceId)}/${encodeURIComponent(articleId)}`
+    );
     return response.data;
   }
 
@@ -332,12 +371,15 @@ export class Client {
       showOnHomePage?: boolean;
     }
   ) {
-    let response = await this.axios.patch(`/docs/articles/${articleId}`, data);
+    let response = await this.axios.patch(
+      `/docs/articles/${encodeURIComponent(articleId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteArticle(articleId: string) {
-    let response = await this.axios.delete(`/docs/articles/${articleId}`);
+    let response = await this.axios.delete(`/docs/articles/${encodeURIComponent(articleId)}`);
     return response.data;
   }
 }

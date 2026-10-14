@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTag = SlateTool.create(spec, {
   name: 'Manage Tag',
   key: 'manage_tag',
-  description: `Create or update a tag in Nozbe Teams. Tags categorize tasks by context, place, or tool. Configure with custom name, color, and icon. Set teamId to make a tag public (visible to all space members) or leave null for private.`,
+  description: `Create or update a tag in Nozbe Teams. Tags categorize tasks by context, place, or tool. Configure with custom name, color, and icon. Set teamId to make a tag public (visible to all space members) or leave null for private. Call list_teams to discover space IDs.`,
   tags: {
     destructive: false
   }
@@ -15,11 +16,12 @@ export let manageTag = SlateTool.create(spec, {
     z.object({
       tagId: z.string().optional().describe('Tag ID to update. Omit to create a new tag.'),
       name: z.string().optional().describe('Tag name (required when creating)'),
-      teamId: z
-        .string()
+      teamId: teamIdSchema
         .nullable()
         .optional()
-        .describe('Team ID for public tags, null for private'),
+        .describe(
+          'Space ID for public tags, null for private. Call list_teams to discover space IDs.'
+        ),
       color: z.string().nullable().optional().describe('Tag color'),
       icon: z.string().nullable().optional().describe('Tag icon identifier'),
       isFavorite: z.boolean().optional().describe('Whether to favorite the tag')
@@ -35,6 +37,9 @@ export let manageTag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.tagId && !ctx.input.name?.trim()) {
+      throw createApiServiceError('name is required when creating a tag.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let data: Record<string, unknown> = {};
@@ -46,6 +51,9 @@ export let manageTag = SlateTool.create(spec, {
 
     let tag: any;
     if (ctx.input.tagId) {
+      if (Object.keys(data).length === 0) {
+        throw createApiServiceError('Provide at least one field to update the tag.');
+      }
       tag = await client.updateTag(ctx.input.tagId, data);
     } else {
       tag = await client.createTag(data);

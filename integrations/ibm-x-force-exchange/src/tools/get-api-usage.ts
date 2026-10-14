@@ -28,8 +28,17 @@ export let getApiUsage = SlateTool.create(spec, {
     ctx.progress('Fetching API usage...');
     let data = await client.getApiUsage();
 
+    let usage = Array.isArray(data)
+      ? Object.fromEntries(
+          data.map((subscription, index) => [
+            `${subscription.subscriptionType ?? 'subscription'}:${subscription.usageData?.subscriptionID ?? index}`,
+            subscription
+          ])
+        )
+      : data;
+
     return {
-      output: { usage: data },
+      output: { usage },
       message: `Retrieved API usage statistics`
     };
   })

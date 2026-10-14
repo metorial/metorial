@@ -1,4 +1,4 @@
-Let me find the specific webhook event types that SavvyCal supports.# Slates Specification for SavvyCal
+# SavvyCal API Specification
 
 ## Overview
 
@@ -24,7 +24,7 @@ Authorization: Bearer pt_secret_XXXXXXXXXXX
 
 OAuth is used for building integrations where you are operating on behalf of another user.
 
-To register an OAuth app, you must reach out to SavvyCal support.
+Register an OAuth app under Settings > Developers in SavvyCal.
 
 **Authorization URL:** `https://savvycal.com/oauth/authorize`
 **Token URL:** `https://savvycal.com/oauth/token`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FeatheryClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let exportSubmissionPdf = SlateTool.create(spec, {
   name: 'Export Submission as PDF',
   key: 'export_submission_pdf',
-  description: `Generate a PDF export of a form submission for a specific user. Returns the URL or content of the generated PDF.`,
+  description: `Generate a PDF export of a form submission for a specific user. Provides the generated PDF for download. A completed submission uses its existing exported PDF.`,
   tags: {
     readOnly: true
   }
@@ -26,7 +26,11 @@ export let exportSubmissionPdf = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let result = await client.exportSubmissionPdf({
@@ -34,9 +38,22 @@ export let exportSubmissionPdf = SlateTool.create(spec, {
       userId: ctx.input.userId
     });
 
+    let pdfUrl = result.pdf_url || result.url || result.file_url;
+    if (
+      typeof pdfUrl !== 'string' ||
+      !URL.canParse(pdfUrl) ||
+      !['http:', 'https:'].includes(new URL(pdfUrl).protocol)
+    ) {
+      throw createApiServiceError(
+        'Feathery did not return a submission PDF URL. Retry the export.'
+      );
+    }
+    await client.waitForSubmissionPdf(pdfUrl);
+    await ctx.addAttachment({ type: 'url', url: pdfUrl, mimeType: 'application/pdf' });
+
     return {
       output: {
-        pdfUrl: result.url || result.file_url || result.pdf_url,
+        pdfUrl,
         exported: true
       },
       message: `Exported submission PDF for user **${ctx.input.userId}** on form **${ctx.input.formId}**.`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,8 +35,8 @@ export let listClients = SlateTool.create(spec, {
     let mapped = clients.map((c: any) => ({
       clientId: c.id,
       name: c.name,
-      projects: c.projects,
-      businessDetails: c.businessDetails,
+      projects: c.projects ?? undefined,
+      businessDetails: c.businessDetails ?? undefined,
       budget: c.budget
     }));
     return {
@@ -69,8 +69,8 @@ export let createClient = SlateTool.create(spec, {
       output: {
         clientId: result.id,
         name: result.name,
-        projects: result.projects,
-        businessDetails: result.businessDetails,
+        projects: result.projects ?? undefined,
+        businessDetails: result.businessDetails ?? undefined,
         budget: result.budget
       },
       message: `Created client **${result.name}** (ID: ${result.id}).`
@@ -113,22 +113,31 @@ export let updateClient = SlateTool.create(spec, {
     let client = new EverhourClient(ctx.auth.token);
     let { clientId, budget, removeBudget, ...updateData } = ctx.input;
 
-    let result = await client.updateClient(clientId, updateData);
+    if (budget && removeBudget) {
+      throw createApiServiceError('Provide budget or removeBudget, not both.');
+    }
+    updateData = pickDefined(updateData);
+    if (Object.keys(updateData).length > 0) {
+      await client.updateClient(clientId, updateData);
+    }
 
     if (removeBudget) {
       await client.removeClientBudget(clientId);
-      result = await client.getClient(clientId);
     } else if (budget) {
-      await client.setClientBudget(clientId, budget);
-      result = await client.getClient(clientId);
+      await client.setClientBudget(clientId, {
+        ...budget,
+        period: budget.period ?? 'general'
+      });
     }
+
+    let result = await client.getClient(clientId);
 
     return {
       output: {
         clientId: result.id,
         name: result.name,
-        projects: result.projects,
-        businessDetails: result.businessDetails,
+        projects: result.projects ?? undefined,
+        businessDetails: result.businessDetails ?? undefined,
         budget: result.budget
       },
       message: `Updated client **${result.name}**.`

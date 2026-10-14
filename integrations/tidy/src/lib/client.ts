@@ -1,27 +1,23 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://api.tidy.com/api/v1'
-});
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { toTidyServiceError } from './errors';
+import { toTidyDateTime, toTidyId } from './format';
 
 export class Client {
-  private token: string;
+  private http;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private get headers() {
-    return {
-      Authorization: `Bearer ${this.token}`,
-      'Content-Type': 'application/json'
-    };
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.tidy.com/api/v1',
+      timeout: 30_000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: toTidyServiceError
+    });
   }
 
   // ── Addresses ──────────────────────────────────────────
 
   async listAddresses(): Promise<any> {
-    let res = await http.get('/addresses', { headers: this.headers });
+    let res = await this.http.get('/addresses');
     return res.data;
   }
 
@@ -62,12 +58,12 @@ export class Client {
     if (params.parkingNotes !== undefined) parking.parking_notes = params.parkingNotes;
     if (Object.keys(parking).length > 0) body.parking = parking;
 
-    let res = await http.post('/addresses', body, { headers: this.headers });
+    let res = await this.http.post('/addresses', body);
     return res.data;
   }
 
   async getAddress(addressId: string): Promise<any> {
-    let res = await http.get(`/addresses/${addressId}`, { headers: this.headers });
+    let res = await this.http.get(`/addresses/${encodeURIComponent(addressId)}`);
     return res.data;
   }
 
@@ -100,12 +96,12 @@ export class Client {
     if (params.parkingNotes !== undefined) parking.parking_notes = params.parkingNotes;
     if (Object.keys(parking).length > 0) body.parking = parking;
 
-    let res = await http.put(`/addresses/${addressId}`, body, { headers: this.headers });
+    let res = await this.http.put(`/addresses/${encodeURIComponent(addressId)}`, body);
     return res.data;
   }
 
   async deleteAddress(addressId: string): Promise<void> {
-    await http.delete(`/addresses/${addressId}`, { headers: this.headers });
+    await this.http.delete(`/addresses/${encodeURIComponent(addressId)}`);
   }
 
   // ── Jobs ───────────────────────────────────────────────
@@ -119,7 +115,7 @@ export class Client {
     if (params?.addressId) query.address_id = params.addressId;
     if (params?.status) query.status = params.status;
     if (params?.toDoListId) query.to_do_list_id = params.toDoListId;
-    let res = await http.get('/jobs', { headers: this.headers, params: query });
+    let res = await this.http.get('/jobs', { params: query });
     return res.data;
   }
 
@@ -132,21 +128,25 @@ export class Client {
     preferredStartDatetime?: string;
   }): Promise<any> {
     let body: Record<string, any> = {
-      address_id: params.addressId,
+      address_id: toTidyId(params.addressId, 'addressId'),
       service_type_key: params.serviceTypeKey,
-      start_no_earlier_than: params.startNoEarlierThan,
-      end_no_later_than: params.endNoLaterThan
+      start_no_earlier_than: toTidyDateTime(params.startNoEarlierThan, 'startNoEarlierThan'),
+      end_no_later_than: toTidyDateTime(params.endNoLaterThan, 'endNoLaterThan')
     };
-    if (params.toDoListId !== undefined) body.to_do_list_id = params.toDoListId;
+    if (params.toDoListId !== undefined)
+      body.to_do_list_id = toTidyId(params.toDoListId, 'toDoListId');
     if (params.preferredStartDatetime !== undefined)
-      body.preferred_start_datetime = params.preferredStartDatetime;
+      body.preferred_start_datetime = toTidyDateTime(
+        params.preferredStartDatetime,
+        'preferredStartDatetime'
+      );
 
-    let res = await http.post('/jobs', body, { headers: this.headers });
+    let res = await this.http.post('/jobs', body);
     return res.data;
   }
 
   async getJob(jobId: string): Promise<any> {
-    let res = await http.get(`/jobs/${jobId}`, { headers: this.headers });
+    let res = await this.http.get(`/jobs/${encodeURIComponent(jobId)}`);
     return res.data;
   }
 
@@ -159,18 +159,27 @@ export class Client {
     }
   ): Promise<any> {
     let body: Record<string, any> = {};
-    if (params.toDoListId !== undefined) body.to_do_list_id = params.toDoListId;
+    if (params.toDoListId !== undefined)
+      body.to_do_list_id = toTidyId(params.toDoListId, 'toDoListId');
     if (params.startNoEarlierThan !== undefined)
-      body.start_no_earlier_than = params.startNoEarlierThan;
-    if (params.endNoLaterThan !== undefined) body.end_no_later_than = params.endNoLaterThan;
+      body.start_no_earlier_than = toTidyDateTime(
+        params.startNoEarlierThan,
+        'startNoEarlierThan'
+      );
+    if (params.endNoLaterThan !== undefined)
+      body.end_no_later_than = toTidyDateTime(params.endNoLaterThan, 'endNoLaterThan');
 
-    let res = await http.put(`/jobs/${jobId}`, body, { headers: this.headers });
+    let res = await this.http.put(`/jobs/${encodeURIComponent(jobId)}`, body);
     return res.data;
   }
 
   async cancelJob(jobId: string): Promise<any> {
-    let res = await http.post(`/jobs/${jobId}/cancel`, {}, { headers: this.headers });
-    return res.data;
+    let res = await this.http.post(`/jobs/${encodeURIComponent(jobId)}/cancel`, {});
+    if (res.data?.id !== undefined) return res.data;
+    if (res.data?.result !== 'success') {
+      throw createApiServiceError('TIDY did not confirm that the job was cancelled.');
+    }
+    return this.getJob(jobId);
   }
 
   async rescheduleJob(
@@ -185,14 +194,18 @@ export class Client {
   ): Promise<any> {
     let body: Record<string, any> = {
       service_type_key: params.serviceTypeKey,
-      start_no_earlier_than: params.startNoEarlierThan,
-      end_no_later_than: params.endNoLaterThan
+      start_no_earlier_than: toTidyDateTime(params.startNoEarlierThan, 'startNoEarlierThan'),
+      end_no_later_than: toTidyDateTime(params.endNoLaterThan, 'endNoLaterThan')
     };
     if (params.preferredStartDatetime !== undefined)
-      body.preferred_start_datetime = params.preferredStartDatetime;
-    if (params.toDoListId !== undefined) body.to_do_list_id = params.toDoListId;
+      body.preferred_start_datetime = toTidyDateTime(
+        params.preferredStartDatetime,
+        'preferredStartDatetime'
+      );
+    if (params.toDoListId !== undefined)
+      body.to_do_list_id = toTidyId(params.toDoListId, 'toDoListId');
 
-    let res = await http.post(`/jobs/${jobId}/reschedule`, body, { headers: this.headers });
+    let res = await this.http.post(`/jobs/${encodeURIComponent(jobId)}/reschedule`, body);
     return res.data;
   }
 
@@ -202,8 +215,7 @@ export class Client {
     serviceTypeKey: string;
     addressId: string;
   }): Promise<any> {
-    let res = await http.get('/booking-availabilities', {
-      headers: this.headers,
+    let res = await this.http.get('/booking-availabilities', {
       params: {
         service_type_key: params.serviceTypeKey,
         address_id: params.addressId
@@ -225,9 +237,17 @@ export class Client {
       email: params.email
     };
     if (params.phone !== undefined) body.phone = params.phone;
-    if (params.serviceTypes !== undefined) body.service_types = params.serviceTypes;
+    if (params.serviceTypes !== undefined) {
+      body.service_types = params.serviceTypes
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+      if (body.service_types.length === 0) {
+        throw createApiServiceError('serviceTypes must contain at least one service type.');
+      }
+    }
 
-    let res = await http.post('/pros', body, { headers: this.headers });
+    let res = await this.http.post('/pros', body);
     return res.data;
   }
 
@@ -236,7 +256,7 @@ export class Client {
   async listToDoLists(addressId?: string): Promise<any> {
     let query: Record<string, string> = {};
     if (addressId) query.address_id = addressId;
-    let res = await http.get('/to-do-lists', { headers: this.headers, params: query });
+    let res = await this.http.get('/to-do-lists', { params: query });
     return res.data;
   }
 
@@ -245,7 +265,7 @@ export class Client {
   async listGuestReservations(addressId?: string): Promise<any> {
     let query: Record<string, string> = {};
     if (addressId) query.address_id = addressId;
-    let res = await http.get('/guest-reservations', { headers: this.headers, params: query });
+    let res = await this.http.get('/guest-reservations', { params: query });
     return res.data;
   }
 
@@ -257,7 +277,7 @@ export class Client {
     checkOutTime?: string;
   }): Promise<any> {
     let body: Record<string, any> = {
-      address_id: params.addressId,
+      address_id: toTidyId(params.addressId, 'addressId'),
       check_in: {
         date: params.checkInDate,
         ...(params.checkInTime !== undefined ? { time: params.checkInTime } : {})
@@ -268,19 +288,17 @@ export class Client {
       }
     };
 
-    let res = await http.post('/guest-reservations', body, { headers: this.headers });
+    let res = await this.http.post('/guest-reservations', body);
     return res.data;
   }
 
   async getGuestReservation(reservationId: string): Promise<any> {
-    let res = await http.get(`/guest-reservations/${reservationId}`, {
-      headers: this.headers
-    });
+    let res = await this.http.get(`/guest-reservations/${encodeURIComponent(reservationId)}`);
     return res.data;
   }
 
   async deleteGuestReservation(reservationId: string): Promise<void> {
-    await http.delete(`/guest-reservations/${reservationId}`, { headers: this.headers });
+    await this.http.delete(`/guest-reservations/${encodeURIComponent(reservationId)}`);
   }
 
   // ── Issues ─────────────────────────────────────────────
@@ -289,7 +307,7 @@ export class Client {
     let query: Record<string, string> = {};
     if (params?.addressId) query.address_id = params.addressId;
     if (params?.status) query.status = params.status;
-    let res = await http.get('/issues', { headers: this.headers, params: query });
+    let res = await this.http.get('/issues', { params: query });
     return res.data;
   }
 
@@ -299,25 +317,30 @@ export class Client {
     type: string;
   }): Promise<any> {
     let body = {
-      address_id: params.addressId,
+      address_id: toTidyId(params.addressId, 'addressId'),
       description: params.description,
       type: params.type
     };
-    let res = await http.post('/issues', body, { headers: this.headers });
+    let res = await this.http.post('/issues', body);
     return res.data;
   }
 
   async getIssue(issueId: string): Promise<any> {
-    let res = await http.get(`/issues/${issueId}`, { headers: this.headers });
+    let res = await this.http.get(`/issues/${encodeURIComponent(issueId)}`);
     return res.data;
   }
 
   async resolveIssue(issueId: string): Promise<any> {
-    let res = await http.post(`/issues/${issueId}/resolve`, {}, { headers: this.headers });
+    let res = await this.http.post(`/issues/${encodeURIComponent(issueId)}/resolve`, {});
     return res.data;
   }
 
   async deleteIssue(issueId: string): Promise<void> {
-    await http.delete(`/issues/${issueId}`, { headers: this.headers });
+    await this.http.delete(`/issues/${encodeURIComponent(issueId)}`);
+  }
+
+  async messageTidy(message: string): Promise<unknown> {
+    let res = await this.http.post('https://api.tidy.com/api/v2/message-tidy', { message });
+    return res.data;
   }
 }

@@ -1,17 +1,19 @@
-import { createAxios } from 'slates';
-
-let platformApi = createAxios({
-  baseURL: 'https://api.landbot.io/v1'
-});
-
-let chatApi = createAxios({
-  baseURL: 'https://chat.landbot.io/v1'
-});
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class PlatformClient {
   private headers: Record<string, string>;
+  private api;
 
   constructor(token: string) {
+    if (!token.trim()) {
+      throw createApiServiceError('A Landbot account API token is required.');
+    }
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.landbot.io/v1',
+      authHeader: { value: `Token ${token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Landbot', reason: 'landbot_api' })
+    });
     this.headers = {
       Authorization: `Token ${token}`,
       'Content-Type': 'application/json'
@@ -20,8 +22,29 @@ export class PlatformClient {
 
   // --- Customers ---
 
-  async listCustomers(params?: { offset?: number; limit?: number }) {
-    let response = await platformApi.get('/customers/', {
+  async listCustomers(params?: {
+    offset?: number;
+    limit?: number;
+    channel_id?: number;
+    agent_id?: number;
+    search_by?: 'name' | 'email' | 'phone';
+    search?: string;
+    archived?: boolean;
+    opt_in?: boolean;
+  }) {
+    if (
+      params?.offset !== undefined &&
+      (!Number.isInteger(params.offset) || params.offset < 0)
+    ) {
+      throw createApiServiceError('Customer offset must be a non-negative whole number.');
+    }
+    if (
+      params?.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 0 || params.limit > 100)
+    ) {
+      throw createApiServiceError('Customer limit must be a whole number from 0 to 100.');
+    }
+    let response = await this.api.get('/customers/', {
       headers: this.headers,
       params
     });
@@ -29,27 +52,64 @@ export class PlatformClient {
   }
 
   async getCustomer(customerId: number) {
-    let response = await platformApi.get(`/customers/${customerId}/`, {
+    let response = await this.api.get(`/customers/${customerId}/`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteCustomer(customerId: number) {
-    let response = await platformApi.delete(`/customers/${customerId}/`, {
+    let response = await this.api.delete(`/customers/${customerId}/`, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async updateCustomerFields(customerId: number, fields: Record<string, any>) {
-    let response = await platformApi.put(
-      `/customers/${customerId}/fields/data/`,
-      {
-        type: 'object',
-        extra: {},
-        value: fields
-      },
+  async updateCustomerFields(customerId: number, fields: Record<string, unknown>) {
+    for (let [name, value] of Object.entries(fields)) {
+      if (!/^[a-z0-9_]+$/.test(name)) {
+        throw createApiServiceError(
+          'Customer field names may contain only lowercase letters, numbers, and underscores.'
+        );
+      }
+      if (value === null || value === undefined) {
+        throw createApiServiceError(`Provide a non-null value for customer field "${name}".`);
+      }
+    }
+    for (let [name, value] of Object.entries(fields)) {
+      let type =
+        typeof value === 'number'
+          ? Number.isInteger(value)
+            ? 'integer'
+            : 'float'
+          : typeof value === 'boolean'
+            ? 'boolean'
+            : typeof value === 'string'
+              ? 'string'
+              : 'object';
+      let path = `/customers/${customerId}/fields/${encodeURIComponent(name)}/`;
+      let body = { type, extra: {}, value };
+      let response = await this.api.post(path, body, {
+        headers: this.headers,
+        validateStatus: status => (status >= 200 && status < 300) || status === 412
+      });
+      if (response.status === 412) {
+        await this.api.put(path, body, { headers: this.headers });
+      }
+    }
+  }
+
+  async getCustomerMessages(customerId: number) {
+    let response = await this.api.get(`/customers/${customerId}/messages/`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async sendCustomerText(customerId: number, message: string) {
+    let response = await this.api.post(
+      `/customers/${customerId}/send_text/`,
+      { message },
       {
         headers: this.headers
       }
@@ -62,18 +122,14 @@ export class PlatformClient {
     if (options?.node) {
       body.node = options.node;
     }
-    let response = await platformApi.put(
-      `/customers/${customerId}/assign_bot/${botId}/`,
-      body,
-      {
-        headers: this.headers
-      }
-    );
+    let response = await this.api.put(`/customers/${customerId}/assign_bot/${botId}/`, body, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async unassignCustomer(customerId: number) {
-    let response = await platformApi.put(
+    let response = await this.api.put(
       `/customers/${customerId}/unassign/`,
       {},
       {
@@ -84,7 +140,7 @@ export class PlatformClient {
   }
 
   async deleteCustomerOptIns(customerId: number) {
-    let response = await platformApi.delete(`/customers/${customerId}/opt_ins/`, {
+    let response = await this.api.delete(`/customers/${customerId}/opt_ins/`, {
       headers: this.headers
     });
     return response.data;
@@ -93,14 +149,14 @@ export class PlatformClient {
   // --- Channels ---
 
   async listChannels() {
-    let response = await platformApi.get('/channels/', {
+    let response = await this.api.get('/channels/', {
       headers: this.headers
     });
     return response.data;
   }
 
   async getChannel(channelId: number) {
-    let response = await platformApi.get(`/channels/${channelId}/`, {
+    let response = await this.api.get(`/channels/${channelId}/`, {
       headers: this.headers
     });
     return response.data;
@@ -108,15 +164,16 @@ export class PlatformClient {
 
   // --- WhatsApp Templates ---
 
-  async listWhatsAppTemplates() {
-    let response = await platformApi.get('/channels/whatsapp/templates/', {
-      headers: this.headers
+  async listWhatsAppTemplates(channelId?: number) {
+    let response = await this.api.get('/channels/whatsapp/templates/', {
+      headers: this.headers,
+      params: { channel_id: channelId }
     });
     return response.data;
   }
 
   async listWhatsAppTemplatesMultiChannel() {
-    let response = await platformApi.get('/channels/whatsapp/templates/multi/', {
+    let response = await this.api.get('/channels/whatsapp/templates/multi/', {
       headers: this.headers
     });
     return response.data;
@@ -136,26 +193,23 @@ export class PlatformClient {
       };
     }
   ) {
-    let body: Record<string, any> = {
-      template_id: templateData.templateId,
-      template_language: templateData.templateLanguage
+    let params: Record<string, any> = {
+      body: templateData.templateParams?.body ?? { params: [] }
     };
-
-    if (templateData.templateParams) {
-      let params: Record<string, any> = {};
-      if (templateData.templateParams.header) {
-        params.header = templateData.templateParams.header;
-      }
-      if (templateData.templateParams.body) {
-        params.body = templateData.templateParams.body;
-      }
-      if (templateData.templateParams.buttons) {
-        params.buttons = templateData.templateParams.buttons;
-      }
-      body.template_params = params;
+    if (templateData.templateParams?.header) {
+      params.header = templateData.templateParams.header;
+    }
+    if (templateData.templateParams?.buttons) {
+      params.buttons = templateData.templateParams.buttons;
     }
 
-    let response = await platformApi.post(`/customers/${customerId}/send_template/`, body, {
+    let body: Record<string, any> = {
+      template_id: templateData.templateId,
+      template_language: templateData.templateLanguage,
+      template_params: params
+    };
+
+    let response = await this.api.post(`/customers/${customerId}/send_template/`, body, {
       headers: this.headers
     });
     return response.data;
@@ -164,14 +218,14 @@ export class PlatformClient {
   // --- Agents ---
 
   async listAgents() {
-    let response = await platformApi.get('/agents/', {
+    let response = await this.api.get('/agents/', {
       headers: this.headers
     });
     return response.data;
   }
 
   async getAgent(agentId: number) {
-    let response = await platformApi.get(`/agents/${agentId}/`, {
+    let response = await this.api.get(`/agents/${agentId}/`, {
       headers: this.headers
     });
     return response.data;
@@ -180,7 +234,7 @@ export class PlatformClient {
   // --- Tickets ---
 
   async listTickets(params?: { offset?: number; limit?: number }) {
-    let response = await platformApi.get('/tickets/', {
+    let response = await this.api.get('/tickets/', {
       headers: this.headers,
       params
     });
@@ -188,21 +242,21 @@ export class PlatformClient {
   }
 
   async getTicket(ticketId: number) {
-    let response = await platformApi.get(`/tickets/${ticketId}/`, {
+    let response = await this.api.get(`/tickets/${ticketId}/`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async createTicket(data: Record<string, any>) {
-    let response = await platformApi.post('/tickets/', data, {
+    let response = await this.api.post('/tickets/', data, {
       headers: this.headers
     });
     return response.data;
   }
 
   async updateTicket(ticketId: number, data: Record<string, any>) {
-    let response = await platformApi.put(`/tickets/${ticketId}/`, data, {
+    let response = await this.api.put(`/tickets/${ticketId}/`, data, {
       headers: this.headers
     });
     return response.data;
@@ -211,14 +265,14 @@ export class PlatformClient {
   // --- Bots ---
 
   async getBot(botId: number) {
-    let response = await platformApi.get(`/bots/${botId}/`, {
+    let response = await this.api.get(`/bots/${botId}/`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async listBots() {
-    let response = await platformApi.get('/bots/', {
+    let response = await this.api.get('/bots/', {
       headers: this.headers
     });
     return response.data;
@@ -227,8 +281,21 @@ export class PlatformClient {
 
 export class ChatClient {
   private headers: Record<string, string>;
+  private api;
 
   constructor(channelToken: string) {
+    if (!channelToken.trim()) {
+      throw createApiServiceError('A Landbot APIchat channel token is required.');
+    }
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://chat.landbot.io/v1',
+      authHeader: { value: `Token ${channelToken}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Landbot APIchat',
+          reason: 'landbot_chat_api'
+        })
+    });
     this.headers = {
       Authorization: `Token ${channelToken}`,
       'Content-Type': 'application/json'
@@ -236,8 +303,8 @@ export class ChatClient {
   }
 
   async sendTextMessage(customerToken: string, message: string) {
-    let response = await chatApi.post(
-      `/send/${customerToken}/`,
+    let response = await this.api.post(
+      `/send/${encodeURIComponent(customerToken)}/`,
       {
         message: {
           type: 'text',
@@ -252,8 +319,8 @@ export class ChatClient {
   }
 
   async sendImageMessage(customerToken: string, url: string) {
-    let response = await chatApi.post(
-      `/send/${customerToken}/`,
+    let response = await this.api.post(
+      `/send/${encodeURIComponent(customerToken)}/`,
       {
         message: {
           type: 'image',
@@ -273,14 +340,30 @@ export class ChatClient {
     longitude: string,
     address?: string
   ) {
-    let response = await chatApi.post(
-      `/send/${customerToken}/`,
+    let numericLatitude = Number(latitude);
+    let numericLongitude = Number(longitude);
+    if (
+      !latitude.trim() ||
+      !longitude.trim() ||
+      !Number.isFinite(numericLatitude) ||
+      !Number.isFinite(numericLongitude) ||
+      numericLatitude < -90 ||
+      numericLatitude > 90 ||
+      numericLongitude < -180 ||
+      numericLongitude > 180
+    ) {
+      throw createApiServiceError(
+        'Provide valid numeric latitude (-90 to 90) and longitude (-180 to 180).'
+      );
+    }
+    let response = await this.api.post(
+      `/send/${encodeURIComponent(customerToken)}/`,
       {
         message: {
           type: 'location',
-          latitude,
-          longitude,
-          address
+          latitude: numericLatitude,
+          longitude: numericLongitude,
+          message: address
         }
       },
       {

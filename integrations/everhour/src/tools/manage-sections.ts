@@ -35,7 +35,7 @@ export let listSections = SlateTool.create(spec, {
       name: s.name,
       projectId: s.project,
       position: s.position,
-      status: s.status
+      status: s.status ?? undefined
     }));
     return {
       output: { sections: mapped },
@@ -69,7 +69,7 @@ export let createSection = SlateTool.create(spec, {
         name: s.name,
         projectId: s.project,
         position: s.position,
-        status: s.status
+        status: s.status ?? undefined
       },
       message: `Created section **${s.name}**.`
     };
@@ -100,7 +100,7 @@ export let updateSection = SlateTool.create(spec, {
         name: s.name,
         projectId: s.project,
         position: s.position,
-        status: s.status
+        status: s.status ?? undefined
       },
       message: `Updated section **${s.name}**.`
     };

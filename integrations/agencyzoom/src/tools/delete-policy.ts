@@ -14,7 +14,13 @@ export let deletePolicy = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      policyId: z.string().describe('ID of the policy to delete')
+      policyId: z.string().describe('ID of the policy to delete'),
+      customerId: z
+        .string()
+        .optional()
+        .describe(
+          'Customer ID for the documented customer-policy deletion route. Discover it with search_customers or get_customer.'
+        )
     })
   )
   .output(
@@ -23,13 +29,9 @@ export let deletePolicy = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
-    await client.deletePolicy(ctx.input.policyId);
+    await client.deletePolicy(ctx.input.policyId, ctx.input.customerId);
 
     return {
       output: { success: true },

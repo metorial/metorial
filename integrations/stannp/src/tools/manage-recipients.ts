@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let recipientOutputSchema = z.object({
@@ -18,15 +18,15 @@ let recipientOutputSchema = z.object({
 
 let mapRecipient = (r: any) => ({
   recipientId: String(r.id),
-  firstname: r.firstname,
-  lastname: r.lastname,
-  company: r.company,
-  email: r.email,
-  address1: r.address1,
-  address2: r.address2,
-  city: r.city,
-  country: r.country,
-  postcode: r.postcode || r.zipcode
+  firstname: r.firstname ?? undefined,
+  lastname: r.lastname ?? undefined,
+  company: r.company ?? undefined,
+  email: r.email ?? undefined,
+  address1: r.address1 ?? undefined,
+  address2: r.address2 ?? undefined,
+  city: r.city ?? undefined,
+  country: r.country ?? undefined,
+  postcode: r.postcode || r.zipcode || undefined
 });
 
 // ---- List Recipients ----
@@ -53,7 +53,7 @@ export let listRecipients = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listRecipients({
       groupId: ctx.input.groupId,
@@ -88,7 +88,7 @@ export let getRecipient = SlateTool.create(spec, {
   )
   .output(recipientOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getRecipient(ctx.input.recipientId);
 
@@ -145,7 +145,7 @@ export let createRecipient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let customFields: Record<string, string> | undefined;
     if (ctx.input.customFields) {
@@ -176,7 +176,7 @@ export let createRecipient = SlateTool.create(spec, {
     return {
       output: {
         recipientId: String(result.id),
-        valid: result.valid
+        valid: result.valid ?? undefined
       },
       message: `Recipient created with ID **${result.id}**. Address valid: ${result.valid ?? 'unknown'}.`
     };
@@ -205,7 +205,7 @@ export let deleteRecipient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.deleteRecipient(ctx.input.recipientId);
 

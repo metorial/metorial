@@ -61,16 +61,16 @@ export let createClient = SlateTool.create(spec, {
       output: {
         clientId: c.id,
         name: c.name,
-        number: c.number,
-        address: c.address,
-        address2: c.address_2,
-        city: c.city,
-        state: c.state,
-        zip: c.zip,
-        country: c.country,
-        website: c.website,
-        description: c.description,
-        status: c.status
+        number: c.number ?? undefined,
+        address: c.address ?? undefined,
+        address2: c.address_2 ?? undefined,
+        city: c.city ?? undefined,
+        state: c.state ?? undefined,
+        zip: c.zip ?? undefined,
+        country: c.country ?? undefined,
+        website: c.website ?? undefined,
+        description: c.description ?? undefined,
+        status: c.status ?? undefined
       },
       message: `Created client **${c.name}** (ID: ${c.id}).`
     };
@@ -122,16 +122,16 @@ export let updateClient = SlateTool.create(spec, {
       output: {
         clientId: c.id,
         name: c.name,
-        number: c.number,
-        address: c.address,
-        address2: c.address_2,
-        city: c.city,
-        state: c.state,
-        zip: c.zip,
-        country: c.country,
-        website: c.website,
-        description: c.description,
-        status: c.status
+        number: c.number ?? undefined,
+        address: c.address ?? undefined,
+        address2: c.address_2 ?? undefined,
+        city: c.city ?? undefined,
+        state: c.state ?? undefined,
+        zip: c.zip ?? undefined,
+        country: c.country ?? undefined,
+        website: c.website ?? undefined,
+        description: c.description ?? undefined,
+        status: c.status ?? undefined
       },
       message: `Updated client **${c.name}** (ID: ${c.id}).`
     };
@@ -178,16 +178,16 @@ export let getClient = SlateTool.create(spec, {
             {
               clientId: c.id,
               name: c.name,
-              number: c.number,
-              address: c.address,
-              address2: c.address_2,
-              city: c.city,
-              state: c.state,
-              zip: c.zip,
-              country: c.country,
-              website: c.website,
-              description: c.description,
-              status: c.status
+              number: c.number ?? undefined,
+              address: c.address ?? undefined,
+              address2: c.address_2 ?? undefined,
+              city: c.city ?? undefined,
+              state: c.state ?? undefined,
+              zip: c.zip ?? undefined,
+              country: c.country ?? undefined,
+              website: c.website ?? undefined,
+              description: c.description ?? undefined,
+              status: c.status ?? undefined
             }
           ]
         },
@@ -203,23 +203,23 @@ export let getClient = SlateTool.create(spec, {
     let clients = (result.clients || []).map((c: any) => ({
       clientId: c.id,
       name: c.name,
-      number: c.number,
-      address: c.address,
-      address2: c.address_2,
-      city: c.city,
-      state: c.state,
-      zip: c.zip,
-      country: c.country,
-      website: c.website,
-      description: c.description,
-      status: c.status
+      number: c.number ?? undefined,
+      address: c.address ?? undefined,
+      address2: c.address_2 ?? undefined,
+      city: c.city ?? undefined,
+      state: c.state ?? undefined,
+      zip: c.zip ?? undefined,
+      country: c.country ?? undefined,
+      website: c.website ?? undefined,
+      description: c.description ?? undefined,
+      status: c.status ?? undefined
     }));
 
     return {
       output: {
         clients,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${clients.length} client(s)${result.total_count ? ` (${result.total_count} total)` : ''}.`
     };

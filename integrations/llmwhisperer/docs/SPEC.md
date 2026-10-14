@@ -1,4 +1,4 @@
-# Slates Specification for LLMWhisperer
+# LLMWhisperer Specification
 
 ## Overview
 
@@ -50,6 +50,8 @@ Convert complex PDF documents, scanned documents, scanned images, Office documen
 
 The typical workflow is to submit a document for extraction, then check the status of the conversion process, repeating until the status is "processed," and then retrieve the converted text. This supports asynchronous processing of documents.
 
+The detail endpoint provides processing timestamps, duration, requested and processed page counts, total document pages, upload size, mode, and tag. Retrieval consumes the result: cloud results can only be retrieved once, so save the returned text.
+
 ### Text Highlighting and Line Metadata
 
 Location information about every line of text extracted from the document can be retrieved, which can be used to highlight search terms or extraction results in a frontend application. Line numbers can be added to the extracted text, and line metadata can be queried later using the highlights API. You can search for specific text and get bounding box coordinates for highlighting.
@@ -57,6 +59,19 @@ Location information about every line of text extracted from the document can be
 ### Usage Tracking
 
 The APIs are metered based on the number of pages processed per mode (native_text, low_cost, high_quality and form). You can check usage metrics of your account, including filtering by tag.
+
+`get_tag_usage` accepts the tag supplied during extraction and optional `fromDate` / `toDate` values in `YYYY-MM-DD` format. Without dates, the API reports the last 30 days. `get_usage_info` reports account quotas and aggregate counts.
+
+## API Reference
+
+- [Extraction](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_text_extraction_api/)
+- [Status](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_text_extraction_status_api/)
+- [Retrieval](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_text_extraction_retrieve_api/)
+- [Extraction details](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_text_extraction_detail_api/)
+- [Highlights](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_highlighting_api/)
+- [Account usage](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_usage_api/)
+- [Tagged usage](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_usage_stats/)
+- [Webhook management](https://docs.unstract.com/llmwhisperer/llm_whisperer/apis/llm_whisperer_webhooks_manage/)
 
 ## Events
 

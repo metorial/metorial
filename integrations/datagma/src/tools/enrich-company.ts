@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseDatagmaNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let enrichCompany = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ Optionally retrieve premium LinkedIn data, financial/Crunchbase data, French SIR
     'Set companyFull to true for financial data from Crunchbase including funding rounds and revenue.',
     'Set companyFrench to true for SIREN directory information (French companies only).'
   ],
-  constraints: ['Rate limited to 10 requests per second.', '1 credit per enrichment.'],
+  constraints: ['Rate limited to 10 requests per second.'],
   tags: {
     destructive: false,
     readOnly: true
@@ -61,6 +62,9 @@ Optionally retrieve premium LinkedIn data, financial/Crunchbase data, French SIR
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.companyIdentifier.trim()) {
+      throw createApiServiceError('Provide a company name, website URL, or SIREN number.');
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.enrichFull({
@@ -71,14 +75,16 @@ Optionally retrieve premium LinkedIn data, financial/Crunchbase data, French SIR
       deepTraffic: ctx.input.deepTraffic
     });
 
-    let companyName = result?.company?.name || ctx.input.companyIdentifier;
+    let companyName =
+      result?.company?.basic?.name || result?.company?.name || ctx.input.companyIdentifier;
+    let creditBurn = parseDatagmaNumber(result?.creditBurn, 'creditBurn');
 
     return {
       output: {
         company: result?.company,
-        creditBurn: result?.creditBurn
+        creditBurn
       },
-      message: `Enriched company **${companyName}**. Credits used: ${result?.creditBurn ?? 'N/A'}.`
+      message: `Enriched company **${companyName}**. Credits used: ${creditBurn ?? 'N/A'}.`
     };
   })
   .build();

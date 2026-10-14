@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios, isApiErrorRecord } from 'slates';
 
 // --- Mapping helpers ---
 
@@ -8,7 +8,7 @@ let toSnakeCase = (str: string): string =>
 let toSnakeCaseKeys = (obj: Record<string, any>): Record<string, any> => {
   let result: Record<string, any> = {};
   for (let [key, value] of Object.entries(obj)) {
-    let snakeKey = toSnakeCase(key);
+    let snakeKey = key === 'groupId' ? 'id' : toSnakeCase(key);
     if (Array.isArray(value)) {
       result[snakeKey] = value.map(v =>
         typeof v === 'object' && v !== null ? toSnakeCaseKeys(v) : v
@@ -34,6 +34,12 @@ let toCamelCaseKeys = (obj: any): any => {
     for (let [key, value] of Object.entries(obj)) {
       let camelKey = toCamelCase(key);
       result[camelKey] = toCamelCaseKeys(value);
+      if (camelKey === 'groups' && Array.isArray(result[camelKey])) {
+        result[camelKey] = result[camelKey].map(group => ({
+          ...group,
+          groupId: group.id !== undefined ? group.id : group.groupId
+        }));
+      }
     }
     return result;
   }
@@ -60,6 +66,13 @@ export interface BulkResponse {
   modifiedCount: number;
   insertedCount: number;
   insertedIds: Array<{ index: number; id: string }>;
+  omittedCount?: number;
+  omittedEntries?: Array<{ id?: string; index?: number; reason?: string }>;
+}
+
+export interface ChasingResponse {
+  id: string;
+  chasing: boolean;
 }
 
 // --- Client ---
@@ -73,7 +86,8 @@ export class Client {
       headers: {
         Authorization: `Basic ${config.token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      paramsSerializer: { indexes: null }
     });
   }
 
@@ -85,8 +99,10 @@ export class Client {
     return this.mapListResponse(response.data);
   }
 
-  async getCustomer(customerId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/customers/${customerId}`);
+  async getCustomer(customerId: string, additionalFields?: string[]): Promise<any> {
+    let response = await this.axios.get(`/v1/customers/${encodeURIComponent(customerId)}`, {
+      params: this.buildListParams({ additionalFields })
+    });
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -98,7 +114,10 @@ export class Client {
 
   async updateCustomer(customerId: string, data: Record<string, any>): Promise<any> {
     let body = toSnakeCaseKeys(data);
-    let response = await this.axios.put(`/v1/customers/${customerId}`, body);
+    let response = await this.axios.put(
+      `/v1/customers/${encodeURIComponent(customerId)}`,
+      body
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -115,22 +134,28 @@ export class Client {
     params: ListParams = {}
   ): Promise<ListResponse<any>> {
     let queryParams = this.buildListParams(params);
-    let response = await this.axios.get(`/v1/customers/${customerId}/contact_persons`, {
-      params: queryParams
-    });
+    let response = await this.axios.get(
+      `/v1/customers/${encodeURIComponent(customerId)}/contact_persons`,
+      {
+        params: queryParams
+      }
+    );
     return this.mapListResponse(response.data);
   }
 
   async getContactPerson(customerId: string, contactPersonId: string): Promise<any> {
     let response = await this.axios.get(
-      `/v1/customers/${customerId}/contact_persons/${contactPersonId}`
+      `/v1/customers/${encodeURIComponent(customerId)}/contact_persons/${encodeURIComponent(contactPersonId)}`
     );
     return toCamelCaseKeys(response.data.data);
   }
 
   async createContactPerson(customerId: string, data: Record<string, any>): Promise<any> {
     let body = toSnakeCaseKeys(data);
-    let response = await this.axios.post(`/v1/customers/${customerId}/contact_persons`, body);
+    let response = await this.axios.post(
+      `/v1/customers/${encodeURIComponent(customerId)}/contact_persons`,
+      body
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -141,14 +166,16 @@ export class Client {
   ): Promise<any> {
     let body = toSnakeCaseKeys(data);
     let response = await this.axios.put(
-      `/v1/customers/${customerId}/contact_persons/${contactPersonId}`,
+      `/v1/customers/${encodeURIComponent(customerId)}/contact_persons/${encodeURIComponent(contactPersonId)}`,
       body
     );
     return toCamelCaseKeys(response.data.data);
   }
 
   async deleteContactPerson(customerId: string, contactPersonId: string): Promise<void> {
-    await this.axios.delete(`/v1/customers/${customerId}/contact_persons/${contactPersonId}`);
+    await this.axios.delete(
+      `/v1/customers/${encodeURIComponent(customerId)}/contact_persons/${encodeURIComponent(contactPersonId)}`
+    );
   }
 
   async bulkUpsertContactPersons(
@@ -157,7 +184,7 @@ export class Client {
   ): Promise<BulkResponse> {
     let body = { entries: entries.map(toSnakeCaseKeys) };
     let response = await this.axios.put(
-      `/v1/bulk/customers/${customerId}/contact_persons`,
+      `/v1/bulk/customers/${encodeURIComponent(customerId)}/contact_persons`,
       body
     );
     return toCamelCaseKeys(response.data.data);
@@ -172,7 +199,7 @@ export class Client {
   }
 
   async getInvoice(invoiceId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/invoices/${invoiceId}`);
+    let response = await this.axios.get(`/v1/invoices/${encodeURIComponent(invoiceId)}`);
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -184,7 +211,7 @@ export class Client {
 
   async updateInvoice(invoiceId: string, data: Record<string, any>): Promise<any> {
     let body = toSnakeCaseKeys(data);
-    let response = await this.axios.put(`/v1/invoices/${invoiceId}`, body);
+    let response = await this.axios.put(`/v1/invoices/${encodeURIComponent(invoiceId)}`, body);
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -203,7 +230,9 @@ export class Client {
   }
 
   async getCreditNote(creditNoteId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/credit_notes/${creditNoteId}`);
+    let response = await this.axios.get(
+      `/v1/credit_notes/${encodeURIComponent(creditNoteId)}`
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -215,7 +244,10 @@ export class Client {
 
   async updateCreditNote(creditNoteId: string, data: Record<string, any>): Promise<any> {
     let body = toSnakeCaseKeys(data);
-    let response = await this.axios.put(`/v1/credit_notes/${creditNoteId}`, body);
+    let response = await this.axios.put(
+      `/v1/credit_notes/${encodeURIComponent(creditNoteId)}`,
+      body
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -234,7 +266,9 @@ export class Client {
   }
 
   async getOverpayment(overpaymentId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/overpayments/${overpaymentId}`);
+    let response = await this.axios.get(
+      `/v1/overpayments/${encodeURIComponent(overpaymentId)}`
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -246,7 +280,10 @@ export class Client {
 
   async updateOverpayment(overpaymentId: string, data: Record<string, any>): Promise<any> {
     let body = toSnakeCaseKeys(data);
-    let response = await this.axios.put(`/v1/overpayments/${overpaymentId}`, body);
+    let response = await this.axios.put(
+      `/v1/overpayments/${encodeURIComponent(overpaymentId)}`,
+      body
+    );
     return toCamelCaseKeys(response.data.data);
   }
 
@@ -277,10 +314,45 @@ export class Client {
     return response.data.data;
   }
 
+  async setCustomerChasing(
+    customerId: string,
+    action: 'pause' | 'resume'
+  ): Promise<ChasingResponse> {
+    let response = await this.axios.post(
+      `/v1/customers/${encodeURIComponent(customerId)}/chasing/${action}`
+    );
+    return this.mapChasingResponse(response.data.data);
+  }
+
+  async setInvoiceChasing(
+    invoiceId: string,
+    action: 'pause' | 'resume'
+  ): Promise<ChasingResponse> {
+    let response = await this.axios.post(
+      `/v1/invoices/${encodeURIComponent(invoiceId)}/chasing/${action}`
+    );
+    return this.mapChasingResponse(response.data.data);
+  }
+
+  async setOrganisationChasing(action: 'pause' | 'resume'): Promise<ChasingResponse> {
+    let response = await this.axios.post(`/v1/chasing/${action}`);
+    return this.mapChasingResponse(response.data.data);
+  }
+
   // --- Helpers ---
 
   private buildListParams(params: ListParams): Record<string, any> {
     let queryParams: Record<string, any> = {};
+
+    if (params.page !== undefined && (!Number.isSafeInteger(params.page) || params.page < 0)) {
+      throw createApiServiceError('Page must be a whole number greater than or equal to 0.');
+    }
+    if (
+      params.limit !== undefined &&
+      (!Number.isSafeInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('Limit must be a whole number between 1 and 100.');
+    }
 
     if (params.page !== undefined) {
       queryParams.page = params.page;
@@ -289,18 +361,39 @@ export class Client {
       queryParams.limit = params.limit;
     }
     if (params.additionalFields && params.additionalFields.length > 0) {
-      queryParams.additional_fields = params.additionalFields.join(',');
+      queryParams.additional_fields = params.additionalFields;
     }
     if (params.filters) {
       for (let [key, value] of Object.entries(params.filters)) {
         if (value !== undefined && value !== null) {
           let snakeKey = toSnakeCase(key);
-          queryParams[snakeKey] = value;
+          if (isApiErrorRecord(value)) {
+            for (let [operator, operand] of Object.entries(value)) {
+              if (operand !== undefined && operand !== null) {
+                queryParams[`${snakeKey}[${operator}]`] = Array.isArray(operand)
+                  ? operand.join(',')
+                  : operand;
+              }
+            }
+          } else {
+            queryParams[snakeKey] = Array.isArray(value) ? value.join(',') : value;
+          }
         }
       }
     }
 
     return queryParams;
+  }
+
+  private mapChasingResponse(data: unknown): ChasingResponse {
+    if (
+      !isApiErrorRecord(data) ||
+      typeof data.id !== 'string' ||
+      typeof data.chasing !== 'boolean'
+    ) {
+      throw createApiServiceError('Chaser returned an invalid chasing status response.');
+    }
+    return { id: data.id, chasing: data.chasing };
   }
 
   private mapListResponse(data: any): ListResponse<any> {

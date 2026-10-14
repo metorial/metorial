@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -77,6 +77,13 @@ export let updateGroupProfile = SlateTool.create(spec, {
       accountId: ctx.config.accountId,
       region: ctx.config.region
     });
+
+    if (
+      (!ctx.input.properties || Object.keys(ctx.input.properties).length === 0) &&
+      (!ctx.input.userIds || ctx.input.userIds.length === 0)
+    ) {
+      throw createApiServiceError('Provide at least one group property or user ID to update.');
+    }
 
     let messages: string[] = [];
 

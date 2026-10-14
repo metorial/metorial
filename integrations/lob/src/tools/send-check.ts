@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addMailPiecePreview } from '../lib/mail-piece-preview';
 import { spec } from '../spec';
 
 let inlineAddressSchema = z.object({
@@ -125,6 +126,7 @@ export let sendCheck = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       useType: ctx.input.useType
     });
+    await addMailPiecePreview(ctx, result, 'check');
     return {
       output: {
         checkId: result.id,
@@ -184,6 +186,7 @@ export let getCheck = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getCheck(ctx.input.checkId);
+    await addMailPiecePreview(ctx, result, 'check');
     return {
       output: {
         checkId: result.id,
@@ -231,8 +234,11 @@ export let cancelCheck = SlateTool.create(spec, {
     return {
       output: {
         checkId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Canceled check **${ctx.input.checkId}**`
+      message:
+        result.deleted === true
+          ? `Canceled check **${ctx.input.checkId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

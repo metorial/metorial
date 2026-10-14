@@ -4,6 +4,7 @@ export * from './get-serp-result';
 export * from './list-domains';
 export * from './list-languages';
 export * from './schedule-serp';
+export * from './search-google-autocomplete';
 export * from './search-google-jobs';
 export * from './search-google-short-videos';
 export * from './search-google-videos';

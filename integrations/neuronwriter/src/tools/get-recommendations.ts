@@ -67,23 +67,10 @@ export let getRecommendations = SlateTool.create(spec, {
     let client = new NeuronWriterClient(ctx.auth.token);
     let result = await client.getQuery(ctx.input.queryId);
 
-    let output: Record<string, any> = {
-      status: result.status
-    };
-
-    if (result.query) output.queryId = result.query;
-    if (result.keyword) output.keyword = result.keyword;
-    if (result.language) output.language = result.language;
-    if (result.engine) output.engine = result.engine;
-    if (result.tags) output.tags = result.tags;
-    if (result.created) output.createdAt = result.created;
-    if (result.updated) output.updatedAt = result.updated;
-    if (result.metrics) output.metrics = result.metrics;
-    if (result.terms_txt) output.termsSummary = result.terms_txt;
-    if (result.terms) output.terms = result.terms;
-    if (result.ideas) output.ideas = result.ideas;
-    if (result.competitors) output.competitors = result.competitors;
-    if (result.entities) output.entities = result.entities;
+    let entities = result.entities;
+    if (entities === undefined && Array.isArray(result.terms?.entities)) {
+      entities = result.terms.entities;
+    }
 
     let message = `Query status: **${result.status}**`;
     if (result.keyword) {
@@ -91,12 +78,29 @@ export let getRecommendations = SlateTool.create(spec, {
     }
     if (result.status === 'ready') {
       message += '. Recommendations are available.';
+    } else if (result.status === 'not found') {
+      message += '. Verify the query ID and that the query belongs to this account.';
     } else {
       message += '. Recommendations are not yet ready, please retry shortly.';
     }
 
     return {
-      output: output as any,
+      output: {
+        status: result.status,
+        queryId: result.query ?? ctx.input.queryId,
+        keyword: result.keyword,
+        language: result.language,
+        engine: result.engine,
+        tags: result.tags,
+        createdAt: result.created,
+        updatedAt: result.updated,
+        metrics: result.metrics,
+        termsSummary: result.terms_txt,
+        terms: result.terms,
+        ideas: result.ideas,
+        competitors: result.competitors,
+        entities
+      },
       message
     };
   })

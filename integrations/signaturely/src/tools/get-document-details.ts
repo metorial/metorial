@@ -6,8 +6,7 @@ import { spec } from '../spec';
 export let getDocumentDetails = SlateTool.create(spec, {
   name: 'Get Document Signers',
   key: 'get_document_signers',
-  description: `Retrieves the list of signers for a specific document, including their signing status and contact information.
-Use this to check who has signed a document and who is still pending.`,
+  description: `Retrieves signer IDs, roles, signing order, and contact information for a document. Signing status and completion timestamps are included when Signaturely returns them. Use the IDs with send_reminders.`,
   tags: {
     readOnly: true
   }
@@ -31,7 +30,15 @@ Use this to check who has signed a document and who is still pending.`,
               .string()
               .optional()
               .describe('ISO timestamp when the signer completed signing'),
-            order: z.number().optional().describe('Signing order position')
+            order: z.number().optional().describe('Signing order position'),
+            isFinished: z
+              .boolean()
+              .optional()
+              .describe('Whether Signaturely reports this signer finished'),
+            isDeclined: z
+              .boolean()
+              .optional()
+              .describe('Whether Signaturely reports this signer declined')
           })
         )
         .describe('List of signers for the document')
@@ -44,15 +51,16 @@ Use this to check who has signed a document and who is still pending.`,
 
     let result = await client.getDocumentSigners(ctx.input.documentId);
 
-    let items = result.items || result || [];
-    let signers = (Array.isArray(items) ? items : []).map((signer: any) => ({
-      signerId: signer.id?.toString() || '',
-      name: signer.name || signer.fullName || undefined,
-      email: signer.email || undefined,
-      role: signer.role || undefined,
-      status: signer.status || undefined,
-      signedAt: signer.signedAt || signer.completedAt || undefined,
-      order: signer.order ?? undefined
+    let signers = result.map(signer => ({
+      signerId: signer.id,
+      name: signer.name ?? signer.fullName ?? undefined,
+      email: signer.email ?? undefined,
+      role: signer.role ?? undefined,
+      status: signer.status ?? undefined,
+      signedAt: signer.signedAt ?? signer.completedAt ?? undefined,
+      order: signer.order ?? undefined,
+      isFinished: signer.isFinished ?? undefined,
+      isDeclined: signer.isDeclined ?? undefined
     }));
 
     return {

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCredits = SlateTool.create(spec, {
   name: 'Get Credits',
   key: 'get_credits',
-  description: `Retrieves the current API credit balance and total credits used for the account.`,
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Retrieves the current API credit balance and total credits used for the account.`,
   tags: {
     destructive: false,
     readOnly: true

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,19 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://site-api.datocms.com'
-      });
-
-      let response = await axios.get('/site', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json',
-          'X-Api-Version': '3'
-        }
-      });
-
-      let site = response.data;
+      let site = await new Client({ token: ctx.output.token }).getSite();
+      if (!site?.id || !site.name) {
+        throw createApiServiceError(
+          'DatoCMS did not return a project identity. Check that the API token has Content Management API access.'
+        );
+      }
       return {
         profile: {
           id: site.id,

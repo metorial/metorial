@@ -14,7 +14,7 @@ After uploading, use the **Check Bulk Verification Status** tool to monitor prog
     'Give the file a descriptive filename ending in .csv or .txt.'
   ],
   constraints: [
-    'Credits are consumed per email verified.',
+    'Standard verification costs one credit per unique email; high quality costs two. Deep Scan costs three credits per unresolved email re-verified.',
     'Processing will fail if the account balance is zero.',
     'The file must contain properly formatted email addresses.'
   ],
@@ -26,7 +26,19 @@ After uploading, use the **Check Bulk Verification Status** tool to monitor prog
   .input(
     z.object({
       filename: z.string().describe('Name for the uploaded file (e.g., "contacts.csv")'),
-      fileContents: z.string().describe('File contents with email addresses, one per line')
+      fileContents: z.string().describe('File contents with email addresses, one per line'),
+      quality: z
+        .enum(['standard', 'high'])
+        .optional()
+        .describe(
+          'Verification quality; defaults to standard. High quality retries more thoroughly and costs two credits per email.'
+        ),
+      deepScan: z
+        .boolean()
+        .optional()
+        .describe(
+          'Automatically re-verify unresolved emails after the initial pass. Costs three credits per re-verified email.'
+        )
     })
   )
   .output(
@@ -37,7 +49,12 @@ After uploading, use the **Check Bulk Verification Status** tool to monitor prog
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.uploadBulkFile(ctx.input.filename, ctx.input.fileContents);
+    let result = await client.uploadBulkFile(
+      ctx.input.filename,
+      ctx.input.fileContents,
+      ctx.input.quality,
+      ctx.input.deepScan
+    );
 
     return {
       output: {
@@ -51,12 +68,12 @@ After uploading, use the **Check Bulk Verification Status** tool to monitor prog
 export let checkBulkStatus = SlateTool.create(spec, {
   name: 'Check Bulk Verification Status',
   key: 'check_bulk_status',
-  description: `Check the processing status of a bulk email verification job. Returns the current status, progress, and download links when processing is complete.
+  description: `Check the processing status of a bulk email verification job. Returns the current status and progress, with downloadable CSV results when processing is complete.
 
 Use the job ID returned by the **Upload Bulk Verification File** tool.`,
   instructions: [
     'Provide the job ID from a previous bulk upload.',
-    'When status is "finished", the download links will be available in the output.'
+    'When status is "finished", all results and the verified subset are available to download. Use Download Bulk Verification Results for XLSX or custom result filters.'
   ],
   tags: {
     readOnly: true,
@@ -92,10 +109,29 @@ Use the job ID returned by the **Upload Bulk Verification File** tool.`,
 
     let result = await client.getBulkFileStatus(ctx.input.jobId);
 
+    if (result.status === 'finished') {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.linkAll,
+        mimeType: 'text/csv',
+        headers: { 'x-api-key': ctx.auth.token }
+      });
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.linkOk,
+        mimeType: 'text/csv',
+        headers: { 'x-api-key': ctx.auth.token }
+      });
+    }
+
     let progressText =
       result.status === 'finished'
         ? 'Processing complete.'
-        : `Processing: ${result.linesProcessed}/${result.lines} emails.`;
+        : result.status === 'waiting'
+          ? 'Waiting for a processing slot.'
+          : result.status === 'errored'
+            ? 'Verification failed; no credits were deducted.'
+            : `Processing: ${result.linesProcessed}/${result.lines} emails.`;
 
     return {
       output: {

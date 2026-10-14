@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let attachmentSchema = z.object({
@@ -20,8 +21,8 @@ export let listAttachments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('Project ID'),
-      taskId: z.number().describe('Task ID to list attachments for')
+      projectId: positiveIntegerSchema.describe('Project ID'),
+      taskId: positiveIntegerSchema.describe('Task ID to list attachments for')
     })
   )
   .output(

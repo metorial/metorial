@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,6 +52,18 @@ Costs 1 credit per successful match.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    for (let [index, email] of ctx.input.emails.entries()) {
+      if (
+        email.custom &&
+        (Object.keys(email.custom).length > 10 ||
+          Object.values(email.custom).some(value => value.length > 100))
+      ) {
+        throw createApiServiceError(
+          `Email ${index + 1} custom fields allow at most 10 keys and 100 characters per value.`
+        );
+      }
+    }
+
     let webhookEvents: { contact_finished?: string } | undefined;
     if (ctx.input.contactFinishedWebhookUrl) {
       webhookEvents = { contact_finished: ctx.input.contactFinishedWebhookUrl };
@@ -63,7 +75,7 @@ Costs 1 credit per successful match.`,
       webhook_events: webhookEvents,
       data: ctx.input.emails.map(e => ({
         email: e.email,
-        custom: e.custom as Record<string, string> | undefined
+        custom: e.custom
       }))
     });
 

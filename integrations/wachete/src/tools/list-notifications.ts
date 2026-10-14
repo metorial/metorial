@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -73,24 +73,31 @@ Returns the current and previous content values along with alert metadata.`,
       html: ctx.input.html
     });
 
-    let notifications = (response.data ?? []).map(n => ({
-      notificationId: n.id,
-      alertType: n.type,
-      current: n.current,
-      comparand: n.comparand,
-      htmlContent: n.html,
-      error: n.error,
-      timestamp: n.timestamp,
-      serverTime: n.serverTime,
-      wachetId: n.taskId,
-      wachetName: n.taskName,
-      url: n.url
-    }));
+    let notifications = (response.data ?? []).map(n => {
+      if (!n.id || !n.taskId) {
+        throw createApiServiceError(
+          'Wachete returned a notification without its notification or monitor ID.'
+        );
+      }
+      return {
+        notificationId: n.id,
+        alertType: String(n.type),
+        current: n.current ?? undefined,
+        comparand: n.comparand ?? undefined,
+        htmlContent: n.html ?? undefined,
+        error: n.error ?? undefined,
+        timestamp: n.timestamp,
+        serverTime: n.serverTime,
+        wachetId: n.taskId,
+        wachetName: n.taskName ?? undefined,
+        url: n.url ?? undefined
+      };
+    });
 
     return {
       output: {
         notifications,
-        continuationToken: response.continuationToken
+        continuationToken: response.continuationToken ?? undefined
       },
       message: `Retrieved **${notifications.length}** notification(s).${response.continuationToken ? ' More results available with continuation token.' : ''}`
     };

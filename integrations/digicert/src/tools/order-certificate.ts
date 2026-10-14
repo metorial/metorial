@@ -42,17 +42,39 @@ Provide the product type identifier and required fields such as CSR, common name
           signatureHash: z
             .string()
             .optional()
-            .describe('Signature hash algorithm (e.g., "sha256")')
+            .describe('Signature hash algorithm (e.g., "sha256")'),
+          validityDays: z
+            .number()
+            .int()
+            .min(1)
+            .max(199)
+            .optional()
+            .describe(
+              'Validity of the first issued public TLS certificate in days. The provider may cap it at the order duration.'
+            )
         })
         .describe('Certificate details'),
       organizationId: z
         .number()
         .describe('ID of the organization to associate with the certificate'),
-      validityYears: z.number().optional().describe('Certificate validity in years (1 or 2)'),
+      validityYears: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(1)
+        .max(3)
+        .optional()
+        .describe(
+          'Requested order duration in years (default 1). Multi-year coverage requires an enabled plan; each issued public TLS certificate is subject to provider validity limits.'
+        ),
       validityDays: z
         .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .min(1)
+        .max(1095)
         .optional()
-        .describe('Certificate validity in days (overrides validityYears)'),
+        .describe(
+          'Requested order duration in days (overrides validityYears). Provider limits depend on whether multi-year plans are enabled.'
+        ),
       comments: z.string().optional().describe('Comments or notes for the order'),
       disableRenewalNotifications: z
         .boolean()
@@ -100,7 +122,11 @@ Provide the product type identifier and required fields such as CSR, common name
         server_platform: ctx.input.certificate.serverPlatform
           ? { id: ctx.input.certificate.serverPlatform }
           : undefined,
-        signature_hash: ctx.input.certificate.signatureHash || 'sha256'
+        signature_hash: ctx.input.certificate.signatureHash || 'sha256',
+        cert_validity:
+          ctx.input.certificate.validityDays === undefined
+            ? undefined
+            : { days: ctx.input.certificate.validityDays }
       },
       organization: { id: ctx.input.organizationId },
       comments: ctx.input.comments,
@@ -108,11 +134,10 @@ Provide the product type identifier and required fields such as CSR, common name
       payment_method: ctx.input.paymentMethod
     };
 
-    if (ctx.input.validityDays) {
-      body.validity_days = ctx.input.validityDays;
-    } else if (ctx.input.validityYears) {
-      body.validity_years = ctx.input.validityYears;
-    }
+    body.order_validity =
+      ctx.input.validityDays === undefined
+        ? { years: ctx.input.validityYears ?? 1 }
+        : { days: ctx.input.validityDays };
 
     ctx.progress('Submitting certificate order...');
     let result = await client.orderCertificate(ctx.input.productType, body);

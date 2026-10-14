@@ -62,8 +62,8 @@ export let sendEmail = SlateTool.create(spec, {
     return {
       output: {
         emailId: result.id,
-        status: result.status,
-        dateSent: result.dateSent
+        status: result.status ?? undefined,
+        dateSent: result.dateSent ?? undefined
       },
       message: `Email sent to **${ctx.input.to}** with subject "${ctx.input.subject}".`
     };

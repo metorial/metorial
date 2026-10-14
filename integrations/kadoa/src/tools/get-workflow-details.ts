@@ -74,40 +74,40 @@ Use this to inspect a workflow's full setup before running or modifying it.`,
       let history = await client.getWorkflowHistory(ctx.input.workflowId);
       runs = (history.workflowRuns || []).map((r: any) => ({
         runId: r.id,
-        state: r.state,
-        startedAt: r.startedAt,
-        finishedAt: r.finishedAt,
-        records: r.records,
-        credits: r.credits
+        state: r.state ?? undefined,
+        startedAt: r.startedAt ?? undefined,
+        finishedAt: r.finishedAt ?? undefined,
+        records: r.records ?? undefined,
+        credits: r.credits ?? undefined
       }));
     }
 
     return {
       output: {
         workflowId: workflow.id,
-        name: workflow.name,
-        description: workflow.description,
-        state: workflow.state,
-        displayState: workflow.displayState,
-        url: workflow.url,
-        urls: workflow.urls,
-        totalRecords: workflow.totalRecords,
-        runState: workflow.runState,
-        tags: workflow.tags,
-        navigationMode: workflow.navigationMode,
-        maxDepth: workflow.maxDepth,
-        maxPages: workflow.maxPages,
-        monitoring: workflow.monitoring,
+        name: workflow.name ?? undefined,
+        description: workflow.description ?? undefined,
+        state: workflow.state ?? undefined,
+        displayState: workflow.displayState ?? undefined,
+        url: workflow.url ?? undefined,
+        urls: workflow.urls ?? undefined,
+        totalRecords: workflow.totalRecords ?? undefined,
+        runState: workflow.runState ?? undefined,
+        tags: workflow.tags ?? undefined,
+        navigationMode: workflow.navigationMode ?? undefined,
+        maxDepth: workflow.maxDepth ?? undefined,
+        maxPages: workflow.maxPages ?? undefined,
+        monitoring: workflow.monitoring ?? undefined,
         schema: workflow.schema?.map((s: any) => ({
           name: s.name,
-          description: s.description,
-          dataType: s.dataType,
-          isKey: s.isKey,
-          isRequired: s.isRequired
+          description: s.description ?? undefined,
+          dataType: s.dataType ?? undefined,
+          isKey: s.isKey ?? undefined,
+          isRequired: s.isRequired ?? undefined
         })),
         healthTier: workflow.observerHealth?.healthTier,
-        createdAt: workflow.createdAt,
-        lastRunAt: workflow.finishedAt,
+        createdAt: workflow.createdAt ?? undefined,
+        lastRunAt: workflow.finishedAt ?? undefined,
         runs
       },
       message: `Workflow **${workflow.name || workflow.id}** — state: **${workflow.state}**, ${workflow.totalRecords || 0} records.${runs ? ` ${runs.length} run(s) in history.` : ''}`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,7 @@ export let manageRoles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
@@ -58,7 +58,7 @@ export let manageRoles = SlateTool.create(spec, {
 
       case 'get': {
         if (ctx.input.roleId === undefined) {
-          throw new Error('roleId is required for get');
+          throw createApiServiceError('roleId is required for get');
         }
         let role = await client.getRole(ctx.input.roleId);
         return {
@@ -69,7 +69,7 @@ export let manageRoles = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.roleName) {
-          throw new Error('roleName is required for create');
+          throw createApiServiceError('roleName is required for create');
         }
         let role = await client.createRole({ name: ctx.input.roleName });
         return {
@@ -80,7 +80,7 @@ export let manageRoles = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.roleSettings) {
-          throw new Error('roleSettings is required for update');
+          throw createApiServiceError('roleSettings is required for update');
         }
         let role = await client.updateRole(ctx.input.roleSettings);
         return {
@@ -91,7 +91,7 @@ export let manageRoles = SlateTool.create(spec, {
 
       case 'delete': {
         if (ctx.input.roleId === undefined) {
-          throw new Error('roleId is required for delete');
+          throw createApiServiceError('roleId is required for delete');
         }
         await client.deleteRole(ctx.input.roleId);
         return {
@@ -101,7 +101,7 @@ export let manageRoles = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

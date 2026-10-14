@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface PaginationParams {
   page?: number;
@@ -10,14 +17,10 @@ export interface PagedResponse<T> {
   page: number;
   page_size: number;
   total: number;
-  successful: boolean;
-  error: string | null;
 }
 
 export interface SingleResponse<T> {
   data: T;
-  successful: boolean;
-  error: string | null;
 }
 
 export interface PersonRecord {
@@ -44,7 +47,7 @@ export interface PersonRecord {
     city?: string;
     address_line?: string;
     zip_code?: string;
-    building_no?: string;
+    building?: string;
     state?: string;
   };
   [key: string]: unknown;
@@ -71,12 +74,23 @@ export interface CreatePersonData {
     city?: string;
     address_line?: string;
     zip_code?: string;
-    building_no?: string;
+    building?: string;
     state?: string;
   };
 }
 
-export interface UpdatePersonData extends Partial<CreatePersonData> {}
+export type UpdatePersonData = Partial<CreatePersonData>;
+
+export interface PeopleParams extends PaginationParams {
+  searchText?: string;
+  name?: string;
+  mobile?: string;
+  email?: string;
+  includeFamilyMembers?: boolean;
+  includeAdditionalFields?: boolean;
+  includeOrganizations?: boolean;
+  includeGroups?: boolean;
+}
 
 export interface ProfileNote {
   id: number;
@@ -153,6 +167,9 @@ export interface CreateContributionData {
   notes?: string;
   check_number?: string;
   transaction_id?: string;
+  reference_id?: string;
+  payment_method_id?: number;
+  batch_id?: number;
 }
 
 export interface CampaignRecord {
@@ -178,15 +195,44 @@ export interface OrganizationRecord {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('Connect a ChMeetings API key before using this tool.');
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.chmeetings.com/api/v1',
-      headers: {
-        ApiKey: config.token,
-        'Content-Type': 'application/json'
+      authHeader: { name: 'apikey', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ChMeetings',
+          reason: 'chmeetings_api_error'
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      let body: unknown = response.data;
+      if (!isApiErrorRecord(body)) return response;
+      let status = Number(body.status_code ?? response.status);
+      let errors = Array.isArray(body.errors) ? body.errors.filter(Boolean) : [];
+      if (status >= 400 || errors.length > 0) {
+        throw createApiServiceError(
+          `ChMeetings API request failed: ${errors.join('; ') || `HTTP ${status}`}`,
+          { reason: 'chmeetings_api_error', upstreamStatus: status }
+        );
       }
+      if (isApiErrorRecord(body.paging)) {
+        response.data = {
+          ...body,
+          data: body.data ?? [],
+          page: Number(body.paging.page),
+          page_size: Number(body.paging.page_size),
+          total: Number(body.paging.total_count)
+        };
+      } else if (!('data' in body) && !('status_code' in body)) {
+        response.data = { data: body };
+      }
+      return response;
     });
   }
 
@@ -206,20 +252,24 @@ export class Client {
   }
 
   async getOrganization(organizationId: string): Promise<SingleResponse<OrganizationRecord>> {
-    let response = await this.http.get(`/organizations/${organizationId}`);
+    let response = await this.http.get(`/organizations/${encodeURIComponent(organizationId)}`);
     return response.data;
   }
 
   // ─── People ──────────────────────────────────────────────────
 
-  async listPeople(
-    params?: PaginationParams & { searchText?: string }
-  ): Promise<PagedResponse<PersonRecord>> {
+  async listPeople(params?: PeopleParams): Promise<PagedResponse<PersonRecord>> {
     let response = await this.http.get('/people', {
       params: {
         page: params?.page ?? 1,
         page_size: params?.pageSize ?? 100,
-        search_text: params?.searchText
+        name: params?.name ?? params?.searchText,
+        mobile: params?.mobile,
+        email: params?.email,
+        include_family_members: params?.includeFamilyMembers ?? true,
+        include_additional_fields: params?.includeAdditionalFields ?? true,
+        include_organizations: params?.includeOrganizations ?? false,
+        include_groups: params?.includeGroups ?? false
       }
     });
     return response.data;
@@ -227,20 +277,83 @@ export class Client {
 
   async getPerson(personId: number): Promise<SingleResponse<PersonRecord>> {
     let response = await this.http.get(`/people/${personId}`);
+    if (!isApiErrorRecord(response.data?.data)) {
+      throw createApiServiceError(
+        'ChMeetings did not return a person record. Check the person ID.'
+      );
+    }
     return response.data;
   }
 
-  async createPerson(data: CreatePersonData): Promise<SingleResponse<PersonRecord>> {
+  async createPerson(
+    data: CreatePersonData
+  ): Promise<SingleResponse<PersonRecord | { created: true }>> {
     let response = await this.http.post('/people', data);
-    return response.data;
+    if (isApiErrorRecord(response.data?.data)) return response.data;
+    let location = getResponseHeaderValue(response.headers, 'location');
+    let id = location?.match(/\/people\/(\d+)(?:[?#]|$)/)?.[1];
+    if (id) return this.getPerson(Number(id));
+    return { data: { created: true } };
   }
 
   async updatePerson(
     personId: number,
     data: UpdatePersonData
   ): Promise<SingleResponse<PersonRecord>> {
-    let response = await this.http.put(`/people/${personId}`, data);
-    return response.data;
+    let current = (await this.getPerson(personId)).data;
+    let writableFields = [
+      'first_name',
+      'middle_name',
+      'last_name',
+      'nick_name',
+      'native_name',
+      'email',
+      'birth_date',
+      'mobile',
+      'do_not_text',
+      'do_not_email',
+      'facebook',
+      'gender',
+      'social_status',
+      'engagement_date',
+      'marriage_date',
+      'job_title',
+      'work_place',
+      'qualification',
+      'education_level',
+      'school',
+      'father_name',
+      'church',
+      'is_deacon',
+      'rank',
+      'bishop_donor',
+      'baptism_date',
+      'baptism_location',
+      'grade',
+      'graduation_year',
+      'telephone',
+      'talents_and_hobbies',
+      'address',
+      'additional_fields'
+    ];
+    let replacement: Record<string, unknown> = {};
+    for (let key of writableFields) {
+      if (current[key] !== undefined) replacement[key] = current[key];
+    }
+    Object.assign(replacement, pickDefined(data));
+    if (data.address) {
+      replacement.address = {
+        ...(isApiErrorRecord(current.address) ? current.address : {}),
+        ...pickDefined(data.address)
+      };
+    }
+    if (!replacement.first_name || !replacement.last_name) {
+      throw createApiServiceError(
+        'The current profile must have first and last names before it can be updated.'
+      );
+    }
+    await this.http.put(`/people/${personId}`, replacement);
+    return this.getPerson(personId);
   }
 
   async deletePerson(personId: number): Promise<void> {
@@ -249,25 +362,24 @@ export class Client {
 
   async listPeopleByOrganization(
     organizationId: string,
-    params?: PaginationParams & {
-      name?: string;
-      mobile?: string;
-      email?: string;
-      includeFamilyMembers?: boolean;
-      includeAdditionalFields?: boolean;
-    }
+    params?: PeopleParams
   ): Promise<PagedResponse<PersonRecord>> {
-    let response = await this.http.get(`/organizations/${organizationId}/people`, {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100,
-        name: params?.name,
-        mobile: params?.mobile,
-        email: params?.email,
-        include_family_members: params?.includeFamilyMembers,
-        include_additional_fields: params?.includeAdditionalFields
+    let response = await this.http.get(
+      `/organizations/${encodeURIComponent(organizationId)}/people`,
+      {
+        params: {
+          page: params?.page ?? 1,
+          page_size: params?.pageSize ?? 100,
+          name: params?.name ?? params?.searchText,
+          mobile: params?.mobile,
+          email: params?.email,
+          include_family_members: params?.includeFamilyMembers ?? true,
+          include_additional_fields: params?.includeAdditionalFields ?? true,
+          include_organizations: params?.includeOrganizations ?? false,
+          include_groups: params?.includeGroups ?? false
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -338,7 +450,12 @@ export class Client {
   async createFamily(data: {
     members: { person_id: number; role?: string }[];
   }): Promise<SingleResponse<FamilyRecord>> {
-    let response = await this.http.post('/families', data);
+    let response = await this.http.post('/families', {
+      members: data.members.map(member => ({
+        person_id: member.person_id,
+        family_role: member.role ?? 'Other'
+      }))
+    });
     return response.data;
   }
 
@@ -355,7 +472,12 @@ export class Client {
     familyId: number,
     members: { person_id: number; role?: string }[]
   ): Promise<SingleResponse<FamilyRecord>> {
-    let response = await this.http.post(`/families/${familyId}/members`, { members });
+    let response = await this.http.post(`/families/${familyId}/members`, {
+      members: members.map(member => ({
+        person_id: member.person_id,
+        family_role: member.role ?? 'Other'
+      }))
+    });
     return response.data;
   }
 
@@ -363,7 +485,12 @@ export class Client {
     familyId: number,
     members: { person_id: number; role?: string }[]
   ): Promise<SingleResponse<FamilyRecord>> {
-    let response = await this.http.put(`/families/${familyId}/members`, { members });
+    let response = await this.http.put(`/families/${familyId}/members`, {
+      members: members.map(member => ({
+        person_id: member.person_id,
+        family_role: member.role ?? 'Other'
+      }))
+    });
     return response.data;
   }
 
@@ -377,15 +504,15 @@ export class Client {
     role: string
   ): Promise<SingleResponse<unknown>> {
     let response = await this.http.patch(`/families/${familyId}/members/${personId}`, {
-      role
+      family_role: role
     });
     return response.data;
   }
 
   // ─── Groups ──────────────────────────────────────────────────
 
-  async listGroups(): Promise<SingleResponse<GroupRecord[]>> {
-    let response = await this.http.get('/groups');
+  async listGroups(searchText?: string): Promise<SingleResponse<GroupRecord[]>> {
+    let response = await this.http.get('/groups', { params: { search_text: searchText } });
     return response.data;
   }
 
@@ -393,13 +520,16 @@ export class Client {
     organizationId: string,
     params?: PaginationParams & { searchText?: string }
   ): Promise<PagedResponse<GroupRecord>> {
-    let response = await this.http.get(`/organizations/${organizationId}/groups`, {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.pageSize ?? 100,
-        search_text: params?.searchText
+    let response = await this.http.get(
+      `/organizations/${encodeURIComponent(organizationId)}/groups`,
+      {
+        params: {
+          page: params?.page ?? 1,
+          page_size: params?.pageSize ?? 100,
+          search_text: params?.searchText
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -416,7 +546,7 @@ export class Client {
     params?: PaginationParams
   ): Promise<PagedResponse<GroupMembership>> {
     let response = await this.http.get(
-      `/organizations/${organizationId}/groups/${groupId}/memberships`,
+      `/organizations/${encodeURIComponent(organizationId)}/groups/${groupId}/memberships`,
       {
         params: {
           page: params?.page ?? 1,
@@ -465,7 +595,17 @@ export class Client {
   async createContribution(
     data: CreateContributionData
   ): Promise<SingleResponse<ContributionRecord>> {
-    let response = await this.http.post('/contributions', data);
+    let response = await this.http.post('/contributions', {
+      person: { person_id: data.person_id },
+      date: data.date,
+      payment_method: data.payment_method ?? null,
+      payment_method_id: data.payment_method_id,
+      funds: data.funds,
+      batch_num: data.batch_number,
+      batch_id: data.batch_id,
+      note: data.notes,
+      reference_id: data.reference_id ?? data.transaction_id
+    });
     return response.data;
   }
 
@@ -493,6 +633,65 @@ export class Client {
       params: {
         page: params?.page ?? 1,
         page_size: params?.pageSize ?? 100
+      }
+    });
+    return response.data;
+  }
+
+  async listEvents(
+    params: PaginationParams & { from: string; to: string; organizationId?: string }
+  ): Promise<PagedResponse<Record<string, unknown>>> {
+    let path = params.organizationId
+      ? `/organizations/${encodeURIComponent(params.organizationId)}/events`
+      : '/events';
+    let response = await this.http.get(path, {
+      params: {
+        from: params.from,
+        to: params.to,
+        page: params.page ?? 1,
+        page_size: params.pageSize ?? 100
+      }
+    });
+    return response.data;
+  }
+
+  async listEventOccurrences(
+    eventId: number,
+    params: PaginationParams & { from: string; to: string; organizationId?: string }
+  ): Promise<PagedResponse<Record<string, unknown>>> {
+    let path = params.organizationId
+      ? `/organizations/${encodeURIComponent(params.organizationId)}/events/${eventId}/occurrences`
+      : `/events/${eventId}/occurrences`;
+    let response = await this.http.get(path, {
+      params: {
+        from: params.from,
+        to: params.to,
+        page: params.page ?? 1,
+        page_size: params.pageSize ?? 100
+      }
+    });
+    return response.data;
+  }
+
+  async listOccurrenceAttendance(
+    occurrenceId: string,
+    params: PaginationParams & {
+      organizationId?: string;
+      status?: string;
+      groupId?: number;
+      ungrouped?: boolean;
+    }
+  ): Promise<PagedResponse<Record<string, unknown>>> {
+    let path = params.organizationId
+      ? `/organizations/${encodeURIComponent(params.organizationId)}/occurrences/${encodeURIComponent(occurrenceId)}/attendance`
+      : `/occurrences/${encodeURIComponent(occurrenceId)}/attendance`;
+    let response = await this.http.get(path, {
+      params: {
+        status: params.status,
+        group_id: params.groupId,
+        ungrouped: params.ungrouped,
+        page: params.page ?? 1,
+        page_size: params.pageSize ?? 100
       }
     });
     return response.data;

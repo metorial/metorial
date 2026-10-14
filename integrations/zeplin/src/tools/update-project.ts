@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,6 +26,9 @@ export let updateProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.name === undefined && ctx.input.description === undefined) {
+      throw createApiServiceError('Provide a name or description to update the project.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
 
     let updateData: { name?: string; description?: string } = {};

@@ -1,6 +1,4 @@
-Let me look for the specific API endpoints in the documentation.Now let me get more details on the send campaign endpoint settings and the other API endpoints:Now I have enough information to write the specification. Let me also quickly check the get campaign and get campaign list endpoints for completeness:Now I have comprehensive information. Let me compile the specification.
-
-# Slates Specification for Campaign Cleaner
+# Campaign Cleaner API Specification
 
 ## Overview
 
@@ -67,6 +65,12 @@ List, check status of, and delete saved campaigns.
 - **Campaign Status:** Check the processing status of a specific campaign by ID.
 - **Delete Campaign:** Remove a saved campaign from your account by ID.
 
+### Inbox Placement Testing
+
+Create an inbox test with a name of up to 255 characters. The result includes a job ID, monitoring address, instructions, and seed address list. Send the campaign through your email service to every returned address, then retrieve results using the job ID. Results include status, inbox and spam rates, pending mailbox counts, and per-provider placement and SPF details. A test may remain Processing if any seed address has not received the campaign.
+
+This workflow requires an active Campaign Cleaner or standalone Inbox Placement Tester subscription and consumes one API credit when a test is created.
+
 ### Credit Management
 
 Check available credits in your account. Credits are consumed each time a campaign is submitted for processing.
@@ -74,3 +78,22 @@ Check available credits in your account. Credits are consumed each time a campai
 ## Events
 
 Campaign Cleaner supports webhooks for campaign processing completion. When submitting a campaign for processing, you can provide a `webhook_url` parameter. Once the campaign is fully processed, Campaign Cleaner sends the complete campaign results (equivalent to the Get Campaign response) to your specified webhook endpoint. The webhook endpoint can be tested and troubleshot via the API Management section of the Campaign Cleaner dashboard.
+
+
+## API Reference
+
+| Tool | Method and endpoint |
+| --- | --- |
+| Clean Campaign | POST `/send_campaign` with `send_campaign` settings |
+| Get Campaign | POST `/get_campaign` with `campaign.id` and optional `campaign.minimize_html` |
+| Get Campaign Status | POST `/get_campaign_status` with `campaign.id` |
+| List Campaigns | GET `/get_campaign_list` |
+| Delete Campaign | POST `/delete_campaign` with `campaign.id` |
+| Get Credits | GET `/get_credits` |
+| Get Campaign PDF Report | POST `/get_campaign_pdf_analysis` with `campaign.id` |
+| Create Inbox Test | POST `/create_inbox_test` with `test_name` |
+| Get Inbox Test Results | POST `/get_inbox_test_results` with `job_id` |
+
+Cleaned HTML and PDF reports are available as downloadable files. Existing structured HTML and PDF base64 fields remain available for compatibility. Numeric campaign fields continue to expose counts; optional domain and broken-link lists provide the corresponding detail. Link diagnostics retain textual failure reasons alongside numeric status codes.
+
+Official references: [API overview](https://docs.campaigncleaner.com/api-reference/introduction), [campaign results](https://docs.campaigncleaner.com/api-reference/endpoint/get-campaign), [PDF reports](https://docs.campaigncleaner.com/api-reference/endpoint/get-campaign-pdf-analysis), [create inbox test](https://docs.campaigncleaner.com/api-reference/endpoint/create-inbox-test), and [inbox test results](https://docs.campaigncleaner.com/api-reference/endpoint/get-inbox-test-results).

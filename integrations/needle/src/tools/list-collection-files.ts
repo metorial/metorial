@@ -52,11 +52,11 @@ export let listCollectionFiles = SlateTool.create(spec, {
     let mapped = files.map(f => ({
       fileId: f.id,
       name: f.name,
-      size: f.size,
-      contentType: f.content_type,
-      status: f.status,
-      createdAt: f.created_at,
-      updatedAt: f.updated_at
+      size: f.size ?? undefined,
+      contentType: f.content_type ?? f.type,
+      status: f.status ?? undefined,
+      createdAt: f.created_at ?? undefined,
+      updatedAt: f.updated_at ?? undefined
     }));
 
     return {

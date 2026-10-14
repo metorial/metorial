@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let planningEntryOutputSchema = z.object({
@@ -37,6 +38,7 @@ export let listPlanningEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       period: z.string().describe('Planning period (e.g., "2024-01" for January 2024)'),
       userId: z.number().optional().describe('Filter by user ID'),
       projectId: z.number().optional().describe('Filter by project ID'),
@@ -52,6 +54,8 @@ export let listPlanningEntries = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = { period: ctx.input.period };
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.userId) params.user_id = ctx.input.userId;
     if (ctx.input.projectId) params.project_id = ctx.input.projectId;
     if (ctx.input.dealId) params.deal_id = ctx.input.dealId;

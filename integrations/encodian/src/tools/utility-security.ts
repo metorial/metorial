@@ -58,11 +58,13 @@ export let utilitySecurity = SlateTool.create(spec, {
       result: z
         .string()
         .describe('Operation result (encrypted/decrypted data, hash, token, password, etc.)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
 
     switch (ctx.input.operation) {
@@ -143,9 +145,13 @@ export let utilitySecurity = SlateTool.create(spec, {
           result.token ||
           result.Token ||
           '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}**.`
+      message: client.message(
+        `Successfully performed **${ctx.input.operation.replace(/_/g, ' ')}**.`
+      )
     };
   })
   .build();

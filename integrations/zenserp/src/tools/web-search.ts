@@ -51,11 +51,12 @@ let searchResultSchema = z
 export let webSearch = SlateTool.create(spec, {
   name: 'Web Search',
   key: 'web_search',
-  description: `Scrape structured web search results from Google, Bing, Yandex, or DuckDuckGo. Returns organic results, ads, People Also Ask, knowledge panels, answer boxes, and related searches. Supports geotargeting by location name or coordinates, language and country filtering, and pagination.`,
+  description: `Scrape structured web search results from Google, Bing, Yandex, or DuckDuckGo. Returns organic results and provider-specific SERP sections. Supports location targeting, language and country filters, and provider-specific pagination. Coordinates are supported for Bing; use location names for other web engines.`,
   instructions: [
     'Use `searchEngine` to target a specific engine: "google" (default), "bing", "yandex", or "duckduckgo".',
-    'For geotargeting, provide either a `location` name (e.g. "New York, United States") or `latitude`/`longitude` coordinates.',
-    'Use `start` for pagination; it represents the offset of results.'
+    'For geotargeting, provide a `location` name (e.g. "New York, United States"). Bing also supports paired `latitude`/`longitude` coordinates.',
+    'Use `start` for offset pagination on Google or Bing. Yandex uses pages and cannot honor this offset; omit start for Yandex.',
+    'Bing allows at most 50 results per request; Google allows at most 100. Available fields and filters vary by engine.'
   ],
   tags: {
     readOnly: true

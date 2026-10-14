@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   us: 'https://api.feathery.io',
@@ -8,16 +8,19 @@ let BASE_URLS: Record<string, string> = {
 };
 
 export class FeatheryClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { token: string; region?: string }) {
-    let baseURL = BASE_URLS[params.region || 'us'] || BASE_URLS.us;
-    this.axios = createAxios({
+    let baseURL = BASE_URLS[params.region || 'us'];
+    if (!baseURL) throw createApiServiceError('Choose a supported Feathery account region.');
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        Authorization: `Token ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Token ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Feathery',
+          reason: 'Feathery API request failed'
+        })
     });
   }
 
@@ -34,17 +37,19 @@ export class FeatheryClient {
     permissions?: Record<string, boolean>;
     userGroups?: string[];
   }): Promise<any> {
-    let response = await this.axios.post('/api/account/invite/', {
-      email: params.email,
-      role: params.role,
-      ...params.permissions,
-      user_groups: params.userGroups
-    });
+    let response = await this.axios.post('/api/account/invite/', [
+      {
+        email: params.email,
+        role: params.role,
+        ...params.permissions,
+        user_groups: params.userGroups
+      }
+    ]);
     return response.data;
   }
 
   async removeTeamMember(email: string): Promise<any> {
-    let response = await this.axios.patch('/api/account/uninvite/', { email });
+    let response = await this.axios.patch('/api/account/uninvite/', [{ email }]);
     return response.data;
   }
 
@@ -56,7 +61,7 @@ export class FeatheryClient {
   }
 
   async getForm(formId: string): Promise<any> {
-    let response = await this.axios.get(`/api/form/${formId}/`);
+    let response = await this.axios.get(`/api/form/${encodeURIComponent(formId)}/`);
     return response.data;
   }
 
@@ -92,12 +97,12 @@ export class FeatheryClient {
     if (params.translations !== undefined) body.translations = params.translations;
     if (params.integrations !== undefined) body.integrations = params.integrations;
 
-    let response = await this.axios.patch(`/api/form/${formId}/`, body);
+    let response = await this.axios.patch(`/api/form/${encodeURIComponent(formId)}/`, body);
     return response.data;
   }
 
   async deleteForm(formId: string): Promise<void> {
-    await this.axios.delete(`/api/form/${formId}/`, {
+    await this.axios.delete(`/api/form/${encodeURIComponent(formId)}/`, {
       data: { confirm_delete: true }
     });
   }
@@ -125,7 +130,8 @@ export class FeatheryClient {
     noFieldValues?: boolean;
     sort?: string;
     pageSize?: number;
-    count?: boolean;
+    count?: number;
+    pageUrl?: string;
   }): Promise<any> {
     let queryParams: Record<string, any> = {
       form_id: params.formId
@@ -135,14 +141,36 @@ export class FeatheryClient {
     if (params.createdAfter) queryParams.created_after = params.createdAfter;
     if (params.createdBefore) queryParams.created_before = params.createdBefore;
     if (params.completed !== undefined) queryParams.completed = params.completed;
-    if (params.fieldSearch) queryParams.field_search = JSON.stringify(params.fieldSearch);
+    if (params.fieldSearch)
+      queryParams.field_search = JSON.stringify(
+        Object.entries(params.fieldSearch).map(([field_id, value]) => ({ field_id, value }))
+      );
     if (params.fuzzySearch) queryParams.fuzzy_search = JSON.stringify(params.fuzzySearch);
     if (params.fields) queryParams.fields = params.fields.join(',');
     if (params.noFieldValues) queryParams.no_field_values = params.noFieldValues;
     if (params.sort) queryParams.sort = params.sort;
-    if (params.pageSize) queryParams.page_size = params.pageSize;
-    if (params.count) queryParams.count = params.count;
+    if (params.pageSize !== undefined) queryParams.page_size = params.pageSize;
+    if (params.count !== undefined) queryParams.count = params.count;
 
+    if (params.pageUrl) {
+      let page: URL;
+      try {
+        page = new URL(params.pageUrl);
+      } catch {
+        throw createApiServiceError('Use the nextPageUrl returned by list_submissions.');
+      }
+      if (
+        page.origin !== this.axios.defaults.baseURL ||
+        page.pathname !== '/api/form/submission/' ||
+        page.searchParams.get('form_id') !== params.formId
+      ) {
+        throw createApiServiceError(
+          'The submission page must belong to this Feathery region and form. Use nextPageUrl returned by list_submissions.'
+        );
+      }
+      let response = await this.axios.get(`${page.pathname}${page.search}`);
+      return response.data;
+    }
     let response = await this.axios.get('/api/form/submission/', { params: queryParams });
     return response.data;
   }
@@ -152,7 +180,7 @@ export class FeatheryClient {
     forms: string[];
     fields: Record<string, any>;
     complete?: boolean;
-    documents?: Array<{ id: string; outputLocation?: string }>;
+    documents?: Array<{ id: string; outputLocation?: { sheet: string; cell: string } }>;
   }): Promise<any> {
     let body: Record<string, any> = {
       user_id: params.userId,
@@ -179,6 +207,32 @@ export class FeatheryClient {
     return response.data;
   }
 
+  async waitForSubmissionPdf(url: string): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let response: Response;
+      try {
+        response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+        await response.body?.cancel();
+      } catch (error) {
+        throw buildApiServiceError(error, {
+          providerLabel: 'Feathery',
+          reason: 'Could not check submission PDF availability'
+        });
+      }
+      if (response.status === 200) return;
+      if (response.status !== 404 && response.status !== 202) {
+        throw buildApiServiceError(
+          { response: { status: response.status } },
+          { providerLabel: 'Feathery', reason: 'Submission PDF download failed' }
+        );
+      }
+      if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    throw createApiServiceError(
+      'Feathery is still preparing the submission PDF. Retry the export shortly.'
+    );
+  }
+
   // ---- Users ----
 
   async listUsers(params?: {
@@ -203,11 +257,11 @@ export class FeatheryClient {
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await this.axios.delete(`/api/user/${userId}/`);
+    await this.axios.delete(`/api/user/${encodeURIComponent(userId)}/`);
   }
 
   async getUserSession(userId: string): Promise<any> {
-    let response = await this.axios.get(`/api/user/${userId}/session/`);
+    let response = await this.axios.get(`/api/user/${encodeURIComponent(userId)}/session/`);
     return response.data;
   }
 
@@ -219,12 +273,16 @@ export class FeatheryClient {
   // ---- Hidden Fields ----
 
   async listHiddenFields(): Promise<any[]> {
-    let response = await this.axios.get('/api/form/hidden_field/');
+    let response = await this.axios.get('/api/field/hidden/');
     return response.data;
   }
 
   async createHiddenField(fieldId: string): Promise<any> {
-    let response = await this.axios.post('/api/form/hidden_field/', { field_id: fieldId });
+    let response = await this.axios.post('/api/field/hidden/', {
+      id: fieldId,
+      type: 'json_value',
+      server_side: false
+    });
     return response.data;
   }
 
@@ -243,11 +301,15 @@ export class FeatheryClient {
       formData.append('files', blob, file.name);
     }
 
-    let response = await this.axios.post(`/api/ai/run/${extractionId}/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+    let response = await this.axios.post(
+      `/api/ai/run/${encodeURIComponent(extractionId)}/`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -264,9 +326,12 @@ export class FeatheryClient {
     if (params?.endTime) queryParams.end_time = params.endTime;
     if (params?.userId) queryParams.user_id = params.userId;
 
-    let response = await this.axios.get(`/api/ai/run/batch/${extractionId}/`, {
-      params: queryParams
-    });
+    let response = await this.axios.get(
+      `/api/ai/run/batch/${encodeURIComponent(extractionId)}/`,
+      {
+        params: queryParams
+      }
+    );
     return response.data;
   }
 
@@ -309,7 +374,7 @@ export class FeatheryClient {
   }
 
   async deleteDocumentEnvelope(envelopeId: string): Promise<void> {
-    await this.axios.delete(`/api/document/envelope/${envelopeId}/`);
+    await this.axios.delete(`/api/document/envelope/${encodeURIComponent(envelopeId)}/`);
   }
 
   // ---- Workspaces ----
@@ -323,7 +388,7 @@ export class FeatheryClient {
   }
 
   async getWorkspace(workspaceId: string): Promise<any> {
-    let response = await this.axios.get(`/api/workspace/${workspaceId}/`);
+    let response = await this.axios.get(`/api/workspace/${encodeURIComponent(workspaceId)}/`);
     return response.data;
   }
 
@@ -346,11 +411,30 @@ export class FeatheryClient {
     if (params.brandUrl) body.brand_url = params.brandUrl;
     if (params.brandFavicon) body.brand_favicon = params.brandFavicon;
     if (params.brandName) body.brand_name = params.brandName;
-    if (params.colors) body.colors = params.colors;
+    if (params.colors) {
+      if (Object.keys(params.colors).some(key => key !== 'primary' && key !== 'secondary')) {
+        throw createApiServiceError(
+          'Workspace colors supports only primary and secondary color keys.'
+        );
+      }
+      body.brand_primary_color = params.colors.primary;
+      body.brand_secondary_color = params.colors.secondary;
+    }
     if (params.features) body.features = params.features;
-    if (params.disabledTabs) body.disabled_tabs = params.disabledTabs;
-    if (params.disabledSettings) body.disabled_settings = params.disabledSettings;
-    if (params.disabledElements) body.disabled_elements = params.disabledElements;
+    if (params.disabledTabs) {
+      let globalTabs = ['themes', 'ab_tests', 'all_users'];
+      let formTabs = ['flow', 'integrations', 'results', 'settings'];
+      if (
+        params.disabledTabs.some(tab => !globalTabs.includes(tab) && !formTabs.includes(tab))
+      )
+        throw createApiServiceError(
+          'Workspace disabledTabs must contain supported global or form editor tabs.'
+        );
+      body.disabled_global_tabs = params.disabledTabs.filter(tab => globalTabs.includes(tab));
+      body.disabled_form_tabs = params.disabledTabs.filter(tab => formTabs.includes(tab));
+    }
+    if (params.disabledSettings) body.disabled_form_settings = params.disabledSettings;
+    if (params.disabledElements) body.disabled_form_elements = params.disabledElements;
     if (params.enabledIntegrations) body.enabled_integrations = params.enabledIntegrations;
     if (params.metadata) body.metadata = params.metadata;
 
@@ -381,34 +465,60 @@ export class FeatheryClient {
     if (params.brandUrl !== undefined) body.brand_url = params.brandUrl;
     if (params.brandFavicon !== undefined) body.brand_favicon = params.brandFavicon;
     if (params.brandName !== undefined) body.brand_name = params.brandName;
-    if (params.colors !== undefined) body.colors = params.colors;
+    if (params.colors !== undefined) {
+      if (Object.keys(params.colors).some(key => key !== 'primary' && key !== 'secondary'))
+        throw createApiServiceError(
+          'Workspace colors supports only primary and secondary color keys.'
+        );
+      body.brand_primary_color = params.colors.primary;
+      body.brand_secondary_color = params.colors.secondary;
+    }
     if (params.features !== undefined) body.features = params.features;
-    if (params.disabledTabs !== undefined) body.disabled_tabs = params.disabledTabs;
+    if (params.disabledTabs !== undefined) {
+      let globalTabs = ['themes', 'ab_tests', 'all_users'];
+      let formTabs = ['flow', 'integrations', 'results', 'settings'];
+      if (
+        params.disabledTabs.some(tab => !globalTabs.includes(tab) && !formTabs.includes(tab))
+      )
+        throw createApiServiceError(
+          'Workspace disabledTabs must contain supported global or form editor tabs.'
+        );
+      body.disabled_global_tabs = params.disabledTabs.filter(tab => globalTabs.includes(tab));
+      body.disabled_form_tabs = params.disabledTabs.filter(tab => formTabs.includes(tab));
+    }
     if (params.disabledSettings !== undefined)
-      body.disabled_settings = params.disabledSettings;
+      body.disabled_form_settings = params.disabledSettings;
     if (params.disabledElements !== undefined)
-      body.disabled_elements = params.disabledElements;
+      body.disabled_form_elements = params.disabledElements;
     if (params.enabledIntegrations !== undefined)
       body.enabled_integrations = params.enabledIntegrations;
     if (params.metadata !== undefined) body.metadata = params.metadata;
 
-    let response = await this.axios.patch(`/api/workspace/${workspaceId}/`, body);
+    let response = await this.axios.patch(
+      `/api/workspace/${encodeURIComponent(workspaceId)}/`,
+      body
+    );
     return response.data;
   }
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
-    await this.axios.delete(`/api/workspace/${workspaceId}/`);
+    await this.axios.delete(`/api/workspace/${encodeURIComponent(workspaceId)}/`);
   }
 
   async generateWorkspaceLoginToken(workspaceId: string): Promise<any> {
-    let response = await this.axios.post(`/api/workspace/${workspaceId}/login_token/`);
+    let response = await this.axios.post(
+      `/api/workspace/${encodeURIComponent(workspaceId)}/login_token/`
+    );
     return response.data;
   }
 
   async populateWorkspaceTemplate(workspaceId: string, templateFormId: string): Promise<any> {
-    let response = await this.axios.post(`/api/workspace/${workspaceId}/populate_template/`, {
-      template_form_id: templateFormId
-    });
+    let response = await this.axios.post(
+      `/api/workspace/${encodeURIComponent(workspaceId)}/populate_template/`,
+      {
+        template_form_id: templateFormId
+      }
+    );
     return response.data;
   }
 
@@ -422,9 +532,12 @@ export class FeatheryClient {
     if (params?.startTime) queryParams.start_time = params.startTime;
     if (params?.endTime) queryParams.end_time = params.endTime;
 
-    let response = await this.axios.get(`/api/logs/api-connector/${formId}/`, {
-      params: queryParams
-    });
+    let response = await this.axios.get(
+      `/api/logs/api-connector/${encodeURIComponent(formId)}/`,
+      {
+        params: queryParams
+      }
+    );
     return response.data;
   }
 
@@ -436,9 +549,12 @@ export class FeatheryClient {
     if (params?.startTime) queryParams.start_time = params.startTime;
     if (params?.endTime) queryParams.end_time = params.endTime;
 
-    let response = await this.axios.get(`/api/logs/email/form/${formId}/`, {
-      params: queryParams
-    });
+    let response = await this.axios.get(
+      `/api/logs/email/form/${encodeURIComponent(formId)}/`,
+      {
+        params: queryParams
+      }
+    );
     return response.data;
   }
 

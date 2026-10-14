@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getProfileTool = SlateTool.create(spec, {
@@ -25,7 +25,7 @@ export let getProfileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let profile = await client.getProfile();
 
     return {
@@ -33,8 +33,8 @@ export let getProfileTool = SlateTool.create(spec, {
         profileId: profile.id,
         fullname: profile.fullname,
         email: profile.email,
-        lang: profile.lang,
-        theme: profile.theme,
+        lang: profile.lang ?? undefined,
+        theme: profile.theme ?? undefined,
         defaultTeamId: profile['default-team-id'] ?? profile.defaultTeamId,
         defaultProjectId: profile['default-project-id'] ?? profile.defaultProjectId,
         createdAt: profile['created-at'] ?? profile.createdAt

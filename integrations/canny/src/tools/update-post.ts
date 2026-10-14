@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ export let updatePostTool = SlateTool.create(spec, {
       postId: z.string().describe('The ID of the post to update'),
       title: z.string().optional().describe('New title for the post'),
       details: z.string().optional().describe('New body/description for the post'),
-      eta: z.string().optional().describe('New estimated completion date (ISO 8601)'),
+      eta: z.string().optional().describe('New estimated completion date (MM/YYYY)'),
       etaPublic: z.boolean().optional().describe('Whether to show ETA publicly'),
       customFields: z
         .record(z.string(), z.any())
@@ -44,10 +44,13 @@ export let updatePostTool = SlateTool.create(spec, {
       customFields: ctx.input.customFields,
       imageURLs: ctx.input.imageURLs
     });
+    if (result !== 'success') {
+      throw createApiServiceError('Canny did not confirm that the post was updated.');
+    }
 
     return {
-      output: { postId: result.id },
-      message: `Updated post **${result.id}**.`
+      output: { postId: ctx.input.postId },
+      message: `Updated post **${ctx.input.postId}**.`
     };
   })
   .build();

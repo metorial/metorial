@@ -39,10 +39,10 @@ export let updateProduct = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.productCode) body.productCode = ctx.input.productCode;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.productCode !== undefined) body.productCode = ctx.input.productCode;
     if (ctx.input.saleable !== undefined) body.saleable = ctx.input.saleable;
-    if (ctx.input.unit) body.unit = ctx.input.unit;
+    if (ctx.input.unit !== undefined) body.unit = ctx.input.unit;
     if (ctx.input.currentStoreState !== undefined)
       body.currentStoreState = ctx.input.currentStoreState;
     if (ctx.input.purchaseNetPrice !== undefined)

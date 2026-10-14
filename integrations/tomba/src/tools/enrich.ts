@@ -29,7 +29,7 @@ let employmentSchema = z
 export let enrich = SlateTool.create(spec, {
   name: 'Email Enrichment',
   key: 'enrich',
-  description: `Look up person and company data based on an email address. Returns rich profile data including name, location, employment details, social profiles, and more.`,
+  description: `Look up person and company data based on an email address. Returns name, company, job title, country, social profiles, confidence score, and email verification details.`,
   tags: {
     readOnly: true
   }
@@ -45,6 +45,18 @@ export let enrich = SlateTool.create(spec, {
       fullName: z.string().nullable().optional().describe('Full name'),
       givenName: z.string().nullable().optional().describe('First/given name'),
       familyName: z.string().nullable().optional().describe('Last/family name'),
+      company: z.string().nullable().optional().describe('Company name'),
+      position: z.string().nullable().optional().describe('Job title'),
+      country: z.string().nullable().optional().describe('Country code'),
+      score: z.number().nullable().optional().describe('Confidence score'),
+      websiteUrl: z.string().nullable().optional().describe('Company domain'),
+      verification: z
+        .object({
+          date: z.string().nullable().optional(),
+          status: z.string().nullable().optional()
+        })
+        .optional()
+        .describe('Last verification date and status'),
       location: z.string().nullable().optional().describe('Location string'),
       timeZone: z.string().nullable().optional().describe('Timezone'),
       geo: geoSchema.describe('Geographic location details'),
@@ -70,10 +82,16 @@ export let enrich = SlateTool.create(spec, {
 
     return {
       output: {
-        email: data.email || ctx.input.email,
-        fullName: data.name?.fullName || data.name?.full_name,
-        givenName: data.name?.givenName || data.name?.given_name,
-        familyName: data.name?.familyName || data.name?.family_name,
+        email: data.email,
+        company: data.company,
+        position: data.position,
+        country: data.country,
+        score: data.score,
+        websiteUrl: data.website_url,
+        verification: data.verification,
+        fullName: data.full_name ?? data.name?.fullName ?? data.name?.full_name,
+        givenName: data.first_name ?? data.name?.givenName ?? data.name?.given_name,
+        familyName: data.last_name ?? data.name?.familyName ?? data.name?.family_name,
         location: data.location,
         timeZone: data.timeZone || data.time_zone,
         geo: data.geo
@@ -99,14 +117,22 @@ export let enrich = SlateTool.create(spec, {
               subRole: data.employment.subRole || data.employment.sub_role,
               seniority: data.employment.seniority
             }
-          : undefined,
+          : data.company || data.position || data.website_url
+            ? {
+                domain: data.website_url,
+                name: data.company,
+                title: data.position
+              }
+            : undefined,
         phone: data.phone,
         twitter: data.twitter?.handle || data.twitter,
         linkedin: data.linkedin?.handle || data.linkedin,
         facebook: data.facebook?.handle || data.facebook,
         github: data.github?.handle || data.github
       },
-      message: `Enriched data for **${ctx.input.email}**: ${data.name?.fullName || data.name?.full_name || 'unknown name'}, ${data.employment?.title || 'unknown title'} at ${data.employment?.name || 'unknown company'}.`
+      message: data.email
+        ? `Enriched data for **${ctx.input.email}**: ${data.full_name || data.name?.fullName || 'unknown name'}, ${data.position || data.employment?.title || 'unknown title'} at ${data.company || data.employment?.name || 'unknown company'}.`
+        : `No enrichment data found for **${ctx.input.email}**.`
     };
   })
   .build();

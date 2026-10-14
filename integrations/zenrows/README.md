@@ -1,6 +1,6 @@
-# <img src="logo.jpeg" height="20"> Zen Rows
+# <img src="logo.jpeg" height="20"> ZenRows
 
-Scrape and extract data from public websites. Fetch page content from any URL with JavaScript rendering, anti-bot bypass, CAPTCHA solving, and premium proxy rotation. Extract structured data using CSS selectors or auto-parsing. Capture screenshots, render pages as Markdown, plain text, or PDF. Target requests from 190+ countries using geolocation. Scrape structured product data from e-commerce platforms like Amazon and Walmart, real estate listings from Zillow and Idealista, and Google search results. Supports session management, device emulation, custom headers, and JavaScript instructions for page interaction.
+Scrape and extract data from public websites. Fetch page content with JavaScript rendering, premium proxies, CSS selectors, network capture, Markdown, and plain text. Download screenshots and PDF renders. Discover domains prepared for structured extraction, select the fields you need, and read subscription usage. Existing Amazon, Walmart, Zillow, Idealista, and Google scraping tools are retained for compatibility. Supports sessions, device emulation, custom target headers, and JavaScript page interactions.
 
 ## License
 

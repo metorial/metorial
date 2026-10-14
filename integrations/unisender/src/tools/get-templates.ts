@@ -21,11 +21,11 @@ export let getTemplates = SlateTool.create(spec, {
       dateFrom: z
         .string()
         .optional()
-        .describe('Filter templates created after this date (YYYY-MM-DD)'),
+        .describe('Start of the creation date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM)'),
       dateTo: z
         .string()
         .optional()
-        .describe('Filter templates created before this date (YYYY-MM-DD)'),
+        .describe('End of the creation date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM)'),
       limit: z.number().optional().describe('Maximum number of templates to return'),
       offset: z.number().optional().describe('Offset for pagination')
     })
@@ -45,7 +45,7 @@ export let getTemplates = SlateTool.create(spec, {
       locale: ctx.config.locale
     });
 
-    if (ctx.input.templateId) {
+    if (ctx.input.templateId !== undefined) {
       let template = await client.getTemplate(ctx.input.templateId);
       return {
         output: { template },

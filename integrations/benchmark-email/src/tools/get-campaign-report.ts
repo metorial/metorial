@@ -105,21 +105,25 @@ export let getCampaignReport = SlateTool.create(spec, {
     let reportResult = await client.getCampaignReport(campaignId);
     let r = reportResult?.Data;
 
+    let sent = Number(r?.Sent ?? r?.MailSent ?? 0);
+    let rate = (count: unknown) =>
+      sent > 0 ? `${((Number(count ?? 0) / sent) * 100).toFixed(2)}%` : '0%';
+
     let output: Record<string, any> = {
-      campaignName: String(r?.EmailName ?? ''),
+      campaignName: String(r?.Name ?? r?.EmailName ?? ''),
       subject: String(r?.Subject ?? ''),
-      sentDate: String(r?.Completed ?? ''),
-      mailSent: Number(r?.MailSent ?? 0),
+      sentDate: String(r?.SentDate || r?.ScheduleDate || ''),
+      mailSent: Number(r?.Sent ?? r?.MailSent ?? 0),
       opens: Number(r?.Opens ?? 0),
-      openRate: String(r?.OpenPer ?? '0%'),
+      openRate: String(r?.OpenPer ?? rate(r?.Opens)),
       clicks: Number(r?.Clicks ?? 0),
-      clickRate: String(r?.ClickPer ?? '0%'),
+      clickRate: String(r?.ClickPer ?? rate(r?.Clicks)),
       bounces: Number(r?.Bounces ?? 0),
-      bounceRate: String(r?.BouncePer ?? '0%'),
+      bounceRate: String(r?.BouncePer ?? rate(r?.Bounces)),
       unsubscribes: Number(r?.Unsubscribes ?? 0),
-      unsubscribeRate: String(r?.UnsubscribePer ?? '0%'),
-      abuseComplaints: Number(r?.Abuse ?? 0),
-      unopened: Number(r?.Unopened ?? 0)
+      unsubscribeRate: String(r?.UnsubscribePer ?? rate(r?.Unsubscribes)),
+      abuseComplaints: Number(r?.Complaints ?? r?.Abuse ?? 0),
+      unopened: Number(r?.UnOpens ?? r?.Unopened ?? 0)
     };
 
     if (includeDetails?.includes('opens')) {

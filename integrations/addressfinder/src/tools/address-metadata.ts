@@ -108,7 +108,11 @@ export let addressMetadataTool = SlateTool.create(spec, {
     }
 
     let displayAddress =
-      address.full_address || address.a || address.canonical_address || 'Address retrieved';
+      address.full_address ||
+      address.a ||
+      address.canonical_address ||
+      address.address?.full_address ||
+      'Address retrieved';
 
     return {
       output: {

@@ -1,6 +1,4 @@
-Now let me get the full list of APIs from their documentation:Now I have enough information to write the specification.
-
-# Slates Specification for CommCare
+# CommCare API Specification
 
 ## Overview
 
@@ -14,7 +12,7 @@ CommCare supports several authentication methods for API access:
 
 The APIs support a few different methods of authentication in addition to the normal session-based authentication used on the rest of CommCare HQ.
 
-- API keys are generated from the CommCare HQ account settings page at `https://www.commcarehq.org/a/[domain]/settings/`.
+- API keys are generated from the CommCare HQ account settings page at `https://www.commcarehq.org/account/api_keys/`.
 - When creating a new API key, the actual key will only be shown once so you should note it down at that moment.
 - The API key is passed via an `Authorization` header in the format: `Authorization: ApiKey [USERNAME]:[API_KEY]` where `USERNAME` is the email address of the web user.
 - API keys can be restricted by IP address allowlist and/or scoped to a specific domain/project space. If either of these fields are left blank, the API Key will by default be unrestricted.
@@ -26,10 +24,10 @@ Standard HTTP Basic Authentication using the web user's email and password. If t
 
 ### Important Notes
 
-- All API URLs follow the pattern: `https://www.commcarehq.org/a/[domain]/api/[version]/[resource]/` where `[domain]` is the project space name.
+- Project-scoped API URLs use `https://www.commcarehq.org/a/[domain]/api/[resource]/[version]/`; identity and project discovery use global URLs. Legacy version-first URLs remain aliases where supported.
 - In addition to the permissions listed for each API, all APIs also require the "API Access" permission.
 - API access is only available to CommCare users with a Standard Plan or above.
-- The current API version is **v0.5**.
+- Resources are versioned independently: most use **v1**, while JSON case writes and bulk case retrieval use **v2**.
 
 ## Features
 
@@ -111,3 +109,11 @@ When cases are created, updated, or closed, the full case data is sent via HTTP 
 You get notified of the app ID whenever an app change is saved and the "build ID" whenever a new version is built.
 
 - Useful for detecting when applications have been updated or rebuilt.
+
+## Implemented API surface
+
+The integration exposes case reads through Case API v1 and JSON case writes through Case API v2. It preserves offset pagination for case reads. Bulk writes use the collection endpoint and explicit create flags. Creating a case requires a case type, name, and owner; case property values must be strings. The JSON API does not reopen already closed cases.
+
+Read-only identity (`get_current_user`), accessible project spaces (`list_projects`), and batch case retrieval (`bulk_get_cases`) supplement the existing tools. Batch retrieval retains missing-record error stubs and the provider's full case objects. Application list pagination is applied locally because the provider returns all applications. Fixture results retain the legacy field array and additionally expose the provider's keyed field values.
+
+The existing SMS tool retains its legacy endpoint and request payload. Current official source describes a separate sending endpoint protected by session or Digest authentication; its availability does not establish retirement of the legacy route on all deployed servers. Sending SMS with an API-key connection remains unverified.

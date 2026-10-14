@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageWorkflow = SlateTool.create(spec, {
@@ -40,6 +41,21 @@ Use this to change a workflow's name, URLs, schedule, tags, monitoring configura
         .enum(['ONLY_ONCE', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'])
         .optional()
         .describe('Schedule frequency (for update_metadata)'),
+      schedules: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Cron expressions for update_metadata; provide these when using CUSTOM frequency'
+        ),
+      timezone: z
+        .string()
+        .optional()
+        .describe('IANA timezone for cron schedules (for update_metadata)'),
+      limit: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Maximum records per run, or null for unlimited (for update_metadata)'),
       monitoring: z
         .object({
           fields: z
@@ -95,7 +111,15 @@ Use this to change a workflow's name, URLs, schedule, tags, monitoring configura
 
     if (action === 'schedule') {
       if (!ctx.input.scheduleDate) {
-        throw new Error('scheduleDate is required for the schedule action');
+        throw createApiServiceError('scheduleDate is required for the schedule action.');
+      }
+      if (
+        !Number.isFinite(Date.parse(ctx.input.scheduleDate)) ||
+        !ctx.input.scheduleDate.endsWith('Z')
+      ) {
+        throw createApiServiceError(
+          'scheduleDate must be a valid ISO 8601 UTC timestamp ending in Z.'
+        );
       }
       await client.scheduleWorkflow(workflowId, ctx.input.scheduleDate);
       return {
@@ -113,18 +137,26 @@ Use this to change a workflow's name, URLs, schedule, tags, monitoring configura
     }
 
     if (action === 'update_metadata') {
-      let body: Record<string, any> = {};
-      if (ctx.input.name !== undefined) body.name = ctx.input.name;
-      if (ctx.input.description !== undefined) body.description = ctx.input.description;
-      if (ctx.input.urls !== undefined) body.urls = ctx.input.urls;
-      if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
-      if (ctx.input.updateInterval !== undefined)
-        body.updateInterval = ctx.input.updateInterval;
-      if (ctx.input.monitoring !== undefined) body.monitoring = ctx.input.monitoring;
-      if (ctx.input.maxPages !== undefined) body.maxPages = ctx.input.maxPages;
-      if (ctx.input.maxDepth !== undefined) body.maxDepth = ctx.input.maxDepth;
-      if (ctx.input.navigationMode !== undefined)
-        body.navigationMode = ctx.input.navigationMode;
+      validateKadoaInteger(ctx.input.maxPages, 'maxPages', 1);
+      validateKadoaInteger(ctx.input.maxDepth, 'maxDepth', 1);
+      validateKadoaInteger(ctx.input.limit, 'limit', 1, 2147483647);
+      let body = pickDefined({
+        name: ctx.input.name,
+        description: ctx.input.description,
+        urls: ctx.input.urls,
+        tags: ctx.input.tags,
+        updateInterval: ctx.input.updateInterval,
+        schedules: ctx.input.schedules,
+        timezone: ctx.input.timezone,
+        limit: ctx.input.limit,
+        monitoring: ctx.input.monitoring,
+        maxPages: ctx.input.maxPages,
+        maxDepth: ctx.input.maxDepth,
+        navigationMode: ctx.input.navigationMode
+      });
+      if (Object.keys(body).length === 0) {
+        throw createApiServiceError('Provide at least one metadata field to update.');
+      }
 
       let result = await client.updateWorkflowMetadata(workflowId, body);
       return {
@@ -136,6 +168,6 @@ Use this to change a workflow's name, URLs, schedule, tags, monitoring configura
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown workflow action: ${action}.`);
   })
   .build();

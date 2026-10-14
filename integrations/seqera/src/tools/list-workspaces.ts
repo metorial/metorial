@@ -39,7 +39,7 @@ export let listWorkspaces = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
       workspaceId: ctx.config.workspaceId
     });
 
@@ -48,13 +48,13 @@ export let listWorkspaces = SlateTool.create(spec, {
     return {
       output: {
         workspaces: workspaces.map(w => ({
-          workspaceId: w.id,
-          name: w.name,
-          fullName: w.fullName,
-          description: w.description,
-          visibility: w.visibility,
-          dateCreated: w.dateCreated,
-          orgId: w.orgId
+          workspaceId: w.id ?? undefined,
+          name: w.name ?? undefined,
+          fullName: w.fullName ?? undefined,
+          description: w.description ?? undefined,
+          visibility: w.visibility ?? undefined,
+          dateCreated: w.dateCreated ?? undefined,
+          orgId: ctx.input.orgId
         }))
       },
       message: `Found **${workspaces.length}** workspaces in organization **${ctx.input.orgId}**.`

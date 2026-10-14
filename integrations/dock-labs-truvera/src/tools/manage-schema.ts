@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageSchema = SlateTool.create(spec, {
   description: `Create, retrieve, or list credential schemas. Schemas define the structure and required fields for Verifiable Credentials using JSON Schema format.
 Schemas can be registered on the blockchain and referenced when issuing credentials.`,
   instructions: [
-    'To create a schema, set action to "create" and provide the schema definition including properties, required fields, and an author DID.',
+    'To create a schema, set action to "create" and provide the schema definition including properties and required fields.',
     'To get a schema, set action to "get" and provide the schemaId.',
     'To list all schemas, set action to "list".'
   ],
@@ -26,7 +26,7 @@ Schemas can be registered on the blockchain and referenced when issuing credenti
         .record(z.string(), z.unknown())
         .optional()
         .describe(
-          'JSON Schema definition for the credential schema. Must include $schema, type, properties, and author DID'
+          'JSON Schema definition for the credential schema. Include $schema, type, properties, and required fields'
         ),
       offset: z.number().optional().describe('Pagination offset for list'),
       limit: z.number().optional().describe('Maximum number of results for list')
@@ -50,7 +50,7 @@ Schemas can be registered on the blockchain and referenced when issuing credenti
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.schemaDefinition)
-          throw new Error('schemaDefinition is required for create action');
+          throw createApiServiceError('schemaDefinition is required for create action');
         let result = await client.createSchema(ctx.input.schemaDefinition);
         return {
           output: { schema: result },
@@ -58,7 +58,8 @@ Schemas can be registered on the blockchain and referenced when issuing credenti
         };
       }
       case 'get': {
-        if (!ctx.input.schemaId) throw new Error('schemaId is required for get action');
+        if (!ctx.input.schemaId)
+          throw createApiServiceError('schemaId is required for get action');
         let result = await client.getSchema(ctx.input.schemaId);
         return {
           output: { schema: result },

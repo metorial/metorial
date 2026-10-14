@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   checkBalance,
+  getCurrentUser,
   getDeliveryStatus,
   getSmsReport,
   listSenderIds,
@@ -24,6 +25,7 @@ export let provider = Slate.create({
     manageContacts,
     manageGroups,
     manageTemplates,
+    getCurrentUser,
     checkBalance,
     listSenderIds,
     getSmsReport,

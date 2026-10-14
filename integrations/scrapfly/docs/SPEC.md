@@ -1,4 +1,4 @@
-# Slates Specification for Scrapfly
+# Scrapfly API Specification
 
 ## Overview
 
@@ -67,9 +67,12 @@ The Crawler API enables recursive website crawling at scale.
 - The Crawler API automatically discovers URLs by following links from a starting point. It can crawl entire websites or sections based on URL filtering rules.
 - **Configurable Limits**: Set page limits, maximum crawl duration, crawl depth, and request delays.
 - **Content Formats**: Multiple formats can be extracted simultaneously from each page. Markdown format is ideal for LLM processing.
-- **Result Artifacts**: Results are delivered as industry-standard artifacts like WARC, Parquet, and HAR formats.
+- **Result Artifacts**: Results are available as WARC and HAR archives.
+- **Cancellation**: `POST /crawl/{crawler_uuid}/cancel` stops an active crawl while preserving collected results. Cancelling a finished crawl is an idempotent no-op.
+- **Content Retrieval**: `GET /crawl/{crawler_uuid}/contents` accepts `formats`, `url`, `limit`, and `offset`. Content defaults to 10 URLs per page, with a maximum of 50.
+- **Archive Download**: `GET /crawl/{crawler_uuid}/artifact?type=warc` downloads a gzip-compressed WARC file; `type=har` downloads a HAR archive. Archives are finalized when the crawl is finished.
 - Supports anti-bot bypass, JavaScript rendering, proxy configuration, and extraction rules — same as the Web Scraping API.
-- The Crawler API is currently in early access. Features and API may evolve based on user feedback.
+- Crawl size and concurrency remain subject to subscription limits.
 
 ### Account & Project Management
 

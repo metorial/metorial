@@ -8,7 +8,7 @@ export let getPlanningStatus = SlateTool.create(spec, {
   key: 'get_planning_status',
   description: `Check the status and progress of an asynchronous route optimization run. Also supports stopping a running optimization. Use the **planningId** returned from the Optimize Routes tool.`,
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -23,7 +23,7 @@ export let getPlanningStatus = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('N=not started, R=running, C=completed, F=failed, E=error'),
+        .describe('N=new, R=running, C=cancelled, F=finished, E=error'),
       percentageComplete: z.number().optional().describe('Completion percentage (0-100)'),
       code: z.string().optional(),
       message: z.string().optional()
@@ -49,10 +49,10 @@ export let getPlanningStatus = SlateTool.create(spec, {
     let result = await client.getPlanningStatus(ctx.input.planningId);
 
     let statusLabels: Record<string, string> = {
-      N: 'Not started',
+      N: 'New',
       R: 'Running',
-      C: 'Completed',
-      F: 'Failed',
+      C: 'Cancelled',
+      F: 'Finished',
       E: 'Error'
     };
 

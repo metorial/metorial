@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ export let manageAccount = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!accounts || accounts.length === 0)
-        throw new Error('accounts is required for add action');
+        throw createApiServiceError('accounts is required for add action');
       await client.addUserToAccounts(
         uid,
         accounts.map(a => ({ id: a.accountId, role: a.role }))
@@ -84,7 +84,7 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!accountId) throw new Error('accountId is required for remove action');
+      if (!accountId) throw createApiServiceError('accountId is required for remove action');
       await client.removeUserFromAccount(uid, accountId);
       return {
         output: { status: 'ok' },
@@ -93,8 +93,9 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'change_role') {
-      if (!accountId) throw new Error('accountId is required for change_role action');
-      if (!role) throw new Error('role is required for change_role action');
+      if (!accountId)
+        throw createApiServiceError('accountId is required for change_role action');
+      if (!role) throw createApiServiceError('role is required for change_role action');
       await client.changeAccountRole(uid, accountId, role);
       return {
         output: { status: 'ok' },
@@ -103,7 +104,7 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'convert') {
-      if (!convertTo) throw new Error('convertTo is required for convert action');
+      if (!convertTo) throw createApiServiceError('convertTo is required for convert action');
       await client.convertUserType(uid, convertTo);
       return {
         output: { status: 'ok' },

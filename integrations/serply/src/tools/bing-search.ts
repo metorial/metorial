@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeBingShoppingAd, searchResultArray } from '../lib/responses';
 import { spec } from '../spec';
 
 let bingResultSchema = z.object({
@@ -107,7 +108,7 @@ export let bingSearch = SlateTool.create(spec, {
         results,
         ads: data.ads || [],
         adsCount: data.adsCount || 0,
-        shoppingAds: data.shoppingAds || [],
+        shoppingAds: searchResultArray(data.shoppingAds).map(normalizeBingShoppingAd),
         location: data.location || null
       },
       message: `Found **${results.length}** Bing results for "${ctx.input.query}".`

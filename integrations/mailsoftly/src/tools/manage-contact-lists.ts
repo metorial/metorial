@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailsoftlyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,6 +38,15 @@ export let manageContactLists = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailsoftlyClient({ token: ctx.auth.token });
+
+    if (ctx.input.name !== undefined && ctx.input.contactListId !== undefined) {
+      throw createApiServiceError(
+        'Provide name to create a list or contactListId to retrieve one, not both.'
+      );
+    }
+    if (ctx.input.name !== undefined && !ctx.input.name.trim()) {
+      throw createApiServiceError('Provide a non-empty contact list name.');
+    }
 
     if (ctx.input.name) {
       let contactList = await client.createContactList(ctx.input.name);

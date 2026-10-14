@@ -1,53 +1,53 @@
-# Slates Specification for Imejis.io
+# Imejis.io Integration
 
-## Overview
-
-Imejis.io is an API-based image generation platform that allows users to generate images with custom text, color, and image using pre-designed templates. It automates and scales marketing by generating custom images through a JSON API, allowing users to create social media graphics, e-commerce banners, and more using pre-designed templates or custom designs.
+Imejis.io renders template-based images and single-page PDFs with dynamic text,
+colors, images, QR codes, and other component properties.
 
 ## Authentication
 
-Imejis.io supports API key-based authentication. Imejis.io uses API keys for authentication.
+Connect with an API key from the [Imejis.io dashboard](https://app.imejis.io).
+Render requests use the `dma-api-key` header. This integration retains the
+existing API key authentication for its design-listing and AI-assistant tools.
 
-- **API Key**: A valid API key from Imejis.io is required. Sign up on their website (https://www.imejis.io) and obtain your API key from the Developer Portal at https://app.imejis.io.
+## Rendering
 
-The API key can be passed in one of two ways depending on the endpoint used:
+`generate_image` posts template overrides to
+`https://render.imejis.io/v1/{designId}`. Overrides may use nested component
+objects or dot notation. The existing `responseFormat` values are retained:
 
-1. **Render API** (`https://render.imejis.io/v1/{DESIGN_ID}`): Pass the API key either as a `Bearer` token in the `Authorization` header or via the `dma-api-key` header.
-   - Example with Bearer: `Authorization: Bearer YOUR_API_KEY`
-   - Example with custom header: `dma-api-key: YOUR_API_KEY`
+- `url` requests public hosted delivery and returns `imageUrl`.
+- `binary` returns the original `imageBase64` and `contentType` values.
 
-2. **Management API** (`https://api.imejis.io/api/...`): Pass the API key via the `dma-api-key` header.
-   - Example: `dma-api-key: YOUR_API_KEY`
+Both modes also provide a downloadable file. Optional `format` selects `png`,
+`jpeg`, `webp`, or single-page `pdf`; omitted format uses the provider's JPEG
+default. Optional `quality` is a whole number from 1 to 100 and affects JPEG
+only. Each render consumes the provider's quota or credits.
 
-## Features
+`generate_signed_image` requests private signed delivery with a configurable
+lifetime in minutes, defaulting to 60 and limited to 7 days. It returns the
+signed URL, the design ID, MIME type, and a conservative expiry timestamp based
+on the requested lifetime. Anyone with the URL can access it until it expires.
+The download link expires too. To get a replacement, invoke the tool again;
+this performs another render and consumes quota or credits. Downloads do not
+regenerate files automatically.
 
-### Template-Based Image Generation
+## Design management
 
-Generate images by sending a POST request with dynamic data to a pre-configured design template. A design ID from Imejis.io is required — select or create a design on the Imejis.io platform and make a note of its unique ID. The request body accepts a JSON payload with customizable component properties such as text content, colors, background colors, border colors, stroke colors, image URLs, and opacity. You can use nested objects, flattened keys with dot notation (e.g., `image.opacity`, `image.borderColor`), or combine both formats in a single request.
+`list_designs` retains its search, cursor, limit, and visibility inputs and
+returns design identifiers and available metadata. `ai_design_assistant` retains
+its natural-language prompt and optional design ID.
 
-- The API returns the generated image as binary data (PNG) or a JSON response containing the image URL, depending on the endpoint used.
-- Each component in the design template (text, image, shape, QR code) can be overridden via the API payload.
+The current public documentation describes these management capabilities but
+does not publish the REST request, response, or API key authorization contracts
+for the existing `/api/designs` and `/api/ai/designs` routes. Their routes and
+public schemas are preserved for compatibility; their current availability has
+not been verified against a live account.
 
-### Design Management
+## Official references
 
-Imejis.io provides a List Designs API with a search parameter to filter templates by name or description. It supports pagination with cursors and configurable limits, allowing programmatic browsing of template libraries.
-
-### AI Design Assistant
-
-Imejis.io features an AI Design Assistant that can create new designs or update existing ones based on natural language prompts, making design creation accessible without manual template editing.
-
-### QR Code Generation
-
-Imejis.io supports QR code components, allowing you to generate dynamic QR codes directly in designs for seamless integration with URLs, contact information, and more.
-
-### Text Patterns and Auto-Resize
-
-Imejis.io supports text patterns that allow you to style specific portions of text using delimiters, enabling rich inline formatting like highlighted keywords, badges, and emphasized text without creating separate components. Additionally, it offers an auto-resize text feature, ensuring text fits perfectly within containers by scaling down or truncating.
-
-### Public Pages and Sharing
-
-Designs can be made public and shareable with a simple link. Public pages allow others to fill out forms and download generated images without needing direct API access.
-
-## Events
-
-The provider does not support events. There is no evidence of webhook subscriptions, event streaming, or purpose-built polling mechanisms in the Imejis.io API. Automation workflows are achieved through third-party integration platforms like Zapier rather than native event support.
+- [API documentation](https://www.imejis.io/apis)
+- [Render formats and hosted or signed delivery](https://www.imejis.io/help/generate-images-with-the-api)
+- [cURL guide](https://www.imejis.io/apis/curl)
+- [Hosted render example](https://www.imejis.io/blogs/tutorials/how-to-generate-images-with-api)
+- [AI agent capabilities](https://www.imejis.io/agents)
+- [Product changelog](https://www.imejis.io/changelogs)

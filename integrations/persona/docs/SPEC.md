@@ -1,6 +1,4 @@
-Now let me get the full list of events:Now I have enough information to write the specification.
-
-# Slates Specification for Persona
+# Persona API Specification
 
 ## Overview
 

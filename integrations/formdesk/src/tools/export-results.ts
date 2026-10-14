@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FormdeskClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,8 @@ import { spec } from '../spec';
 export let exportResults = SlateTool.create(spec, {
   name: 'Export Form Results',
   key: 'export_results',
-  description: `Exports form results to a file in various formats: Excel, CSV, XML, dBase, FoxPro, or plain text. Returns the file as an attachment. Supports the same date and status filters as the result listing tool.`,
-  constraints: [
-    'API credits consumed equals the number of entries exported (minimum 1 credit).'
-  ],
+  description: `Exports form results to a file in various formats: Excel, CSV, XML, dBase, FoxPro, or plain text. Provides a downloadable file. Supports the same date and status filters as the result listing tool.`,
+  constraints: ['API credits consumed equal the number of entries exported.'],
   tags: {
     readOnly: true
   }
@@ -58,7 +56,7 @@ export let exportResults = SlateTool.create(spec, {
       creditsUsed: z
         .string()
         .optional()
-        .describe('Number of API credits consumed by this export')
+        .describe('Remaining API credit balance reported after this export')
     })
   )
   .handleInvocation(async ctx => {
@@ -83,12 +81,19 @@ export let exportResults = SlateTool.create(spec, {
       filter: ctx.input.filterName
     });
 
+    for (let file of result.files) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(file.content, { headers: { 'content-type': file.contentType } }),
+        filename: file.fileName
+      });
+    }
+
     return {
       output: {
-        contentType: result.contentType,
-        creditsUsed: result.credits ? String(result.credits) : undefined
+        contentType: result.files[0].contentType,
+        creditsUsed: result.credits !== undefined ? String(result.credits) : undefined
       },
-      attachments: [createBase64Attachment(result.content, result.contentType)],
       message: `Successfully exported results from form "${ctx.input.formName}" as **${ctx.input.format}**.`
     };
   })

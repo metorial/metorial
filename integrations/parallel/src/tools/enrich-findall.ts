@@ -10,16 +10,32 @@ export let enrichFindall = SlateTool.create(spec, {
 Enrichment runs asynchronously — results will be available when polling with the **Get FindAll Results** tool.`,
   instructions: [
     'The outputSchema defines what additional fields to extract from each matched entity.',
-    'Processor tiers: core (standard), advanced (more thorough), auto (system selects).'
+    'Use a documented Task API processor such as core, pro, or ultra.',
+    'Legacy advanced and auto processor values are retained for existing callers; current documentation does not guarantee their availability.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
       findallId: z.string().describe('FindAll run ID to enrich'),
-      processor: z.enum(['core', 'advanced', 'auto']).describe('Enrichment processor tier'),
+      processor: z
+        .enum([
+          'core',
+          'advanced',
+          'auto',
+          'lite',
+          'base',
+          'pro',
+          'ultra',
+          'lite-fast',
+          'base-fast',
+          'core-fast',
+          'pro-fast',
+          'ultra-fast'
+        ])
+        .describe('Task API enrichment processor tier; advanced and auto are legacy values'),
       outputSchema: z
         .record(z.string(), z.unknown())
         .describe('JSON schema defining additional fields to extract from each entity')

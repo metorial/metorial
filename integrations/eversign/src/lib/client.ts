@@ -1,15 +1,16 @@
-import { createAxios } from 'slates';
+import { createApiServiceError } from 'slates';
+import { createEversignAxios } from './errors';
 
 export interface ClientConfig {
   token: string;
-  businessId: string;
+  businessId?: string;
   sandbox?: boolean;
   isOauth?: boolean;
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-  private businessId: string;
+  private axios: ReturnType<typeof createEversignAxios>;
+  private businessId: string | undefined;
   private sandbox: boolean;
   private isOauth: boolean;
   private token: string;
@@ -28,7 +29,7 @@ export class Client {
       headers.Authorization = `Bearer ${config.token}`;
     }
 
-    this.axios = createAxios({
+    this.axios = createEversignAxios({
       baseURL: 'https://api.eversign.com',
       headers
     });
@@ -37,6 +38,11 @@ export class Client {
   private getParams(
     extra: Record<string, string | number> = {}
   ): Record<string, string | number> {
+    if (!this.businessId?.trim()) {
+      throw createApiServiceError(
+        'A business ID is required. Call list_businesses and pass the selected businessId.'
+      );
+    }
     let params: Record<string, string | number> = {
       business_id: this.businessId,
       ...extra
@@ -75,6 +81,42 @@ export class Client {
       params: this.getParams({ document_hash: documentHash })
     });
     return response.data;
+  }
+
+  async getDocumentAuditLog(documentHash: string): Promise<any[]> {
+    let response = await this.axios.get(
+      `/document/${encodeURIComponent(documentHash)}/audit_log`,
+      {
+        params: this.getParams()
+      }
+    );
+    return response.data;
+  }
+
+  getDownloadDetails(documentHash: string, type: 'raw' | 'final', auditTrail?: boolean) {
+    let endpoint = type === 'raw' ? '/download_raw_document' : '/download_final_document';
+    let query = this.getParams({ document_hash: documentHash });
+    if (type === 'final' && auditTrail) query.audit_trail = 1;
+    let url = new URL(endpoint, 'https://api.eversign.com');
+    for (let [key, value] of Object.entries(query)) {
+      if (key !== 'access_key') url.searchParams.set(key, String(value));
+    }
+    return {
+      url: url.toString(),
+      query: !this.isOauth ? { access_key: this.token } : undefined,
+      headers: this.isOauth ? { Authorization: `Bearer ${this.token}` } : undefined
+    };
+  }
+
+  getBulkCsvDownloadDetails(templateHash: string) {
+    let query = this.getParams();
+    return {
+      url: `https://api.eversign.com/template/${encodeURIComponent(templateHash)}/bulk/csv/blank`,
+      query: Object.fromEntries(
+        Object.entries(query).map(([key, value]) => [key, String(value)])
+      ),
+      headers: this.isOauth ? { Authorization: `Bearer ${this.token}` } : undefined
+    };
   }
 
   async listDocuments(type: string, page?: number, limit?: number): Promise<any[]> {
@@ -222,28 +264,38 @@ export class Client {
   // ==================== Bulk Sending ====================
 
   async getBulkCsvTemplate(templateHash: string): Promise<string> {
-    let response = await this.axios.get(`/template/${templateHash}/bulk/csv/blank`, {
-      params: this.getParams()
-    });
+    let response = await this.axios.get(
+      `/template/${encodeURIComponent(templateHash)}/bulk/csv/blank`,
+      {
+        params: this.getParams()
+      }
+    );
+    if (typeof response.data !== 'string') {
+      throw createApiServiceError('Eversign did not return the requested CSV structure.');
+    }
     return response.data;
   }
 
   async createBulkJob(templateHash: string, csvData: any[][]): Promise<any> {
-    let response = await this.axios.post(`/template/${templateHash}/bulk/job`, csvData, {
-      params: this.getParams()
-    });
+    let response = await this.axios.post(
+      `/template/${encodeURIComponent(templateHash)}/bulk/job`,
+      csvData,
+      {
+        params: this.getParams()
+      }
+    );
     return response.data;
   }
 
   async getBulkJob(bulkJobId: string): Promise<any> {
-    let response = await this.axios.get(`/bulk_job/${bulkJobId}`, {
+    let response = await this.axios.get(`/bulk_job/${encodeURIComponent(bulkJobId)}`, {
       params: this.getParams()
     });
     return response.data;
   }
 
   async getBulkJobStatus(bulkJobId: string): Promise<any> {
-    let response = await this.axios.get(`/bulk_job/${bulkJobId}/status`, {
+    let response = await this.axios.get(`/bulk_job/${encodeURIComponent(bulkJobId)}/status`, {
       params: this.getParams()
     });
     return response.data;
@@ -253,9 +305,12 @@ export class Client {
     let extra: Record<string, string | number> = {};
     if (limit !== undefined) extra.limit = limit;
     if (offset !== undefined) extra.offset = offset;
-    let response = await this.axios.get(`/bulk_job/${bulkJobId}/documents`, {
-      params: this.getParams(extra)
-    });
+    let response = await this.axios.get(
+      `/bulk_job/${encodeURIComponent(bulkJobId)}/documents`,
+      {
+        params: this.getParams(extra)
+      }
+    );
     return response.data;
   }
 

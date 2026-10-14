@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let createTicket = SlateTool.create(spec, {
   key: 'create_ticket',
   description: `Create a new support ticket with an initial message. Supports API, email, chat, phone, and SMS channels. A ticket always requires at least one message.`,
   instructions: [
-    'For "api" channel, set both channel and via to "api".',
+    'Messages created through this tool use the API transport.',
     'For "email" channel, include source.from and source.to in the message.',
     'Set fromAgent to false for customer messages and true for agent-initiated messages.'
   ]
@@ -20,18 +20,39 @@ export let createTicket = SlateTool.create(spec, {
         .enum(['api', 'email', 'chat', 'phone', 'sms'])
         .default('api')
         .describe('Channel for the ticket'),
+      senderEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Agent sender email for outgoing messages; defaults to the authenticated user'
+        ),
+      sourceFromAddress: z
+        .string()
+        .optional()
+        .describe(
+          'Email routing sender address. Outgoing email requires an address connected to a Gorgias email integration'
+        ),
+      sourceToAddress: z
+        .string()
+        .optional()
+        .describe(
+          'Email routing recipient address. For incoming email, use your connected support mailbox'
+        ),
       subject: z.string().optional().describe('Ticket subject'),
       bodyHtml: z.string().optional().describe('HTML body of the initial message'),
       bodyText: z.string().optional().describe('Plain text body of the initial message'),
       fromAgent: z.boolean().default(false).describe('Whether the message is from an agent'),
       status: z.enum(['open', 'closed']).default('open').describe('Initial ticket status'),
       priority: z
-        .enum(['urgent', 'high', 'normal', 'low'])
+        .enum(['urgent', 'critical', 'high', 'normal', 'low'])
         .optional()
-        .describe('Ticket priority'),
+        .describe('Ticket priority; urgent is an alias for critical'),
       tags: z.array(z.string()).optional().describe('Tag names to apply to the ticket'),
       assigneeUserId: z.number().optional().describe('User ID of the agent to assign'),
-      assigneeTeamId: z.number().optional().describe('Team ID to assign'),
+      assigneeTeamId: z
+        .number()
+        .optional()
+        .describe('Team ID to assign; call list_teams to discover teams'),
       externalId: z.string().optional().describe('External system identifier'),
       meta: z.record(z.string(), z.any()).optional().describe('Custom key-value metadata')
     })
@@ -47,11 +68,28 @@ export let createTicket = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
+    if (ctx.input.channel === 'email' && !ctx.input.fromAgent && !ctx.input.sourceToAddress) {
+      throw createApiServiceError(
+        'Provide sourceToAddress with the support mailbox receiving this incoming email.'
+      );
+    }
+    if (ctx.input.fromAgent && ctx.input.channel === 'email' && !ctx.input.sourceFromAddress) {
+      throw createApiServiceError(
+        'Provide sourceFromAddress matching a connected Gorgias email integration for outgoing email.'
+      );
+    }
+    let sender = ctx.input.fromAgent
+      ? ctx.input.senderEmail
+        ? { email: ctx.input.senderEmail }
+        : { id: (await client.getUser(0)).id }
+      : { email: ctx.input.customerEmail };
+
     let message: any = {
       channel: ctx.input.channel,
-      via: ctx.input.channel,
+      via: 'api',
       from_agent: ctx.input.fromAgent,
-      sender: { email: ctx.input.customerEmail },
+      sender,
+      ...(ctx.input.fromAgent ? { receiver: { email: ctx.input.customerEmail } } : {}),
       body_html: ctx.input.bodyHtml,
       body_text: ctx.input.bodyText,
       stripped_text: ctx.input.bodyText,
@@ -60,8 +98,11 @@ export let createTicket = SlateTool.create(spec, {
 
     if (ctx.input.channel === 'email') {
       message.source = {
-        from: { address: ctx.input.customerEmail },
-        to: []
+        from: { address: ctx.input.sourceFromAddress || ctx.input.customerEmail },
+        to:
+          ctx.input.sourceToAddress || ctx.input.fromAgent
+            ? [{ address: ctx.input.sourceToAddress || ctx.input.customerEmail }]
+            : []
       };
     }
 
@@ -69,7 +110,7 @@ export let createTicket = SlateTool.create(spec, {
       customer: { email: ctx.input.customerEmail },
       messages: [message],
       channel: ctx.input.channel,
-      via: ctx.input.channel,
+      via: 'api',
       from_agent: ctx.input.fromAgent,
       status: ctx.input.status,
       subject: ctx.input.subject,
@@ -78,18 +119,18 @@ export let createTicket = SlateTool.create(spec, {
     };
 
     if (ctx.input.priority) {
-      ticketData.priority = ctx.input.priority;
+      ticketData.priority = ctx.input.priority === 'urgent' ? 'critical' : ctx.input.priority;
     }
 
     if (ctx.input.tags && ctx.input.tags.length > 0) {
       ticketData.tags = ctx.input.tags.map(name => ({ name }));
     }
 
-    if (ctx.input.assigneeUserId) {
+    if (ctx.input.assigneeUserId !== undefined) {
       ticketData.assignee_user = { id: ctx.input.assigneeUserId };
     }
 
-    if (ctx.input.assigneeTeamId) {
+    if (ctx.input.assigneeTeamId !== undefined) {
       ticketData.assignee_team = { id: ctx.input.assigneeTeamId };
     }
 

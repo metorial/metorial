@@ -16,7 +16,9 @@ export let getTimeEntry = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+        .describe(
+          'Optional workspace context. Entries are retrieved by ID for the authenticated user.'
+        ),
       timeEntryId: z
         .string()
         .optional()
@@ -42,12 +44,11 @@ export let getTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
 
     let entry: any;
     if (ctx.input.timeEntryId) {
-      let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
-      entry = await client.getTimeEntry(wsId, ctx.input.timeEntryId);
+      entry = await client.getTimeEntry(ctx.input.timeEntryId);
     } else {
       entry = await client.getCurrentTimeEntry();
     }

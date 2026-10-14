@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getWorkflow = SlateTool.create(spec, {
@@ -13,12 +14,18 @@ export let getWorkflow = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       workflowId: z.string().describe('The workflow run ID'),
       includeTasks: z
         .boolean()
         .optional()
-        .describe('Include the list of tasks in the run (default false)'),
-      includeLog: z.boolean().optional().describe('Include the execution log (default false)'),
+        .describe(
+          'Include the first 100 tasks (default false). Use list_workflow_tasks to retrieve further pages.'
+        ),
+      includeLog: z
+        .boolean()
+        .optional()
+        .describe('Include the current page of execution log entries (default false)'),
       includeMetrics: z
         .boolean()
         .optional()
@@ -68,45 +75,45 @@ export let getWorkflow = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let { workflow, progress } = await client.describeWorkflow(ctx.input.workflowId);
 
     let output: Record<string, any> = {
-      workflowId: workflow.id,
-      runName: workflow.runName,
-      status: workflow.status,
-      projectName: workflow.projectName,
-      repository: workflow.repository,
-      revision: workflow.revision,
-      commitId: workflow.commitId,
-      userName: workflow.userName,
-      workDir: workflow.workDir,
-      commandLine: workflow.commandLine,
-      start: workflow.start,
-      complete: workflow.complete,
-      duration: workflow.duration,
-      exitStatus: workflow.exitStatus,
-      errorMessage: workflow.errorMessage,
-      errorReport: workflow.errorReport,
+      workflowId: workflow.id ?? undefined,
+      runName: workflow.runName ?? undefined,
+      status: workflow.status ?? undefined,
+      projectName: workflow.projectName ?? undefined,
+      repository: workflow.repository ?? undefined,
+      revision: workflow.revision ?? undefined,
+      commitId: workflow.commitId ?? undefined,
+      userName: workflow.userName ?? undefined,
+      workDir: workflow.workDir ?? undefined,
+      commandLine: workflow.commandLine ?? undefined,
+      start: workflow.start ?? undefined,
+      complete: workflow.complete ?? undefined,
+      duration: workflow.duration ?? undefined,
+      exitStatus: workflow.exitStatus ?? undefined,
+      errorMessage: workflow.errorMessage ?? undefined,
+      errorReport: workflow.errorReport ?? undefined,
       progress
     };
 
     if (ctx.input.includeTasks) {
       let taskResult = await client.listWorkflowTasks(ctx.input.workflowId, { max: 100 });
       output.tasks = taskResult.tasks.map(t => ({
-        taskId: t.taskId,
-        name: t.name,
-        process: t.process,
-        status: t.status,
-        exit: t.exit,
-        duration: t.duration,
-        cpus: t.cpus,
-        memory: t.memory,
-        container: t.container,
-        executor: t.executor
+        taskId: t.taskId ?? undefined,
+        name: t.name ?? undefined,
+        process: t.process ?? undefined,
+        status: t.status ?? undefined,
+        exit: t.exit ?? undefined,
+        duration: t.duration ?? undefined,
+        cpus: t.cpus ?? undefined,
+        memory: t.memory ?? undefined,
+        container: t.container ?? undefined,
+        executor: t.executor ?? undefined
       }));
     }
 

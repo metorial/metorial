@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listFeatureFlags = SlateTool.create(spec, {
@@ -16,7 +17,9 @@ export let listFeatureFlags = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       flagName: z.string().optional().describe('Filter flags by name (partial match).'),
       tag: z.string().optional().describe('Filter flags by tag (case-sensitive exact match).'),
       offset: z.number().optional().describe('Pagination offset. Defaults to 0.'),
@@ -37,7 +40,15 @@ export let listFeatureFlags = SlateTool.create(spec, {
           rolloutStatus: z.string().nullable().optional()
         })
       ),
-      totalCount: z.number(),
+      totalCount: z
+        .number()
+        .describe(
+          'Provider-reported total for the workspace and tag filter, before local name filtering.'
+        ),
+      matchingCount: z
+        .number()
+        .optional()
+        .describe('Total flags matching flagName when the local name filter is used.'),
       offset: z.number(),
       limit: z.number()
     })
@@ -45,10 +56,13 @@ export let listFeatureFlags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    validatePagination(ctx.input.offset, ctx.input.limit, 50);
+    let client = new Client(ctx.auth);
     let result = await client.listFeatureFlags(wsId, {
       offset: ctx.input.offset,
       limit: ctx.input.limit,
@@ -59,11 +73,11 @@ export let listFeatureFlags = SlateTool.create(spec, {
     let flags = result.objects.map(f => ({
       flagId: f.id,
       flagName: f.name,
-      description: f.description,
+      description: f.description ?? null,
       trafficTypeName: f.trafficType.name,
       trafficTypeId: f.trafficType.id,
       creationTime: f.creationTime,
-      tags: f.tags.map(t => t.name),
+      tags: (f.tags ?? []).map(t => t.name),
       rolloutStatus: f.rolloutStatus?.name ?? null
     }));
 
@@ -71,10 +85,11 @@ export let listFeatureFlags = SlateTool.create(spec, {
       output: {
         flags,
         totalCount: result.totalCount,
+        matchingCount: result.matchingCount,
         offset: result.offset,
         limit: result.limit
       },
-      message: `Found **${result.totalCount}** feature flags. Returned ${flags.length} starting at offset ${result.offset}.`
+      message: `Found **${result.matchingCount ?? result.totalCount}** ${result.matchingCount !== undefined ? 'matching ' : ''}feature flags. Returned ${flags.length} starting at offset ${result.offset}.`
     };
   })
   .build();

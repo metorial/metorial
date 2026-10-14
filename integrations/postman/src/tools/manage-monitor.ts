@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -43,6 +43,7 @@ export let manageMonitorTool = SlateTool.create(spec, {
           uid: z.string().optional(),
           collectionUid: z.string().optional(),
           environmentUid: z.string().optional(),
+          lastRun: z.any().optional().describe('Latest run status, job ID, and statistics'),
           schedule: z
             .object({
               cron: z.string().optional(),
@@ -82,7 +83,8 @@ export let manageMonitorTool = SlateTool.create(spec, {
       name: m.name,
       uid: m.uid,
       collectionUid: m.collectionUid,
-      environmentUid: m.environmentUid,
+      environmentUid: m.environmentUid ?? undefined,
+      lastRun: m.lastRun ?? undefined,
       schedule: m.schedule
         ? {
             cron: m.schedule.cron,
@@ -109,7 +111,7 @@ export let manageMonitorTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!monitorId) throw new Error('monitorId is required for get.');
+      if (!monitorId) throw createApiServiceError('monitorId is required for get.');
       let monitor = await client.getMonitor(monitorId);
       return {
         output: { monitor: mapMonitor(monitor) },
@@ -119,7 +121,9 @@ export let manageMonitorTool = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!name || !collectionUid || !cron || !timezone) {
-        throw new Error('name, collectionUid, cron, and timezone are required for create.');
+        throw createApiServiceError(
+          'name, collectionUid, cron, and timezone are required for create.'
+        );
       }
       let monitor = await client.createMonitor(
         {
@@ -137,7 +141,7 @@ export let manageMonitorTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!monitorId) throw new Error('monitorId is required for update.');
+      if (!monitorId) throw createApiServiceError('monitorId is required for update.');
       let schedule = cron || timezone ? { cron, timezone } : undefined;
       let monitor = await client.updateMonitor(monitorId, { name, schedule });
       return {
@@ -146,7 +150,7 @@ export let manageMonitorTool = SlateTool.create(spec, {
       };
     }
 
-    if (!monitorId) throw new Error('monitorId is required for delete.');
+    if (!monitorId) throw createApiServiceError('monitorId is required for delete.');
     let monitor = await client.deleteMonitor(monitorId);
     return {
       output: { monitor: { monitorId: monitor.id, uid: monitor.uid } },

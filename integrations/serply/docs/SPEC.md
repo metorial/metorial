@@ -1,6 +1,4 @@
-Now I have enough information to write the specification.
-
-# Slates Specification for Serply
+# Serply Integration Specification
 
 ## Overview
 
@@ -72,7 +70,28 @@ Search Google Scholar's academic database and retrieve research papers, articles
 
 ### SERP Ranking
 
-Track domain-level SERP rankings for specific queries. Designed for SEO rank tracking and competitor monitoring use cases.
+Track domain-level SERP rankings for specific queries. The response includes the provider's domain position (`-1` when absent), number of results scanned, and website when available. Existing `results` and `total` output fields remain supported.
+
+### Maps Search
+
+Search places and businesses with `GET /v1/maps/search/{encoded-search-text}`. Pass `num` (1–200), `hl`, and `gl` as ordinary query parameters. This endpoint does not support proxy-location or device headers. Results include place IDs, Maps links, coordinates, contact details, ratings, categories, and opening hours, with nulls for unavailable details.
+
+### Response Compatibility
+
+Image search reads the provider's `image_results` and maps nested image metadata to the existing result fields. Scholar search reads `articles`. Product search maps the documented Amazon field names to the existing camel-case fields and converts numeric prices to the existing string output type. News sources can be strings or objects with a `title`; the existing `source` output remains a string.
+
+Google web search commonly returns only about 10 results per page even when `num` is larger. Use `start` for additional pages. A missing or null provider total retains the existing zero fallback. API errors use the provider's HTTP status and `detail` message.
+
+News search accepts separate optional `countryLanguage` (`ceid`, for example `US:en`) and `resolveLinks` (`resolve_links`) inputs, so filters are not encoded into the query text.
+
+## Sources
+
+- [Authentication](https://serply.io/docs/guides/authentication)
+- [Errors](https://serply.io/docs/guides/errors)
+- [Pagination](https://serply.io/docs/guides/pagination)
+- [Google Maps](https://serply.io/docs/resources/google-maps)
+- [Google News](https://serply.io/docs/resources/google-news)
+- [Official OpenAPI specification](https://github.com/serply-inc/openapi/blob/main/serply_openapi.json)
 
 ## Events
 

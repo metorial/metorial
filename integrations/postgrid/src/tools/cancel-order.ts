@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PrintMailClient } from '../lib/client';
+import { PrintMailClient, resolveOrderType } from '../lib/client';
 import { spec } from '../spec';
 
 export let cancelOrder = SlateTool.create(spec, {
@@ -35,16 +35,7 @@ export let cancelOrder = SlateTool.create(spec, {
     let client = new PrintMailClient(ctx.auth.token);
     let { orderId, orderType } = ctx.input;
 
-    if (!orderType) {
-      if (orderId.startsWith('letter_')) orderType = 'letter';
-      else if (orderId.startsWith('postcard_')) orderType = 'postcard';
-      else if (orderId.startsWith('cheque_')) orderType = 'cheque';
-      else if (orderId.startsWith('self_mailer_')) orderType = 'self_mailer';
-      else
-        throw new Error(
-          `Could not determine order type from ID "${orderId}". Please specify orderType.`
-        );
-    }
+    orderType = resolveOrderType(orderId, orderType);
 
     let result: any;
     switch (orderType) {

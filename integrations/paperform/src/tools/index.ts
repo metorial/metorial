@@ -1,4 +1,5 @@
 export * from './delete-submission';
+export * from './get-details';
 export * from './get-form';
 export * from './get-submission';
 export * from './list-form-fields';

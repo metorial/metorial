@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://rest.clicksend.com/v3'
-});
+import { ClickSendClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -38,16 +35,7 @@ export let auth = SlateAuth.create()
       output: { username: string; token: string };
       input: { username: string; apiKey: string };
     }) => {
-      let encoded = Buffer.from(`${ctx.output.username}:${ctx.output.token}`).toString(
-        'base64'
-      );
-      let response = await axios.get('/account', {
-        headers: {
-          Authorization: `Basic ${encoded}`
-        }
-      });
-
-      let account = response.data.data;
+      let account = await new ClickSendClient(ctx.output).getAccount();
 
       return {
         profile: {

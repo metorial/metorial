@@ -214,37 +214,38 @@ Returns a risk summary with individual verification task results (name verificat
 
     let riskSummary = result.risk_summary
       ? {
-          overallRiskRating: result.risk_summary.overall_risk_rating,
-          legalExistenceRiskRating: result.risk_summary.legal_existence_risk_rating,
-          activityRiskRating: result.risk_summary.activity_risk_rating,
-          watchlistRiskRating: result.risk_summary.watchlist_risk_rating,
+          overallRiskRating: result.risk_summary.overall_risk_rating ?? undefined,
+          legalExistenceRiskRating:
+            result.risk_summary.legal_existence_risk_rating ?? undefined,
+          activityRiskRating: result.risk_summary.activity_risk_rating ?? undefined,
+          watchlistRiskRating: result.risk_summary.watchlist_risk_rating ?? undefined,
           tasks: result.risk_summary.tasks?.map((t: Record<string, unknown>) => ({
-            taskName: t.task_name,
-            status: t.status,
-            result: t.result,
-            reason: t.reason
+            taskName: t.task_name ?? undefined,
+            status: t.status ?? undefined,
+            result: t.result ?? undefined,
+            reason: t.reason ?? undefined
           }))
         }
       : undefined;
 
     let bestMatch = result.data?.best_match
       ? {
-          matchConfidence: result.data.best_match.match_confidence,
+          matchConfidence: result.data.best_match.match_confidence ?? undefined,
           matchedFields: result.data.best_match.matched_fields
         }
       : undefined;
 
     let legalEntities = result.data?.legal_entities?.map((le: Record<string, unknown>) => ({
-      enigmaId: le.enigma_id,
-      matchConfidence: le.match_confidence,
+      enigmaId: le.enigma_id ?? undefined,
+      matchConfidence: le.match_confidence ?? undefined,
       matchedFields: le.matched_fields,
       registrations: le.registrations,
-      dataSources: le.data_sources
+      dataSources: le.data_sources ?? undefined
     }));
 
     let brands = result.data?.brands?.map((b: Record<string, unknown>) => ({
-      enigmaId: b.enigma_id,
-      matchConfidence: b.match_confidence,
+      enigmaId: b.enigma_id ?? undefined,
+      matchConfidence: b.match_confidence ?? undefined,
       matchedFields: b.matched_fields,
       names: b.names,
       addresses: b.addresses,
@@ -256,17 +257,17 @@ Returns a risk summary with individual verification task results (name verificat
     let watchlists = result.data?.watchlists?.map((w: Record<string, unknown>) => {
       let entity = w.watchlist_entity as Record<string, unknown> | undefined;
       return {
-        enigmaId: w.enigma_id,
-        matchConfidence: w.match_confidence,
+        enigmaId: w.enigma_id ?? undefined,
+        matchConfidence: w.match_confidence ?? undefined,
         matchedFields: w.matched_fields,
         watchlistEntity: entity
           ? {
-              watchlistName: entity.watchlist_name,
-              entityType: entity.entity_type,
-              fullName: entity.full_name,
-              organizationName: entity.organization_name,
-              dob: entity.dob,
-              fullAddress: entity.full_address
+              watchlistName: entity.watchlist_name ?? undefined,
+              entityType: entity.entity_type ?? undefined,
+              fullName: entity.full_name ?? undefined,
+              organizationName: entity.organization_name ?? undefined,
+              dob: entity.dob ?? undefined,
+              fullAddress: entity.full_address ?? undefined
             }
           : undefined
       };
@@ -280,7 +281,7 @@ Returns a risk summary with individual verification task results (name verificat
 
     return {
       output: {
-        responseId: result.response_id,
+        responseId: result.response_id ?? undefined,
         riskSummary,
         bestMatch,
         legalEntities,

@@ -1,4 +1,4 @@
-# Slates Specification for ChatBotKit
+# ChatBotKit API Capabilities
 
 ## Overview
 
@@ -26,7 +26,7 @@ JWT tokens automatically expire after a predetermined period, enhancing security
 
 **3. User Impersonation (Partner API)**
 
-For parent accounts managing multiple sub-accounts or child users, the API supports user impersonation through special request headers. This allows a parent account to make requests on behalf of child accounts without requiring separate authentication credentials. To make requests on behalf of a specific child user, include the `X-RunAs-User-ID` header. Alternatively, use the `X-RunAs-Child-User-Email` header to impersonate by email.
+For parent accounts managing multiple sub-accounts or child users, the API supports user impersonation through special request headers. This allows a parent account to make requests on behalf of child accounts without requiring separate authentication credentials. To make requests on behalf of a specific child user, include the `X-RunAs-UserId` header. Alternatively, use the `X-RunAs-Child-User-Email` header to impersonate by email.
 
 ## Features
 
@@ -101,7 +101,7 @@ Blueprints are organizational containers that group related resources like bots,
 The Partner API is a tool for developing SaaS solutions. It simplifies SaaS development by providing unique sub-accounts with customizable configurations and restrictions.
 
 - Create and manage sub-accounts with resource limits and custom branding.
-- Impersonate sub-accounts via the `X-RunAs-User-ID` header.
+- Impersonate sub-accounts via the `X-RunAs-UserId` header.
 
 ### Content Moderation and Privacy
 

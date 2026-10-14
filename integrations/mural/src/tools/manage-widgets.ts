@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,7 @@ let widgetOutputSchema = z.object({
 let mapWidget = (w: any) => ({
   widgetId: w.id,
   widgetType: w.type,
-  text: w.text,
+  text: w.text ?? w.message,
   title: w.title,
   x: w.x,
   y: w.y,
@@ -45,7 +45,12 @@ export let listWidgetsTool = SlateTool.create(spec, {
   .input(
     z.object({
       muralId: z.string().describe('ID of the mural to list widgets from'),
-      limit: z.number().optional().describe('Maximum number of widgets to return'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a whole number.')
+        .min(1)
+        .optional()
+        .describe('Maximum number of widgets to return'),
       nextToken: z.string().optional().describe('Pagination token from a previous request')
     })
   )
@@ -56,7 +61,7 @@ export let listWidgetsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listWidgets(ctx.input.muralId, {
       limit: ctx.input.limit,
       next: ctx.input.nextToken
@@ -87,7 +92,7 @@ export let getWidgetTool = SlateTool.create(spec, {
   )
   .output(widgetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let w = await client.getWidget(ctx.input.muralId, ctx.input.widgetId);
 
     return {
@@ -105,8 +110,8 @@ Specify the **widgetType** to determine which kind of widget to create, then pro
   instructions: [
     'For sticky notes: provide text, position (x, y), and optionally backgroundColor in style.',
     'For shapes: provide shape type (e.g., "rectangle", "circle"), position, dimensions, and optionally text.',
-    'For images: provide a URL to the image source.',
-    'For arrows: provide startWidgetId and endWidgetId to connect two existing widgets.',
+    'For images: provide assetName from the Mural asset-upload API, position, and dimensions. Source URLs alone are unsupported.',
+    'For arrows: provide x, y, width, height, and at least two points. Optionally connect endpoints using startWidgetId and endWidgetId.',
     'For areas: provide title, position, and dimensions to create a grouping area.'
   ]
 })
@@ -125,7 +130,23 @@ Specify the **widgetType** to determine which kind of widget to create, then pro
         .string()
         .optional()
         .describe('Shape type for shape widgets (e.g., "rectangle", "circle", "triangle")'),
-      url: z.string().optional().describe('Image URL for image widgets'),
+      url: z
+        .string()
+        .optional()
+        .describe(
+          'Source URL retained for compatibility; Mural requires assetName for image creation'
+        ),
+      assetName: z
+        .string()
+        .optional()
+        .describe(
+          'Required for images: uploaded asset name returned by Mural asset-upload API'
+        ),
+      points: z
+        .array(z.object({ x: z.number(), y: z.number() }))
+        .min(2)
+        .optional()
+        .describe('Required arrow path points; provide x, y, width, and height too'),
       startWidgetId: z.string().optional().describe('Start widget ID for arrow connectors'),
       endWidgetId: z.string().optional().describe('End widget ID for arrow connectors'),
       style: z
@@ -136,7 +157,7 @@ Specify the **widgetType** to determine which kind of widget to create, then pro
   )
   .output(widgetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let {
       muralId,
       widgetType,
@@ -147,26 +168,66 @@ Specify the **widgetType** to determine which kind of widget to create, then pro
       height,
       shape,
       url,
+      assetName,
+      points,
       startWidgetId,
       endWidgetId,
       style
     } = ctx.input;
+    if (
+      widgetType === 'arrow' &&
+      (x === undefined ||
+        y === undefined ||
+        width === undefined ||
+        height === undefined ||
+        !points)
+    )
+      throw createApiServiceError(
+        'Arrow creation requires x, y, width, height, and at least two points.'
+      );
+    if (
+      widgetType === 'image' &&
+      (!assetName ||
+        x === undefined ||
+        y === undefined ||
+        width === undefined ||
+        height === undefined)
+    )
+      throw createApiServiceError(
+        'Image creation requires assetName, x, y, width, and height.'
+      );
+    if (widgetType === 'comment' && text === undefined)
+      throw createApiServiceError('Comment creation requires text.');
+    if (
+      widgetType === 'sticky_note' &&
+      shape !== undefined &&
+      !['rectangle', 'circle'].includes(shape)
+    )
+      throw createApiServiceError('Sticky-note shape must be rectangle or circle.');
     let w: any;
 
     switch (widgetType) {
       case 'sticky_note':
         w = await client.createStickyNote(muralId, {
           text,
-          x,
-          y,
+          x: x ?? 0,
+          y: y ?? 0,
           width,
           height,
           style,
-          shape
+          shape: shape ?? 'rectangle'
         });
         break;
       case 'shape':
-        w = await client.createShape(muralId, { text, x, y, width, height, shape, style });
+        w = await client.createShape(muralId, {
+          text,
+          x: x ?? 0,
+          y: y ?? 0,
+          width,
+          height,
+          shape: shape ?? 'rectangle',
+          style
+        });
         break;
       case 'text':
         w = await client.createTextBox(muralId, { text, x, y, width, height, style });
@@ -175,16 +236,33 @@ Specify the **widgetType** to determine which kind of widget to create, then pro
         w = await client.createTitle(muralId, { text, x, y, style });
         break;
       case 'image':
-        w = await client.createImage(muralId, { url, x, y, width, height, title: text });
+        w = await client.createImage(muralId, {
+          url,
+          name: assetName,
+          x,
+          y,
+          width,
+          height,
+          title: text
+        });
         break;
       case 'arrow':
-        w = await client.createArrow(muralId, { startWidgetId, endWidgetId, style });
+        w = await client.createArrow(muralId, {
+          startWidgetId,
+          endWidgetId,
+          x,
+          y,
+          width,
+          height,
+          points,
+          style
+        });
         break;
       case 'area':
         w = await client.createArea(muralId, { title: text, x, y, width, height, style });
         break;
       case 'comment':
-        w = await client.createComment(muralId, { text, x, y });
+        w = await client.createComment(muralId, { text, x: x ?? 0, y: y ?? 0 });
         break;
     }
 
@@ -217,7 +295,7 @@ export let updateWidgetTool = SlateTool.create(spec, {
   )
   .output(widgetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { muralId, widgetId, widgetType, text, x, y, width, height, style } = ctx.input;
     let body: Record<string, any> = {};
     if (text !== undefined) body.text = text;
@@ -242,19 +320,33 @@ export let updateWidgetTool = SlateTool.create(spec, {
         w = await client.updateTitle(muralId, widgetId, body);
         break;
       case 'image':
+        if (body.text !== undefined) {
+          body.caption = body.text;
+          body.text = undefined;
+        }
+        if (body.style !== undefined)
+          throw createApiServiceError(
+            'Image widgets do not accept style. Omit style and update text/caption, position, or dimensions.'
+          );
         w = await client.updateImage(muralId, widgetId, body);
         break;
       case 'arrow':
+        if (text !== undefined)
+          throw createApiServiceError(
+            'Arrow text uses a structured label in Mural and cannot be changed through this tool. Omit text and update position, dimensions, or style.'
+          );
         w = await client.updateArrow(muralId, widgetId, body);
         break;
       case 'area':
-        if (body.text) {
+        if (body.text !== undefined) {
           body.title = body.text;
           body.text = undefined;
         }
         w = await client.updateArea(muralId, widgetId, body);
         break;
       case 'comment':
+        if (width !== undefined || height !== undefined || style !== undefined)
+          throw createApiServiceError('Comments support text and position updates only.');
         w = await client.updateComment(muralId, widgetId, body);
         break;
     }

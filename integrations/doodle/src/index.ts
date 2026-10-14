@@ -5,6 +5,7 @@ import {
   createPollTool,
   deletePollTool,
   getCommentsTool,
+  getCurrentUserTool,
   getPollTool,
   listPollsTool,
   participateInPollTool,
@@ -14,6 +15,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
     createPollTool,
     getPollTool,
     listPollsTool,

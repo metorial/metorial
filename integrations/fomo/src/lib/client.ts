@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface FomoEvent {
   eventId?: number;
@@ -68,6 +74,12 @@ export interface FomoApplicationSettings {
   displayInterval?: number;
   randomize?: boolean;
   closable?: boolean;
+  displayPeriod?: number;
+  displayThreshold?: number;
+  timeAgoPeriod?: number;
+  timeAgoThreshold?: number;
+  hideMobile?: boolean;
+  loopNotification?: boolean;
   position?: string;
   theme?: string;
   utmSource?: string;
@@ -79,7 +91,20 @@ export interface ListEventsOptions {
   page?: number;
 }
 
+let validateResourceId = (id: number, label: string) => {
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw createApiServiceError(`Fomo ${label} must be a positive whole number.`);
+  }
+};
+
+let validateObjectResponse = (data: unknown, resource: string): void => {
+  if (!isApiErrorRecord(data)) {
+    throw createApiServiceError(`Fomo returned an invalid ${resource} response.`);
+  }
+};
+
 let fromSnakeCaseEvent = (data: any): FomoEvent => {
+  validateObjectResponse(data, 'event');
   return {
     eventId: data.id,
     applicationId: data.application_id,
@@ -104,6 +129,7 @@ let fromSnakeCaseEvent = (data: any): FomoEvent => {
 };
 
 let fromSnakeCaseTemplate = (data: any): FomoTemplate => {
+  validateObjectResponse(data, 'template');
   return {
     templateId: data.id,
     eventTypeTag: data.event_type_tag,
@@ -117,15 +143,22 @@ let fromSnakeCaseTemplate = (data: any): FomoTemplate => {
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Fomo API token is required. Reconnect with your site API token.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.fomo.com/api/v1/applications/me',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Token ${config.token}`
-      }
+      authHeader: { value: `Token ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fomo',
+          reason: 'fomo_api_error'
+        })
     });
   }
 
@@ -145,6 +178,11 @@ export class Client {
     customEventFieldsAttributes?: Array<{ key: string; value: string }>;
     createdAt?: string;
   }): Promise<FomoEvent> {
+    if (!event.eventTypeId?.trim() && !event.eventTypeTag?.trim()) {
+      throw createApiServiceError(
+        'Provide eventTypeId or eventTypeTag from the Fomo Templates page before creating an event.'
+      );
+    }
     let body: Record<string, any> = {};
 
     if (event.eventTypeId !== undefined) body.event_type_id = event.eventTypeId;
@@ -168,6 +206,7 @@ export class Client {
   }
 
   async getEvent(eventId: number): Promise<FomoEvent> {
+    validateResourceId(eventId, 'event ID');
     let response = await this.axios.get(`/events/${eventId}`);
     return fromSnakeCaseEvent(response.data);
   }
@@ -181,13 +220,17 @@ export class Client {
       totalCount: number;
     };
   }> {
-    let params: Record<string, any> = { show_meta: true };
-    if (options?.perPage) params.per_page = options.perPage;
-    if (options?.page) params.page = options.page;
+    if (options?.perPage !== undefined) validateResourceId(options.perPage, 'page size');
+    if (options?.page !== undefined) validateResourceId(options.page, 'page number');
+    let params = pickDefined({
+      show_meta: true,
+      per: options?.perPage,
+      page: options?.page
+    });
 
     let response = await this.axios.get('/events', { params });
 
-    if (response.data?.events) {
+    if (Array.isArray(response.data?.events)) {
       return {
         events: response.data.events.map(fromSnakeCaseEvent),
         meta: response.data.meta
@@ -201,9 +244,10 @@ export class Client {
       };
     }
 
-    // If API returns array directly
-    let events = Array.isArray(response.data) ? response.data : [];
-    return { events: events.map(fromSnakeCaseEvent) };
+    if (Array.isArray(response.data)) {
+      return { events: response.data.map(fromSnakeCaseEvent) };
+    }
+    throw createApiServiceError('Fomo returned an invalid events list response.');
   }
 
   async searchEvent(field: string, query: string): Promise<FomoEvent | null> {
@@ -233,6 +277,7 @@ export class Client {
       createdAt?: string;
     }
   ): Promise<FomoEvent> {
+    validateResourceId(eventId, 'event ID');
     let body: Record<string, any> = {};
 
     if (event.eventTypeId !== undefined) body.event_type_id = event.eventTypeId;
@@ -256,6 +301,7 @@ export class Client {
   }
 
   async deleteEvent(eventId: number): Promise<{ message: string }> {
+    validateResourceId(eventId, 'event ID');
     let response = await this.axios.delete(`/events/${eventId}`);
     return { message: response.data?.message ?? 'Event successfully deleted' };
   }
@@ -291,6 +337,10 @@ export class Client {
     });
 
     let data = response.data;
+    validateObjectResponse(data, 'statistics');
+    if (data.graph != null && !Array.isArray(data.graph)) {
+      throw createApiServiceError('Fomo returned an invalid statistics response.');
+    }
 
     let graphEntries = (data.graph || []).map((entry: any) => ({
       date: entry.date,
@@ -326,6 +376,26 @@ export class Client {
     applicationId: number,
     settings: FomoApplicationSettings
   ): Promise<Record<string, any>> {
+    validateResourceId(applicationId, 'application ID');
+    for (let [field, value] of Object.entries({
+      pageLoad: settings.pageLoad,
+      displayFor: settings.displayFor,
+      displayInterval: settings.displayInterval,
+      displayThreshold: settings.displayThreshold,
+      timeAgoThreshold: settings.timeAgoThreshold
+    })) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+        throw createApiServiceError(`Fomo ${field} must be a non-negative whole number.`);
+      }
+    }
+    for (let [field, value] of Object.entries({
+      displayPeriod: settings.displayPeriod,
+      timeAgoPeriod: settings.timeAgoPeriod
+    })) {
+      if (value !== undefined && ![1, 2, 3, 4].includes(value)) {
+        throw createApiServiceError(`Fomo ${field} must be 1, 2, 3, or 4.`);
+      }
+    }
     let body: Record<string, any> = {};
 
     if (settings.name !== undefined) body.name = settings.name;
@@ -338,6 +408,15 @@ export class Client {
       body.display_interval = settings.displayInterval;
     if (settings.randomize !== undefined) body.randomize = settings.randomize;
     if (settings.closable !== undefined) body.closable = settings.closable;
+    if (settings.displayPeriod !== undefined) body.display_period = settings.displayPeriod;
+    if (settings.displayThreshold !== undefined)
+      body.display_threshold = settings.displayThreshold;
+    if (settings.timeAgoPeriod !== undefined) body.time_ago_period = settings.timeAgoPeriod;
+    if (settings.timeAgoThreshold !== undefined)
+      body.time_ago_threshold = settings.timeAgoThreshold;
+    if (settings.hideMobile !== undefined) body.hide_mobile = settings.hideMobile;
+    if (settings.loopNotification !== undefined)
+      body.loop_notification = settings.loopNotification;
     if (settings.position !== undefined) body.position = settings.position;
     if (settings.theme !== undefined) body.theme = settings.theme;
     if (settings.utmSource !== undefined) body.utm_source = settings.utmSource;
@@ -349,14 +428,16 @@ export class Client {
 }
 
 export class FomoOpenClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor() {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://fomo.com/api/v1',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fomo Open',
+          reason: 'fomo_open_api_error'
+        })
     });
   }
 

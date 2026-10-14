@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,9 +27,16 @@ export let exportEvents = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('End time for the export range (ISO 8601 or milliseconds)'),
-      timeZone: z.string().optional().describe('Time zone for the export'),
+      timeZone: z
+        .string()
+        .optional()
+        .describe('UTC offset for export timestamps, such as -04:00 or -240'),
       email: z.string().optional().describe('Email address to send the export to'),
-      limit: z.number().optional().describe('Maximum number of records to export')
+      limit: z.number().optional().describe('Maximum number of records to export'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Number of records to skip; use with limit to page through export results')
     })
   )
   .output(
@@ -45,6 +52,21 @@ export let exportEvents = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 10000000)
+    ) {
+      throw createApiServiceError(
+        'Export limit must be a positive integer no greater than 10000000.'
+      );
+    }
+    if (
+      ctx.input.offset !== undefined &&
+      (!Number.isInteger(ctx.input.offset) || ctx.input.offset < 0)
+    ) {
+      throw createApiServiceError('Export offset must be a non-negative integer.');
+    }
+
     let result = await client.exportEvents({
       format: ctx.input.format,
       conditions: ctx.input.conditions,
@@ -52,7 +74,8 @@ export let exportEvents = SlateTool.create(spec, {
       endTime: ctx.input.endTime,
       timeZone: ctx.input.timeZone,
       email: ctx.input.email,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      offset: ctx.input.offset
     });
 
     return {

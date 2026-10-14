@@ -46,7 +46,7 @@ export let createLipsync = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.createLipsync({
       inputVideoUrl: ctx.input.inputVideoUrl,
       inputAudioUrl: ctx.input.inputAudioUrl,

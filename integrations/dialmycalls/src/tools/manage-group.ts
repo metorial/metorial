@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,10 +15,7 @@ export let manageGroup = SlateTool.create(spec, {
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('The operation to perform.'),
       groupId: z.string().optional().describe('Required for update and delete actions.'),
-      name: z
-        .string()
-        .optional()
-        .describe('Group name. Required for create, optional for update.')
+      name: z.string().optional().describe('Group name. Required for create and update.')
     })
   )
   .output(
@@ -35,7 +32,7 @@ export let manageGroup = SlateTool.create(spec, {
     let { action, groupId, name } = ctx.input;
 
     if (action === 'delete') {
-      if (!groupId) throw new Error('groupId is required for delete action');
+      if (!groupId) throw createApiServiceError('groupId is required for delete action');
       await client.deleteGroup(groupId);
       return {
         output: { groupId },
@@ -44,7 +41,7 @@ export let manageGroup = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
+      if (!name) throw createApiServiceError('name is required for create action');
       let result = await client.createGroup({ name });
       return {
         output: {
@@ -59,8 +56,8 @@ export let manageGroup = SlateTool.create(spec, {
     }
 
     // update
-    if (!groupId) throw new Error('groupId is required for update action');
-    if (!name) throw new Error('name is required for update action');
+    if (!groupId) throw createApiServiceError('groupId is required for update action');
+    if (!name) throw createApiServiceError('name is required for update action');
     let result = await client.updateGroup(groupId, { name });
     return {
       output: {

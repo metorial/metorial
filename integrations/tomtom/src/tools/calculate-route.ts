@@ -137,7 +137,9 @@ export let calculateRoute = SlateTool.create(spec, {
       }))
     }));
 
-    let optimizedWaypoints = data.optimizedWaypoints?.map((w: any) => ({
+    let optimizedWaypoints = (
+      data.routes?.[0]?.optimizedWaypoints ?? data.optimizedWaypoints
+    )?.map((w: any) => ({
       providedIndex: w.providedIndex,
       optimizedIndex: w.optimizedIndex
     }));

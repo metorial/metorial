@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addMailPiecePreview } from '../lib/mail-piece-preview';
 import { spec } from '../spec';
 
 let inlineAddressSchema = z.object({
@@ -108,6 +109,7 @@ export let sendSelfMailer = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       useType: ctx.input.useType
     });
+    await addMailPiecePreview(ctx, result, 'self_mailer');
     return {
       output: {
         selfMailerId: result.id,
@@ -163,6 +165,7 @@ export let getSelfMailer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getSelfMailer(ctx.input.selfMailerId);
+    await addMailPiecePreview(ctx, result, 'self_mailer');
     return {
       output: {
         selfMailerId: result.id,
@@ -210,8 +213,11 @@ export let cancelSelfMailer = SlateTool.create(spec, {
     return {
       output: {
         selfMailerId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Canceled self-mailer **${ctx.input.selfMailerId}**`
+      message:
+        result.deleted === true
+          ? `Canceled self-mailer **${ctx.input.selfMailerId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

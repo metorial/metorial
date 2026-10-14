@@ -9,7 +9,7 @@ export let listTasks = SlateTool.create(spec, {
   key: 'list_tasks',
   description: `Lists and filters tasks across dartboards. Supports filtering by assignee, dartboard, status, priority, tag, completion state, date ranges, and more. Returns paginated results with support for custom ordering.`,
   instructions: [
-    'By default, Dart applies default filters (e.g., excluding completed tasks). Set noDefaults to true to disable this.',
+    'Workspace filters are skipped by default. Set noDefaults to false to apply them. Ordering and exclusion of trashed tasks still apply.',
     'For ordering, use field names like "created_at", "-created_at" (descending), "updated_at", "title", etc.'
   ],
   tags: {
@@ -28,8 +28,14 @@ export let listTasks = SlateTool.create(spec, {
         .describe('Filter by priority (Critical, High, Medium, Low)'),
       tag: z.string().optional().describe('Filter by tag name'),
       isCompleted: z.boolean().optional().describe('Filter by completion status'),
-      dueDateBefore: z.string().optional().describe('Tasks due before this date (ISO 8601)'),
-      dueDateAfter: z.string().optional().describe('Tasks due after this date (ISO 8601)'),
+      dueDateBefore: z
+        .string()
+        .optional()
+        .describe('Tasks due on or before this calendar date (YYYY-MM-DD)'),
+      dueDateAfter: z
+        .string()
+        .optional()
+        .describe('Tasks due on or after this calendar date (YYYY-MM-DD)'),
       createdAtAfter: z
         .string()
         .optional()
@@ -48,19 +54,36 @@ export let listTasks = SlateTool.create(spec, {
         .describe('Tasks updated before this date (ISO 8601)'),
       parentId: z.string().optional().describe('Filter by parent task ID (for subtasks)'),
       title: z.string().optional().describe('Filter by title text'),
-      inTrash: z.boolean().optional().describe('Include trashed tasks'),
+      inTrash: z.boolean().optional().describe('Return trashed tasks instead of active tasks'),
       ordering: z
         .array(z.string())
         .optional()
         .describe('Ordering fields (e.g., ["-created_at", "title"])'),
       limit: z.number().optional().describe('Max results per page (default 25)'),
       offset: z.number().optional().describe('Pagination offset'),
-      noDefaults: z.boolean().optional().describe('Disable default filters and sorting')
+      noDefaults: z
+        .boolean()
+        .optional()
+        .describe(
+          'Skip workspace filters (defaults to true); ordering and trash exclusion still apply'
+        )
     })
   )
   .output(
     z.object({
       count: z.number().describe('Total number of matching tasks'),
+      next: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Next page URL, or null when there are no more results; use its offset with the same filters'
+        ),
+      previous: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Previous page URL, or null on the first page'),
       tasks: z.array(conciseTaskSchema).describe('List of tasks')
     })
   )
@@ -71,6 +94,8 @@ export let listTasks = SlateTool.create(spec, {
     return {
       output: {
         count: result.count,
+        next: result.next,
+        previous: result.previous,
         tasks: result.results
       },
       message: `Found **${result.count}** task(s). Returned ${result.results.length} result(s).`

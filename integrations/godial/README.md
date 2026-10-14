@@ -1,6 +1,12 @@
-# Godial
+# GoDial
 
-Manage outbound calling operations, contacts, and leads through a mobile-first auto dialer and CRM platform. Create and organize contacts into calling lists, manage teams and agents, and trigger automated call workflows. Supports webhook events for call completion and contact updates to sync with external systems. Integrates with WhatsApp Business API for messaging follow-ups.
+Manage calling lists, contacts, teams, and members in GoDial Enterprise. Discover list and team IDs, add contacts and members, and remove member accounts.
+
+Obtain an API access token from **Dashboard → Integration → External API** using a manager account. The integration sends this token as the `access_token` query parameter.
+
+Use `list_lists` before `list_contacts` or `add_contact`, `list_teams` before `add_member`, and `list_accounts` before `remove_account` to discover the required IDs.
+
+See the [GoDial API guide](https://godial.cc/blog/integrating-your-website-or-crm-with-godial-using-api/) and [developer documentation](https://godial.stoplight.io/).
 
 ## License
 

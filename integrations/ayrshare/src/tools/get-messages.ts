@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,6 +21,24 @@ export let getMessages = SlateTool.create(spec, {
       platform: z
         .enum(['facebook', 'instagram', 'twitter'])
         .describe('Platform to get messages from'),
+      action: z
+        .enum(['sent', 'received'])
+        .optional()
+        .describe('Return only sent or received messages'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Page size. On X, setting this selects the live timeline, which ignores status, action, and conversationsOnly'
+        ),
+      next: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque pagination cursor from nextCursor; keep the same platform, profile, and filters'
+        ),
       status: z
         .enum(['active', 'archived'])
         .optional()
@@ -34,6 +52,18 @@ export let getMessages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether another page is available, including for an empty filtered page'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe('Pass this cursor as next to retrieve another page'),
+      conversations: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Conversation details including participants and status'),
       messages: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -47,7 +77,7 @@ export let getMessages = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -55,14 +85,32 @@ export let getMessages = SlateTool.create(spec, {
       platform: ctx.input.platform,
       status: ctx.input.status,
       conversationId: ctx.input.conversationId,
-      conversationsOnly: ctx.input.conversationsOnly
+      conversationsOnly: ctx.input.conversationsOnly,
+      action: ctx.input.action,
+      limit: ctx.input.limit,
+      next: ctx.input.next
     });
+
+    let details = result.converstationsDetails ?? result.conversationsDetails;
+    let conversationDetails = Array.isArray(details)
+      ? Object.fromEntries(
+          details.map((item, index) => [
+            typeof item.id === 'string' ? item.id : String(index),
+            item
+          ])
+        )
+      : isApiErrorRecord(details)
+        ? details
+        : undefined;
 
     return {
       output: {
         messages: result.messages,
         conversationIds: result.conversationIds,
-        conversationDetails: result.conversationsDetails
+        conversationDetails,
+        conversations: Array.isArray(details) ? details : undefined,
+        hasMore: result.meta?.pagination?.hasMore,
+        nextCursor: result.meta?.pagination?.next ?? undefined
       },
       message: ctx.input.conversationsOnly
         ? `Retrieved **${(result.conversationIds || []).length}** conversations from **${ctx.input.platform}**.`

@@ -1,29 +1,43 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let commentSchema = z.object({
-  commentId: z.string().optional().describe('Unique comment identifier'),
-  body: z.string().optional().describe('Comment text'),
-  createdBy: z.string().optional().describe('User who created the comment'),
-  created: z.string().optional().describe('Creation timestamp'),
-  modified: z.string().optional().describe('Last modification timestamp'),
-  position: z.number().optional().describe('Line position in the spec'),
-  status: z.string().optional().describe('Comment status (OPEN, RESOLVED)'),
-  replies: z
-    .array(
-      z.object({
-        replyId: z.string().optional().describe('Reply identifier'),
-        body: z.string().optional().describe('Reply text'),
-        createdBy: z.string().optional().describe('User who created the reply'),
-        created: z.string().optional().describe('Creation timestamp'),
-        modified: z.string().optional().describe('Last modification timestamp')
-      })
-    )
-    .optional()
-    .describe('Replies to this comment')
-});
+let commentSchema = z
+  .object({
+    commentId: z.string().optional().describe('Unique comment identifier'),
+    id: z.string().optional().describe('Provider comment identifier'),
+    user: z
+      .object({ id: z.string(), active: z.boolean().optional() })
+      .optional()
+      .describe('User who created the comment'),
+    body: z.string().optional().describe('Comment text'),
+    createdBy: z.string().optional().describe('User who created the comment'),
+    created: z.string().optional().describe('Creation timestamp'),
+    modified: z.string().optional().describe('Last modification timestamp'),
+    position: z.number().optional().describe('Line position in the spec'),
+    status: z.string().optional().describe('Comment status (OPEN, RESOLVED)'),
+    replies: z
+      .array(
+        z
+          .object({
+            replyId: z.string().optional().describe('Reply identifier'),
+            id: z.string().optional().describe('Provider reply identifier'),
+            user: z
+              .object({ id: z.string(), active: z.boolean().optional() })
+              .optional()
+              .describe('User who created the reply'),
+            body: z.string().optional().describe('Reply text'),
+            createdBy: z.string().optional().describe('User who created the reply'),
+            created: z.string().optional().describe('Creation timestamp'),
+            modified: z.string().optional().describe('Last modification timestamp')
+          })
+          .passthrough()
+      )
+      .optional()
+      .describe('Replies to this comment')
+  })
+  .passthrough();
 
 export let getComments = SlateTool.create(spec, {
   name: 'Get Comments',
@@ -58,21 +72,33 @@ export let getComments = SlateTool.create(spec, {
 
     let owner = ctx.input.owner || ctx.config.owner;
     if (!owner)
-      throw new Error(
+      throw createApiServiceError(
         'Owner is required. Provide it in the input or configure a default owner.'
       );
 
-    let comments: unknown[];
+    let comments: unknown;
     if (ctx.input.resourceType === 'api') {
-      comments =
-        (await client.getApiComments(owner, ctx.input.resourceName, ctx.input.version)) ?? [];
+      comments = await client.getApiComments(owner, ctx.input.resourceName, ctx.input.version);
     } else {
-      comments =
-        (await client.getDomainComments(owner, ctx.input.resourceName, ctx.input.version)) ??
-        [];
+      comments = await client.getDomainComments(
+        owner,
+        ctx.input.resourceName,
+        ctx.input.version
+      );
     }
 
-    let commentList: any[] = Array.isArray(comments) ? comments : [];
+    let parsed = commentSchema.array().safeParse(comments);
+    if (!parsed.success) throw createApiServiceError('SwaggerHub returned invalid comments.');
+    let commentList = parsed.data.map(comment => ({
+      ...comment,
+      commentId: comment.commentId ?? comment.id,
+      createdBy: comment.createdBy ?? comment.user?.id,
+      replies: comment.replies?.map(reply => ({
+        ...reply,
+        replyId: reply.replyId ?? reply.id,
+        createdBy: reply.createdBy ?? reply.user?.id
+      }))
+    }));
 
     return {
       output: {

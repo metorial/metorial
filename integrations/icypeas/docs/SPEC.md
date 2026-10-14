@@ -1,6 +1,4 @@
-Now I have enough information to write the specification.
-
-# Slates Specification for Icypeas
+# Icypeas Integration Specification
 
 ## Overview
 
@@ -48,11 +46,11 @@ Scan a domain or company name to find role-based emails like support@, info@, or
 Scrape professional profile data from LinkedIn-style profile URLs. Returns detailed information about individuals including job titles, company, and profile summaries. A separate endpoint also supports company profile scraping.
 
 - Input: a profile URL (for person or company).
-- Transforms email addresses into complete professional profiles — names, job titles, companies, and LinkedIn data.
+- Returns professional data for a supplied profile URL. Use reverse email lookup first when starting from an email address.
 
 ### Profile URL Finder
 
-Find LinkedIn profile URLs for people or companies. For people, you can search by first name, last name, company name/domain, and job title. For companies, you can search by company name or domain.
+Find LinkedIn profile URLs for people or companies. For people, supply both first and last names plus a company name/domain or job title. For companies, supply a company name or domain.
 
 ### Lead Database Search
 
@@ -66,11 +64,15 @@ Search for people in the lead database using filters. A separate endpoint allows
 Icypeas' reverse email lookup API automatically identifies profiles from email addresses, revealing company details, seniority levels, and social profiles.
 
 - Input: an email address.
-- Returns enriched profile data associated with the email.
+- Returns the professional profile URL associated with the email. Use profile scraping to retrieve its details.
 
 ### Subscription Management
 
 You can retrieve your remaining credits and your current subscription via the API.
+
+### Bulk Search Discovery
+
+List bulk search records and inspect their processing status and statistics. Filter by file ID or status, and paginate with the returned cursor. Retrieve individual results with Get Bulk Search Results.
 
 ## Events
 

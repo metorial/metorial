@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { UniOneEmailBody, UniOneEmailMessage } from '../lib/types';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
@@ -118,7 +119,7 @@ Can reference a stored template by ID, include attachments, schedule delivery up
       datacenter: ctx.config.datacenter
     });
 
-    let message: Record<string, unknown> = {
+    let message: UniOneEmailMessage = {
       recipients: ctx.input.recipients.map(r => ({
         email: r.email,
         substitutions: r.substitutions,
@@ -127,6 +128,8 @@ Can reference a stored template by ID, include attachments, schedule delivery up
     };
 
     if (ctx.input.templateId) message.template_id = ctx.input.templateId;
+    if (ctx.input.idempotenceKey !== undefined)
+      message.idempotence_key = ctx.input.idempotenceKey;
     if (ctx.input.templateEngine) message.template_engine = ctx.input.templateEngine;
     if (ctx.input.subject) message.subject = ctx.input.subject;
     if (ctx.input.fromEmail) message.from_email = ctx.input.fromEmail;
@@ -142,7 +145,7 @@ Can reference a stored template by ID, include attachments, schedule delivery up
     if (ctx.input.inlineAttachments) message.inline_attachments = ctx.input.inlineAttachments;
 
     if (ctx.input.html || ctx.input.plaintext || ctx.input.amp) {
-      let body: Record<string, string> = {};
+      let body: UniOneEmailBody = {};
       if (ctx.input.html) body.html = ctx.input.html;
       if (ctx.input.plaintext) body.plaintext = ctx.input.plaintext;
       if (ctx.input.amp) body.amp = ctx.input.amp;
@@ -166,7 +169,7 @@ Can reference a stored template by ID, include attachments, schedule delivery up
       message.options = { send_at: ctx.input.sendAt };
     }
 
-    let result = await client.sendEmail(message as any);
+    let result = await client.sendEmail(message);
 
     let failedCount = result.failed_emails ? Object.keys(result.failed_emails).length : 0;
 

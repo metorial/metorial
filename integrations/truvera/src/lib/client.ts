@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   production: 'https://api.truvera.io',
@@ -9,13 +9,17 @@ export class Client {
   private axios;
 
   constructor(params: { token: string; environment: string }) {
+    if (!params.token.trim()) {
+      throw createApiServiceError(
+        'A Truvera API key is required. Reconnect with a valid API key.'
+      );
+    }
     let baseURL = BASE_URLS[params.environment] || BASE_URLS.production;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Truvera', reason: 'truvera_api_error' })
     });
   }
 
@@ -48,7 +52,12 @@ export class Client {
 
   // ---------- Credentials ----------
 
-  async listCredentials(options?: { offset?: number; limit?: number }) {
+  async listCredentials(options?: {
+    offset?: number;
+    limit?: number;
+    filter?: string;
+    subjectId?: string;
+  }) {
     let res = await this.axios.get('/credentials', { params: options });
     return res.data;
   }
@@ -226,7 +235,7 @@ export class Client {
     did: string,
     body: { name?: string; logo?: string; description?: string }
   ) {
-    let res = await this.axios.patch(`/profiles/${encodeURIComponent(did)}`, body);
+    let res = await this.axios.patch(`/profiles/${encodeURIComponent(did)}`, { ...body, did });
     return res.data;
   }
 
@@ -237,7 +246,7 @@ export class Client {
 
   // ---------- Verify ----------
 
-  async verifyCredential(credential: Record<string, any>) {
+  async verifyCredential(credential: unknown) {
     let res = await this.axios.post('/verify', credential);
     return res.data;
   }
@@ -270,6 +279,11 @@ export class Client {
   }
 
   // ---------- Jobs ----------
+
+  async getCurrentUser() {
+    let res = await this.axios.get('/data/profile');
+    return res.data;
+  }
 
   async getJob(jobId: string) {
     let res = await this.axios.get(`/jobs/${encodeURIComponent(jobId)}`);

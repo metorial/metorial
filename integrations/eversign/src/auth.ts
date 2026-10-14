@@ -1,10 +1,28 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { createEversignAxios } from './lib/errors';
+
+let getBusinessProfile = async (token: string, isOauth: boolean) => {
+  let businesses = await new Client({ token, isOauth }).listBusinesses();
+  if (!Array.isArray(businesses)) {
+    throw createApiServiceError('Eversign returned an invalid business list.');
+  }
+  let primary =
+    businesses.find(b => b.is_primary === 1 || b.is_primary === '1') ?? businesses[0];
+  return {
+    profile: {
+      id: primary ? String(primary.business_id) : undefined,
+      name: primary?.business_name
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      authType: z.enum(['api_key', 'oauth']).optional()
     })
   )
   .addTokenAuth({
@@ -21,7 +39,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiAccessKey
+          token: ctx.input.apiAccessKey,
+          authType: 'api_key' as const
         }
       };
     },
@@ -29,20 +48,7 @@ export let auth = SlateAuth.create()
       output: { token: string };
       input: { apiAccessKey: string };
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.eversign.com'
-      });
-      let response = await axios.get('/business', {
-        params: { access_key: ctx.output.token }
-      });
-      let businesses = response.data as Array<{ business_id: number; business_name: string }>;
-      let primary = businesses[0];
-      return {
-        profile: {
-          id: primary ? String(primary.business_id) : undefined,
-          name: primary ? primary.business_name : undefined
-        }
-      };
+      return getBusinessProfile(ctx.output.token, false);
     }
   })
   .addOauth({
@@ -62,46 +68,43 @@ export let auth = SlateAuth.create()
       return { url };
     },
     handleCallback: async ctx => {
-      let axios = createAxios({
-        baseURL: 'https://app.eversign.com'
+      let axios = createEversignAxios({
+        baseURL: 'https://app.eversign.com',
+        contentType: false
       });
 
-      let formData = new URLSearchParams();
+      let formData = new FormData();
       formData.append('client_id', ctx.clientId);
       formData.append('client_secret', ctx.clientSecret);
       formData.append('code', ctx.code);
       formData.append('state', ctx.state);
 
-      let response = await axios.post('/oauth/token', formData.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+      let response = await axios.post('/oauth/token', formData);
 
-      let data = response.data as { access_token: string };
+      let data: unknown = response.data;
+      if (
+        !isApiErrorRecord(data) ||
+        typeof data.access_token !== 'string' ||
+        !data.access_token
+      ) {
+        throw createApiServiceError(
+          'Eversign did not return an OAuth access token. Reconnect the account.'
+        );
+      }
+      if (typeof data.state === 'string' && data.state !== ctx.state) {
+        throw createApiServiceError(
+          'Eversign returned an OAuth state mismatch. Reconnect the account.'
+        );
+      }
 
       return {
         output: {
-          token: data.access_token
+          token: data.access_token,
+          authType: 'oauth' as const
         }
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.eversign.com'
-      });
-      let response = await axios.get('/business', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let businesses = response.data as Array<{ business_id: number; business_name: string }>;
-      let primary = businesses[0];
-      return {
-        profile: {
-          id: primary ? String(primary.business_id) : undefined,
-          name: primary ? primary.business_name : undefined
-        }
-      };
+      return getBusinessProfile(ctx.output.token, true);
     }
   });

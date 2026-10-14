@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeocoderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,11 +47,12 @@ export let geocodeAddress = SlateTool.create(spec, {
   key: 'geocode_address',
   description: `Convert a street address to geographic coordinates (latitude/longitude) and optionally identify which Census geographic areas it falls within (state, county, tract, block group, etc.).
 
-Supports structured address input (street, city, state, zip) or a single-line address string. Can also perform reverse geocoding from coordinates to address/geographies.`,
+Supports structured address input (street, city, state, zip) or a single-line address string. Coordinates can identify containing Census geographies; coordinate lookup does not return a street address.`,
   instructions: [
     'Provide either a `street` address (with optional city/state/zip) or a single `address` string, or coordinates for reverse geocoding.',
     'Set `includeGeographies` to true to get Census geography identifiers (FIPS codes) for the address.',
-    'The default benchmark is "Public_AR_Current" which uses the most recent address data.'
+    'Structured addresses require a street and ZIP code, or a street, city, and state.',
+    'The default benchmark is "Public_AR_Current". Use Get Geocoder Options to discover benchmarks and their compatible geography vintages.'
   ],
   tags: {
     readOnly: true
@@ -69,8 +70,8 @@ Supports structured address input (street, city, state, zip) or a single-line ad
         .describe(
           'Single-line full address (alternative to structured input, e.g., "4600 Silver Hill Rd, Washington, DC 20233")'
         ),
-      longitude: z.number().optional().describe('Longitude for reverse geocoding'),
-      latitude: z.number().optional().describe('Latitude for reverse geocoding'),
+      longitude: z.number().optional().describe('Longitude for Census geography lookup'),
+      latitude: z.number().optional().describe('Latitude for Census geography lookup'),
       includeGeographies: z
         .boolean()
         .optional()
@@ -83,7 +84,7 @@ Supports structured address input (street, city, state, zip) or a single-line ad
         .string()
         .optional()
         .describe(
-          'Geography vintage to use when includeGeographies is true (default: "Current_Current")'
+          "Geography vintage for address geographies or coordinate lookup. Defaults to Current_Current for the current benchmark, or the selected benchmark's default vintage."
         )
     })
   )
@@ -92,7 +93,9 @@ Supports structured address input (street, city, state, zip) or a single-line ad
       matches: z
         .array(matchedAddressSchema)
         .describe('List of matched addresses with coordinates and optionally geographies'),
-      inputAddress: z.string().describe('The input address as interpreted by the geocoder')
+      inputAddress: z
+        .string()
+        .describe('The input address or coordinates as interpreted by the geocoder')
     })
   )
   .handleInvocation(async ctx => {
@@ -100,15 +103,31 @@ Supports structured address input (street, city, state, zip) or a single-line ad
     let returnType = ctx.input.includeGeographies
       ? ('geographies' as const)
       : ('locations' as const);
-    let result: any;
+    let result: Awaited<ReturnType<GeocoderClient['geocodeAddress']>>;
+    let hasLongitude = ctx.input.longitude !== undefined;
+    let hasLatitude = ctx.input.latitude !== undefined;
+    if (hasLongitude !== hasLatitude) {
+      throw createApiServiceError(
+        'Provide both longitude and latitude for coordinate lookup.'
+      );
+    }
+    if (
+      (ctx.input.longitude !== undefined &&
+        (!Number.isFinite(ctx.input.longitude) || Math.abs(ctx.input.longitude) > 180)) ||
+      (ctx.input.latitude !== undefined &&
+        (!Number.isFinite(ctx.input.latitude) || Math.abs(ctx.input.latitude) > 90))
+    ) {
+      throw createApiServiceError(
+        'Longitude must be between -180 and 180, and latitude between -90 and 90.'
+      );
+    }
 
     if (ctx.input.longitude !== undefined && ctx.input.latitude !== undefined) {
       result = await geocoder.reverseGeocode({
         longitude: ctx.input.longitude,
         latitude: ctx.input.latitude,
         benchmark: ctx.input.benchmark,
-        vintage: ctx.input.vintage,
-        returnType
+        vintage: ctx.input.vintage
       });
     } else if (ctx.input.address) {
       result = await geocoder.geocodeOneLineAddress({
@@ -128,18 +147,31 @@ Supports structured address input (street, city, state, zip) or a single-line ad
         returnType
       });
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Please provide either a street address, a single-line address, or longitude/latitude coordinates.'
       );
     }
 
     let addressMatches = result.addressMatches || [];
+    let location = result.input?.location;
+    let providerAddress = result.input?.address;
     let inputAddress =
-      result.input?.address?.address || result.input?.location?.x
-        ? `${result.input?.location?.y}, ${result.input?.location?.x}`
-        : ctx.input.address || ctx.input.street || '';
+      providerAddress?.address ||
+      (providerAddress
+        ? [
+            providerAddress.street,
+            providerAddress.city,
+            providerAddress.state,
+            providerAddress.zip
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '') ||
+      (location
+        ? `${location.y}, ${location.x}`
+        : ctx.input.address || ctx.input.street || '');
 
-    let matches = addressMatches.map((match: any) => ({
+    let matches = addressMatches.map(match => ({
       matchedAddress: match.matchedAddress || undefined,
       coordinates: match.coordinates
         ? {
@@ -153,18 +185,29 @@ Supports structured address input (street, city, state, zip) or a single-line ad
             side: match.tigerLine.side
           }
         : undefined,
-      addressComponents: match.addressComponents || undefined,
+      addressComponents: match.addressComponents,
       geographies: match.geographies || undefined
     }));
+    if (ctx.input.longitude !== undefined && ctx.input.latitude !== undefined) {
+      matches.push({
+        matchedAddress: undefined,
+        coordinates: { longitude: ctx.input.longitude, latitude: ctx.input.latitude },
+        tigerLine: undefined,
+        addressComponents: undefined,
+        geographies: ctx.input.includeGeographies === false ? undefined : result.geographies
+      });
+      if (!inputAddress) inputAddress = `${ctx.input.latitude}, ${ctx.input.longitude}`;
+    }
 
     return {
       output: {
         matches,
         inputAddress: inputAddress.toString()
       },
-      message:
-        matches.length > 0
-          ? `Found **${matches.length}** match(es) for the address. ${matches[0].matchedAddress ? `Best match: ${matches[0].matchedAddress}` : ''}`
+      message: hasLongitude
+        ? 'Retrieved Census geography lookup for the provided coordinates.'
+        : matches.length > 0
+          ? `Found **${matches.length}** match(es) for the address. ${matches[0]?.matchedAddress ? `Best match: ${matches[0].matchedAddress}` : ''}`
           : 'No matches found for the provided address.'
     };
   })

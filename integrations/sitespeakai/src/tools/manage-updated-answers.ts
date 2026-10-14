@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { chatbotIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let updatedAnswerSchema = z.object({
@@ -24,7 +25,7 @@ export let listUpdatedAnswers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot.')
+      chatbotId: chatbotIdSchema
     })
   )
   .output(
@@ -61,7 +62,7 @@ export let listUpdatedAnswers = SlateTool.create(spec, {
 export let createUpdatedAnswer = SlateTool.create(spec, {
   name: 'Create Updated Answer',
   key: 'create_updated_answer',
-  description: `Create a custom question-and-answer pair for a chatbot. This overrides or supplements the chatbot's trained knowledge so it returns the specified answer when asked the given question. Useful for correcting or improving specific responses.`,
+  description: `Create or update a custom question-and-answer pair for a chatbot. This overrides or supplements the chatbot's trained knowledge so it returns the specified answer when asked the given question. Useful for correcting or improving specific responses.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -69,7 +70,7 @@ export let createUpdatedAnswer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot.'),
+      chatbotId: chatbotIdSchema,
       question: z.string().describe('The question to create a custom answer for.'),
       suggestedAnswer: z
         .string()
@@ -97,7 +98,7 @@ export let createUpdatedAnswer = SlateTool.create(spec, {
         createdAt: finetune.created_at ?? null,
         updatedAt: finetune.updated_at ?? null
       },
-      message: `Created updated answer for question: "${ctx.input.question}".`
+      message: `Saved updated answer for question: "${ctx.input.question}".`
     };
   })
   .build();
@@ -113,7 +114,7 @@ export let deleteUpdatedAnswer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot.'),
+      chatbotId: chatbotIdSchema,
       answerId: z.string().describe('The ID of the updated answer to delete.')
     })
   )

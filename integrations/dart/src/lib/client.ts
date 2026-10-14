@@ -1,9 +1,13 @@
-import { createAxios } from 'slates';
-import type { Comment, ConciseDoc, ConciseTask, Doc, Task, WorkspaceConfig } from './types';
-
-let api = createAxios({
-  baseURL: 'https://app.dartai.com/api/v0/public'
-});
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
+import type {
+  Comment,
+  ConciseDoc,
+  ConciseTask,
+  CurrentUser,
+  Doc,
+  Task,
+  WorkspaceConfig
+} from './types';
 
 export interface PaginatedResponse<T> {
   count: number;
@@ -181,98 +185,65 @@ let mapConciseDoc = (raw: any): ConciseDoc => ({
 });
 
 export class Client {
-  private headers: Record<string, string>;
+  private api;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json'
-    };
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://app.dartai.com/api/v0/public',
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Dart',
+          reason: 'dart_api_error'
+        })
+    });
   }
 
   // --- Tasks ---
 
   async createTask(params: CreateTaskParams): Promise<Task> {
-    let response = await api.post(
-      '/tasks',
-      {
-        item: {
-          title: params.title,
-          dartboard: params.dartboard,
-          description: params.description,
-          status: params.status,
-          type: params.type,
-          assignee: params.assignee,
-          assignees: params.assignees,
-          priority: params.priority,
-          tags: params.tags,
-          startAt: params.startAt,
-          dueAt: params.dueAt,
-          size: params.size,
-          parentId: params.parentId,
-          customProperties: params.customProperties
-        }
-      },
-      { headers: this.headers }
-    );
+    let response = await this.api.post('/tasks', { item: pickDefined(params) });
     return mapTask(response.data.item);
   }
 
   async getTask(taskId: string): Promise<Task> {
-    let response = await api.get(`/tasks/${taskId}`, { headers: this.headers });
+    let response = await this.api.get(`/tasks/${encodeURIComponent(taskId)}`);
     return mapTask(response.data.item);
   }
 
   async updateTask(taskId: string, params: UpdateTaskParams): Promise<Task> {
-    let item: Record<string, any> = {};
-    if (params.title !== undefined) item.title = params.title;
-    if (params.dartboard !== undefined) item.dartboard = params.dartboard;
-    if (params.description !== undefined) item.description = params.description;
-    if (params.status !== undefined) item.status = params.status;
-    if (params.type !== undefined) item.type = params.type;
-    if (params.assignee !== undefined) item.assignee = params.assignee;
-    if (params.assignees !== undefined) item.assignees = params.assignees;
-    if (params.priority !== undefined) item.priority = params.priority;
-    if (params.tags !== undefined) item.tags = params.tags;
-    if (params.startAt !== undefined) item.startAt = params.startAt;
-    if (params.dueAt !== undefined) item.dueAt = params.dueAt;
-    if (params.size !== undefined) item.size = params.size;
-    if (params.parentId !== undefined) item.parentId = params.parentId;
-    if (params.customProperties !== undefined) item.customProperties = params.customProperties;
-    if (params.taskRelationships !== undefined)
-      item.taskRelationships = params.taskRelationships;
-
-    let response = await api.put(`/tasks/${taskId}`, { item }, { headers: this.headers });
+    let item = pickDefined({ id: taskId, ...params });
+    let response = await this.api.put(`/tasks/${encodeURIComponent(taskId)}`, { item });
     return mapTask(response.data.item);
   }
 
   async deleteTask(taskId: string): Promise<void> {
-    await api.delete(`/tasks/${taskId}`, { headers: this.headers });
+    await this.api.delete(`/tasks/${encodeURIComponent(taskId)}`);
   }
 
   async listTasks(params: ListTasksParams = {}): Promise<PaginatedResponse<ConciseTask>> {
     let query: Record<string, any> = {};
-    if (params.assignee) query.assignee = params.assignee;
-    if (params.dartboard) query.dartboard = params.dartboard;
-    if (params.status) query.status = params.status;
-    if (params.priority) query.priority = params.priority;
-    if (params.tag) query.tag = params.tag;
+    if (params.assignee !== undefined) query.assignee = params.assignee;
+    if (params.dartboard !== undefined) query.dartboard = params.dartboard;
+    if (params.status !== undefined) query.status = params.status;
+    if (params.priority !== undefined) query.priority = params.priority;
+    if (params.tag !== undefined) query.tag = params.tag;
     if (params.isCompleted !== undefined) query.is_completed = params.isCompleted;
-    if (params.dueDateBefore) query.due_at_before = params.dueDateBefore;
-    if (params.dueDateAfter) query.due_at_after = params.dueDateAfter;
-    if (params.createdAtAfter) query.created_at_after = params.createdAtAfter;
-    if (params.createdAtBefore) query.created_at_before = params.createdAtBefore;
-    if (params.updatedAtAfter) query.updated_at_after = params.updatedAtAfter;
-    if (params.updatedAtBefore) query.updated_at_before = params.updatedAtBefore;
-    if (params.parentId) query.parent_id = params.parentId;
-    if (params.title) query.title = params.title;
+    if (params.dueDateBefore !== undefined) query.due_at_before = params.dueDateBefore;
+    if (params.dueDateAfter !== undefined) query.due_at_after = params.dueDateAfter;
+    if (params.createdAtAfter !== undefined) query.created_at_after = params.createdAtAfter;
+    if (params.createdAtBefore !== undefined) query.created_at_before = params.createdAtBefore;
+    if (params.updatedAtAfter !== undefined) query.updated_at_after = params.updatedAtAfter;
+    if (params.updatedAtBefore !== undefined) query.updated_at_before = params.updatedAtBefore;
+    if (params.parentId !== undefined) query.parent_id = params.parentId;
+    if (params.title !== undefined) query.title = params.title;
     if (params.inTrash !== undefined) query.in_trash = params.inTrash;
-    if (params.ordering && params.ordering.length > 0) query.o = params.ordering;
+    if (params.ordering && params.ordering.length > 0) query.o = params.ordering.join(',');
     if (params.limit !== undefined) query.limit = params.limit;
     if (params.offset !== undefined) query.offset = params.offset;
     if (params.noDefaults !== undefined) query.no_defaults = params.noDefaults;
 
-    let response = await api.get('/tasks/list', { headers: this.headers, params: query });
+    let response = await this.api.get('/tasks/list', { params: query });
     let data = response.data;
     return {
       count: data.count,
@@ -282,20 +253,45 @@ export class Client {
     };
   }
 
+  async addTaskTimeTracking(
+    taskId: string,
+    params: {
+      startedAt: string;
+      finishedAt: string;
+      user?: string | null;
+      customPropertyName?: string | null;
+    }
+  ): Promise<Task> {
+    let response = await this.api.post(
+      `/tasks/${encodeURIComponent(taskId)}/time-tracking`,
+      pickDefined(params)
+    );
+    return mapTask(response.data.item);
+  }
+
+  async getCurrentUser(): Promise<CurrentUser> {
+    let response = await this.api.get<{
+      isLoggedIn: boolean;
+      user: { id: string; name: string; email: string };
+    }>('/me');
+    return {
+      isLoggedIn: response.data.isLoggedIn,
+      userId: response.data.user.id,
+      name: response.data.user.name,
+      email: response.data.user.email
+    };
+  }
+
   // --- Comments ---
 
   async createComment(params: CreateCommentParams): Promise<Comment> {
-    let response = await api.post(
-      '/comments',
-      {
-        item: {
-          taskId: params.taskId,
-          text: params.text,
-          parentId: params.parentId
-        }
-      },
-      { headers: this.headers }
-    );
+    let response = await this.api.post('/comments', {
+      item: {
+        taskId: params.taskId,
+        text: params.text,
+        parentId: params.parentId
+      }
+    });
     return mapComment(response.data.item);
   }
 
@@ -305,9 +301,9 @@ export class Client {
     };
     if (params.limit !== undefined) query.limit = params.limit;
     if (params.offset !== undefined) query.offset = params.offset;
-    if (params.ordering && params.ordering.length > 0) query.o = params.ordering;
+    if (params.ordering && params.ordering.length > 0) query.o = params.ordering.join(',');
 
-    let response = await api.get('/comments/list', { headers: this.headers, params: query });
+    let response = await this.api.get('/comments/list', { params: query });
     let data = response.data;
     return {
       count: data.count,
@@ -320,22 +316,18 @@ export class Client {
   // --- Documents ---
 
   async createDoc(params: CreateDocParams): Promise<Doc> {
-    let response = await api.post(
-      '/docs',
-      {
-        item: {
-          title: params.title,
-          folder: params.folder,
-          text: params.text
-        }
-      },
-      { headers: this.headers }
-    );
+    let response = await this.api.post('/docs', {
+      item: {
+        title: params.title,
+        folder: params.folder,
+        text: params.text
+      }
+    });
     return mapDoc(response.data.item);
   }
 
   async getDoc(docId: string): Promise<Doc> {
-    let response = await api.get(`/docs/${docId}`, { headers: this.headers });
+    let response = await this.api.get(`/docs/${encodeURIComponent(docId)}`);
     return mapDoc(response.data.item);
   }
 
@@ -345,26 +337,26 @@ export class Client {
     if (params.folder !== undefined) item.folder = params.folder;
     if (params.text !== undefined) item.text = params.text;
 
-    let response = await api.put(`/docs/${docId}`, { item }, { headers: this.headers });
+    let response = await this.api.put(`/docs/${encodeURIComponent(docId)}`, { item });
     return mapDoc(response.data.item);
   }
 
   async deleteDoc(docId: string): Promise<void> {
-    await api.delete(`/docs/${docId}`, { headers: this.headers });
+    await this.api.delete(`/docs/${encodeURIComponent(docId)}`);
   }
 
   async listDocs(params: ListDocsParams = {}): Promise<PaginatedResponse<ConciseDoc>> {
     let query: Record<string, any> = {};
-    if (params.folder) query.folder = params.folder;
-    if (params.title) query.title = params.title;
-    if (params.search) query.s = params.search;
+    if (params.folder !== undefined) query.folder = params.folder;
+    if (params.title !== undefined) query.title = params.title;
+    if (params.search !== undefined) query.s = params.search;
     if (params.inTrash !== undefined) query.in_trash = params.inTrash;
     if (params.limit !== undefined) query.limit = params.limit;
     if (params.offset !== undefined) query.offset = params.offset;
-    if (params.ordering && params.ordering.length > 0) query.o = params.ordering;
+    if (params.ordering && params.ordering.length > 0) query.o = params.ordering.join(',');
     if (params.noDefaults !== undefined) query.no_defaults = params.noDefaults;
 
-    let response = await api.get('/docs/list', { headers: this.headers, params: query });
+    let response = await this.api.get('/docs/list', { params: query });
     let data = response.data;
     return {
       count: data.count,
@@ -377,7 +369,7 @@ export class Client {
   // --- Workspace Config ---
 
   async getWorkspaceConfig(): Promise<WorkspaceConfig> {
-    let response = await api.get('/config', { headers: this.headers });
+    let response = await this.api.get('/config');
     let data = response.data;
     return {
       today: data.today ?? '',
@@ -393,7 +385,7 @@ export class Client {
       })),
       tags: data.tags ?? [],
       priorities: data.priorities ?? [],
-      sizes: data.sizes ?? [],
+      sizes: Array.isArray(data.sizes) ? data.sizes : [],
       customProperties: (data.customProperties ?? []).map((p: any) => ({
         name: p.name ?? '',
         type: p.type ?? '',

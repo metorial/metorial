@@ -14,8 +14,17 @@ export let getConversation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      inboxId: z.string().describe('ID of the inbox containing the conversation'),
-      conversationId: z.string().describe('ID of the conversation to retrieve')
+      inboxId: z.string().describe('Inbox ID from list_inboxes'),
+      conversationId: z
+        .string()
+        .describe('Hiver conversation ID or Gmail thread ID from list_conversations'),
+      userEmail: z
+        .string()
+        .email()
+        .optional()
+        .describe(
+          'Inbox user email when conversationId is a Gmail thread ID from that user’s mailbox'
+        )
     })
   )
   .output(
@@ -35,14 +44,18 @@ export let getConversation = SlateTool.create(spec, {
         .optional()
         .describe('Recipient information'),
       createdAt: z.string().optional().describe('Creation timestamp'),
-      updatedAt: z.string().optional().describe('Last update timestamp')
+      updatedAt: z.string().optional().describe('Last update timestamp'),
+      gmailThreadId: z.string().optional().describe('Gmail thread ID in the shared mailbox'),
+      privatePermalink: z.string().optional().describe('Private conversation link'),
+      publicPermalink: z.string().optional().describe('Public conversation link')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let conversation = await client.getConversation(
       ctx.input.inboxId,
-      ctx.input.conversationId
+      ctx.input.conversationId,
+      ctx.input.userEmail
     );
 
     return {
@@ -56,7 +69,10 @@ export let getConversation = SlateTool.create(spec, {
         from: conversation.from,
         to: conversation.to,
         createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt
+        updatedAt: conversation.updatedAt,
+        gmailThreadId: conversation.gmailThreadId,
+        privatePermalink: conversation.privatePermalink,
+        publicPermalink: conversation.publicPermalink
       },
       message: `Retrieved conversation **${conversation.subject ?? conversation.id}** (status: ${conversation.status ?? 'unknown'}).`
     };

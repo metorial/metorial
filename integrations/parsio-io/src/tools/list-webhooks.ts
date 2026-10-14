@@ -36,9 +36,9 @@ export let listWebhooks = SlateTool.create(spec, {
 
     let mapped = (Array.isArray(webhooks) ? webhooks : []).map((wh: any) => ({
       webhookId: wh._id || wh.id,
-      url: wh.url,
-      event: wh.event,
-      tableId: wh.table_id || wh.tableId
+      url: wh.url ?? undefined,
+      event: wh.event ?? undefined,
+      tableId: wh.table_id || wh.tableId || undefined
     }));
 
     return {

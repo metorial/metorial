@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,6 +55,12 @@ export let manageModel = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      job: z
+        .any()
+        .optional()
+        .describe(
+          'Asynchronous job object, when the operation is queued. Use get_job_result with its id.'
+        ),
       model: z.any().describe('The model object'),
       fields: z
         .array(z.any())
@@ -71,7 +77,7 @@ export let manageModel = SlateTool.create(spec, {
     let { action, modelId, name, apiKey, includeFields, ...settings } = ctx.input;
 
     if (action === 'get') {
-      if (!modelId) throw new Error('modelId is required for get action');
+      if (!modelId) throw createApiServiceError('modelId is required for get action');
       let model = await client.getModel(modelId);
       let fields: any[] | undefined;
       if (includeFields) {
@@ -84,8 +90,8 @@ export let manageModel = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
-      if (!apiKey) throw new Error('apiKey is required for create action');
+      if (!name) throw createApiServiceError('name is required for create action');
+      if (!apiKey) throw createApiServiceError('apiKey is required for create action');
       let attributes: Record<string, any> = { name, api_key: apiKey };
       if (settings.singleton !== undefined) attributes.singleton = settings.singleton;
       if (settings.sortable !== undefined) attributes.sortable = settings.sortable;
@@ -98,13 +104,16 @@ export let manageModel = SlateTool.create(spec, {
         attributes.collection_appearance = settings.collectionAppearance;
       let model = await client.createModel(attributes);
       return {
-        output: { model },
-        message: `Created model **${model.name}** (ID: ${model.id}).`
+        output: { model, ...(model?.type === 'job' ? { job: model } : {}) },
+        message:
+          model?.type === 'job'
+            ? `Queued operation as job **${model.id}**. Use get_job_result to check completion.`
+            : `Created model **${model.name}** (ID: ${model.id}).`
       };
     }
 
     if (action === 'update') {
-      if (!modelId) throw new Error('modelId is required for update action');
+      if (!modelId) throw createApiServiceError('modelId is required for update action');
       let attributes: Record<string, any> = {};
       if (name) attributes.name = name;
       if (apiKey) attributes.api_key = apiKey;
@@ -119,20 +128,26 @@ export let manageModel = SlateTool.create(spec, {
         attributes.collection_appearance = settings.collectionAppearance;
       let model = await client.updateModel(modelId, attributes);
       return {
-        output: { model },
-        message: `Updated model **${model.name}** (ID: ${model.id}).`
+        output: { model, ...(model?.type === 'job' ? { job: model } : {}) },
+        message:
+          model?.type === 'job'
+            ? `Queued operation as job **${model.id}**. Use get_job_result to check completion.`
+            : `Updated model **${model.name}** (ID: ${model.id}).`
       };
     }
 
     if (action === 'delete') {
-      if (!modelId) throw new Error('modelId is required for delete action');
+      if (!modelId) throw createApiServiceError('modelId is required for delete action');
       let model = await client.deleteModel(modelId);
       return {
-        output: { model },
-        message: `Deleted model with ID **${modelId}**.`
+        output: { model, ...(model?.type === 'job' ? { job: model } : {}) },
+        message:
+          model?.type === 'job'
+            ? `Queued operation as job **${model.id}**. Use get_job_result to check completion.`
+            : `Deleted model with ID **${modelId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

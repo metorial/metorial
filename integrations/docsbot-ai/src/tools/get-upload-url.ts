@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getUploadUrl = SlateTool.create(spec, {
   name: 'Get Upload URL',
   key: 'get_upload_url',
-  description: `Get a presigned upload URL for uploading a file to use as a bot training source. After uploading the file to the returned URL, use the returned file path with the **Create Source** tool.`,
+  description: `Get a presigned upload URL for uploading a file to use as a bot training source. After uploading the file to the returned URL, use the returned file path with the **Create Source** tool. Call list_teams to discover accessible team IDs.`,
   instructions: [
     'Upload the file to the returned uploadUrl using a PUT request with Content-Type: application/octet-stream.',
     'Then pass the returned filePath to the Create Source tool\'s "file" field.'
@@ -17,6 +18,7 @@ export let getUploadUrl = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to upload the file for'),
       fileName: z.string().describe('Name of the file to upload')
     })
@@ -32,7 +34,7 @@ export let getUploadUrl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
     let result = await client.getUploadUrl(
-      ctx.config.teamId,
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
       ctx.input.botId,
       ctx.input.fileName
     );

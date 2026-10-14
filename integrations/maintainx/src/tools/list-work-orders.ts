@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWorkOrders = SlateTool.create(spec, {
   name: 'List Work Orders',
   key: 'list_work_orders',
-  description: `Lists work orders from MaintainX with optional filtering by status, priority, and date ranges. Supports cursor-based pagination. Returns a summary of each work order.`,
+  description: `Lists work orders from MaintainX with optional filtering by status, priority, and date ranges. Supports cursor-based pagination. Returns a summary of each work order. For multi-organization keys, call list_organizations and pass organizationId.`,
   constraints: ['Maximum 200 results per page. Use cursor for pagination.'],
   tags: {
     destructive: false,
@@ -15,6 +16,7 @@ export let listWorkOrders = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       status: z
         .enum(['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'DONE'])
         .optional()
@@ -26,7 +28,9 @@ export let listWorkOrders = SlateTool.create(spec, {
       workOrderType: z
         .enum(['REACTIVE', 'PREVENTIVE'])
         .optional()
-        .describe('Filter by work order type'),
+        .describe(
+          'Filter the current returned page by work order type. Continue with nextCursor to inspect further pages.'
+        ),
       createdAfter: z
         .string()
         .optional()
@@ -43,7 +47,13 @@ export let listWorkOrders = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter: updated at or before this ISO 8601 date'),
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -68,10 +78,7 @@ export let listWorkOrders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listWorkOrders({
       status: ctx.input.status,
@@ -86,14 +93,14 @@ export let listWorkOrders = SlateTool.create(spec, {
     });
 
     let workOrders = (result.workOrders ?? []).map((wo: any) => ({
-      workOrderId: wo.id,
-      title: wo.title,
-      status: wo.status,
-      priority: wo.priority,
-      workOrderType: wo.workOrderType,
-      dueDate: wo.dueDate,
-      createdAt: wo.createdAt,
-      updatedAt: wo.updatedAt
+      workOrderId: wo.id ?? undefined,
+      title: wo.title ?? undefined,
+      status: wo.status ?? undefined,
+      priority: wo.priority ?? undefined,
+      workOrderType: wo.type ?? undefined,
+      dueDate: wo.dueDate ?? undefined,
+      createdAt: wo.createdAt ?? undefined,
+      updatedAt: wo.updatedAt ?? undefined
     }));
 
     return {

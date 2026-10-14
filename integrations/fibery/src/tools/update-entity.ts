@@ -47,8 +47,8 @@ export let updateEntityTool = SlateTool.create(spec, {
     });
 
     let entityData: Record<string, any> = {
-      'fibery/id': ctx.input.entityId,
-      ...ctx.input.fields
+      ...ctx.input.fields,
+      'fibery/id': ctx.input.entityId
     };
 
     let result = await client.updateEntity(ctx.input.typeName, entityData);

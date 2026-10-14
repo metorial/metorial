@@ -24,9 +24,15 @@ export let listSubmissions = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(50)
+        .refine(Number.isInteger, 'Limit must be a whole number.')
         .optional()
         .describe('Number of results per page (1-50, default: 25)'),
-      page: z.number().min(1).optional().describe('Page number for pagination (default: 1)'),
+      page: z
+        .number()
+        .min(1)
+        .refine(Number.isInteger, 'Page must be a whole number.')
+        .optional()
+        .describe('Page number for pagination (default: 1)'),
       sort: z
         .string()
         .optional()

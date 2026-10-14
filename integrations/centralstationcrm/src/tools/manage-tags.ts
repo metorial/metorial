@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,7 +42,7 @@ export let manageTags = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.tagName) {
-        throw new Error('tagName is required when adding a tag');
+        throw createApiServiceError('tagName is required when adding a tag');
       }
 
       let result: any;
@@ -66,7 +66,7 @@ export let manageTags = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.tagId) {
-        throw new Error('tagId is required when removing a tag');
+        throw createApiServiceError('tagId is required when removing a tag');
       }
 
       if (ctx.input.resourceType === 'person') {

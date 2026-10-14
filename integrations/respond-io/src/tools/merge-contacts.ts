@@ -39,7 +39,7 @@ export let mergeContacts = SlateTool.create(spec, {
 
     return {
       output: {
-        contactId: String(data?.id || ctx.input.primaryContactId)
+        contactId: String(data?.contactId ?? data?.id ?? ctx.input.primaryContactId)
       },
       message: `Merged contact **${ctx.input.secondaryContactId}** into **${ctx.input.primaryContactId}**.`
     };

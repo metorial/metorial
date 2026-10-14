@@ -49,9 +49,10 @@ Useful for converting web pages into structured text for processing or analysis.
         content: result.content,
         pageName: result.name ?? result.pageName,
         pageDescription: result.description ?? result.pageDescription,
-        characterCount: result.characterCount ?? result.content?.length
+        characterCount:
+          result.countCharacters ?? result.characterCount ?? result.content?.length
       },
-      message: `Scraped **${result.name ?? result.pageName ?? ctx.input.url}** — ${result.characterCount ?? result.content?.length ?? 0} characters of content extracted.`
+      message: `Scraped **${result.name ?? result.pageName ?? ctx.input.url}** — ${result.countCharacters ?? result.characterCount ?? result.content?.length ?? 0} characters of content extracted.`
     };
   })
   .build();

@@ -14,7 +14,13 @@ export let listRules = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of rules to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of rules to return')
     })
   )
   .output(
@@ -45,16 +51,16 @@ export let listRules = SlateTool.create(spec, {
       ruleId: r.id,
       name: r.name,
       description: r.description || null,
-      enabled: r.enabled ?? true,
-      priority: r.priority ?? null,
+      enabled: r.enabled ?? !r.deactivated_datetime,
+      priority: r.priority != null ? Number(r.priority) : null,
       createdDatetime: r.created_datetime || null
     }));
 
     return {
       output: {
         rules,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
       message: `Found **${rules.length}** rule(s).`
     };
@@ -78,6 +84,12 @@ export let createRule = SlateTool.create(spec, {
         )
         .optional()
         .describe('Trigger events'),
+      code: z
+        .string()
+        .optional()
+        .describe(
+          'JavaScript rule logic. Required when creating a rule; use code to express conditions and actions'
+        ),
       conditions: z
         .any()
         .optional()
@@ -92,7 +104,10 @@ export let createRule = SlateTool.create(spec, {
         .optional()
         .describe('Actions to perform'),
       enabled: z.boolean().default(true).describe('Whether the rule is enabled'),
-      priority: z.number().optional().describe('Execution priority (lower = higher priority)')
+      priority: z
+        .number()
+        .optional()
+        .describe('Execution priority; higher numbers execute first')
     })
   )
   .output(
@@ -109,6 +124,7 @@ export let createRule = SlateTool.create(spec, {
       name: ctx.input.name,
       description: ctx.input.description,
       events: ctx.input.events,
+      code: ctx.input.code,
       conditions: ctx.input.conditions,
       actions: ctx.input.actions,
       enabled: ctx.input.enabled,
@@ -119,9 +135,9 @@ export let createRule = SlateTool.create(spec, {
       output: {
         ruleId: rule.id,
         name: rule.name,
-        enabled: rule.enabled ?? true
+        enabled: rule.enabled ?? !rule.deactivated_datetime
       },
-      message: `Created rule **"${rule.name}"** (ID: ${rule.id}, ${rule.enabled ? 'enabled' : 'disabled'}).`
+      message: `Created rule **"${rule.name}"** (ID: ${rule.id}, ${(rule.enabled ?? !rule.deactivated_datetime) ? 'enabled' : 'disabled'}).`
     };
   })
   .build();
@@ -144,6 +160,12 @@ export let updateRule = SlateTool.create(spec, {
         )
         .optional()
         .describe('Updated trigger events'),
+      code: z
+        .string()
+        .optional()
+        .describe(
+          'JavaScript rule logic. Required when creating a rule; use code to express conditions and actions'
+        ),
       conditions: z.any().optional().describe('Updated conditions'),
       actions: z
         .array(
@@ -155,7 +177,11 @@ export let updateRule = SlateTool.create(spec, {
         .optional()
         .describe('Updated actions'),
       enabled: z.boolean().optional().describe('Enable or disable the rule'),
-      priority: z.number().optional().describe('New execution priority')
+      priority: z
+        .number()
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('New execution priority')
     })
   )
   .output(
@@ -172,6 +198,7 @@ export let updateRule = SlateTool.create(spec, {
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
     if (ctx.input.events !== undefined) data.events = ctx.input.events;
+    if (ctx.input.code !== undefined) data.code = ctx.input.code;
     if (ctx.input.conditions !== undefined) data.conditions = ctx.input.conditions;
     if (ctx.input.actions !== undefined) data.actions = ctx.input.actions;
     if (ctx.input.enabled !== undefined) data.enabled = ctx.input.enabled;
@@ -183,9 +210,9 @@ export let updateRule = SlateTool.create(spec, {
       output: {
         ruleId: rule.id,
         name: rule.name,
-        enabled: rule.enabled ?? true
+        enabled: rule.enabled ?? !rule.deactivated_datetime
       },
-      message: `Updated rule **"${rule.name}"** (ID: ${rule.id}, ${rule.enabled ? 'enabled' : 'disabled'}).`
+      message: `Updated rule **"${rule.name}"** (ID: ${rule.id}, ${(rule.enabled ?? !rule.deactivated_datetime) ? 'enabled' : 'disabled'}).`
     };
   })
   .build();

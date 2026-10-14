@@ -397,8 +397,12 @@ export class LaunchDarklyClient {
     return response.data;
   }
 
-  async getMetric(projectKey: string, metricKey: string) {
-    let response = await this.http.get(`/metrics/${projectKey}/${metricKey}`);
+  async getMetric(
+    projectKey: string,
+    metricKey: string,
+    params: { expand?: string; versionId?: string } = {}
+  ) {
+    let response = await this.http.get(`/metrics/${projectKey}/${metricKey}`, { params });
     return response.data;
   }
 
@@ -445,9 +449,15 @@ export class LaunchDarklyClient {
     return response.data;
   }
 
-  async getExperiment(projectKey: string, environmentKey: string, experimentKey: string) {
+  async getExperiment(
+    projectKey: string,
+    environmentKey: string,
+    experimentKey: string,
+    params: { expand?: string } = {}
+  ) {
     let response = await this.http.get(
-      `/projects/${projectKey}/environments/${environmentKey}/experiments/${experimentKey}`
+      `/projects/${projectKey}/environments/${environmentKey}/experiments/${experimentKey}`,
+      { params }
     );
     return response.data;
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IgnisignClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,13 +46,13 @@ export let manageDocument = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     if (ctx.input.action === 'init') {
       if (!ctx.input.signatureRequestId) {
-        throw new Error('signatureRequestId is required for init action');
+        throw createApiServiceError('signatureRequestId is required for init action');
       }
       let result = await client.initDocument({
         signatureRequestId: ctx.input.signatureRequestId,
@@ -71,7 +71,7 @@ export let manageDocument = SlateTool.create(spec, {
     }
 
     if (!ctx.input.documentId) {
-      throw new Error('documentId is required for this action');
+      throw createApiServiceError('documentId is required for this action');
     }
 
     if (ctx.input.action === 'get') {

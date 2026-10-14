@@ -34,11 +34,13 @@ export let aiSpeechToText = SlateTool.create(spec, {
   .output(
     z.object({
       transcribedText: z.string().describe('Transcribed text from the audio file'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let body: Record<string, any> = {
       fileContent: ctx.input.fileContent,
@@ -57,9 +59,11 @@ export let aiSpeechToText = SlateTool.create(spec, {
     return {
       output: {
         transcribedText: result.text || result.Text || result.result || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully transcribed audio to text.`
+      message: client.message(`Successfully transcribed audio to text.`)
     };
   })
   .build();

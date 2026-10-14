@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseNumericValue } from '../lib/response';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -67,7 +68,7 @@ export let listTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
 
     let result = await client.getTasks({
@@ -93,7 +94,7 @@ export let listTasks = SlateTool.create(spec, {
       projectId: t.project_id ? String(t.project_id) : undefined,
       startDate: t.start_date || undefined,
       dueDate: t.due_date || undefined,
-      progress: t.progress ?? undefined,
+      progress: parseNumericValue(t.progress),
       status: t.status || undefined,
       users: t.users || undefined,
       teams: t.teams || undefined

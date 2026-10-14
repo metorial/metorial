@@ -71,7 +71,7 @@ export let searchAppointments = SlateTool.create(spec, {
     let appointments = Array.isArray(result)
       ? result
       : result.appointments || result.data || [];
-    let totalCount = result.totalCount || result.total || appointments.length;
+    let totalCount = result.totalCount ?? result.total ?? appointments.length;
 
     return {
       output: {

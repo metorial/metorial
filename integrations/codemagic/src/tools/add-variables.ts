@@ -8,7 +8,7 @@ export let addVariables = SlateTool.create(spec, {
   key: 'add_variables',
   description: `Add environment variables to an existing variable group. Variables can be marked as secret for encrypted storage. This is for apps configured using codemagic.yaml.`,
   instructions: [
-    'The variable group must already exist. Use the Codemagic UI or API to create a group first.',
+    'The variable group must already exist. Use list_variable_groups to discover application group IDs, or create a group in Codemagic first.',
     'Setting secure to true encrypts the variable values and hides them in the UI and build logs.'
   ],
   tags: {
@@ -18,7 +18,11 @@ export let addVariables = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      variableGroupId: z.string().describe('ID of the variable group to add variables to'),
+      variableGroupId: z
+        .string()
+        .describe(
+          'Variable group ID. Call list_variable_groups to discover application group IDs.'
+        ),
       secure: z
         .boolean()
         .optional()

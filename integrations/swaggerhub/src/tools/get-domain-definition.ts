@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,7 +49,7 @@ export let getDomainDefinition = SlateTool.create(spec, {
 
     let owner = ctx.input.owner || ctx.config.owner;
     if (!owner)
-      throw new Error(
+      throw createApiServiceError(
         'Owner is required. Provide it in the input or configure a default owner.'
       );
 

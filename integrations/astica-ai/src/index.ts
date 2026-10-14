@@ -4,6 +4,7 @@ import {
   analyzeImageTool,
   generateImageTool,
   generateTextTool,
+  getSpeechTaskTool,
   listVoicesTool,
   speechToTextTool,
   textToSpeechTool
@@ -17,7 +18,8 @@ export let provider = Slate.create({
     textToSpeechTool,
     speechToTextTool,
     generateTextTool,
-    listVoicesTool
+    listVoicesTool,
+    getSpeechTaskTool
   ],
   triggers: []
 });

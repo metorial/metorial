@@ -1,94 +1,27 @@
-Now let me fetch the full Make.com documentation for more details on the API actions:Now I have comprehensive information. Let me compile the specification.
+# La Growth Machine API integration
 
-# Slates Specification for La Growth Machine
-
-## Overview
-
-La Growth Machine (LGM) is a multichannel sales outreach automation platform that manages prospecting campaigns across LinkedIn, email, and Twitter/X. It automates multi-channel prospecting by managing LinkedIn, email, and Twitter outreach campaigns, with built-in lead enrichment, audience management, and a unified inbox for managing replies across all channels.
+La Growth Machine manages sales outreach leads, audiences, campaigns, connected identities, and a LinkedIn and email inbox.
 
 ## Authentication
 
-All API requests to La Growth Machine must be authenticated using an API key.
+Use an API key from Settings > Integrations & API. Requests use `Authorization: Bearer YOUR_API_KEY` against `https://apiv2.lagrowthmachine.com/flow`. API access requires an eligible plan. Query-string API keys are deprecated.
 
-**Base URL:** `https://apiv2.lagrowthmachine.com/flow` — this is the main endpoint for all API requests.
+## Supported workflows
 
-**Obtaining an API Key:**
-You can retrieve your API key from your account settings: `https://app.lagrowthmachine.com/settings/api`. You must be logged in to access this page.
+- Search leads by ID, email, LinkedIn URL, CRM ID, or full name plus company. The result exposes the lead profile and recent campaign logs.
+- Create or update leads, optionally assigning an audience by name or ID. A missing audience name creates an audience; omit it to manage a lead without audience membership. The result includes the lead ID and provider message.
+- Create an empty audience with a unique name, or import prospects from a LinkedIn URL. Imports are queued and run asynchronously through the connected identity.
+- Remove a lead from audiences using professional or personal email, LinkedIn URL, Twitter handle, CRM ID, or full name plus company. A lead ID or generic email is looked up first to resolve a supported identifier.
+- List campaigns with offset pagination, optional status and name filters, and a total count. The default page size is 25. Retrieve detailed campaign statistics by campaign ID.
+- Update a lead's campaign status. Generic email inputs resolve to a lead ID; explicit professional or personal email and CRM ID inputs use the provider's documented payload names. Result logs identify whether a matching campaign was updated.
+- Retrieve the authenticated member, list workspace members, and list connected identities.
+- Queue a LinkedIn message to an existing lead conversation. Provide a connected identity and optionally a workspace member for attribution; omitted member IDs resolve to the authenticated member. Queue acceptance does not establish delivery.
+- Create, list, and delete inbox webhooks for sent and received LinkedIn or email messages. Omit campaign IDs to receive events from all campaigns; an empty filter receives no events. Deletion is idempotent according to the provider.
 
-**How to Authenticate:**
-Include your API key in the query parameters of your request under the key `apikey`.
+## Official references
 
-Example: `GET https://apiv2.lagrowthmachine.com/flow/members?apikey=YOUR_API_KEY`
+- [Authentication](https://developers.lagrowthmachine.com/guides/authentication/)
+- [Endpoint reference](https://developers.lagrowthmachine.com/agents/endpoints/)
+- [OpenAPI specification](https://developers.lagrowthmachine.com/openapi.yaml)
 
-**Note:** API access and many key integrations are only available on higher-tier plans (Pro plan at ~€100/month or above).
-
-## Features
-
-### Lead Management
-
-Search, create, and update leads in La Growth Machine. The Search Lead action allows you to search a lead in La Growth Machine from an email, LinkedIn URL, or lead ID. You can also search by full name, company name, or company domain. When creating or updating leads, ensure you are mapping fields like first name, last name, and email correctly. By default, only empty fields will be updated; if you want to update fields that already have data, go to Outreach Settings and turn on "Update the existing contact with changed or new fields".
-
-### Audience Management
-
-Organize leads into audiences (segmented lists). You can import leads into La Growth Machine audiences from LinkedIn URLs. Leads can also be removed from one or more specified audiences. To add leads to an audience, the audience must already exist and must be created directly within La Growth Machine.
-
-### Campaign Management
-
-Retrieve campaign information and manage lead statuses within campaigns. You can retrieve all campaigns from your account. You can change the LGM status of a specific lead in a specific campaign (e.g., pause, stop, or update their qualification status). LGM's API gives you access to raw campaign stats, including performance metrics for reporting.
-
-### LinkedIn Messaging
-
-Send LinkedIn messages to leads directly through the API. You can target a lead by their ID or LinkedIn profile URL.
-
-### LinkedIn Lead Import
-
-Import leads from LinkedIn by extracting contact information from regular LinkedIn search results, Sales Navigator search URLs, or specific LinkedIn post URLs.
-
-### Workspace & Identity Management
-
-List all connected identities in your account. List all members (users) associated with your workspace.
-
-### Inbox Webhooks
-
-Create inbox webhooks for real-time notifications. List all inbox webhooks currently configured in your workspace.
-
-## Events
-
-La Growth Machine supports webhook-based event subscriptions. You can use a Webhook block directly in your prospecting sequences to communicate with your own tools, and choose when to send the trigger (e.g., lead enriched, email sent, lead responded, etc.). Webhooks can be created under "Settings > Webhooks" in the LGM interface. The platform also exposes events via its Zapier/Make integrations.
-
-### Email Events
-
-- **Email Sent** — Triggers when an email is sent to a lead.
-- **Email Opened** — Triggers when a lead opened one of your emails.
-- **Email Clicked** — Triggers when a lead clicked on a link in one of your emails. Click tracking must be enabled.
-- **Email Replied** — Triggers when a lead replied to one of your emails.
-
-### LinkedIn Events
-
-- **LinkedIn Contact Request Sent** — Triggers when a LinkedIn contact request is sent to a lead.
-- **LinkedIn Contact Request Accepted** — Triggers when a lead accepted your identity's connection request on LinkedIn.
-- **LinkedIn Message Sent** — Triggers when a LinkedIn message is sent to a lead.
-- **LinkedIn Message Replied** — Triggers when a lead replied to one of your LinkedIn messages or an invite note.
-- **LinkedIn Profile Visited** — Triggers when a lead's LinkedIn profile is visited.
-
-### Twitter/X Events
-
-- **Tweet Sent** — Triggers when a tweet is sent.
-- **Twitter DM Sent** — Triggers when a Twitter DM is sent to a lead.
-- **Tweet Favorited** — Triggers when a lead's tweet is favorited.
-- **Tweet Retweeted** — Triggers when a lead's tweet is retweeted.
-- **Twitter Followed** — Triggers when a lead is followed on Twitter.
-- **Twitter Unfollowed** — Triggers when a lead is unfollowed on Twitter.
-
-### Lead Lifecycle Events
-
-- **Lead Enriched** — Triggers when a Lead is enriched by LGM.
-- **Lead Converted** — Triggers when a lead is marked as converted.
-- **Lead Resubscribed** — Triggers when a Lead is resubscribed.
-- **Lead Unsubscribed** — Triggers when a Lead is unsubscribed.
-- **New Lead in Audience** — Triggers when a new lead is added to a specific audience or moved into a different audience.
-- **Lead Status Changed** — Triggers when the status of a lead within a specific campaign is updated.
-
-### Campaign Events
-
-- **Campaign Ended** — Triggers when the lead finishes a campaign sequence.
+Provider calls and webhook delivery have not been verified with live credentials in this refresh.

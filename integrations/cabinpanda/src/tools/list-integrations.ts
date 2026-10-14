@@ -38,16 +38,14 @@ export let listIntegrations = SlateTool.create(spec, {
     let client = new CabinPandaClient({ token: ctx.auth.token });
     let integrations = await client.listIntegrations();
 
-    let mappedIntegrations = (Array.isArray(integrations) ? integrations : []).map(
-      (integ: any) => ({
-        integrationId: integ?.id?.toString(),
-        name: integ?.name,
-        type: integ?.type,
-        formId: integ?.form_id?.toString() ?? integ?.form_key,
-        status: integ?.status,
-        raw: integ
-      })
-    );
+    let mappedIntegrations = integrations.map((integ: any) => ({
+      integrationId: integ?.id?.toString(),
+      name: integ?.name ?? undefined,
+      type: integ?.type ?? undefined,
+      formId: integ?.form_id?.toString() ?? integ?.form_key?.toString(),
+      status: integ?.status ?? undefined,
+      raw: integ
+    }));
 
     return {
       output: { integrations: mappedIntegrations },

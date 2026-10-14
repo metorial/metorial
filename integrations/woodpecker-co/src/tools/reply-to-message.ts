@@ -26,7 +26,7 @@ export let replyToMessage = SlateTool.create(spec, {
     });
 
     await client.replyToInboxMessage(ctx.input.messageId, {
-      body: ctx.input.body
+      body: { html: ctx.input.body }
     });
 
     return {

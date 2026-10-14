@@ -1,4 +1,20 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+let createDocsBotAxios = (token: string, baseURL: string) => {
+  if (!token.trim()) {
+    throw createApiServiceError('Provide a DocsBot user API key.');
+  }
+  return createAuthenticatedAxios({
+    baseURL,
+    authHeader: { value: `Bearer ${token}` },
+    timeout: 60_000,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'DocsBot',
+        reason: 'docsbot_api_error'
+      })
+  });
+};
 
 export interface PaginationInfo {
   perPage: number;
@@ -25,7 +41,7 @@ export interface Team {
   pageCount: number;
   sourceCount: number;
   chunkCount: number;
-  openAIKey: string;
+  openAIKey?: string | null;
   botCount: number;
   plan: TeamPlan;
 }
@@ -49,7 +65,7 @@ export interface Bot {
   language: string;
   model: string;
   embeddingModel?: string | null;
-  customPrompt?: string;
+  customPrompt?: string | null;
   createdAt: string;
   status: string;
   questionCount: number;
@@ -108,16 +124,28 @@ export interface Source {
   id: string;
   type: string;
   status: string;
-  title?: string;
-  url?: string;
+  title?: string | null;
+  url?: string | null;
   file?: string;
   createdAt: string;
   pageCount: number;
   chunkCount: number;
   scheduleInterval?: string;
   faqs?: Array<{ question: string; answer: string }>;
-  indexedUrls?: Array<{ url: string; title: string }>;
+  indexedUrls?: Array<{ source: string; title: string }>;
   warnsList?: string[];
+  files?: Array<{ p: string; n?: number }>;
+  processedPages?: { count: number; total: number };
+}
+
+export interface ListSourcesParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListSourcesResponse {
+  sources: Source[];
+  pagination: PaginationInfo;
 }
 
 export interface CreateSourceParams {
@@ -125,14 +153,9 @@ export interface CreateSourceParams {
   title?: string;
   url?: string;
   file?: string;
+  fileDir?: string;
   faqs?: Array<{ question: string; answer: string }>;
   scheduleInterval?: string;
-}
-
-export interface EditSourceParams {
-  scheduleInterval?: string;
-  title?: string;
-  url?: string;
 }
 
 export interface QuestionSource {
@@ -146,14 +169,14 @@ export interface Question {
   id: string;
   createdAt: string;
   alias: string;
-  question: string;
+  question: string | null;
   standaloneQuestion?: string | null;
-  answer: string;
-  sources: QuestionSource[];
+  answer: string | null;
+  sources: QuestionSource[] | null;
   ip: string;
   rating: number;
   escalation: boolean;
-  metadata?: Record<string, string>;
+  metadata?: Record<string, unknown> | null;
   couldAnswer?: boolean | null;
   deleted?: boolean;
 }
@@ -195,7 +218,7 @@ export interface Conversation {
   ip: string;
   answered?: boolean;
   summary?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> | null;
   sentiment?: string | null;
   history?: ConversationMessage[];
   resolved?: string;
@@ -269,13 +292,7 @@ export class DocsBotAdminClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://docsbot.ai/api/',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.axios = createDocsBotAxios(token, 'https://docsbot.ai/api/');
   }
 
   // Teams
@@ -285,7 +302,7 @@ export class DocsBotAdminClient {
   }
 
   async getTeam(teamId: string): Promise<Team> {
-    let response = await this.axios.get(`/teams/${teamId}`);
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamId)}`);
     return response.data;
   }
 
@@ -293,44 +310,72 @@ export class DocsBotAdminClient {
     teamId: string,
     params: { name?: string; openAIKey?: string }
   ): Promise<Team> {
-    let response = await this.axios.put(`/teams/${teamId}`, params);
+    let response = await this.axios.put(`/teams/${encodeURIComponent(teamId)}`, params);
     return response.data;
   }
 
   // Bots
   async listBots(teamId: string): Promise<Bot[]> {
-    let response = await this.axios.get(`/teams/${teamId}/bots`);
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamId)}/bots`);
     return response.data;
   }
 
   async getBot(teamId: string, botId: string): Promise<Bot> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}`);
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}`
+    );
     return response.data;
   }
 
   async createBot(teamId: string, params: CreateBotParams): Promise<Bot> {
-    let response = await this.axios.post(`/teams/${teamId}/bots`, params);
+    let response = await this.axios.post(`/teams/${encodeURIComponent(teamId)}/bots`, params);
     return response.data;
   }
 
   async updateBot(teamId: string, botId: string, params: UpdateBotParams): Promise<Bot> {
-    let response = await this.axios.put(`/teams/${teamId}/bots/${botId}`, params);
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}`,
+      params
+    );
     return response.data;
   }
 
   async deleteBot(teamId: string, botId: string): Promise<{ message: string }> {
-    let response = await this.axios.delete(`/teams/${teamId}/bots/${botId}`);
+    let response = await this.axios.delete(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}`
+    );
     return response.data;
   }
 
   // Sources
-  async listSources(teamId: string, botId: string): Promise<Source[]> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}/sources`);
+  async listSources(
+    teamId: string,
+    botId: string,
+    params?: ListSourcesParams
+  ): Promise<ListSourcesResponse> {
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources`,
+      { params }
+    );
+    // Older API responses were arrays; continue accepting them for existing deployments.
+    if (Array.isArray(response.data)) {
+      return {
+        sources: response.data,
+        pagination: {
+          page: params?.page ?? 0,
+          perPage: response.data.length,
+          totalCount: response.data.length,
+          hasMorePages: false
+        }
+      };
+    }
     return response.data;
   }
 
   async getSource(teamId: string, botId: string, sourceId: string): Promise<Source> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}/sources/${sourceId}`);
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources/${encodeURIComponent(sourceId)}`
+    );
     return response.data;
   }
 
@@ -339,19 +384,29 @@ export class DocsBotAdminClient {
     botId: string,
     params: CreateSourceParams
   ): Promise<Source> {
-    let response = await this.axios.post(`/teams/${teamId}/bots/${botId}/sources`, params);
+    let response = await this.axios.post(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources`,
+      params
+    );
     return response.data;
   }
 
-  async editSource(
+  async updateSourceTitle(
     teamId: string,
     botId: string,
     sourceId: string,
-    params: EditSourceParams
+    title: string
   ): Promise<Source> {
+    let response = await this.axios.patch(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources/${encodeURIComponent(sourceId)}`,
+      { title }
+    );
+    return response.data;
+  }
+
+  async retrySource(teamId: string, botId: string, sourceId: string): Promise<Source> {
     let response = await this.axios.put(
-      `/teams/${teamId}/bots/${botId}/sources/${sourceId}`,
-      params
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources/${encodeURIComponent(sourceId)}`
     );
     return response.data;
   }
@@ -362,7 +417,7 @@ export class DocsBotAdminClient {
     sourceId: string
   ): Promise<{ message: string }> {
     let response = await this.axios.delete(
-      `/teams/${teamId}/bots/${botId}/sources/${sourceId}`
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/sources/${encodeURIComponent(sourceId)}`
     );
     return response.data;
   }
@@ -372,9 +427,12 @@ export class DocsBotAdminClient {
     botId: string,
     fileName: string
   ): Promise<UploadUrlResponse> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}/upload-url`, {
-      params: { fileName }
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/upload-url`,
+      {
+        params: { fileName }
+      }
+    );
     return response.data;
   }
 
@@ -384,9 +442,12 @@ export class DocsBotAdminClient {
     botId: string,
     params?: ListQuestionsParams
   ): Promise<ListQuestionsResponse> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}/questions`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/questions`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
@@ -396,7 +457,7 @@ export class DocsBotAdminClient {
     questionId: string
   ): Promise<{ message: string }> {
     let response = await this.axios.delete(
-      `/teams/${teamId}/bots/${botId}/questions/${questionId}`
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/questions/${encodeURIComponent(questionId)}`
     );
     return response.data;
   }
@@ -407,9 +468,12 @@ export class DocsBotAdminClient {
     botId: string,
     params?: ListConversationsParams
   ): Promise<ListConversationsResponse> {
-    let response = await this.axios.get(`/teams/${teamId}/bots/${botId}/conversations`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/conversations`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
@@ -419,7 +483,7 @@ export class DocsBotAdminClient {
     conversationId: string
   ): Promise<Conversation> {
     let response = await this.axios.get(
-      `/teams/${teamId}/bots/${botId}/conversations/${conversationId}`
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/conversations/${encodeURIComponent(conversationId)}`
     );
     return response.data;
   }
@@ -430,7 +494,7 @@ export class DocsBotAdminClient {
     conversationId: string
   ): Promise<{ message: string }> {
     let response = await this.axios.delete(
-      `/teams/${teamId}/bots/${botId}/conversations/${conversationId}`
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/conversations/${encodeURIComponent(conversationId)}`
     );
     return response.data;
   }
@@ -440,13 +504,7 @@ export class DocsBotChatClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://api.docsbot.ai/',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.axios = createDocsBotAxios(token, 'https://api.docsbot.ai/');
   }
 
   async chatAgent(
@@ -474,7 +532,10 @@ export class DocsBotChatClient {
     if (params.reasoningEffort) body.reasoning_effort = params.reasoningEffort;
     if (params.searchLimit !== undefined) body.search_limit = params.searchLimit;
 
-    let response = await this.axios.post(`/teams/${teamId}/bots/${botId}/chat-agent`, body);
+    let response = await this.axios.post(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/chat-agent`,
+      body
+    );
     return response.data;
   }
 
@@ -484,14 +545,27 @@ export class DocsBotChatClient {
     answerId: string,
     rating: number
   ): Promise<boolean> {
-    let response = await this.axios.put(`/teams/${teamId}/bots/${botId}/rate/${answerId}`, {
-      rating
-    });
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/rate/${encodeURIComponent(answerId)}`,
+      {
+        rating
+      }
+    );
+    if (response.data !== true) {
+      throw createApiServiceError(
+        'DocsBot did not confirm that the answer rating was recorded.'
+      );
+    }
     return response.data;
   }
 
   async recordEscalation(teamId: string, botId: string, answerId: string): Promise<boolean> {
-    let response = await this.axios.put(`/teams/${teamId}/bots/${botId}/support/${answerId}`);
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamId)}/bots/${encodeURIComponent(botId)}/support/${encodeURIComponent(answerId)}`
+    );
+    if (response.data !== true) {
+      throw createApiServiceError('DocsBot did not confirm that the escalation was recorded.');
+    }
     return response.data;
   }
 }

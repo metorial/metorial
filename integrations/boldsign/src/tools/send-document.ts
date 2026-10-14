@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formFieldSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let signerSchema = z.object({
@@ -26,7 +27,11 @@ let signerSchema = z.object({
   enableEmailOTP: z
     .boolean()
     .optional()
-    .describe('Require email OTP verification for this signer')
+    .describe('Require email OTP verification for this signer'),
+  formFields: z
+    .array(formFieldSchema)
+    .optional()
+    .describe('Signature and other fields assigned to this signer')
 });
 
 export let sendDocument = SlateTool.create(spec, {
@@ -45,7 +50,10 @@ export let sendDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      title: z.string().optional().describe('Document title displayed to recipients'),
+      title: z
+        .string()
+        .optional()
+        .describe('Document title displayed to recipients; required by BoldSign when sending'),
       message: z
         .string()
         .optional()
@@ -83,12 +91,26 @@ export let sendDocument = SlateTool.create(spec, {
         .optional()
         .describe('Suppress email notifications to signers'),
       disableExpiryAlert: z.boolean().optional().describe('Suppress expiry alert emails'),
+      useTextTags: z
+        .boolean()
+        .optional()
+        .describe('Convert text tags in the document into form fields'),
+      enableEmbeddedSigning: z
+        .boolean()
+        .optional()
+        .describe('Enable signing the document inside an embedded application'),
       onBehalfOf: z
         .string()
         .optional()
         .describe('Send the document on behalf of this email address'),
       reminderSettings: z
         .object({
+          enableAutoReminder: z
+            .boolean()
+            .optional()
+            .describe(
+              'Enable automatic reminders; defaults to true when reminderSettings is provided'
+            ),
           reminderDays: z.number().optional().describe('Days between reminders'),
           reminderCount: z.number().optional().describe('Total number of reminders to send')
         })
@@ -103,7 +125,7 @@ export let sendDocument = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,20 +6,22 @@ import { spec } from '../spec';
 export let getLead = SlateTool.create(spec, {
   name: 'Get Lead',
   key: 'get_lead',
-  description: `Retrieve detailed information about a specific lead (prospect) by their ID. Returns contact data, engagement metrics, and current status.`,
+  description: `Retrieve detailed information about a specific lead (prospect) by their ID or email address. Returns contact data, engagement metrics, and current status.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      leadId: z.string().describe('ID of the lead to retrieve (e.g. l_1abc)')
+      leadId: z
+        .string()
+        .describe('Lead ID or email address. Call list_leads to find lead IDs.')
     })
   )
   .output(
     z.object({
       leadId: z.string().describe('Unique identifier for the lead'),
-      ownerId: z.string().optional().describe('ID of the user who owns this lead'),
+      ownerId: z.string().optional().nullable().describe('ID of the user who owns this lead'),
       creatorId: z
         .string()
         .optional()
@@ -64,7 +66,11 @@ export let getLead = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getLead(ctx.input.leadId);
 
-    let lead = result.leads?.[0] || result;
+    let lead = result.lead || result.leads?.[0];
+    if (!lead?.id)
+      throw createApiServiceError(
+        'PersistIQ did not return the requested lead. Verify its ID or email address with list_leads.'
+      );
 
     return {
       output: {

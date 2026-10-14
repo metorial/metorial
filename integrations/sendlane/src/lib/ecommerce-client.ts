@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   CheckoutStartedParams,
   CustomEventParams,
@@ -8,16 +8,18 @@ import type {
 } from './client';
 
 export class SendlaneEcommerceClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.sendlane.com/v2',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Sendlane',
+          reason: 'sendlane_api_error'
+        })
     });
   }
 
@@ -81,16 +83,22 @@ export class SendlaneEcommerceClient {
   }
 
   async trackCustomEvent(params: CustomEventParams): Promise<void> {
+    let reservedProperties = ['event', 'token', 'email', 'event_id'].filter(key =>
+      Object.hasOwn(params.properties ?? {}, key)
+    );
+    if (reservedProperties.length > 0) {
+      throw createApiServiceError(
+        `Event properties cannot override ${reservedProperties.join(', ')}. Use the dedicated event fields instead.`
+      );
+    }
     let body: Record<string, any> = {
+      ...params.properties,
       event: params.eventName,
       token: params.token,
       email: params.email
     };
 
     if (params.eventId) body.event_id = params.eventId;
-    if (params.properties) {
-      Object.assign(body, params.properties);
-    }
 
     await this.axios.post('/custom-integration/custom-event', body);
   }

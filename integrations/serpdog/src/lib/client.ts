@@ -1,25 +1,78 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 let axiosInstance = createAxios({
-  baseURL: 'https://api.serpdog.io'
+  baseURL: 'https://api.serpdog.io',
+  timeout: 90000
 });
 
 export class Client {
   private apiKey: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Serpdog API key is required. Reconnect your account.');
+    }
     this.apiKey = config.token;
   }
 
-  private async get(path: string, params: Record<string, any> = {}) {
-    let cleanParams: Record<string, any> = { api_key: this.apiKey };
-    for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && value !== '') {
-        cleanParams[key] = value;
+  private sanitizeResponse(data: unknown): unknown {
+    if (typeof data === 'string') return data.split(this.apiKey).join('[REDACTED]');
+    if (Array.isArray(data)) return data.map(value => this.sanitizeResponse(value));
+    if (data && typeof data === 'object') {
+      return Object.fromEntries(
+        Object.entries(data)
+          .filter(([key]) => key !== 'api_key')
+          .map(([key, value]) => [key, this.sanitizeResponse(value)])
+      );
+    }
+    return data;
+  }
+
+  private async get(path: string, params: Record<string, unknown> = {}) {
+    for (let key of [
+      'num',
+      'page',
+      'ijn',
+      'count',
+      'first',
+      'start',
+      'wait',
+      'product_id',
+      'store_id'
+    ]) {
+      let value = params[key];
+      if (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) {
+        throw createApiServiceError(`${key} must be a non-negative whole number.`);
       }
     }
-    let response = await axiosInstance.get(path, { params: cleanParams });
-    return response.data;
+    if (params.num === 0 || params.count === 0) {
+      throw createApiServiceError('The number of results must be greater than zero.');
+    }
+    let requestParams = Object.fromEntries(
+      Object.entries(pickDefined(params)).filter(([, value]) => value !== null && value !== '')
+    );
+    let data = await requestAxiosData(
+      path,
+      () =>
+        axiosInstance.get(path, {
+          params: { ...requestParams, api_key: this.apiKey }
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Serpdog',
+          reason: 'serpdog_api_error',
+          operation,
+          extractMessage: (value, helpers) =>
+            helpers.extractMessage(value).split(this.apiKey).join('[REDACTED]')
+        })
+    );
+    return this.sanitizeResponse(data);
   }
 
   // Google Search
@@ -59,6 +112,11 @@ export class Client {
     safe?: string;
     html?: boolean;
   }) {
+    if (params.num !== undefined && params.page !== undefined) {
+      throw createApiServiceError(
+        'Google News does not support numResults and page together. Supply one of them.'
+      );
+    }
     return this.get('/news', params);
   }
 
@@ -70,7 +128,13 @@ export class Client {
     page?: number;
     domain?: string;
   }) {
-    return this.get('/maps_search', params);
+    return this.get('/maps_search', {
+      q: params.q,
+      ll: params.ll,
+      hl: params.hl,
+      page: params.page,
+      google_domain: params.domain
+    });
   }
 
   // Google Maps Reviews
@@ -193,12 +257,16 @@ export class Client {
   // Google Scholar Author Profile
   async googleScholarAuthor(params: {
     authorId: string;
+    num?: number;
+    hl?: string;
     viewOp?: string;
     sort?: string;
     citationId?: string;
   }) {
     return this.get('/scholar_author', {
       author_id: params.authorId,
+      num: params.num,
+      hl: params.hl,
       view_op: params.viewOp,
       sort: params.sort,
       citation_id: params.citationId
@@ -299,7 +367,7 @@ export class Client {
     excludeSponsored?: boolean;
   }) {
     return this.get('/amazon_search', {
-      url: params.url,
+      url: this.normalizeUrl(params.url),
       premium: params.premium,
       country: params.country,
       exclude_sponsored: params.excludeSponsored
@@ -353,7 +421,7 @@ export class Client {
     return this.get('/yelp', {
       find_loc: params.findLoc,
       find_desc: params.findDesc,
-      sort_by: params.sortBy,
+      sortby: params.sortBy,
       start: params.start
     });
   }
@@ -366,6 +434,7 @@ export class Client {
     jobType?: string;
     sortBy?: string;
     expLevel?: string;
+    workType?: string;
   }) {
     return this.get('/linkedin_jobs', {
       q: params.q,
@@ -373,7 +442,8 @@ export class Client {
       page: params.page,
       job_type: params.jobType,
       sort_by: params.sortBy,
-      exp_level: params.expLevel
+      exp_level: params.expLevel,
+      work_type: params.workType
     });
   }
 
@@ -385,8 +455,13 @@ export class Client {
     wait?: number;
     country?: string;
   }) {
+    if (params.wait !== undefined && (params.wait > 35000 || params.renderJs === false)) {
+      throw createApiServiceError(
+        'waitMs must be at most 35000 and requires renderJs to be enabled.'
+      );
+    }
     return this.get('/scrape', {
-      url: params.url,
+      url: this.normalizeUrl(params.url),
       render_js: params.renderJs,
       premium: params.premium,
       wait: params.wait,
@@ -397,5 +472,27 @@ export class Client {
   // Account Info
   async getAccountInfo() {
     return this.get('/account_info');
+  }
+
+  private normalizeUrl(value: string) {
+    let url = value;
+    if (/^https?%3a%2f%2f/i.test(value)) {
+      try {
+        url = decodeURIComponent(value);
+      } catch {
+        throw createApiServiceError(
+          'The URL encoding is invalid. Provide a complete HTTP or HTTPS URL.'
+        );
+      }
+    }
+    try {
+      let parsed = new URL(url);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw createApiServiceError('Provide a complete HTTP or HTTPS URL.');
+      }
+    } catch {
+      throw createApiServiceError('Provide a complete HTTP or HTTPS URL.');
+    }
+    return url;
   }
 }

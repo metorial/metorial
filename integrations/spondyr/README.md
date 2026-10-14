@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Spondyr
 
-Generate template-driven correspondence and deliver it across multiple channels including email, internet fax, U.S. postal mail, SMS, and batch file download. Submit JSON transaction data to merge with configured templates and produce PDF or HTML documents. Manage transaction types and event types to control template selection rules. Track correspondence processing and delivery status via reference ID. Supports generate-only mode to defer delivery, multi-language template selection, automatic delivery channel fallback, and cloud storage integration for document backup.
+Generate template-driven correspondence and deliver it across configured channels including email, fax, postal mail, and SMS. Discover transaction types, event types, and template configuration. Submit a single request or a batch, defer delivery with generate-only mode, and track processing and delivery status using reference IDs.
+
+See the [official API reference](https://client.spondyr.io/Public/Public/Documentation) for provider setup and request formats.
 
 ## License
 

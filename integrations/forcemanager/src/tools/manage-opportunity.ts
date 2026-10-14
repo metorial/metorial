@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,10 @@ let opportunityFields = z
     accountId2: z.number().optional().describe('Secondary account ID'),
     accountId3: z.number().optional().describe('Tertiary account ID'),
     salesForecastDate: z.string().optional().describe('Expected closing date (ISO 8601)'),
-    salesProbability: z.number().optional().describe('Win probability percentage (0-100)'),
+    salesProbability: z
+      .number()
+      .optional()
+      .describe('Win probability percentage (0-100, in increments of 10)'),
     salesRepId: z.number().optional().describe('Assigned sales rep ID'),
     comments: z.string().optional().describe('Comments or notes'),
     branchId: z.number().optional().describe('Branch ID'),
@@ -70,7 +73,7 @@ Opportunities track deals through their lifecycle with amounts, probabilities, a
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating an opportunity');
+        throw createApiServiceError('Fields are required for creating an opportunity');
       }
       let result = await client.createOpportunity(ctx.input.fields);
       let opportunityId = result?.id;
@@ -83,7 +86,7 @@ Opportunities track deals through their lifecycle with amounts, probabilities, a
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.opportunityId) {
-        throw new Error('opportunityId is required for updating an opportunity');
+        throw createApiServiceError('opportunityId is required for updating an opportunity');
       }
       await client.updateOpportunity(ctx.input.opportunityId, ctx.input.fields || {});
       let opportunity = await client.getOpportunity(ctx.input.opportunityId);
@@ -99,7 +102,7 @@ Opportunities track deals through their lifecycle with amounts, probabilities, a
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.opportunityId) {
-        throw new Error('opportunityId is required for deleting an opportunity');
+        throw createApiServiceError('opportunityId is required for deleting an opportunity');
       }
       await client.deleteOpportunity(ctx.input.opportunityId);
       return {
@@ -111,6 +114,6 @@ Opportunities track deals through their lifecycle with amounts, probabilities, a
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

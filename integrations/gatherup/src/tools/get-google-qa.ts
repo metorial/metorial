@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getGoogleQA = SlateTool.create(spec, {
@@ -41,19 +41,12 @@ export let getGoogleQA = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    if (data.errorCode !== undefined && data.errorCode !== 0) {
-      throw new Error(
-        `Failed to get Google Q&A: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
-
     return {
       output: {
         questions: data.questions ?? {},
-        totalCount:
-          typeof data.total === 'string' ? Number.parseInt(data.total, 10) : (data.total ?? 0),
-        page: data.page ?? 1,
-        pages: data.pages ?? 1
+        totalCount: readOptionalNumber(data.total) ?? 0,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1
       },
       message: `Retrieved Google Q&A (${data.total ?? 0} questions, page ${data.page ?? 1} of ${data.pages ?? 1}).`
     };

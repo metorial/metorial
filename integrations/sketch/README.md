@@ -1,37 +1,36 @@
 # <img src="https://provider-logos.metorial-cdn.com/sketch.png" height="20"> Sketch
 
-Manipulate Sketch design documents programmatically via a local JavaScript Plugin API, CLI tool (sketchtool), and open JSON-based file format. Create, read, and modify documents including layers, symbols, colors, and styles. Export artboards, layers, slices, and pages in multiple formats (PNG, JPG, SVG, PDF). Inspect document metadata and dump full document structure as JSON. Import symbols and styles from shared libraries. Generate or process Sketch files server-side without the app by reading/writing the open ZIP/JSON file format. Supply custom data (images, text) to Sketch via Data Suppliers. Note: all APIs are local to macOS or file-based — there is no public remote/cloud API, no webhooks, and no OAuth or API key authentication.
+Inspect unpacked Sketch document JSON using the documented open file format.
+Summarize pages and layers, search layers, extract colors and text, inventory
+local reusable symbols, and generate downloadable draft JSON structures.
+This integration processes supplied JSON without a Sketch account connection.
 
 ## Tools
 
-### Extract Colors
+| Tool | Purpose |
+| --- | --- |
+| Parse Document | Summarize pages, artboards, layers, local symbols, shared styles, fonts, and version metadata. |
+| Inspect Layers | Find a layer by object ID, exact name, or class, or list all child layers. |
+| Extract Colors | Collect color entries from color assets, shared swatches, shared styles, layer fills and borders, and text attributes. |
+| Extract Text Content | Extract text and layer/page identifiers, including empty text layers. |
+| Extract Symbols | Inventory local symbol sources with symbol IDs, object IDs, names, pages, and dimensions. |
+| Generate Page | Produce a draft page JSON object and downloadable JSON file. |
+| Generate Document | Produce draft document, metadata, user, and page JSON structures and downloadable JSON files. |
 
-Extract all unique colors from a Sketch document. Collects colors from document color assets, shared layer styles, shared text styles, and individual layer fills and borders across all pages. Returns each color in both hex and rgba formats along with its source. Use this to audit the color palette of a design, check for consistency, or export a design system's color tokens.
+## Input and generation limits
 
-### Extract Text Content
+Sketch documents are ZIP archives. Unpack a document and supply the JSON objects
+from its `pages/` directory; `document.json` and `meta.json` enrich relevant
+tools. The integration does not unzip archives, invoke the Mac app, render
+designs, or retrieve remote library contents.
 
-Extract all text content from text layers in a Sketch document. Returns the string content of every text layer along with the layer name and page it belongs to. Use this for content auditing, localization workflows, copy extraction, or checking text across a design for consistency or typos.
-
-### Generate Document
-
-Generate a complete Sketch document structure including **document.json**, **meta.json**, and **page JSON** files. Creates valid Sketch file format data that can be assembled into a .sketch ZIP archive. Use this to programmatically create entire Sketch documents with pages, artboards, layers, color assets, and shared styles.
-
-### Generate Page
-
-Generate a Sketch page JSON structure with artboards and layers. Creates valid Sketch file format JSON that can be included in a .sketch archive. Use this to programmatically create page content for Sketch documents, including artboards sized for common device screens and layers with fills, borders, and text.
-
-### Inspect Layers
-
-Search and inspect layers within Sketch page JSON data. Find layers by **object ID**, **name**, or **layer class** (e.g. artboard, text, symbolMaster, group, rectangle). Returns a summarized view of matching layers including their type, position, dimensions, visibility, and relevant metadata. Use this to drill into specific layers or find all layers of a certain type across pages.
-
-### Parse Document
-
-Parse Sketch document JSON data and return a structured overview of the document contents. Accepts the raw JSON from a Sketch file's **document.json**, **meta.json**, and **page JSON** files, and returns a summary including pages, artboards, layer counts, symbols, shared styles, fonts, and version info. Use this to quickly understand the structure and contents of a Sketch document without manually inspecting the raw JSON.
+Generation produces partial draft structures, not certified native `.sketch`
+files. Complete required layer and document fields and validate against the
+[target official file-format specification](https://developer.sketch.com/file-format/spec)
+before assembling an archive. Preserve any original version-specific fields
+when modifying existing documents. The official linked schema repository is
+archived, so it must not be assumed to describe every current Sketch release.
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NextDnsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -55,45 +55,44 @@ export let updateSettings = SlateTool.create(spec, {
     let client = new NextDnsClient({ token: ctx.auth.token });
     let { profileId } = ctx.input;
 
+    if (
+      ctx.input.logs?.retention !== undefined &&
+      (!Number.isInteger(ctx.input.logs.retention) || ctx.input.logs.retention < 0)
+    ) {
+      throw createApiServiceError('Log retention must be a non-negative integer in seconds.', {
+        reason: 'nextdns_invalid_log_retention'
+      });
+    }
+
     if (ctx.input.logs) {
-      let logData: Record<string, unknown> = {};
-      if (ctx.input.logs.enabled !== undefined) logData.logging = ctx.input.logs.enabled;
-      if (ctx.input.logs.dropIp !== undefined)
-        logData.logging_disable_client = ctx.input.logs.dropIp;
-      if (ctx.input.logs.dropDomain !== undefined)
-        logData.logging_disable_query = ctx.input.logs.dropDomain;
-      if (ctx.input.logs.retention !== undefined)
-        logData.logging_retention = ctx.input.logs.retention;
-      if (ctx.input.logs.location !== undefined)
-        logData.logging_location = ctx.input.logs.location;
+      let drop = pickDefined({ ip: ctx.input.logs.dropIp, domain: ctx.input.logs.dropDomain });
+      let logData = pickDefined({
+        enabled: ctx.input.logs.enabled,
+        drop: Object.keys(drop).length > 0 ? drop : undefined,
+        retention: ctx.input.logs.retention,
+        location: ctx.input.logs.location
+      });
       if (Object.keys(logData).length > 0) {
         await client.updateLogSettings(profileId, logData);
       }
     }
 
     if (ctx.input.blockPage) {
-      let blockPageData: Record<string, unknown> = {};
-      if (ctx.input.blockPage.enabled !== undefined)
-        blockPageData.blockPage = ctx.input.blockPage.enabled;
+      let blockPageData = pickDefined(ctx.input.blockPage);
       if (Object.keys(blockPageData).length > 0) {
         await client.updateBlockPageSettings(profileId, blockPageData);
       }
     }
 
     if (ctx.input.performance) {
-      let perfData: Record<string, unknown> = {};
-      if (ctx.input.performance.ecs !== undefined) perfData.ecs = ctx.input.performance.ecs;
-      if (ctx.input.performance.cacheBoost !== undefined)
-        perfData.cacheBoost = ctx.input.performance.cacheBoost;
-      if (ctx.input.performance.cnameFlattening !== undefined)
-        perfData.cnameFlattening = ctx.input.performance.cnameFlattening;
+      let perfData = pickDefined(ctx.input.performance);
       if (Object.keys(perfData).length > 0) {
         await client.updatePerformanceSettings(profileId, perfData);
       }
     }
 
     if (ctx.input.web3 !== undefined) {
-      await client.updateSettings(profileId, { handshake: ctx.input.web3 });
+      await client.updateSettings(profileId, { web3: ctx.input.web3 });
     }
 
     let settings = await client.getSettings(profileId);

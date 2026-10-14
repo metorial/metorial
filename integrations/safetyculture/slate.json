@@ -1,6 +1,6 @@
 {
   "name": "@metorial/safetyculture",
-  "description": "Manage workplace inspections, safety issues, corrective actions, assets, and team training on the SafetyCulture (iAuditor) platform. Create, start, complete, and export inspections using configurable templates. Track and assign corrective actions with priorities, due dates, and statuses. Create and manage issues (incidents) with categories, assignees, and timelines. Organize assets with custom types and fields. Administer users, groups, permissions, and site hierarchies. Schedule recurring inspections. Access training courses, lessons, and analytics. Manage documents, credentials, contractor companies, OSHA recordkeeping, IoT sensors, and investigations. Export data incrementally via data feeds for syncing to external warehouses.",
+  "description": "Manage workplace inspections, safety issues, corrective actions, assets, and inspection schedules on SafetyCulture, now Mitti. Discover groups, organization connections, sites, and asset types. Start, complete, archive, or delete inspections and export downloadable PDF or Word reports. Create, assign, update, and delete corrective actions. Track issues, manage their assignments and status, and add timeline comments.",
   "categories": [
     "education-and-learning",
     "legal-and-compliance",
@@ -8,15 +8,12 @@
   ],
   "skills": [
     "create and manage inspections",
-    "export inspections to PDF",
+    "export inspections to PDF or Word",
     "manage corrective actions",
     "track issues and incidents",
-    "manage assets and locations",
-    "administer users and groups",
-    "schedule recurring inspections",
-    "manage training courses",
-    "sync data via feeds",
-    "monitor IoT sensors"
+    "discover assets and sites",
+    "discover users and groups",
+    "schedule recurring inspections"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/safetyculture.png"
 }

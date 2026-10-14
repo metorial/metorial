@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,14 +6,18 @@ import { spec } from '../spec';
 export let findPhone = SlateTool.create(spec, {
   name: 'Find Phone Number',
   key: 'find_phone',
-  description: `Find the phone number of a contact. Submit a job with the person's name and company details, then optionally poll for the result. Uses credit-based billing.`,
+  description: `Find the phone number of a contact. Submit a job with the person's LinkedIn profile URL, then optionally poll for the result. Uses credit-based billing.`,
   constraints: ['Credits are consumed only when a phone number is found.']
 })
   .input(
     z.object({
-      firstName: z.string().describe('First name of the person'),
-      lastName: z.string().describe('Last name of the person'),
-      companyName: z.string().describe('Company name'),
+      linkedinUrl: z
+        .string()
+        .optional()
+        .describe('LinkedIn profile URL containing linkedin.com/in/; required for submission'),
+      firstName: z.string().optional().describe('First name of the person'),
+      lastName: z.string().optional().describe('Last name of the person'),
+      companyName: z.string().optional().describe('Company name'),
       website: z.string().optional().describe('Company website URL'),
       country: z.string().optional().describe('Country of the person'),
       submitOnly: z
@@ -52,7 +56,18 @@ export let findPhone = SlateTool.create(spec, {
       };
     }
 
-    let job = await client.findPhone({ firstName, lastName, companyName, website, country });
+    if (!ctx.input.linkedinUrl)
+      throw createApiServiceError(
+        'LinkedIn profile URL is required to submit a phone search.'
+      );
+    let job = await client.findPhone({
+      firstName,
+      lastName,
+      companyName,
+      website,
+      country,
+      linkedinUrl: ctx.input.linkedinUrl
+    });
     let submittedJobId = job?.jobId || job?._id || job?.id;
 
     if (submitOnly || !submittedJobId) {

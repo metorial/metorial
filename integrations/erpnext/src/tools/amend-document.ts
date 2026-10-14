@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let amendDocument = SlateTool.create(spec, {
   name: 'Amend Document',
   key: 'amend_document',
-  description: `Amend a cancelled or submitted ERPNext document by creating a revised copy linked to the original. The new document is created in draft status with an "amended_from" reference. Optionally override specific fields in the amended copy.`,
+  description: `Amend a cancelled ERPNext document by creating a revised copy linked to the original. The new document is created in draft status with an "amended_from" reference. Optionally override specific fields in the amended copy.`,
+  instructions: ['Cancel a submitted document with cancel_document before amending it.'],
   tags: {
     destructive: false
   }
@@ -27,10 +28,7 @@ export let amendDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      siteUrl: ctx.config.siteUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let document = await client.amendDocument(
       ctx.input.doctype,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 export let addPro = SlateTool.create(spec, {
@@ -16,7 +17,9 @@ export let addPro = SlateTool.create(spec, {
       serviceTypes: z
         .string()
         .optional()
-        .describe('Service types the pro offers (defaults to "regular_cleaning")')
+        .describe(
+          'Comma-separated service types the pro offers (defaults to "regular_cleaning")'
+        )
     })
   )
   .output(
@@ -35,11 +38,13 @@ export let addPro = SlateTool.create(spec, {
 
     return {
       output: {
-        proId: result.id,
+        proId: formatTidyId(result.id),
         name: result.name,
         email: result.email,
         phone: result.phone ?? null,
-        serviceTypes: result.service_types ?? null,
+        serviceTypes: Array.isArray(result.service_types)
+          ? result.service_types.join(',')
+          : (result.service_types ?? null),
         createdAt: result.created_at ?? null
       },
       message: `Added pro **${result.name}** (${result.email}) to your priority list.`

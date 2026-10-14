@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSystemUsers = SlateTool.create(spec, {
   name: 'Manage System Users',
   key: 'manage_system_users',
-  description: `List or create system users on a server. System users control file ownership and permissions for applications. Each application runs under a system user.`,
+  description: `List or create system users on a server. System users control file ownership and permissions for applications. Each application runs under a system user.
+${organizationScopeGuidance}`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,7 +16,7 @@ export let manageSystemUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       action: z.enum(['list', 'create']).describe('Action to perform'),
       username: z.string().optional().describe('Username for new system user (for create)'),
@@ -33,7 +35,8 @@ export let manageSystemUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, action } = ctx.input;
 
@@ -46,8 +49,10 @@ export let manageSystemUsers = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.username) throw new Error('username is required for create action');
-      if (!ctx.input.password) throw new Error('password is required for create action');
+      if (!ctx.input.username)
+        throw createApiServiceError('username is required for create action');
+      if (!ctx.input.password)
+        throw createApiServiceError('password is required for create action');
 
       let result = await client.createSystemUser(orgId, serverId, {
         username: ctx.input.username,
@@ -63,6 +68,6 @@ export let manageSystemUsers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

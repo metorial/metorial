@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { UnisenderClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,24 +25,19 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let ax = createAxios({
-        baseURL: 'https://api.unisender.com/en/api'
-      });
-
-      let response = await ax.get('/getUserInfo', {
-        params: {
-          api_key: ctx.output.token,
-          format: 'json'
-        }
-      });
-
-      let result = response.data?.result;
+      let client = new UnisenderClient({ token: ctx.output.token });
+      let result = await client.getUserInfo();
+      if (!isApiErrorRecord(result) || typeof result.login !== 'string' || !result.login) {
+        throw createApiServiceError(
+          'Unisender did not return an account login for this API key.'
+        );
+      }
 
       return {
         profile: {
-          id: result?.login,
-          email: result?.email,
-          name: result?.login
+          id: result.login,
+          email: typeof result.email === 'string' ? result.email : undefined,
+          name: result.login
         }
       };
     }

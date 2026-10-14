@@ -1,54 +1,27 @@
-The API docs page seems to be down. Let me search for more details.Let me try to access the archived version of the PersistIQ API docs and search for Zapier triggers to understand webhook/event support.Now let me try to access the Wayback Machine version of the API docs.The Airbyte docs don't list the specific streams. Let me check the Airbyte source code to see what streams are available.I now have enough information to write the specification. Let me compile what I've gathered.
+# PersistIQ Integration Specification
 
-# Slates Specification for Persistiq
+PersistIQ is a sales engagement platform for prospects and outreach sequences. This integration uses the current public REST API at `https://api.persistiq.com/v1`, authenticated using the `x-api-key` header. Find the key under Settings > Integrations > API Key.
 
-## Overview
+## Supported workflows
 
-PersistIQ is a sales engagement platform that automates outbound sales processes including personalized email campaigns, multi-channel outreach sequences (email, calls, LinkedIn, tasks), follow-up automation, and lead management. It allows users to automate personalized emails, calls, and tasks, A/B test messages, analyze results, and sync data with CRMs. The API base URL is `https://api.persistiq.com/v1`.
+- Create a prospect with the singular `lead` payload and explicit duplicate handling (`skip` by default, or `update`). An optional creator ID is discoverable through `list_users`.
+- List prospects using email, status name/ID, and creation/update timestamp filters. Retrieve a prospect by hashed ID or email address.
+- Update prospect contact/custom data, status name/ID, owner, bounce state, and opt-out state in a single PATCH request. Status values and owner IDs are discoverable through `list_lead_statuses` and `list_users`.
+- List campaigns with name, owner, and prospect filters. Create a campaign with a name and selected owner, or duplicate an existing campaign for another owner.
+- List campaign memberships, add a prospect with an optional sending mailbox, and remove a prospect using its lead ID. Omitting the mailbox uses the campaign owner mailbox. Team user results include mailbox IDs and email addresses.
+- List configured prospect fields and statuses. Field output exposes a display label and API key for custom-field writes.
+- Add and list Do Not Contact domains. These domains block outreach, including prospects already enrolled in campaigns.
 
-## Authentication
+List results expose `hasMore` from the provider's `has_more` flag and the optional `nextPage` continuation value. Page inputs remain numeric. The specification defines integer page inputs and string continuations without explaining their conversion or starting index; callers should preserve the returned continuation and verify pagination behavior in their account.
 
-PersistIQ uses API key-based authentication. PersistIQ uses token-based authentication to control access to the API. To authenticate, you need to obtain an `X-API-Key`.
+The existing `delete_campaign` key remains for compatibility. The current reference does not document campaign deletion; provider support for its legacy endpoint is unverified.
 
-You can find this key under **Profile > Integrations > PersistIQ API** in the PersistIQ dashboard. Alternatively, from the bottom left corner, click your profile button and go to **Settings and Billing > Integrations**. Your API key will be listed there.
+The API exposes all team users but no documented current-user or account identity endpoint. Authentication validates the key through the user list without attributing it to the first team member.
 
-The API key must be passed as an `x-api-key` HTTP header with every request. The authentication method is Header Token.
+## Sources and verification limits
 
-Example:
+- [Official API documentation](https://api.persistiq.com/api-docs)
+- [Official OpenAPI specification](https://api.persistiq.com/api-docs/v1/swagger.json)
+- [Do Not Contact domain behavior](https://help.persistiq.com/en/articles/806003-do-not-contact-domains)
 
-```
-GET /v1/leads HTTP/1.1
-Host: api.persistiq.com
-x-api-key: YOUR_API_KEY
-```
-
-No OAuth or additional scopes are required. There is a single API key per account.
-
-## Features
-
-### Lead (Prospect) Management
-
-Allows listing leads, viewing a single lead, creating leads, and updating leads. Lead data includes fields such as email, first name, last name, company name, industry, title, and custom fields. Leads have associated metadata like status (e.g., replied), bounce status, opt-out status, sent count, reply count, and last sent timestamp. You can also retrieve all lead statuses and all lead fields configured for your company.
-
-- Leads can be assigned to specific users (owners) via a `creator_id` parameter.
-- It allows sales teams to import lead lists, create custom database fields, and detect duplicate leads.
-
-### Campaign Management
-
-You can list, create, and delete campaigns. Campaigns represent outreach sequences. You can add or remove a lead from a campaign through the campaigns endpoint. When adding a lead to a campaign, a `mailbox_id` parameter is required to specify which mailbox to use for sending.
-
-### User Management
-
-You can list users in the account. This allows you to retrieve team member information for lead assignment and reporting purposes.
-
-### Do Not Contact Management
-
-You can add domains to a Do Not Contact list to prevent outreach to specified domains. This helps maintain compliance and avoid contacting companies that should be excluded from campaigns.
-
-### Prospect Status Updates
-
-You can update the status of a prospect. Statuses must already be configured in the PersistIQ dashboard before they can be set via the API.
-
-## Events
-
-The provider does not support webhooks or purpose-built event subscription mechanisms through its API. PersistIQ's Zapier integration offers polling-based triggers for when a new prospect is created and when a prospect is updated, but these are Zapier-specific polling mechanisms rather than native webhook or event subscription capabilities provided by the PersistIQ API itself.
+Payloads and response mapping were audited against the current official OpenAPI specification. Provider acceptance and account permissions were not verified live. The official reference also documents events, replies, tags, and webhook-plugin settings; those capabilities are outside this focused tool refresh.

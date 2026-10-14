@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,12 @@ export let manageProperty = SlateTool.create(spec, {
     z.object({
       propertyId: z.string().describe('ID of the custom property to manage'),
       action: z.enum(['update', 'delete']).describe('Action to perform on the property'),
-      name: z.string().optional().describe('New name for the property (for update action)'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Property name, required for update. Include the current name when changing only its description; omit for delete.'
+        ),
       description: z
         .string()
         .optional()
@@ -51,6 +56,12 @@ export let manageProperty = SlateTool.create(spec, {
         },
         message: `Successfully deleted property \`${ctx.input.propertyId}\`.`
       };
+    }
+
+    if (!ctx.input.name?.trim()) {
+      throw createApiServiceError(
+        'Provide name for the update action. Include the current name when changing only the description.'
+      );
     }
 
     let result = await client.updateProperty(ctx.input.propertyId, {

@@ -35,13 +35,13 @@ export interface QueryFromUrlParams {
 }
 
 export interface SearchSource {
-  title: string;
-  url: string;
+  title?: string;
+  url?: string;
   snippet?: string;
 }
 
 export interface SearchImage {
-  url: string;
+  url?: string;
   description?: string;
 }
 

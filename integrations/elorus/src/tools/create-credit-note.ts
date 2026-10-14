@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
@@ -27,6 +28,7 @@ export let createCreditNote = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       clientId: z.string().describe('Contact ID of the client.'),
       documentTypeId: z.string().describe('Document type ID for the credit note.'),
       date: z
@@ -58,10 +60,12 @@ export let createCreditNote = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
     let body: any = {
+      date: ctx.input.date ?? new Date().toISOString().slice(0, 10),
+      draft: ctx.input.draft ?? true,
       client: ctx.input.clientId,
       documenttype: ctx.input.documentTypeId,
       calculator_mode: ctx.input.calculatorMode || 'total',
@@ -71,9 +75,9 @@ export let createCreditNote = SlateTool.create(spec, {
         if (item.quantity) lineItem.quantity = item.quantity;
         if (item.unitTotal) lineItem.unit_total = item.unitTotal;
         if (item.unitValue) lineItem.unit_value = item.unitValue;
-        if (item.unit) lineItem.unit = item.unit;
+        if (item.unit) lineItem.unit_measure = item.unit;
         if (item.productId) lineItem.product = item.productId;
-        if (item.taxes) lineItem.taxes = item.taxes;
+        if (item.taxes) lineItem.taxes = item.taxes.map(tax => ({ tax }));
         return lineItem;
       })
     };

@@ -7,15 +7,23 @@ export let getResponses = SlateTool.create(spec, {
   name: 'Get Responses',
   key: 'get_responses',
   description: `Retrieve complete survey responses. A response groups all answers from the same survey submission, including customer details, ticket info, and all individual answers. Supports filtering by date range.`,
-  instructions: ['Use YYYY-MM-DD format for date filters.'],
+  instructions: [
+    'Use YYYY-MM-DD dates or ISO 8601 timestamps for date filters. Date-only ranges include the full end date.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      startDate: z.string().optional().describe('Start date filter in YYYY-MM-DD format'),
-      endDate: z.string().optional().describe('End date filter in YYYY-MM-DD format'),
+      startDate: z
+        .string()
+        .optional()
+        .describe('Start date filter as a YYYY-MM-DD date or ISO 8601 timestamp'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('End date filter as a YYYY-MM-DD date or ISO 8601 timestamp'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z.number().optional().describe('Number of results per page (max 100)')
     })
@@ -68,20 +76,20 @@ export let getResponses = SlateTool.create(spec, {
       responseId: r.id,
       created: r.created,
       modified: r.modified,
-      ipAddress: r.ip_address,
+      ipAddress: r.ip_address ?? null,
       customerName: r.customer?.name ?? null,
       customerEmail: r.customer?.email ?? null,
       customerCompany: r.customer?.company ?? null,
-      ticketId: r.ticket?.id ?? null,
+      ticketId: r.ticket?.id == null ? null : String(r.ticket.id),
       ticketSubject: r.ticket?.subject ?? null,
       surveyId: r.survey.id,
       surveyName: r.survey.name,
       answers: r.answers.map(a => ({
         answerId: a.id,
-        choice: a.choice,
-        choiceLabel: a.choice_label,
-        sentiment: a.sentiment,
-        followUpAnswer: a.follow_up_answer,
+        choice: a.choice ?? null,
+        choiceLabel: a.choice_label ?? null,
+        sentiment: a.sentiment ?? null,
+        followUpAnswer: a.follow_up_answer ?? null,
         questionId: a.question.id,
         questionText: a.question.text
       }))

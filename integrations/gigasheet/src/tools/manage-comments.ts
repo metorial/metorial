@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,7 +43,9 @@ export let manageComments = SlateTool.create(spec, {
 
       case 'add_column_comment':
         if (!ctx.input.columnName || !ctx.input.commentText) {
-          throw new Error('columnName and commentText are required for add_column_comment');
+          throw createApiServiceError(
+            'columnName and commentText are required for add_column_comment'
+          );
         }
         result = await client.addColumnComment(ctx.input.sheetHandle, {
           column: ctx.input.columnName,
@@ -53,7 +55,7 @@ export let manageComments = SlateTool.create(spec, {
 
       case 'add_cell_comment':
         if (!ctx.input.columnName || !ctx.input.rowId || !ctx.input.commentText) {
-          throw new Error(
+          throw createApiServiceError(
             'columnName, rowId, and commentText are required for add_cell_comment'
           );
         }
@@ -67,7 +69,7 @@ export let manageComments = SlateTool.create(spec, {
 
       case 'delete_column_comment':
         if (!ctx.input.commentId) {
-          throw new Error('commentId is required for delete_column_comment');
+          throw createApiServiceError('commentId is required for delete_column_comment');
         }
         await client.deleteColumnComment(ctx.input.sheetHandle, ctx.input.commentId);
         result = { deleted: true };
@@ -75,7 +77,7 @@ export let manageComments = SlateTool.create(spec, {
 
       case 'delete_cell_comment':
         if (!ctx.input.columnName || !ctx.input.rowId || !ctx.input.commentId) {
-          throw new Error(
+          throw createApiServiceError(
             'columnName, rowId, and commentId are required for delete_cell_comment'
           );
         }

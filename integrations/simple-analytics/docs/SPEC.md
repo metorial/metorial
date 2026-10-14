@@ -1,4 +1,4 @@
-Now let me check the Stats API for available fields:# Slates Specification for Simple Analytics
+# Simple Analytics Integration
 
 ## Overview
 
@@ -31,7 +31,8 @@ Retrieve the aggregated statistics as seen in the Simple Analytics dashboard. Th
 
 - Available fields include: pageviews, visitors, histogram (time-series data), pages, countries, referrers, UTM parameters (source, medium, campaign, content, term), browser names, OS names, device types, and median time on page.
 - Data can be filtered by page path, country, referrer, UTM parameters, browser, OS, and device type.
-- Filtering parameters support wildcard searches.
+- Page filters support multiple paths and trailing wildcards. Contains searches have stricter provider restrictions.
+- Exact metadata filters use normalized keys and are combined with AND.
 - Histogram data supports intervals of hour, day, week, month, or year.
 - Date ranges support relative placeholders like `today`, `yesterday`, and `today-30d`.
 
@@ -48,7 +49,8 @@ With events in Simple Analytics you can collect counts of certain events. For ex
 
 Export raw data points (without sampling). Data points are both page views and events combined. Define a date range and it pulls out the data. The response will only include the selected fields.
 
-- Export formats include CSV and JSON.
+- `export_raw_data` returns the actual records plus a downloadable JSON file; `export_analytics_file` prepares CSV or JSON downloads without placing file contents in its output.
+- `additionalFields` and file export fields can select custom metadata using storage type suffixes.
 - Data can be exported for specific hours of a day.
 - Exportable fields include timestamps, paths, referrers, UTM parameters, browser/OS info, screen dimensions, country, scroll percentage, duration, and custom metadata fields.
 - Data can be filtered to only page views or only events via the `type` parameter.
@@ -64,4 +66,11 @@ Manage websites tracked in your Simple Analytics account via the Admin API.
 
 ## Events
 
-The provider does not support events. Simple Analytics does not offer webhooks, event subscriptions, or any purpose-built push notification mechanism through its API.
+This integration exposes analytics event counts; it does not register webhook triggers. The reviewed API documentation does not describe a public identity endpoint or general website update/delete endpoints.
+
+## Official API References
+
+- [Authentication](https://docs.simpleanalytics.com/api/authenticate)
+- [Statistics](https://docs.simpleanalytics.com/api/stats)
+- [Raw export](https://docs.simpleanalytics.com/api/export-data-points)
+- [Website administration](https://docs.simpleanalytics.com/api/admin)

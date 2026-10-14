@@ -162,6 +162,7 @@ export interface AhaTodo {
   name?: string;
   body?: string;
   due_date?: string;
+  status?: string;
   completed?: boolean;
   created_at?: string;
   updated_at?: string;

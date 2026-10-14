@@ -36,10 +36,6 @@ If both email and phone are provided, all records matching **either** identifier
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.input.email && !ctx.input.phone) {
-      throw new Error('At least one of email or phone must be provided.');
-    }
-
     let client = new Client(ctx.auth.token);
 
     let result = await client.deleteUserData({

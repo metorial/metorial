@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord
+} from 'slates';
 
 export interface SuperSaasAuth {
   token: string;
@@ -6,11 +12,17 @@ export interface SuperSaasAuth {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(auth: SuperSaasAuth) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://www.supersaas.com',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SuperSaaS',
+          reason: 'SUPERSAAS_API_ERROR'
+        }),
       params: {
         account: auth.accountName,
         api_key: auth.token
@@ -86,10 +98,18 @@ export class Client {
     let response = await this.axios.post(url, null, {
       params: { ...userParams, webhook: 'true' }
     });
-    return response.data;
+    if (
+      foreignKey &&
+      !getResponseHeaderValue(response.headers, 'location') &&
+      !isApiErrorRecord(response.data)
+    ) {
+      return this.getUser(`${foreignKey}fk`);
+    }
+    return this.createdRecord(response, 'users', { ...userData, fk: foreignKey });
   }
 
   async updateUser(userId: string, userData: Record<string, any>): Promise<any> {
+    let existing = await this.getUser(userId);
     let userParams: Record<string, any> = {};
     for (let [key, value] of Object.entries(userData)) {
       if (value !== undefined && value !== null) {
@@ -101,10 +121,14 @@ export class Client {
       `/api/users/${encodeURIComponent(userId)}.json`,
       null,
       {
-        params: { ...userParams, webhook: 'true' }
+        params: { ...userParams, webhook: 'true', notfound: 'error' }
       }
     );
-    return response.data;
+    return {
+      ...existing,
+      ...userData,
+      ...(isApiErrorRecord(response.data) ? response.data : {})
+    };
   }
 
   async deleteUser(userId: string): Promise<void> {
@@ -113,11 +137,13 @@ export class Client {
 
   // ─── Appointments ──────────────────────────────────────────────────
 
-  async getAppointment(appointmentId: string): Promise<any> {
-    let response = await this.axios.get(
-      `/api/bookings/${encodeURIComponent(appointmentId)}.json`
-    );
-    return response.data;
+  async getAppointment(
+    appointmentId: string,
+    scheduleId?: string,
+    form?: boolean
+  ): Promise<any> {
+    let resolved = await this.resolveAppointment(appointmentId, scheduleId, form);
+    return { ...resolved.booking, schedule_id: resolved.scheduleId };
   }
 
   async listAppointments(
@@ -129,6 +155,8 @@ export class Client {
       from?: string;
       to?: string;
       user?: string;
+      resourceId?: string;
+      serviceId?: string;
     }
   ): Promise<any[]> {
     let response = await this.axios.get(`/api/range/${encodeURIComponent(scheduleId)}.json`, {
@@ -138,10 +166,16 @@ export class Client {
         limit: params?.limit,
         offset: params?.offset,
         form: params?.form ? 'true' : undefined,
-        user: params?.user
+        user: params?.user,
+        resource_id: params?.resourceId,
+        service_id: params?.serviceId,
+        slot: 'true'
       }
     });
-    return response.data;
+    return this.appointmentCollection(response.data).map(booking => ({
+      ...booking,
+      schedule_id: scheduleId
+    }));
   }
 
   async getAgenda(
@@ -159,7 +193,10 @@ export class Client {
         slot: params?.slot ? 'true' : undefined
       }
     });
-    return response.data;
+    return this.appointmentCollection(response.data).map(booking => ({
+      ...booking,
+      schedule_id: scheduleId
+    }));
   }
 
   async getAvailability(
@@ -178,10 +215,10 @@ export class Client {
         length: params?.length,
         resource: params?.resource,
         full: params?.full ? 'true' : undefined,
-        limit: params?.limit
+        maxresults: params?.limit
       }
     });
-    return response.data;
+    return this.collection(response.data, ['slots']);
   }
 
   async getRecentChanges(
@@ -204,7 +241,10 @@ export class Client {
         }
       }
     );
-    return response.data;
+    return this.appointmentCollection(response.data).map(booking => ({
+      ...booking,
+      schedule_id: scheduleId
+    }));
   }
 
   async createAppointment(
@@ -216,7 +256,7 @@ export class Client {
       schedule_id: scheduleId
     };
     if (userId) {
-      bookingParams.user = userId;
+      bookingParams.user_id = userId;
     }
     for (let [key, value] of Object.entries(bookingData)) {
       if (value !== undefined && value !== null) {
@@ -227,13 +267,19 @@ export class Client {
     let response = await this.axios.post('/api/bookings.json', null, {
       params: { ...bookingParams, webhook: 'true' }
     });
-    return response.data;
+    return {
+      ...this.createdRecord(response, 'bookings', bookingData),
+      schedule_id: scheduleId,
+      user_id: userId
+    };
   }
 
   async updateAppointment(
     appointmentId: string,
-    bookingData: Record<string, any>
+    bookingData: Record<string, any>,
+    scheduleId?: string
   ): Promise<any> {
+    let resolved = await this.resolveAppointment(appointmentId, scheduleId);
     let bookingParams: Record<string, any> = {};
     for (let [key, value] of Object.entries(bookingData)) {
       if (value !== undefined && value !== null) {
@@ -245,14 +291,23 @@ export class Client {
       `/api/bookings/${encodeURIComponent(appointmentId)}.json`,
       null,
       {
-        params: { ...bookingParams, webhook: 'true' }
+        params: { ...bookingParams, schedule_id: resolved.scheduleId, webhook: 'true' }
       }
     );
-    return response.data;
+    return {
+      ...resolved.booking,
+      ...bookingData,
+      ...(isApiErrorRecord(response.data) ? response.data : {}),
+      id: appointmentId,
+      schedule_id: resolved.scheduleId
+    };
   }
 
-  async deleteAppointment(appointmentId: string): Promise<void> {
-    await this.axios.delete(`/api/bookings/${encodeURIComponent(appointmentId)}.json`);
+  async deleteAppointment(appointmentId: string, scheduleId?: string): Promise<void> {
+    let resolved = await this.resolveAppointment(appointmentId, scheduleId);
+    await this.axios.delete(`/api/bookings/${encodeURIComponent(appointmentId)}.json`, {
+      params: { schedule_id: resolved.scheduleId }
+    });
   }
 
   // ─── Forms ─────────────────────────────────────────────────────────
@@ -311,7 +366,101 @@ export class Client {
         template_code: templateCode
       }
     });
-    return response.data;
+    return isApiErrorRecord(response.data) ? response.data : { code: newCode };
+  }
+
+  async deletePromotion(promotionCode: string): Promise<void> {
+    await this.axios.delete('/api/promotions.json', { params: { id: promotionCode } });
+  }
+
+  async listSlots(
+    scheduleId: string,
+    params?: { start?: string; finish?: string; limit?: number; offset?: number }
+  ): Promise<any[]> {
+    let response = await this.axios.get('/api/slots.json', {
+      params: { schedule_id: scheduleId, ...params }
+    });
+    return this.collection(response.data, ['slots']);
+  }
+
+  private appointmentCollection(data: unknown): any[] {
+    if (isApiErrorRecord(data) && Array.isArray(data.slots)) {
+      return data.slots.flatMap((slot: any) => {
+        if (!Array.isArray(slot.bookings)) {
+          throw createApiServiceError('SuperSaaS returned slots without booking details.', {
+            reason: 'SUPERSAAS_RESPONSE_INVALID'
+          });
+        }
+        return slot.bookings.map((booking: any) => ({
+          start: slot.start,
+          finish: slot.finish,
+          ...booking,
+          slot_id: booking.slot_id ?? slot.id
+        }));
+      });
+    }
+    return this.collection(data, ['bookings']);
+  }
+
+  private collection(data: unknown, keys: string[]): any[] {
+    if (Array.isArray(data)) return data;
+    if (isApiErrorRecord(data)) {
+      for (let key of keys) {
+        if (Array.isArray(data[key])) return data[key];
+      }
+    }
+    throw createApiServiceError('SuperSaaS returned an unexpected collection response.', {
+      reason: 'SUPERSAAS_RESPONSE_INVALID'
+    });
+  }
+
+  private createdRecord(
+    response: { data: unknown; headers: unknown },
+    collection: string,
+    fields: Record<string, any>
+  ): Record<string, any> {
+    let data = isApiErrorRecord(response.data) ? response.data : {};
+    let location = getResponseHeaderValue(response.headers, 'location');
+    let id =
+      data.id ?? location?.match(new RegExp(`/api/${collection}/(\\d+)\\.(?:json|xml)`))?.[1];
+    if (id == null) {
+      throw createApiServiceError(
+        'SuperSaaS accepted the creation but did not return its ID. Check the account before retrying.',
+        { reason: 'SUPERSAAS_CREATED_ID_MISSING' }
+      );
+    }
+    return { ...fields, ...data, id };
+  }
+
+  private async resolveAppointment(
+    appointmentId: string,
+    scheduleId?: string,
+    form?: boolean
+  ): Promise<{ scheduleId: string; booking: any }> {
+    let scheduleIds = scheduleId
+      ? [scheduleId]
+      : (await this.listSchedules()).map(schedule => String(schedule.id ?? schedule[0]));
+    for (let id of scheduleIds) {
+      try {
+        let response = await this.axios.get(
+          `/api/bookings/${encodeURIComponent(appointmentId)}.json`,
+          { params: { schedule_id: id, form: form ? 'true' : undefined } }
+        );
+        return { scheduleId: id, booking: response.data };
+      } catch (error) {
+        if (
+          scheduleId ||
+          !isApiErrorRecord(error) ||
+          !isApiErrorRecord(error.data) ||
+          Number(error.data.upstreamStatus) !== 404
+        )
+          throw error;
+      }
+    }
+    throw createApiServiceError(
+      'Appointment was not found in any account schedule. Call list_appointments to discover an appointment ID and provide its scheduleId.',
+      { reason: 'SUPERSAAS_APPOINTMENT_NOT_FOUND', upstreamStatus: 404 }
+    );
   }
 
   // ─── Webhooks ──────────────────────────────────────────────────────

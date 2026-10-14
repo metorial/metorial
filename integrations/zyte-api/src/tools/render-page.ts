@@ -30,6 +30,10 @@ let actionSchema = z.object({
     .describe('Action type to perform'),
   selector: selectorSchema.optional().describe('Element selector for targeted actions'),
   text: z.string().optional().describe('Text to type (for "type" action)'),
+  values: z
+    .array(z.string())
+    .optional()
+    .describe('Option values to choose for the select action'),
   timeout: z.number().optional().describe('Timeout in milliseconds for wait actions'),
   delay: z
     .number()
@@ -57,7 +61,10 @@ let networkCaptureSchema = z.object({
     .describe('How to match the filter value'),
   value: z.string().optional().describe('Value to match against'),
   httpResponseBody: z.boolean().optional().describe('Capture response body'),
-  httpResponseHeaders: z.boolean().optional().describe('Capture response headers')
+  httpResponseHeaders: z
+    .boolean()
+    .optional()
+    .describe('Legacy header option; captured response headers are returned when available')
 });
 
 let cookieSchema = z.object({
@@ -104,7 +111,9 @@ Use this when pages rely on JavaScript to load content. For static/server-render
       javascript: z
         .boolean()
         .optional()
-        .describe('Enable or disable JavaScript execution. Defaults to true.'),
+        .describe(
+          'Enable or disable JavaScript execution; Zyte chooses automatically when omitted.'
+        ),
       includeIframes: z
         .boolean()
         .optional()
@@ -146,7 +155,7 @@ Use this when pages rely on JavaScript to load content. For static/server-render
       url: z.string().describe('Final URL after any redirects'),
       statusCode: z.number().optional().describe('HTTP status code'),
       browserHtml: z.string().optional().describe('Fully rendered HTML of the page'),
-      screenshot: z.string().optional().describe('Base64-encoded PNG screenshot'),
+      screenshot: z.string().optional().describe('Base64-encoded JPEG screenshot'),
       actionResults: z
         .array(
           z.object({
@@ -188,7 +197,9 @@ Use this when pages rely on JavaScript to load content. For static/server-render
       url: ctx.input.url,
       browserHtml: true,
       screenshot: ctx.input.includeScreenshot || undefined,
-      screenshotOptions: ctx.input.fullPageScreenshot ? { fullPage: true } : undefined,
+      screenshotOptions: ctx.input.includeScreenshot
+        ? { fullPage: ctx.input.fullPageScreenshot, format: 'jpeg' }
+        : undefined,
       actions: ctx.input.actions,
       networkCapture: ctx.input.networkCapture,
       javascript: ctx.input.javascript,
@@ -202,9 +213,43 @@ Use this when pages rely on JavaScript to load content. For static/server-render
       session: ctx.input.sessionId ? { id: ctx.input.sessionId } : undefined
     });
 
+    if (response.browserHtml !== undefined) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(response.browserHtml, {
+          headers: { 'content-type': 'text/html; charset=utf-8' }
+        }),
+        filename: 'rendered-page.html'
+      });
+    }
+    if (response.screenshot) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(Buffer.from(response.screenshot, 'base64'), {
+          headers: { 'content-type': 'image/jpeg' }
+        }),
+        filename: 'rendered-page.jpg'
+      });
+    }
+    for (let [index, capture] of (response.networkCapture ?? []).entries()) {
+      if (capture.httpResponseBody !== undefined) {
+        let mimeType =
+          Object.entries(capture.headers ?? {}).find(
+            ([name]) => name.toLowerCase() === 'content-type'
+          )?.[1] ?? 'application/octet-stream';
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(Buffer.from(capture.httpResponseBody, 'base64'), {
+            headers: { 'content-type': mimeType }
+          }),
+          filename: `captured-response-${index + 1}.bin`
+        });
+      }
+    }
+
     let actionResults = response.actions?.map(a => ({
       action: a.action,
-      elapsedTime: a.elapsedTime,
+      elapsedTime: a.elapsedTime === undefined ? undefined : a.elapsedTime * 1000,
       error: a.error,
       status: a.status
     }));
@@ -218,7 +263,15 @@ Use this when pages rely on JavaScript to load content. For static/server-render
         browserHtml: response.browserHtml,
         screenshot: response.screenshot,
         actionResults,
-        networkCapture: response.networkCapture,
+        networkCapture: response.networkCapture?.map(capture => ({
+          url: capture.url,
+          method: capture.request?.method,
+          statusCode: capture.statusCode,
+          httpResponseBody: capture.httpResponseBody,
+          httpResponseHeaders: capture.headers
+            ? Object.entries(capture.headers).map(([name, value]) => ({ name, value }))
+            : undefined
+        })),
         responseCookies: response.responseCookies
       },
       message: `Rendered **${response.url}** — ${htmlLength} characters of HTML${ctx.input.includeScreenshot ? ', screenshot captured' : ''}${actionResults?.length ? `, ${actionResults.length} action(s) executed` : ''}`

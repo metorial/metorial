@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,6 +54,11 @@ Can list all widgets, get aggregated stats, list users per widget, or get per-us
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let dateParams = { startDate: ctx.input.startDate, endDate: ctx.input.endDate };
+    if (ctx.input.userId && !ctx.input.widgetKey) {
+      throw createApiServiceError(
+        'Provide widgetKey when requesting data for a specific user.'
+      );
+    }
 
     if (ctx.input.scope === 'widgets' && !ctx.input.widgetKey) {
       let widgets = await client.listWidgets();
@@ -72,7 +77,9 @@ Can list all widgets, get aggregated stats, list users per widget, or get per-us
     }
 
     if (!ctx.input.widgetKey) {
-      throw new Error('Widget key is required for this scope when not listing all widgets.');
+      throw createApiServiceError(
+        'Widget key is required for this scope when not listing all widgets.'
+      );
     }
 
     if (ctx.input.scope === 'stats' || ctx.input.scope === 'widgets') {
@@ -121,6 +128,6 @@ Can list all widgets, get aggregated stats, list users per widget, or get per-us
       };
     }
 
-    throw new Error('Invalid scope/parameter combination.');
+    throw createApiServiceError('Invalid scope/parameter combination.');
   })
   .build();

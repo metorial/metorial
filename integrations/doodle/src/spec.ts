@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'doodle',
   name: 'Doodle',
   description:
-    'Online scheduling platform for group meeting polls, booking pages, and sign-up sheets with calendar and video conferencing integrations.',
+    'Manage legacy Doodle group scheduling polls, participants, votes, and comments through an existing Enterprise API connection. New API access is no longer supported by Doodle.',
   metadata: {},
   config,
   auth

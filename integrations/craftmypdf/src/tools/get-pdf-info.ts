@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getPdfInfo = SlateTool.create(spec, {
   name: 'Get PDF Info',
   key: 'get_pdf_info',
-  description: `Extract metadata and structural information from a PDF document. Returns page count, page dimensions, and a list of fillable form fields with their types and current values.`,
+  description: `Retrieve PDF page count and document metadata. Page dimensions and form fields are included only when returned by the provider.`,
   tags: {
     readOnly: true
   }
@@ -35,7 +35,14 @@ export let getPdfInfo = SlateTool.create(spec, {
             currentValue: z.string().describe('Current value of the form field.')
           })
         )
-        .describe('List of fillable form fields in the PDF.')
+        .describe('List of fillable form fields in the PDF when available; otherwise empty.'),
+      title: z.string().optional().describe('Document title.'),
+      author: z.string().optional().describe('Document author.'),
+      subject: z.string().optional().describe('Document subject.'),
+      creator: z.string().optional().describe('Application that created the document.'),
+      producer: z.string().optional().describe('PDF producer.'),
+      creationDate: z.string().optional().describe('Document creation date.'),
+      modificationDate: z.string().optional().describe('Document modification date.')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,11 +63,18 @@ export let getPdfInfo = SlateTool.create(spec, {
 
     return {
       output: {
-        pageCount: result.page_count,
+        pageCount: result.totalPages,
         pages: result.pages || [],
-        formFields
+        formFields,
+        title: result.title,
+        author: result.author,
+        subject: result.subject,
+        creator: result.creator,
+        producer: result.producer,
+        creationDate: result.creationDate,
+        modificationDate: result.modificationDate
       },
-      message: `PDF has **${result.page_count}** page(s) and **${formFields.length}** form field(s).`
+      message: `PDF has **${result.totalPages}** page(s).`
     };
   })
   .build();

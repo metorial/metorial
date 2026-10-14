@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let stopTimeEntry = SlateTool.create(spec, {
@@ -13,10 +14,7 @@ export let stopTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       timeEntryId: z
         .string()
         .optional()
@@ -37,17 +35,19 @@ export let stopTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId: string;
 
     let entryId = ctx.input.timeEntryId;
     if (!entryId) {
       let current = await client.getCurrentTimeEntry();
       if (!current) {
-        throw new Error('No running time entry to stop.');
+        throw createApiServiceError('No running time entry to stop.');
       }
       entryId = String(current.id);
-      wsId = String(current.workspace_id);
+      wsId = String(current.workspace_id ?? current.wid);
+    } else {
+      wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
     }
 
     let entry = await client.stopTimeEntry(wsId, entryId);

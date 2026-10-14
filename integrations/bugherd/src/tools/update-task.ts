@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateTask = SlateTool.create(spec, {
@@ -19,8 +20,8 @@ export let updateTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('Project ID containing the task'),
-      taskId: z.number().describe('Global task ID to update'),
+      projectId: positiveIntegerSchema.describe('Project ID containing the task'),
+      taskId: positiveIntegerSchema.describe('Global task ID to update'),
       description: z.string().optional().describe('New task description'),
       priority: z
         .enum(['not set', 'critical', 'important', 'normal', 'minor'])
@@ -32,14 +33,12 @@ export let updateTask = SlateTool.create(spec, {
         .describe(
           'New status (e.g., "backlog", "todo", "doing", "done", "closed", "feedback", or custom column name)'
         ),
-      assignedToId: z
-        .number()
+      assignedToId: positiveIntegerSchema
         .nullable()
         .optional()
         .describe('User ID to assign, or null to unassign all'),
-      assignedToEmail: z.string().optional().describe('Email of the assignee'),
-      unassignUserId: z
-        .number()
+      assignedToEmail: z.string().email().optional().describe('Email of the assignee'),
+      unassignUserId: positiveIntegerSchema
         .optional()
         .describe('Specific user ID to unassign from the task'),
       tagNames: z
@@ -49,6 +48,7 @@ export let updateTask = SlateTool.create(spec, {
       externalId: z.string().optional().describe('External tracking ID'),
       updaterEmail: z
         .string()
+        .email()
         .optional()
         .describe('Email of the user making the update (for audit trail)')
     })
@@ -62,12 +62,16 @@ export let updateTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let { projectId, taskId, ...changes } = ctx.input;
+    if (!Object.values(changes).some(value => value !== undefined)) {
+      throw createApiServiceError('Provide at least one task field to update.');
+    }
     let client = new BugherdClient(ctx.auth.token);
     let task = await client.updateTask(ctx.input.projectId, ctx.input.taskId, {
       description: ctx.input.description,
       priority: ctx.input.priority,
       status: ctx.input.status,
-      assignedToId: ctx.input.assignedToId ?? undefined,
+      assignedToId: ctx.input.assignedToId,
       assignedToEmail: ctx.input.assignedToEmail,
       unassignUser: ctx.input.unassignUserId,
       tagNames: ctx.input.tagNames,

@@ -31,7 +31,12 @@ export let listData = SlateTool.create(spec, {
         .enum(['created_at:asc', 'created_at:desc', 'title:asc', 'title:desc'])
         .optional()
         .describe('Sort order'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )

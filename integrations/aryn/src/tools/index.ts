@@ -1,3 +1,4 @@
+export * from './document-files';
 export * from './extract-properties';
 export * from './manage-docsets';
 export * from './manage-documents';

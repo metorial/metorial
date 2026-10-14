@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -44,9 +44,11 @@ export let issueCredential = SlateTool.create(spec, {
         .describe('Revocation registry ID to enable revocation for this credential'),
       revocable: z.boolean().optional().describe('Whether the credential should be revocable'),
       algorithm: z
-        .enum(['ed25519', 'dockbbs'])
+        .enum(['ed25519', 'dockbbs', 'secp256r1'])
         .default('ed25519')
-        .describe('Signature algorithm. Use "dockbbs" for BBS+ zero-knowledge proofs.'),
+        .describe(
+          'Signature algorithm. Use "dockbbs" for BBS+ zero-knowledge proofs or "secp256r1" for ES256 SD-JWT credentials.'
+        ),
       format: z
         .enum(['jsonld', 'jwt', 'sdjwt'])
         .default('jsonld')
@@ -81,6 +83,14 @@ export let issueCredential = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.persist &&
+      (!ctx.input.password || ctx.input.password.length < 4 || ctx.input.password.length > 32)
+    ) {
+      throw createApiServiceError(
+        'Persisting a credential requires a password of 4 to 32 characters.'
+      );
+    }
     let client = createClient(ctx);
 
     let body: Record<string, any> = {

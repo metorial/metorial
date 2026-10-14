@@ -1,226 +1,166 @@
-/**
- * Lightweight XML parser and builder for the Worksnaps API.
- * Worksnaps returns XML responses and expects XML request bodies.
- */
+import { createApiServiceError } from 'slates';
 
-export type XmlObject = {
-  [key: string]: string | number | boolean | null | undefined | XmlObject | XmlObject[];
-};
+export type XmlValue = string | number | boolean | null | undefined | XmlObject | XmlValue[];
+export type XmlObject = { [key: string]: XmlValue };
 
-/**
- * Parse a simple XML string into a JavaScript object.
- * Handles nested elements and arrays of sibling elements with the same tag name.
- */
+export let isXmlObject = (value: unknown): value is XmlObject =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+let invalidXml = () => createApiServiceError('Worksnaps returned an invalid XML response.');
+
 export let parseXml = (xml: string): XmlObject => {
-  let cleaned = xml.replace(/<\?xml[^?]*\?>/g, '').trim();
-  return parseElement(cleaned).value as XmlObject;
+  let cleaned = xml.replace(/^\s*<\?xml[^?]*\?>/, '').trim();
+  let parsed = parseElement(cleaned);
+  if (parsed.rest.trim()) throw invalidXml();
+  return parsed.value;
 };
 
-/**
- * Parse a list of XML elements wrapped in a root element.
- * Returns an array of parsed objects for the specified child tag.
- */
+export let parseXmlObject = (xml: string, tag: string): XmlObject => {
+  let parsed = parseXml(xml);
+  let container = isXmlObject(parsed.reply) ? parsed.reply : parsed;
+  let value = container[tag] ?? container[tag.replace(/_/g, '-')];
+  if (!isXmlObject(value)) throw invalidXml();
+  return value;
+};
+
 export let parseXmlList = (xml: string, childTag: string): XmlObject[] => {
   let parsed = parseXml(xml);
   let root = Object.values(parsed)[0];
-  if (!root || typeof root !== 'object') return [];
-  if (Array.isArray(root)) return root;
-
-  let rootObj = root as XmlObject;
-  let children = rootObj[childTag];
-  if (!children) return [];
-  if (Array.isArray(children)) return children as XmlObject[];
-  return [children as XmlObject];
+  if (root === '' || root === null) return [];
+  if (!isXmlObject(root)) throw invalidXml();
+  let children = root[childTag] ?? root[childTag.replace(/_/g, '-')];
+  if (children === undefined) return [];
+  let items = Array.isArray(children) ? children : [children];
+  if (!items.every(isXmlObject)) throw invalidXml();
+  return items;
 };
 
-/**
- * Build an XML string from a JavaScript object.
- */
-export let buildXml = (rootTag: string, obj: XmlObject): string => {
-  return `<${rootTag}>${objectToXml(obj)}</${rootTag}>`;
-};
+export let buildXml = (rootTag: string, obj: XmlObject): string =>
+  `<${rootTag}>${objectToXml(obj)}</${rootTag}>`;
 
 let objectToXml = (obj: XmlObject): string => {
   let parts: string[] = [];
   for (let [key, value] of Object.entries(obj)) {
     if (value === undefined || value === null) continue;
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      parts.push(`<${key}>${objectToXml(value as XmlObject)}</${key}>`);
-    } else if (Array.isArray(value)) {
-      for (let item of value) {
-        parts.push(`<${key}>${objectToXml(item)}</${key}>`);
-      }
-    } else {
-      parts.push(`<${key}>${escapeXml(String(value))}</${key}>`);
+    let values = Array.isArray(value) ? value : [value];
+    for (let item of values) {
+      if (item === undefined || item === null) continue;
+      let content = isXmlObject(item) ? objectToXml(item) : escapeXml(String(item));
+      parts.push(`<${key}>${content}</${key}>`);
     }
   }
   return parts.join('');
 };
 
-let escapeXml = (str: string): string => {
-  return str
+let escapeXml = (str: string): string =>
+  str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
-};
 
-let unescapeXml = (str: string): string => {
-  return str
-    .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&gt;/g, '>')
-    .replace(/&lt;/g, '<')
-    .replace(/&amp;/g, '&');
-};
+let unescapeXml = (str: string): string =>
+  str.replace(/&(#x[0-9a-f]+|#\d+|apos|quot|gt|lt|amp);/gi, (entity, code: string) => {
+    if (code.startsWith('#')) {
+      let value =
+        code[1]?.toLowerCase() === 'x'
+          ? Number.parseInt(code.slice(2), 16)
+          : Number(code.slice(1));
+      if (value < 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) {
+        throw invalidXml();
+      }
+      return String.fromCodePoint(value);
+    }
+    return (
+      ({ apos: "'", quot: '"', gt: '>', lt: '<', amp: '&' } as Record<string, string>)[code] ??
+      entity
+    );
+  });
 
 interface ParseResult {
-  value: string | XmlObject;
+  value: XmlObject;
   rest: string;
 }
 
 let parseElement = (xml: string): ParseResult => {
-  let trimmed = xml.trim();
-
-  // Match opening tag
-  let openMatch = trimmed.match(/^<([a-zA-Z0-9_-]+)([^>]*)>/);
-  if (!openMatch) {
-    return { value: trimmed, rest: '' };
+  let trimmed = xml.trimStart();
+  let open = trimmed.match(/^<([A-Za-z_][\w:.-]*)(\s+(?:[^>"']|"[^"]*"|'[^']*')*)?\s*(\/?)>/);
+  if (!open) throw invalidXml();
+  let tag = open[1]!;
+  let attributes = open[2] ?? '';
+  let nil = /\bnil\s*=\s*['"]true['"]/.test(attributes);
+  let remaining = trimmed.slice(open[0].length);
+  if (open[3] === '/' || attributes.trimEnd().endsWith('/')) {
+    return { value: { [tag]: nil ? null : '' }, rest: remaining };
   }
 
-  let tagName = openMatch[1]!;
-  let attrs = openMatch[2]!;
-  let afterOpen = trimmed.slice(openMatch[0].length);
-
-  // Check for nil attribute
-  if (attrs.includes('nil="true"') || attrs.includes("nil='true'")) {
-    let closeTag = `</${tagName}>`;
-    let closeIdx = afterOpen.indexOf(closeTag);
-    let rest = closeIdx >= 0 ? afterOpen.slice(closeIdx + closeTag.length) : afterOpen;
-    return { value: { [tagName]: '' }, rest };
-  }
-
-  // Check for self-closing tag
-  if (attrs.trimEnd().endsWith('/') || trimmed.match(new RegExp(`^<${tagName}[^>]*/>`))) {
-    let selfCloseMatch = trimmed.match(new RegExp(`^<${tagName}[^>]*/>`));
-    if (selfCloseMatch) {
-      return { value: { [tagName]: '' }, rest: trimmed.slice(selfCloseMatch[0].length) };
+  let children: XmlObject = {};
+  let text = '';
+  let hasChildren = false;
+  while (remaining.length) {
+    if (remaining.startsWith(`</${tag}>`)) {
+      if (hasChildren && text.trim()) throw invalidXml();
+      return {
+        value: { [tag]: nil ? null : hasChildren ? children : text.trim() },
+        rest: remaining.slice(tag.length + 3)
+      };
     }
-  }
-
-  // Find the matching closing tag - handle nested same-name tags
-  let closeTag = `</${tagName}>`;
-  let depth = 1;
-  let pos = 0;
-  let content = afterOpen;
-
-  while (depth > 0 && pos < content.length) {
-    let nextOpen = content.indexOf(`<${tagName}`, pos);
-    let nextClose = content.indexOf(closeTag, pos);
-
-    if (nextClose === -1) break;
-
-    if (nextOpen !== -1 && nextOpen < nextClose) {
-      // Check it's actually an opening tag (not a different tag that starts with same name)
-      let charAfterName = content[nextOpen + tagName.length + 1];
-      if (charAfterName === '>' || charAfterName === ' ' || charAfterName === '/') {
-        depth++;
+    if (remaining.startsWith('<!--')) {
+      let end = remaining.indexOf('-->');
+      if (end < 0) throw invalidXml();
+      remaining = remaining.slice(end + 3);
+      continue;
+    }
+    if (remaining.startsWith('<![CDATA[')) {
+      let end = remaining.indexOf(']]>');
+      if (end < 0) throw invalidXml();
+      text += remaining.slice(9, end);
+      remaining = remaining.slice(end + 3);
+      continue;
+    }
+    if (remaining.startsWith('<')) {
+      let parsed = parseElement(remaining);
+      for (let [key, value] of Object.entries(parsed.value)) {
+        if (Object.hasOwn(children, key)) {
+          let existing = children[key];
+          children[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
+        } else {
+          children[key] = value;
+        }
       }
-      pos = nextOpen + 1;
+      hasChildren = true;
+      remaining = parsed.rest;
     } else {
-      depth--;
-      if (depth === 0) {
-        let innerContent = content.slice(0, nextClose).trim();
-        let rest = content.slice(nextClose + closeTag.length);
-
-        // Check if inner content has child elements
-        if (innerContent.startsWith('<')) {
-          let children = parseChildren(innerContent);
-          return { value: { [tagName]: children }, rest };
-        } else {
-          return { value: { [tagName]: unescapeXml(innerContent) }, rest };
-        }
-      }
-      pos = nextClose + 1;
+      let end = remaining.indexOf('<');
+      if (end < 0) throw invalidXml();
+      text += unescapeXml(remaining.slice(0, end));
+      remaining = remaining.slice(end);
     }
   }
-
-  return { value: { [tagName]: afterOpen }, rest: '' };
+  throw invalidXml();
 };
 
-let parseChildren = (xml: string): XmlObject => {
-  let result: XmlObject = {};
-  let remaining = xml.trim();
-
-  while (remaining.length > 0) {
-    remaining = remaining.trim();
-    if (!remaining.startsWith('<') || remaining.startsWith('</')) break;
-
-    let parsed = parseElement(remaining);
-    let obj = parsed.value as XmlObject;
-
-    for (let [key, value] of Object.entries(obj)) {
-      if (key in result) {
-        let existing = result[key];
-        if (Array.isArray(existing)) {
-          (existing as XmlObject[]).push(value as XmlObject);
-        } else {
-          result[key] = [existing as XmlObject, value as XmlObject];
-        }
-      } else {
-        result[key] = value;
-      }
-    }
-
-    remaining = parsed.rest.trim();
-  }
-
-  return result;
-};
-
-/**
- * Convert XML-style hyphenated keys to camelCase.
- */
-export let toCamelCase = (str: string): string => {
-  return str.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
-};
-
-/**
- * Convert camelCase keys to XML-style hyphenated keys.
- */
-export let toHyphenated = (str: string): string => {
-  return str.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-};
-
-/**
- * Recursively convert all keys in an object from hyphenated to camelCase.
- */
 export let camelizeKeys = (obj: unknown): unknown => {
-  if (Array.isArray(obj)) {
-    return obj.map(camelizeKeys);
-  }
-  if (obj !== null && typeof obj === 'object') {
+  if (Array.isArray(obj)) return obj.map(camelizeKeys);
+  if (isXmlObject(obj)) {
     let result: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      result[toCamelCase(key)] = camelizeKeys(value);
+    for (let [key, value] of Object.entries(obj)) {
+      result[key.replace(/[-_]([a-z])/g, (_, letter: string) => letter.toUpperCase())] =
+        camelizeKeys(value);
     }
     return result;
   }
   return obj;
 };
 
-/**
- * Recursively convert all keys in an object from camelCase to hyphenated.
- */
-export let hyphenateKeys = (obj: unknown): unknown => {
-  if (Array.isArray(obj)) {
-    return obj.map(hyphenateKeys);
-  }
-  if (obj !== null && typeof obj === 'object') {
+export let snakeCaseKeys = (obj: unknown): unknown => {
+  if (Array.isArray(obj)) return obj.map(snakeCaseKeys);
+  if (isXmlObject(obj)) {
     let result: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      result[toHyphenated(key)] = hyphenateKeys(value);
+    for (let [key, value] of Object.entries(obj)) {
+      result[key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)] =
+        snakeCaseKeys(value);
     }
     return result;
   }

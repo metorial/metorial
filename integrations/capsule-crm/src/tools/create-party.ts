@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema, websiteServiceSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createParty = SlateTool.create(spec, {
@@ -15,8 +16,8 @@ export let createParty = SlateTool.create(spec, {
   .input(
     z.object({
       type: z.enum(['person', 'organisation']).describe('Type of contact to create'),
-      firstName: z.string().optional().describe('First name (required for persons)'),
-      lastName: z.string().optional().describe('Last name (required for persons)'),
+      firstName: z.string().optional().describe('First name (persons only)'),
+      lastName: z.string().optional().describe('Last name (persons only)'),
       name: z.string().optional().describe('Organisation name (required for organisations)'),
       title: z.string().optional().describe('Title prefix (e.g. Mr, Mrs, Dr)'),
       jobTitle: z.string().optional().describe('Job title'),
@@ -31,8 +32,11 @@ export let createParty = SlateTool.create(spec, {
         })
         .optional()
         .describe('Organisation to associate with a person'),
-      ownerId: z.number().optional().describe('User ID of the owner'),
-      teamId: z.number().optional().describe('Team ID to assign'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('Owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('Team ID. Use list_teams to discover IDs.'),
       emailAddresses: z
         .array(
           z.object({
@@ -70,12 +74,18 @@ export let createParty = SlateTool.create(spec, {
             type: z
               .string()
               .optional()
-              .describe('Type: Home, Work, URL, Twitter, Linked_in, Facebook'),
+              .describe(
+                'Website label: Home or Work. For compatibility, a service name such as Twitter can also be supplied here.'
+              ),
+            service: websiteServiceSchema
+              .optional()
+              .describe('Website or social network service (default: URL)'),
             address: z.string().describe('Website URL or handle')
           })
         )
         .optional()
         .describe('Websites or social profiles to add'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
@@ -126,7 +136,23 @@ export let createParty = SlateTool.create(spec, {
     if (ctx.input.emailAddresses) party.emailAddresses = ctx.input.emailAddresses;
     if (ctx.input.phoneNumbers) party.phoneNumbers = ctx.input.phoneNumbers;
     if (ctx.input.addresses) party.addresses = ctx.input.addresses;
-    if (ctx.input.websites) party.websites = ctx.input.websites;
+    if (ctx.input.websites) {
+      party.websites = ctx.input.websites.map(website => {
+        let legacyService = websiteServiceSchema.safeParse(website.type?.toUpperCase());
+        return {
+          address: website.address,
+          type: legacyService.success ? undefined : website.type,
+          service: website.service ?? (legacyService.success ? legacyService.data : 'URL')
+        };
+      });
+    }
+
+    if (ctx.input.fields) {
+      party.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
 
     if (ctx.input.tags) {
       party.tags = ctx.input.tags.map(t => {
@@ -145,11 +171,11 @@ export let createParty = SlateTool.create(spec, {
     return {
       output: {
         partyId: result.id,
-        type: result.type,
-        firstName: result.firstName,
-        lastName: result.lastName,
-        name: result.name,
-        createdAt: result.createdAt
+        type: result.type ?? undefined,
+        firstName: result.firstName ?? undefined,
+        lastName: result.lastName ?? undefined,
+        name: result.name ?? undefined,
+        createdAt: result.createdAt ?? undefined
       },
       message: `Created ${result.type} **${displayName}** (ID: ${result.id}).`
     };

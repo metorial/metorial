@@ -1,28 +1,61 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage
+} from 'slates';
 
 export class TwoChatClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.p.2chat.io/open',
-      headers: {
-        'X-User-API-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-User-API-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: '2Chat',
+          reason: '2chat_api_error'
+        })
     });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.success === false) {
+        throw createApiServiceError(
+          extractApiErrorMessage(
+            { response: { data: response.data } },
+            { fallbackMessage: '2Chat rejected the request.' }
+          ),
+          { reason: '2chat_api_error' }
+        );
+      }
+      return response;
+    });
+  }
+
+  async getAccountInfo(): Promise<any> {
+    return (await this.axios.get('/info')).data;
   }
 
   // ── WhatsApp Numbers ────────────────────────────────────────────
 
-  async listWhatsAppNumbers(): Promise<any> {
-    let response = await this.axios.get('/whatsapp/get-numbers');
+  async listWhatsAppNumbers(params?: {
+    page?: number;
+    resultsPerPage?: number;
+    status?: string;
+  }): Promise<any> {
+    let response = await this.axios.get('/whatsapp/get-numbers', {
+      params: {
+        page_number: params?.page ?? 0,
+        results_per_page: params?.resultsPerPage ?? 50,
+        status: params?.status
+      }
+    });
     return response.data;
   }
 
-  async getWhatsAppNumber(phoneNumber: string): Promise<any> {
+  async getWhatsAppNumber(channelUuid: string): Promise<any> {
     let response = await this.axios.get(
-      `/whatsapp/get-number/${encodeURIComponent(phoneNumber)}`
+      `/whatsapp/channel/${encodeURIComponent(channelUuid)}`
     );
     return response.data;
   }
@@ -69,7 +102,7 @@ export class TwoChatClient {
     groupUuid: string;
     text: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/send-group-message', {
+    let response = await this.axios.post('/whatsapp/send-message', {
       from_number: params.fromNumber,
       to_group_uuid: params.groupUuid,
       text: params.text
@@ -83,7 +116,7 @@ export class TwoChatClient {
     url: string;
     text?: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/send-group-message', {
+    let response = await this.axios.post('/whatsapp/send-message', {
       from_number: params.fromNumber,
       to_group_uuid: params.groupUuid,
       url: params.url,
@@ -101,57 +134,89 @@ export class TwoChatClient {
       remoteNumber?: string;
     }
   ): Promise<any> {
-    let query = new URLSearchParams();
-    if (params?.page) query.set('page', String(params.page));
-    if (params?.remoteNumber) query.set('remote_number', params.remoteNumber);
-    let qs = query.toString();
     let response = await this.axios.get(
-      `/whatsapp/messages/${encodeURIComponent(phoneNumber)}${qs ? `?${qs}` : ''}`
+      `/whatsapp/messages/${encodeURIComponent(phoneNumber)}${params?.remoteNumber ? `/${encodeURIComponent(params.remoteNumber)}` : ''}`,
+      { params: { page_number: params?.page ?? 0 } }
     );
     return response.data;
   }
 
-  async getSingleMessage(phoneNumber: string, messageUuid: string): Promise<any> {
-    let response = await this.axios.get(
-      `/whatsapp/messages/${encodeURIComponent(phoneNumber)}/message/${encodeURIComponent(messageUuid)}`
-    );
-    return response.data;
-  }
-
-  async deleteMessage(phoneNumber: string, messageUuid: string): Promise<any> {
-    let response = await this.axios.delete(
-      `/whatsapp/messages/${encodeURIComponent(phoneNumber)}/message/${encodeURIComponent(messageUuid)}`
-    );
-    return response.data;
-  }
-
-  async listConversations(
+  private async resolveSessionKey(
     phoneNumber: string,
-    params?: {
-      page?: number;
-    }
+    messageUuid: string,
+    sessionKey?: string
+  ): Promise<string> {
+    if (sessionKey?.trim()) return sessionKey;
+    let result = await this.getMessages(phoneNumber);
+    let message = result.messages?.find(
+      (item: any) => (item.uuid ?? item.message_uuid) === messageUuid
+    );
+    if (typeof message?.session_key === 'string') return message.session_key;
+    throw createApiServiceError(
+      'Provide sessionKey from Get WhatsApp Messages for this message. Automatic lookup covers only the newest 100 messages.',
+      { reason: 'missing_session_key' }
+    );
+  }
+
+  async getSingleMessage(
+    phoneNumber: string,
+    messageUuid: string,
+    sessionKey?: string
   ): Promise<any> {
-    let query = new URLSearchParams();
-    if (params?.page) query.set('page', String(params.page));
-    let qs = query.toString();
+    let key = await this.resolveSessionKey(phoneNumber, messageUuid, sessionKey);
     let response = await this.axios.get(
-      `/whatsapp/conversations/${encodeURIComponent(phoneNumber)}${qs ? `?${qs}` : ''}`
+      `/whatsapp/message/${encodeURIComponent(key)}/${encodeURIComponent(messageUuid)}`
+    );
+    return response.data;
+  }
+
+  async deleteMessage(
+    phoneNumber: string,
+    messageUuid: string,
+    sessionKey?: string
+  ): Promise<any> {
+    let key = await this.resolveSessionKey(phoneNumber, messageUuid, sessionKey);
+    let response = await this.axios.delete(
+      `/whatsapp/message/${encodeURIComponent(key)}/${encodeURIComponent(messageUuid)}`
+    );
+    return response.data;
+  }
+
+  async listConversations(phoneNumber: string, params?: { page?: number }): Promise<any> {
+    let page = 0;
+    let channelUuid: string | undefined;
+    while (!channelUuid) {
+      let result = await this.listWhatsAppNumbers({ page });
+      let numbers = result.numbers ?? [];
+      channelUuid = numbers.find(
+        (item: any) =>
+          item.phone_number?.replace(/[^0-9]/g, '') === phoneNumber.replace(/[^0-9]/g, '')
+      )?.uuid;
+      if (channelUuid || numbers.length < 50) break;
+      page += 1;
+    }
+    if (!channelUuid)
+      throw createApiServiceError(
+        'The connected number was not found. Use List WhatsApp Numbers to select a connected number.',
+        { reason: 'unknown_connected_number' }
+      );
+    let response = await this.axios.get(
+      `/whatsapp/conversations/${encodeURIComponent(channelUuid)}`,
+      { params: { page_number: params?.page ?? 0 } }
     );
     return response.data;
   }
 
   async getGroupMessages(
-    phoneNumber: string,
+    _phoneNumber: string,
     groupUuid: string,
     params?: {
       page?: number;
     }
   ): Promise<any> {
-    let query = new URLSearchParams();
-    if (params?.page) query.set('page', String(params.page));
-    let qs = query.toString();
     let response = await this.axios.get(
-      `/whatsapp/messages/${encodeURIComponent(phoneNumber)}/group/${encodeURIComponent(groupUuid)}${qs ? `?${qs}` : ''}`
+      `/whatsapp/groups/messages/${encodeURIComponent(groupUuid)}`,
+      { params: { page_number: params?.page ?? 0 } }
     );
     return response.data;
   }
@@ -168,9 +233,7 @@ export class TwoChatClient {
   // ── WhatsApp Groups ─────────────────────────────────────────────
 
   async listGroups(phoneNumber: string): Promise<any> {
-    let response = await this.axios.get(
-      `/whatsapp/groups/${encodeURIComponent(phoneNumber)}/get-groups`
-    );
+    let response = await this.axios.get(`/whatsapp/groups/${encodeURIComponent(phoneNumber)}`);
     return response.data;
   }
 
@@ -178,19 +241,21 @@ export class TwoChatClient {
     fromNumber: string;
     groupName: string;
     participants: string[];
+    description?: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/create-group', {
+    let response = await this.axios.post('/whatsapp/group/create', {
       from_number: params.fromNumber,
-      group_name: params.groupName,
-      participants: params.participants
+      group: {
+        name: params.groupName,
+        participants: params.participants,
+        description: params.description
+      }
     });
     return response.data;
   }
 
-  async listGroupParticipants(phoneNumber: string, groupUuid: string): Promise<any> {
-    let response = await this.axios.get(
-      `/whatsapp/groups/${encodeURIComponent(phoneNumber)}/${encodeURIComponent(groupUuid)}/get-participants`
-    );
+  async listGroupParticipants(_phoneNumber: string, groupUuid: string): Promise<any> {
+    let response = await this.axios.get(`/whatsapp/group/${encodeURIComponent(groupUuid)}`);
     return response.data;
   }
 
@@ -199,11 +264,13 @@ export class TwoChatClient {
     groupUuid: string;
     phoneNumber: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/add-participant', {
-      from_number: params.fromNumber,
-      to_group_uuid: params.groupUuid,
-      phone_number: params.phoneNumber
-    });
+    let response = await this.axios.post(
+      `/whatsapp/group/${encodeURIComponent(params.groupUuid)}/add-participant`,
+      {
+        from_number: params.fromNumber,
+        participants: [params.phoneNumber]
+      }
+    );
     return response.data;
   }
 
@@ -212,11 +279,13 @@ export class TwoChatClient {
     groupUuid: string;
     phoneNumber: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/remove-participant', {
-      from_number: params.fromNumber,
-      to_group_uuid: params.groupUuid,
-      phone_number: params.phoneNumber
-    });
+    let response = await this.axios.post(
+      `/whatsapp/group/${encodeURIComponent(params.groupUuid)}/remove-participant`,
+      {
+        from_number: params.fromNumber,
+        participants: [params.phoneNumber]
+      }
+    );
     return response.data;
   }
 
@@ -225,11 +294,13 @@ export class TwoChatClient {
     groupUuid: string;
     phoneNumber: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/promote-participant', {
-      from_number: params.fromNumber,
-      to_group_uuid: params.groupUuid,
-      phone_number: params.phoneNumber
-    });
+    let response = await this.axios.post(
+      `/whatsapp/group/${encodeURIComponent(params.groupUuid)}/promote-participant`,
+      {
+        from_number: params.fromNumber,
+        participants: [params.phoneNumber]
+      }
+    );
     return response.data;
   }
 
@@ -238,11 +309,13 @@ export class TwoChatClient {
     groupUuid: string;
     phoneNumber: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/demote-participant', {
-      from_number: params.fromNumber,
-      to_group_uuid: params.groupUuid,
-      phone_number: params.phoneNumber
-    });
+    let response = await this.axios.post(
+      `/whatsapp/group/${encodeURIComponent(params.groupUuid)}/demote-participant`,
+      {
+        from_number: params.fromNumber,
+        participants: [params.phoneNumber]
+      }
+    );
     return response.data;
   }
 
@@ -251,11 +324,13 @@ export class TwoChatClient {
     groupUuid: string;
     description: string;
   }): Promise<any> {
-    let response = await this.axios.post('/whatsapp/groups/set-description', {
-      from_number: params.fromNumber,
-      to_group_uuid: params.groupUuid,
-      description: params.description
-    });
+    let response = await this.axios.post(
+      `/whatsapp/group/${encodeURIComponent(params.groupUuid)}/set-description`,
+      {
+        from_number: params.fromNumber,
+        description: params.description
+      }
+    );
     return response.data;
   }
 
@@ -264,20 +339,42 @@ export class TwoChatClient {
   async createContact(params: {
     firstName: string;
     lastName?: string;
+    channelUuid?: string;
     details: Array<{
       type: string;
       value: string;
       label?: string;
     }>;
   }): Promise<any> {
-    let response = await this.axios.post('/contacts/create', {
+    let response = await this.axios.post('/contacts', {
       first_name: params.firstName,
       last_name: params.lastName,
-      details: params.details.map(d => ({
-        type: d.type,
-        value: d.value,
-        label: d.label
+      channel_uuid: params.channelUuid,
+      contact_detail: params.details.map(d => ({
+        type:
+          (
+            { phone: 'PH', email: 'E', address: 'A', whatsapp: 'WAPH' } as Record<
+              string,
+              string
+            >
+          )[d.type] ?? d.type,
+        value: d.value
       }))
+    });
+    return response.data;
+  }
+
+  async listContacts(params: {
+    page?: number;
+    resultsPerPage?: number;
+    channelUuid?: string;
+  }): Promise<any> {
+    let response = await this.axios.get('/contacts', {
+      params: {
+        page_number: params.page ?? 0,
+        results_per_page: params.resultsPerPage ?? 50,
+        channel_uuid: params.channelUuid
+      }
     });
     return response.data;
   }

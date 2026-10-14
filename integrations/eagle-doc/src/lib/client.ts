@@ -1,14 +1,26 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class EagleDocClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; baseUrl: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'An Eagle Doc API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: config.baseUrl,
-      headers: {
-        'api-key': config.token
-      }
+      contentType: false,
+      timeout: 300000,
+      authHeader: { name: 'api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Eagle Doc',
+          reason: 'eagle_doc_api_error',
+          detailKeys: ['message', 'messageCode', 'messageDetails'],
+          nestedKeys: ['messageDetails']
+        })
     });
   }
 
@@ -26,8 +38,7 @@ export class EagleDocClient {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
     let response = await this.axios.post('/api/invoice/v1/processing', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -51,8 +62,7 @@ export class EagleDocClient {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
     let response = await this.axios.post('/api/receipt/v3/processing', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -71,8 +81,7 @@ export class EagleDocClient {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
     let response = await this.axios.post('/api/finance/v1/processing', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -94,8 +103,15 @@ export class EagleDocClient {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
     let response = await this.axios.post('/api/anydoc/v1/processing', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
+    });
+    return response.data;
+  }
+
+  async classifyDocument(params: { fileBase64: string; fileName: string; privacy?: boolean }) {
+    let formData = this.buildFormData(params.fileBase64, params.fileName);
+    let response = await this.axios.post('/api/anydoc/v1/classify', formData, {
+      params: { privacy: params.privacy }
     });
     return response.data;
   }
@@ -105,9 +121,7 @@ export class EagleDocClient {
   async splitDocument(params: { fileBase64: string; fileName: string }) {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
-    let response = await this.axios.post('/api/doc/v1/split', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let response = await this.axios.post('/api/doc/v1/split', formData);
     return response.data;
   }
 
@@ -116,9 +130,7 @@ export class EagleDocClient {
   async extractSignatures(params: { fileBase64: string; fileName: string }) {
     let formData = this.buildFormData(params.fileBase64, params.fileName);
 
-    let response = await this.axios.post('/api/signature/v1/extract', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let response = await this.axios.post('/api/signature/v1/extract', formData);
     return response.data;
   }
 
@@ -140,8 +152,7 @@ export class EagleDocClient {
     let formData = this.buildMultiFileFormData(params.filesBase64);
 
     let response = await this.axios.post('/api/finance/extract/batch/task/v1', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -160,8 +171,7 @@ export class EagleDocClient {
     let formData = this.buildMultiFileFormData(params.filesBase64);
 
     let response = await this.axios.post('/api/anydoc/extract/batch/task/v1', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -188,11 +198,9 @@ export class EagleDocClient {
     originalJson: string;
     correctedJson: string;
   }) {
-    let formData = new FormData();
-
-    let fileBuffer = Buffer.from(params.fileBase64, 'base64');
-    let fileBlob = new Blob([fileBuffer], { type: this.getMimeType(params.fileName) });
-    formData.append('file', fileBlob, params.fileName);
+    this.validateJson(params.originalJson, 'originalJson');
+    this.validateJson(params.correctedJson, 'correctedJson');
+    let formData = this.buildFormData(params.fileBase64, params.fileName);
 
     let originalBlob = new Blob([params.originalJson], { type: 'application/json' });
     formData.append('original', originalBlob, 'original.json');
@@ -200,9 +208,7 @@ export class EagleDocClient {
     let correctedBlob = new Blob([params.correctedJson], { type: 'application/json' });
     formData.append('corrected', correctedBlob, 'corrected.json');
 
-    let response = await this.axios.post('/api/docu/learning', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let response = await this.axios.post('/api/docu/learning', formData);
     return response.data;
   }
 
@@ -211,6 +217,7 @@ export class EagleDocClient {
     instructions: string;
     overwrite?: boolean;
   }) {
+    this.validateJson(params.correctedJson, 'correctedJson');
     let formData = new FormData();
 
     let correctedBlob = new Blob([params.correctedJson], { type: 'application/json' });
@@ -222,8 +229,7 @@ export class EagleDocClient {
     if (params.overwrite !== undefined) queryParams.overwrite = String(params.overwrite);
 
     let response = await this.axios.post('/api/docu/learning/instructions', formData, {
-      params: queryParams,
-      headers: { 'Content-Type': 'multipart/form-data' }
+      params: queryParams
     });
     return response.data;
   }
@@ -266,11 +272,22 @@ export class EagleDocClient {
     return queryParams;
   }
 
+  private validateJson(value: string, field: string): void {
+    try {
+      JSON.parse(value);
+    } catch {
+      throw createApiServiceError(`${field} must contain valid JSON.`);
+    }
+  }
+
   private buildFormData(fileBase64: string, fileName: string): FormData {
+    if (!fileName.trim() || !fileBase64.trim()) {
+      throw createApiServiceError(
+        'Provide a nonempty document file and its original file name.'
+      );
+    }
     let formData = new FormData();
-    let fileBuffer = Buffer.from(fileBase64, 'base64');
-    let fileBlob = new Blob([fileBuffer], { type: this.getMimeType(fileName) });
-    formData.append('file', fileBlob, fileName);
+    formData.append('file', this.documentBlob(fileBase64, fileName), fileName);
     return formData;
   }
 
@@ -279,11 +296,22 @@ export class EagleDocClient {
   ): FormData {
     let formData = new FormData();
     for (let file of files) {
-      let fileBuffer = Buffer.from(file.base64, 'base64');
-      let fileBlob = new Blob([fileBuffer], { type: this.getMimeType(file.fileName) });
-      formData.append('file', fileBlob, file.fileName);
+      formData.append('file', this.documentBlob(file.base64, file.fileName), file.fileName);
     }
     return formData;
+  }
+
+  private documentBlob(fileBase64: string, fileName: string): Blob {
+    if (!fileName.trim() || !fileBase64.trim()) {
+      throw createApiServiceError(
+        'Provide a nonempty document file and its original file name.'
+      );
+    }
+    let bytes = Buffer.from(fileBase64, 'base64');
+    if (!bytes.length) {
+      throw createApiServiceError('The document file must contain base64-encoded content.');
+    }
+    return new Blob([bytes], { type: this.getMimeType(fileName) });
   }
 
   private getMimeType(fileName: string): string {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -43,9 +43,10 @@ export let manageComment = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.resourceType)
-        throw new Error('resourceType is required to create a comment');
-      if (!ctx.input.resourceId) throw new Error('resourceId is required to create a comment');
-      if (!ctx.input.body) throw new Error('body is required to create a comment');
+        throw createApiServiceError('resourceType is required to create a comment');
+      if (!ctx.input.resourceId)
+        throw createApiServiceError('resourceId is required to create a comment');
+      if (!ctx.input.body) throw createApiServiceError('body is required to create a comment');
       let result = await client.createComment(ctx.input.resourceType, ctx.input.resourceId, {
         body: ctx.input.body
       });
@@ -57,8 +58,9 @@ export let manageComment = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to update a comment');
-      if (!ctx.input.body) throw new Error('body is required to update a comment');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('commentId is required to update a comment');
+      if (!ctx.input.body) throw createApiServiceError('body is required to update a comment');
       await client.updateComment(ctx.input.commentId, { body: ctx.input.body });
       return {
         output: { commentId: ctx.input.commentId, updated: true },
@@ -67,7 +69,8 @@ export let manageComment = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to delete a comment');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('commentId is required to delete a comment');
       await client.deleteComment(ctx.input.commentId);
       return {
         output: { commentId: ctx.input.commentId, deleted: true },
@@ -75,6 +78,6 @@ export let manageComment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

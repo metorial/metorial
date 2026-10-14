@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getRemainingCredits = SlateTool.create(spec, {
   name: 'Get Remaining Credits',
   key: 'get_remaining_credits',
-  description: `Check the number of monthly data credits remaining in your SimilarWeb account. This does not consume any data credits.`,
+  description: `Check the data credits remaining at the Similarweb account level. This does not consume any data credits.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -17,7 +17,7 @@ export let getRemainingCredits = SlateTool.create(spec, {
     z.object({
       remainingHits: z
         .number()
-        .describe('Number of data credits remaining for the current month.')
+        .describe('Number of data credits remaining at the account level.')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,7 +29,7 @@ export let getRemainingCredits = SlateTool.create(spec, {
       output: {
         remainingHits: result.remainingHits
       },
-      message: `You have **${result.remainingHits}** data credits remaining this month.`
+      message: `Your account has **${result.remainingHits}** data credits remaining.`
     };
   })
   .build();

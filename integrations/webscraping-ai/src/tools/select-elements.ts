@@ -77,7 +77,7 @@ Useful when you only need specific parts of a page like headings, prices, naviga
 
       elements = ctx.input.selectors.map((selector, i) => ({
         selector,
-        html: Array.isArray(results) ? results[i] || '' : String(results)
+        html: results[i] ?? ''
       }));
     }
 

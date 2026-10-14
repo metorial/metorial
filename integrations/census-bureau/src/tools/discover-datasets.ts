@@ -41,13 +41,23 @@ Use this tool to find the correct dataset path and vintage year before querying 
         .optional()
         .describe(
           'Search keyword to filter datasets by title or description (e.g., "population", "income", "housing")'
-        )
+        ),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of matching datasets to skip; use nextOffset to fetch the next page')
     })
   )
   .output(
     z.object({
       datasets: z.array(datasetSchema).describe('List of matching datasets'),
-      totalFound: z.number().describe('Total number of datasets found')
+      totalFound: z.number().describe('Total number of datasets found'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset for the next page, when more datasets exist')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,26 +68,29 @@ Use this tool to find the correct dataset path and vintage year before querying 
       keyword: ctx.input.keyword
     });
 
-    let mapped = datasets.slice(0, 100).map((ds: any) => ({
+    let offset = ctx.input.offset ?? 0;
+    let mapped = datasets.slice(offset, offset + 100).map(ds => ({
       title: ds.title || 'Untitled',
       description: ds.description || undefined,
       datasetPath: (ds.c_dataset || []).join('/'),
       vintage: ds.c_vintage?.toString() || undefined,
       modified: ds.modified || undefined,
-      distribution: (ds.distribution || []).map((d: any) => ({
+      distribution: (ds.distribution || []).map(d => ({
         accessURL: d.accessURL || undefined,
-        format: d['@type'] || undefined
+        format: d.format || d['@type'] || undefined
       }))
     }));
 
-    let filterDesc: any[] = [];
+    let filterDesc: string[] = [];
     if (ctx.input.vintage) filterDesc.push(`vintage ${ctx.input.vintage}`);
     if (ctx.input.keyword) filterDesc.push(`keyword "${ctx.input.keyword}"`);
 
     return {
       output: {
         datasets: mapped,
-        totalFound: datasets.length
+        totalFound: datasets.length,
+        nextOffset:
+          offset + mapped.length < datasets.length ? offset + mapped.length : undefined
       },
       message: `Found **${datasets.length}** datasets${filterDesc.length ? ` matching ${filterDesc.join(' and ')}` : ''}. Showing up to 100 results.`
     };

@@ -2,6 +2,7 @@ export * from './autosuggest-places';
 export * from './calculate-isoline';
 export * from './calculate-matrix';
 export * from './calculate-route';
+export * from './calculate-transit-route';
 export * from './estimate-position';
 export * from './geocode-address';
 export * from './get-traffic';

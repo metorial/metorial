@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'sendloop',
   name: 'Sendloop',
-  description: undefined,
+  description:
+    'Manage subscriber lists, import contacts, prepare and send email campaigns, and retrieve performance reports.',
   metadata: {},
   config,
   auth

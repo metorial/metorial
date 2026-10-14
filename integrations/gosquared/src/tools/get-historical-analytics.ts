@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GoSquaredClient } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,7 @@ export let getHistoricalAnalytics = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Aggregation interval for time series (e.g. "hour", "day", "week", "month"). Only for aggregate dimension.'
+          'Aggregation interval for time series: "hour", "day", or "month". Only for aggregate dimension.'
         ),
       limit: z.string().optional().describe('Maximum number of results to return')
     })
@@ -70,10 +70,17 @@ export let getHistoricalAnalytics = SlateTool.create(spec, {
 
     let result: any;
     if (ctx.input.dimension === 'aggregate') {
+      if (
+        ctx.input.interval !== undefined &&
+        !['hour', 'day', 'month'].includes(ctx.input.interval)
+      ) {
+        throw createApiServiceError('Use hour, day, or month for the aggregation interval.');
+      }
       result = await client.getTrendsAggregate({
         from: ctx.input.from,
         to: ctx.input.to,
-        interval: ctx.input.interval
+        interval: ctx.input.interval,
+        limit: ctx.input.limit
       });
     } else {
       result = await client.getTrendsByDimension(ctx.input.dimension, {

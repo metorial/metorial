@@ -1,5 +1,6 @@
 export * from './facilitation';
 export * from './list-workspaces';
+export * from './lookup';
 export * from './manage-murals';
 export * from './manage-rooms';
 export * from './manage-tags';

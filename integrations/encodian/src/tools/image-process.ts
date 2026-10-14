@@ -94,11 +94,13 @@ Supports JPG, PNG, BMP, TIFF, GIF, and HEIC formats.`,
     z.object({
       fileName: z.string().optional().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded output image'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
     let operationLabel = ctx.input.operation.replace(/_/g, ' ');
 
@@ -228,9 +230,11 @@ Supports JPG, PNG, BMP, TIFF, GIF, and HEIC formats.`,
       output: {
         fileName: result.Filename || result.filename || '',
         fileContent: result.FileContent || result.fileContent || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully performed **${operationLabel}** on image.`
+      message: client.message(`Successfully performed **${operationLabel}** on image.`)
     };
   })
   .build();

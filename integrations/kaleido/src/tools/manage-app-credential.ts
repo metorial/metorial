@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId, environmentId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageAppCredential = SlateTool.create(spec, {
@@ -18,8 +19,8 @@ export let manageAppCredential = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Action to perform'),
-      consortiumId: z.string().describe('Consortium ID'),
-      environmentId: z.string().describe('Environment ID'),
+      consortiumId,
+      environmentId,
       appCredId: z
         .string()
         .optional()
@@ -61,10 +62,10 @@ export let manageAppCredential = SlateTool.create(spec, {
       let creds = await client.listAppCreds(ctx.input.consortiumId, ctx.input.environmentId);
       let mapped = creds.map((c: any) => ({
         appCredId: c._id,
-        name: c.name || undefined,
-        membershipId: c.membership_id || undefined,
-        authType: c.auth_type || undefined,
-        createdAt: c.created_at || undefined
+        name: c.name ?? undefined,
+        membershipId: c.membership_id ?? undefined,
+        authType: c.auth_type ?? undefined,
+        createdAt: c.created_at ?? undefined
       }));
 
       return {
@@ -74,7 +75,8 @@ export let manageAppCredential = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.membershipId) throw new Error('Membership ID is required');
+      if (!ctx.input.membershipId)
+        throw createApiServiceError('Membership ID is required', { reason: 'invalid_input' });
 
       let result = await client.createAppCred(
         ctx.input.consortiumId,
@@ -87,18 +89,21 @@ export let manageAppCredential = SlateTool.create(spec, {
 
       return {
         output: {
-          appCredId: result._id,
-          name: result.name,
-          membershipId: result.membership_id,
-          username: result.username,
-          password: result.password,
-          authType: result.auth_type
+          appCredId: result._id ?? result.id ?? result.username,
+          name: result.name ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          username: result.username ?? undefined,
+          password: result.password ?? undefined,
+          authType: result.auth_type ?? undefined
         },
         message: `Created app credential (\`${result._id}\`). **Save the password now — it won't be shown again.**`
       };
     }
 
-    if (!ctx.input.appCredId) throw new Error('App credential ID is required');
+    if (!ctx.input.appCredId)
+      throw createApiServiceError('App credential ID is required', {
+        reason: 'invalid_input'
+      });
 
     if (ctx.input.action === 'get') {
       let result = await client.getAppCred(
@@ -108,10 +113,10 @@ export let manageAppCredential = SlateTool.create(spec, {
       );
       return {
         output: {
-          appCredId: result._id,
-          name: result.name,
-          membershipId: result.membership_id,
-          authType: result.auth_type
+          appCredId: result._id ?? result.id ?? result.username,
+          name: result.name ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          authType: result.auth_type ?? undefined
         },
         message: `App credential \`${result._id}\` — membership: ${result.membership_id || 'unknown'}.`
       };

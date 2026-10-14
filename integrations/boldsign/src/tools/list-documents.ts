@@ -22,7 +22,7 @@ export let listDocuments = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Filter by status: WaitingForMe, WaitingForOthers, NeedAttention, Completed, Declined, Revoked, Expired, Draft'
+          'Filter by status: WaitingForMe, WaitingForOthers, NeedAttention, Completed, Declined, Revoked, Expired, Scheduled, Draft, or None'
         ),
       searchKey: z
         .string()
@@ -58,7 +58,7 @@ export let listDocuments = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,8 +38,9 @@ export let geocodeTool = SlateTool.create(spec, {
   description: `Convert between addresses/place names and geographic coordinates. Supports **forward geocoding** (text to coordinates) and **reverse geocoding** (coordinates to place name). Use forward mode to find coordinates for an address or place, and reverse mode to find what's at a given location.`,
   instructions: [
     'For forward geocoding, provide a searchText. For reverse geocoding, provide longitude and latitude.',
-    'Use the "types" parameter to filter results (e.g., "address", "poi", "place", "region", "country").',
-    'Use "proximity" as "longitude,latitude" to bias results toward a location.'
+    'Use the "types" parameter to filter results (e.g., "address", "place", "region", "country").',
+    'Use "proximity" as "longitude,latitude" to bias results toward a location.',
+    'Points of interest are no longer provided by Geocoding v5. Use geocode_v6 for structured addresses and detailed address matches.'
   ],
   constraints: [
     'Search text is limited to 256 characters and 20 words.',
@@ -59,7 +60,7 @@ export let geocodeTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Text to geocode (required for forward mode). Can be an address, place name, or landmark.'
+          'Text to geocode (required for forward mode). Can be an address or place name.'
         ),
       longitude: z.number().optional().describe('Longitude for reverse geocoding'),
       latitude: z.number().optional().describe('Latitude for reverse geocoding'),
@@ -76,7 +77,7 @@ export let geocodeTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Comma-separated feature types to filter: country, region, postcode, district, place, locality, neighborhood, address, poi'
+          'Comma-separated feature types to filter: country, region, postcode, district, place, locality, neighborhood, address'
         ),
       proximity: z
         .string()
@@ -113,7 +114,7 @@ export let geocodeTool = SlateTool.create(spec, {
 
     if (ctx.input.mode === 'forward') {
       if (!ctx.input.searchText) {
-        throw new Error('searchText is required for forward geocoding');
+        throw createApiServiceError('searchText is required for forward geocoding');
       }
       result = await client.forwardGeocode(ctx.input.searchText, {
         country: ctx.input.country,
@@ -127,7 +128,9 @@ export let geocodeTool = SlateTool.create(spec, {
       });
     } else {
       if (ctx.input.longitude === undefined || ctx.input.latitude === undefined) {
-        throw new Error('longitude and latitude are required for reverse geocoding');
+        throw createApiServiceError(
+          'longitude and latitude are required for reverse geocoding'
+        );
       }
       result = await client.reverseGeocode(ctx.input.longitude, ctx.input.latitude, {
         country: ctx.input.country,

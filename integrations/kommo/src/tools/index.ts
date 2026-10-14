@@ -14,6 +14,7 @@ export * from './list-custom-fields';
 export * from './list-events';
 export * from './list-incoming-leads';
 export * from './list-leads';
+export * from './list-loss-reasons';
 export * from './list-notes';
 export * from './list-pipelines';
 export * from './list-tasks';

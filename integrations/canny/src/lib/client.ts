@@ -1,18 +1,33 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData
+} from 'slates';
 
 let http = createAxios({
-  baseURL: 'https://canny.io/api'
+  baseURL: 'https://canny.io/api',
+  headers: { 'Content-Type': 'application/json' }
 });
 
 export class CannyClient {
   constructor(private token: string) {}
 
   private async post<T = any>(path: string, data: Record<string, any> = {}): Promise<T> {
-    let response = await http.post(path, {
-      apiKey: this.token,
-      ...data
-    });
-    return response.data;
+    let result = await requestAxiosData<T>(
+      path,
+      () => http.post<T>(path, { ...data, apiKey: this.token }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Canny',
+          reason: 'canny_api_error',
+          operation
+        })
+    );
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      throw createApiServiceError(`Canny API ${path} failed: ${String(result.error)}`);
+    }
+    return result;
   }
 
   // ── Boards ──
@@ -73,7 +88,7 @@ export class CannyClient {
     customFields?: Record<string, any>;
     imageURLs?: string[];
   }) {
-    return this.post('/v1/posts/update', params);
+    return this.post<string>('/v1/posts/update', params);
   }
 
   async deletePost(postId: string) {
@@ -221,8 +236,8 @@ export class CannyClient {
   }
 
   async removeUserFromCompany(userId: string, companyId: string) {
-    return this.post('/v1/users/remove_from_company', {
-      userID: userId,
+    return this.post<string>('/v1/users/remove_user_from_company', {
+      id: userId,
       companyID: companyId
     });
   }
@@ -258,7 +273,7 @@ export class CannyClient {
     boardID: string;
     name: string;
     parentID?: string;
-    subscribeAdmins?: boolean;
+    subscribeAdmins: boolean;
   }) {
     return this.post('/v1/categories/create', params);
   }
@@ -267,7 +282,7 @@ export class CannyClient {
     return this.post('/v1/categories/retrieve', { id: categoryId });
   }
 
-  async listCategories(params: { boardID: string; limit?: number; skip?: number }) {
+  async listCategories(params: { boardID?: string; limit?: number; skip?: number }) {
     return this.post<{ categories: any[]; hasMore: boolean }>('/v1/categories/list', params);
   }
 
@@ -285,7 +300,7 @@ export class CannyClient {
     return this.post('/v1/tags/retrieve', { id: tagId });
   }
 
-  async listTags(params: { boardID: string; limit?: number; skip?: number }) {
+  async listTags(params: { boardID?: string; limit?: number; skip?: number }) {
     return this.post<{ tags: any[]; hasMore: boolean }>('/v1/tags/list', params);
   }
 
@@ -338,12 +353,15 @@ export class CannyClient {
   // ── Autopilot ──
 
   async enqueueFeedback(params: {
-    content: string;
-    sourceType?: string;
-    sourceURL?: string;
-    userID?: string;
-    companyID?: string;
+    type: 'call' | 'conversation';
+    payload: {
+      id: string;
+      authorID: string;
+      text: string;
+      sourceType?: string;
+      sourceURL?: string;
+    };
   }) {
-    return this.post('/v1/autopilot/enqueue_feedback', params);
+    return this.post<string>('/v1/ai/enqueue', params);
   }
 }

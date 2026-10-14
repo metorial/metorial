@@ -18,7 +18,7 @@ export let listImages = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'If provided, retrieves details for this specific image. Otherwise lists images with pagination.'
+          'Numeric image ID or image URL from a previous List Images result. If provided, retrieves this image; otherwise lists images with pagination.'
         ),
       page: z
         .number()

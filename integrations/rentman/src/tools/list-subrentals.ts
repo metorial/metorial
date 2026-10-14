@@ -24,10 +24,20 @@ export let listSubrentals = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 300)'),
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of results (max 1500)'),
       offset: z.number().optional().default(0).describe('Number of results to skip'),
       sort: z.string().optional().describe('Sort field with + or - prefix'),
-      fields: z.string().optional().describe('Comma-separated fields to return')
+      fields: z.string().optional().describe('Comma-separated fields to return'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
@@ -35,7 +45,8 @@ export let listSubrentals = SlateTool.create(spec, {
       subrentals: z.array(subrentalSchema),
       itemCount: z.number(),
       limit: z.number(),
-      offset: z.number()
+      offset: z.number(),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -45,20 +56,21 @@ export let listSubrentals = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      cursor: ctx.input.cursor
     });
 
     let subrentals = result.data.map((s: any) => ({
       subrentalId: s.id,
       name: s.name,
-      supplier: s.supplier,
+      supplier: s.supplier ?? undefined,
       project: s.project,
       status: s.status,
-      planningFrom: s.planperiod_start,
-      planningTo: s.planperiod_end,
-      memo: s.memo,
-      createdAt: s.created,
-      updatedAt: s.modified
+      planningFrom: s.planperiod_start ?? undefined,
+      planningTo: s.planperiod_end ?? undefined,
+      memo: s.remark ?? s.memo,
+      createdAt: s.created ?? undefined,
+      updatedAt: s.modified ?? undefined
     }));
 
     return {
@@ -66,7 +78,8 @@ export let listSubrentals = SlateTool.create(spec, {
         subrentals,
         itemCount: result.itemCount,
         limit: result.limit,
-        offset: result.offset
+        offset: result.offset,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** subrentals. Returned ${subrentals.length} subrentals (offset: ${result.offset}).`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BackendlessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let sendEmail = SlateTool.create(spec, {
   instructions: [
     'The template must already exist in Backendless Console under Messaging > Email Templates.',
     'Use `templateValues` to fill dynamic placeholder fields defined in the template.',
-    'Recipients can be specified explicitly via `toAddresses` or dynamically via `recipientCriteria` (a where clause against the Users table).'
+    'Recipients can be specified explicitly via `toAddresses` or dynamically via `recipientCriteria` (a where clause against the Users table). Criteria takes precedence over explicit addresses.'
   ],
   tags: {
     destructive: false,
@@ -41,11 +41,13 @@ export let sendEmail = SlateTool.create(spec, {
       templateValues: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Key-value pairs to substitute in template placeholders'),
+        .describe(
+          'Key-value pairs of primitive values to substitute in template placeholders'
+        ),
       attachments: z
         .array(z.string())
         .optional()
-        .describe('File paths in Backendless storage to attach to the email')
+        .describe('File paths from the Backendless storage root to attach to the email')
     })
   )
   .output(
@@ -58,6 +60,16 @@ export let sendEmail = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.templateValues &&
+      Object.values(ctx.input.templateValues).some(
+        value => value !== null && !['string', 'number', 'boolean'].includes(typeof value)
+      )
+    ) {
+      throw createApiServiceError(
+        'Template values must be strings, numbers, booleans, or null.'
+      );
+    }
     let client = new BackendlessClient({
       applicationId: ctx.auth.applicationId,
       token: ctx.auth.token,

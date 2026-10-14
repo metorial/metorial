@@ -7,9 +7,9 @@ export interface BugherdUser {
   id: number;
   email: string;
   display_name: string;
-  avatar_url: string | null;
-  created_at: string;
-  updated_at: string;
+  avatar_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BugherdProject {
@@ -54,7 +54,7 @@ export interface BugherdTask {
 
 export interface BugherdComment {
   id: number;
-  task_id: number;
+  task_id?: number;
   user_id: number;
   user: BugherdUser;
   text: string;
@@ -75,7 +75,7 @@ export interface BugherdColumn {
   id: number;
   name: string;
   position: number;
-  sortorder: string | null;
+  sortorder?: string | null;
 }
 
 export interface BugherdWebhook {

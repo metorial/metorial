@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,7 +64,7 @@ export let manageDeployment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
@@ -75,7 +75,7 @@ export let manageDeployment = SlateTool.create(spec, {
           !ctx.input.projectSlug ||
           !ctx.input.buildVersion
         ) {
-          throw new Error(
+          throw createApiServiceError(
             'environmentName, accountName, projectSlug, and buildVersion are required for start'
           );
         }
@@ -95,7 +95,7 @@ export let manageDeployment = SlateTool.create(spec, {
 
       case 'get': {
         if (ctx.input.deploymentId === undefined) {
-          throw new Error('deploymentId is required for get');
+          throw createApiServiceError('deploymentId is required for get');
         }
         let deployment = await client.getDeployment(ctx.input.deploymentId);
         return {
@@ -106,7 +106,7 @@ export let manageDeployment = SlateTool.create(spec, {
 
       case 'cancel': {
         if (ctx.input.deploymentId === undefined) {
-          throw new Error('deploymentId is required for cancel');
+          throw createApiServiceError('deploymentId is required for cancel');
         }
         await client.cancelDeployment(ctx.input.deploymentId);
         return {
@@ -117,7 +117,9 @@ export let manageDeployment = SlateTool.create(spec, {
 
       case 'projectHistory': {
         if (!ctx.input.accountName || !ctx.input.projectSlug) {
-          throw new Error('accountName and projectSlug are required for projectHistory');
+          throw createApiServiceError(
+            'accountName and projectSlug are required for projectHistory'
+          );
         }
         let result = await client.getProjectDeployments(
           ctx.input.accountName,
@@ -132,7 +134,7 @@ export let manageDeployment = SlateTool.create(spec, {
 
       case 'environmentHistory': {
         if (ctx.input.environmentId === undefined) {
-          throw new Error('environmentId is required for environmentHistory');
+          throw createApiServiceError('environmentId is required for environmentHistory');
         }
         let result = await client.getEnvironmentDeployments(ctx.input.environmentId);
         let deployments = (result as any).deployments || [];
@@ -143,7 +145,7 @@ export let manageDeployment = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

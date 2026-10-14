@@ -13,8 +13,10 @@ export let getForm = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list the form belongs to'),
-      formId: z.string().describe('ID of the form to retrieve')
+      listId: z.string().describe('List ID. Call list_lists to discover available lists.'),
+      formId: z
+        .string()
+        .describe('Form ID. Call list_forms for the chosen list to find forms.')
     })
   )
   .output(

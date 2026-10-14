@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  requestAxios
+} from 'slates';
+import { z } from 'zod';
 
 export interface EmailValidationResult {
   email: string;
@@ -15,29 +22,22 @@ export interface EmailValidationResult {
   score: number | null;
 }
 
-interface RawEmailValidationResult {
-  email: string;
-  did_you_mean: string | null;
-  user: string | null;
-  domain: string | null;
-  format_valid: boolean | null;
-  mx_found: boolean | null;
-  smtp_check: boolean | null;
-  catch_all: boolean | null;
-  role: boolean | null;
-  disposable: boolean | null;
-  free: boolean | null;
-  score: number | null;
-}
+let rawEmailResultSchema = z.object({
+  email: z.string(),
+  did_you_mean: z.string().nullish(),
+  user: z.string().nullish(),
+  domain: z.string().nullish(),
+  format_valid: z.boolean().nullish(),
+  mx_found: z.boolean().nullish(),
+  smtp_check: z.boolean().nullish(),
+  catch_all: z.boolean().nullish(),
+  role: z.boolean().nullish(),
+  disposable: z.boolean().nullish(),
+  free: z.boolean().nullish(),
+  score: z.number().nullish()
+});
 
-interface ApiErrorResponse {
-  success: false;
-  error: {
-    code: number;
-    type: string;
-    info: string;
-  };
-}
+type RawEmailValidationResult = z.infer<typeof rawEmailResultSchema>;
 
 let mapResult = (raw: RawEmailValidationResult): EmailValidationResult => ({
   email: raw.email,
@@ -54,25 +54,55 @@ let mapResult = (raw: RawEmailValidationResult): EmailValidationResult => ({
   score: raw.score ?? null
 });
 
-let checkForError = (data: any) => {
-  if (data && data.success === false && data.error) {
-    let err = data as ApiErrorResponse;
-    throw new Error(
-      `Mailboxlayer API error (${err.error.code}): ${err.error.type} - ${err.error.info}`
-    );
-  }
-};
-
 export class Client {
-  private api;
+  private api: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Mailboxlayer API Access Key is required.');
+    }
     this.api = createAxios({
       baseURL: 'https://apilayer.net/api',
       params: {
         access_key: config.token
-      }
+      },
+      // Inspect HTTP failures before the shared interceptor discards the response body.
+      validateStatus: () => true
     });
+  }
+
+  private async request(path: string, params: Record<string, string>): Promise<unknown> {
+    let response = await requestAxios(
+      path,
+      () => this.api.get<unknown>(path, { params }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Mailboxlayer',
+          reason: 'mailboxlayer_api_error',
+          operation
+        })
+    );
+    let data = response.data;
+    if (response.status >= 400 || (isApiErrorRecord(data) && data.success === false)) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Mailboxlayer',
+          reason: 'mailboxlayer_api_error',
+          operation: path,
+          detailKeys: ['info', 'type', 'code', 'msg', 'message'],
+          nestedKeys: ['error', 'detail'],
+          fallbackMessage: 'The request was rejected.',
+          extractUpstreamCode: () =>
+            isApiErrorRecord(data) &&
+            isApiErrorRecord(data.error) &&
+            (typeof data.error.code === 'number' || typeof data.error.code === 'string')
+              ? String(data.error.code)
+              : undefined
+        }
+      );
+    }
+    return data;
   }
 
   async validateEmail(params: {
@@ -92,9 +122,14 @@ export class Client {
       queryParams.catch_all = '1';
     }
 
-    let response = await this.api.get('/check', { params: queryParams });
-    checkForError(response.data);
-    return mapResult(response.data as RawEmailValidationResult);
+    let data = await this.request('/check', queryParams);
+    let result = rawEmailResultSchema.safeParse(data);
+    if (!result.success) {
+      throw createApiServiceError('Mailboxlayer returned an invalid validation response.', {
+        reason: 'mailboxlayer_invalid_response'
+      });
+    }
+    return mapResult(result.data);
   }
 
   async bulkValidateEmails(params: {
@@ -114,9 +149,16 @@ export class Client {
       queryParams.catch_all = '1';
     }
 
-    let response = await this.api.get('/bulk_check', { params: queryParams });
-    checkForError(response.data);
-    let results = response.data as RawEmailValidationResult[];
-    return results.map(mapResult);
+    let data = await this.request('/bulk_check', queryParams);
+    let results = z.array(rawEmailResultSchema).safeParse(data);
+    if (!results.success) {
+      throw createApiServiceError(
+        'Mailboxlayer returned an invalid bulk validation response.',
+        {
+          reason: 'mailboxlayer_invalid_response'
+        }
+      );
+    }
+    return results.data.map(mapResult);
   }
 }

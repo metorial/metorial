@@ -24,10 +24,19 @@ export let listProfiles = SlateTool.create(spec, {
         z.object({
           profileId: z.string().describe('Unique identifier of the profile'),
           name: z.string().describe('Name of the profile'),
+          isDefault: z
+            .boolean()
+            .optional()
+            .describe('Whether this is the default run profile'),
           variables: z
             .record(z.string(), z.string())
+            .optional()
             .describe('Variable key-value pairs defined in this profile'),
-          browser: z.string().nullable().describe('Browser configured for this profile')
+          browser: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Browser configured for this profile')
         })
       ),
       hasMore: z.boolean().describe('Whether there are more pages of results')
@@ -44,6 +53,7 @@ export let listProfiles = SlateTool.create(spec, {
     let profiles = result.results.map(p => ({
       profileId: p.id,
       name: p.name,
+      isDefault: p.isDefault,
       variables: p.variables,
       browser: p.browser
     }));
@@ -52,7 +62,7 @@ export let listProfiles = SlateTool.create(spec, {
       output: {
         totalCount: result.count,
         profiles,
-        hasMore: result.next !== null
+        hasMore: Boolean(result.next)
       },
       message: `Found **${result.count}** profile(s). Returned ${profiles.length} on this page.`
     };

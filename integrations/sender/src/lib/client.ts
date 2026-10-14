@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -18,19 +18,36 @@ export interface PaginatedResponse<T> {
   };
 }
 
+type SenderPageResponse<T> = Omit<PaginatedResponse<T>, 'data'> & { data: T | T[] };
+
+// Some Sender list endpoint examples wrap one result in an object instead of an array.
+let senderPage = <T>(response: SenderPageResponse<T>): PaginatedResponse<T> => ({
+  ...response,
+  data: Array.isArray(response.data) ? response.data : [response.data]
+});
+
 export interface Subscriber {
-  id: number;
+  id: string | number;
   email: string;
   firstname: string | null;
   lastname: string | null;
   phone: string | null;
-  phone_country: string | null;
+  phone_country: { phone_code: number; country_code: string } | string | null;
   created: string;
-  subscriber_status: string;
-  sms_status: string;
-  transactional_email_status: string;
+  subscriber_status?: string;
+  sms_status?: string;
+  transactional_email_status?: string;
+  status?: { email?: string; sms?: string; temail?: string };
   subscriber_tags: Array<{ id: string; title: string }>;
-  columns: Record<string, string>;
+  columns?:
+    | Record<string, string>
+    | Array<{
+        id: string;
+        title: string;
+        type: string;
+        field_name?: string;
+        value: string | number | boolean | null;
+      }>;
 }
 
 export interface Group {
@@ -42,8 +59,8 @@ export interface Group {
   bounced_count: number;
   phone_count: number;
   active_phone_count: number;
-  opens_rate: number;
-  click_rate: number;
+  opens_rate?: number;
+  click_rate?: number;
   created: string;
   account_id: string;
 }
@@ -66,16 +83,19 @@ export interface Campaign {
   title: string | null;
   from: string | null;
   reply_to: string | null;
-  content_type: string;
+  content_type?: string;
+  editor?: string;
   status: string;
   created: string;
   modified: string;
-  groups: unknown[];
-  segments: unknown[];
+  groups?: string[];
+  campaign_groups?: string[];
+  segments?: string[];
+  html?: { html_content?: string | null; html_body?: string | null } | null;
 }
 
 export interface CustomField {
-  id: string;
+  id: string | null;
   title: string;
   type: string;
   field_name: string;
@@ -94,12 +114,46 @@ export interface Webhook {
   status: string;
 }
 
+export interface Workflow {
+  id: string;
+  title: string;
+  status: string;
+  created: string;
+  modified: string | null;
+  description?: string | null;
+  emails_sent?: number;
+}
+
+export let subscriberDetails = (subscriber: Subscriber) => ({
+  subscriberId: typeof subscriber.id === 'number' ? subscriber.id : undefined,
+  subscriberKey: String(subscriber.id),
+  email: subscriber.email,
+  firstname: subscriber.firstname ?? null,
+  lastname: subscriber.lastname ?? null,
+  phone: subscriber.phone ?? null,
+  subscriberStatus: subscriber.subscriber_status ?? subscriber.status?.email ?? 'UNKNOWN',
+  smsStatus: subscriber.sms_status ?? subscriber.status?.sms,
+  transactionalEmailStatus:
+    subscriber.transactional_email_status ?? subscriber.status?.temail ?? 'UNKNOWN',
+  createdAt: subscriber.created
+});
+
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(private config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.sender.net/v2'
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Sender API access token is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.sender.net/v2',
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Sender',
+          reason: 'sender_api_error'
+        })
     });
   }
 
@@ -183,10 +237,11 @@ export class Client {
     triggerAutomation: boolean = true
   ): Promise<{
     message: {
-      subscribers_add_tag_group: string[];
-      non_existing_subscribers: string[];
-      invalid_emails: string[];
-      subscribers_with_group_already: string[];
+      subscribers_added_to_group?: string[];
+      subscribers_add_tag_group?: string[];
+      non_existing_subscribers?: string[];
+      invalid_emails?: string[];
+      subscribers_with_group_already?: string[];
     };
   }> {
     let response = await this.axios.post(
@@ -201,12 +256,16 @@ export class Client {
     groupId: string,
     subscribers: string[]
   ): Promise<{
-    message: {
-      subscribers_remove_tag_group: string[];
-      subscribers_without_group_already: string[];
-      non_existing_subscribers: string[];
-      invalid_emails: string[];
-    };
+    success?: boolean;
+    message:
+      | string
+      | {
+          subscribers_removed_from_group?: string[];
+          subscribers_remove_tag_group?: string[];
+          subscribers_without_group_already?: string[];
+          non_existing_subscribers?: string[];
+          invalid_emails?: string[];
+        };
   }> {
     let response = await this.axios.delete(
       `/subscribers/groups/${encodeURIComponent(groupId)}`,
@@ -279,11 +338,11 @@ export class Client {
   // ---- Custom Fields ----
 
   async listFields(page: number = 1): Promise<PaginatedResponse<CustomField>> {
-    let response = await this.axios.get('/fields', {
+    let response = await this.axios.get<SenderPageResponse<CustomField>>('/fields', {
       headers: this.headers,
       params: { page }
     });
-    return response.data;
+    return senderPage(response.data);
   }
 
   // ---- Campaigns ----
@@ -293,11 +352,11 @@ export class Client {
     status?: string;
     page?: number;
   }): Promise<PaginatedResponse<Campaign>> {
-    let response = await this.axios.get('/campaigns', {
+    let response = await this.axios.get<SenderPageResponse<Campaign>>('/campaigns', {
       headers: this.headers,
       params
     });
-    return response.data;
+    return senderPage(response.data);
   }
 
   async getCampaign(campaignId: string): Promise<{ success: boolean; data: Campaign }> {
@@ -373,6 +432,16 @@ export class Client {
 
   // ---- Workflows ----
 
+  async listWorkflows(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    title?: string;
+  }): Promise<PaginatedResponse<Workflow>> {
+    let response = await this.axios.get('/workflows', { headers: this.headers, params });
+    return response.data;
+  }
+
   async startWorkflow(
     workflowId: string,
     email: string
@@ -406,7 +475,7 @@ export class Client {
         params: { page }
       }
     );
-    return response.data;
+    return senderPage(response.data);
   }
 
   async getCampaignOpens(
@@ -423,7 +492,7 @@ export class Client {
       headers: this.headers,
       params: { page }
     });
-    return response.data;
+    return senderPage(response.data);
   }
 
   // ---- Webhooks ----

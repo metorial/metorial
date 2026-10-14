@@ -16,6 +16,8 @@ import {
   deleteSpace,
   deleteTask,
   deleteTimeEntry,
+  getCompany,
+  getPhase,
   getProject,
   getTask,
   listComments,
@@ -43,6 +45,8 @@ export let provider = Slate.create({
   tools: [
     createProject,
     updateProject,
+    getCompany,
+    getPhase,
     getProject,
     listProjects,
     deleteProject,

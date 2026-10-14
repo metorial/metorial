@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { MotionClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a valid Motion API key.');
+      }
       return {
         output: {
           token: ctx.input.token
@@ -27,21 +31,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.usemotion.com/v1'
-      });
-
-      let response = await axios.get('/users/me', {
-        headers: {
-          'X-API-Key': ctx.output.token
-        }
-      });
+      let profile = await new MotionClient({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
-          id: response.data.id,
-          email: response.data.email,
-          name: response.data.name
+          id: profile.id,
+          email: profile.email,
+          name: profile.name
         }
       };
     }

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SmsAlertClient } from '../lib/client';
+import { SmsAlertClient, type SmsAlertResponse } from '../lib/client';
+import { groupIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let sendSms = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ Optionally specify a delivery report callback URL to receive delivery status upd
   instructions: [
     'Mobile numbers can include country code (e.g., 918010551055) or be without it.',
     'For multiple recipients, provide comma-separated numbers in the mobileNumbers field.',
-    'To send to a contact group instead, use the groupName field and leave mobileNumbers empty.'
+    'To send to a contact group, use groupId from manage_groups action list, or groupName, and leave mobileNumbers empty.'
   ],
   constraints: ['Sender ID must be pre-approved and assigned to your SMS Alert account.'],
   tags: {
@@ -34,11 +35,12 @@ Optionally specify a delivery report callback URL to receive delivery status upd
         .describe(
           'Recipient mobile number(s), comma-separated for multiple recipients (e.g., "918010551055,918010551056").'
         ),
+      groupId: groupIdSchema,
       groupName: z
         .string()
         .optional()
         .describe(
-          'Name of a contact group to send the SMS to. Use this instead of mobileNumbers to message an entire group.'
+          'Name of a contact group to discover and message. Alternatively use groupId from manage_groups action list.'
         ),
       message: z.string().describe('SMS message text to send.'),
       route: z
@@ -50,7 +52,9 @@ Optionally specify a delivery report callback URL to receive delivery status upd
       dlrUrl: z
         .string()
         .optional()
-        .describe('URL-encoded callback URL to receive delivery report notifications.'),
+        .describe(
+          'HTTP or HTTPS callback URL for delivery reports. Previously URL-encoded values are also accepted.'
+        ),
       reference: z
         .string()
         .optional()
@@ -70,24 +74,33 @@ Optionally specify a delivery report callback URL to receive delivery status upd
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
     let senderId = ctx.input.senderId || ctx.config.senderId;
 
     if (!senderId) {
-      throw new Error(
+      throw createApiServiceError(
         'Sender ID is required. Set it in the configuration or provide it in the input.'
       );
     }
 
-    let result: any;
+    let result: SmsAlertResponse;
 
-    if (ctx.input.groupName) {
+    if ((ctx.input.groupName || ctx.input.groupId) && ctx.input.mobileNumbers) {
+      throw createApiServiceError(
+        'Provide either a contact group or mobile numbers, not both.'
+      );
+    }
+
+    if (ctx.input.groupName || ctx.input.groupId) {
       ctx.info(`Sending SMS to group: ${ctx.input.groupName}`);
       result = await client.sendSmsToGroup({
         sender: senderId,
         groupName: ctx.input.groupName,
+        groupId: ctx.input.groupId,
         text: ctx.input.message,
-        route: ctx.input.route
+        route: ctx.input.route,
+        dlrUrl: ctx.input.dlrUrl,
+        reference: ctx.input.reference
       });
     } else if (ctx.input.mobileNumbers) {
       ctx.info(`Sending SMS to: ${ctx.input.mobileNumbers}`);
@@ -100,17 +113,18 @@ Optionally specify a delivery report callback URL to receive delivery status upd
         reference: ctx.input.reference
       });
     } else {
-      throw new Error('Either mobileNumbers or groupName must be provided.');
+      throw createApiServiceError('Provide mobileNumbers, groupId, or groupName.');
     }
 
-    let target = ctx.input.groupName
-      ? `group **${ctx.input.groupName}**`
-      : `**${ctx.input.mobileNumbers}**`;
+    let target =
+      ctx.input.groupName || ctx.input.groupId
+        ? `group **${ctx.input.groupName || ctx.input.groupId}**`
+        : `**${ctx.input.mobileNumbers}**`;
 
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        description: result.description ?? result
       },
       message: `SMS sent to ${target} with status: **${result.status || 'unknown'}**`
     };

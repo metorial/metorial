@@ -23,7 +23,13 @@ export let listJobs = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Number of jobs to skip for pagination. Defaults to 0.'),
-      limit: z.number().optional().describe('Maximum number of jobs to return.')
+      limit: z
+        .number()
+        .min(1)
+        .max(1000)
+        .refine(Number.isInteger, 'Use a whole-number limit.')
+        .optional()
+        .describe('Maximum number of jobs to return.')
     })
   )
   .output(
@@ -82,7 +88,7 @@ export let listJobs = SlateTool.create(spec, {
     });
 
     let jobs = (result.result || []).map((j: any) => ({
-      jobId: j.job_id,
+      jobId: String(j.job_id),
       agentId: j.agent_id,
       status: j.status,
       pagesProcessed: j.pages_processed,

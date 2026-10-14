@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,6 +31,7 @@ export let manageCampaign = SlateTool.create(spec, {
         .optional()
         .describe('Sender email address (must use a verified domain)'),
       subject: z.string().optional().describe('Email subject line'),
+      replyTo: z.string().optional().describe('Reply-to email address'),
       htmlContent: z.string().optional().describe('HTML content of the campaign email')
     })
   )
@@ -39,7 +40,8 @@ export let manageCampaign = SlateTool.create(spec, {
       status: z.string().describe('Response status'),
       statusCode: z.string().describe('Response status code'),
       message: z.string().optional().describe('Response message'),
-      campaignData: z.any().optional().describe('Campaign data returned by the API')
+      campaignData: z.any().optional().describe('Campaign data returned by the API'),
+      campaignId: z.string().optional().describe('ID of the created or updated campaign')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,7 +57,8 @@ export let manageCampaign = SlateTool.create(spec, {
         senderName: ctx.input.senderName,
         senderEmail: ctx.input.senderEmail,
         subject: ctx.input.subject,
-        content: ctx.input.htmlContent
+        content: ctx.input.htmlContent,
+        replyTo: ctx.input.replyTo
       });
       action = 'updated';
     } else {
@@ -66,7 +69,7 @@ export let manageCampaign = SlateTool.create(spec, {
         !ctx.input.subject ||
         !ctx.input.htmlContent
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'When creating a new campaign, campaignName, senderName, senderEmail, subject, and htmlContent are all required.'
         );
       }
@@ -75,7 +78,8 @@ export let manageCampaign = SlateTool.create(spec, {
         senderName: ctx.input.senderName,
         senderEmail: ctx.input.senderEmail,
         subject: ctx.input.subject,
-        content: ctx.input.htmlContent
+        content: ctx.input.htmlContent,
+        replyTo: ctx.input.replyTo
       });
       action = 'created';
     }
@@ -85,7 +89,8 @@ export let manageCampaign = SlateTool.create(spec, {
         status: result.Result?.Status ?? 'Unknown',
         statusCode: result.Result?.StatusCode ?? 'Unknown',
         message: result.Result?.Message ?? result.Result?.ErrorMessage,
-        campaignData: result.Result?.Data
+        campaignData: result.Result?.Data,
+        campaignId: result.Result?.CampaignID ?? ctx.input.campaignId
       },
       message: `Campaign ${action} successfully: **${ctx.input.campaignName ?? ctx.input.campaignId}**.`
     };

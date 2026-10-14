@@ -13,15 +13,24 @@ export let listJobsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageSize: z.number().optional().describe('Number of items per page'),
+      pageSize: z
+        .number()
+        .min(1)
+        .max(25)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .optional()
+        .describe('Number of items per page, up to 25'),
       pageStartIndex: z
         .number()
+        .min(0)
+        .max(100000)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
         .optional()
         .describe('Index of the first element to return (default: 0, max: 100000)'),
       startDate: z.string().optional().describe('Start date filter in YYYY-MM-DD format'),
       endDate: z.string().optional().describe('End date filter in YYYY-MM-DD format'),
       filterByDate: z
-        .enum(['CreatedDate', 'ModifiedDate'])
+        .enum(['CreatedDate', 'ModifiedDate', 'MilestoneDate'])
         .optional()
         .describe('Which date field to filter on'),
       milestones: z
@@ -39,7 +48,14 @@ export let listJobsTool = SlateTool.create(spec, {
         .describe(
           'Comma-separated related data to include (e.g. "contact,initialAppointment")'
         ),
-      assignment: z.enum(['unassigned']).optional().describe('Filter by assignment status')
+      assignment: z
+        .enum(['unassigned', 'assigned'])
+        .optional()
+        .describe('Filter by assignment status'),
+      dateFilterType: z
+        .enum(['CreatedDate', 'MilestoneDate', 'ModifiedDate'])
+        .optional()
+        .describe('Date field to filter on; takes precedence over filterByDate')
     })
   )
   .output(
@@ -57,6 +73,7 @@ export let listJobsTool = SlateTool.create(spec, {
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
       filterByDate: ctx.input.filterByDate,
+      dateFilterType: ctx.input.dateFilterType,
       milestones: ctx.input.milestones,
       sortBy: ctx.input.sortBy,
       sortOrder: ctx.input.sortOrder,
@@ -65,7 +82,7 @@ export let listJobsTool = SlateTool.create(spec, {
     });
 
     let jobs = Array.isArray(result) ? result : (result?.items ?? result?.data ?? [result]);
-    let totalCount = result?.totalCount ?? result?.total ?? jobs.length;
+    let totalCount = result?.count ?? result?.totalCount ?? result?.total ?? jobs.length;
 
     return {
       output: { jobs, totalCount },

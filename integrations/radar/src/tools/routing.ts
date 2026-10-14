@@ -6,7 +6,9 @@ import { spec } from '../spec';
 let routeInfoSchema = z.object({
   distance: z
     .object({
-      value: z.number().describe('Distance value in meters'),
+      value: z
+        .number()
+        .describe('Distance value in meters for metric units or feet for imperial units'),
       text: z.string().describe('Human-readable distance')
     })
     .optional()
@@ -24,7 +26,7 @@ export let calculateDistanceTool = SlateTool.create(spec, {
   name: 'Calculate Distance',
   key: 'calculate_distance',
   description: `Calculate the travel distance and duration between an origin and destination. Supports multiple travel modes (car, truck, foot, bike) simultaneously and returns results for each mode.`,
-  constraints: ['Rate limited to 100 requests per second.'],
+  constraints: ['Default rate limit is 50 requests per second.'],
   tags: {
     readOnly: true
   }
@@ -99,7 +101,7 @@ export let getDirectionsTool = SlateTool.create(spec, {
   name: 'Get Directions',
   key: 'get_directions',
   description: `Get turn-by-turn directions between multiple locations. Supports different travel modes and can return alternative routes.`,
-  constraints: ['Rate limited to 10 requests per second.'],
+  constraints: ['Default rate limit is 20 requests per second.'],
   tags: {
     readOnly: true
   }
@@ -168,7 +170,7 @@ export let calculateMatrixTool = SlateTool.create(spec, {
   name: 'Calculate Distance Matrix',
   key: 'calculate_distance_matrix',
   description: `Calculate distances and durations between multiple origins and destinations. Useful for comparing travel times across many location pairs simultaneously.`,
-  constraints: ['Rate limited to 20 requests per second.'],
+  constraints: ['Default rate limit is 10 requests per second.'],
   tags: {
     readOnly: true
   }

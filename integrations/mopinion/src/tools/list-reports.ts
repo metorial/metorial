@@ -54,7 +54,7 @@ export let listReports = SlateTool.create(spec, {
               description: reportData.description,
               language: reportData.language,
               created: reportData.created,
-              datasets: reportData.datasets || []
+              datasets: reportData.datasets ?? reportData.dataSets ?? []
             }
           ]
         },
@@ -71,7 +71,7 @@ export let listReports = SlateTool.create(spec, {
       description: r.description,
       language: r.language,
       created: r.created,
-      datasets: r.datasets || []
+      datasets: r.datasets ?? r.dataSets ?? []
     }));
 
     return {

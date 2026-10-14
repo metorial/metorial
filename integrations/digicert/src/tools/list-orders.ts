@@ -43,7 +43,9 @@ export let listOrders = SlateTool.create(spec, {
           'needs_approval',
           'expired',
           'reissue_pending',
-          'reissue_revoked'
+          'reissue_revoked',
+          'waiting_pickup',
+          'active_issued'
         ])
         .optional()
         .describe('Filter orders by status'),
@@ -52,11 +54,19 @@ export let listOrders = SlateTool.create(spec, {
         .optional()
         .describe('Filter by product name ID (e.g., "ssl_plus", "ssl_ev_plus")'),
       commonName: z.string().optional().describe('Filter by common name (domain)'),
-      offset: z.number().optional().describe('Pagination offset (default 0)'),
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .nonnegative()
+        .optional()
+        .describe('Pagination offset (default 0)'),
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .nonnegative()
+        .max(5000)
         .optional()
-        .describe('Number of results to return (default 25, max 1000)')
+        .describe('Number of results to return (default 1000, max 5000)')
     })
   )
   .output(
@@ -71,15 +81,7 @@ export let listOrders = SlateTool.create(spec, {
       platform: ctx.config.platform
     });
 
-    let params: Record<string, any> = {};
-    if (ctx.input.status) params.status = ctx.input.status;
-    if (ctx.input.productNameId) params.filters = { product_name_id: ctx.input.productNameId };
-    if (ctx.input.commonName)
-      params.filters = { ...params.filters, common_name: ctx.input.commonName };
-    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
-    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
-
-    let result = await client.listOrders(params);
+    let result = await client.listOrders(ctx.input);
 
     let orders = (result.orders || []).map((order: any) => ({
       orderId: order.id,
@@ -97,7 +99,7 @@ export let listOrders = SlateTool.create(spec, {
       isRenewal: order.is_renewal
     }));
 
-    let totalCount = result.page?.total || orders.length;
+    let totalCount = result.page?.total ?? orders.length;
 
     return {
       output: { orders, totalCount },

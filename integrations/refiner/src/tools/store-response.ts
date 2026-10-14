@@ -16,6 +16,12 @@ export let storeResponse = SlateTool.create(spec, {
     z.object({
       userId: z.string().optional().describe('External user ID'),
       email: z.string().optional().describe('Email address of the user'),
+      contactUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Refiner contact UUID from get_contact or list_contacts, as an alternative to userId or email'
+        ),
       surveyUuid: z.string().describe('UUID of the survey to store the response for'),
       responseDate: z
         .string()
@@ -44,13 +50,14 @@ export let storeResponse = SlateTool.create(spec, {
     let result = (await client.storeResponse({
       id: ctx.input.userId,
       email: ctx.input.email,
+      uuid: ctx.input.contactUuid,
       formUuid: ctx.input.surveyUuid,
       date: ctx.input.responseDate,
       preventDuplicates: ctx.input.preventDuplicates,
       responseData: ctx.input.responseData
     })) as any;
 
-    let identifier = ctx.input.userId || ctx.input.email || 'unknown';
+    let identifier = ctx.input.userId || ctx.input.email || ctx.input.contactUuid || 'unknown';
 
     return {
       output: {

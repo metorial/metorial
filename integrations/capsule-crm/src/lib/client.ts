@@ -1,4 +1,8 @@
-import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue
+} from 'slates';
 
 export class CapsuleClient {
   private axios: ReturnType<typeof createAuthenticatedAxios>;
@@ -376,7 +380,14 @@ export class CapsuleClient {
   // ── Users ────────────────────────────────────────────────
 
   async listUsers() {
-    let response = await this.axios.get('/users');
+    let response = await this.axios.get('/users', { params: { embed: 'party' } });
+    return response.data;
+  }
+
+  async listTeams(embed?: string[]) {
+    let response = await this.axios.get('/teams', {
+      params: { embed: embed?.join(',') }
+    });
     return response.data;
   }
 
@@ -404,14 +415,25 @@ export class CapsuleClient {
     return response.data.lostReasons as { id: number; name: string }[];
   }
 
-  async listPipelines() {
-    let response = await this.axios.get('/pipelines');
+  async listPipelines(params?: { page?: number; perPage?: number; includeDeleted?: boolean }) {
+    let response = await this.axios.get('/pipelines', { params });
     return response.data;
   }
 
   async listMilestones(pipelineId: number) {
-    let response = await this.axios.get(`/pipelines/${pipelineId}/milestones`);
-    return response.data;
+    let milestones: { id: number; name: string; probability?: number; complete?: boolean }[] =
+      [];
+    let page = 1;
+    while (true) {
+      let response = await this.axios.get(`/pipelines/${pipelineId}/milestones`, {
+        params: { page, perPage: 100 }
+      });
+      milestones.push(...response.data.milestones);
+      let link = getResponseHeaderValue(response.headers, 'link');
+      if (!link || !/rel="?next"?/.test(link)) break;
+      page += 1;
+    }
+    return { milestones };
   }
 
   // ── Boards & Stages ─────────────────────────────────────

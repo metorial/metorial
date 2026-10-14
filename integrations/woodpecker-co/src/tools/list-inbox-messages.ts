@@ -15,7 +15,12 @@ export let listInboxMessages = SlateTool.create(spec, {
     z.object({
       campaignId: z.number().optional().describe('Filter messages by campaign ID'),
       page: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Messages per page')
+      perPage: z.number().optional().describe('Messages per page (maximum 50)'),
+      nextPageCursor: z.string().optional().describe('Next page cursor returned by this tool'),
+      previousPageCursor: z
+        .string()
+        .optional()
+        .describe('Previous page cursor returned by this tool')
     })
   )
   .output(
@@ -32,7 +37,13 @@ export let listInboxMessages = SlateTool.create(spec, {
             campaignName: z.string().optional().describe('Campaign name')
           })
         )
-        .describe('List of inbox messages')
+        .describe('List of inbox messages'),
+      nextPageCursor: z.string().nullable().optional().describe('Cursor for the next page'),
+      previousPageCursor: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Cursor for the previous page')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,25 +53,32 @@ export let listInboxMessages = SlateTool.create(spec, {
     });
 
     let params: Record<string, any> = {};
-    if (ctx.input.campaignId) params.campaign_id = ctx.input.campaignId;
-    if (ctx.input.page) params.page = ctx.input.page;
+    if (ctx.input.campaignId) params.campaign_ids = String(ctx.input.campaignId);
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
     if (ctx.input.perPage) params.per_page = ctx.input.perPage;
+    if (ctx.input.nextPageCursor) params.next_page_cursor = ctx.input.nextPageCursor;
+    if (ctx.input.previousPageCursor)
+      params.previous_page_cursor = ctx.input.previousPageCursor;
 
     let data = await client.listInboxMessages(params);
-    let messages = Array.isArray(data) ? data : (data?.messages ?? []);
+    let messages = Array.isArray(data) ? data : (data?.content ?? data?.messages ?? []);
 
     let mapped = messages.map((m: any) => ({
       messageId: m.id,
-      prospectEmail: m.email ?? m.prospect_email,
+      prospectEmail: m.from_email ?? m.email ?? m.prospect_email,
       subject: m.subject,
-      body: m.body ?? m.message,
-      date: m.date,
-      campaignId: m.campaign_id,
-      campaignName: m.campaign_name
+      body: typeof m.body === 'string' ? m.body : (m.body?.html ?? m.message),
+      date: m.stamp ?? m.date,
+      campaignId: m.campaign?.id ?? m.campaign_id,
+      campaignName: m.campaign?.name ?? m.campaign_name
     }));
 
     return {
-      output: { messages: mapped },
+      output: {
+        messages: mapped,
+        nextPageCursor: data?.pagination?.next_page_cursor,
+        previousPageCursor: data?.pagination?.previous_page_cursor
+      },
       message: `Retrieved **${mapped.length}** inbox message(s).`
     };
   })

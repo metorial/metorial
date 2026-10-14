@@ -1,106 +1,65 @@
-Now let me look at webhook setup and monitor API details more closely:Now I have enough information to write a comprehensive specification. Let me compile it:
+# Parallel API Specification
 
-# Slates Specification for Parallel
-
-## Overview
-
-Parallel (by Parallel Web Systems) is a web API platform built for AI agents that provides web search, content extraction, deep research, entity discovery, chat completions, and continuous web monitoring capabilities. It is a web API purpose-built for AIs, providing production-ready outputs with minimal hallucination and evidence-based results. Parallel develops critical web search infrastructure for AI, with a suite of web search and agent APIs built on a proprietary index of the global internet.
+Parallel provides web search, URL extraction, asynchronous research, web-grounded chat, entity discovery, and continuous web monitoring.
 
 ## Authentication
 
-Parallel uses API key authentication. You can generate an API key from the [Parallel Developer Platform](https://platform.parallel.ai).
+Create an API key at [Parallel Developer Platform](https://platform.parallel.ai). Requests use `x-api-key`; Chat Completions additionally uses `Authorization: Bearer`. This integration does not use the separate device OAuth authentication required by the Account API.
 
-The API key is passed in request headers. Depending on the API endpoint, it uses one of two header formats:
+## Tools
 
-- **Most endpoints (Search, Extract, Task, FindAll, Monitor):** Pass the key via the `x-api-key` header:
+| Tool key | Provider operation | Result |
+| --- | --- | --- |
+| `web_search` | `POST /v1beta/search` | Ranked URLs, excerpts, and warning messages |
+| `extract_content` | `POST /v1beta/extract` | Original excerpts/full markdown, URL errors, and warnings |
+| `deep_research` | `POST /v1/tasks/runs` | Run ID, interaction ID, processor, status, and metadata |
+| `get_task_run` | `GET /v1/tasks/runs/{id}` and optionally `/result` | Status and the original provider output with research basis |
+| `chat_completion` | `POST /v1beta/chat/completions` | Response content, token usage, citations, and interaction ID when available |
+| `ingest_findall` | `POST /v1beta/findall/ingest` | Entity type and generated match conditions |
+| `find_entities` | `POST /v1beta/findall/runs` | Run ID for a discovery objective, criteria, generator, and match limit |
+| `get_findall_results` | `GET /v1beta/findall/runs/{id}` and optionally `/result` | Status, metrics, normalized condition decisions, original field values, and evidence |
+| `enrich_findall` | `POST /v1beta/findall/runs/{id}/enrich` | Confirmation that structured enrichment was accepted |
+| `cancel_findall` | `POST /v1beta/findall/runs/{id}/cancel` | Confirmation that cancellation was accepted |
+| `extend_findall` | `POST /v1beta/findall/runs/{id}/extend` | Updated search schema and total match limit |
+| `get_findall_schema` | `GET /v1beta/findall/runs/{id}/schema` | Objective, conditions, generator, match limit, and configured enrichments |
+| `create_monitor` | `POST /v1alpha/monitors` | Monitor ID, query, frequency, status, and metadata |
+| `manage_monitor` | Alpha monitor retrieve/list/update/delete/events | Monitor details, all-status monitor list, or detected/execution events |
 
-  ```
-  x-api-key: YOUR_PARALLEL_API_KEY
-  ```
+## Research and extraction
 
-- **Chat API (OpenAI-compatible):** Pass the key as a Bearer token in the `Authorization` header:
-  ```
-  Authorization: Bearer YOUR_PARALLEL_API_KEY
-  ```
+Search requires a non-empty objective or keyword query. Search and Extract retain the documented legacy endpoints and their existing request fields. They must not be migrated by substituting `/v1` in the URL: the current GA request envelopes differ.
 
-An active Parallel API key is required for all requests. The base URL is `https://api.parallel.ai`. There are no OAuth flows or scopes; authentication is solely API key-based.
+Task and enrichment JSON schemas are sent as `{ "type": "json", "json_schema": ... }`. Callers may provide a bare JSON schema or an existing provider envelope. Task output schema `"auto"` selects automatic structured output; other strings describe text output. Supplying only an input schema uses an automatic output schema. The task result retains the original provider `output` value, with its nested research basis also exposed through `basis`.
 
-Parallel also offers an MCP server at `https://search-mcp.parallel.ai/mcp`, which can be used programmatically by providing the API key as a Bearer token in the Authorization header.
+Chat accepts bare JSON schemas or OpenAI `response_format` envelopes. Its interaction ID is an empty string when the provider does not return one. Null or missing confidence levels are represented as `"unknown"`, preserving the existing string output type.
 
-## Features
+Extract's legacy `fullContent.maxCharsTotal` input is retained for compatibility. The current provider schema documents only `max_chars_per_result` for full content, so total-length enforcement is not guaranteed.
 
-### Web Search
+## FindAll lifecycle
 
-Perform AI-optimized web searches with natural language objectives and optional keyword queries. Supports multiple modes: `one-shot` returns more comprehensive results, `agentic` returns concise token-efficient results for use in agentic loops, and `fast` trades some quality for lower latency. You provide an objective (natural language description of what to find) and/or keyword search queries, and receive ranked results with excerpts and source URLs.
+Use Ingest FindAll Query to generate criteria, then Find Entities to create a run. Match limits must be whole numbers from 5 to 1000. Preview, base, core, and pro generators remain available. Candidate snapshots can be fetched while a run is active through `includePartialResults`; `includeResults` retrieves available candidates once a run has stopped, including after cancellation.
 
-- Configurable maximum number of results and excerpt length.
-- The objective may include guidance about preferred sources or freshness. At least one of `objective` or `search_queries` must be provided.
+Condition evaluations preserve the existing `{ value, isMatched }` output shape. The optional `rawOutput` retains the complete provider output, including enrichment fields and values that are not boolean conditions. Current docs show both structured decisions (`value`/`is_matched`) and older yes/no examples; both are supported without discarding the original values.
 
-### Content Extraction
+Extend adds an incremental number of matches. Preview runs cannot be extended, the total limit cannot exceed 1000, and completed runs can resume only when their termination reason was `match_limit_met`. Cancel stops additional work but does not reverse prior charges; persisted candidates remain available.
 
-Extract and retrieve content from specific URLs. You provide one or more URLs along with an objective describing what information to extract. Returns excerpts or full content from the target pages.
+Enrichments accept current Task API processor tiers. Existing `advanced` and `auto` enum values remain available to preserve callers, but current documentation does not guarantee these legacy tiers; they are sent unchanged rather than silently selecting another processor.
 
-- Can be directed with an objective to extract only relevant information.
-- Options for excerpts-only or full content retrieval.
+## Monitor compatibility
 
-### Deep Research (Task API)
+Alpha endpoints remain reachable and documented. Their output string, status spelling, and extracted real-world event dates differ from GA, so these existing tools retain Alpha behavior. Listing uses the documented unpaginated, all-status collection endpoint. Completion and error entries preserve their execution identifiers and messages; detected events preserve both the original `output` and optional structured `result`.
 
-Run complex, multi-step web research tasks that autonomously search, retrieve, reason, and synthesize information. Users declare what information and insights they need, and the API orchestrates querying, ranking, retrieval, reasoning, validation, and synthesis to deliver structured outputs.
+The separate GA Monitor API supports additional features such as snapshot monitors and processor selection. Those features are not exposed by these Alpha-compatible tools.
 
-- Multiple processor tiers available (`base`, `core`, `ultra`, and higher multipliers like `ultra2x`, `ultra4x`, `ultra8x`) that trade cost for thoroughness and accuracy.
-- Supports structured JSON output schemas to get results in a specific format with defined fields.
-- Supports authenticated page access, allowing research across both public and private sources within a single workflow.
-- Task Groups allow organizing and managing multiple related task runs.
+## Official references
 
-### Chat Completions
-
-An OpenAI-compatible chat completions endpoint that provides web-grounded conversational AI. The Chat API offers two modes: the `speed` model for low-latency responses, and a research mode for deeper queries.
-
-- Supports streaming responses.
-- Supports structured output via JSON schema in `response_format`.
-- Compatible with OpenAI client libraries by changing the base URL and API key.
-
-### FindAll (Entity Discovery)
-
-Unlike traditional search APIs that return a fixed set of results, FindAll generates candidates from web data, validates them against your criteria, and optionally enriches matches with additional structured information—all from a single natural language query.
-
-- Accepts natural language objectives which are parsed into entity types and match conditions via an ingest step.
-- Offers multiple tiers: Base is cost-effective for broad queries, Core balances cost and thoroughness, and Pro provides the most comprehensive search for highly specific queries.
-- Configurable `match_limit` to control how many entities to discover.
-- Includes enrichment capability that extracts additional structured fields from matched entities.
-- Asynchronous processing: you start a run, poll for completion, then retrieve results.
-
-### Web Monitoring (Monitor API)
-
-The Monitor API lets you continuously track the web for changes relevant to a query, on a schedule you control. It flips the model from pull to push — you create queries that themselves trigger notifications when new information is published to the web.
-
-- Supports scheduling with configurable frequency (e.g., `1h`, `1d`, `1w`) between 1 hour and 30 days.
-- Supports structured output schemas so each detected event returns data in a consistent, machine-readable format.
-- Currently in public alpha; endpoints and formats are subject to change.
-- Designed to track new updates as they happen, not to retrieve historical data.
-
-## Events
-
-Parallel supports webhooks for both the Task API and the Monitor API.
-
-### Task Run Events
-
-Webhooks are available for all Task Runs on the Parallel Task API, including Deep Research. Get notified when tasks complete instead of continuously checking their status.
-
-- Event type: `task_run.status` — fires when a task run completes or changes status.
-- Configured per-request by including a `webhook` object with a `url` and `event_types` array.
-
-### Monitor Events
-
-Webhooks allow you to receive real-time notifications when a Monitor execution completes, fails, or when material events are detected.
-
-- Event types:
-  - `monitor.event.detected` — fired when new relevant information is discovered on the web.
-  - `monitor.execution.completed` — fired when a scheduled monitor run finishes.
-  - `monitor.execution.failed` — fired when a monitor run encounters an error.
-- Configured when creating a monitor by including a `webhook` object with a `url` and `event_types` array.
-- When a webhook fires with a `monitor.event.detected` event, it returns an `event_group_id` that you use to retrieve the complete set of results.
-
-### Webhook Security
-
-Webhooks follow standard webhook conventions. Go to Settings → Webhooks to view your account webhook secret, which is needed to verify webhook signatures. Signatures use HMAC verification and are included in the `webhook-signature` header.
+- [Current API schema](https://docs.parallel.ai/docs-latest-openapi.json)
+- [Legacy API schema](https://docs.parallel.ai/docs-legacy-openapi.json)
+- [Task specification](https://docs.parallel.ai/task-api/guides/specify-a-task)
+- [FindAll candidates](https://docs.parallel.ai/findall-api/core-concepts/findall-candidates)
+- [FindAll migration](https://docs.parallel.ai/findall-api/findall-migration-guide)
+- [FindAll enrichments](https://docs.parallel.ai/findall-api/features/findall-enrich)
+- [Extend FindAll runs](https://docs.parallel.ai/findall-api/features/findall-extend)
+- [Cancel FindAll runs](https://docs.parallel.ai/findall-api/features/findall-cancel)
+- [Monitor migration and compatibility](https://docs.parallel.ai/monitor-api/monitor-migration-guide)
+- [Account API authentication](https://docs.parallel.ai/integrations/account-api)

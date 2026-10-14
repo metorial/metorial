@@ -35,12 +35,12 @@ export let updateCompany = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
-    if (ctx.input.phoneNumber !== undefined) body.phoneNumber = ctx.input.phoneNumber;
-    if (ctx.input.altPhone !== undefined) body.altPhone = ctx.input.altPhone;
-    if (ctx.input.taxId !== undefined) body.taxId = ctx.input.taxId;
+    if (ctx.input.phoneNumber !== undefined) body.phone1 = ctx.input.phoneNumber;
+    if (ctx.input.altPhone !== undefined) body.phone2 = ctx.input.altPhone;
+    if (ctx.input.taxId !== undefined) body.taxNumber = ctx.input.taxId;
     if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
     if (ctx.input.accountManagerId !== undefined)
-      body.accountManagerId = ctx.input.accountManagerId;
+      body.companyLeadUserId = ctx.input.accountManagerId;
 
     let result = await client.updateCompany(ctx.input.companyId, body);
 

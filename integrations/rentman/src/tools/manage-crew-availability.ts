@@ -17,7 +17,9 @@ export let createCrewAvailability = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Availability status (e.g. available, unavailable)'),
+        .describe(
+          'Availability status: B (available), N (unavailable), or O (unknown). The corresponding words are also accepted.'
+        ),
       memo: z.string().optional().describe('Notes about this availability entry')
     })
   )
@@ -34,12 +36,19 @@ export let createCrewAvailability = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {
-      from: ctx.input.from,
-      to: ctx.input.to
+      start: ctx.input.from,
+      end: ctx.input.to
     };
 
-    if (ctx.input.status) body.status = ctx.input.status;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
+    if (ctx.input.status !== undefined) {
+      let statuses: Record<string, string> = {
+        available: 'B',
+        unavailable: 'N',
+        unknown: 'O'
+      };
+      body.status = statuses[ctx.input.status.toLowerCase()] ?? ctx.input.status;
+    }
+    if (ctx.input.memo !== undefined) body.remark = ctx.input.memo;
 
     let result = await client.createNested('crew', ctx.input.crewId, 'crewavailability', body);
     let a = result.data as any;
@@ -48,9 +57,9 @@ export let createCrewAvailability = SlateTool.create(spec, {
       output: {
         availabilityId: a.id,
         crewId: ctx.input.crewId,
-        from: a.from,
-        to: a.to,
-        createdAt: a.created
+        from: a.start ?? a.from,
+        to: a.end ?? a.to,
+        createdAt: a.created ?? undefined
       },
       message: `Created availability entry (ID: ${a.id}) for crew member **${ctx.input.crewId}**.`
     };
@@ -67,7 +76,13 @@ export let listCrewAvailability = SlateTool.create(spec, {
     z.object({
       crewId: z.number().describe('ID of the crew member'),
       limit: z.number().optional().default(25).describe('Maximum number of results'),
-      offset: z.number().optional().default(0).describe('Number of results to skip')
+      offset: z.number().optional().default(0).describe('Number of results to skip'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
@@ -82,7 +97,8 @@ export let listCrewAvailability = SlateTool.create(spec, {
           createdAt: z.string().optional()
         })
       ),
-      itemCount: z.number()
+      itemCount: z.number(),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -90,22 +106,24 @@ export let listCrewAvailability = SlateTool.create(spec, {
 
     let result = await client.listNested('crew', ctx.input.crewId, 'crewavailability', {
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      cursor: ctx.input.cursor
     });
 
     let availability = result.data.map((a: any) => ({
       availabilityId: a.id,
-      from: a.from,
-      to: a.to,
+      from: a.start ?? a.from,
+      to: a.end ?? a.to,
       status: a.status,
-      memo: a.memo,
-      createdAt: a.created
+      memo: a.remark ?? a.memo,
+      createdAt: a.created ?? undefined
     }));
 
     return {
       output: {
         availability,
-        itemCount: result.itemCount
+        itemCount: result.itemCount,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** availability entries for crew member **${ctx.input.crewId}**.`
     };

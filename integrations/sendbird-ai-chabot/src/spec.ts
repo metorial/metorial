@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'sendbird-ai-chatbot',
   name: 'Sendbird AI Chatbot',
   description:
-    'Integration with Sendbird AI Chatbot platform for creating and managing AI-powered chatbots, sending messages, generating AI replies, and handling chat events.',
+    'Create and manage Sendbird bots, discover joined group channels, send and retrieve messages, generate AI replies where enabled, and control typing indicators.',
   metadata: {},
   config,
   auth

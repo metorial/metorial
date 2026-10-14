@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactOutputSchema, formatContact } from '../lib/contact';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
@@ -35,20 +36,7 @@ Use **delete** to remove a contact.`,
         .describe('List of group IDs to assign the contact to.')
     })
   )
-  .output(
-    z.object({
-      contactId: z.string().optional(),
-      firstName: z.string().optional(),
-      lastName: z.string().optional(),
-      phone: z.string().optional(),
-      extension: z.string().optional(),
-      email: z.string().optional(),
-      extraData: z.string().optional(),
-      groups: z.string().optional(),
-      createdAt: z.string().optional(),
-      updatedAt: z.string().optional()
-    })
-  )
+  .output(contactOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let {
@@ -64,7 +52,7 @@ Use **delete** to remove a contact.`,
     } = ctx.input;
 
     if (action === 'delete') {
-      if (!contactId) throw new Error('contactId is required for delete action');
+      if (!contactId) throw createApiServiceError('contactId is required for delete action');
       await client.deleteContact(contactId);
       return {
         output: { contactId },
@@ -73,7 +61,7 @@ Use **delete** to remove a contact.`,
     }
 
     if (action === 'create') {
-      if (!phone) throw new Error('phone is required for create action');
+      if (!phone) throw createApiServiceError('phone is required for create action');
       let result = await client.createContact({
         phone,
         firstname: firstName,
@@ -84,24 +72,13 @@ Use **delete** to remove a contact.`,
         groups: groupIds
       });
       return {
-        output: {
-          contactId: result.id,
-          firstName: result.firstname,
-          lastName: result.lastname,
-          phone: result.phone,
-          extension: result.extension,
-          email: result.email,
-          extraData: result.extra1,
-          groups: result.groups,
-          createdAt: result.created_at,
-          updatedAt: result.updated_at
-        },
+        output: formatContact(result),
         message: `Contact created successfully with ID \`${result.id}\`.`
       };
     }
 
     // update
-    if (!contactId) throw new Error('contactId is required for update action');
+    if (!contactId) throw createApiServiceError('contactId is required for update action');
     let result = await client.updateContact(contactId, {
       phone,
       firstname: firstName,
@@ -112,18 +89,7 @@ Use **delete** to remove a contact.`,
       groups: groupIds
     });
     return {
-      output: {
-        contactId: result.id,
-        firstName: result.firstname,
-        lastName: result.lastname,
-        phone: result.phone,
-        extension: result.extension,
-        email: result.email,
-        extraData: result.extra1,
-        groups: result.groups,
-        createdAt: result.created_at,
-        updatedAt: result.updated_at
-      },
+      output: formatContact(result),
       message: `Contact \`${contactId}\` updated successfully.`
     };
   })

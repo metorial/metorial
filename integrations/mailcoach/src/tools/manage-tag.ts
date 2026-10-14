@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -60,7 +60,7 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tagUuid) throw new Error('tagUuid is required for delete');
+      if (!ctx.input.tagUuid) throw createApiServiceError('tagUuid is required for delete');
       await client.deleteTag(ctx.input.emailListUuid, ctx.input.tagUuid);
       return {
         output: { tag: null, tagList: null, totalCount: null },
@@ -69,7 +69,7 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let result = await client.createTag(ctx.input.emailListUuid, {
         name: ctx.input.name,
         visible_in_preferences: ctx.input.visibleInPreferences
@@ -81,8 +81,8 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.tagUuid) throw new Error('tagUuid is required for update');
-    if (!ctx.input.name) throw new Error('name is required for update');
+    if (!ctx.input.tagUuid) throw createApiServiceError('tagUuid is required for update');
+    if (!ctx.input.name) throw createApiServiceError('name is required for update');
 
     let result = await client.updateTag(ctx.input.emailListUuid, ctx.input.tagUuid, {
       name: ctx.input.name,

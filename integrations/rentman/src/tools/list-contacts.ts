@@ -29,10 +29,20 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 300)'),
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of results (max 1500)'),
       offset: z.number().optional().default(0).describe('Number of results to skip'),
       sort: z.string().optional().describe('Sort field with + or - prefix'),
-      fields: z.string().optional().describe('Comma-separated fields to return')
+      fields: z.string().optional().describe('Comma-separated fields to return'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
@@ -40,7 +50,8 @@ export let listContacts = SlateTool.create(spec, {
       contacts: z.array(contactSchema),
       itemCount: z.number(),
       limit: z.number(),
-      offset: z.number()
+      offset: z.number(),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -50,7 +61,8 @@ export let listContacts = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      cursor: ctx.input.cursor
     });
 
     let contacts = result.data.map((c: any) => ({
@@ -58,17 +70,17 @@ export let listContacts = SlateTool.create(spec, {
       name: c.name,
       firstName: c.firstname,
       surName: c.surname,
-      email: c.email,
-      phone: c.phone,
-      city: c.city,
+      email: c.email_1 ?? c.email,
+      phone: c.phone_1 ?? c.phone,
+      city: c.visit_city ?? c.city,
       country: c.country,
-      street: c.street,
-      postalCode: c.postal_code,
+      street: c.visit_street ?? c.street,
+      postalCode: c.visit_postalcode ?? c.postal_code,
       companyName: c.company_name,
-      vatCode: c.vat_code,
+      vatCode: c.VAT_code ?? c.vat_code,
       tags: c.tags,
-      createdAt: c.created,
-      updatedAt: c.modified
+      createdAt: c.created ?? undefined,
+      updatedAt: c.modified ?? undefined
     }));
 
     return {
@@ -76,7 +88,8 @@ export let listContacts = SlateTool.create(spec, {
         contacts,
         itemCount: result.itemCount,
         limit: result.limit,
-        offset: result.offset
+        offset: result.offset,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** contacts. Returned ${contacts.length} contacts (offset: ${result.offset}).`
     };

@@ -4,6 +4,7 @@ import {
   crawlWebsite,
   extractStructuredData,
   getCrawlJobResult,
+  getCurrentAccount,
   getExtractionJobResult,
   getMediaMetadata,
   getTranscript,
@@ -20,6 +21,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentAccount,
     getTranscript,
     getTranscriptJobResult,
     getMediaMetadata,

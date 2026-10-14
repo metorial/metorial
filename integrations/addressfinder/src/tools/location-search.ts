@@ -7,6 +7,7 @@ let locationCompletionSchema = z.object({
   fullLocation: z.string().optional().describe('Full location string (AU)'),
   canonicalLocation: z.string().optional().describe('Canonical location string (NZ)'),
   locationId: z.string().optional().describe('Unique location identifier (AU: id, NZ: pxid)'),
+  pxid: z.string().optional().describe('NZ location identifier for location_metadata.'),
   locationType: z.string().optional().describe('AU only: street, locality, or state'),
   stateTerritory: z.string().optional().describe('AU only: state or territory code')
 });
@@ -16,7 +17,7 @@ export let locationSearchTool = SlateTool.create(spec, {
   key: 'location_search',
   description: `Search for locations such as streets, suburbs, cities, and states in Australia and New Zealand. Returns matching locations with identifiers that can be used to retrieve full location metadata including geocoordinates.`,
   instructions: [
-    'Use the returned location identifier with the getMetadata flag to also retrieve full metadata in a single call.',
+    'Use the returned location identifier with the Location Metadata tool to retrieve full metadata.',
     'For AU, use locationTypes to filter results (e.g., "street,locality").',
     'For NZ, use type filters like street, suburb, city, region to include/exclude specific types.'
   ],
@@ -104,6 +105,7 @@ export let locationSearchTool = SlateTool.create(spec, {
       fullLocation: c.full_location || undefined,
       canonicalLocation: c.a || undefined,
       locationId: c.id || c.pxid || undefined,
+      pxid: c.pxid || undefined,
       locationType: c.location_type || undefined,
       stateTerritory: c.state_territory || undefined
     }));

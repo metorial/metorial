@@ -55,7 +55,7 @@ export let stopReattempts = SlateTool.create(spec, {
         phone: ctx.input.phone,
         response: responseStr
       },
-      message: `Reattempt sequence stopped for lead with phone number **${ctx.input.phone}**. No further automated call attempts will be made to this lead.`
+      message: `Submitted a request to stop call reattempts for lead with phone number **${ctx.input.phone}**.`
     };
   })
   .build();

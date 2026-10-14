@@ -16,7 +16,7 @@ let suggestionSchema = z
 export let getKeywordSuggestionsTool = SlateTool.create(spec, {
   name: 'Get Keyword Suggestions',
   key: 'get_keyword_suggestions',
-  description: `Get related keyword suggestions for a seed keyword. Returns a list of related keywords with their metrics, helping identify new content opportunities and expand keyword targeting.`,
+  description: `Get related keyword suggestions for a seed keyword. Waits for the generated suggestion result and returns related keywords with available relevance or metric data, helping identify new content opportunities and expand keyword targeting.`,
   tags: {
     readOnly: true
   }
@@ -25,7 +25,24 @@ export let getKeywordSuggestionsTool = SlateTool.create(spec, {
     z.object({
       keyword: z.string().describe('Seed keyword to get suggestions for'),
       locale: z.string().optional().describe('Locale code (default: en-US)'),
-      limit: z.number().optional().describe('Maximum number of suggestions to return')
+      limit: z
+        .number()
+        .min(1)
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .optional()
+        .describe('Maximum number of suggestions to return'),
+      page: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .optional()
+        .describe('Zero-based page number'),
+      asyncCallId: z
+        .string()
+        .optional()
+        .describe(
+          'Resume a pending keyword suggestion request; the original query and page are used'
+        )
     })
   )
   .output(
@@ -39,20 +56,23 @@ export let getKeywordSuggestionsTool = SlateTool.create(spec, {
     let result = await client.getKeywordSuggestions({
       keyword: ctx.input.keyword,
       locale: ctx.input.locale,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      page: ctx.input.page,
+      asyncCallId: ctx.input.asyncCallId
     });
 
     let suggestions = (result?.suggestions || result?.results || []).map((s: any) => ({
+      ...s,
       keyword: s.keyword,
-      volume: s.volume ?? s.keyword_metrics?.volume,
-      difficulty: s.difficulty ?? s.keyword_metrics?.difficulty,
-      organicCtr: s.organic_ctr ?? s.keyword_metrics?.organic_ctr,
-      priority: s.priority ?? s.keyword_metrics?.priority
+      volume: s.volume ?? s.keyword_metrics?.volume ?? undefined,
+      difficulty: s.difficulty ?? s.keyword_metrics?.difficulty ?? undefined,
+      organicCtr: s.organic_ctr ?? s.keyword_metrics?.organic_ctr ?? undefined,
+      priority: s.priority ?? s.keyword_metrics?.priority ?? undefined
     }));
 
     return {
       output: { suggestions },
-      message: `Found **${suggestions.length}** keyword suggestions for "${ctx.input.keyword}".`
+      message: `Found **${suggestions.length}** keyword suggestions for "${result?.serp_query?.keyword ?? ctx.input.keyword}".`
     };
   })
   .build();

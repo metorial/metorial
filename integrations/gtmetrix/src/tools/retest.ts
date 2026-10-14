@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type TestData } from '../lib/client';
 import { reportOutputSchema, testOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
@@ -44,11 +44,15 @@ export let retest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (!ctx.input.pageId && !ctx.input.reportId) {
-      throw new Error('Either pageId or reportId must be provided');
+    if (ctx.input.pageId && ctx.input.reportId) {
+      throw createApiServiceError('Provide only one of pageId or reportId.');
     }
 
-    let test: any;
+    if (!ctx.input.pageId && !ctx.input.reportId) {
+      throw createApiServiceError('Either pageId or reportId must be provided');
+    }
+
+    let test: TestData;
     if (ctx.input.pageId) {
       ctx.info(`Retesting page ${ctx.input.pageId}`);
       test = await client.retestPage(ctx.input.pageId);

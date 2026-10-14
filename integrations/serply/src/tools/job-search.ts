@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeJobResult, searchResultArray } from '../lib/responses';
 import { spec } from '../spec';
 
 let jobResultSchema = z.object({
@@ -58,12 +59,12 @@ export let jobSearch = SlateTool.create(spec, {
       deviceType: ctx.input.deviceType
     });
 
-    let jobs = data.jobs || [];
+    let jobs = searchResultArray(data.jobs).map(normalizeJobResult);
 
     return {
       output: {
         jobs,
-        deviceRegion: data.device_region || null
+        deviceRegion: data.device_region ?? undefined
       },
       message: `Found **${jobs.length}** job listings for "${ctx.input.query}".`
     };

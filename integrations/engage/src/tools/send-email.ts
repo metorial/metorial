@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,6 +9,7 @@ export let sendEmail = SlateTool.create(spec, {
   description: `Sends a transactional email through Engage or a connected Email Service Provider (ESP). Supports HTML content, plain text, or pre-built templates with variable substitution. Useful for password resets, activity notifications, receipts, and other programmatic emails.`,
   instructions: [
     'Provide one of: html, text, or templateName. At least one is required.',
+    'When using templateName, provide templateVariables (an empty object is allowed).',
     'The sender email domain must match a domain connected to Engage or registered with your ESP.',
     'Free accounts using Engage as ESP are limited to 100 transactional emails per day.'
   ],
@@ -49,6 +50,13 @@ export let sendEmail = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.html && !ctx.input.text && !ctx.input.templateName) {
+      throw createApiServiceError('Provide html, text, or templateName to send an email.');
+    }
+    if (ctx.input.templateName && ctx.input.templateVariables === undefined) {
+      throw createApiServiceError('Provide templateVariables when using templateName.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       secret: ctx.auth.secret
@@ -64,7 +72,7 @@ export let sendEmail = SlateTool.create(spec, {
       html: ctx.input.html,
       text: ctx.input.text,
       template: ctx.input.templateName,
-      templateVariables: ctx.input.templateVariables as Record<string, string> | undefined,
+      templateVariables: ctx.input.templateVariables,
       cc: ctx.input.cc,
       bcc: ctx.input.bcc,
       replyTo: ctx.input.replyTo,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DialerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let getDialerStatistics = SlateTool.create(spec, {
   instructions: [
     'Dates should be in YYYY-MM-DD format.',
     'Requires a Power Dialer API key (dialerToken in auth).',
-    'The same filters available for call reports also apply here.'
+    'Brightcall requires dateInterval for statistics. Confirm accepted values with Brightcall support.'
   ],
   tags: {
     readOnly: true
@@ -45,6 +45,22 @@ export let getDialerStatistics = SlateTool.create(spec, {
     z.object({
       dayFrom: z.string().describe('Start date in YYYY-MM-DD format'),
       dayTo: z.string().describe('End date in YYYY-MM-DD format'),
+      dateInterval: z
+        .string()
+        .optional()
+        .describe(
+          'Date interval required by the statistics API. Confirm accepted values with Brightcall support.'
+        ),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Call categories, such as all, inbound, outbound, internal, answered, unanswered, or failed'
+        ),
+      outcomeTypes: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by outcome types: positive, negative, neutral, or absent'),
       searchString: z.string().optional().describe('Text search filter'),
       timezone: z.string().optional().describe('Timezone for the query'),
       types: z
@@ -82,7 +98,7 @@ export let getDialerStatistics = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.dialerToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Power Dialer API key (dialerToken) is required for this action. Please configure it in your authentication settings.'
       );
     }

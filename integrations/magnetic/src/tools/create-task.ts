@@ -20,7 +20,10 @@ export let createTask = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ID of the opportunity/job to link this task to'),
-      ownerId: z.string().optional().describe('User ID of the task owner'),
+      ownerId: z
+        .string()
+        .optional()
+        .describe('User ID of the task owner. Call list_users to discover user IDs.'),
       billable: z
         .boolean()
         .optional()

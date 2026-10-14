@@ -7,7 +7,7 @@ export let sendEmail = SlateTool.create(spec, {
   name: 'Send Individual Email',
   key: 'send_email',
   description: `Send an individual email to a specific recipient. Unlike campaign-based sending, this sends directly to one email address. Useful for transactional-style messages or one-off communications.
-The recipient must already be in the specified list.`,
+The provider automatically adds the recipient to the specified list if needed.`,
   tags: {
     destructive: true
   }
@@ -19,7 +19,9 @@ The recipient must already be in the specified list.`,
       senderEmail: z.string().describe('Sender email address (must be verified)'),
       subject: z.string().describe('Email subject line'),
       body: z.string().describe('HTML body of the email'),
-      listId: z.number().describe('ID of the list the recipient belongs to'),
+      listId: z
+        .number()
+        .describe("List ID from get_lists, used for the recipient's unsubscribe link"),
       trackRead: z.boolean().optional().describe('Enable open tracking'),
       trackLinks: z.boolean().optional().describe('Enable link click tracking'),
       cc: z.string().optional().describe('CC email address'),
@@ -57,7 +59,7 @@ The recipient must already be in the specified list.`,
 
     return {
       output: { result },
-      message: `Sent email to **${ctx.input.email}** with subject **"${ctx.input.subject}"**`
+      message: `Email send result for **${ctx.input.email}** with subject **"${ctx.input.subject}"**`
     };
   })
   .build();

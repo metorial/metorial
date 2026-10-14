@@ -1,56 +1,88 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData
+} from 'slates';
 
 let http = createAxios({
-  baseURL: 'https://api.optimoroute.com/v1'
+  baseURL: 'https://api.optimoroute.com/v1',
+  timeout: 30_000
 });
 
 export class Client {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('An OptimoRoute API key is required.');
+    }
     this.token = config.token;
   }
 
-  // ─── Order Management ────────────────────────────────────────
+  private async request(
+    method: 'GET' | 'POST',
+    endpoint: string,
+    values: Record<string, unknown> = {}
+  ) {
+    let result = await requestAxiosData(
+      endpoint.slice(1),
+      () =>
+        http.request({
+          method,
+          url: endpoint,
+          params: method === 'GET' ? { ...values, key: this.token } : { key: this.token },
+          ...(method === 'POST' ? { data: values } : {})
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'OptimoRoute',
+          reason: 'optimoroute_api_error',
+          operation
+        })
+    );
+
+    if (!result || typeof result.success !== 'boolean') {
+      throw createApiServiceError('OptimoRoute returned an invalid API response.');
+    }
+    // Bulk responses retain their per-item failures, including when every item failed.
+    if (!result.success && !Array.isArray(result.orders) && !Array.isArray(result.updates)) {
+      let error = createApiServiceError(
+        `OptimoRoute ${endpoint.slice(1)} failed: ${result.message || result.code || 'Unknown API error'}`,
+        { reason: 'optimoroute_api_error', upstreamCode: result.code }
+      );
+      error.data.baggage = {
+        planningId: result.planningId === undefined ? undefined : String(result.planningId),
+        missingOrders: result.missingOrders,
+        missingDrivers: result.missingDrivers,
+        ordersWithInvalidLocation: result.ordersWithInvalidLocation
+      };
+      throw error;
+    }
+    return result;
+  }
 
   async createOrder(order: Record<string, unknown>) {
-    let res = await http.post('/create_order', order, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/create_order', order);
   }
 
   async createOrUpdateOrders(orders: Record<string, unknown>[]) {
-    let res = await http.post(
-      '/create_or_update_orders',
-      { orders },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+    validateBatch(orders, 'orders');
+    return this.request('POST', '/create_or_update_orders', { orders });
   }
 
   async getOrders(orders: Record<string, unknown>[]) {
-    let res = await http.post(
-      '/get_orders',
-      { orders },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+    validateOrderReferences(orders);
+    return this.request('POST', '/get_orders', { orders });
   }
 
   async deleteOrder(orderNo?: string, orderId?: string, forceDelete?: boolean) {
-    let body: Record<string, unknown> = {};
-    if (orderNo) body.orderNo = orderNo;
-    if (orderId) body.id = orderId;
-    if (forceDelete !== undefined) body.forceDelete = forceDelete;
-    let res = await http.post('/delete_order', body, {
-      params: { key: this.token }
+    validateOrderReference({ orderNo, id: orderId });
+    return this.request('POST', '/delete_order', {
+      orderNo,
+      id: orderId,
+      forceDelete
     });
-    return res.data;
   }
 
   async deleteOrders(
@@ -58,138 +90,102 @@ export class Client {
     forceDelete?: boolean,
     deleteMultiple?: boolean
   ) {
-    let body: Record<string, unknown> = { orders };
-    if (forceDelete !== undefined) body.forceDelete = forceDelete;
-    if (deleteMultiple !== undefined) body.deleteMultiple = deleteMultiple;
-    let res = await http.post('/delete_orders', body, {
-      params: { key: this.token }
-    });
-    return res.data;
+    validateOrderReferences(orders);
+    return this.request('POST', '/delete_orders', { orders, forceDelete, deleteMultiple });
   }
 
   async deleteAllOrders(date?: string) {
-    let body: Record<string, unknown> = {};
-    if (date) body.date = date;
-    let res = await http.post('/delete_all_orders', body, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/delete_all_orders', { date });
   }
-
-  // ─── Search Orders ───────────────────────────────────────────
 
   async searchOrders(params: Record<string, unknown>) {
-    let res = await http.post('/search_orders', params, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/search_orders', params);
   }
-
-  // ─── Scheduling Info ─────────────────────────────────────────
 
   async getSchedulingInfo(orderNo?: string, orderId?: string) {
-    let params: Record<string, string> = { key: this.token };
-    if (orderNo) params.orderNo = orderNo;
-    if (orderId) params.id = orderId;
-    let res = await http.get('/get_scheduling_info', { params });
-    return res.data;
+    validateOrderReference({ orderNo, id: orderId });
+    return this.request('GET', '/get_scheduling_info', { orderNo, id: orderId });
   }
 
-  // ─── Route Optimization ──────────────────────────────────────
-
   async startPlanning(params: Record<string, unknown>) {
-    let res = await http.post('/start_planning', params, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/start_planning', params);
   }
 
   async getPlanningStatus(planningId: string) {
-    let res = await http.get('/get_planning_status', {
-      params: { key: this.token, planningId }
+    return this.request('GET', '/get_planning_status', {
+      planningId: parsePlanningId(planningId)
     });
-    return res.data;
   }
 
   async stopPlanning(planningId: string) {
-    let res = await http.post(
-      '/stop_planning',
-      { planningId },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+    return this.request('POST', '/stop_planning', { planningId: parsePlanningId(planningId) });
   }
-
-  // ─── Routes ──────────────────────────────────────────────────
 
   async getRoutes(params: Record<string, unknown>) {
-    let res = await http.get('/get_routes', {
-      params: { key: this.token, ...params }
-    });
-    return res.data;
+    return this.request('GET', '/get_routes', params);
   }
 
-  // ─── Driver Management ───────────────────────────────────────
+  async sendRoutes(params: Record<string, unknown>) {
+    return this.request('POST', '/send_routes', params);
+  }
+
+  async getDispatchStatus(params: Record<string, unknown>) {
+    return this.request('GET', '/get_dispatch_status', params);
+  }
 
   async updateDriverParameters(params: Record<string, unknown>) {
-    let res = await http.post('/update_driver_parameters', params, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/update_driver_parameters', params);
   }
 
   async updateDriversParameters(updates: Record<string, unknown>[]) {
-    let res = await http.post(
-      '/update_drivers_parameters',
-      { updates },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+    validateBatch(updates, 'driver updates');
+    return this.request('POST', '/update_drivers_parameters', { updates });
   }
 
-  // ─── Driver Positions ────────────────────────────────────────
-
-  async updateDriversPositions(positions: Record<string, unknown>[]) {
-    let res = await http.post(
-      '/update_drivers_positions',
-      { positions },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+  async updateDriversPositions(updates: Record<string, unknown>[]) {
+    return this.request('POST', '/update_drivers_positions', { updates });
   }
-
-  // ─── Completion / Proof of Delivery ──────────────────────────
 
   async getCompletionDetails(orders: Record<string, unknown>[]) {
-    let res = await http.post(
-      '/get_completion_details',
-      { orders },
-      {
-        params: { key: this.token }
-      }
-    );
-    return res.data;
+    validateOrderReferences(orders);
+    return this.request('POST', '/get_completion_details', { orders });
   }
 
   async updateCompletionDetails(params: Record<string, unknown>) {
-    let res = await http.post('/update_completion_details', params, {
-      params: { key: this.token }
-    });
-    return res.data;
+    return this.request('POST', '/update_completion_details', { updates: [params] });
   }
-
-  // ─── Events ──────────────────────────────────────────────────
 
   async getEvents(afterTag?: string) {
-    let params: Record<string, string> = { key: this.token };
-    if (afterTag) params.after_tag = afterTag;
-    let res = await http.get('/get_events', { params });
-    return res.data;
+    return this.request('GET', '/get_events', { after_tag: afterTag });
   }
 }
+
+export let validateBatch = (items: unknown[], label: string) => {
+  if (items.length === 0 || items.length > 500) {
+    throw createApiServiceError(`Provide between 1 and 500 ${label} per request.`);
+  }
+};
+
+export let validateOrderReference = (order: Record<string, unknown>) => {
+  if (
+    !(typeof order.orderNo === 'string' && order.orderNo.trim()) &&
+    !(typeof order.id === 'string' && order.id.trim())
+  ) {
+    throw createApiServiceError('Provide an orderNo or orderId for each order.');
+  }
+};
+
+export let validateOrderReferences = (orders: Record<string, unknown>[]) => {
+  validateBatch(orders, 'orders');
+  for (let order of orders) validateOrderReference(order);
+};
+
+let parsePlanningId = (planningId: string) => {
+  let id = Number(planningId);
+  if (!/^\d+$/.test(planningId) || !Number.isSafeInteger(id) || id < 1) {
+    throw createApiServiceError(
+      'Provide the positive planning ID returned by Optimize Routes.'
+    );
+  }
+  return id;
+};

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -94,7 +94,7 @@ export let manageAgents = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.agentId) {
-        throw new Error('agentId is required for the "get" action');
+        throw createApiServiceError('agentId is required for the "get" action');
       }
       let agent = await client.getAgent(ctx.input.agentId);
       return {
@@ -105,10 +105,10 @@ export let manageAgents = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.email) {
-        throw new Error('email is required for the "create" action');
+        throw createApiServiceError('email is required for the "create" action');
       }
       if (!ctx.input.name) {
-        throw new Error('name is required for the "create" action');
+        throw createApiServiceError('name is required for the "create" action');
       }
       let input: Record<string, unknown> = {
         email: ctx.input.email,
@@ -130,7 +130,7 @@ export let manageAgents = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.agentId) {
-        throw new Error('agentId is required for the "update" action');
+        throw createApiServiceError('agentId is required for the "update" action');
       }
       let input: Record<string, unknown> = {};
       if (ctx.input.name !== undefined) input.name = ctx.input.name;
@@ -150,7 +150,7 @@ export let manageAgents = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.agentId) {
-        throw new Error('agentId is required for the "delete" action');
+        throw createApiServiceError('agentId is required for the "delete" action');
       }
       await client.deleteAgent(ctx.input.agentId);
       return {
@@ -159,6 +159,6 @@ export let manageAgents = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

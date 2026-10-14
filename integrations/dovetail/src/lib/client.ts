@@ -1,9 +1,16 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 import type {
   DovetailChannel,
   DovetailContact,
   DovetailData,
   DovetailDoc,
+  DovetailExport,
+  DovetailField,
   DovetailFolder,
   DovetailFolderContent,
   DovetailHighlight,
@@ -25,17 +32,27 @@ interface PaginatedResponse<T> {
 
 let buildPaginationParams = (params?: PaginationParams): Record<string, string> => {
   let result: Record<string, string> = {};
-  if (params?.limit) result['page[limit]'] = String(params.limit);
+  if (params?.limit !== undefined && !Number.isSafeInteger(params.limit)) {
+    throw createApiServiceError('limit must be a whole number.');
+  }
+  if (params?.limit !== undefined) result['page[limit]'] = String(params.limit);
   if (params?.startCursor) result['page[start_cursor]'] = params.startCursor;
   return result;
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) throw createApiServiceError('A Dovetail API token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://dovetail.com/api/v1',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Dovetail',
+          reason: 'dovetail_api_error'
+        }),
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json',
@@ -66,13 +83,28 @@ export class Client {
     return response.data;
   }
 
-  async createProject(title?: string): Promise<DovetailProject> {
-    let response = await this.axios.post('/projects', title ? { title } : {});
+  async createProject(title?: string, folderId?: string): Promise<DovetailProject> {
+    let response = await this.axios.post(
+      '/projects',
+      pickDefined({ title, folder_id: folderId })
+    );
     return response.data.data;
   }
 
   async getProject(projectId: string): Promise<DovetailProject> {
-    let response = await this.axios.get(`/projects/${projectId}`);
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}`);
+    return response.data.data;
+  }
+
+  async updateProject(projectId: string, title: string): Promise<DovetailProject> {
+    let response = await this.axios.patch(`/projects/${encodeURIComponent(projectId)}`, {
+      title
+    });
+    return response.data.data;
+  }
+
+  async deleteProject(projectId: string): Promise<DovetailProject> {
+    let response = await this.axios.delete(`/projects/${encodeURIComponent(projectId)}`);
     return response.data.data;
   }
 
@@ -89,20 +121,65 @@ export class Client {
       sort?: string;
     }
   ): Promise<PaginatedResponse<DovetailNote>> {
-    let queryParams: Record<string, string> = {
-      ...buildPaginationParams(params)
-    };
-    if (params?.titleContains) queryParams['filter[title][contains]'] = params.titleContains;
-    if (params?.titleEqualTo) queryParams['filter[title][equal_to]'] = params.titleEqualTo;
-    if (params?.contentContains)
-      queryParams['filter[content][contains]'] = params.contentContains;
-    if (params?.createdAfter)
-      queryParams['filter[created_at][greater_than]'] = params.createdAfter;
-    if (params?.createdBefore)
-      queryParams['filter[created_at][less_than]'] = params.createdBefore;
+    let queryParams: Record<string, string> = buildPaginationParams(params);
+    if (params?.contentContains !== undefined) {
+      if (params.sort)
+        throw createApiServiceError(
+          'Content filtering uses full-text search, which does not support sort. Omit sort or use list_data for sorted metadata.'
+        );
+      let cursor = params.startCursor;
+      if (cursor && !/^notes-search:\d+$/.test(cursor))
+        throw createApiServiceError(
+          'Use the nextCursor returned by a notes content search, or omit startCursor to begin a new search.'
+        );
+      let offset = cursor ? Number(cursor.slice('notes-search:'.length)) : 0;
+      if (!Number.isSafeInteger(offset))
+        throw createApiServiceError(
+          'Invalid notes search cursor. Omit startCursor to begin a new search.'
+        );
+      let limit = params.limit ?? 100;
+      let filter = pickDefined({
+        title:
+          params.titleContains !== undefined || params.titleEqualTo !== undefined
+            ? pickDefined({ contains: params.titleContains, equal_to: params.titleEqualTo })
+            : undefined,
+        content: { contains: params.contentContains },
+        created_at:
+          params.createdAfter !== undefined || params.createdBefore !== undefined
+            ? pickDefined({
+                greater_than: params.createdAfter,
+                less_than: params.createdBefore
+              })
+            : undefined
+      });
+      let response = await this.axios.post('/search', {
+        filter: { notes: [filter] },
+        offset,
+        limit
+      });
+      let result: SearchResults = response.data.data;
+      let hasMore = offset + limit < result.total;
+      return {
+        data: result.notes,
+        page: {
+          total_count: result.total,
+          has_more: hasMore,
+          next_cursor: hasMore ? `notes-search:${offset + limit}` : null
+        }
+      };
+    }
+    if (params?.titleContains !== undefined)
+      queryParams['filter[title][contains]'] = params.titleContains;
+    if (params?.titleEqualTo !== undefined)
+      queryParams['filter[title][equal_to]'] = params.titleEqualTo;
+    if (params?.createdAfter) queryParams['filter[created_at][gt]'] = params.createdAfter;
+    if (params?.createdBefore) queryParams['filter[created_at][lt]'] = params.createdBefore;
     if (params?.sort) queryParams.sort = params.sort;
-
-    let response = await this.axios.get('/notes', { params: queryParams });
+    let path =
+      params?.titleContains !== undefined || params?.titleEqualTo !== undefined
+        ? '/data'
+        : '/notes';
+    let response = await this.axios.get(path, { params: queryParams });
     return response.data;
   }
 
@@ -110,13 +187,22 @@ export class Client {
     title?: string;
     content?: string;
     fields?: { label: string; value?: string }[];
+    projectId?: string;
   }): Promise<DovetailNote> {
-    let response = await this.axios.post('/notes', data);
+    let response = await this.axios.post(
+      '/notes',
+      pickDefined({
+        title: data.title,
+        content: data.content,
+        project_id: data.projectId,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async getNote(noteId: string): Promise<DovetailNote> {
-    let response = await this.axios.get(`/notes/${noteId}`);
+    let response = await this.axios.get(`/notes/${encodeURIComponent(noteId)}`);
     return response.data.data;
   }
 
@@ -124,30 +210,43 @@ export class Client {
     noteId: string,
     data: {
       title?: string;
-      content?: string;
       fields?: { label: string; value?: string }[];
     }
   ): Promise<DovetailNote> {
-    let response = await this.axios.patch(`/notes/${noteId}`, data);
+    let response = await this.axios.patch(
+      `/notes/${encodeURIComponent(noteId)}`,
+      pickDefined({
+        title: data.title,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async deleteNote(
     noteId: string
   ): Promise<{ id: string; title: string; deleted_at: string; deleted: boolean }> {
-    let response = await this.axios.delete(`/notes/${noteId}`);
+    let response = await this.axios.delete(`/notes/${encodeURIComponent(noteId)}`);
     return response.data.data;
   }
 
-  async exportNote(noteId: string, format: 'html' | 'markdown'): Promise<any> {
-    let response = await this.axios.get(`/notes/${noteId}/export/${format}`);
+  async exportNote(noteId: string, format: 'html' | 'markdown'): Promise<DovetailExport> {
+    let response = await this.axios.get(
+      `/notes/${encodeURIComponent(noteId)}/export/${format}`
+    );
     return response.data.data;
   }
 
-  async importNoteFromFile(url: string, mimeType?: string): Promise<DovetailNote> {
-    let body: Record<string, string> = { url };
-    if (mimeType) body.mime_type = mimeType;
-    let response = await this.axios.post('/notes/import/file', body);
+  async importNoteFromFile(
+    url: string,
+    title: string,
+    projectId: string,
+    mimeType?: string
+  ): Promise<DovetailNote> {
+    let response = await this.axios.post(
+      '/notes/import/file',
+      pickDefined({ url, title, project_id: projectId, mime_type: mimeType })
+    );
     return response.data.data;
   }
 
@@ -182,49 +281,55 @@ export class Client {
   async createData(data: {
     title?: string;
     content?: string;
-    fields?: Record<string, unknown>;
+    fields?: DovetailField[];
     projectId?: string;
   }): Promise<DovetailData> {
-    let body: Record<string, unknown> = {};
-    if (data.title) body.title = data.title;
-    if (data.content) body.content = data.content;
-    if (data.fields) body.fields = data.fields;
-    if (data.projectId) body.project_id = data.projectId;
-    let response = await this.axios.post('/data', body);
+    let response = await this.axios.post(
+      '/data',
+      pickDefined({
+        title: data.title,
+        content: data.content,
+        fields: data.fields,
+        project_id: data.projectId
+      })
+    );
     return response.data.data;
   }
 
   async getData(dataId: string): Promise<DovetailData> {
-    let response = await this.axios.get(`/data/${dataId}`);
+    let response = await this.axios.get(`/data/${encodeURIComponent(dataId)}`);
     return response.data.data;
   }
 
   async updateData(dataId: string, data: { title?: string }): Promise<DovetailData> {
-    let response = await this.axios.patch(`/data/${dataId}`, data);
+    let response = await this.axios.patch(`/data/${encodeURIComponent(dataId)}`, data);
     return response.data.data;
   }
 
   async deleteData(
     dataId: string
   ): Promise<{ id: string; title: string; deleted_at: string; deleted: boolean }> {
-    let response = await this.axios.delete(`/data/${dataId}`);
+    let response = await this.axios.delete(`/data/${encodeURIComponent(dataId)}`);
     return response.data.data;
   }
 
-  async exportData(dataId: string, format: 'html' | 'markdown'): Promise<any> {
-    let response = await this.axios.get(`/data/${dataId}/export/${format}`);
+  async exportData(dataId: string, format: 'html' | 'markdown'): Promise<DovetailExport> {
+    let response = await this.axios.get(
+      `/data/${encodeURIComponent(dataId)}/export/${format}`
+    );
     return response.data.data;
   }
 
   async importDataFromFile(
     url: string,
-    projectId?: string,
+    title: string,
+    projectId: string,
     mimeType?: string
   ): Promise<DovetailData> {
-    let body: Record<string, string> = { url };
-    if (projectId) body.project_id = projectId;
-    if (mimeType) body.mime_type = mimeType;
-    let response = await this.axios.post('/data/import/file', body);
+    let response = await this.axios.post(
+      '/data/import/file',
+      pickDefined({ url, title, project_id: projectId, mime_type: mimeType })
+    );
     return response.data.data;
   }
 
@@ -233,6 +338,7 @@ export class Client {
   async listInsights(
     params?: PaginationParams & {
       sort?: string;
+      userId?: string;
     }
   ): Promise<PaginatedResponse<DovetailInsight>> {
     let queryParams: Record<string, string> = {
@@ -240,7 +346,10 @@ export class Client {
     };
     if (params?.sort) queryParams.sort = params.sort;
 
-    let response = await this.axios.get('/insights', { params: queryParams });
+    let response = await this.axios.get(
+      params?.userId ? `/insights/user/${encodeURIComponent(params.userId)}` : '/insights',
+      { params: queryParams }
+    );
     return response.data;
   }
 
@@ -248,13 +357,26 @@ export class Client {
     title?: string;
     content?: string;
     fields?: { label: string; value?: string | null }[];
+    contentType?: 'html' | 'markdown' | 'text';
+    projectId?: string;
+    folderId?: string;
   }): Promise<DovetailInsight> {
-    let response = await this.axios.post('/insights', data);
+    let response = await this.axios.post(
+      '/insights',
+      pickDefined({
+        title: data.title,
+        content: data.content,
+        content_type: data.contentType,
+        project_id: data.projectId,
+        folder_id: data.folderId,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async getInsight(insightId: string): Promise<DovetailInsight> {
-    let response = await this.axios.get(`/insights/${insightId}`);
+    let response = await this.axios.get(`/insights/${encodeURIComponent(insightId)}`);
     return response.data.data;
   }
 
@@ -262,41 +384,53 @@ export class Client {
     insightId: string,
     data: {
       title?: string;
-      content?: string;
-      published?: boolean;
-      contributors?: string[];
+      fields?: { label: string; value?: string | null }[];
     }
   ): Promise<DovetailInsight> {
-    let response = await this.axios.patch(`/insights/${insightId}`, data);
+    let response = await this.axios.patch(
+      `/insights/${encodeURIComponent(insightId)}`,
+      pickDefined({
+        title: data.title,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async deleteInsight(
     insightId: string
   ): Promise<{ id: string; title: string; deleted_at: string; deleted: boolean }> {
-    let response = await this.axios.delete(`/insights/${insightId}`);
+    let response = await this.axios.delete(`/insights/${encodeURIComponent(insightId)}`);
     return response.data.data;
   }
 
-  async listUserInsights(userId: string): Promise<DovetailInsight[]> {
-    let response = await this.axios.get(`/insights/user/${userId}`);
-    return response.data.data?.insights ?? [];
-  }
-
-  async exportInsight(insightId: string, format: 'html' | 'markdown'): Promise<any> {
-    let response = await this.axios.get(`/insights/${insightId}/export/${format}`);
+  async exportInsight(
+    insightId: string,
+    format: 'html' | 'markdown'
+  ): Promise<DovetailExport> {
+    let response = await this.axios.get(
+      `/insights/${encodeURIComponent(insightId)}/export/${format}`
+    );
     return response.data.data;
   }
 
   async importInsightFromFile(
     url: string,
-    title?: string,
-    mimeType?: string
+    title: string,
+    mimeType?: string,
+    projectId?: string,
+    folderId?: string
   ): Promise<DovetailInsight> {
-    let body: Record<string, string> = { url };
-    if (title) body.title = title;
-    if (mimeType) body.mime_type = mimeType;
-    let response = await this.axios.post('/insights/import/file', body);
+    let response = await this.axios.post(
+      '/insights/import/file',
+      pickDefined({
+        url,
+        title,
+        mime_type: mimeType,
+        project_id: projectId,
+        folder_id: folderId
+      })
+    );
     return response.data.data;
   }
 
@@ -304,14 +438,14 @@ export class Client {
 
   async listHighlights(
     params?: PaginationParams
-  ): Promise<{ highlights: DovetailHighlight[] }> {
+  ): Promise<PaginatedResponse<DovetailHighlight>> {
     let queryParams = buildPaginationParams(params);
     let response = await this.axios.get('/highlights', { params: queryParams });
-    return response.data.data;
+    return response.data;
   }
 
   async getHighlight(highlightId: string): Promise<DovetailHighlight> {
-    let response = await this.axios.get(`/highlights/${highlightId}`);
+    let response = await this.axios.get(`/highlights/${encodeURIComponent(highlightId)}`);
     return response.data.data;
   }
 
@@ -324,15 +458,17 @@ export class Client {
   }
 
   async getTag(tagId: string): Promise<DovetailTag> {
-    let response = await this.axios.get(`/tags/${tagId}`);
+    let response = await this.axios.get(`/tags/${encodeURIComponent(tagId)}`);
     return response.data.data;
   }
 
   // ---- Contacts ----
 
-  async listContacts(): Promise<{ total: number; contacts: DovetailContact[] }> {
-    let response = await this.axios.get('/contacts');
-    return response.data.data;
+  async listContacts(params?: PaginationParams): Promise<PaginatedResponse<DovetailContact>> {
+    let response = await this.axios.get('/contacts', {
+      params: buildPaginationParams(params)
+    });
+    return response.data;
   }
 
   async createContact(data: Record<string, unknown>): Promise<DovetailContact> {
@@ -341,7 +477,7 @@ export class Client {
   }
 
   async getContact(contactId: string): Promise<DovetailContact> {
-    let response = await this.axios.get(`/contacts/${contactId}`);
+    let response = await this.axios.get(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data.data;
   }
 
@@ -349,7 +485,7 @@ export class Client {
     contactId: string,
     data: Record<string, unknown>
   ): Promise<DovetailContact> {
-    let response = await this.axios.patch(`/contacts/${contactId}`, data);
+    let response = await this.axios.patch(`/contacts/${encodeURIComponent(contactId)}`, data);
     return response.data.data;
   }
 
@@ -362,6 +498,7 @@ export class Client {
       titleContains?: string;
       titleEqualTo?: string;
       sort?: string;
+      userId?: string;
     }
   ): Promise<PaginatedResponse<DovetailDoc>> {
     let queryParams: Record<string, string> = {
@@ -373,7 +510,10 @@ export class Client {
     if (params?.titleEqualTo) queryParams['filter[title][equal_to]'] = params.titleEqualTo;
     if (params?.sort) queryParams.sort = params.sort;
 
-    let response = await this.axios.get('/docs', { params: queryParams });
+    let response = await this.axios.get(
+      params?.userId ? `/docs/user/${encodeURIComponent(params.userId)}` : '/docs',
+      { params: queryParams }
+    );
     return response.data;
   }
 
@@ -381,13 +521,26 @@ export class Client {
     title?: string;
     content?: string;
     fields?: { label: string; value?: string }[];
+    contentType?: 'html' | 'markdown' | 'text';
+    projectId?: string;
+    folderId?: string;
   }): Promise<DovetailDoc> {
-    let response = await this.axios.post('/docs', data);
+    let response = await this.axios.post(
+      '/docs',
+      pickDefined({
+        title: data.title,
+        content: data.content,
+        content_type: data.contentType,
+        project_id: data.projectId,
+        folder_id: data.folderId,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async getDoc(docId: string): Promise<DovetailDoc> {
-    let response = await this.axios.get(`/docs/${docId}`);
+    let response = await this.axios.get(`/docs/${encodeURIComponent(docId)}`);
     return response.data.data;
   }
 
@@ -395,34 +548,48 @@ export class Client {
     docId: string,
     data: {
       title?: string;
-      content?: string;
+      fields?: { label: string; value?: string }[];
     }
   ): Promise<DovetailDoc> {
-    let response = await this.axios.patch(`/docs/${docId}`, data);
+    let response = await this.axios.patch(
+      `/docs/${encodeURIComponent(docId)}`,
+      pickDefined({
+        title: data.title,
+        fields: data.fields?.map(f => ({ label: f.label, value: f.value ?? null }))
+      })
+    );
     return response.data.data;
   }
 
   async deleteDoc(
     docId: string
   ): Promise<{ id: string; title: string; deleted_at: string; deleted: boolean }> {
-    let response = await this.axios.delete(`/docs/${docId}`);
+    let response = await this.axios.delete(`/docs/${encodeURIComponent(docId)}`);
     return response.data.data;
   }
 
-  async listUserDocs(userId: string): Promise<DovetailDoc[]> {
-    let response = await this.axios.get(`/docs/user/${userId}`);
+  async exportDoc(docId: string, format: 'html' | 'markdown'): Promise<DovetailExport> {
+    let response = await this.axios.get(`/docs/${encodeURIComponent(docId)}/export/${format}`);
     return response.data.data;
   }
 
-  async exportDoc(docId: string, format: 'html' | 'markdown'): Promise<any> {
-    let response = await this.axios.get(`/docs/${docId}/export/${format}`);
-    return response.data.data;
-  }
-
-  async importDocFromFile(url: string, mimeType?: string): Promise<DovetailDoc> {
-    let body: Record<string, string> = { url };
-    if (mimeType) body.mime_type = mimeType;
-    let response = await this.axios.post('/docs/import/file', body);
+  async importDocFromFile(
+    url: string,
+    title: string,
+    mimeType?: string,
+    projectId?: string,
+    folderId?: string
+  ): Promise<DovetailDoc> {
+    let response = await this.axios.post(
+      '/docs/import/file',
+      pickDefined({
+        url,
+        title,
+        mime_type: mimeType,
+        project_id: projectId,
+        folder_id: folderId
+      })
+    );
     return response.data.data;
   }
 
@@ -459,7 +626,7 @@ export class Client {
   }
 
   async getChannel(channelId: string): Promise<DovetailChannel> {
-    let response = await this.axios.get(`/channels/${channelId}`);
+    let response = await this.axios.get(`/channels/${encodeURIComponent(channelId)}`);
     return response.data.data;
   }
 
@@ -470,14 +637,14 @@ export class Client {
       context?: string;
     }
   ): Promise<DovetailChannel> {
-    let response = await this.axios.patch(`/channels/${channelId}`, data);
+    let response = await this.axios.patch(`/channels/${encodeURIComponent(channelId)}`, data);
     return response.data.data;
   }
 
   async deleteChannel(
     channelId: string
   ): Promise<{ id: string; title: string; deleted_at: string; deleted: boolean }> {
-    let response = await this.axios.delete(`/channels/${channelId}`);
+    let response = await this.axios.delete(`/channels/${encodeURIComponent(channelId)}`);
     return response.data.data;
   }
 
@@ -503,12 +670,15 @@ export class Client {
       description?: string;
     }
   ): Promise<DovetailTopic> {
-    let response = await this.axios.patch(`/channels/topic/${topicId}`, data);
+    let response = await this.axios.patch(
+      `/channels/topic/${encodeURIComponent(topicId)}`,
+      data
+    );
     return response.data.data;
   }
 
-  async deleteTopic(topicId: string): Promise<any> {
-    let response = await this.axios.delete(`/channels/topic/${topicId}`);
+  async deleteTopic(topicId: string): Promise<DovetailTopic> {
+    let response = await this.axios.delete(`/channels/topic/${encodeURIComponent(topicId)}`);
     return response.data.data;
   }
 
@@ -560,7 +730,7 @@ export class Client {
   }
 
   async getFolder(folderId: string): Promise<DovetailFolder> {
-    let response = await this.axios.get(`/folders/${folderId}`);
+    let response = await this.axios.get(`/folders/${encodeURIComponent(folderId)}`);
     return response.data.data;
   }
 
@@ -575,7 +745,7 @@ export class Client {
     };
     if (params?.sort) queryParams.sort = params.sort;
 
-    let response = await this.axios.get(`/folders/${folderId}/contents`, {
+    let response = await this.axios.get(`/folders/${encodeURIComponent(folderId)}/contents`, {
       params: queryParams
     });
     return response.data;
@@ -583,8 +753,8 @@ export class Client {
 
   // ---- Files ----
 
-  async getFile(fileId: string): Promise<any> {
-    let response = await this.axios.get(`/files/${fileId}`);
+  async getFile(fileId: string): Promise<Record<string, unknown>> {
+    let response = await this.axios.get(`/files/${encodeURIComponent(fileId)}`);
     return response.data.data;
   }
 
@@ -597,6 +767,12 @@ export class Client {
       limit?: number;
     }
   ): Promise<SearchResults> {
+    if (params?.offset !== undefined && !Number.isSafeInteger(params.offset)) {
+      throw createApiServiceError('offset must be a whole number.');
+    }
+    if (params?.limit !== undefined && !Number.isSafeInteger(params.limit)) {
+      throw createApiServiceError('limit must be a whole number.');
+    }
     let body: Record<string, unknown> = { query };
     if (params?.offset !== undefined) body.offset = params.offset;
     if (params?.limit !== undefined) body.limit = params.limit;
@@ -615,6 +791,12 @@ export class Client {
     tagIds?: string[];
     withCitations?: boolean;
   }): Promise<SummarizeResult> {
+    if (
+      ![data.highlightIds, data.noteIds, data.insightIds, data.themeIds, data.tagIds].some(
+        ids => ids?.length
+      )
+    )
+      throw createApiServiceError('Provide at least one source ID to summarize.');
     let body: Record<string, unknown> = {};
     if (data.highlightIds?.length) body.highlight_ids = data.highlightIds;
     if (data.noteIds?.length) body.note_ids = data.noteIds;

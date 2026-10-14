@@ -1,11 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WakaTimeClient } from '../lib/client';
 import { spec } from '../spec';
 
 let heartbeatInputSchema = z.object({
   entity: z.string().describe('File path, app name, or domain being tracked'),
-  type: z.enum(['file', 'app', 'domain']).describe('Type of entity'),
+  type: z.enum(['file', 'app', 'url', 'domain']).describe('Type of entity'),
   time: z.number().describe('UNIX epoch timestamp of the heartbeat'),
   project: z.string().optional().describe('Project name'),
   branch: z.string().optional().describe('Git branch name'),
@@ -35,6 +35,7 @@ export let createHeartbeat = SlateTool.create(spec, {
       heartbeats: z
         .array(heartbeatInputSchema)
         .min(1)
+        .max(25)
         .describe('One or more heartbeats to create')
     })
   )
@@ -45,23 +46,36 @@ export let createHeartbeat = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
-    let responses: any[];
+    let responses: unknown[];
+    let createdCount: number;
     if (ctx.input.heartbeats.length === 1) {
       let result = await client.createHeartbeat(ctx.input.heartbeats[0]!);
       responses = [result];
+      createdCount = 1;
     } else {
       let result = await client.createHeartbeatsBulk(ctx.input.heartbeats);
-      responses = Array.isArray(result.responses) ? result.responses : [result];
+      let parsed = z
+        .object({ responses: z.array(z.tuple([z.unknown(), z.number().int()])) })
+        .safeParse(result);
+      if (!parsed.success || parsed.data.responses.length !== ctx.input.heartbeats.length) {
+        throw createApiServiceError(
+          'WakaTime returned an unexpected bulk heartbeat response. Check recorded activity before retrying.'
+        );
+      }
+      responses = parsed.data.responses;
+      createdCount = parsed.data.responses.filter(
+        ([, status]) => status >= 200 && status < 300
+      ).length;
     }
 
     return {
       output: {
-        createdCount: ctx.input.heartbeats.length,
+        createdCount,
         responses
       },
-      message: `Created **${ctx.input.heartbeats.length}** heartbeat(s).`
+      message: `Created **${createdCount}** of **${ctx.input.heartbeats.length}** heartbeat(s). Check responses for any rejected events.`
     };
   })
   .build();

@@ -1,55 +1,33 @@
-Now let me check the API docs for more details on endpoints and features:Now let me look at the Make.com integration for more details on available modules and the Zapier triggers:Now I have sufficient information. Let me compile the specification.
+# Endorsal Integration Specification
 
-# Slates Specification for Endorsal
-
-## Overview
-
-Endorsal is a testimonial and review management platform that automates the collection, management, and display of customer testimonials and reviews. It provides tools for sending automated review request campaigns (via email and SMS), importing reviews from external platforms (Google, Facebook, Yelp, Tripadvisor, etc.), and embedding testimonial widgets on websites.
+Endorsal collects, manages, and displays customer testimonials. This integration exposes contact and testimonial management, search, tag discovery, campaign inspection, widget inspection, and the existing SuperLink tool.
 
 ## Authentication
 
-Endorsal uses API key-based authentication, with the API key passed as a Bearer token in the `Authorization` header:
+Use a property-specific API key from [Endorsal API settings](https://app.endorsal.io/account/api). Requests use `Authorization: Bearer <api_key>` and the base URL `https://api.endorsal.io/v1`. Configuration has no required resource IDs. Endorsal's documented public API has no current-user or account identity endpoint.
 
-```
-Authorization: Bearer <api_key>
-```
+## Contact management
 
-The base URL for API requests is `https://api.endorsal.io/v1`.
+`list_contacts`, `get_contact`, `create_contact`, `update_contact`, and `archive_contact` manage customer records. Creation needs an email or phone number and can enroll the new contact in an AutoRequest campaign through the `campaignID` query parameter. Updates submit a `fields` object and then retrieve the updated resource so returned fields come from Endorsal. Contact creation timestamps are read from the provider's `activity.added` field. Archiving preserves the fetched contact identity and only reports success after the provider confirms the archive.
 
-To generate API credentials, go to the API page on your Endorsal dashboard and select the property for which you want to generate an API key. Click your profile icon > API > Generate new API key, then copy the key.
+`search_contacts` submits AND-combined field comparisons to `POST /contacts/search`. Comparisons accept string, number, null, or array values; the `in` operator requires an array. The provider's documented operators are `=`, `>`, `>=`, `<`, `<=`, `!=`, `contains`, and `in`.
 
-API keys are property-specific, meaning a property is a unique domain on which the embed code is installed and for which testimonials are collected. You will need a separate API key for each property you wish to access.
+## Testimonials and tags
 
-## Features
+`list_testimonials`, `get_testimonial`, `create_testimonial`, `update_testimonial`, and `delete_testimonial` manage reviews. A list can target either a contact or a tag. Testimonial creation requires a reviewer name, comments, and property ID. Approval and featured boolean inputs map to the provider's numeric status values. Updates submit a `fields` object and retrieve the current testimonial after confirmation. Deletes must receive a successful provider confirmation.
 
-### Contact Management
+Testimonial avatar objects expose their real URL through the existing `avatar` field; optional `avatarDetails` retains the provider's complete image-size data. Numeric timestamp fields retain their types.
 
-The API allows you to create, retrieve, update, list, and archive contacts in your Endorsal account. Contacts serve as Endorsal's CRM, allowing you to manage customer records that are used in review request campaigns. Contacts support custom attributes to track dynamic properties or events and sync with other CRM or marketing software.
+`search_testimonials` submits the same documented comparison format to `POST /testimonials/search`. `list_tags` discovers tag IDs, names, categories, and complete tag details from `GET /tags`. Pass a discovered tag ID to `list_testimonials`.
 
-### Testimonial Management
+## Campaigns, widgets, and lists
 
-You can list, create, retrieve, update, and delete testimonials. When creating a testimonial, you can submit feedback along with the customer's name, email, company, job title, and star rating. Testimonials can be retrieved by ID or filtered by tag to find reviews relevant to a specific product or service. You can also retrieve all testimonials associated with a specific contact.
+`list_campaigns` lists campaigns or retrieves one campaign by ID. The provider's `live`, `added`, and `edited` values map to the existing enabled, created, and updated output fields. `list_widgets` maps the documented widget name, type/layout, configuration settings, and edit timestamp.
 
-### AutoRequest Campaigns
+Documented list endpoints return complete arrays without `page` or `limit` parameters. Existing pagination inputs remain optional numbers and are applied locally. Runtime validation requires positive whole-number values. Listing testimonials for a contact or tag also honors those inputs. Contact and testimonial totals reflect the complete returned list before pagination.
 
-The API provides access to list AutoRequest campaigns and fetch details for a specific campaign by ID, including delivery stats and configuration. AutoRequests are automated testimonial generation campaigns that send customers review requests via email and SMS at the right time.
+## SuperLinks and verification limits
 
-- Campaigns can be filtered by custom attribute rules for targeted outreach.
-- AutoRequests includes campaign data such as open & click rates and new reviews.
+`create_superlink` retains the existing `POST /superlinks` request and URL output. This route is absent from the current published OpenAPI reference, so its current provider request and response contract remains unverified. Absence from that reference does not establish that the API route was removed.
 
-### Widgets
-
-You can fetch all Endorsal widgets, showing their configuration and status, to verify social proof placement on your site.
-
-### SuperLinks
-
-You can create unique SuperLinks based on customer data of your choice. SuperLinks are pre-filled review form URLs that reduce friction for customers by populating forms with data you already hold on them.
-
-## Events
-
-Endorsal supports webhook-based event notifications via integrations with platforms like Zapier and Make.
-
-### New Testimonial
-
-- Triggers when a new testimonial is submitted to your property.
-- This is the primary event type available, enabling you to react to incoming testimonials in real time (e.g., forward to Slack, sync with a CRM, trigger approval workflows).
+The current refresh used the [official API reference](https://developers.endorsal.io/docs/endorsal/YXBpOjE2OTAxMDk-public-rest-api) and its [published OpenAPI source](https://developers.endorsal.io/api/v1/projects/endorsal/endorsal/nodes/Public%20API/Endorsal.v1.json). No live provider operations were performed.

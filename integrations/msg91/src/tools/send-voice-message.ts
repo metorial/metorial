@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Msg91Client } from '../lib/client';
 import { spec } from '../spec';
@@ -69,7 +69,9 @@ export let sendVoiceMessage = SlateTool.create(spec, {
 
     if (ctx.input.callType === 'click_to_call') {
       if (!ctx.input.destination || !ctx.input.destinationB) {
-        throw new Error('destination and destinationB are required for click_to_call');
+        throw createApiServiceError(
+          'destination and destinationB are required for click_to_call'
+        );
       }
       let result = await client.clickToCall({
         callerId: ctx.input.callerId,
@@ -84,7 +86,7 @@ export let sendVoiceMessage = SlateTool.create(spec, {
     }
 
     if (!ctx.input.template || !ctx.input.clientNumber) {
-      throw new Error('template and clientNumber are required for voice_sms');
+      throw createApiServiceError('template and clientNumber are required for voice_sms');
     }
     let result = await client.sendVoiceCall({
       template: ctx.input.template,

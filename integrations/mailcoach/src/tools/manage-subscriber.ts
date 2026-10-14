@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,6 +52,14 @@ export let manageSubscriber = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Custom extra attributes as key-value pairs'),
+      strict: z
+        .boolean()
+        .optional()
+        .describe('Reject an existing subscriber instead of updating it (create only)'),
+      appendTags: z
+        .boolean()
+        .optional()
+        .describe('Append tags instead of replacing them (update only)'),
       skipConfirmation: z
         .boolean()
         .optional()
@@ -74,7 +82,8 @@ export let manageSubscriber = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'delete') {
-      if (!ctx.input.subscriberUuid) throw new Error('subscriberUuid is required for delete');
+      if (!ctx.input.subscriberUuid)
+        throw createApiServiceError('subscriberUuid is required for delete');
       await client.deleteSubscriber(ctx.input.subscriberUuid);
       return {
         output: { subscriber: null },
@@ -84,7 +93,7 @@ export let manageSubscriber = SlateTool.create(spec, {
 
     if (action === 'resend_confirmation') {
       if (!ctx.input.subscriberUuid)
-        throw new Error('subscriberUuid is required for resend_confirmation');
+        throw createApiServiceError('subscriberUuid is required for resend_confirmation');
       await client.resendConfirmation(ctx.input.subscriberUuid);
       return {
         output: { subscriber: null },
@@ -93,7 +102,8 @@ export let manageSubscriber = SlateTool.create(spec, {
     }
 
     if (action === 'confirm') {
-      if (!ctx.input.subscriberUuid) throw new Error('subscriberUuid is required for confirm');
+      if (!ctx.input.subscriberUuid)
+        throw createApiServiceError('subscriberUuid is required for confirm');
       let result = await client.confirmSubscriber(ctx.input.subscriberUuid);
       return {
         output: { subscriber: mapSubscriber(result) },
@@ -103,7 +113,7 @@ export let manageSubscriber = SlateTool.create(spec, {
 
     if (action === 'unsubscribe') {
       if (!ctx.input.subscriberUuid)
-        throw new Error('subscriberUuid is required for unsubscribe');
+        throw createApiServiceError('subscriberUuid is required for unsubscribe');
       let result = await client.unsubscribe(ctx.input.subscriberUuid);
       return {
         output: { subscriber: mapSubscriber(result) },
@@ -112,8 +122,9 @@ export let manageSubscriber = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.emailListUuid) throw new Error('emailListUuid is required for create');
-      if (!ctx.input.email) throw new Error('email is required for create');
+      if (!ctx.input.emailListUuid)
+        throw createApiServiceError('emailListUuid is required for create');
+      if (!ctx.input.email) throw createApiServiceError('email is required for create');
 
       let result = await client.createSubscriber(ctx.input.emailListUuid, {
         email: ctx.input.email,
@@ -121,7 +132,8 @@ export let manageSubscriber = SlateTool.create(spec, {
         last_name: ctx.input.lastName,
         tags: ctx.input.tags,
         extra_attributes: ctx.input.extraAttributes,
-        skip_confirmation: ctx.input.skipConfirmation
+        skip_confirmation: ctx.input.skipConfirmation,
+        strict: ctx.input.strict
       });
 
       return {
@@ -131,14 +143,19 @@ export let manageSubscriber = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.subscriberUuid) throw new Error('subscriberUuid is required for update');
+    if (!ctx.input.subscriberUuid)
+      throw createApiServiceError('subscriberUuid is required for update');
+
+    let email = ctx.input.email;
+    if (!email) email = (await client.getSubscriber(ctx.input.subscriberUuid)).email;
 
     let result = await client.updateSubscriber(ctx.input.subscriberUuid, {
-      email: ctx.input.email,
+      email,
       first_name: ctx.input.firstName,
       last_name: ctx.input.lastName,
       tags: ctx.input.tags,
-      extra_attributes: ctx.input.extraAttributes
+      extra_attributes: ctx.input.extraAttributes,
+      append_tags: ctx.input.appendTags
     });
 
     return {
@@ -153,9 +170,11 @@ let mapSubscriber = (sub: any) => ({
   email: sub.email,
   firstName: sub.first_name ?? null,
   lastName: sub.last_name ?? null,
-  status: sub.status ?? 'subscribed',
+  status:
+    sub.status ??
+    (sub.unsubscribed_at ? 'unsubscribed' : sub.subscribed_at ? 'subscribed' : 'unconfirmed'),
   tags: sub.tags ?? [],
-  extraAttributes: sub.extra_attributes ?? null,
+  extraAttributes: Array.isArray(sub.extra_attributes) ? null : (sub.extra_attributes ?? null),
   subscribedAt: sub.subscribed_at ?? null,
   unsubscribedAt: sub.unsubscribed_at ?? null,
   createdAt: sub.created_at,

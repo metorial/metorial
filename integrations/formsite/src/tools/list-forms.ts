@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FormsiteClient } from '../lib/client';
+import { FormsiteClient, type FormsiteForm } from '../lib/client';
 import { spec } from '../spec';
 
 export let listForms = SlateTool.create(spec, {
@@ -47,7 +47,7 @@ export let listForms = SlateTool.create(spec, {
       userDir: ctx.config.userDir
     });
 
-    let forms: any;
+    let forms: FormsiteForm[];
     if (ctx.input.formDir) {
       let form = await client.getForm(ctx.input.formDir);
       forms = [form];

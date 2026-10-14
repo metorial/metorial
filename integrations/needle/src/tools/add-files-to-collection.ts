@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let addFilesToCollection = SlateTool.create(spec, {
   name: 'Add Files to Collection',
   key: 'add_files_to_collection',
-  description: `Add one or more files to a collection by providing a URL for each file. URLs can be public or signed upload URLs obtained via the **Get File Upload URL** tool. Files are automatically indexed for semantic search after being added.`,
+  description: `Add one or more files to a collection by providing a URL for each file. URLs can be public or private file reference URLs obtained via the **Get File Upload URL** tool. Files are automatically indexed for semantic search after being added.`,
   instructions: [
     'For public files, provide the direct URL.',
     'For local/private files, first use the Get File Upload URL tool to obtain a signed upload URL, upload the file to it, then use the returned reference URL here.'
@@ -19,7 +19,7 @@ export let addFilesToCollection = SlateTool.create(spec, {
         .array(
           z.object({
             name: z.string().describe('Display name for the file'),
-            url: z.string().describe('Public URL or signed upload URL of the file')
+            url: z.string().describe('Public URL or uploaded file reference URL of the file')
           })
         )
         .min(1)
@@ -53,7 +53,7 @@ export let addFilesToCollection = SlateTool.create(spec, {
       name: r.name,
       url: r.url,
       status: r.status,
-      error: r.error
+      error: r.error ?? undefined
     }));
 
     let successCount = mapped.filter(f => !f.error).length;

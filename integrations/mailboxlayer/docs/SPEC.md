@@ -1,4 +1,4 @@
-# Slates Specification for Mailboxlayer
+# Mailboxlayer API Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ Mailboxlayer uses **API key authentication** via an `access_key` query parameter
 
 - After signing up at mailboxlayer.com, each user is assigned a personal API Access Key.
 - The key is passed as a query parameter on every request: `https://apilayer.net/api/check?access_key=YOUR_ACCESS_KEY&email=test@example.com`
-- HTTPS encryption is available on all plans.
+- Requests use HTTPS. Feature and encryption restrictions depend on the provider's subscription plan and are reported as API errors.
 - No OAuth, scopes, or additional credentials are required.
 
 ## Features
@@ -21,6 +21,7 @@ Validates a single email address in real time. The API performs multiple checks 
 
 - **Parameters:** `email` (required), `smtp` (enabled by default, can be disabled), `catch_all` (disabled by default, set to `1` to enable catch-all detection).
 - Catch-all detection adds latency to the response since it performs additional SMTP checks.
+- Catch-all detection requires a paid plan. Unperformed checks are returned as `null`; disabling SMTP verification is not a failed mailbox check.
 
 ### Bulk Email Validation
 
@@ -28,6 +29,10 @@ Validates multiple email addresses in a single request by providing comma-separa
 
 - Available only on Professional Plus (up to 25 addresses) and Enterprise Plus (up to 100 addresses) plans.
 - Returns the same response structure per email as the single-check endpoint.
+
+### Error Handling
+
+Both endpoints can return a `success: false` error object even with HTTP 200. Authentication, quota, subscription, and request errors preserve the provider's error information. HTTP and network failures are also reported as structured errors rather than successful validation results.
 
 ### Syntax & Typo Detection
 

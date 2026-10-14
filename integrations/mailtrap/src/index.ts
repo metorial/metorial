@@ -5,7 +5,9 @@ import {
   getEmailStats,
   getSandboxMessage,
   listAccounts,
+  listContacts,
   listEmailLogs,
+  listSandboxInboxes,
   listSandboxMessages,
   listSandboxProjects,
   manageContact,
@@ -30,7 +32,9 @@ export let provider = Slate.create({
     getEmailStats,
     listEmailLogs,
     getEmailLog,
-    listAccounts
+    listAccounts,
+    listContacts,
+    listSandboxInboxes
   ],
   triggers: []
 });

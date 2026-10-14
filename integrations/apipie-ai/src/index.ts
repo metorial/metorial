@@ -1,19 +1,23 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  analyzeImages,
   chatCompletion,
   createEmbeddings,
   discoverModels,
   generateImage,
+  getState,
   getUsage,
   manageRag,
   textToSpeech,
+  updateState,
   webSearch
 } from './tools';
 
 export let provider = Slate.create({
   spec,
   tools: [
+    analyzeImages,
     chatCompletion,
     generateImage,
     textToSpeech,
@@ -21,7 +25,9 @@ export let provider = Slate.create({
     discoverModels,
     webSearch,
     manageRag,
-    getUsage
+    getUsage,
+    getState,
+    updateState
   ],
   triggers: []
 });

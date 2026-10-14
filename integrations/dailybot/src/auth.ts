@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { DailyBotClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,21 +25,15 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.dailybot.com/v1',
-        headers: {
-          'X-API-KEY': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await axios.get('/me/');
-      let data = response.data;
+      let data = await new DailyBotClient({ token: ctx.output.token }).getMe(true);
 
       return {
         profile: {
-          id: data.uuid,
-          name: data.full_name,
+          id: data.uuid ?? data.id,
+          name:
+            data.full_name ??
+            data.name ??
+            [data.first_name, data.last_name].filter(Boolean).join(' '),
           email: data.email
         }
       };

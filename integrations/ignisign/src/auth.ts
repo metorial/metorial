@@ -1,10 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { getApiKeyScope, IgnisignClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('Ignisign API secret key (Bearer token)')
+      token: z.string().describe('IgniSign API key'),
+      appId: z.string().optional(),
+      appEnv: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -14,36 +17,27 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiSecret: z
         .string()
-        .describe('Your Ignisign App Secret from the API Keys section of the Ignisign Console')
+        .describe('API key beginning with skv2_ from the IgniSign Console API Keys section')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiSecret.trim();
+      let scope = getApiKeyScope(token);
+      if (!scope)
+        throw createApiServiceError(
+          'Create a current API key beginning with skv2_ in the IgniSign Console.'
+        );
+      return { output: { token, ...scope } };
+    },
+    getProfile: async (ctx: {
+      output: { token: string; appId?: string; appEnv?: string };
+    }) => {
+      let client = new IgnisignClient(ctx.output);
+      let application = await client.getApplicationContext();
       return {
-        output: {
-          token: ctx.input.apiSecret
+        profile: {
+          id: ctx.output.appId,
+          name: application.appName ?? application.name ?? 'IgniSign Application'
         }
       };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { apiSecret: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.ignisign.io',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      try {
-        await client.get('/v4/healthcheck');
-        return {
-          profile: {
-            name: 'Ignisign API User'
-          }
-        };
-      } catch {
-        return {
-          profile: {
-            name: 'Ignisign API User'
-          }
-        };
-      }
     }
   });

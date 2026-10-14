@@ -1,28 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
-
-let _jobSchema = z.object({
-  jobId: z.string().describe('Unique job identifier'),
-  title: z.string().describe('Job name'),
-  code: z.string().optional().describe('Job code'),
-  color: z.string().optional().describe('Hex color'),
-  description: z.string().optional().describe('Job description'),
-  gps: z
-    .object({
-      address: z.string().optional(),
-      longitude: z.number().optional(),
-      latitude: z.number().optional()
-    })
-    .optional()
-    .describe('GPS location'),
-  isDeleted: z.boolean().optional(),
-  parentId: z.string().optional().nullable(),
-  subJobs: z.array(z.any()).optional(),
-  instanceIds: z.array(z.number()).optional(),
-  customFields: z.array(z.any()).optional()
-});
 
 export let manageJobs = SlateTool.create(spec, {
   name: 'Manage Jobs',
@@ -62,8 +41,18 @@ export let manageJobs = SlateTool.create(spec, {
         .describe('Filter by job names (case-sensitive)'),
       jobCodes: z.array(z.string()).optional().describe('Filter by job codes'),
       includeDeleted: z.boolean().optional().describe('Include deleted jobs'),
-      jobs: z.array(z.any()).optional().describe('Array of job objects for create_jobs'),
-      updateBody: z.any().optional().describe('Update data for update_job'),
+      jobs: z
+        .array(z.any())
+        .optional()
+        .describe(
+          'For create_jobs: each job requires title and instanceIds (from list_schedulers or list_time_clocks); a sub-job requires title and parentId.'
+        ),
+      updateBody: z
+        .any()
+        .optional()
+        .describe(
+          'For update_job: an object with required title and optional code, description, gps, color, assign, or customFields.'
+        ),
       sort: z.enum(['title']).optional().describe('Sort field'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
       limit: z.number().optional().describe('Results per page (max 500)'),
@@ -77,8 +66,8 @@ export let manageJobs = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action } = ctx.input;
@@ -102,7 +91,7 @@ export let manageJobs = SlateTool.create(spec, {
     }
 
     if (action === 'get_job') {
-      if (!ctx.input.jobId) throw new Error('jobId is required.');
+      if (!ctx.input.jobId) throw createApiServiceError('jobId is required.');
       let result = await client.getJob(ctx.input.jobId);
       return {
         output: { result },
@@ -111,7 +100,21 @@ export let manageJobs = SlateTool.create(spec, {
     }
 
     if (action === 'create_jobs') {
-      if (!ctx.input.jobs) throw new Error('jobs array is required.');
+      if (!ctx.input.jobs?.length || ctx.input.jobs.length > 500) {
+        throw createApiServiceError('Provide between 1 and 500 jobs to create.');
+      }
+      if (
+        ctx.input.jobs.some(
+          job =>
+            !job ||
+            typeof job.title !== 'string' ||
+            (!Array.isArray(job.instanceIds) && typeof job.parentId !== 'string')
+        )
+      ) {
+        throw createApiServiceError(
+          'Each job requires title and instanceIds, or title and parentId for a sub-job.'
+        );
+      }
       let result = await client.createJobs(ctx.input.jobs);
       return {
         output: { result },
@@ -120,7 +123,10 @@ export let manageJobs = SlateTool.create(spec, {
     }
 
     if (action === 'update_job') {
-      if (!ctx.input.jobId) throw new Error('jobId is required.');
+      if (!ctx.input.jobId) throw createApiServiceError('jobId is required.');
+      if (typeof ctx.input.updateBody?.title !== 'string') {
+        throw createApiServiceError('updateBody.title is required for update_job.');
+      }
       let result = await client.updateJob(ctx.input.jobId, ctx.input.updateBody);
       return {
         output: { result },
@@ -129,7 +135,7 @@ export let manageJobs = SlateTool.create(spec, {
     }
 
     if (action === 'delete_job') {
-      if (!ctx.input.jobId) throw new Error('jobId is required.');
+      if (!ctx.input.jobId) throw createApiServiceError('jobId is required.');
       let result = await client.deleteJob(ctx.input.jobId);
       return {
         output: { result },
@@ -148,6 +154,6 @@ export let manageJobs = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

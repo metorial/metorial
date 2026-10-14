@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { addResultFiles, validateWholeNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 let restorationSchema = z
@@ -205,6 +206,34 @@ Provide the source image as a public URL or storage URI and specify the desired 
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    for (let [field, value] of Object.entries(ctx.input.adjustments ?? {})) {
+      validateWholeNumber(value, `adjustments.${field}`);
+    }
+    for (let [field, value] of Object.entries(ctx.input.resizing ?? {})) {
+      if (typeof value === 'number') validateWholeNumber(value, `resizing.${field}`);
+    }
+    validateWholeNumber(ctx.input.output?.quality, 'output.quality');
+    validateWholeNumber(ctx.input.output?.dpi, 'output.dpi');
+    let style = ctx.input.generative?.styleTransfer;
+    if (style) {
+      if (!style.referenceUrl) {
+        throw createApiServiceError(
+          'generative.styleTransfer.referenceUrl is required for style transfer.'
+        );
+      }
+      for (let [field, value] of Object.entries({
+        depth: style.depth,
+        denoising: style.denoising,
+        styleStrength: style.styleStrength
+      })) {
+        if (value !== undefined && (value < 0 || value > 1)) {
+          throw createApiServiceError(
+            `generative.styleTransfer.${field} must be between 0 and 1.`
+          );
+        }
+      }
+    }
+
     let operations: Record<string, unknown> = {};
 
     if (ctx.input.restorations) {
@@ -234,10 +263,10 @@ Provide the source image as a public URL or storage URI and specify the desired 
       if (ctx.input.generative.styleTransfer) {
         let st = ctx.input.generative.styleTransfer;
         let styleTransfer: Record<string, unknown> = {};
-        if (st.referenceUrl) styleTransfer.reference_url = st.referenceUrl;
+        if (st.referenceUrl) styleTransfer.style_reference_image = st.referenceUrl;
         if (st.prompt) styleTransfer.prompt = st.prompt;
-        if (st.depth !== undefined) styleTransfer.depth = st.depth;
-        if (st.denoising !== undefined) styleTransfer.denoising = st.denoising;
+        if (st.depth !== undefined) styleTransfer.depth_strength = st.depth;
+        if (st.denoising !== undefined) styleTransfer.denoising_strength = st.denoising;
         if (st.styleStrength !== undefined) styleTransfer.style_strength = st.styleStrength;
         generative.style_transfer = styleTransfer;
       }
@@ -247,12 +276,32 @@ Provide the source image as a public URL or storage URI and specify the desired 
     let outputConfig: Record<string, unknown> | undefined;
     if (ctx.input.output) {
       outputConfig = {};
-      if (ctx.input.output.format) outputConfig.format = ctx.input.output.format;
-      if (ctx.input.output.quality) outputConfig.quality = ctx.input.output.quality;
+      let format = ctx.input.output.format ?? 'jpeg';
+      outputConfig.format = format;
+      if (ctx.input.output.quality !== undefined) {
+        if (format === 'png') {
+          throw createApiServiceError(
+            'output.quality applies to lossy formats. Omit it for PNG output.'
+          );
+        }
+        outputConfig.format =
+          format === 'jpeg'
+            ? { type: format, quality: ctx.input.output.quality }
+            : {
+                type: format,
+                compression: { type: 'lossy', quality: ctx.input.output.quality }
+              };
+      }
       if (ctx.input.output.destination)
         outputConfig.destination = ctx.input.output.destination;
-      if (ctx.input.output.colorSpace) outputConfig.color_space = ctx.input.output.colorSpace;
-      if (ctx.input.output.dpi) outputConfig.metadata = { dpi: ctx.input.output.dpi };
+      if (ctx.input.output.colorSpace !== undefined || ctx.input.output.dpi !== undefined) {
+        outputConfig.metadata = {
+          ...(ctx.input.output.dpi !== undefined ? { dpi: ctx.input.output.dpi } : {}),
+          ...(ctx.input.output.colorSpace !== undefined
+            ? { color_space: ctx.input.output.colorSpace }
+            : {})
+        };
+      }
     }
 
     let requestBody = {
@@ -279,6 +328,7 @@ Provide the source image as a public URL or storage URI and specify the desired 
     ctx.info('Processing synchronous image edit');
     let result = await client.editImage(requestBody);
     let data = result.data;
+    await addResultFiles(ctx, [data.output]);
 
     return {
       output: {

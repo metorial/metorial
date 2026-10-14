@@ -1,8 +1,17 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import type { LeigaResponse } from './lib/client';
+import { assertLeigaResponse } from './lib/response';
 
 let api = createAxios({
-  baseURL: 'https://app.leiga.com/openapi/api'
+  baseURL: 'https://app.leiga.com/openapi/api',
+  timeout: 30000
 });
 
 export let auth = SlateAuth.create()
@@ -22,15 +31,28 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let response = await api.post('/authorize/access-permanent-token', {
-        clientId: ctx.input.clientId,
-        secretKey: ctx.input.secretKey
-      });
+      let data = await requestAxiosData<LeigaResponse<{ accessToken: string }>>(
+        'authorize',
+        () =>
+          api.post('/authorize/access-permanent-token', {
+            clientId: ctx.input.clientId,
+            secretKey: ctx.input.secretKey
+          }),
+        (error, operation) =>
+          buildApiServiceError(error, {
+            providerLabel: 'Leiga',
+            reason: 'leiga_auth_error',
+            operation,
+            detailKeys: ['msg', 'message', 'code']
+          })
+      );
+      assertLeigaResponse(data, 'authorization');
 
-      let data = response.data;
-
-      if (data.code !== '0' || !data.data?.accessToken) {
-        throw new Error(data.msg || 'Failed to obtain access token');
+      if (typeof data.data?.accessToken !== 'string' || !data.data.accessToken.trim()) {
+        throw createApiServiceError(
+          'Leiga did not return an access token. Check the client credentials and OpenAPI module permissions.',
+          { reason: 'leiga_auth_error' }
+        );
       }
 
       return {

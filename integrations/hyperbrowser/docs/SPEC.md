@@ -1,4 +1,4 @@
-Now let me check for sandboxes and recordings features that appeared in the nav:# Slates Specification for Hyperbrowser
+# Hyperbrowser Specification
 
 ## Overview
 

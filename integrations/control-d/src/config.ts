@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Sub-organization ID to impersonate. When set, all API calls will operate within the specified sub-organization context.'
+        'Optional sub-organization ID to impersonate. Use manage_organization with list_sub_orgs to discover IDs. When set, supported API calls operate within that sub-organization context.'
       )
   })
 );

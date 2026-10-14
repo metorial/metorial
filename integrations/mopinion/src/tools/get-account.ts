@@ -30,13 +30,14 @@ export let getAccount = SlateTool.create(spec, {
       signatureToken: ctx.auth.signatureToken
     });
 
-    let account = await client.getAccount();
+    let result = await client.getAccount();
+    let account = result.data ?? result;
 
     return {
       output: {
         name: account.name || '',
         packageName: account.package || '',
-        endDate: account.endDate || account.end_date || '',
+        endDate: account.endDate || account.end_date || account.enddate || '',
         numberUsers: account.numberUsers ?? account.number_users ?? 0,
         numberCharts: account.numberCharts ?? account.number_charts ?? 0,
         numberForms: account.numberForms ?? account.number_forms ?? 0,

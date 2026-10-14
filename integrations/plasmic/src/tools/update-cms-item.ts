@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
+import { cmsModelIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateCmsItem = SlateTool.create(spec, {
@@ -13,13 +14,12 @@ export let updateCmsItem = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      modelId: z
-        .string()
-        .describe('Unique identifier of the CMS model/table containing the item'),
+      modelId: cmsModelIdSchema,
       rowId: z.string().describe('ID of the row/item to update'),
       fields: z
         .record(z.string(), z.unknown())
         .describe('Field values to update. Keys should match the model field identifiers'),
+      identifier: z.string().optional().describe('Human-readable identifier for the CMS item'),
       publish: z.boolean().optional().describe('Whether to publish the item after updating')
     })
   )
@@ -29,8 +29,8 @@ export let updateCmsItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.cmsId || !ctx.auth.cmsPublicToken || !ctx.auth.cmsSecretToken) {
-      throw new Error('CMS ID, public token, and secret token are required to update items');
+    if (!ctx.auth.cmsId || !ctx.auth.cmsSecretToken) {
+      throw createApiServiceError('CMS ID and secret token are required to update items');
     }
 
     let client = new CmsClient({
@@ -43,6 +43,7 @@ export let updateCmsItem = SlateTool.create(spec, {
       modelId: ctx.input.modelId,
       rowId: ctx.input.rowId,
       data: ctx.input.fields,
+      identifier: ctx.input.identifier,
       publish: ctx.input.publish
     });
 

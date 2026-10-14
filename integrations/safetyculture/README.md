@@ -1,11 +1,9 @@
-# <img src="logo.png" height="20"> Safety Culture
+# SafetyCulture
 
-Manage workplace inspections, safety issues, corrective actions, assets, and team training on the SafetyCulture (iAuditor) platform. Create, start, complete, and export inspections using configurable templates. Track and assign corrective actions with priorities, due dates, and statuses. Create and manage issues (incidents) with categories, assignees, and timelines. Organize assets with custom types and fields. Administer users, groups, permissions, and site hierarchies. Schedule recurring inspections. Access training courses, lessons, and analytics. Manage documents, credentials, contractor companies, OSHA recordkeeping, IoT sensors, and investigations. Export data incrementally via data feeds for syncing to external warehouses.
+Manage inspections, templates, corrective actions, issues, assets, and inspection schedules in SafetyCulture, now Mitti. Discover organization/group connections, site IDs, and asset types before assigning work or creating assets.
 
-## License
+Connect with a user or service user API token. API access requires a Premium or Enterprise plan, and each operation uses the token owner's permissions and content access. The SafetyCulture API host remains supported by Mitti.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Inspection exports produce downloadable PDF or Word files. A processing export returns its status; repeat the same request until it is ready. Legacy inspection schedule endpoints remain supported, and schedules run in the token owner's profile timezone.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+See [the integration specification](docs/SPEC.md) and [the official API reference](https://developer.mitti.com/reference/introduction).

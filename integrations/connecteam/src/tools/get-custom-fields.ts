@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,8 +34,8 @@ export let getCustomFields = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     if (ctx.input.resource === 'custom_fields') {
@@ -72,6 +72,6 @@ export let getCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown resource: ${ctx.input.resource}`);
+    throw createApiServiceError(`Unknown resource: ${ctx.input.resource}`);
   })
   .build();

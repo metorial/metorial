@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DsmClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getDesignTokenStyles = SlateTool.create(spec, {
   name: 'Get Design Token Styles',
   key: 'get_design_token_styles',
-  description: `Retrieves design tokens from an InVision DSM design system in a specific style format (CSS, SCSS, Less, YAML, XML, etc.).
-Useful for directly consuming tokens in platform-specific formats without additional transformation.
+  description: `Prepares a downloadable design token stylesheet from an InVision DSM design system in a specific format (CSS, SCSS, Less, YAML, XML, or JSON).
+Useful for consuming tokens in platform-specific formats without additional transformation.
 
-**Note:** InVision was shut down on December 31, 2024. This tool will only work if the service is still accessible.`,
+**Note:** InVision discontinued its design products on December 31, 2024. Legacy API availability is not guaranteed.`,
   instructions: [
     'Provide the full DSM export base URL from the InVision DSM API setup page.',
     'Choose the output format that matches your target platform.'
@@ -18,6 +18,7 @@ Useful for directly consuming tokens in platform-specific formats without additi
     readOnly: true
   }
 })
+  .authMethods(['dsm_api_key'])
   .input(
     z.object({
       dsmExportBaseUrl: z
@@ -33,7 +34,9 @@ Useful for directly consuming tokens in platform-specific formats without additi
   .output(
     z.object({
       styleContent: z.string().describe('The style content in the requested format'),
-      format: z.string().describe('The format of the returned style content')
+      format: z.string().describe('The format of the downloadable style file'),
+      filename: z.string().optional().describe('Name of the downloadable style file'),
+      mimeType: z.string().optional().describe('MIME type of the downloadable style file')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,15 +45,50 @@ Useful for directly consuming tokens in platform-specific formats without additi
       dsmBaseUrl: ctx.input.dsmExportBaseUrl
     });
 
-    let styleContent = await client.getStyleParams(ctx.input.format);
+    let providerStyles = await client.getStyleParams(ctx.input.format);
+    let styleContent: string | undefined;
+    try {
+      styleContent =
+        typeof providerStyles === 'string' ? providerStyles : JSON.stringify(providerStyles);
+    } catch (error) {
+      throw createApiServiceError(
+        'InVision returned style content that could not be serialized.',
+        {
+          parent: error
+        }
+      );
+    }
+    if (styleContent === undefined) {
+      throw createApiServiceError('InVision did not return design token style content.');
+    }
+
+    let mimeTypes = {
+      css: 'text/css',
+      scss: 'text/x-scss',
+      less: 'text/plain',
+      styl: 'text/plain',
+      xml: 'application/xml',
+      yaml: 'application/yaml',
+      json: 'application/json'
+    };
+    let filename = `design-token-styles.${ctx.input.format}`;
+    let mimeType = mimeTypes[ctx.input.format];
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.getStyleParamsUrl(ctx.input.format),
+      headers: { 'X-API-KEY': ctx.auth.token },
+      filename,
+      mimeType
+    });
 
     return {
       output: {
-        styleContent:
-          typeof styleContent === 'string' ? styleContent : JSON.stringify(styleContent),
-        format: ctx.input.format
+        styleContent,
+        format: ctx.input.format,
+        filename,
+        mimeType
       },
-      message: `Successfully retrieved design token styles in **${ctx.input.format}** format.`
+      message: `Retrieved design token styles in **${ctx.input.format}** format and prepared the file for download.`
     };
   })
   .build();

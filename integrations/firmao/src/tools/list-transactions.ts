@@ -72,21 +72,24 @@ export let listTransactions = SlateTool.create(spec, {
 
     let transactions = result.data.map((t: any) => ({
       transactionId: t.id,
-      transactionNumber: t.transactionNumber,
-      type: t.type,
-      mode: t.mode,
-      transactionDate: t.transactionDate,
-      invoiceDate: t.invoiceDate,
-      paymentDate: t.paymentDate,
-      currency: t.currency,
-      paymentType: t.paymentType,
-      paid: t.paid,
-      paidValue: t.paidValue,
-      netTotal: t.transactionNettoPrice,
-      grossTotal: t.transactionBruttoPrice,
-      customerId: typeof t.customer === 'object' ? t.customer?.id : t.customer,
-      customerName: typeof t.customer === 'object' ? t.customer?.name : undefined,
-      creationDate: t.creationDate
+      transactionNumber: t.transactionNumber ?? undefined,
+      type: t.type ?? undefined,
+      mode: t.mode ?? undefined,
+      transactionDate: t.transactionDate ?? undefined,
+      invoiceDate: t.invoiceDate ?? undefined,
+      paymentDate: t.paymentDate ?? undefined,
+      currency: t.currency ?? undefined,
+      paymentType: t.paymentType ?? undefined,
+      paid: t.paid ?? undefined,
+      paidValue: t.paidValue ?? undefined,
+      netTotal: t.transactionNettoPrice ?? undefined,
+      grossTotal: t.transactionBruttoPrice ?? undefined,
+      customerId: (typeof t.customer === 'object' ? t.customer?.id : t.customer) ?? undefined,
+      customerName:
+        (typeof t.customer === 'object'
+          ? (t.customer?.name ?? t.customer?.label)
+          : undefined) ?? undefined,
+      creationDate: t.creationDate ?? undefined
     }));
 
     return {

@@ -40,7 +40,8 @@ export let bulkValidateEmails = SlateTool.create(spec, {
 Returns an array of validation results, one per email address.`,
   instructions: [
     'Provide email addresses as an array of strings.',
-    'Disabling SMTP check significantly speeds up the response but reduces verification accuracy.'
+    'Disabling SMTP check significantly speeds up the response but reduces verification accuracy.',
+    'Catch-all detection requires a paid plan and adds latency.'
   ],
   constraints: [
     'Requires a Professional Plus (up to 25 emails) or Enterprise Plus (up to 100 emails) plan.',
@@ -93,6 +94,10 @@ Returns an array of validation results, one per email address.`,
 
     let validCount = results.filter(r => r.formatValid === true).length;
     let deliverableCount = results.filter(r => r.smtpCheck === true).length;
+    let smtpSummary =
+      ctx.input.smtp === false
+        ? 'SMTP verification was disabled'
+        : `**${deliverableCount}** passed SMTP verification`;
 
     return {
       output: {
@@ -101,7 +106,7 @@ Returns an array of validation results, one per email address.`,
         validCount,
         deliverableCount
       },
-      message: `Validated **${results.length}** email addresses — **${validCount}** have valid format, **${deliverableCount}** passed SMTP verification.`
+      message: `Validated **${results.length}** email addresses — **${validCount}** have valid format, ${smtpSummary}.`
     };
   })
   .build();

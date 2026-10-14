@@ -1,21 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let moveTasks = SlateTool.create(spec, {
   name: 'Move Tasks',
   key: 'move_tasks',
-  description: `Move one or more tasks from one BugHerd project to another in bulk.`,
+  description: `Move one or more tasks from one BugHerd project to another in bulk. Use project-scoped local task IDs returned by list_tasks or get_task.`,
+  constraints: [
+    'Bulk moves may be unavailable for some accounts. Contact BugHerd support if the API returns 404.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      sourceProjectId: z.number().describe('Project ID to move tasks from'),
-      taskIds: z.array(z.number()).describe('Task IDs to move'),
-      targetProjectId: z.number().describe('Project ID to move tasks to')
+      sourceProjectId: positiveIntegerSchema.describe('Project ID to move tasks from'),
+      taskIds: z
+        .array(positiveIntegerSchema)
+        .min(1)
+        .describe(
+          'Project-scoped local task IDs to move (localTaskId from list_tasks or get_task)'
+        ),
+      targetProjectId: positiveIntegerSchema.describe('Project ID to move tasks to')
     })
   )
   .output(

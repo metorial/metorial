@@ -27,10 +27,20 @@ export let listEquipment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 300)'),
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of results (max 1500)'),
       offset: z.number().optional().default(0).describe('Number of results to skip'),
       sort: z.string().optional().describe('Sort field with + or - prefix'),
-      fields: z.string().optional().describe('Comma-separated fields to return')
+      fields: z.string().optional().describe('Comma-separated fields to return'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
@@ -38,7 +48,8 @@ export let listEquipment = SlateTool.create(spec, {
       equipment: z.array(equipmentSchema),
       itemCount: z.number(),
       limit: z.number(),
-      offset: z.number()
+      offset: z.number(),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -48,23 +59,24 @@ export let listEquipment = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      cursor: ctx.input.cursor
     });
 
     let equipment = result.data.map((e: any) => ({
       equipmentId: e.id,
       name: e.name,
       code: e.code,
-      category: e.folder,
-      quantityTotal: e.quantity_total,
-      rentalPrice: e.rental_price,
-      subrentalPrice: e.subrental_price,
+      category: e.folder ?? undefined,
+      quantityTotal: e.current_quantity ?? e.quantity_total,
+      rentalPrice: e.rental_price ?? (e.rental_sales === 'Rental' ? e.price : undefined),
+      subrentalPrice: e.subrental_costs ?? e.subrental_price,
       weight: e.weight,
       volume: e.volume,
-      isContainer: e.is_container,
+      isContainer: e.is_container ?? (e.type !== undefined ? e.type === 'case' : undefined),
       trackSerialNumbers: e.track_serial_numbers,
-      createdAt: e.created,
-      updatedAt: e.modified
+      createdAt: e.created ?? undefined,
+      updatedAt: e.modified ?? undefined
     }));
 
     return {
@@ -72,7 +84,8 @@ export let listEquipment = SlateTool.create(spec, {
         equipment,
         itemCount: result.itemCount,
         limit: result.limit,
-        offset: result.offset
+        offset: result.offset,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** equipment items. Returned ${equipment.length} items (offset: ${result.offset}).`
     };

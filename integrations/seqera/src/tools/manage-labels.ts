@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageLabels = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let manageLabels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
       labelId: z.number().optional().describe('Label ID (required for update and delete)'),
       name: z.string().optional().describe('Label name (required for create)'),
@@ -44,8 +46,8 @@ export let manageLabels = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.action === 'list') {
@@ -53,10 +55,10 @@ export let manageLabels = SlateTool.create(spec, {
       return {
         output: {
           labels: labels.map(l => ({
-            labelId: l.id,
-            name: l.name,
-            value: l.value,
-            isDefault: l.isDefault
+            labelId: l.id ?? undefined,
+            name: l.name ?? undefined,
+            value: l.value ?? undefined,
+            isDefault: l.isDefault ?? undefined
           }))
         },
         message: `Found **${labels.length}** resource labels.`
@@ -64,7 +66,7 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required to create a label');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create a label');
       let label = await client.createLabel({
         name: ctx.input.name,
         value: ctx.input.value,
@@ -76,7 +78,8 @@ export let manageLabels = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.labelId) throw new Error('labelId is required for update and delete');
+    if (!ctx.input.labelId)
+      throw createApiServiceError('labelId is required for update and delete');
 
     if (ctx.input.action === 'delete') {
       await client.deleteLabel(ctx.input.labelId);

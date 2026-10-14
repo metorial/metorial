@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   Block,
   BlogPost,
@@ -33,12 +33,21 @@ export class FingertipClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) {
+      throw createApiServiceError('A Fingertip API key is required.', {
+        reason: 'fingertip_missing_api_key'
+      });
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${token.trim()}` },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fingertip',
+          reason: 'fingertip_api_error'
+        })
     });
   }
 

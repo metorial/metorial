@@ -46,19 +46,19 @@ export let listInvoices = SlateTool.create(spec, {
           invoices: [
             {
               invoiceId: inv.id,
-              publicId: inv.publicId,
-              status: inv.status,
-              clientId: inv.client?.id,
-              clientName: inv.client?.name,
-              dateFrom: inv.dateFrom,
-              dateTill: inv.dateTill,
-              issueDate: inv.issueDate,
-              dueDate: inv.dueDate,
-              listAmountCents: inv.listAmount,
-              totalAmountCents: inv.totalAmount,
-              totalTimeSeconds: inv.totalTime,
-              invoiceItems: inv.invoiceItems,
-              createdAt: inv.createdAt
+              publicId: inv.publicId ?? undefined,
+              status: inv.status ?? undefined,
+              clientId: inv.client?.id ?? undefined,
+              clientName: inv.client?.name ?? undefined,
+              dateFrom: inv.dateFrom ?? undefined,
+              dateTill: inv.dateTill ?? undefined,
+              issueDate: inv.issueDate ?? undefined,
+              dueDate: inv.dueDate ?? undefined,
+              listAmountCents: inv.listAmount ?? undefined,
+              totalAmountCents: inv.totalAmount ?? undefined,
+              totalTimeSeconds: inv.totalTime ?? undefined,
+              invoiceItems: inv.invoiceItems ?? undefined,
+              createdAt: inv.createdAt ?? undefined
             }
           ]
         },
@@ -69,19 +69,19 @@ export let listInvoices = SlateTool.create(spec, {
     let invoices = await client.listInvoices();
     let mapped = invoices.map((inv: any) => ({
       invoiceId: inv.id,
-      publicId: inv.publicId,
-      status: inv.status,
-      clientId: inv.client?.id,
-      clientName: inv.client?.name,
-      dateFrom: inv.dateFrom,
-      dateTill: inv.dateTill,
-      issueDate: inv.issueDate,
-      dueDate: inv.dueDate,
-      listAmountCents: inv.listAmount,
-      totalAmountCents: inv.totalAmount,
-      totalTimeSeconds: inv.totalTime,
-      invoiceItems: inv.invoiceItems,
-      createdAt: inv.createdAt
+      publicId: inv.publicId ?? undefined,
+      status: inv.status ?? undefined,
+      clientId: inv.client?.id ?? undefined,
+      clientName: inv.client?.name ?? undefined,
+      dateFrom: inv.dateFrom ?? undefined,
+      dateTill: inv.dateTill ?? undefined,
+      issueDate: inv.issueDate ?? undefined,
+      dueDate: inv.dueDate ?? undefined,
+      listAmountCents: inv.listAmount ?? undefined,
+      totalAmountCents: inv.totalAmount ?? undefined,
+      totalTimeSeconds: inv.totalTime ?? undefined,
+      invoiceItems: inv.invoiceItems ?? undefined,
+      createdAt: inv.createdAt ?? undefined
     }));
 
     return {
@@ -131,19 +131,19 @@ export let createInvoice = SlateTool.create(spec, {
     return {
       output: {
         invoiceId: inv.id,
-        publicId: inv.publicId,
-        status: inv.status,
-        clientId: inv.client?.id,
-        clientName: inv.client?.name,
-        dateFrom: inv.dateFrom,
-        dateTill: inv.dateTill,
-        issueDate: inv.issueDate,
-        dueDate: inv.dueDate,
-        listAmountCents: inv.listAmount,
-        totalAmountCents: inv.totalAmount,
-        totalTimeSeconds: inv.totalTime,
-        invoiceItems: inv.invoiceItems,
-        createdAt: inv.createdAt
+        publicId: inv.publicId ?? undefined,
+        status: inv.status ?? undefined,
+        clientId: inv.client?.id ?? undefined,
+        clientName: inv.client?.name ?? undefined,
+        dateFrom: inv.dateFrom ?? undefined,
+        dateTill: inv.dateTill ?? undefined,
+        issueDate: inv.issueDate ?? undefined,
+        dueDate: inv.dueDate ?? undefined,
+        listAmountCents: inv.listAmount ?? undefined,
+        totalAmountCents: inv.totalAmount ?? undefined,
+        totalTimeSeconds: inv.totalTime ?? undefined,
+        invoiceItems: inv.invoiceItems ?? undefined,
+        createdAt: inv.createdAt ?? undefined
       },
       message: `Created invoice **#${inv.publicId || inv.id}** for $${((inv.totalAmount || 0) / 100).toFixed(2)}.`
     };
@@ -212,19 +212,19 @@ export let updateInvoice = SlateTool.create(spec, {
     return {
       output: {
         invoiceId: inv.id,
-        publicId: inv.publicId,
-        status: inv.status,
-        clientId: inv.client?.id,
-        clientName: inv.client?.name,
-        dateFrom: inv.dateFrom,
-        dateTill: inv.dateTill,
-        issueDate: inv.issueDate,
-        dueDate: inv.dueDate,
-        listAmountCents: inv.listAmount,
-        totalAmountCents: inv.totalAmount,
-        totalTimeSeconds: inv.totalTime,
-        invoiceItems: inv.invoiceItems,
-        createdAt: inv.createdAt
+        publicId: inv.publicId ?? undefined,
+        status: inv.status ?? undefined,
+        clientId: inv.client?.id ?? undefined,
+        clientName: inv.client?.name ?? undefined,
+        dateFrom: inv.dateFrom ?? undefined,
+        dateTill: inv.dateTill ?? undefined,
+        issueDate: inv.issueDate ?? undefined,
+        dueDate: inv.dueDate ?? undefined,
+        listAmountCents: inv.listAmount ?? undefined,
+        totalAmountCents: inv.totalAmount ?? undefined,
+        totalTimeSeconds: inv.totalTime ?? undefined,
+        invoiceItems: inv.invoiceItems ?? undefined,
+        createdAt: inv.createdAt ?? undefined
       },
       message: `Updated invoice **#${inv.publicId || inv.id}** (${inv.status}).`
     };

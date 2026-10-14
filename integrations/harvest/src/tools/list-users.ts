@@ -1,19 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Retrieve users with optional filtering by active status. Includes the authenticated user's own information. Returns user details including roles, rates, and access levels.`,
+  description: `Retrieve users with optional filtering by active status. Use get_current_user for your own profile without requiring team-management permissions. Returns user details including roles, rates, and access levels. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       isActive: z.boolean().optional().describe('Filter by active status'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor returned as nextCursor by the previous call'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page (max 2000)')
     })
@@ -36,18 +42,23 @@ export let listUsers = SlateTool.create(spec, {
       ),
       totalEntries: z.number().describe('Total users'),
       totalPages: z.number().describe('Total pages'),
-      page: z.number().describe('Current page')
+      nextCursor: z.string().nullable().describe('Pass this cursor to retrieve the next page'),
+      pageNumberKnown: z
+        .boolean()
+        .describe('Whether the API returned a page number; cursor responses may omit it'),
+      page: z.number().describe('Page number; 1 when pageNumberKnown is false')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let result = await client.listUsers({
       isActive: ctx.input.isActive,
-      page: ctx.input.page,
+      cursor: ctx.input.cursor,
+      page: ctx.input.cursor ? undefined : ctx.input.page,
       perPage: ctx.input.perPage
     });
 
@@ -57,10 +68,15 @@ export let listUsers = SlateTool.create(spec, {
       lastName: u.last_name,
       email: u.email,
       isActive: u.is_active,
-      isAdmin: u.is_admin,
-      isProjectManager: u.is_project_manager,
+      isAdmin: u.is_admin ?? u.access_roles?.includes('administrator') ?? false,
+      isProjectManager:
+        u.is_project_manager ??
+        u.access_roles?.some((role: string) =>
+          ['manager', 'project_manager'].includes(role)
+        ) ??
+        false,
       timezone: u.timezone,
-      defaultHourlyRate: u.default_hourly_rate,
+      defaultHourlyRate: u.default_hourly_rate ?? null,
       weeklyCapacity: u.weekly_capacity
     }));
 
@@ -69,9 +85,11 @@ export let listUsers = SlateTool.create(spec, {
         users,
         totalEntries: result.totalEntries,
         totalPages: result.totalPages,
+        nextCursor: result.nextCursor,
+        pageNumberKnown: result.pageNumberKnown,
         page: result.page
       },
-      message: `Found **${result.totalEntries}** users (page ${result.page}/${result.totalPages}).`
+      message: `Found **${result.totalEntries}** users${result.pageNumberKnown ? ` (page ${result.page}/${result.totalPages})` : ' (cursor page)'}.`
     };
   })
   .build();

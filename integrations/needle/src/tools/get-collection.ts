@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeedleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,15 @@ export let getCollection = SlateTool.create(spec, {
       client.getCollectionStats(ctx.input.collectionId)
     ]);
 
+    let dataStats = stats.data_stats.map(d => {
+      if (d.bytes === null) {
+        throw createApiServiceError(
+          'Needle did not report the byte size for an indexing status. Use get_collection_stats to retrieve statistics with unknown byte sizes.'
+        );
+      }
+      return { status: d.status, count: d.files, size: d.bytes };
+    });
+
     return {
       output: {
         collectionId: collection.id,
@@ -57,11 +66,7 @@ export let getCollection = SlateTool.create(spec, {
           users: stats.users,
           chunksCount: stats.chunks_count,
           characters: stats.characters,
-          dataStats: stats.data_stats.map(d => ({
-            status: d.status,
-            count: d.count,
-            size: d.size
-          }))
+          dataStats
         }
       },
       message: `Collection **${collection.name}** has ${stats.chunks_count} chunks and ${stats.characters} characters.`

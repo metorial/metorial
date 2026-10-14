@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteTimeEntry = SlateTool.create(spec, {
   name: 'Delete Time Entry',
   key: 'delete_time_entry',
-  description: `Permanently delete a time entry from Timely. This cannot be undone.`,
+  description: `Call list_accounts to choose a workspace when needed. Permanently delete a time entry from Timely. This cannot be undone.`,
   tags: { destructive: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       eventId: z.string().describe('ID of the time entry to delete')
     })
   )
@@ -20,10 +22,7 @@ export let deleteTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     await client.deleteEvent(ctx.input.eventId);
 

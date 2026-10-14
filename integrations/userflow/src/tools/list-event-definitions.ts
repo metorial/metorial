@@ -30,7 +30,8 @@ export let listEventDefinitions = SlateTool.create(spec, {
           })
         )
         .describe('List of event definitions'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextPageUrl: z.string().nullable().describe('URL for the next page')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,7 +56,8 @@ export let listEventDefinitions = SlateTool.create(spec, {
     return {
       output: {
         eventDefinitions,
-        hasMore: result.has_more
+        hasMore: result.has_more,
+        nextPageUrl: result.next_page_url
       },
       message: `Retrieved **${eventDefinitions.length}** event definition(s).`
     };

@@ -1,11 +1,24 @@
-# Kanbanize
+# Businessmap
 
-Manage Kanban boards, cards, and workflows for enterprise project and portfolio management. Create, update, move, archive, and delete cards with properties like assignees, priorities, deadlines, custom fields, tags, and attachments. Organize work into workspaces and boards with configurable columns, swimlanes, and WIP limits. Break down cards into subtasks, establish parent-child and predecessor-successor relationships between work items, and manage initiatives for high-level project tracking. Add comments and attachments to cards. Manage users and roles, define custom fields, and configure OKRs with measurable outcomes. Set up webhooks for card, subtask, comment, and board events, and create business rule automations.
+Manage cards, boards, workspaces, comments, subtasks, relationships, blocking,
+custom-field values, and logged time through the Businessmap API v2.
 
-## License
+Connect with your API key from **My Account > API**, the account subdomain,
+and the domain used to sign in (`kanbanize.com` or `businessmap.io`). Existing
+connections default to `kanbanize.com`.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Use `get_current_user` to check the connected identity, `list_workspaces` and
+`list_boards` to discover containers, and `get_board` to find matching workflow,
+column, and lane IDs before creating or moving cards. Use `list_card_types`,
+`list_users`, and `list_block_reasons` to discover IDs for card properties.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Card priority values are 1=Critical, 2=High, 3=Average, and 4=Low. Deadlines use
+ISO 8601 datetimes with timezone offsets. `log_time` accepts hours or minutes
+and converts them to the API's seconds. `list_cards` returns up to 200 cards
+per state per page; `includeArchived` combines active and archived pages.
+
+`manage_custom_fields` updates scalar text, number, date, and link fields; use
+`null` to clear a value. Relationship `linkType` values remain 0=relative,
+1=predecessor, and 2=successor.
+
+[Official API documentation](https://demo.kanbanize.com/openapi)

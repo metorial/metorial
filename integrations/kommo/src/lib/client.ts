@@ -89,6 +89,11 @@ export class KommoClient {
     return response.data?._embedded?.leads || [];
   }
 
+  async listLossReasons() {
+    let response = await this.http.get('/leads/loss_reasons');
+    return response.data?._embedded?.loss_reasons || [];
+  }
+
   async getLead(leadId: number) {
     let response = await this.http.get(`/leads/${leadId}`, {
       params: { with: 'contacts,loss_reason,catalog_elements' }
@@ -195,6 +200,9 @@ export class KommoClient {
       );
     if (filters?.isCompleted !== undefined)
       params['filter[is_completed]'] = filters.isCompleted ? 1 : 0;
+    if (filters?.entityIds?.length && !filters.entityType) {
+      throw createApiServiceError('Provide entityType when filtering tasks by entityIds.');
+    }
     if (filters?.entityType) params['filter[entity_type]'] = filters.entityType;
     if (filters?.entityIds)
       filters.entityIds.forEach((id, i) => (params[`filter[entity_id][${i}]`] = id));
@@ -286,7 +294,9 @@ export class KommoClient {
   }
 
   async createNote(entityType: string, entityId: number, note: Record<string, any>) {
-    let response = await this.http.post(`/${entityType}/${entityId}/notes`, [note]);
+    let response = await this.http.post(`/${entityType}/notes`, [
+      { ...note, entity_id: entityId }
+    ]);
     return response.data?._embedded?.notes?.[0];
   }
 
@@ -395,11 +405,16 @@ export class KommoClient {
     let params: Record<string, any> = {};
     if (pagination?.page) params.page = pagination.page;
     if (pagination?.limit) params.limit = pagination.limit;
+    if (filters?.entityId !== undefined && !filters.entityType) {
+      throw createApiServiceError('Provide entityType when filtering events by entityId.');
+    }
     if (filters?.entityType) params['filter[entity]'] = filters.entityType;
-    if (filters?.entityId) params['filter[entity_id]'] = filters.entityId;
-    if (filters?.types) filters.types.forEach((t, i) => (params[`filter[type][${i}]`] = t));
-    if (filters?.createdAtFrom) params['filter[created_at][from]'] = filters.createdAtFrom;
-    if (filters?.createdAtTo) params['filter[created_at][to]'] = filters.createdAtTo;
+    if (filters?.entityId !== undefined) params['filter[entity_id]'] = filters.entityId;
+    if (filters?.types?.length) params['filter[type]'] = filters.types.join(',');
+    if (filters?.createdAtFrom !== undefined)
+      params['filter[created_at][from]'] = filters.createdAtFrom;
+    if (filters?.createdAtTo !== undefined)
+      params['filter[created_at][to]'] = filters.createdAtTo;
 
     let response = await this.http.get('/events', { params });
     return response.data?._embedded?.events || [];

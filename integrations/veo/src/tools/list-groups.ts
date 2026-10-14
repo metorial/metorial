@@ -14,7 +14,12 @@ export let listGroups = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().optional().describe('Filter groups by name'),
-      organisationId: z.string().optional().describe('Filter by organisation ID'),
+      organisationId: z
+        .string()
+        .optional()
+        .describe(
+          'Organisation ID to filter by. Call list_organisations to discover your organisations.'
+        ),
       createdByMe: z.boolean().optional().describe('If true, only return groups you created'),
       pageSize: z.number().optional().default(20).describe('Number of groups per page'),
       pageNumber: z
@@ -43,8 +48,8 @@ export let listGroups = SlateTool.create(spec, {
       pageNumber: ctx.input.pageNumber
     });
 
-    let items = result.Items ?? result.items ?? [];
-    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? 0;
+    let items = Array.isArray(result) ? result : (result.Items ?? result.items ?? []);
+    let totalItemCount = result.TotalItemCount ?? result.totalItemCount ?? items.length;
     let page = result.Page ?? result.page ?? ctx.input.pageNumber;
     let pageSize = result.PageSize ?? result.pageSize ?? ctx.input.pageSize;
 

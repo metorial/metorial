@@ -1,6 +1,4 @@
-Let me get the specific OAuth scopes and the API endpoint reference page.Now I have comprehensive information to write the specification.
-
-# Slates Specification for Chatwork
+# Chatwork API specification
 
 ## Overview
 
@@ -18,7 +16,7 @@ A simple token-based authentication method. Users generate an API token from the
 
 ### 2. OAuth 2.0 (Authorization Code Grant)
 
-Chatwork supports the **Authorization Code Grant** flow with optional **PKCE** (required for public clients).
+The integration supports the **Authorization Code Grant** with confidential OAuth clients and Basic client authentication. Access tokens are refreshed through the documented refresh-token grant. Chatwork also supports public PKCE clients, which this integration does not expose.
 
 - **Authorization URL:** `https://www.chatwork.com/packages/oauth2/login.php`
 - **Token URL:** `https://oauth.chatwork.com/token`
@@ -91,7 +89,7 @@ Create and retrieve tasks within chat rooms. Tasks can be assigned to one or mor
 
 ### File Sharing
 
-Upload files to chat rooms and retrieve metadata about uploaded files, including download URLs.
+List file metadata with an optional uploader filter, or request a specific file for download. Specific-file output preserves the provider download URL. The URL expires after 30 seconds and downloads renew through the stable room and file IDs with a 10-second margin. Upload is available in the provider API but is not exposed by this integration.
 
 ## Events
 
@@ -108,3 +106,17 @@ Triggered when a message is edited in any chat room the user participates in. Th
 ### Mention to Me (`mention_to_me`)
 
 Triggered when the authenticated user is mentioned in a message. The payload includes the sender's account ID, the recipient's account ID, room ID, message ID, message body, and timestamp.
+
+## Direct resource lookup
+
+- `get_message`: GET `/rooms/{room_id}/messages/{message_id}` returns a known message with sender, body, and timestamps.
+- `get_task`: GET `/rooms/{room_id}/tasks/{task_id}` returns a known task with its originating message, assignee, assigner, status, and deadline.
+
+The `get_tasks` room branch sends the status and optional assignee filter to Chatwork before its 100-item limit. Its existing assigner filter retains its personal-task-only meaning. Task-status updates send the provider form field `body` and return the confirmed input status; the upstream response contains only a string task ID. The existing public task ID remains numeric.
+
+## Official documentation
+
+- [API endpoint guide](https://developer.chatwork.com/docs/endpoints)
+- [OAuth](https://developer.chatwork.com/docs/oauth)
+- [Endpoint reference](https://developer.chatwork.com/reference)
+- [Current OpenAPI endpoint definitions](https://developer.chatwork.com/llms.txt)

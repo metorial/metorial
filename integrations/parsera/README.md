@@ -1,6 +1,8 @@
 # Parsera
 
-Extract structured data from web pages using AI-powered natural-language descriptions. Scrape any URL by specifying desired attributes with names, descriptions, and types. Parse raw HTML or text content directly. Convert web pages to markdown. Create reusable scrapers that can be run across multiple URLs at once. Generate deterministic Python scraping code for faster, cost-effective extraction. Supports proxy configuration for geo-specific access, precision mode for hidden HTML data, and custom cookies for authenticated pages.
+Extract structured data from web pages using natural-language descriptions or typed attributes, and parse HTML or text you already have. Convert pages to Markdown text and downloadable files. List reusable scrapers, inspect their configuration, run them synchronously or asynchronously, and retrieve run progress and results. Extractor scrapers support batches of up to 100 URLs; agentic scrapers run one URL at a time and can accept named parameters. Proxy routing and cookies apply to extractor requests.
+
+The existing create-and-generate tool retains the legacy code-generation workflow for compatibility. Current API documentation describes configuring extractor scrapers in the Parsera app and building agentic scrapers through a separate API.
 
 ## License
 

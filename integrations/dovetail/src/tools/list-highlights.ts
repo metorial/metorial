@@ -17,12 +17,20 @@ export let listHighlights = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Retrieve a specific highlight by ID. If omitted, lists all highlights.'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor')
     })
   )
   .output(
     z.object({
+      totalCount: z.number().optional(),
+      hasMore: z.boolean().optional(),
+      nextCursor: z.string().nullable().optional(),
       highlights: z.array(
         z.object({
           highlightId: z.string(),
@@ -37,6 +45,7 @@ export let listHighlights = SlateTool.create(spec, {
           updatedAt: z.string(),
           tags: z.array(
             z.object({
+              tagId: z.string().optional(),
               title: z.string().nullable(),
               highlightCount: z.number().nullable()
             })
@@ -65,8 +74,9 @@ export let listHighlights = SlateTool.create(spec, {
               createdAt: h.created_at,
               updatedAt: h.updated_at,
               tags: (h.tags || []).map(t => ({
+                tagId: t.id,
                 title: t.title,
-                highlightCount: t.highlight_count
+                highlightCount: t.highlight_count ?? null
               }))
             }
           ]
@@ -80,9 +90,9 @@ export let listHighlights = SlateTool.create(spec, {
       startCursor: ctx.input.startCursor
     });
 
-    let highlights = (result.highlights || []).map(h => ({
+    let highlights = result.data.map(h => ({
       highlightId: h.id,
-      text: (h as any).text ?? null,
+      text: h.text ?? null,
       previewText: h.preview_text ?? null,
       noteId: h.note_id ?? null,
       noteTitle: h.note_title ?? null,
@@ -92,13 +102,19 @@ export let listHighlights = SlateTool.create(spec, {
       createdAt: h.created_at,
       updatedAt: h.updated_at,
       tags: (h.tags || []).map(t => ({
+        tagId: t.id,
         title: t.title,
-        highlightCount: t.highlight_count
+        highlightCount: t.highlight_count ?? null
       }))
     }));
 
     return {
-      output: { highlights },
+      output: {
+        highlights,
+        totalCount: result.page.total_count,
+        hasMore: result.page.has_more,
+        nextCursor: result.page.next_cursor
+      },
       message: `Found **${highlights.length}** highlights.`
     };
   })

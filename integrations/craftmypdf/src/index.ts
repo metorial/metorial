@@ -5,6 +5,7 @@ import {
   addWatermark,
   createEditorSession,
   createTemplate,
+  deactivateEditorSession,
   deleteTemplate,
   fillPdfFields,
   generateImage,
@@ -14,6 +15,7 @@ import {
   getPdfInfo,
   getTemplate,
   listTemplates,
+  listTemplateVersions,
   listTransactions,
   mergePdfs,
   updateTemplate
@@ -35,8 +37,10 @@ export let provider = Slate.create({
     updateTemplate,
     deleteTemplate,
     createEditorSession,
+    deactivateEditorSession,
     getAccountInfo,
-    listTransactions
+    listTransactions,
+    listTemplateVersions
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 export class Client {
   private api: ReturnType<typeof createAxios>;
@@ -6,11 +6,49 @@ export class Client {
   constructor(config: { token: string }) {
     this.api = createAxios({
       baseURL: 'https://app.icypeas.com/api',
+      timeout: 60000,
       headers: {
         Authorization: config.token,
         'Content-Type': 'application/json'
       }
     });
+    this.api.interceptors.response.use(
+      response => {
+        if (
+          response.data?.success === false ||
+          (Array.isArray(response.data?.validationErrors) &&
+            response.data.validationErrors.length > 0)
+        ) {
+          throw buildApiServiceError(
+            { response },
+            {
+              providerLabel: 'Icypeas',
+              reason: 'icypeas_api_error',
+              operation: response.config.url,
+              nestedKeys: ['validationErrors', 'errors'],
+              detailKeys: [
+                'field',
+                'humanReadableMessage',
+                'message',
+                'detail',
+                'error',
+                'code'
+              ],
+              fallbackMessage: 'The request was rejected by Icypeas.'
+            }
+          );
+        }
+        return response;
+      },
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'Icypeas',
+            reason: 'icypeas_api_error',
+            nestedKeys: ['validationErrors', 'errors']
+          })
+        )
+    );
   }
 
   // ─── Email Discovery ───
@@ -22,6 +60,9 @@ export class Client {
     webhookUrl?: string;
     externalId?: string;
   }) {
+    if (!params.firstname?.trim() && !params.lastname?.trim()) {
+      throw createApiServiceError('Provide at least a first name or a last name.');
+    }
     let body: Record<string, any> = {
       firstname: params.firstname || '',
       lastname: params.lastname || '',
@@ -78,7 +119,6 @@ export class Client {
 
   async getSearchResult(searchId: string) {
     let response = await this.api.post('/bulk-single-searchs/read', {
-      mode: 'single',
       id: searchId
     });
     return response.data;
@@ -93,7 +133,7 @@ export class Client {
     let body: Record<string, any> = {
       mode: 'bulk',
       file: params.fileId,
-      limit: params.limit || 10
+      limit: params.limit ?? 10
     };
     if (params.next !== undefined) body.next = params.next;
     if (params.sorts) body.sorts = params.sorts;
@@ -112,11 +152,24 @@ export class Client {
     externalIds?: string[];
     includeResultsInWebhook?: boolean;
   }) {
+    for (let [index, row] of params.data.entries()) {
+      let valid =
+        params.task === 'email-search'
+          ? row.length === 3 &&
+            Boolean(row[0]?.trim() || row[1]?.trim()) &&
+            Boolean(row[2]?.trim())
+          : row.length === 1 && Boolean(row[0]?.trim());
+      if (!valid) {
+        throw createApiServiceError(
+          `Row ${index + 1} is invalid for ${params.task}. Email discovery requires [firstname, lastname, domainOrCompany] with at least one name; other tasks require one nonempty value.`
+        );
+      }
+    }
     let body: Record<string, any> = {
+      name: params.name?.trim() || 'API bulk search',
       task: params.task,
       data: params.data
     };
-    if (params.name) body.name = params.name;
     let custom: Record<string, any> = {};
     if (params.webhookUrlItem) custom.webhookUrlItem = params.webhookUrlItem;
     if (params.webhookUrlBulkDone) custom.webhookUrlBulkDone = params.webhookUrlBulkDone;
@@ -178,7 +231,17 @@ export class Client {
     companyOrDomain?: string;
     jobTitle?: string;
   }) {
-    let response = await this.api.post('/url-search/person', params);
+    if (!params.firstname?.trim() || !params.lastname?.trim()) {
+      throw createApiServiceError(
+        'Provide both first name and last name for a person search.'
+      );
+    }
+    if (!params.companyOrDomain?.trim() && !params.jobTitle?.trim()) {
+      throw createApiServiceError(
+        'Provide a company/domain or a job title for a person search.'
+      );
+    }
+    let response = await this.api.post('/url-search/profile', params);
     return response.data;
   }
 
@@ -207,6 +270,28 @@ export class Client {
 
   async countCompanies(query: Record<string, any>) {
     let response = await this.api.post('/find-companies/count', { query });
+    return response.data;
+  }
+
+  async reverseEmailLookup(email: string) {
+    let response = await this.api.post('/reverse-email-lookup', { email });
+    return response.data;
+  }
+
+  async listBulkSearches(params: {
+    fileId?: string;
+    status?: 'in_progress' | 'done';
+    limit?: number;
+    next?: boolean;
+    sorts?: any[];
+  }) {
+    let response = await this.api.post('/search-files/read', {
+      file: params.fileId,
+      status: params.status,
+      limit: params.limit ?? 10,
+      next: params.next,
+      sorts: params.sorts
+    });
     return response.data;
   }
 

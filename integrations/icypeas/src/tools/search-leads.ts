@@ -5,8 +5,8 @@ import { spec } from '../spec';
 
 let includeExcludeSchema = z
   .object({
-    include: z.array(z.string()).optional().describe('Values to include'),
-    exclude: z.array(z.string()).optional().describe('Values to exclude')
+    include: z.array(z.string()).max(200).optional().describe('Values to include'),
+    exclude: z.array(z.string()).max(200).optional().describe('Values to exclude')
   })
   .optional();
 
@@ -53,7 +53,13 @@ export let searchLeads = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Pagination token from a previous response'),
-      pageSize: z.number().optional().describe('Results per page (1-200, default: 100)')
+      pageSize: z
+        .number()
+        .min(1)
+        .max(200)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .optional()
+        .describe('Results per page (1-200, default: 100)')
     })
   )
   .output(

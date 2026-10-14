@@ -60,14 +60,14 @@ export let listCampaigns = SlateTool.create(spec, {
     });
 
     let campaigns = (result?.broadcasts || []).map((b: any) => ({
-      campaignId: b.id,
-      channelId: b.channel_id,
-      name: b.name,
-      status: b.status,
-      templateId: b.template_id,
-      created: b.created,
-      lastUpdated: b.last_updated,
-      scheduledAt: b.scheduled_at
+      campaignId: b.id ?? undefined,
+      channelId: b.channel_id ?? undefined,
+      name: b.name ?? undefined,
+      status: b.status ?? undefined,
+      templateId: b.template_id ?? undefined,
+      created: b.created ?? undefined,
+      lastUpdated: b.last_updated ?? undefined,
+      scheduledAt: b.scheduled_at ?? undefined
     }));
 
     return {

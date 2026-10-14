@@ -76,7 +76,7 @@ export let listOrganizations = SlateTool.create(spec, {
       }))
     }));
 
-    let totalCount = result.page?.total || organizations.length;
+    let totalCount = result.page?.total ?? organizations.length;
 
     return {
       output: { organizations, totalCount },

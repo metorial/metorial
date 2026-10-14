@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ export let manageQuest = SlateTool.create(spec, {
     'Most quest actions use "party" as the groupId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -44,13 +44,16 @@ export let manageQuest = SlateTool.create(spec, {
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let groupId = ctx.input.groupId || 'party';
 
     if (ctx.input.action === 'invite') {
-      if (!ctx.input.questKey) throw new Error('questKey is required for invite action');
+      if (!ctx.input.questKey)
+        throw createApiServiceError('questKey is required for invite action');
       let result = await client.inviteToQuest(groupId, ctx.input.questKey);
       return {
         output: {
@@ -67,7 +70,7 @@ export let manageQuest = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          questKey: result.key,
+          questKey: result.key || undefined,
           questActive: result.active
         },
         message: `Accepted quest invitation`
@@ -79,7 +82,7 @@ export let manageQuest = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          questKey: result.key,
+          questKey: result.key || undefined,
           questActive: result.active
         },
         message: `Rejected quest invitation`
@@ -91,7 +94,7 @@ export let manageQuest = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          questKey: result.key,
+          questKey: result.key || undefined,
           questActive: result.active
         },
         message: `Force-started quest`
@@ -103,7 +106,7 @@ export let manageQuest = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          questKey: result.key,
+          questKey: result.key || undefined,
           questActive: false
         },
         message: `Cancelled pending quest`
@@ -115,13 +118,13 @@ export let manageQuest = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          questKey: result.key,
+          questKey: result.key || undefined,
           questActive: false
         },
         message: `Aborted active quest`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

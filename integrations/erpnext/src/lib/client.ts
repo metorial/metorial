@@ -1,8 +1,10 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
-  siteUrl: string;
+  siteUrl?: string;
   token: string;
+  authType?: 'bearer' | 'api_token' | 'session';
+  refreshToken?: string;
 }
 
 export interface ListParams {
@@ -31,39 +33,44 @@ export interface WebhookConfig {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createFrappeAxios>;
 
   constructor(config: ClientConfig) {
-    let siteUrl = config.siteUrl.replace(/\/+$/, '');
-    let isSessionToken = !config.token.includes(':') && !config.token.startsWith('ey');
-    let authHeader = isSessionToken
-      ? undefined
-      : config.token.includes(':')
-        ? `token ${config.token}`
-        : `Bearer ${config.token}`;
+    if (!config.siteUrl || !config.token) {
+      throw createApiServiceError('Reconnect ERPNext with a site URL and valid credentials.', {
+        reason: 'missing_auth_state'
+      });
+    }
+    let authType =
+      config.authType ??
+      (config.token.includes(':')
+        ? 'api_token'
+        : config.refreshToken || config.token.startsWith('ey')
+          ? 'bearer'
+          : 'session');
 
-    this.http = createAxios({
-      baseURL: siteUrl,
-      headers: {
-        ...(authHeader ? { Authorization: authHeader } : {}),
-        ...(isSessionToken ? { Cookie: `sid=${config.token}` } : {}),
-        'Content-Type': 'application/json'
-      }
+    this.http = createFrappeAxios(config.siteUrl, {
+      ...(authType === 'session'
+        ? { Cookie: `sid=${config.token}` }
+        : {
+            Authorization: `${authType === 'api_token' ? 'token' : 'Bearer'} ${config.token}`
+          })
     });
   }
 
   // --- Document CRUD ---
 
   async getDocument(doctype: string, name: string, fields?: string[]): Promise<DocumentData> {
-    let params: Record<string, string> = {};
-    if (fields && fields.length > 0) {
-      params.fields = JSON.stringify(fields);
-    }
     let response = await this.http.get(
-      `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
-      { params }
+      `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`
     );
-    return response.data.data;
+    let document: DocumentData = response.data.data;
+    if (!fields?.length || fields.includes('*')) return document;
+    return Object.fromEntries(
+      fields
+        .filter(field => Object.hasOwn(document, field))
+        .map(field => [field, document[field]])
+    );
   }
 
   async listDocuments(params: ListParams): Promise<DocumentData[]> {
@@ -139,8 +146,29 @@ export class Client {
     data?: DocumentData
   ): Promise<DocumentData> {
     let original = await this.getDocument(doctype, name);
-    let newDoc: DocumentData = { ...original, ...data };
-    newDoc.name = undefined;
+    if (original.docstatus !== 2) {
+      throw createApiServiceError('Cancel the submitted document before amending it.', {
+        reason: 'document_not_cancelled'
+      });
+    }
+    let metadataFields = new Set(['name', 'owner', 'creation', 'modified', 'modified_by']);
+    let copyDocument = (document: DocumentData): DocumentData => {
+      let copy: DocumentData = { docstatus: 0, __islocal: 1 };
+      for (let [field, value] of Object.entries(document)) {
+        if (metadataFields.has(field) || field === 'docstatus' || field === '__islocal')
+          continue;
+        copy[field] = Array.isArray(value)
+          ? value.map(row =>
+              row && typeof row === 'object' && !Array.isArray(row) && row.doctype
+                ? copyDocument(row)
+                : row
+            )
+          : value;
+      }
+      return copy;
+    };
+    let newDoc: DocumentData = copyDocument({ ...original, ...data });
+    newDoc.amendment_date = undefined;
     newDoc.amended_from = name;
     newDoc.docstatus = 0;
     let response = await this.http.post(
@@ -158,8 +186,28 @@ export class Client {
   }
 
   async callGetMethod(method: string, params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get(`/api/method/${method}`, { params: params || {} });
+    let queryParams = Object.fromEntries(
+      Object.entries(params ?? {}).map(([key, value]) => [
+        key,
+        value !== null && typeof value === 'object' ? JSON.stringify(value) : value
+      ])
+    );
+    let response = await this.http.get(`/api/method/${method}`, { params: queryParams });
     return response.data;
+  }
+
+  async getCurrentUser(): Promise<string> {
+    let response = await this.http.get('/api/method/frappe.auth.get_logged_user');
+    if (
+      typeof response.data.message !== 'string' ||
+      !response.data.message ||
+      response.data.message === 'Guest'
+    ) {
+      throw createApiServiceError('ERPNext did not return an authenticated user.', {
+        reason: 'invalid_identity_response'
+      });
+    }
+    return response.data.message;
   }
 
   // --- Count ---
@@ -211,3 +259,28 @@ export class Client {
     return response.data.message;
   }
 }
+
+export let createFrappeAxios = (siteUrl: string, headers?: Record<string, string>) =>
+  createAuthenticatedAxios({
+    baseURL: siteUrl.replace(/\/+$/, ''),
+    headers,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'ERPNext',
+        reason: 'erpnext_api_error'
+      })
+  });
+
+export let createClient = (ctx: {
+  auth: Omit<ClientConfig, 'siteUrl'> & { siteUrl?: string };
+  config: unknown;
+}) => {
+  let legacySiteUrl =
+    ctx.config &&
+    typeof ctx.config === 'object' &&
+    'siteUrl' in ctx.config &&
+    typeof ctx.config.siteUrl === 'string'
+      ? ctx.config.siteUrl
+      : undefined;
+  return new Client({ ...ctx.auth, siteUrl: ctx.auth.siteUrl ?? legacySiteUrl });
+};

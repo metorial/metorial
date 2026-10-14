@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageCardLinksTool = SlateTool.create(spec, {
   name: 'Manage Card Links',
   key: 'manage_card_links',
-  description: `Create or remove relationships between cards. Supports parent-child relationships and linked card connections for tracking cross-team dependencies.`
+  description: `Create or remove relationships between cards. Supports parent-child relationships and relative, predecessor, and successor connections for tracking cross-team dependencies.`
 })
   .input(
     z.object({
@@ -23,7 +23,7 @@ export let manageCardLinksTool = SlateTool.create(spec, {
       linkType: z
         .number()
         .optional()
-        .describe('Link type for "link" action (e.g. 0=related, 1=predecessor, 2=successor)')
+        .describe('Link type for "link" action ( 0=relative, 1=predecessor, 2=successor)')
     })
   )
   .output(
@@ -58,10 +58,7 @@ export let manageCardLinksTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let [linked, parents, children] = await Promise.all([
@@ -75,7 +72,9 @@ export let manageCardLinksTool = SlateTool.create(spec, {
           cardId: ctx.input.cardId,
           linkedCards: (linked ?? []).map((l: any) => ({
             linkedCardId: l.linked_card_id ?? l.card_id,
-            linkType: l.link_type
+            linkType: (
+              { relative: 0, predecessor: 1, successor: 2 } as Record<string, number>
+            )[l.link_type ?? l.type]
           })),
           parentCards: (parents ?? []).map((p: any) => ({
             parentCardId: p.parent_card_id ?? p.card_id
@@ -89,7 +88,8 @@ export let manageCardLinksTool = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.targetCardId) throw new Error('targetCardId is required for this action.');
+    if (!ctx.input.targetCardId)
+      throw createApiServiceError('targetCardId is required for this action.');
 
     if (ctx.input.action === 'add_parent') {
       await client.addParentCard(ctx.input.cardId, ctx.input.targetCardId);

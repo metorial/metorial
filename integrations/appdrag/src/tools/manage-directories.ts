@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppDragClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,9 @@ export let manageDirectories = SlateTool.create(spec, {
 
       case 'rename':
         if (!ctx.input.destinationPath) {
-          throw new Error('Destination path is required for the rename action.');
+          throw createApiServiceError('Destination path is required for the rename action.', {
+            reason: 'missing_destination'
+          });
         }
         result = await client.directoryRename(
           ctx.input.directoryPath,

@@ -5,6 +5,7 @@ import {
   createLocation,
   deleteLocation,
   findLocations,
+  getLocation,
   getMap,
   listMaps,
   lookupTerritory,
@@ -16,6 +17,7 @@ export let provider = Slate.create({
   tools: [
     listMaps,
     getMap,
+    getLocation,
     createLocation,
     updateLocation,
     deleteLocation,

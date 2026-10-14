@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createOfflineTimeEntry,
   createProject,
   createTask,
   deleteProject,
@@ -8,6 +9,7 @@ import {
   getProject,
   getProjectReport,
   getSummaryReport,
+  getTask,
   getTimeEntries,
   getTimeEntry,
   getUser,
@@ -15,6 +17,7 @@ import {
   listTasks,
   listUsers,
   manageTaskAssignments,
+  manageTimeEntries,
   manageUserAssignments,
   updateProject,
   updateTask,
@@ -26,6 +29,7 @@ export let provider = Slate.create({
   tools: [
     listProjects,
     getProject,
+    createOfflineTimeEntry,
     createProject,
     updateProject,
     deleteProject,
@@ -37,11 +41,13 @@ export let provider = Slate.create({
     getTimeEntry,
     manageUserAssignments,
     manageTaskAssignments,
+    manageTimeEntries,
     listUsers,
     getUser,
     updateUser,
     getProjectReport,
-    getSummaryReport
+    getSummaryReport,
+    getTask
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BlazeMeterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,8 @@ export let getTestResults = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.listRecent && ctx.input.testId) {
@@ -101,7 +102,7 @@ export let getTestResults = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(
+    throw createApiServiceError(
       'Provide either masterId for specific results, or testId with listRecent to list runs'
     );
   })

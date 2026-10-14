@@ -1,4 +1,4 @@
-Now let me look at the new unified Moz API documentation for complete feature coverage:# Slates Specification for Moz
+# Moz API Specification
 
 ## Overview
 
@@ -56,8 +56,16 @@ Track when the index is updated with new data. When queried, the endpoint return
 
 ### Usage Data
 
-Monitor API usage via the Moz API Dashboard at `https://moz.com/api/dashboard` or programmatically via a usage data endpoint that reports how many API rows have been consumed within a given time period.
+Look up API quota and account identity with `get_api_quota`, including rows used, allowance, and reset times. Monitor API usage via the Moz API Dashboard at `https://moz.com/api/dashboard` or programmatically via a usage data endpoint that reports how many API rows have been consumed within a given time period.
 
 ## Events
 
 The provider does not support events. Moz's API is a data retrieval service with no webhook or event subscription mechanism. The Index Metadata endpoint can be used to detect when the link index has been updated, but this requires manual polling.
+
+## Redirect Audits
+
+Use `get_final_redirect` to retrieve the final redirect destination recorded in Moz's index. A null destination means the indexed page has no redirect; this endpoint does not make a live HTTP check.
+
+## API Compatibility
+
+Link analysis tools preserve the documented Links API V2 endpoints and legacy Basic authentication. Keyword research and site metrics use the current JSON-RPC API with API tokens. Keyword suggestions may take more than one request to complete; the tool polls at five-second intervals for up to 12 lookups and reports a resumable `asyncCallId` when still pending. `page` is zero-based for suggestions and ranking keywords. Missing keyword metric values are omitted from optional numeric output fields.

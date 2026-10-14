@@ -1,22 +1,36 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
-let BASE_URLS: Record<string, string> = {
+let BASE_URLS = {
   certcentral: 'https://www.digicert.com/services/v2',
-  certcentral_eu: 'https://www.digicert.com/services/v2'
+  certcentral_eu: 'https://certcentral.digicert.eu/services/v2'
 };
 
 export class CertCentralClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private baseURL: string;
 
   constructor(opts: { token: string; platform: string }) {
-    let baseURL = BASE_URLS[opts.platform] || BASE_URLS.certcentral;
+    if (!opts.token.trim()) {
+      throw createApiServiceError(
+        'A CertCentral API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.baseURL =
+      opts.platform === 'certcentral_eu' ? BASE_URLS.certcentral_eu : BASE_URLS.certcentral;
 
-    this.axios = createAxios({
-      baseURL,
-      headers: {
-        'X-DC-DEVKEY': opts.token,
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: this.baseURL,
+      authHeader: { name: 'X-DC-DEVKEY', value: opts.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'DigiCert CertCentral',
+          reason: 'digicert_api_error'
+        })
     });
   }
 
@@ -29,7 +43,15 @@ export class CertCentralClient {
     productNameId?: string;
     commonName?: string;
   }): Promise<any> {
-    let res = await this.axios.get('/order/certificate', { params });
+    let res = await this.axios.get('/order/certificate', {
+      params: pickDefined({
+        offset: params?.offset,
+        limit: params?.limit,
+        'filters[status]': params?.status,
+        'filters[product_name_id]': params?.productNameId,
+        'filters[common_name]': params?.commonName
+      })
+    });
     return res.data;
   }
 
@@ -38,8 +60,21 @@ export class CertCentralClient {
     return res.data;
   }
 
+  async getOrderValidation(orderId: string, includeRiskCheck?: boolean): Promise<any> {
+    let res = await this.axios.get(
+      `/order/certificate/${encodeURIComponent(orderId)}/validation`,
+      {
+        params: pickDefined({ include_risk_check: includeRiskCheck })
+      }
+    );
+    return res.data;
+  }
+
   async orderCertificate(productType: string, body: Record<string, any>): Promise<any> {
-    let res = await this.axios.post(`/order/certificate/${productType}`, body);
+    let res = await this.axios.post(
+      `/order/certificate/${encodeURIComponent(productType)}`,
+      body
+    );
     return res.data;
   }
 
@@ -65,10 +100,15 @@ export class CertCentralClient {
   }
 
   async downloadCertificate(certificateId: string, format: string = 'pem_all'): Promise<any> {
-    let res = await this.axios.get(`/certificate/${certificateId}/download/format/${format}`, {
-      responseType: format === 'pem_all' ? 'text' : 'arraybuffer'
+    let res = await this.axios.get(this.getCertificateDownloadUrl(certificateId, format), {
+      responseType: 'arraybuffer'
     });
     return res.data;
+  }
+
+  getCertificateDownloadUrl(certificateId: string, format: string): string {
+    let providerFormat = format === 'pem' ? 'pem_nointermediate' : format;
+    return `${this.baseURL}/certificate/${encodeURIComponent(certificateId)}/download/format/${encodeURIComponent(providerFormat)}`;
   }
 
   async getCertificate(certificateId: string): Promise<any> {
@@ -137,10 +177,13 @@ export class CertCentralClient {
     domainId: string,
     body: {
       dcv_method: string;
-      order_id?: number;
+      validations: Array<{ type: string }>;
     }
   ): Promise<any> {
-    let res = await this.axios.put(`/domain/${domainId}/dcv`, body);
+    let res = await this.axios.post(
+      `/domain/${encodeURIComponent(domainId)}/validation`,
+      body
+    );
     return res.data;
   }
 
@@ -183,7 +226,7 @@ export class CertCentralClient {
   async submitOrganizationForValidation(
     organizationId: string,
     body: {
-      validations: Array<{ type: string }>;
+      validations: Array<{ type: string; verified_users?: Array<{ id: number }> }>;
     }
   ): Promise<any> {
     let res = await this.axios.post(`/organization/${organizationId}/validation`, body);
@@ -209,7 +252,13 @@ export class CertCentralClient {
     limit?: number;
     status?: string;
   }): Promise<any> {
-    let res = await this.axios.get('/request', { params });
+    let res = await this.axios.get('/request', {
+      params: pickDefined({
+        offset: params?.offset,
+        limit: params?.limit,
+        'filters[status]': params?.status
+      })
+    });
     return res.data;
   }
 

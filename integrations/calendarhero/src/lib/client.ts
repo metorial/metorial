@@ -1,14 +1,17 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.calendarhero.com',
-      headers: {
-        Authorization: token
-      }
+      authHeader: { value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CalendarHero',
+          reason: 'calendarhero_api'
+        })
     });
   }
 
@@ -23,6 +26,16 @@ export class Client {
 
   async listMeetingTypes(params?: { onlyTypes?: boolean }): Promise<any> {
     let response = await this.axios.get('/user/meeting', { params });
+    return response.data;
+  }
+
+  async createMeetingType(type: string): Promise<any> {
+    let response = await this.axios.post(`/user/meeting/${encodeURIComponent(type)}`);
+    return response.data;
+  }
+
+  async deleteMeetingType(type: string): Promise<any> {
+    let response = await this.axios.delete(`/user/meeting/${encodeURIComponent(type)}`);
     return response.data;
   }
 
@@ -52,26 +65,30 @@ export class Client {
   }
 
   async createMeetingRequest(data: {
-    contacts: Array<{ email: string; name?: string }>;
-    subject?: string;
+    contacts?: { id: string }[];
+    contactEmails?: string[];
+    subject: string;
     dateStart: string;
     dateEnd: string;
     meetingLength?: number;
     type?: string;
-    locations?: string[];
+    locations?: { name: string }[];
     capacity?: number;
+    description?: string;
   }): Promise<any> {
     let response = await this.axios.post('/meeting/tasks', data);
     return response.data;
   }
 
   async deleteMeetingRequest(requestId: string): Promise<any> {
-    let response = await this.axios.delete(`/meeting/tasks/${requestId}`);
+    let response = await this.axios.delete(`/meeting/tasks/${encodeURIComponent(requestId)}`);
     return response.data;
   }
 
   async sendMeetingReminder(requestId: string): Promise<any> {
-    let response = await this.axios.put(`/meeting/tasks/${requestId}/remind`);
+    let response = await this.axios.put(
+      `/meeting/tasks/${encodeURIComponent(requestId)}/remind`
+    );
     return response.data;
   }
 
@@ -80,18 +97,19 @@ export class Client {
   async searchContacts(params?: {
     search?: string;
     filter?: string;
-    all?: boolean;
-    includeTeams?: boolean;
+    all?: number;
+    includeTeams?: number;
   }): Promise<any> {
     let response = await this.axios.get('/contact', { params });
     return response.data;
   }
 
   async createContact(data: {
-    name: string;
+    name?: string;
     title?: string;
     organization?: string;
-    email?: string[];
+    email: string[];
+    defaultEmail?: string;
     telephone?: string[];
   }): Promise<any> {
     let response = await this.axios.post('/contact', data);
@@ -99,7 +117,9 @@ export class Client {
   }
 
   async getContact(contactId: string, params?: { basic?: boolean }): Promise<any> {
-    let response = await this.axios.get(`/contact/${contactId}`, { params });
+    let response = await this.axios.get(`/contact/${encodeURIComponent(contactId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -109,17 +129,18 @@ export class Client {
       name?: string;
       title?: string;
       organization?: string;
-      email?: string[];
+      email: string[];
+      defaultEmail?: string;
       telephone?: string[];
-      providerId?: string;
+      providerId?: string[];
     }
   ): Promise<any> {
-    let response = await this.axios.put(`/contact/${contactId}`, data);
+    let response = await this.axios.put(`/contact/${encodeURIComponent(contactId)}`, data);
     return response.data;
   }
 
   async deleteContact(contactId: string): Promise<any> {
-    let response = await this.axios.delete(`/contact/${contactId}`);
+    let response = await this.axios.delete(`/contact/${encodeURIComponent(contactId)}`);
     return response.data;
   }
 

@@ -1,6 +1,4 @@
-Now let me get more details on the specific API features available:Now I have enough information to write the specification.
-
-# Slates Specification for Semrush
+# Semrush Integration Specification
 
 ## Overview
 
@@ -63,9 +61,13 @@ This report provides a summary of backlinks, including their type, referring dom
 
 The Trends API is a powerful website traffic API that delivers a robust dataset on web traffic and market dynamics. Unlike the Standard API, which focuses on tactical SEO and PPC data, the Trends API delivers strategic insights. Available reports include traffic summaries, daily/weekly traffic, geo distribution, traffic sources and destinations, top pages, subdomains, subfolders, traffic rank, audience insights, purchase conversion, audience demographics (age, sex, household, income, education, occupation), audience interests, and social media preferences. Supports analyzing up to 200 domains per request for summary reports. Requires a separate Trends API subscription (Basic or Premium tiers).
 
+### API Unit Balance
+
+The `get_api_unit_balance` tool returns the remaining Standard API units using the free read-only balance endpoint. It requires an API Key connection.
+
 ### Project Management
 
-Project API lets you get basic information about your Semrush projects, as well as perform some basic management actions (create, update, delete a project). Available via API v4 with OAuth 2.0. Requires SEO Business subscription.
+Project API lets you get basic information about your Semrush projects, as well as perform some basic management actions (create, update, delete a project). The existing API Key connection uses the legacy Standard Projects API, while OAuth uses the legacy OAuth Projects API. Both are deprecated by Semrush. Project updates rename the project; they do not change its domain. Requires SEO Business subscription.
 
 ### Position Tracking
 

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
+import { cmsModelIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let countCmsItems = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let countCmsItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      modelId: z.string().describe('Unique identifier of the CMS model/table to count'),
+      modelId: cmsModelIdSchema,
       where: z
         .record(z.string(), z.unknown())
         .optional()
@@ -31,8 +32,8 @@ export let countCmsItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.cmsId || !ctx.auth.cmsPublicToken) {
-      throw new Error('CMS ID and CMS public token are required to count items');
+    if (!ctx.auth.cmsId || !(ctx.auth.cmsPublicToken || ctx.auth.cmsSecretToken)) {
+      throw createApiServiceError('CMS ID and a CMS token are required to count items');
     }
 
     let client = new CmsClient({

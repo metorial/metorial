@@ -1,5 +1,7 @@
 export * from './check-batch-task';
 export * from './check-usage';
+export * from './classify-document';
+export * from './delete-batch-task';
 export * from './extract-signatures';
 export * from './process-any-document';
 export * from './process-finance-document';

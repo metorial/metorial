@@ -1,4 +1,4 @@
-# Slates Specification for Timely
+# Timely Integration
 
 ## Overview
 
@@ -6,7 +6,7 @@ Timely is an AI-powered automatic time tracking application for teams, focused o
 
 ## Authentication
 
-Timely supports **OAuth 2.0** using the Authorization Code grant type. There are no API key-based authentication methods.
+Timely supports **OAuth 2.0** using the Authorization Code grant type. The integration uses OAuth 2.0.
 
 ### Setup
 
@@ -36,11 +36,11 @@ Required parameters:
 - `client_secret`: Your application secret
 - `grant_type`: `authorization_code`
 
-The response includes an `access_token` and a `refresh_token`. All API requests must include the access token in the `Authorization: Bearer <token>` header.
+The response includes an `access_token`, and may include a `refresh_token` and an `expires_in` duration. Expiry is persisted when supplied; refresh preserves the previous refresh token when the provider omits a replacement. All API requests must include the access token in the `Authorization: Bearer <token>` header.
 
 **Base URL:** `https://api.timelyapp.com/1.1`
 
-All resource endpoints are scoped under an `account_id`, e.g., `/1.1/:account_id/projects`. There are no defined OAuth scopes — the token grants access based on the user's role (Admin, Manager, Employee, Team Lead).
+All resource endpoints are scoped under an `account_id`, e.g., `/1.1/:account_id/projects`. The documented `manage` scope grants resource access, bounded by the user's workspace role.
 
 **Note:** For security and privacy purposes, Memory is a private API so you won't be able to make calls to retrieve memories or post information to your timeline.
 
@@ -156,3 +156,15 @@ Webhooks are configured with:
 - `projects:created` — A new project is created.
 - `projects:updated` — An existing project is modified.
 - `projects:deleted` — A project is deleted.
+
+## Workspace Selection And Current Tools
+
+Call `list_accounts` to discover authorized workspace IDs, then provide `accountId` to workspace tools. Connections with one workspace can omit this field. Previously saved workspace configuration remains a fallback for existing connections. `get_current_user` retrieves the authenticated user in the chosen workspace, and `get_time_entry` retrieves an entry by its ID.
+
+Time-entry tools use `/1.1/{account_id}/hours`, and timer actions use `PUT /hours/{id}/start` or `/stop`. Creating time entries requires a project. Duration inputs use either hours/minutes or a complete from/to range. Reports keep the public `upto` input and send it as the provider's `until` filter.
+
+Forecast creation requires `title` and start/end dates (`from`/`to`, or `day` for a single-day task). Estimates are combined into total minutes. Forecast updates use `PATCH`; listing uses page/perPage, with limit/offset retained as a compatibility option for the first 5000 records. Do not mix the two pagination forms.
+
+The current API reference contains inconsistent request/response descriptions for legacy project label flags. Existing field types and legacy payloads are retained pending provider confirmation. Account discovery is documented in the API introduction; the existing account-detail operation is retained because omission from the OpenAPI operation list does not establish removal.
+
+Official reference: https://developer.timely.com/

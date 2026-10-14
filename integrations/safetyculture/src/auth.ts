@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -21,29 +21,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A SafetyCulture API token is required.');
       return {
         output: {
           token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.safetyculture.io',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/users/v1/users/me');
-      let user = response.data;
-
-      return {
-        profile: {
-          id: user.user_id || user.id,
-          email: user.email,
-          name: `${user.firstname || ''} ${user.lastname || ''}`.trim() || user.email
         }
       };
     }

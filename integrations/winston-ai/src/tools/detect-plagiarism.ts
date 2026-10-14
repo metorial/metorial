@@ -10,7 +10,7 @@ export let detectPlagiarism = SlateTool.create(spec, {
 
 Accepts plain text, a publicly accessible file URL (.pdf, .doc, .docx), or a website URL. Supports 45+ languages with auto-detection. You can exclude specific domains or URLs from the scan and tailor results by country.`,
   instructions: [
-    'Provide exactly one of: text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.'
+    'Provide text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.'
   ],
   constraints: [
     'Text must be between 100 and 120,000 characters.',

@@ -1,7 +1,29 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let resolveDumpReference = (input: { dumpId?: number; dumpReference?: string }) => {
+  if (input.dumpReference !== undefined) {
+    if (!input.dumpReference.trim()) {
+      throw createApiServiceError(
+        'Provide a nonempty dumpReference returned by create_event_dump or list_event_dumps.'
+      );
+    }
+    if (input.dumpId !== undefined && String(input.dumpId) !== input.dumpReference) {
+      throw createApiServiceError(
+        'Provide one event dump identifier, or matching dumpId and dumpReference values.'
+      );
+    }
+    return input.dumpReference;
+  }
+  if (input.dumpId === undefined) {
+    throw createApiServiceError(
+      'Provide dumpReference returned by create_event_dump or list_event_dumps, or a legacy numeric dumpId.'
+    );
+  }
+  return String(input.dumpId);
+};
 
 // ── Create Event Dump ──
 
@@ -34,7 +56,14 @@ export let createEventDump = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      dumpId: z.number().describe('ID of the created dump request')
+      dumpId: z
+        .number()
+        .optional()
+        .describe('Legacy numeric ID, when returned by the provider'),
+      dumpReference: z
+        .string()
+        .optional()
+        .describe('Provider dump identifier for get_event_dump or delete_event_dump')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,7 +78,7 @@ export let createEventDump = SlateTool.create(spec, {
     if (ctx.input.filterDeliveryStatus)
       filter.delivery_status = ctx.input.filterDeliveryStatus;
     if (ctx.input.filterEmail) filter.email = ctx.input.filterEmail;
-    if (ctx.input.filterSender) filter.sender = ctx.input.filterSender;
+    if (ctx.input.filterSender) filter.email_from = ctx.input.filterSender;
     if (ctx.input.filterDomain) filter.domain = ctx.input.filterDomain;
     if (ctx.input.filterCampaignId) filter.campaign_id = ctx.input.filterCampaignId;
 
@@ -62,7 +91,10 @@ export let createEventDump = SlateTool.create(spec, {
     });
 
     return {
-      output: { dumpId: result.dump_id },
+      output: {
+        dumpId: typeof result.dump_id === 'number' ? result.dump_id : undefined,
+        dumpReference: typeof result.dump_id === 'string' ? result.dump_id : undefined
+      },
       message: `Event dump created with ID **${result.dump_id}**. Use "Get Event Dump" to check its status.`
     };
   })
@@ -73,19 +105,26 @@ export let createEventDump = SlateTool.create(spec, {
 export let getEventDump = SlateTool.create(spec, {
   name: 'Get Event Dump',
   key: 'get_event_dump',
-  description: `Check the status of an event dump and retrieve its download URL once ready.`,
+  description: `Check an event dump and download available CSV files, including files completed while the export is still processing. Use dumpReference returned by create_event_dump or list_event_dumps.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      dumpId: z.number().describe('ID of the event dump to check')
+      dumpId: z.number().optional().describe('Legacy numeric event dump ID'),
+      dumpReference: z
+        .string()
+        .optional()
+        .describe(
+          'Provider dump identifier from create_event_dump or list_event_dumps; supply this or dumpId'
+        )
     })
   )
   .output(
     z.object({
-      dumpId: z.number().describe('Dump ID'),
+      dumpId: z.number().optional().describe('Legacy numeric dump ID, when returned'),
+      dumpReference: z.string().optional().describe('Provider dump identifier'),
       dumpStatus: z.string().describe('Current status of the dump (e.g., processing, ready)'),
       downloadUrl: z
         .string()
@@ -100,13 +139,22 @@ export let getEventDump = SlateTool.create(spec, {
       datacenter: ctx.config.datacenter
     });
 
-    let result = await client.getEventDump(ctx.input.dumpId);
+    let result = await client.getEventDump(resolveDumpReference(ctx.input));
+
+    for (let url of new Set([...(result.files ?? []), ...(result.url ? [result.url] : [])])) {
+      await ctx.addAttachment({
+        type: 'url',
+        url,
+        mimeType: url.split(/[?#]/)[0]?.endsWith('.gz') ? 'application/gzip' : 'text/csv'
+      });
+    }
 
     return {
       output: {
-        dumpId: result.dump_id,
+        dumpId: typeof result.dump_id === 'number' ? result.dump_id : undefined,
+        dumpReference: typeof result.dump_id === 'string' ? result.dump_id : undefined,
         dumpStatus: result.dump_status,
-        downloadUrl: result.url,
+        downloadUrl: result.url ?? result.files?.[0],
         files: result.files
       },
       message: `Event dump **${result.dump_id}**: status is **${result.dump_status}**.${result.url ? ` Download: ${result.url}` : ''}`
@@ -130,7 +178,8 @@ export let listEventDumps = SlateTool.create(spec, {
       dumps: z
         .array(
           z.object({
-            dumpId: z.number().describe('Dump ID'),
+            dumpId: z.number().optional().describe('Legacy numeric dump ID, when returned'),
+            dumpReference: z.string().optional().describe('Provider dump identifier'),
             dumpStatus: z.string().describe('Current dump status'),
             downloadUrl: z.string().optional().describe('Download URL'),
             created: z.string().optional().describe('Creation timestamp')
@@ -148,9 +197,10 @@ export let listEventDumps = SlateTool.create(spec, {
     let result = await client.listEventDumps();
 
     let dumps = (result.list ?? []).map(d => ({
-      dumpId: d.dump_id,
+      dumpId: typeof d.dump_id === 'number' ? d.dump_id : undefined,
+      dumpReference: typeof d.dump_id === 'string' ? d.dump_id : undefined,
       dumpStatus: d.dump_status,
-      downloadUrl: d.url,
+      downloadUrl: d.url ?? d.files?.[0],
       created: d.created
     }));
 
@@ -166,14 +216,20 @@ export let listEventDumps = SlateTool.create(spec, {
 export let deleteEventDump = SlateTool.create(spec, {
   name: 'Delete Event Dump',
   key: 'delete_event_dump',
-  description: `Delete an event dump by its ID.`,
+  description: `Delete an event dump by dumpReference from create_event_dump or list_event_dumps, or by a legacy numeric dumpId.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      dumpId: z.number().describe('ID of the event dump to delete')
+      dumpId: z.number().optional().describe('Legacy numeric event dump ID'),
+      dumpReference: z
+        .string()
+        .optional()
+        .describe(
+          'Provider dump identifier from create_event_dump or list_event_dumps; supply this or dumpId'
+        )
     })
   )
   .output(
@@ -187,11 +243,12 @@ export let deleteEventDump = SlateTool.create(spec, {
       datacenter: ctx.config.datacenter
     });
 
-    let result = await client.deleteEventDump(ctx.input.dumpId);
+    let dumpReference = resolveDumpReference(ctx.input);
+    let result = await client.deleteEventDump(dumpReference);
 
     return {
       output: { success: result.status === 'success' },
-      message: `Event dump **${ctx.input.dumpId}** deleted.`
+      message: `Event dump **${dumpReference}** deleted.`
     };
   })
   .build();

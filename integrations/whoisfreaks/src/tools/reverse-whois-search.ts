@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,15 +18,36 @@ export let reverseWhoisSearch = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      keyword: z.string().optional().describe('Domain keyword to search for'),
-      email: z.string().optional().describe('Registrant email address to search for'),
-      owner: z.string().optional().describe('Owner/registrant name to search for'),
-      company: z.string().optional().describe('Company/organization name to search for'),
+      keyword: z.string().trim().min(1).optional().describe('Domain keyword to search for'),
+      email: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Registrant email address to search for'),
+      owner: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Owner/registrant name to search for'),
+      company: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Company/organization name to search for'),
       mode: z
         .enum(['mini', 'default'])
         .optional()
         .describe('Response mode: "mini" for lightweight results, "default" for full details'),
-      page: z.number().optional().describe('Page number for paginated results')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page number must be a safe integer.')
+        .min(1)
+        .optional()
+        .describe('Page number for paginated results'),
+      exact: z.boolean().optional().describe('Whether to require an exact search match')
     })
   )
   .output(
@@ -38,7 +59,7 @@ export let reverseWhoisSearch = SlateTool.create(spec, {
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (!ctx.input.keyword && !ctx.input.email && !ctx.input.owner && !ctx.input.company) {
-      throw new Error(
+      throw createApiServiceError(
         'At least one search parameter (keyword, email, owner, or company) must be provided.'
       );
     }
@@ -49,7 +70,8 @@ export let reverseWhoisSearch = SlateTool.create(spec, {
       owner: ctx.input.owner,
       company: ctx.input.company,
       mode: ctx.input.mode,
-      page: ctx.input.page
+      page: ctx.input.page,
+      exact: ctx.input.exact
     });
 
     let searchBy =

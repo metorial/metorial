@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { CallPageClient } from '../lib/client';
 import { spec } from '../spec';
 
-let voiceMessageIdEnum = z.enum(['manager_greeting', 'visitor_greeting']);
+let voiceMessageIdEnum = z.enum([
+  'manager_greeting',
+  'visitor_greeting',
+  'manager.call',
+  'visitor.call'
+]);
 
 export let listVoiceMessages = SlateTool.create(spec, {
   name: 'List Voice Messages',
@@ -55,7 +60,7 @@ export let upsertVoiceMessage = SlateTool.create(spec, {
     z.object({
       widgetId: z.number().describe('The widget ID'),
       messageId: voiceMessageIdEnum.describe(
-        'Voice message type: manager_greeting or visitor_greeting'
+        'Voice message identifier from list_voice_messages, or manager_greeting / visitor_greeting'
       ),
       enabled: z.boolean().describe('Whether this voice message is active'),
       fileUrl: z

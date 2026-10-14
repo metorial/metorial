@@ -27,7 +27,11 @@ export let getConversations = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      conversations: z.array(z.any()).describe('Array of conversation objects with messages')
+      conversations: z.array(z.any()).describe('Array of conversation objects with messages'),
+      totalCount: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe('Total matching records reported by HeyReach')
     })
   )
   .handleInvocation(async ctx => {
@@ -39,10 +43,11 @@ export let getConversations = SlateTool.create(spec, {
       filters: ctx.input.filters
     });
 
-    let conversations = Array.isArray(result) ? result : (result?.data ?? result?.items ?? []);
+    let page = result?.data ?? result;
+    let conversations = Array.isArray(page) ? page : (page?.items ?? []);
 
     return {
-      output: { conversations },
+      output: { conversations, totalCount: page?.totalCount },
       message: `Retrieved **${conversations.length}** conversation(s).`
     };
   })

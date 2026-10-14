@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectOutputSchema = z.object({
@@ -29,10 +30,7 @@ To **create**: provide a name. To **update**: provide a projectId and fields to 
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       projectId: z
         .string()
         .optional()
@@ -62,8 +60,12 @@ To **create**: provide a name. To **update**: provide a projectId and fields to 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
+
+    if (ctx.input.delete && !ctx.input.projectId) {
+      throw createApiServiceError('projectId is required when deleting.');
+    }
 
     if (ctx.input.delete && ctx.input.projectId) {
       await client.deleteProject(wsId, ctx.input.projectId);
@@ -88,7 +90,7 @@ To **create**: provide a name. To **update**: provide a projectId and fields to 
       });
     } else {
       if (!ctx.input.name)
-        throw new Error('Project name is required when creating a new project.');
+        throw createApiServiceError('Project name is required when creating a new project.');
       project = await client.createProject(wsId, {
         name: ctx.input.name,
         clientId: ctx.input.clientId ?? undefined,

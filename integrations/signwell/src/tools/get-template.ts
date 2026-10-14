@@ -28,6 +28,29 @@ export let getTemplate = SlateTool.create(spec, {
       applySigningOrder: z.boolean().optional().describe('Whether signing order is enforced'),
       allowDecline: z.boolean().optional().describe('Whether decline is allowed'),
       expiresIn: z.number().optional().describe('Default expiration in days'),
+      status: z
+        .string()
+        .optional()
+        .describe('Current template status, including Draft or Available'),
+      fields: z
+        .array(
+          z.array(
+            z.object({
+              apiId: z
+                .string()
+                .optional()
+                .describe('Field identifier for templateFields when creating a document'),
+              type: z.string().optional().describe('Field type'),
+              page: z.number().optional().describe('Page within the file, starting at 1'),
+              placeholderName: z
+                .string()
+                .optional()
+                .describe('Placeholder assigned to the field')
+            })
+          )
+        )
+        .optional()
+        .describe('Template fields grouped by file'),
       placeholders: z
         .array(
           z.object({
@@ -48,20 +71,31 @@ export let getTemplate = SlateTool.create(spec, {
 
     let output = {
       templateId: result.id,
-      name: result.name,
-      subject: result.subject,
-      message: result.message,
-      isDraft: result.is_draft,
-      reminders: result.reminders,
-      applySigningOrder: result.apply_signing_order,
-      allowDecline: result.allow_decline,
-      expiresIn: result.expires_in,
-      placeholders: result.placeholders?.map((p: any) => ({
-        placeholderId: p.id,
-        name: p.name
+      name: result.name ?? undefined,
+      subject: result.subject ?? undefined,
+      message: result.message ?? undefined,
+      isDraft:
+        result.is_draft ??
+        (result.status ? result.status.toLowerCase() === 'draft' : undefined),
+      reminders: result.reminders ?? undefined,
+      applySigningOrder: result.apply_signing_order ?? undefined,
+      allowDecline: result.allow_decline ?? undefined,
+      expiresIn: result.expires_in ?? undefined,
+      status: result.status ?? undefined,
+      fields: result.fields?.map(group =>
+        group.map(field => ({
+          apiId: field.api_id ?? undefined,
+          type: field.type ?? undefined,
+          page: field.page ?? undefined,
+          placeholderName: field.placeholder_name ?? undefined
+        }))
+      ),
+      placeholders: result.placeholders?.map(p => ({
+        placeholderId: p.id ?? undefined,
+        name: p.name ?? undefined
       })),
-      createdAt: result.created_at,
-      updatedAt: result.updated_at
+      createdAt: result.created_at ?? undefined,
+      updatedAt: result.updated_at ?? undefined
     };
 
     return {

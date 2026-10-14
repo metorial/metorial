@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageSegment = SlateTool.create(spec, {
@@ -22,7 +23,9 @@ export let manageSegment = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       action: z
         .enum([
           'create',
@@ -50,7 +53,12 @@ export let manageSegment = SlateTool.create(spec, {
           'Environment ID (required for activate, deactivate, upload_keys, remove_keys, get_keys).'
         ),
       keys: z.array(z.string()).optional().describe('Keys to upload or remove.'),
-      comment: z.string().optional().describe('Comment for key removal.')
+      comment: z.string().optional().describe('Comment for key upload or removal.'),
+      offset: z.number().optional().describe('Pagination offset for get_keys. Defaults to 0.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Page size for get_keys, between 1 and 100. Defaults to 100.')
     })
   )
   .output(
@@ -59,18 +67,22 @@ export let manageSegment = SlateTool.create(spec, {
       action: z.string(),
       success: z.boolean(),
       keys: z.array(z.string()).optional(),
-      keyCount: z.number().optional()
+      keyCount: z.number().optional(),
+      totalKeyCount: z.number().optional(),
+      offset: z.number().optional(),
+      limit: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
-        if (!wsId) throw new Error('workspaceId is required for creating segments.');
+        if (!wsId)
+          throw createApiServiceError('workspaceId is required for creating segments.');
         if (!ctx.input.trafficTypeId)
-          throw new Error('trafficTypeId is required to create a segment.');
+          throw createApiServiceError('trafficTypeId is required to create a segment.');
         await client.createSegment(wsId, ctx.input.trafficTypeId, {
           name: ctx.input.segmentName,
           description: ctx.input.description
@@ -82,7 +94,8 @@ export let manageSegment = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!wsId) throw new Error('workspaceId is required for deleting segments.');
+        if (!wsId)
+          throw createApiServiceError('workspaceId is required for deleting segments.');
         await client.deleteSegment(wsId, ctx.input.segmentName);
         return {
           output: { segmentName: ctx.input.segmentName, action: 'delete', success: true },
@@ -92,7 +105,8 @@ export let manageSegment = SlateTool.create(spec, {
 
       case 'activate': {
         let envId = ctx.input.environmentId ?? ctx.config.environmentId;
-        if (!envId) throw new Error('environmentId is required to activate a segment.');
+        if (!envId)
+          throw createApiServiceError('environmentId is required to activate a segment.');
         await client.activateSegmentInEnv(envId, ctx.input.segmentName);
         return {
           output: { segmentName: ctx.input.segmentName, action: 'activate', success: true },
@@ -102,7 +116,8 @@ export let manageSegment = SlateTool.create(spec, {
 
       case 'deactivate': {
         let envId = ctx.input.environmentId ?? ctx.config.environmentId;
-        if (!envId) throw new Error('environmentId is required to deactivate a segment.');
+        if (!envId)
+          throw createApiServiceError('environmentId is required to deactivate a segment.');
         await client.deactivateSegmentInEnv(envId, ctx.input.segmentName);
         return {
           output: { segmentName: ctx.input.segmentName, action: 'deactivate', success: true },
@@ -112,10 +127,20 @@ export let manageSegment = SlateTool.create(spec, {
 
       case 'upload_keys': {
         let envId = ctx.input.environmentId ?? ctx.config.environmentId;
-        if (!envId) throw new Error('environmentId is required to upload keys.');
+        if (!envId) throw createApiServiceError('environmentId is required to upload keys.');
         if (!ctx.input.keys || ctx.input.keys.length === 0)
-          throw new Error('keys array is required and must not be empty.');
-        await client.uploadSegmentKeys(envId, ctx.input.segmentName, ctx.input.keys);
+          throw createApiServiceError('keys array is required and must not be empty.');
+        if (ctx.input.keys.length > 10000) {
+          throw createApiServiceError(
+            'upload_keys accepts at most 10,000 keys per call. Split the keys into smaller batches.'
+          );
+        }
+        await client.uploadSegmentKeys(
+          envId,
+          ctx.input.segmentName,
+          ctx.input.keys,
+          ctx.input.comment
+        );
         return {
           output: {
             segmentName: ctx.input.segmentName,
@@ -129,9 +154,9 @@ export let manageSegment = SlateTool.create(spec, {
 
       case 'remove_keys': {
         let envId = ctx.input.environmentId ?? ctx.config.environmentId;
-        if (!envId) throw new Error('environmentId is required to remove keys.');
+        if (!envId) throw createApiServiceError('environmentId is required to remove keys.');
         if (!ctx.input.keys || ctx.input.keys.length === 0)
-          throw new Error('keys array is required and must not be empty.');
+          throw createApiServiceError('keys array is required and must not be empty.');
         await client.removeSegmentKeys(
           envId,
           ctx.input.segmentName,
@@ -151,8 +176,12 @@ export let manageSegment = SlateTool.create(spec, {
 
       case 'get_keys': {
         let envId = ctx.input.environmentId ?? ctx.config.environmentId;
-        if (!envId) throw new Error('environmentId is required to get keys.');
-        let result = await client.getSegmentKeys(envId, ctx.input.segmentName);
+        if (!envId) throw createApiServiceError('environmentId is required to get keys.');
+        validatePagination(ctx.input.offset, ctx.input.limit, 100);
+        let result = await client.getSegmentKeys(envId, ctx.input.segmentName, {
+          offset: ctx.input.offset,
+          limit: ctx.input.limit
+        });
         let keys = result.keys.map(k => k.key);
         return {
           output: {
@@ -160,9 +189,12 @@ export let manageSegment = SlateTool.create(spec, {
             action: 'get_keys',
             success: true,
             keys,
-            keyCount: keys.length
+            keyCount: keys.length,
+            totalKeyCount: result.count,
+            offset: result.offset,
+            limit: result.limit
           },
-          message: `Segment **${ctx.input.segmentName}** has **${keys.length}** keys.`
+          message: `Returned **${keys.length}** keys from segment **${ctx.input.segmentName}**, starting at offset ${result.offset}.`
         };
       }
     }

@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+import { dataRegionSchema } from './schemas';
 
 let getBaseUrl = (dataRegion: string): string => {
   if (dataRegion === 'global') {
@@ -11,31 +18,48 @@ let getReportsBaseUrl = (dataRegion: string): string => {
   if (dataRegion === 'global') {
     return 'https://reports.api.clockify.me/v1';
   }
-  return `https://${dataRegion}.reports.api.clockify.me/v1`;
+  return `https://${dataRegion}.clockify.me/report/v1`;
 };
 
 export class Client {
   private ax;
   private reportsAx;
-  private workspaceId: string;
+  private configuredWorkspaceId?: string;
 
-  constructor(config: { token: string; workspaceId: string; dataRegion: string }) {
-    this.workspaceId = config.workspaceId;
+  private get workspaceId(): string {
+    if (!this.configuredWorkspaceId) {
+      throw createApiServiceError(
+        'A workspace ID is required. Call get_workspaces and pass the chosen workspaceId to this tool.'
+      );
+    }
+    return encodeURIComponent(this.configuredWorkspaceId);
+  }
 
-    this.ax = createAxios({
+  constructor(config: { token: string; workspaceId?: string; dataRegion: string }) {
+    this.configuredWorkspaceId = config.workspaceId;
+
+    this.ax = createAuthenticatedAxios({
       baseURL: getBaseUrl(config.dataRegion),
-      headers: {
-        'X-Api-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      timeout: 30_000,
+      paramsSerializer: { indexes: null },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Clockify',
+          reason: 'clockify_api_error'
+        })
     });
 
-    this.reportsAx = createAxios({
+    this.reportsAx = createAuthenticatedAxios({
       baseURL: getReportsBaseUrl(config.dataRegion),
-      headers: {
-        'X-Api-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      timeout: 30_000,
+      paramsSerializer: { indexes: null },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Clockify',
+          reason: 'clockify_api_error'
+        })
     });
   }
 
@@ -51,8 +75,8 @@ export class Client {
     name?: string;
     status?: string;
     page?: number;
-    pageSize?: number;
-    projectId?: string;
+    'page-size'?: number;
+    'project-id'?: string;
     memberships?: string;
   }) => {
     let response = await this.ax.get(`/workspaces/${this.workspaceId}/users`, { params });
@@ -73,7 +97,7 @@ export class Client {
       end?: string;
       project?: string;
       task?: string;
-      tags?: string;
+      tags?: string[];
       description?: string;
       'page-size'?: number;
       page?: number;
@@ -135,9 +159,10 @@ export class Client {
     return response.data;
   };
 
-  getTimeEntry = async (timeEntryId: string) => {
+  getTimeEntry = async (timeEntryId: string, hydrated?: boolean) => {
     let response = await this.ax.get(
-      `/workspaces/${this.workspaceId}/time-entries/${timeEntryId}`
+      `/workspaces/${this.workspaceId}/time-entries/${timeEntryId}`,
+      { params: { hydrated } }
     );
     return response.data;
   };
@@ -150,7 +175,7 @@ export class Client {
     'page-size'?: number;
     page?: number;
     hydrated?: boolean;
-    clients?: string;
+    clients?: string[];
     billable?: boolean;
   }) => {
     let response = await this.ax.get(`/workspaces/${this.workspaceId}/projects`, { params });
@@ -193,9 +218,18 @@ export class Client {
       estimate?: { estimate: string; type: string };
     }
   ) => {
+    let current = await this.getProject(projectId);
     let response = await this.ax.put(
       `/workspaces/${this.workspaceId}/projects/${projectId}`,
-      data
+      pickDefined({
+        name: data.name ?? current.name,
+        clientId: data.clientId ?? current.clientId,
+        isPublic: data.isPublic ?? current.public,
+        color: data.color ?? current.color,
+        billable: data.billable ?? current.billable,
+        archived: data.archived ?? current.archived,
+        note: data.note ?? current.note
+      })
     );
     return response.data;
   };
@@ -243,8 +277,16 @@ export class Client {
   ) => {
     let response = await this.ax.post(
       `/workspaces/${this.workspaceId}/projects/${projectId}/tasks`,
-      data
+      pickDefined({
+        name: data.name,
+        assigneeIds: data.assigneeIds,
+        estimate: data.estimate,
+        status: data.status
+      })
     );
+    if (data.billable !== undefined) {
+      return this.updateTask(projectId, response.data.id, { billable: data.billable });
+    }
     return response.data;
   };
 
@@ -261,9 +303,16 @@ export class Client {
       costRate?: { amount: number; currency: string };
     }
   ) => {
+    let current = await this.getTask(projectId, taskId);
     let response = await this.ax.put(
       `/workspaces/${this.workspaceId}/projects/${projectId}/tasks/${taskId}`,
-      data
+      pickDefined({
+        name: data.name ?? current.name,
+        assigneeIds: data.assigneeIds ?? current.assigneeIds,
+        billable: data.billable ?? current.billable,
+        estimate: data.estimate ?? current.estimate,
+        status: data.status ?? current.status
+      })
     );
     return response.data;
   };
@@ -403,7 +452,11 @@ export class Client {
 
   // ── Invoices ──
 
-  getInvoices = async (params?: { page?: number; 'page-size'?: number; status?: string }) => {
+  getInvoices = async (params?: {
+    page?: number;
+    'page-size'?: number;
+    statuses?: string;
+  }) => {
     let response = await this.ax.get(`/workspaces/${this.workspaceId}/invoices`, { params });
     return response.data;
   };
@@ -413,17 +466,114 @@ export class Client {
     return response.data;
   };
 
-  createInvoice = async (data: Record<string, any>) => {
-    let response = await this.ax.post(`/workspaces/${this.workspaceId}/invoices`, data);
-    return response.data;
+  createInvoice = async (data: {
+    clientId: string;
+    number?: string;
+    issuedDate?: string;
+    dueDate?: string;
+    currency?: string;
+    note?: string;
+    items?: Array<{ description?: string; quantity?: number; unitPrice?: number }>;
+  }) => {
+    for (let field of ['number', 'issuedDate', 'dueDate', 'currency'] as const) {
+      if (!data[field]) {
+        throw createApiServiceError(
+          `Provide ${field}; Clockify requires it to create an invoice.`
+        );
+      }
+    }
+    this.validateInvoiceItems(data.items);
+    let response = await this.ax.post(`/workspaces/${this.workspaceId}/invoices`, {
+      clientId: data.clientId,
+      number: data.number,
+      issuedDate: data.issuedDate,
+      dueDate: data.dueDate,
+      currency: data.currency
+    });
+    let invoice = response.data;
+    if (data.note !== undefined || data.items?.length) {
+      invoice = await this.updateInvoice(invoice.id, {
+        note: data.note,
+        items: data.items
+      });
+    }
+    return invoice;
   };
 
-  updateInvoice = async (invoiceId: string, data: Record<string, any>) => {
-    let response = await this.ax.put(
-      `/workspaces/${this.workspaceId}/invoices/${invoiceId}`,
-      data
-    );
-    return response.data;
+  private validateInvoiceItems(
+    items?: Array<{ description?: string; quantity?: number; unitPrice?: number }>
+  ) {
+    for (let item of items ?? []) {
+      if (
+        item.description === undefined ||
+        !Number.isSafeInteger(item.quantity) ||
+        !Number.isSafeInteger(item.unitPrice)
+      ) {
+        throw createApiServiceError(
+          'Each invoice item requires description, integer quantity, and integer unitPrice in Clockify API units.'
+        );
+      }
+    }
+  }
+
+  updateInvoice = async (
+    invoiceId: string,
+    data: {
+      status?: string;
+      dueDate?: string;
+      note?: string;
+      items?: Array<{ description?: string; quantity?: number; unitPrice?: number }>;
+    }
+  ) => {
+    this.validateInvoiceItems(data.items);
+    let invoice = await this.getInvoice(invoiceId);
+    if (data.dueDate !== undefined || data.note !== undefined) {
+      let response = await this.ax.put(
+        `/workspaces/${this.workspaceId}/invoices/${encodeURIComponent(invoiceId)}`,
+        pickDefined({
+          clientId: invoice.clientId,
+          companyId: invoice.companyId,
+          currency: invoice.currency,
+          discountPercent: invoice.discount ?? 0,
+          dueDate: data.dueDate ?? invoice.dueDate,
+          issuedDate: invoice.issuedDate,
+          note: data.note ?? invoice.note,
+          number: invoice.number,
+          subject: invoice.subject,
+          tax2Percent: invoice.tax2 ?? 0,
+          taxPercent: invoice.tax ?? 0,
+          taxType: invoice.taxType
+        })
+      );
+      invoice = response.data;
+    }
+    if (data.items !== undefined) {
+      let existingItems: Array<{ order: number }> = invoice.items ?? [];
+      for (let item of [...existingItems].sort((left, right) => right.order - left.order)) {
+        await this.ax.delete(
+          `/workspaces/${this.workspaceId}/invoices/${encodeURIComponent(invoiceId)}/items/${item.order}`
+        );
+      }
+      for (let item of data.items) {
+        await this.ax.post(
+          `/workspaces/${this.workspaceId}/invoices/${encodeURIComponent(invoiceId)}/items`,
+          {
+            applyTaxes: 'NONE',
+            itemType: 'Service',
+            ...item
+          }
+        );
+      }
+    }
+    if (data.status !== undefined) {
+      await this.ax.patch(
+        `/workspaces/${this.workspaceId}/invoices/${encodeURIComponent(invoiceId)}/status`,
+        {
+          invoiceStatus: data.status
+        }
+      );
+    }
+    return this.getInvoice(invoiceId);
   };
 
   deleteInvoice = async (invoiceId: string) => {
@@ -441,13 +591,41 @@ export class Client {
     date: string;
     projectId?: string;
     categoryId?: string;
+    userId?: string;
     quantity?: number;
     totalAmount?: number;
     billable?: boolean;
     notes?: string;
-    fileId?: string;
+    receipt?: { fileName: string; contentBase64: string; mimeType?: string };
   }) => {
-    let response = await this.ax.post(`/workspaces/${this.workspaceId}/expenses`, data);
+    if (!data.projectId || !data.categoryId || !data.receipt) {
+      throw createApiServiceError(
+        'Provide projectId, categoryId, and receipt; Clockify requires these fields to create an expense.'
+      );
+    }
+    if ((data.quantity === undefined) === (data.totalAmount === undefined)) {
+      throw createApiServiceError(
+        'Provide exactly one of quantity (unit-based category) or totalAmount (amount-based category).'
+      );
+    }
+    let form = new FormData();
+    form.set('date', data.date);
+    form.set('projectId', data.projectId);
+    form.set('categoryId', data.categoryId);
+    form.set('userId', data.userId ?? (await this.getCurrentUser()).id);
+    form.set('amount', String(data.quantity ?? data.totalAmount));
+    if (data.billable !== undefined) form.set('billable', String(data.billable));
+    if (data.notes !== undefined) form.set('notes', data.notes);
+    form.set(
+      'file',
+      new Blob([Uint8Array.from(Buffer.from(data.receipt.contentBase64, 'base64'))], {
+        type: data.receipt.mimeType ?? 'application/octet-stream'
+      }),
+      data.receipt.fileName
+    );
+    let response = await this.ax.post(`/workspaces/${this.workspaceId}/expenses`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return response.data;
   };
 
@@ -548,17 +726,18 @@ export class Client {
 
   // ── Time Off ──
 
-  getTimeOffRequests = async (params?: {
+  getTimeOffRequests = async (data?: {
     page?: number;
-    'page-size'?: number;
-    status?: string;
-    userIds?: string;
+    pageSize?: number;
+    statuses?: string[];
+    users?: string[];
     start?: string;
     end?: string;
   }) => {
-    let response = await this.ax.get(`/workspaces/${this.workspaceId}/time-off/requests`, {
-      params
-    });
+    let response = await this.ax.post(
+      `/workspaces/${this.workspaceId}/time-off/requests`,
+      pickDefined(data ?? {})
+    );
     return response.data;
   };
 
@@ -568,27 +747,38 @@ export class Client {
     end: string;
     note?: string;
     halfDay?: boolean;
+    halfDayPeriod?: string;
   }) => {
     let response = await this.ax.post(
-      `/workspaces/${this.workspaceId}/time-off/requests`,
-      data
+      `/workspaces/${this.workspaceId}/time-off/policies/${encodeURIComponent(data.policyId)}/requests`,
+      {
+        note: data.note,
+        timeOffPeriod: {
+          period: { start: data.start, end: data.end },
+          isHalfDay: data.halfDay ?? false,
+          halfDayPeriod: data.halfDayPeriod ?? 'NOT_DEFINED'
+        }
+      }
     );
     return response.data;
   };
 
   updateTimeOffRequestStatus = async (
+    policyId: string,
     requestId: string,
     data: { status: string; note?: string }
   ) => {
     let response = await this.ax.patch(
-      `/workspaces/${this.workspaceId}/time-off/requests/${requestId}`,
+      `/workspaces/${this.workspaceId}/time-off/policies/${encodeURIComponent(policyId)}/requests/${encodeURIComponent(requestId)}`,
       data
     );
     return response.data;
   };
 
-  getTimeOffPolicies = async () => {
-    let response = await this.ax.get(`/workspaces/${this.workspaceId}/time-off/policies`);
+  getTimeOffPolicies = async (params?: { page?: number; 'page-size'?: number }) => {
+    let response = await this.ax.get(`/workspaces/${this.workspaceId}/time-off/policies`, {
+      params
+    });
     return response.data;
   };
 
@@ -665,3 +855,22 @@ export class Client {
     await this.ax.delete(`/workspaces/${this.workspaceId}/holidays/${holidayId}`);
   };
 }
+
+let legacyConfigSchema = z.object({
+  workspaceId: z.string().optional(),
+  dataRegion: dataRegionSchema.optional()
+});
+
+export let createApiClient = (ctx: {
+  auth: { token: string; dataRegion?: z.infer<typeof dataRegionSchema> };
+  config: unknown;
+  input: { workspaceId?: string };
+}) => {
+  let stored = legacyConfigSchema.safeParse(ctx.config);
+  let legacy = stored.success ? stored.data : {};
+  return new Client({
+    token: ctx.auth.token,
+    workspaceId: ctx.input.workspaceId ?? legacy.workspaceId,
+    dataRegion: ctx.auth.dataRegion ?? legacy.dataRegion ?? 'global'
+  });
+};

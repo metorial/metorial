@@ -70,8 +70,8 @@ export let searchInvoices = SlateTool.create(spec, {
       contactName: inv.contact?.name || undefined,
       invoiceDate: inv.invoiceDate ?? undefined,
       status: inv.status != null ? String(inv.status) : undefined,
-      totalNet: inv.sumNet ?? undefined,
-      totalGross: inv.sumGross ?? undefined,
+      totalNet: inv.sumNet != null ? String(inv.sumNet) : undefined,
+      totalGross: inv.sumGross != null ? String(inv.sumGross) : undefined,
       currency: inv.currency ?? undefined,
       createdAt: inv.create ?? undefined
     }));

@@ -1,8 +1,20 @@
 # <img src="https://provider-logos.metorial-cdn.com/zeplin-logo.png" height="20"> Zeplin
 
-Access and manage design projects, screens, components, and styleguides in Zeplin. Retrieve design specs, assets, code snippets, and design tokens. Create and manage notes and comments on screens. Publish screen versions with PNG/JPEG images. Manage design tokens including colors, text styles, and spacing tokens at project and styleguide levels. Access flow boards, variable collections, and connected components. Invite and remove project and styleguide members. Manage organization members and workspace settings.
+Access Zeplin projects, screens, published screen-version design data, components, styleguides, design tokens, and flow boards. Manage project members, screen notes and replies, and project colors. Identify the current account and resolve or reopen screen-note discussions.
 
 ## Tools
+
+### Get Current User
+
+Identify the authenticated Zeplin account and retrieve its profile details.
+
+### Get Screen Version
+
+Retrieve published screen-version design data, including layers, assets, and commit information. Omit the version ID to retrieve the latest version.
+
+### Update Screen Note
+
+Resolve or reopen a note, or change its normalized position or color.
 
 ### Get Design Tokens
 
@@ -14,7 +26,7 @@ Retrieve detailed information about a specific Zeplin project including its meta
 
 ### Get Screen
 
-Retrieve detailed information about a specific screen in a Zeplin project, including its versions, sections, and variants.
+Retrieve detailed information about a specific screen in a Zeplin project, including its current section, variant, tags, and thumbnail. Use List Screen Versions for its version history.
 
 ### List Colors
 
@@ -62,11 +74,48 @@ List all members of a Zeplin project, including their roles and profile informat
 
 ### List Screen Notes
 
-List all notes (annotations and comments) on a specific screen in a Zeplin project. Supports pagination.
+List a page of screen notes and their comments. Screen annotations are a separate resource.
 
 ### Update Project
 
 Update a Zeplin project's name or description.
+
+
+### Get Component
+
+Retrieve component metadata from a project or styleguide, including its thumbnail and section reference.
+
+### Get Styleguide
+
+Retrieve styleguide metadata and resource counts.
+
+### Get Flow Board
+
+Retrieve a flow board with all pages of its nodes and connectors.
+
+### Invite Project Member
+
+Invite a user by email, username, or user ID. The invitation API does not assign roles; omit the legacy role field.
+
+### Remove Project Member
+
+Remove a project member by their user ID.
+
+### Create Screen Note
+
+Create a note with initial comment text. Omitted position and color default to the screen center and yellow.
+
+### Delete Screen Note
+
+Delete a screen-note discussion.
+
+### Add Note Comment
+
+Reply to an existing screen note.
+
+### Create Project Color
+
+Create a named RGBA color in the project's local styleguide.
 
 ## License
 

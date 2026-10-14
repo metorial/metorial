@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -56,12 +56,13 @@ export let listEngagements = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let apiPath = engagementTypeMap[ctx.input.engagementType];
     if (!apiPath) {
-      throw new Error(`Unknown engagement type: ${ctx.input.engagementType}`);
+      throw createApiServiceError(`Unknown engagement type: ${ctx.input.engagementType}`);
     }
 
     let result = await client.listEngagements(apiPath);

@@ -7,7 +7,7 @@ export let getTemplateStructure = SlateTool.create(spec, {
   name: 'Get Template Structure',
   key: 'get_template_structure',
   description: `Analyze a template to retrieve its field structure, sections, and conditions. Also returns sample data showing the expected data shape for rendering.
-Use this to understand what data a template expects before calling the render endpoint.`,
+Use this to understand what data a template expects before rendering. Template elements are returned under structure.elements.`,
   tags: {
     readOnly: true
   }
@@ -54,8 +54,10 @@ Use this to understand what data a template expects before calling the render en
     return {
       output: {
         succeeded,
-        structure: structureResult.structure,
-        sampleData: sampleDataResult.sampleData
+        structure: Array.isArray(structureResult.templateStructure)
+          ? { elements: structureResult.templateStructure }
+          : structureResult.templateStructure,
+        sampleData: sampleDataResult.templateSampleData
       },
       message
     };

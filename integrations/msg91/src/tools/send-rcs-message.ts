@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Msg91Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,8 @@ export let sendRcsMessage = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.contentType === 'text') {
-      if (!ctx.input.message) throw new Error('message is required for text content type');
+      if (!ctx.input.message)
+        throw createApiServiceError('message is required for text content type');
       result = await client.sendRcsText({
         to: ctx.input.to,
         message: ctx.input.message,
@@ -64,7 +65,9 @@ export let sendRcsMessage = SlateTool.create(spec, {
       });
     } else if (ctx.input.contentType === 'media') {
       if (!ctx.input.mediaUrl || !ctx.input.mediaType)
-        throw new Error('mediaUrl and mediaType are required for media content type');
+        throw createApiServiceError(
+          'mediaUrl and mediaType are required for media content type'
+        );
       result = await client.sendRcsMedia({
         to: ctx.input.to,
         mediaUrl: ctx.input.mediaUrl,
@@ -73,7 +76,8 @@ export let sendRcsMessage = SlateTool.create(spec, {
         senderId: ctx.input.senderId
       });
     } else {
-      if (!ctx.input.title) throw new Error('title is required for rich_card content type');
+      if (!ctx.input.title)
+        throw createApiServiceError('title is required for rich_card content type');
       result = await client.sendRcsRichCard({
         to: ctx.input.to,
         senderId: ctx.input.senderId,

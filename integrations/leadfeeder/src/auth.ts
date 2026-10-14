@@ -1,10 +1,11 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { LeadfeederClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('Leadfeeder API token for the main API'),
+      token: z.string().describe('Existing Leadfeeder legacy API token'),
       ipEnrichToken: z
         .string()
         .optional()
@@ -13,20 +14,25 @@ export let auth = SlateAuth.create()
   )
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
+    name: 'Legacy API Token',
     key: 'api_token',
     inputSchema: z.object({
       apiToken: z
         .string()
-        .describe('Leadfeeder API token (found in Personal settings > API tokens)'),
+        .describe(
+          'Existing Leadfeeder legacy API token. Newly issued API keys for the /v1 API are not supported by these legacy endpoints.'
+        ),
       ipEnrichApiKey: z
         .string()
         .optional()
         .describe(
-          'IP-Enrich API key (separate from the main API token, required for IP enrichment)'
+          'Existing legacy IP-Enrich API key, separate from the main legacy token and required for IP enrichment. New legacy keys are no longer issued.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim()) {
+        throw createApiServiceError('Provide an existing Leadfeeder legacy API token.');
+      }
       return {
         output: {
           token: ctx.input.apiToken,
@@ -38,21 +44,19 @@ export let auth = SlateAuth.create()
       output: { token: string; ipEnrichToken?: string };
       input: { apiToken: string; ipEnrichApiKey?: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.leadfeeder.com',
-        headers: {
-          Authorization: `Token token=${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/accounts');
-      let accounts = response.data?.data;
-      let firstAccount = accounts?.[0];
+      let client = new LeadfeederClient(ctx.output.token);
+      let accounts = await client.getAccounts();
+      let firstAccount = accounts[0];
+      if (!firstAccount) {
+        throw createApiServiceError(
+          'No Leadfeeder accounts are available for this token. Check its account access.'
+        );
+      }
 
       return {
         profile: {
-          id: firstAccount?.id,
-          name: firstAccount?.attributes?.name
+          id: firstAccount.accountId,
+          name: firstAccount.name
         }
       };
     }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchInvoices = SlateTool.create(spec, {
@@ -15,12 +16,14 @@ export let searchInvoices = SlateTool.create(spec, {
     z.object({
       projectId: z.number().optional().describe('Filter invoices by project ID'),
       status: z.string().optional().describe('Filter invoices by status'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of invoices to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       invoices: z
         .array(
           z.object({
@@ -39,6 +42,7 @@ export let searchInvoices = SlateTool.create(spec, {
     let result = await client.searchInvoices({
       projectId: ctx.input.projectId,
       status: ctx.input.status,
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -46,7 +50,7 @@ export let searchInvoices = SlateTool.create(spec, {
     let invoices = Array.isArray(result) ? result : (result.invoices ?? result.data ?? []);
 
     return {
-      output: { invoices },
+      output: { invoices, pagination: result.pagination },
       message: `Found **${invoices.length}** invoice(s).`
     };
   })

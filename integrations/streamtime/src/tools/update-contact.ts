@@ -49,7 +49,7 @@ export let updateContact = SlateTool.create(spec, {
       output: {
         contactId: result.id,
         firstName: result.firstName,
-        lastName: result.lastName,
+        lastName: result.lastName ?? '',
         raw: result
       },
       message: `Updated contact **${result.firstName} ${result.lastName}** (ID: ${result.id}).`

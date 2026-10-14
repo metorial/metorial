@@ -1,4 +1,4 @@
-# Slates Specification for Short Menu
+# Short Menu API Specification
 
 ## Overview
 
@@ -21,13 +21,13 @@ There are no OAuth flows, scopes, or additional credentials required. A single A
 Create, update, and delete short links programmatically. When creating a link, you specify the destination URL and the domain to use (either the default `shm.to` or a custom domain connected to your account). You can optionally provide a custom slug for the short link; if omitted, a random slug is generated. The slug must be unique within the chosen domain. When updating a link, you can change the destination URL without breaking the existing short URL.
 
 - **Parameters:** `destinationUrl` (required), `domain` (required), `slug` (optional), `tags` (optional).
-- The API is currently limited to link CRUD operations. There is no API endpoint for listing links or retrieving analytics data at this time — the API is noted as being in active development.
+- The current [API reference](https://docs.shortmenu.com/api-reference/introduction) and [OpenAPI specification](https://docs.shortmenu.com/api-reference/openapi.json) document create, update, and delete operations only. No link listing or detailed analytics endpoint is documented; this integration does not expose them.
 
 ### Tagging
 
 Assign one or more tags to short links for organizational purposes. Tags can be created on the fly — if a tag with the same name already exists, it is reused automatically. Tags can also be updated after link creation.
 
-- **Parameters:** Each tag has a `name` and an `id`. When creating links, provide the tag `name`; do not pass `id` values unless the tag already exists in your account.
+- **Parameters:** Each tag has a required `name` and an optional `id`. Do not pass `id` values unless the tag already exists in your account. Responses may omit tag identifiers.
 
 ### Custom Domains
 
@@ -47,4 +47,4 @@ Track click counts, view traffic over configurable time periods, and analyze aud
 
 ## Events
 
-The provider does not support events. There are no webhooks or event subscription mechanisms available in the Short Menu API.
+The current API reference does not document webhook or event subscription endpoints. This integration exposes no events.

@@ -1,16 +1,33 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class AppVeyorClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private baseUrl: string;
 
   constructor(config: { token: string; accountName?: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://ci.appveyor.com/api',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+    this.baseUrl = config.accountName
+      ? `https://ci.appveyor.com/api/account/${encodeURIComponent(config.accountName)}`
+      : 'https://ci.appveyor.com/api';
+    this.axios = createAuthenticatedAxios({
+      baseURL: this.baseUrl,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'AppVeyor',
+          reason: 'appveyor_api_error'
+        })
     });
+  }
+
+  async downloadFile(url: string): Promise<{ bytes: Buffer; text: string }> {
+    let response = await this.axios.get<ArrayBuffer>(url, {
+      responseType: 'arraybuffer',
+      headers: { 'Content-Type': undefined }
+    });
+    let bytes = Buffer.from(response.data);
+    // Preserve the former Axios UTF-8 text response, including its BOM removal.
+    let text = bytes.toString('utf8').replace(/^\uFEFF/, '');
+    return { bytes, text };
   }
 
   // --- Projects ---
@@ -24,7 +41,9 @@ export class AppVeyorClient {
     accountName: string,
     projectSlug: string
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/projects/${accountName}/${projectSlug}`);
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}`
+    );
     return response.data;
   }
 
@@ -34,7 +53,7 @@ export class AppVeyorClient {
     branch: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/projects/${accountName}/${projectSlug}/branch/${encodeURIComponent(branch)}`
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/branch/${encodeURIComponent(branch)}`
     );
     return response.data;
   }
@@ -45,7 +64,7 @@ export class AppVeyorClient {
     buildVersion: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/projects/${accountName}/${projectSlug}/build/${buildVersion}`
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/build/${encodeURIComponent(buildVersion)}`
     );
     return response.data;
   }
@@ -59,17 +78,24 @@ export class AppVeyorClient {
       branch?: string;
     }
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/projects/${accountName}/${projectSlug}/history`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/history`,
+      {
+        params: { ...params, recordsNumber: params?.recordsNumber ?? 20 }
+      }
+    );
     return response.data;
   }
 
   async getProjectDeployments(
     accountName: string,
-    projectSlug: string
-  ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/projects/${accountName}/${projectSlug}/deployments`);
+    projectSlug: string,
+    params?: { recordsNumber?: number; startDeploymentId?: number }
+  ): Promise<{ project?: Record<string, unknown>; deployments?: Record<string, unknown>[] }> {
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/deployments`,
+      { params }
+    );
     return response.data;
   }
 
@@ -77,15 +103,24 @@ export class AppVeyorClient {
     accountName: string,
     projectSlug: string
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/projects/${accountName}/${projectSlug}/settings`);
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings`
+    );
     return response.data;
   }
 
-  async getProjectSettingsYaml(accountName: string, projectSlug: string): Promise<string> {
+  async getProjectEnvironmentVariables(
+    accountName: string,
+    projectSlug: string
+  ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/projects/${accountName}/${projectSlug}/settings/yaml`
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings/environment-variables`
     );
     return response.data;
+  }
+
+  getProjectSettingsYamlUrl(accountName: string, projectSlug: string): string {
+    return `${this.baseUrl}/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings/yaml`;
   }
 
   async addProject(body: {
@@ -105,19 +140,26 @@ export class AppVeyorClient {
     projectSlug: string,
     yaml: string
   ): Promise<void> {
-    await this.axios.put(`/projects/${accountName}/${projectSlug}/settings/yaml`, yaml, {
-      headers: { 'Content-Type': 'text/plain' }
-    });
+    await this.axios.put(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings/yaml`,
+      yaml,
+      {
+        headers: { 'Content-Type': 'text/plain' }
+      }
+    );
   }
 
   async updateProjectEnvironmentVariables(
     accountName: string,
     projectSlug: string,
-    variables: Record<string, unknown>[]
+    variables: { name: string; value: string; isEncrypted?: boolean }[]
   ): Promise<void> {
     await this.axios.put(
-      `/projects/${accountName}/${projectSlug}/settings/environment-variables`,
-      variables
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings/environment-variables`,
+      variables.map(variable => ({
+        name: variable.name,
+        value: { value: variable.value, isEncrypted: variable.isEncrypted ?? false }
+      }))
     );
   }
 
@@ -126,17 +168,24 @@ export class AppVeyorClient {
     projectSlug: string,
     nextBuildNumber: number
   ): Promise<void> {
-    await this.axios.put(`/projects/${accountName}/${projectSlug}/settings/build-number`, {
-      nextBuildNumber
-    });
+    await this.axios.put(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/settings/build-number`,
+      {
+        nextBuildNumber
+      }
+    );
   }
 
   async deleteProject(accountName: string, projectSlug: string): Promise<void> {
-    await this.axios.delete(`/projects/${accountName}/${projectSlug}`);
+    await this.axios.delete(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}`
+    );
   }
 
   async deleteProjectBuildCache(accountName: string, projectSlug: string): Promise<void> {
-    await this.axios.delete(`/projects/${accountName}/${projectSlug}/buildcache`);
+    await this.axios.delete(
+      `/projects/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/buildcache`
+    );
   }
 
   // --- Builds ---
@@ -166,7 +215,9 @@ export class AppVeyorClient {
     projectSlug: string,
     buildVersion: string
   ): Promise<void> {
-    await this.axios.delete(`/builds/${accountName}/${projectSlug}/${buildVersion}`);
+    await this.axios.delete(
+      `/builds/${encodeURIComponent(accountName)}/${encodeURIComponent(projectSlug)}/${encodeURIComponent(buildVersion)}`
+    );
   }
 
   async deleteBuild(buildId: number): Promise<void> {
@@ -175,24 +226,17 @@ export class AppVeyorClient {
 
   // --- Build Jobs ---
 
-  async getBuildJobLog(jobId: string): Promise<string> {
-    let response = await this.axios.get(`/buildjobs/${jobId}/log`, {
-      responseType: 'text',
-      headers: { Accept: 'text/plain' }
-    });
-    return response.data;
+  getBuildJobLogUrl(jobId: string): string {
+    return `${this.baseUrl}/buildjobs/${encodeURIComponent(jobId)}/log`;
   }
 
   async listBuildJobArtifacts(jobId: string): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get(`/buildjobs/${jobId}/artifacts`);
+    let response = await this.axios.get(`/buildjobs/${encodeURIComponent(jobId)}/artifacts`);
     return response.data;
   }
 
-  async downloadBuildJobArtifact(jobId: string, artifactFileName: string): Promise<string> {
-    let response = await this.axios.get(`/buildjobs/${jobId}/artifacts/${artifactFileName}`, {
-      responseType: 'text'
-    });
-    return response.data;
+  getBuildJobArtifactUrl(jobId: string, artifactFileName: string): string {
+    return `${this.baseUrl}/buildjobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactFileName)}`;
   }
 
   // --- Environments ---

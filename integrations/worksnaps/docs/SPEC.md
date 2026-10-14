@@ -1,6 +1,4 @@
-Let me fetch the API documentation for more details.Now let me fetch the Swagger API docs page to get more details on the specific API resources:Let me check the Worksnaps reporting feature page and the left nav for API details:Based on my research, I now have enough information to write the specification. The search for webhooks returned no Worksnaps-specific results, confirming they don't support webhooks.
-
-# Slates Specification for Worksnaps
+# Worksnaps API Specification
 
 ## Overview
 
@@ -29,7 +27,7 @@ curl -u YOUR_API_TOKEN:ignored https://api.worksnaps.com/api/...
 
 ### Project Management
 
-Create, retrieve, update, and manage projects. You can easily manage your team by putting users into different projects. Each user can only access the projects they are assigned to, while as a project manager you can view and control everything.
+Create, retrieve, update, and archive projects. You can easily manage your team by putting users into different projects. Each user can only access the projects they are assigned to, while as a project manager you can view and control everything.
 
 ### Task Management
 
@@ -37,11 +35,11 @@ Create new tasks in a specified project, and delete tasks from a project. Tasks 
 
 ### Time Entry Tracking
 
-Retrieve time entries logged against projects. Time entries can be filtered by user and by date range (using timestamps). The time logged consists of a sequence of "work snaps". Each work snap represents 10 minutes of work which can be verified by a screenshot, mouse and keyboard volume and most active applications used during each interval. You can also retrieve the full-resolution screenshot URL associated with a time entry.
+Retrieve time entries logged against projects. Time entries can be filtered by user and by date range (using timestamps). The time logged consists of a sequence of "work snaps". Each work snap represents 10 minutes of work which can be verified by a screenshot, mouse and keyboard volume and most active applications used during each interval. You can also retrieve the full-resolution screenshot URL associated with a time entry. Create offline time entries for yourself or, as a project manager, another user. Update task associations or comments and remove one or more time entries by ID.
 
 ### User Account Management
 
-Retrieve information about a specific user account, retrieve a list of all user assignments for the authenticated user, and retrieve a list of all users. User account information can also be updated.
+Retrieve information about a specific user account, retrieve a list of all user assignments for the authenticated user, and retrieve a list of all users. The current-user endpoint provides connection identity. User account information can be updated by the user themselves or a trusted partner.
 
 ### User Assignments
 
@@ -57,4 +55,10 @@ Retrieve a project's time tracking report. Reports can be generated for a specif
 
 ## Events
 
-The provider does not support events. Worksnaps does not offer webhooks or any built-in event subscription mechanism through its API.
+This integration exposes tools only.
+
+## API Sources
+
+- [API overview and authentication](https://api.worksnaps.com/api_docs/api_overview.html)
+- [Official Swagger API specification](https://api.worksnaps.com/api_docs/worksnaps.json)
+- [API token setup](https://api.worksnaps.com/api_docs/api_token.html)

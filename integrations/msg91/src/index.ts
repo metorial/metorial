@@ -5,6 +5,9 @@ import {
   deleteContacts,
   getMessagingLogs,
   getPhonebookFields,
+  listEmailTemplates,
+  listWhatsAppNumbers,
+  listWhatsAppTemplates,
   resendOtp,
   runCampaign,
   searchContacts,
@@ -36,7 +39,10 @@ export let provider = Slate.create({
     deleteContacts,
     getPhonebookFields,
     trackEvent,
-    getMessagingLogs
+    getMessagingLogs,
+    listEmailTemplates,
+    listWhatsAppNumbers,
+    listWhatsAppTemplates
   ],
   triggers: []
 });

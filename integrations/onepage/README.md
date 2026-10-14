@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Onepage
 
-Manage contacts, companies, deals, and sales activities in OnePageCRM. Create, update, and delete contacts with detailed fields including emails, phones, tags, statuses, and custom fields. Track sales pipelines by managing deals with stages, amounts, and statuses (pending/won/lost). Log notes, calls, and meetings against contacts to record interactions. Manage the Action Stream — a prioritized task list of next actions due per contact. Organize contacts into companies, configure predefined products/services for deals, and manage lead sources, contact statuses, and relationship types. Upload and manage file attachments on deals, notes, calls, and meetings.
+Manage contacts, companies, deals, and sales activities in OnePageCRM. Create, update, search, and delete contacts with emails, phones, addresses, tags, statuses, and custom fields. Inspect and manage deals with amounts, pipeline stages, and pending, won, or lost statuses. Create, update, list, and permanently delete notes, and log calls and meetings against contacts. Manage the prioritized Action Stream and complete or reopen actions. Discover contact statuses and lead sources, and retrieve the authenticated user and their account permissions.
+
+OnePageCRM uses a boolean `starred` flag. The legacy numeric `starValue` input is unsupported and returns guidance to use `starred`. Updating a contact's `address` replaces its address list with that single address. Update action fields separately from completing or reopening an action.
 
 ## License
 

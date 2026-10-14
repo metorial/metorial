@@ -29,15 +29,21 @@ export let listTests = SlateTool.create(spec, {
         z.object({
           testId: z.string().describe('Unique identifier of the test'),
           name: z.string().describe('Name of the test'),
-          created: z.string().describe('ISO timestamp when the test was created'),
-          lastModified: z.string().describe('ISO timestamp when the test was last modified'),
+          created: z.string().optional().describe('ISO timestamp when the test was created'),
+          lastModified: z
+            .string()
+            .optional()
+            .describe('ISO timestamp when the test was last modified'),
           lastRunStatus: z
             .string()
             .nullable()
             .describe(
               'Status of the most recent run (e.g. passed, failed, or null if never run)'
             ),
-          isFavorite: z.boolean().describe('Whether the test is marked as a favorite')
+          isFavorite: z
+            .boolean()
+            .optional()
+            .describe('Whether the test is marked as a favorite')
         })
       ),
       hasMore: z.boolean().describe('Whether there are more pages of results')
@@ -58,7 +64,7 @@ export let listTests = SlateTool.create(spec, {
       name: t.name,
       created: t.created,
       lastModified: t.lastModified,
-      lastRunStatus: t.lastRunStatus,
+      lastRunStatus: t.latestRun?.status ?? t.lastRunStatus ?? null,
       isFavorite: t.isFavorite
     }));
 
@@ -66,7 +72,7 @@ export let listTests = SlateTool.create(spec, {
       output: {
         totalCount: result.count,
         tests,
-        hasMore: result.next !== null
+        hasMore: Boolean(result.next)
       },
       message: `Found **${result.count}** test(s). Returned ${tests.length} on this page.`
     };

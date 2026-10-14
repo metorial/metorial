@@ -1,9 +1,46 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let studioAxios = createAxios({
-  baseURL: 'https://api.gan.ai'
+let studioAxios = createAuthenticatedAxios({
+  baseURL: 'https://api.gan.ai',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Gan.AI Studio',
+      reason: 'gan_ai_auth_error',
+      operation: 'login'
+    })
 });
+
+let studioTokenSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().optional()
+});
+
+let loginStudio = async (
+  input: { email: string; password: string },
+  previousRefreshToken?: string
+) => {
+  let response = await studioAxios.post('/users/login', {
+    email: input.email,
+    password: input.password
+  });
+  let tokens = studioTokenSchema.safeParse(response.data);
+  if (!tokens.success) {
+    throw createApiServiceError(
+      'Gan.AI Studio login did not return a valid access token. Reconnect the account and try again.'
+    );
+  }
+  return {
+    token: tokens.data.access_token,
+    refreshToken: tokens.data.refresh_token ?? previousRefreshToken,
+    authType: 'studio' as const
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -23,6 +60,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a Playground API key to connect the account.');
+      }
       return {
         output: {
           token: ctx.input.apiKey,
@@ -42,17 +82,17 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let response = await studioAxios.post('/users/login', {
-        email: ctx.input.email,
-        password: ctx.input.password
-      });
-
       return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          authType: 'studio' as const
-        }
+        output: await loginStudio(ctx.input)
+      };
+    },
+
+    handleTokenRefresh: async (ctx: {
+      input: { email: string; password: string };
+      output: { token: string; refreshToken?: string; authType: 'playground' | 'studio' };
+    }) => {
+      return {
+        output: await loginStudio(ctx.input, ctx.output.refreshToken)
       };
     }
   });

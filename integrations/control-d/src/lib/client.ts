@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   AnalyticsEndpoint,
   AnalyticsLevel,
@@ -16,6 +16,7 @@ import type {
   Product,
   Profile,
   ProfileOptionDefinition,
+  ProfileRestriction,
   RuleFolder,
   Service,
   ServiceCategory,
@@ -25,11 +26,10 @@ import type {
 } from './types';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; orgId?: string }) {
     let headers: Record<string, string> = {
-      Authorization: `Bearer ${config.token}`,
       Accept: 'application/json'
     };
 
@@ -37,9 +37,29 @@ export class Client {
       headers['X-Force-Org-Id'] = config.orgId;
     }
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.controld.com',
-      headers
+      authHeader: { value: `Bearer ${config.token}` },
+      contentType: 'application/x-www-form-urlencoded',
+      headers,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Control D',
+          reason: 'control_d_api_error'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      let data = response.data as ApiResponse<unknown>;
+      if (data?.success === false || data?.error) {
+        throw createApiServiceError(
+          `Control D API request failed: ${data.error?.message || data.message || 'Request was unsuccessful'}`,
+          {
+            reason: 'control_d_api_error',
+            upstreamCode: data.error?.code !== undefined ? String(data.error.code) : undefined
+          }
+        );
+      }
+      return response;
     });
   }
 
@@ -59,7 +79,10 @@ export class Client {
     let res = await this.axios.post<ApiResponse<{ profiles: Profile[] }>>('/profiles', data, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
-    return res.data.body.profiles[0]!;
+    let profile = res.data.body?.profiles?.[0];
+    if (!profile)
+      throw createApiServiceError('Control D returned no profile for the completed request');
+    return profile;
   }
 
   async modifyProfile(
@@ -69,6 +92,7 @@ export class Client {
       disableTtl?: number;
       lockStatus?: number;
       lockMessage?: string;
+      password?: string;
     }
   ): Promise<Profile> {
     let data = new URLSearchParams();
@@ -76,18 +100,49 @@ export class Client {
     if (params.disableTtl !== undefined) data.append('disable_ttl', String(params.disableTtl));
     if (params.lockStatus !== undefined) data.append('lock_status', String(params.lockStatus));
     if (params.lockMessage !== undefined) data.append('lock_message', params.lockMessage);
+    if (params.password !== undefined) data.append('password', params.password);
     let res = await this.axios.put<ApiResponse<{ profiles: Profile[] }>>(
-      `/profiles/${profileId}`,
+      `/profiles/${encodeURIComponent(profileId)}`,
       data,
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
     );
-    return res.data.body.profiles[0]!;
+    let profile = res.data.body?.profiles?.[0];
+    if (!profile)
+      throw createApiServiceError('Control D returned no profile for the completed request');
+    return profile;
   }
 
   async deleteProfile(profileId: string): Promise<void> {
-    await this.axios.delete(`/profiles/${profileId}`);
+    await this.axios.delete(`/profiles/${encodeURIComponent(profileId)}`);
+  }
+
+  async listProfileRestrictions(): Promise<ProfileRestriction[]> {
+    let res = await this.axios.get<ApiResponse<{ restrictions: ProfileRestriction[] }>>(
+      '/profiles/restrictions'
+    );
+    return res.data.body.restrictions;
+  }
+
+  async listEnabledProfileRestrictions(profileId: string): Promise<string[]> {
+    let res = await this.axios.get<ApiResponse<{ restrictions: string[] }>>(
+      `/profiles/${encodeURIComponent(profileId)}/restrictions`
+    );
+    return res.data.body.restrictions;
+  }
+
+  async modifyProfileRestriction(
+    profileId: string,
+    restrictionId: string,
+    enabled: boolean
+  ): Promise<string[]> {
+    let data = new URLSearchParams({ status: enabled ? '1' : '0' });
+    let res = await this.axios.put<ApiResponse<{ restrictions: string[] }>>(
+      `/profiles/${encodeURIComponent(profileId)}/restrictions/${encodeURIComponent(restrictionId)}`,
+      data
+    );
+    return res.data.body.restrictions;
   }
 
   // ─── Profile Options ──────────────────────────────────────
@@ -111,16 +166,20 @@ export class Client {
     let data = new URLSearchParams();
     data.append('status', String(params.status));
     if (params.value !== undefined) data.append('value', params.value);
-    await this.axios.put(`/profiles/${profileId}/options/${optionName}`, data, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+    await this.axios.put(
+      `/profiles/${encodeURIComponent(profileId)}/options/${encodeURIComponent(optionName)}`,
+      data,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
   }
 
   // ─── Default Rule ─────────────────────────────────────────
 
   async getDefaultRule(profileId: string): Promise<DefaultRule> {
     let res = await this.axios.get<ApiResponse<{ default: DefaultRule }>>(
-      `/profiles/${profileId}/default`
+      `/profiles/${encodeURIComponent(profileId)}/default`
     );
     return res.data.body.default;
   }
@@ -138,7 +197,7 @@ export class Client {
     if (params.via !== undefined) data.append('via', params.via);
     data.append('status', String(params.status));
     let res = await this.axios.put<ApiResponse<{ default: DefaultRule }>>(
-      `/profiles/${profileId}/default`,
+      `/profiles/${encodeURIComponent(profileId)}/default`,
       data,
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -151,14 +210,14 @@ export class Client {
 
   async listFilters(profileId: string): Promise<Filter[]> {
     let res = await this.axios.get<ApiResponse<{ filters: Filter[] }>>(
-      `/profiles/${profileId}/filters`
+      `/profiles/${encodeURIComponent(profileId)}/filters`
     );
     return res.data.body.filters;
   }
 
   async listExternalFilters(profileId: string): Promise<Filter[]> {
     let res = await this.axios.get<ApiResponse<{ filters: Filter[] }>>(
-      `/profiles/${profileId}/filters/external`
+      `/profiles/${encodeURIComponent(profileId)}/filters/external`
     );
     return res.data.body.filters;
   }
@@ -170,7 +229,7 @@ export class Client {
     let res = await this.axios.put<
       ApiResponse<{ filters: Record<string, { do: number; status: number }> }>
     >(
-      `/profiles/${profileId}/filters`,
+      `/profiles/${encodeURIComponent(profileId)}/filters`,
       { filters },
       { headers: { 'Content-Type': 'application/json' } }
     );
@@ -189,14 +248,14 @@ export class Client {
 
   async listServicesInCategory(category: string): Promise<Service[]> {
     let res = await this.axios.get<ApiResponse<{ services: Service[] }>>(
-      `/services/categories/${category}`
+      `/services/categories/${encodeURIComponent(category)}`
     );
     return res.data.body.services;
   }
 
   async listProfileServices(profileId: string): Promise<Service[]> {
     let res = await this.axios.get<ApiResponse<{ services: Service[] }>>(
-      `/profiles/${profileId}/services`
+      `/profiles/${encodeURIComponent(profileId)}/services`
     );
     return res.data.body.services;
   }
@@ -216,16 +275,20 @@ export class Client {
     data.append('status', String(params.status));
     if (params.via !== undefined) data.append('via', params.via);
     if (params.viaV6 !== undefined) data.append('via_v6', params.viaV6);
-    await this.axios.put(`/profiles/${profileId}/services/${serviceId}`, data, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+    await this.axios.put(
+      `/profiles/${encodeURIComponent(profileId)}/services/${encodeURIComponent(serviceId)}`,
+      data,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
   }
 
   // ─── Custom Rules ─────────────────────────────────────────
 
   async listRuleFolders(profileId: string): Promise<RuleFolder[]> {
     let res = await this.axios.get<ApiResponse<{ groups: RuleFolder[] }>>(
-      `/profiles/${profileId}/groups`
+      `/profiles/${encodeURIComponent(profileId)}/groups`
     );
     return res.data.body.groups;
   }
@@ -245,13 +308,18 @@ export class Client {
     data.append('status', String(params.status));
     if (params.via !== undefined) data.append('via', params.via);
     let res = await this.axios.post<ApiResponse<{ groups: RuleFolder[] }>>(
-      `/profiles/${profileId}/groups`,
+      `/profiles/${encodeURIComponent(profileId)}/groups`,
       data,
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
     );
-    return res.data.body.groups[0]!;
+    let folder = res.data.body?.groups?.[0];
+    if (!folder)
+      throw createApiServiceError(
+        'Control D returned no rule folder for the completed request'
+      );
+    return folder;
   }
 
   async modifyRuleFolder(
@@ -270,23 +338,30 @@ export class Client {
     data.append('status', String(params.status));
     if (params.via !== undefined) data.append('via', params.via);
     let res = await this.axios.put<ApiResponse<{ groups: RuleFolder[] }>>(
-      `/profiles/${profileId}/groups/${folderId}`,
+      `/profiles/${encodeURIComponent(profileId)}/groups/${encodeURIComponent(folderId)}`,
       data,
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
     );
-    return res.data.body.groups[0]!;
+    let folder = res.data.body?.groups?.[0];
+    if (!folder)
+      throw createApiServiceError(
+        'Control D returned no rule folder for the completed request'
+      );
+    return folder;
   }
 
   async deleteRuleFolder(profileId: string, folderId: string): Promise<void> {
-    await this.axios.delete(`/profiles/${profileId}/groups/${folderId}`);
+    await this.axios.delete(
+      `/profiles/${encodeURIComponent(profileId)}/groups/${encodeURIComponent(folderId)}`
+    );
   }
 
   async listCustomRules(profileId: string, folderId?: string): Promise<CustomRule[]> {
     let path = folderId
-      ? `/profiles/${profileId}/rules/${folderId}`
-      : `/profiles/${profileId}/rules/0`;
+      ? `/profiles/${encodeURIComponent(profileId)}/rules/${encodeURIComponent(folderId)}`
+      : `/profiles/${encodeURIComponent(profileId)}/rules/0`;
     let res = await this.axios.get<ApiResponse<{ rules: CustomRule[] }>>(path);
     return res.data.body.rules;
   }
@@ -311,7 +386,7 @@ export class Client {
     if (params.via !== undefined) data.append('via', params.via);
     if (params.viaV6 !== undefined) data.append('via_v6', params.viaV6);
     if (params.group !== undefined) data.append('group', String(params.group));
-    await this.axios.post(`/profiles/${profileId}/rules`, data, {
+    await this.axios.post(`/profiles/${encodeURIComponent(profileId)}/rules`, data, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
   }
@@ -336,13 +411,15 @@ export class Client {
     if (params.via !== undefined) data.append('via', params.via);
     if (params.viaV6 !== undefined) data.append('via_v6', params.viaV6);
     if (params.group !== undefined) data.append('group', String(params.group));
-    await this.axios.put(`/profiles/${profileId}/rules`, data, {
+    await this.axios.put(`/profiles/${encodeURIComponent(profileId)}/rules`, data, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
   }
 
   async deleteCustomRule(profileId: string, hostname: string): Promise<void> {
-    await this.axios.delete(`/profiles/${profileId}/rules/${hostname}`);
+    await this.axios.delete(
+      `/profiles/${encodeURIComponent(profileId)}/rules/${encodeURIComponent(hostname)}`
+    );
   }
 
   // ─── Devices ──────────────────────────────────────────────
@@ -389,10 +466,16 @@ export class Client {
     if (params.ddnsExtStatus !== undefined)
       data.append('ddns_ext_status', String(params.ddnsExtStatus));
     if (params.ddnsExtHost !== undefined) data.append('ddns_ext_host', params.ddnsExtHost);
-    let res = await this.axios.post<ApiResponse<{ devices: Device[] }>>('/devices', data, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-    return res.data.body.devices[0]!;
+    let res = await this.axios.post<ApiResponse<Device | { devices: Device[] }>>(
+      '/devices',
+      data,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    let body = res.data.body;
+    let device = body && 'PK' in body ? body : body?.devices?.[0];
+    if (!device?.PK)
+      throw createApiServiceError('Control D returned no device for the completed request');
+    return device;
   }
 
   async modifyDevice(
@@ -434,18 +517,22 @@ export class Client {
       data.append('ddns_ext_status', String(params.ddnsExtStatus));
     if (params.ddnsExtHost !== undefined) data.append('ddns_ext_host', params.ddnsExtHost);
     if (params.clientCount !== undefined) data.append('client_count', params.clientCount);
-    let res = await this.axios.put<ApiResponse<{ devices: Device[] }>>(
-      `/devices/${deviceId}`,
+    let res = await this.axios.put<ApiResponse<Device | { devices: Device[] }>>(
+      `/devices/${encodeURIComponent(deviceId)}`,
       data,
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
     );
-    return res.data.body.devices[0]!;
+    let body = res.data.body;
+    let device = body && 'PK' in body ? body : body?.devices?.[0];
+    if (!device?.PK)
+      throw createApiServiceError('Control D returned no device for the completed request');
+    return device;
   }
 
   async deleteDevice(deviceId: string): Promise<void> {
-    await this.axios.delete(`/devices/${deviceId}`);
+    await this.axios.delete(`/devices/${encodeURIComponent(deviceId)}`);
   }
 
   async listDeviceTypes(): Promise<Record<string, { name: string; icons: string[] }>> {
@@ -547,7 +634,12 @@ export class Client {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
     );
-    return res.data.body.sub_organizations[0]!;
+    let organization = res.data.body?.sub_organizations?.[0];
+    if (!organization)
+      throw createApiServiceError(
+        'Control D returned no sub-organization for the completed request'
+      );
+    return organization;
   }
 
   async modifyOrganization(params: {

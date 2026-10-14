@@ -76,9 +76,9 @@ export let createBoard = SlateTool.create(spec, {
       output: {
         boardId: board.id,
         name: board.name,
-        description: board.description,
-        viewLink: board.viewLink,
-        createdAt: board.createdAt
+        description: board.description ?? undefined,
+        viewLink: board.viewLink ?? undefined,
+        createdAt: board.createdAt ?? undefined
       },
       message: `Created board **${board.name}** (ID: ${board.id}).${board.viewLink ? ` [Open board](${board.viewLink})` : ''}`
     };

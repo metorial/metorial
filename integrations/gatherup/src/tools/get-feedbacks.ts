@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getFeedbacks = SlateTool.create(spec, {
@@ -78,21 +78,21 @@ export let getFeedbacks = SlateTool.create(spec, {
         businessId: data[`businessId${i}`],
         rating: data[`rating${i}`],
         recommend: data[`recommend${i}`],
-        author: data[`author${i}`],
-        reviewBody: data[`reviewBody${i}`],
-        reviewDate: data[`reviewDate${i}`],
-        visible: data[`visible${i}`],
+        author: data[`authorName${i}`] ?? data[`author${i}`],
+        reviewBody: data[`body${i}`] ?? data[`reviewBody${i}`],
+        reviewDate: data[`dateOfReview${i}`] ?? data[`reviewDate${i}`],
+        visible: data[`showReview${i}`] ?? data[`visible${i}`],
         customerId: data[`customerId${i}`],
-        customerJobId: data[`customerJobId${i}`],
-        customerTags: data[`customerTags${i}`]
+        customerJobId: data[`jobId${i}`] ?? data[`customerJobId${i}`],
+        customerTags: data[`tags${i}`] ?? data[`customerTags${i}`]
       });
     }
 
     return {
       output: {
         feedbacks,
-        page: data.page ?? 1,
-        pages: data.pages ?? 1,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1,
         totalCount: count
       } as any,
       message: `Found **${count}** feedback(s) (page ${data.page ?? 1} of ${data.pages ?? 1}).`

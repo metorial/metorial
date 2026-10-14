@@ -65,21 +65,21 @@ export let searchCustomers = SlateTool.create(spec, {
 
     let customers = (result.customers || []).map((c: any) => ({
       customerId: c.id,
-      firstname: c.firstname,
-      lastname: c.lastname,
-      fullname: c.fullname,
-      businessName: c.business_name,
-      email: c.email,
-      phone: c.phone,
-      mobile: c.mobile,
-      address: c.address,
-      address2: c.address_2,
-      city: c.city,
-      state: c.state,
-      zip: c.zip,
-      notes: c.notes,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
+      firstname: c.firstname ?? undefined,
+      lastname: c.lastname ?? undefined,
+      fullname: c.fullname ?? undefined,
+      businessName: c.business_name ?? undefined,
+      email: c.email ?? undefined,
+      phone: c.phone ?? undefined,
+      mobile: c.mobile ?? undefined,
+      address: c.address ?? undefined,
+      address2: c.address_2 ?? undefined,
+      city: c.city ?? undefined,
+      state: c.state ?? undefined,
+      zip: c.zip ?? undefined,
+      notes: c.notes ?? undefined,
+      createdAt: c.created_at ?? undefined,
+      updatedAt: c.updated_at ?? undefined
     }));
 
     return {
@@ -116,21 +116,21 @@ export let getCustomer = SlateTool.create(spec, {
     return {
       output: {
         customerId: c.id,
-        firstname: c.firstname,
-        lastname: c.lastname,
-        fullname: c.fullname,
-        businessName: c.business_name,
-        email: c.email,
-        phone: c.phone,
-        mobile: c.mobile,
-        address: c.address,
-        address2: c.address_2,
-        city: c.city,
-        state: c.state,
-        zip: c.zip,
-        notes: c.notes,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
+        firstname: c.firstname ?? undefined,
+        lastname: c.lastname ?? undefined,
+        fullname: c.fullname ?? undefined,
+        businessName: c.business_name ?? undefined,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
+        address: c.address ?? undefined,
+        address2: c.address_2 ?? undefined,
+        city: c.city ?? undefined,
+        state: c.state ?? undefined,
+        zip: c.zip ?? undefined,
+        notes: c.notes ?? undefined,
+        createdAt: c.created_at ?? undefined,
+        updatedAt: c.updated_at ?? undefined
       },
       message: `Retrieved customer **${c.fullname || c.firstname || c.business_name || c.id}**.`
     };
@@ -175,21 +175,21 @@ export let createCustomer = SlateTool.create(spec, {
     return {
       output: {
         customerId: c.id,
-        firstname: c.firstname,
-        lastname: c.lastname,
-        fullname: c.fullname,
-        businessName: c.business_name,
-        email: c.email,
-        phone: c.phone,
-        mobile: c.mobile,
-        address: c.address,
-        address2: c.address_2,
-        city: c.city,
-        state: c.state,
-        zip: c.zip,
-        notes: c.notes,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
+        firstname: c.firstname ?? undefined,
+        lastname: c.lastname ?? undefined,
+        fullname: c.fullname ?? undefined,
+        businessName: c.business_name ?? undefined,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
+        address: c.address ?? undefined,
+        address2: c.address_2 ?? undefined,
+        city: c.city ?? undefined,
+        state: c.state ?? undefined,
+        zip: c.zip ?? undefined,
+        notes: c.notes ?? undefined,
+        createdAt: c.created_at ?? undefined,
+        updatedAt: c.updated_at ?? undefined
       },
       message: `Created customer **${c.fullname || c.firstname || c.business_name || c.id}** (ID: ${c.id}).`
     };
@@ -233,21 +233,21 @@ export let updateCustomer = SlateTool.create(spec, {
     return {
       output: {
         customerId: c.id,
-        firstname: c.firstname,
-        lastname: c.lastname,
-        fullname: c.fullname,
-        businessName: c.business_name,
-        email: c.email,
-        phone: c.phone,
-        mobile: c.mobile,
-        address: c.address,
-        address2: c.address_2,
-        city: c.city,
-        state: c.state,
-        zip: c.zip,
-        notes: c.notes,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
+        firstname: c.firstname ?? undefined,
+        lastname: c.lastname ?? undefined,
+        fullname: c.fullname ?? undefined,
+        businessName: c.business_name ?? undefined,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
+        address: c.address ?? undefined,
+        address2: c.address_2 ?? undefined,
+        city: c.city ?? undefined,
+        state: c.state ?? undefined,
+        zip: c.zip ?? undefined,
+        notes: c.notes ?? undefined,
+        createdAt: c.created_at ?? undefined,
+        updatedAt: c.updated_at ?? undefined
       },
       message: `Updated customer **${c.fullname || c.firstname || c.business_name || c.id}**.`
     };

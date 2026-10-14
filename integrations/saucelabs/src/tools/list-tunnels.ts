@@ -41,16 +41,20 @@ export let listTunnels = SlateTool.create(spec, {
       all: ctx.input.includeShared || undefined
     });
 
-    let tunnelsRaw = Array.isArray(result) ? result : [];
+    let tunnelsRaw = Array.isArray(result)
+      ? result
+      : Object.values(result ?? {}).flatMap(tunnels =>
+          Array.isArray(tunnels) ? tunnels : []
+        );
     let tunnels = tunnelsRaw.map((t: any) => ({
       tunnelId: t.id,
-      owner: t.owner,
-      status: t.status,
-      isReady: t.is_ready,
-      tunnelIdentifier: t.tunnel_identifier,
-      creationTime: t.creation_time,
-      launchTime: t.launch_time,
-      lastConnected: t.last_connected
+      owner: t.owner ?? undefined,
+      status: t.status ?? undefined,
+      isReady: t.is_ready ?? undefined,
+      tunnelIdentifier: t.tunnel_identifier ?? undefined,
+      creationTime: t.creation_time ?? undefined,
+      launchTime: t.launch_time ?? undefined,
+      lastConnected: t.last_connected ?? undefined
     }));
 
     return {

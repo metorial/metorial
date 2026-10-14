@@ -1,15 +1,76 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export interface IntellimatchStatus {
+  status: string;
+  progress?: number;
+  total_jobs?: number;
+  processed_jobs?: number;
+  pending_jobs?: number;
+  failed_jobs?: number;
+}
+
+export interface IntellimatchResults {
+  data: {
+    id?: string | number;
+    name?: string | null;
+    domain?: string | null;
+    description?: string | null;
+    employee_count_range?: string | null;
+    industries?: string[] | null;
+    country?: string | null;
+    match_score?: number | null;
+    contact_name?: string | null;
+    contact_email?: string | null;
+    contact_job_title?: string | null;
+    contact_phone?: string | null;
+    contact_linkedin_url?: string | null;
+  }[];
+  meta: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+  };
+}
+
+export interface SavedContacts {
+  data: {
+    id: string | number;
+    name?: string | null;
+    email?: string | null;
+    linkedin_url?: string | null;
+    company?: string | null;
+    job_title?: string | null;
+  }[];
+  recordsTotal: number;
+  recordsFiltered: number;
+}
 
 export class FindymailClient {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://app.findymail.com/api',
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 60_000,
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Findymail',
+          reason: 'findymail_api_error'
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      if (typeof response.data?.error === 'string' && response.data.error) {
+        throw createApiServiceError(`Findymail API request failed: ${response.data.error}`, {
+          reason: 'findymail_api_error',
+          upstreamStatus: response.status
+        });
       }
+      return response;
     });
   }
 
@@ -21,16 +82,8 @@ export class FindymailClient {
     return res.data;
   }
 
-  async findEmailByDomain(params: { name: string; domain: string }) {
-    let res = await this.http.post('/search/domain', {
-      name: params.name,
-      domain: params.domain
-    });
-    return res.data;
-  }
-
   async findEmailByLinkedIn(params: { linkedinUrl: string }) {
-    let res = await this.http.post('/search/linkedin', {
+    let res = await this.http.post('/search/business-profile', {
       linkedin_url: params.linkedinUrl
     });
     return res.data;
@@ -93,16 +146,16 @@ export class FindymailClient {
     return res.data;
   }
 
-  async getIntellimatchStatus(params: { searchId: string }) {
-    let res = await this.http.get('/intellimatch/status', {
-      params: { search_id: params.searchId }
+  async getIntellimatchStatus(params: { hash: string }) {
+    let res = await this.http.get<IntellimatchStatus>('/intellimatch/status', {
+      params: { hash: params.hash }
     });
     return res.data;
   }
 
-  async getIntellimatchData(params: { searchId: string }) {
-    let res = await this.http.get('/intellimatch/data', {
-      params: { search_id: params.searchId }
+  async getIntellimatchData(params: { hash: string; page?: number; perPage?: number }) {
+    let res = await this.http.get<IntellimatchResults>('/intellimatch/data', {
+      params: { hash: params.hash, page: params.page, per_page: params.perPage }
     });
     return res.data;
   }
@@ -112,8 +165,10 @@ export class FindymailClient {
     return res.data;
   }
 
-  async getContact(params: { contactId: string }) {
-    let res = await this.http.get(`/contacts/get/${params.contactId}`);
+  async listContacts(params: { listId: string }) {
+    let res = await this.http.get<SavedContacts>(
+      `/contacts/get/${encodeURIComponent(params.listId)}`
+    );
     return res.data;
   }
 

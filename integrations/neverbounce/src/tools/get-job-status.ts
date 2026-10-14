@@ -37,6 +37,7 @@ export let getJobStatusTool = SlateTool.create(spec, {
         .describe(
           'Current job status (e.g., complete, running, parsing, queued, failed, under_review, waiting)'
         ),
+      failureReason: z.string().optional().describe('Provider reason when the job failed'),
       filename: z.string().describe('Filename associated with the job'),
       createdAt: z.string().describe('Job creation timestamp'),
       startedAt: z.string().describe('Job start timestamp'),
@@ -55,6 +56,7 @@ export let getJobStatusTool = SlateTool.create(spec, {
       output: {
         jobId: result.jobId,
         jobStatus: result.jobStatus,
+        failureReason: result.failureReason,
         filename: result.filename,
         createdAt: result.createdAt,
         startedAt: result.startedAt,

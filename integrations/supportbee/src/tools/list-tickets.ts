@@ -17,7 +17,7 @@ export let listTickets = SlateTool.create(spec, {
       perPage: z
         .number()
         .optional()
-        .describe('Number of tickets per page (max 100, default 15)'),
+        .describe('Number of tickets per page (1 to 99, default 15)'),
       page: z.number().optional().describe('Page number (default 1)'),
       archived: z
         .union([z.boolean(), z.literal('any')])
@@ -27,19 +27,44 @@ export let listTickets = SlateTool.create(spec, {
         ),
       spam: z.boolean().optional().describe('Include spam tickets'),
       trash: z.boolean().optional().describe('Include trashed tickets'),
-      replies: z.boolean().optional().describe('Only return tickets with replies'),
-      assignedUserId: z.string().optional().describe('Filter by assigned user ID'),
-      assignedTeamId: z.string().optional().describe('Filter by assigned team ID'),
+      replies: z
+        .boolean()
+        .optional()
+        .describe('true returns tickets with replies; false returns tickets without replies'),
+      maxReplies: z
+        .number()
+        .optional()
+        .describe('Reply count filter. Cannot be combined with replies=false.'),
+      assignedUserId: z
+        .string()
+        .optional()
+        .describe('User ID from list_agents, or me, any, or none'),
+      assignedTeamId: z
+        .string()
+        .optional()
+        .describe('Team ID from list_agents, or mine or none'),
       starred: z.boolean().optional().describe('Filter by starred status'),
       label: z.string().optional().describe('Filter by label name'),
       since: z
         .string()
         .optional()
-        .describe('Return tickets created after this date (ISO 8601 format)'),
+        .describe(
+          'Return tickets with activity after this UTC date; uses creation time when sortBy=creation_time'
+        ),
       until: z
         .string()
         .optional()
-        .describe('Return tickets created before this date (ISO 8601 format)')
+        .describe(
+          'Return tickets with activity before this UTC date; uses creation time when sortBy=creation_time'
+        ),
+      sortBy: z
+        .enum(['last_activity', 'creation_time'])
+        .optional()
+        .describe('Timestamp used for ordering and date filters'),
+      requesterEmails: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by one or more requester email addresses')
     })
   )
   .output(
@@ -63,12 +88,15 @@ export let listTickets = SlateTool.create(spec, {
       spam: ctx.input.spam,
       trash: ctx.input.trash,
       replies: ctx.input.replies,
+      maxReplies: ctx.input.maxReplies,
       assignedUser: ctx.input.assignedUserId,
       assignedTeam: ctx.input.assignedTeamId,
       starred: ctx.input.starred,
       label: ctx.input.label,
       since: ctx.input.since,
-      until: ctx.input.until
+      until: ctx.input.until,
+      sortBy: ctx.input.sortBy,
+      requesterEmails: ctx.input.requesterEmails
     });
 
     return {

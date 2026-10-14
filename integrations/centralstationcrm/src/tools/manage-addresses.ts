@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -79,7 +79,7 @@ export let manageAddresses = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.addressId)
-        throw new Error('addressId is required when updating an address');
+        throw createApiServiceError('addressId is required when updating an address');
 
       let data: Record<string, unknown> = {};
       if (ctx.input.street !== undefined) data.street = ctx.input.street;
@@ -107,7 +107,7 @@ export let manageAddresses = SlateTool.create(spec, {
 
     // remove
     if (!ctx.input.addressId)
-      throw new Error('addressId is required when removing an address');
+      throw createApiServiceError('addressId is required when removing an address');
     await client.deletePersonAddress(ctx.input.personId, ctx.input.addressId);
 
     return {
