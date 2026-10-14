@@ -1,87 +1,56 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import {
+  type ApiErrorBuildHelpers,
+  type ApiErrorResponse,
+  buildApiServiceError,
+  isApiErrorRecord as isRecord
+} from 'slates';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
+let FIREFLIES_DETAIL_KEYS = ['message', 'error', 'description', 'code'];
+
+// GraphQL errors returned with HTTP 200 are passed in as `{ data: body }`.
+let firefliesErrorResponse = (
+  error: unknown,
+  helpers: ApiErrorBuildHelpers
+): ApiErrorResponse | undefined => {
+  let response = helpers.getResponseWithBody(error);
+  if (response?.data !== undefined) return response;
+  if (
+    !isRecord(error) ||
+    error instanceof Error ||
+    error.name === 'SlateError' ||
+    !isRecord(error.data)
+  ) {
+    return response;
+  }
+
+  return { ...response, data: error.data };
 };
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+let upstreamCodeFor = (response: ApiErrorResponse | undefined) => {
+  let data = response?.data;
+  if (!isRecord(data) || !Array.isArray(data.errors)) return undefined;
 
-let addMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
-  }
-};
-
-let collectMessages = (value: unknown, messages: string[]) => {
-  if (!isRecord(value)) {
-    addMessage(messages, value);
-    return;
-  }
-
-  for (let key of ['message', 'error', 'description', 'code']) {
-    addMessage(messages, value[key]);
-  }
-
-  if (Array.isArray(value.errors)) {
-    for (let item of value.errors) {
-      collectMessages(item, messages);
+  for (let item of data.errors) {
+    if (!isRecord(item)) continue;
+    if (typeof item.code === 'string') return item.code;
+    if (isRecord(item.extensions) && typeof item.extensions.code === 'string') {
+      return item.extensions.code;
     }
   }
-};
 
-let extractMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let messages: string[] = [];
-
-  collectMessages(response?.data, messages);
-
-  if (isRecord(error)) {
-    collectMessages(error.data, messages);
-  }
-
-  if (messages.length > 0) {
-    return messages.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
+  return undefined;
 };
 
 export let firefliesServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let firefliesApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status =
-    response?.status ??
-    (isRecord(error) && typeof error.status === 'number' ? error.status : undefined);
-  let statusText = response?.statusText;
-  let statusLabel =
-    status !== undefined ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}: ` : '';
-
-  let serviceError = firefliesServiceError(
-    `Fireflies API ${operation} failed: ${statusLabel}${extractMessage(error)}`
-  );
-
-  serviceError.data.reason = 'fireflies_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let firefliesApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Fireflies',
+    operation,
+    reason: 'fireflies_api_error',
+    detailKeys: FIREFLIES_DETAIL_KEYS,
+    extractResponse: firefliesErrorResponse,
+    extractUpstreamCode: (_input, response) => upstreamCodeFor(response)
+  });

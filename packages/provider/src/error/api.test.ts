@@ -1,7 +1,29 @@
 import { ServiceError } from '@lowerdeck/error';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it } from 'vitest';
-import { buildApiServiceError, collectApiErrorDetails, createApiServiceError } from './api';
+import {
+  buildApiServiceError,
+  collectApiErrorDetails,
+  createApiServiceError,
+  decodeApiErrorBody,
+  getApiErrorResponseWithBody,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from './api';
 import { SlateError } from './base';
+
+let axiosFailure = (status: number, data: unknown) => {
+  let config = { url: '/widgets', method: 'get', headers: new AxiosHeaders() };
+  return new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, undefined, {
+    status,
+    statusText: 'Error',
+    data,
+    headers: {},
+    config
+  });
+};
 
 describe('API service error helpers', () => {
   it('collects unique nested API error details', () => {
@@ -110,5 +132,105 @@ describe('API service error helpers', () => {
         reason: 'example_api_error'
       })
     ).toBe(existing);
+  });
+
+  it('recovers the upstream body from SlateError baggage', () => {
+    let parent = SlateError.fromAxios(
+      axiosFailure(422, { errors: [{ message: 'Name is required' }] })
+    );
+
+    expect(parent.name).toBe('SlateError');
+    expect((parent as any).response).toBeUndefined();
+    expect(getApiErrorResponseWithBody(parent)).toEqual({
+      status: 422,
+      data: { errors: [{ message: 'Name is required' }] }
+    });
+
+    let error = buildApiServiceError(parent, {
+      providerLabel: 'Example',
+      reason: 'example_api_error',
+      extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+    });
+
+    expect(error.data.upstreamStatus).toBe(422);
+    expect(error.data.message).toBe('Example API request failed: HTTP 422: Name is required');
+  });
+
+  it('prefers an existing response body and ignores non-SlateErrors without one', () => {
+    let response = { status: 400, data: { message: 'Direct' } };
+
+    expect(getApiErrorResponseWithBody({ response })).toEqual({
+      status: 400,
+      statusText: undefined,
+      data: { message: 'Direct' }
+    });
+    expect(
+      getApiErrorResponseWithBody({ name: 'Error', data: { baggage: { response: 'x' } } })
+    ).toBeUndefined();
+  });
+
+  it('detects HTML error pages without dropping plain text that starts with <', () => {
+    expect(looksLikeHtmlErrorBody('<!DOCTYPE html><html><body>Bad</body></html>')).toBe(true);
+    expect(looksLikeHtmlErrorBody('  <html lang="en">')).toBe(true);
+    expect(looksLikeHtmlErrorBody('<h1>502 Bad Gateway</h1>')).toBe(true);
+    expect(looksLikeHtmlErrorBody('Error page: <body>oops</body>')).toBe(true);
+    expect(looksLikeHtmlErrorBody('<id> is required')).toBe(false);
+    expect(looksLikeHtmlErrorBody('<body> is required')).toBe(false);
+    expect(looksLikeHtmlErrorBody('Invalid <body> parameter')).toBe(false);
+    expect(looksLikeHtmlErrorBody('<title> is required')).toBe(false);
+    expect(looksLikeHtmlErrorBody('<p> must be a string')).toBe(false);
+    expect(looksLikeHtmlErrorBody('<= 100 items allowed')).toBe(false);
+    expect(looksLikeHtmlErrorBody('Field must be a number')).toBe(false);
+  });
+
+  it('reads displayable error text and keeps detail lists bounded and unique', () => {
+    expect(readApiErrorText('  Bad input ')).toBe('Bad input');
+    expect(readApiErrorText(42)).toBe('42');
+    expect(readApiErrorText(42, { includeNumbers: false })).toBeUndefined();
+    expect(readApiErrorText('[truncated]')).toBeUndefined();
+    expect(readApiErrorText(' [redacted] ')).toBeUndefined();
+    expect(readApiErrorText('[unserializable]')).toBeUndefined();
+    expect(readApiErrorText('Token [redacted] is invalid')).toBe(
+      'Token [redacted] is invalid'
+    );
+    expect(readApiErrorText('<html></html>')).toBeUndefined();
+    expect(readApiErrorText({ message: 'x' })).toBeUndefined();
+
+    let details: string[] = [];
+    for (let value of ['a', 'a', '', '[truncated]', 'b', 'c', 'd', 'e', 'f']) {
+      pushBoundedApiErrorDetail(details, value);
+    }
+    expect(details).toEqual(['a', 'b', 'c', 'd', 'e']);
+
+    let fieldDetails: string[] = [];
+    pushBoundedApiErrorDetail(fieldDetails, 'is required', { field: 'name' });
+    pushBoundedApiErrorDetail(fieldDetails, 'is required', { field: 'name' });
+    pushBoundedApiErrorDetail(fieldDetails, 'second', { maxDetails: 1 });
+    expect(fieldDetails).toEqual(['name: is required']);
+  });
+
+  it('truncates long error messages', () => {
+    expect(truncateApiErrorMessage('abc', 5)).toBe('abc');
+    expect(truncateApiErrorMessage('abcdef', 3)).toBe('abc...');
+    expect(truncateApiErrorMessage('x'.repeat(1_001))).toBe(`${'x'.repeat(1_000)}...`);
+  });
+
+  it('decodes text and binary error bodies', () => {
+    let json = '{"error":{"message":"Not found"}}';
+    let bytes = new TextEncoder().encode(json);
+
+    expect(decodeApiErrorBody(json)).toEqual({ error: { message: 'Not found' } });
+    expect(decodeApiErrorBody(bytes.buffer)).toEqual({ error: { message: 'Not found' } });
+    expect(decodeApiErrorBody(bytes)).toEqual({ error: { message: 'Not found' } });
+    expect(decodeApiErrorBody(Buffer.from(` ${json} `))).toEqual({
+      error: { message: 'Not found' }
+    });
+    expect(decodeApiErrorBody('  plain text  ')).toBe('plain text');
+    expect(decodeApiErrorBody('{not json')).toBe('{not json');
+    expect(decodeApiErrorBody(new TextEncoder().encode('abcdef'), { maxBytes: 3 })).toBe(
+      'abc'
+    );
+    expect(decodeApiErrorBody({ already: 'parsed' })).toEqual({ already: 'parsed' });
+    expect(decodeApiErrorBody(undefined)).toBeUndefined();
   });
 });

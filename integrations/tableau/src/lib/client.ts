@@ -1,5 +1,5 @@
 import { createAxios } from 'slates';
-import { tableauApiError, tableauServiceError } from './errors';
+import { decodeTableauErrorBody, tableauApiError, tableauServiceError } from './errors';
 
 export interface TableauClientConfig {
   serverUrl: string;
@@ -64,7 +64,26 @@ let buildViewExportParams = (options?: ViewExportOptions) => {
   return params;
 };
 
-let encodeResponseData = (data: unknown) => Buffer.from(data as any).toString('base64');
+export interface ViewExportFile {
+  url: string;
+  mimeType: string;
+}
+
+let EXPORT_MIME_TYPES: Record<ViewExportFormat, string> = {
+  csv: 'text/csv',
+  image: 'image/png',
+  pdf: 'application/pdf'
+};
+
+let EXPORT_ENDPOINTS: Record<ViewExportFormat, string> = {
+  csv: 'data',
+  image: 'image',
+  pdf: 'pdf'
+};
+
+let tableauErrorMapping = {
+  extractResponseData: (response: { data: unknown }) => decodeTableauErrorBody(response.data)
+};
 
 let unwrapCollection = (result: any) => result?.collection ?? result;
 
@@ -94,6 +113,7 @@ export class TableauClient {
 
     this.http = createAxios({
       baseURL: `${baseUrl}/api/${config.apiVersion}`,
+      errorMapping: tableauErrorMapping,
       headers: {
         'X-Tableau-Auth': config.token,
         'Content-Type': 'application/json',
@@ -103,6 +123,7 @@ export class TableauClient {
 
     this.resourceHttp = createAxios({
       baseURL: `${baseUrl}/api/-`,
+      errorMapping: tableauErrorMapping,
       headers: {
         'X-Tableau-Auth': config.token,
         'Content-Type': 'application/json',
@@ -283,46 +304,22 @@ export class TableauClient {
     return response.data;
   }
 
-  async getViewData(viewId: string, options?: ViewExportOptions): Promise<string> {
-    let response = await this.http.get(`/sites/${this.siteId}/views/${viewId}/data`, {
-      params: buildViewExportParams(options),
-      responseType: 'text',
-      headers: { Accept: '*/*' }
-    });
-    return response.data;
+  async getView(viewId: string): Promise<any> {
+    let response = await this.http.get(`/sites/${this.siteId}/views/${viewId}`);
+    return response.data.view;
   }
-
-  async exportView(
+  // Export endpoints are stable GET URLs authenticated by the X-Tableau-Auth header, so
+  // the file is fetched on download instead of being read here.
+  viewExportFile(
     viewId: string,
     format: ViewExportFormat,
     options?: ViewExportOptions
-  ): Promise<{
-    data: string;
-    contentType: string;
-    encoding: 'text' | 'base64';
-  }> {
-    if (format === 'csv') {
-      let data = await this.getViewData(viewId, options);
-      return {
-        data,
-        contentType: 'text/csv',
-        encoding: 'text'
-      };
-    }
-
-    let endpoint = format === 'image' ? 'image' : 'pdf';
-    let contentType = format === 'image' ? 'image/png' : 'application/pdf';
-    let response = await this.http.get(`/sites/${this.siteId}/views/${viewId}/${endpoint}`, {
-      params: buildViewExportParams(options),
-      responseType: 'arraybuffer',
-      headers: { Accept: '*/*' }
-    });
-
-    return {
-      data: encodeResponseData(response.data),
-      contentType,
-      encoding: 'base64'
-    };
+  ): ViewExportFile {
+    return this.exportFile(
+      `/sites/${this.siteId}/views/${encodeURIComponent(viewId)}/${EXPORT_ENDPOINTS[format]}`,
+      format,
+      options
+    );
   }
 
   // --- Custom Views ---
@@ -364,31 +361,28 @@ export class TableauClient {
     await this.http.delete(`/sites/${this.siteId}/customviews/${customViewId}`);
   }
 
-  async exportCustomView(
+  customViewExportFile(
     customViewId: string,
     format: ViewExportFormat,
     options?: ViewExportOptions
-  ): Promise<{
-    data: string;
-    contentType: string;
-    encoding: 'text' | 'base64';
-  }> {
-    let endpoint = format === 'csv' ? 'data' : format;
-    let contentType =
-      format === 'csv' ? 'text/csv' : format === 'image' ? 'image/png' : 'application/pdf';
-    let response = await this.http.get(
-      `/sites/${this.siteId}/customviews/${customViewId}/${endpoint}`,
-      {
-        params: buildViewExportParams(options),
-        responseType: format === 'csv' ? 'text' : 'arraybuffer',
-        headers: { Accept: '*/*' }
-      }
+  ): ViewExportFile {
+    return this.exportFile(
+      `/sites/${this.siteId}/customviews/${encodeURIComponent(customViewId)}/${EXPORT_ENDPOINTS[format]}`,
+      format,
+      options
     );
+  }
 
+  private exportFile(
+    path: string,
+    format: ViewExportFormat,
+    options?: ViewExportOptions
+  ): ViewExportFile {
+    // getUri applies the client's base URL and the same query serialization as a request,
+    // so view filters reach Tableau exactly as a direct export call would send them.
     return {
-      data: format === 'csv' ? response.data : encodeResponseData(response.data),
-      contentType,
-      encoding: format === 'csv' ? 'text' : 'base64'
+      url: this.http.getUri({ url: path, params: buildViewExportParams(options) }),
+      mimeType: EXPORT_MIME_TYPES[format]
     };
   }
 

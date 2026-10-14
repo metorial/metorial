@@ -9,13 +9,13 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.25",
+    "slates": "1.0.0-rc.28",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.23",
+    "@slates/test": "1.0.0-rc.26",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.12"
+  "version": "0.2.13"
 }

@@ -132,12 +132,6 @@ export class AuthClient {
     emailVerified?: boolean;
     disabled?: boolean;
   }): Promise<FirebaseUser> {
-    if (!this.apiKey) {
-      throw firebaseServiceError(
-        'webApiKey must be configured in project settings for create user operations'
-      );
-    }
-
     let response = await withFirebaseApiError('Authentication create user', () =>
       identityAxios.post(
         `/projects/${this.projectId}/accounts`,
@@ -152,9 +146,7 @@ export class AuthClient {
         },
         {
           headers: this.headers,
-          params: {
-            key: this.apiKey
-          }
+          params: this.apiKey ? { key: this.apiKey } : undefined
         }
       )
     );

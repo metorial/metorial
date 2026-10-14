@@ -1,6 +1,5 @@
 import {
   createAuthenticatedAxios,
-  createAxios,
   getApiErrorStatus,
   getResponseHeaderValue,
   pickDefined,
@@ -14,16 +13,12 @@ import {
   DOCUMENT_API_BASE_URL,
   isDisqualifiedOfficerType,
   isSafeDocumentMimeType,
-  MAX_DOCUMENT_DOWNLOAD_BYTES,
   MAX_ITEMS_PER_PAGE,
   PUBLIC_DATA_BASE_URL,
-  SAFE_DOCUMENT_MIME_EXTENSIONS
+  SAFE_DOCUMENT_MIME_EXTENSIONS,
+  type SafeDocumentMimeType
 } from './constants';
-import {
-  companiesHouseApiError,
-  companiesHouseDownloadError,
-  companiesHouseValidationError
-} from './errors';
+import { companiesHouseApiError, companiesHouseValidationError } from './errors';
 import {
   mapAdvancedCompanySearchEnvelope,
   mapChargeListEnvelope,
@@ -187,22 +182,51 @@ let validateDateRange = (from: string | undefined, to: string | undefined, label
   }
 };
 
-let binaryBuffer = (value: unknown) => {
-  if (Buffer.isBuffer(value)) return value;
-  if (value instanceof ArrayBuffer) return Buffer.from(value);
-  if (ArrayBuffer.isView(value)) {
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  }
-  return undefined;
-};
-
 let normalizedMimeType = (value: string | undefined) =>
   value?.split(';', 1)[0]?.trim().toLowerCase();
+
+let requireSafeDocumentMimeType = (requestedMimeType: string): SafeDocumentMimeType => {
+  let mimeType = normalizedMimeType(requestedMimeType);
+  if (!isSafeDocumentMimeType(mimeType)) {
+    throw companiesHouseValidationError(
+      'The requested document MIME type is not safe to download.',
+      'companies_house_document_mime_invalid'
+    );
+  }
+  return mimeType;
+};
+
+// Renew the signed document link this long before it lapses.
+const DOCUMENT_LINK_REFRESH_MARGIN_MS = 30_000;
+
+// The Document API redirects to a short-lived pre-signed storage URL. Read its signing
+// time and lifetime (SigV4 X-Amz-Date/X-Amz-Expires, or SigV2 Expires) so the link is
+// renewed before it lapses; when they are absent, renew it on every download.
+let documentLinkRefreshAt = (url: URL, now = Date.now()) => {
+  let expiresAt: number | undefined;
+  let amzDate = url.searchParams.get('X-Amz-Date');
+  let amzExpires = url.searchParams.get('X-Amz-Expires');
+  let signedAt = amzDate?.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+  if (signedAt && amzExpires && /^\d+$/.test(amzExpires)) {
+    let [, year, month, day, hour, minute, second] = signedAt.map(Number);
+    expiresAt =
+      Date.UTC(year!, month! - 1, day!, hour!, minute!, second!) + Number(amzExpires) * 1000;
+  } else {
+    let legacyExpires = url.searchParams.get('Expires');
+    if (legacyExpires && /^\d+$/.test(legacyExpires)) expiresAt = Number(legacyExpires) * 1000;
+  }
+
+  if (expiresAt === undefined || !Number.isFinite(expiresAt)) {
+    return new Date(now).toISOString();
+  }
+  let lifetime = Math.max(expiresAt - now, 0);
+  let margin = Math.min(DOCUMENT_LINK_REFRESH_MARGIN_MS, lifetime / 2);
+  return new Date(Math.max(expiresAt - margin, now)).toISOString();
+};
 
 export class CompaniesHouseClient {
   private publicHttp: ReturnType<typeof createAuthenticatedAxios>;
   private documentHttp: ReturnType<typeof createAuthenticatedAxios>;
-  private downloadHttp: ReturnType<typeof createAxios>;
   private token: string;
 
   constructor(auth: { token: string; authMethod?: 'api_key' | 'oauth' }) {
@@ -225,7 +249,6 @@ export class CompaniesHouseClient {
       baseURL: DOCUMENT_API_BASE_URL,
       ...authenticated
     });
-    this.downloadHttp = createAxios();
   }
 
   private apiError(error: unknown, operation: string) {
@@ -450,23 +473,42 @@ export class CompaniesHouseClient {
       'get document metadata',
       `/document/${pathSegment(documentId)}`
     );
-    return mapDocumentMetadata(data);
+    return mapDocumentMetadata(data, documentId);
   }
 
-  async getDocumentContent(documentId: string, requestedMimeType: string) {
-    let mimeType = normalizedMimeType(requestedMimeType);
-    if (!isSafeDocumentMimeType(mimeType)) {
+  // Checks that the document advertises the requested representation, then resolves its
+  // short-lived download link without reading the document body.
+  async getDocumentDownload(documentId: string, requestedMimeType: string) {
+    let mimeType = requireSafeDocumentMimeType(requestedMimeType);
+
+    let metadata = await this.getDocumentMetadata(documentId);
+    let advertised = metadata.resources[mimeType];
+    if (!advertised && metadata.availableContentTypes.length > 0) {
       throw companiesHouseValidationError(
-        'The requested document MIME type is not safe to download.',
-        'companies_house_document_mime_invalid'
+        `Companies House does not provide document ${documentId} as ${mimeType}. Available content types: ${metadata.availableContentTypes.map(item => item.mimeType).join(', ')}.`,
+        'companies_house_document_mime_unavailable'
       );
     }
-    let safeMimeType = mimeType;
+
+    let link = await this.getDocumentLink(documentId, mimeType);
+    return {
+      documentId,
+      ...link,
+      mimeType,
+      extension: SAFE_DOCUMENT_MIME_EXTENSIONS[mimeType],
+      byteLength: advertised?.contentLength
+    };
+  }
+
+  // Requests the Document API content endpoint without following its redirect: the
+  // pre-signed destination must be fetched without the Companies House credentials.
+  async getDocumentLink(documentId: string, requestedMimeType: string) {
+    let mimeType = requireSafeDocumentMimeType(requestedMimeType);
     let locationResponse = await requestAxios(
       'locate document content',
       () =>
         this.documentHttp.get(`/document/${pathSegment(documentId)}/content`, {
-          headers: { Accept: safeMimeType },
+          headers: { Accept: mimeType },
           maxRedirects: 0,
           validateStatus: status => status === 302
         }),
@@ -500,67 +542,9 @@ export class CompaniesHouseClient {
       );
     }
 
-    let downloadResponse = await requestAxios(
-      'download document bytes',
-      () =>
-        this.downloadHttp.get(redirectUrl.toString(), {
-          responseType: 'arraybuffer',
-          maxRedirects: 0,
-          maxBodyLength: MAX_DOCUMENT_DOWNLOAD_BYTES,
-          maxContentLength: MAX_DOCUMENT_DOWNLOAD_BYTES,
-          validateStatus: status => status >= 200 && status < 300
-        }),
-      companiesHouseDownloadError
-    );
-
-    let contentLength = getResponseHeaderValue(downloadResponse.headers, 'content-length');
-    if (contentLength !== undefined) {
-      if (
-        !/^\d+$/.test(contentLength) ||
-        Number(contentLength) > MAX_DOCUMENT_DOWNLOAD_BYTES
-      ) {
-        throw companiesHouseValidationError(
-          `The downloaded Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_BYTES}-byte limit or has an invalid declared size.`,
-          'companies_house_document_too_large'
-        );
-      }
-    }
-
-    let content = binaryBuffer(downloadResponse.data);
-    if (!content || content.length === 0) {
-      throw companiesHouseValidationError(
-        'Companies House returned an empty or non-binary document body.',
-        'companies_house_document_body_invalid'
-      );
-    }
-    if (content.length > MAX_DOCUMENT_DOWNLOAD_BYTES) {
-      throw companiesHouseValidationError(
-        `The downloaded Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_BYTES}-byte limit.`,
-        'companies_house_document_too_large'
-      );
-    }
-
-    let responseMimeType = normalizedMimeType(
-      getResponseHeaderValue(downloadResponse.headers, 'content-type')
-    );
-    let resolvedMimeType =
-      !responseMimeType ||
-      responseMimeType === 'application/octet-stream' ||
-      responseMimeType === 'binary/octet-stream'
-        ? safeMimeType
-        : responseMimeType;
-    if (!isSafeDocumentMimeType(resolvedMimeType) || resolvedMimeType !== safeMimeType) {
-      throw companiesHouseValidationError(
-        `Companies House returned an unexpected document MIME type "${resolvedMimeType}".`,
-        'companies_house_document_mime_invalid'
-      );
-    }
-
     return {
-      documentId,
-      content,
-      mimeType: safeMimeType,
-      extension: SAFE_DOCUMENT_MIME_EXTENSIONS[safeMimeType]
+      url: redirectUrl.toString(),
+      refreshAt: documentLinkRefreshAt(redirectUrl)
     };
   }
 

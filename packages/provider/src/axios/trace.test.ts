@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { AuthConfigSecretRedactor } from '../auth/redact';
-import { __traceInternals } from './trace';
+import {
+  __traceInternals,
+  redactAuthConfigSecretsInText,
+  sanitizeSecretValuesInText
+} from './trace';
 
 let {
   sanitizeFreeText,
@@ -8,6 +12,8 @@ let {
   sanitizeHeaders,
   isSafeHeaderName,
   isSecretKeyName,
+  isSecretFieldName,
+  isAuthConfigSecretValue,
   isUrlFormSecretKeyName,
   redactStructuredValue
 } = __traceInternals;
@@ -246,6 +252,53 @@ describe('sanitizeFreeText', () => {
   });
 });
 
+describe('sanitizeSecretValuesInText', () => {
+  it('redacts credential header values regardless of length', () => {
+    expect(sanitizeSecretValuesInText('Authorization: Bearer abc')).toBe(
+      'Authorization: Bearer [redacted]'
+    );
+    expect(sanitizeSecretValuesInText('proxy-authorization=Basic xyz')).toBe(
+      'proxy-authorization=Basic [redacted]'
+    );
+    expect(sanitizeSecretValuesInText('sent X-API-Key: k1 to server')).toBe(
+      'sent X-API-Key: [redacted] to server'
+    );
+    expect(sanitizeSecretValuesInText('apiKey=short&page=2')).toBe('apiKey=[redacted]&page=2');
+    expect(sanitizeSecretValuesInText('Cookie: sid=1; theme=dark next')).toBe(
+      'Cookie: [redacted] next'
+    );
+    expect(sanitizeSecretValuesInText('set-cookie: "sess=abc"')).toBe(
+      'set-cookie: "[redacted]"'
+    );
+  });
+
+  it('redacts 8+ character scheme credentials but keeps prose', () => {
+    expect(sanitizeSecretValuesInText('got Bearer abc12345 back')).toBe(
+      'got Bearer [redacted] back'
+    );
+    expect(sanitizeSecretValuesInText('Basic dXNlcjpwYXNz')).toBe('Basic [redacted]');
+    expect(sanitizeSecretValuesInText('token a1b2c3d4e5')).toBe('token [redacted]');
+
+    for (let prose of [
+      'Invalid token provided',
+      'token expired',
+      'Basic authentication failed',
+      'Bearer Authentication required',
+      'Token verification failed',
+      'Request failed with error code=404',
+      'Invalid token code=404'
+    ]) {
+      expect(sanitizeSecretValuesInText(prose)).toBe(prose);
+    }
+  });
+
+  it('redacts single-quoted secret pairs', () => {
+    expect(
+      sanitizeSecretValuesInText("{'access_token': 'abc', 'token_type': 'bearer', 'ok': 'x'}")
+    ).toBe("{'access_token': '[redacted]', 'token_type': 'bearer', 'ok': 'x'}");
+  });
+});
+
 describe('sanitizeUrl', () => {
   it('redacts common secret query params', () => {
     expect(
@@ -394,5 +447,256 @@ describe('redactStructuredValue', () => {
   it('preserves arrays and numerics', () => {
     let out = redactStructuredValue([1, 'two', { three: 3 }]);
     expect(out).toEqual([1, 'two', { three: 3 }]);
+  });
+});
+
+describe('isSecretFieldName (split-camelCase classifier)', () => {
+  it('matches raw and split camelCase secret keys', () => {
+    for (let key of [
+      'apiSecret',
+      'api_secret',
+      'accessKey',
+      'access_key',
+      'botToken',
+      'bot_token',
+      'githubToken',
+      'github_token',
+      'clientSecret',
+      'sessionToken',
+      'hapikey',
+      'JSESSIONID',
+      'PHPSESSID',
+      'userSessionId',
+      'secret_id'
+    ]) {
+      expect(isSecretFieldName(key), key).toBe(true);
+    }
+  });
+
+  it('skips descriptors, cursors, and ordinary ids', () => {
+    for (let key of [
+      'tokenType',
+      'tokenCount',
+      'tokenExpiresAt',
+      'pageToken',
+      'accountId',
+      'apiKeyId',
+      'email',
+      'subdomain'
+    ]) {
+      expect(isSecretFieldName(key), key).toBe(false);
+    }
+  });
+});
+
+describe('isAuthConfigSecretValue (auth-config paths)', () => {
+  it('accepts secret-named and credential-role fields', () => {
+    expect(isAuthConfigSecretValue('x', 'token')).toBe(true);
+    expect(isAuthConfigSecretValue('x', 'oauth.accessToken')).toBe(true);
+    expect(isAuthConfigSecretValue('x', 'apiKeys.0')).toBe(true);
+    expect(isAuthConfigSecretValue('x', 'subscriptionKey')).toBe(true);
+    expect(isAuthConfigSecretValue('x', 'writeKey')).toBe(true);
+    expect(isAuthConfigSecretValue('x', 'provisioningHash')).toBe(true);
+    expect(isAuthConfigSecretValue('Basic dXNlcjpw', 'authorizationHeader')).toBe(true);
+  });
+
+  it('rejects non-secret fields', () => {
+    for (let path of [
+      'accountId',
+      'email',
+      'tokenType',
+      'subdomain',
+      'scope',
+      'expiresAt',
+      'clientId',
+      'region',
+      'oauth.tenantId'
+    ]) {
+      expect(isAuthConfigSecretValue('x', path), path).toBe(false);
+    }
+    expect(isAuthConfigSecretValue('authorization', 'tokenHeader')).toBe(false);
+    expect(isAuthConfigSecretValue('project-access-token', 'tokenHeader')).toBe(false);
+  });
+});
+
+describe('auth-config literal redaction in traces', () => {
+  let redactor = new AuthConfigSecretRedactor({
+    token: 'tg-secret-123456',
+    pin: '1234',
+    accountId: '123456',
+    email: 'me@acme.com',
+    tokenType: 'Bearer',
+    subdomain: 'acme',
+    scope: 'read',
+    expiresAt: '2026-10-13T12:00:00.000Z'
+  });
+
+  it('replaces only secret-named whole values in structured bodies', () => {
+    expect(
+      redactStructuredValue(
+        {
+          id: '123456',
+          email: 'me@acme.com',
+          type: 'Bearer',
+          subdomain: 'acme',
+          scope: 'read',
+          expiresAt: '2026-10-13T12:00:00.000Z',
+          echoed: 'tg-secret-123456',
+          short: '1234'
+        },
+        0,
+        redactor
+      )
+    ).toEqual({
+      id: '123456',
+      email: 'me@acme.com',
+      type: 'Bearer',
+      subdomain: 'acme',
+      scope: 'read',
+      expiresAt: '2026-10-13T12:00:00.000Z',
+      echoed: '$$MT$secret$authConfig$token',
+      short: '$$MT$secret$authConfig$pin'
+    });
+    expect(sanitizeFreeText('acme', redactor)).toBe('acme');
+  });
+
+  it('keeps non-secret query and fragment values but replaces secret ones', () => {
+    expect(
+      sanitizeUrl(
+        'https://acme.example.com/v1?account_id=123456&scope=read&echo=tg-secret-123456#sub=acme',
+        redactor
+      )
+    ).toBe(
+      'https://acme.example.com/v1?account_id=123456&scope=read&echo=%24%24MT%24secret%24authConfig%24token#sub=acme'
+    );
+  });
+
+  it('replaces camelCase secret auth fields embedded in text', () => {
+    let camel = new AuthConfigSecretRedactor({
+      apiSecret: 'api-secret-value',
+      accessKey: 'access-key-value',
+      botToken: '123:bot-token-value',
+      accountName: 'acme-corporation'
+    });
+    expect(
+      redactAuthConfigSecretsInText(
+        'api-secret-value access-key-value /bot123:bot-token-value/ acme-corporation',
+        camel
+      )
+    ).toBe(
+      '$$MT$secret$authConfig$apiSecret$$ $$MT$secret$authConfig$accessKey$$ ' +
+        '/bot$$MT$secret$authConfig$botToken$$/ acme-corporation'
+    );
+  });
+});
+
+describe('sanitizeSecretValuesInText header schemes', () => {
+  it('redacts credentials after any authorization scheme', () => {
+    let cases: [string, string][] = [
+      ['Authorization: OAuth 00D5g000004XyZ!AQ4AQ', 'Authorization: OAuth [redacted]'],
+      ['Authorization: Bot MTk4NjIyNDgzNDcxOTI1MjQ4.Cl2FMQ', 'Authorization: Bot [redacted]'],
+      ['Authorization: SSWS 00QCjAl4MlV-WPXM', 'Authorization: SSWS [redacted]'],
+      [
+        'Authorization: Zoho-oauthtoken 1000.abc.123 rejected',
+        'Authorization: Zoho-oauthtoken [redacted] rejected'
+      ],
+      [
+        'authorization: Klaviyo-API-Key pk_abc123',
+        'authorization: Klaviyo-API-Key [redacted]'
+      ],
+      [
+        'Authorization: Digest username="Mufasa", realm="x", nonce="dcd98b", response="6629fae49393a05397450978507c4ef1"',
+        'Authorization: Digest [redacted]'
+      ],
+      [
+        'Authorization: AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, SignedHeaders=host, Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7',
+        'Authorization: AWS4-HMAC-SHA256 [redacted]'
+      ],
+      ['Proxy-Authorization: "Custom abc123def"', 'Proxy-Authorization: "Custom [redacted]"'],
+      ['Authorization: abc123def please retry', 'Authorization: [redacted] please retry']
+    ];
+
+    for (let [input, expected] of cases) {
+      expect(sanitizeSecretValuesInText(input), input).toBe(expected);
+    }
+  });
+
+  it('keeps header-name prose that holds no credential', () => {
+    for (let prose of [
+      'Authorization: missing or invalid',
+      'Authorization: Basic',
+      'Missing cookie: please log in',
+      'X-API-Key: invalid',
+      'api_key: required'
+    ]) {
+      expect(sanitizeSecretValuesInText(prose), prose).toBe(prose);
+    }
+  });
+});
+
+describe('sanitizeSecretValuesInText prose key: value pairs', () => {
+  it('redacts secret-named pairs with credential values', () => {
+    let cases: [string, string][] = [
+      ['password: Hunter2', 'password: [redacted]'],
+      ['access_token: abc', 'access_token: [redacted]'],
+      ['refresh_token: 1//0gabc', 'refresh_token: [redacted]'],
+      ['sessionToken: FwoGZXIvYXdzEJr', 'sessionToken: [redacted]'],
+      ['secret: s3cr3tvalue', 'secret: [redacted]'],
+      ['Invalid token: ya29.a0AfH6SMBx.', 'Invalid token: [redacted].'],
+      [
+        "{ access_token: 'abc', token_type: 'bearer' }",
+        "{ access_token: '[redacted]', token_type: 'bearer' }"
+      ],
+      ['client_secret:"xyz"', 'client_secret:"[redacted]"']
+    ];
+
+    for (let [input, expected] of cases) {
+      expect(sanitizeSecretValuesInText(input), input).toBe(expected);
+    }
+  });
+
+  it('keeps state words, non-secret keys, and URLs', () => {
+    for (let prose of [
+      'token: expired',
+      'token: expired.',
+      'Error fetching access token: invalid_grant',
+      'refresh_token: invalid_grant',
+      'password: required',
+      'access_token: missing',
+      'refresh_token: revoked',
+      'Error: Request failed',
+      'see https://api.example.com:443/v1',
+      'token_type: bearer',
+      'tokenCount: 12'
+    ]) {
+      expect(sanitizeSecretValuesInText(prose), prose).toBe(prose);
+    }
+  });
+});
+
+describe('sanitizeUrl credential query values', () => {
+  it('redacts key and hapikey params and known credential formats', () => {
+    let googleKey = `AIza${'b'.repeat(35)}`;
+    expect(sanitizeUrl(`https://maps.googleapis.com/api?key=${googleKey}&q=x`)).toBe(
+      'https://maps.googleapis.com/api?key=[redacted]&q=x'
+    );
+    expect(sanitizeUrl('https://api.hubapi.com/contacts?hapikey=abc-123')).toBe(
+      'https://api.hubapi.com/contacts?hapikey=[redacted]'
+    );
+    expect(sanitizeUrl(`https://example.com/x?q=sk_live_${'a'.repeat(24)}&page=2`)).toBe(
+      'https://example.com/x?q=[redacted]&page=2'
+    );
+    expect(sanitizeUrl(`https://example.com/x#q=sk_live_${'a'.repeat(24)}`)).toBe(
+      'https://example.com/x#q=[redacted]'
+    );
+    expect(sanitizeUrl(`not a url?q=sk_live_${'a'.repeat(24)}`)).toBe(
+      'not a url?q=[redacted]'
+    );
+  });
+
+  it('keeps compound key params', () => {
+    expect(sanitizeUrl('https://example.com/x?sort_key=name&partition_key=p1')).toBe(
+      'https://example.com/x?sort_key=name&partition_key=p1'
+    );
   });
 });

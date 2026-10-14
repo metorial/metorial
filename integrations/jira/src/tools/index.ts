@@ -5,6 +5,7 @@ export * from './get-transitions';
 export * from './link-issues';
 export * from './list-boards';
 export * from './list-projects';
+export * from './list-sites';
 export * from './log-work';
 export * from './manage-comments';
 export * from './manage-filters';

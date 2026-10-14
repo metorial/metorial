@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
 import {
+  isTerminalUnsuccessfulRunStatus,
   jsonObjectSchema,
   MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS,
   mapRun,
+  normalizeRunInput,
   runtimeSafeWaitForFinish,
   validateRunOptions,
   validateWaitForFinish
@@ -96,10 +98,11 @@ export let runActor = SlateTool.create(spec, {
     validateWaitForFinish(ctx.input.waitForFinish);
     let client = new ApifyClient({ token: ctx.auth.token });
     let waitForFinish = runtimeSafeWaitForFinish(ctx.input.waitForFinish);
+    let runInput = normalizeRunInput(ctx.input.input);
 
     if (ctx.input.synchronous) {
       let run = await client.runActor(ctx.input.actorId, {
-        input: ctx.input.input,
+        input: runInput,
         timeout: ctx.input.timeout,
         memory: ctx.input.memory,
         build: ctx.input.build,
@@ -123,12 +126,14 @@ export let runActor = SlateTool.create(spec, {
         },
         message: datasetItems
           ? `Actor **${ctx.input.actorId}** completed and returned **${datasetItems.length}** item(s). Run ID: \`${output.runId}\`.`
-          : `Actor **${ctx.input.actorId}** is **${output.status}** after the bounded wait. Run ID: \`${output.runId}\`; poll Get Run for completion.`
+          : isTerminalUnsuccessfulRunStatus(output.status)
+            ? `Actor **${ctx.input.actorId}** run ended with status **${output.status}** and returned no items. Run ID: \`${output.runId}\`; use Get Run with includeLog for details.`
+            : `Actor **${ctx.input.actorId}** is **${output.status}** after the bounded wait. Run ID: \`${output.runId}\`; poll Get Run for completion.`
       };
     }
 
     let run = await client.runActor(ctx.input.actorId, {
-      input: ctx.input.input,
+      input: runInput,
       timeout: ctx.input.timeout,
       memory: ctx.input.memory,
       build: ctx.input.build,

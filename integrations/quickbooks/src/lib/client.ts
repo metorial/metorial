@@ -1,5 +1,5 @@
 import { createAxios } from '@slates/provider';
-import { quickBooksApiError } from './errors';
+import { flattenQuickBooksErrorResponse, quickBooksApiError } from './errors';
 
 export interface QuickBooksClientConfig {
   token: string;
@@ -31,6 +31,9 @@ export class QuickBooksClient {
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        extractResponseData: response => flattenQuickBooksErrorResponse(response.data)
       }
     });
     this.axios.interceptors.response.use(

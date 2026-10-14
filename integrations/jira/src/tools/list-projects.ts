@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let listProjectsTool = SlateTool.create(spec, {
@@ -14,7 +14,8 @@ export let listProjectsTool = SlateTool.create(spec, {
   .input(
     z.object({
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
-      maxResults: z.number().optional().default(50).describe('Maximum projects to return.')
+      maxResults: z.number().optional().default(50).describe('Maximum projects to return.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -38,11 +39,7 @@ export let listProjectsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let result = await client.getProjects({
       startAt: ctx.input.startAt,

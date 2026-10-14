@@ -63,7 +63,11 @@ export let manageFile = SlateTool.create(spec, {
           'delete'
         ])
         .describe('File action to perform'),
-      driveId: z.string().describe('Drive (document library) ID'),
+      driveId: z
+        .string()
+        .describe(
+          'Drive (document library) ID, e.g. "b!..." from Get Drives. A list ID is not a drive ID.'
+        ),
       itemId: z
         .string()
         .optional()
@@ -129,9 +133,15 @@ export let manageFile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SharePointClient(ctx.auth.token);
+    let driveId = ctx.input.driveId.trim();
+    if (!driveId) {
+      throw serviceError(
+        'driveId is required and cannot be empty. Use Get Drives with the siteId to find the document library drive ID.',
+        'sharepoint_driveid_required'
+      );
+    }
     let {
       action,
-      driveId,
       itemId,
       itemPath,
       fileName,

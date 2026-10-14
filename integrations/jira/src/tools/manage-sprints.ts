@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let listSprintsTool = SlateTool.create(spec, {
@@ -19,7 +19,8 @@ export let listSprintsTool = SlateTool.create(spec, {
         .optional()
         .describe('Filter sprints by state.'),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
-      maxResults: z.number().optional().default(50).describe('Maximum sprints to return.')
+      maxResults: z.number().optional().default(50).describe('Maximum sprints to return.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -38,11 +39,7 @@ export let listSprintsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let result = await client.getSprints(ctx.input.boardId, {
       state: ctx.input.state,
@@ -81,7 +78,8 @@ export let createSprintTool = SlateTool.create(spec, {
       name: z.string().describe('The sprint name.'),
       startDate: z.string().optional().describe('Sprint start date in ISO 8601 format.'),
       endDate: z.string().optional().describe('Sprint end date in ISO 8601 format.'),
-      goal: z.string().optional().describe('The sprint goal.')
+      goal: z.string().optional().describe('The sprint goal.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -92,11 +90,7 @@ export let createSprintTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let sprint = await client.createSprint({
       name: ctx.input.name,
@@ -130,7 +124,8 @@ export let moveIssuesToSprintTool = SlateTool.create(spec, {
       sprintId: z.coerce.number().describe('The target sprint ID.'),
       issueKeys: z
         .array(z.string())
-        .describe('Issue keys to move (e.g., ["PROJ-1", "PROJ-2"]).')
+        .describe('Issue keys to move (e.g., ["PROJ-1", "PROJ-2"]).'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -140,11 +135,7 @@ export let moveIssuesToSprintTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.moveIssuesToSprint(ctx.input.sprintId, ctx.input.issueKeys);
 

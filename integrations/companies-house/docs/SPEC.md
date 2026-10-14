@@ -44,7 +44,7 @@ All endpoints below use `GET`.
 | `list_filing_history` | Public Data API `/company/{company_number}/filing-history` | List and filter filing history |
 | `get_filing_history_item` | Public Data API `/company/{company_number}/filing-history/{transaction_id}` | Retrieve one filing-history item |
 | `get_document_metadata` | Document API `/document/{document_id}` | Discover metadata and available representations |
-| `download_filing_document` | Document API `/document/{document_id}/content` | Locate and download an advertised representation |
+| `download_filing_document` | Document API `/document/{document_id}/content` | Locate an advertised representation and return it as a downloadable file |
 | `list_company_charges` | Public Data API `/company/{company_number}/charges` | List registered charges |
 | `get_company_charge` | Public Data API `/company/{company_number}/charges/{charge_id}` | Retrieve one registered charge |
 | `get_company_insolvency` | Public Data API `/company/{company_number}/insolvency` | Retrieve company insolvency cases |
@@ -94,15 +94,13 @@ Document retrieval is a two-step workflow:
 1. `get_document_metadata` requests `/document/{document_id}` and returns the MIME types advertised under the provider’s `resources` object, with available size and timestamp metadata.
 2. `download_filing_document` requires one advertised MIME type and requests `/document/{document_id}/content` with that value in `Accept`.
 
-The supported allowlist is `application/pdf`, `application/json`, `application/xml`, `application/xhtml+xml`, `application/zip`, and `text/csv`. The download sequence deliberately does not follow redirects automatically:
+The supported allowlist is `application/pdf`, `application/json`, `application/xml`, `application/xhtml+xml`, `application/zip`, and `text/csv`. The tool checks the metadata first: when the document advertises content types and the requested one is not among them, it fails with the available types. The content request deliberately does not follow redirects automatically:
 
 1. The authenticated Document API request must return exactly `302` with a `Location` header.
 2. The location must be an absolute HTTPS URL with no embedded username or password.
-3. The destination is fetched without the Companies House API key, with further redirects disabled, and must return a `2xx` response.
-4. Both declared content length and received bytes are limited to 50 MiB (52,428,800 bytes); empty or non-binary bodies are rejected.
-5. If the response `Content-Type` is missing, `application/octet-stream`, or the legacy `binary/octet-stream`, the requested allowlisted MIME type is used. Any unexpected specific MIME type is rejected.
+3. That short-lived pre-signed location is returned as the downloadable file. It is fetched without the Companies House API key, so the key is never sent to the storage host. When the link nears its signed expiry (`X-Amz-Date` plus `X-Amz-Expires`, renewed 30 seconds early), a fresh link is requested from the same Document API content endpoint for the same document and MIME type.
 
-The successful result exposes the document ID, generated file name, MIME type, and byte length, and makes the document available as a downloadable file. File contents are not included in structured output.
+The document body is not read by the tool, so there is no integration-side size limit. The successful result exposes the document ID, generated file name, MIME type, and the byte length advertised by the metadata when available, and makes the document available as a downloadable file. File contents are not included in structured output.
 
 ## Errors and rate limits
 

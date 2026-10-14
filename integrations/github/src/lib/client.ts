@@ -49,15 +49,56 @@ let isGitHubRateLimitResponse = (
   );
 };
 
+// GitHub validation failures (for example 422 from search or pull request creation) put the
+// actionable detail in `errors[]` while the top-level message is only "Validation Failed":
+// https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api
+let gitHubErrorDetails = (data: unknown): string[] => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return [];
+  let errors = (data as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+
+  let details: string[] = [];
+  for (let item of errors) {
+    let detail: string | undefined;
+    if (typeof item === 'string') {
+      detail = item;
+    } else if (typeof item === 'object' && item !== null) {
+      let record = item as Record<string, unknown>;
+      if (typeof record.message === 'string' && record.message.trim()) {
+        detail = record.message;
+      } else {
+        detail = [record.resource, record.field, record.code]
+          .filter((part): part is string => typeof part === 'string' && part.trim() !== '')
+          .join(' ');
+      }
+    }
+    let trimmed = detail?.trim();
+    if (trimmed && !details.includes(trimmed)) details.push(trimmed);
+  }
+  return details;
+};
+
 export const githubAxiosErrorMapping: SlateAxiosErrorOptions = {
-  mapAxiosError: error =>
-    isGitHubRateLimitResponse(error.response)
-      ? {
-          code: 'upstream.rate_limited',
-          retryable: true,
-          upstream: { code: GITHUB_RATE_LIMITED_CODE }
-        }
-      : undefined
+  mapAxiosError: (error, inferred) => {
+    let details = gitHubErrorDetails(error.response?.data).filter(
+      detail => detail !== inferred.message
+    );
+    let message =
+      details.length > 0
+        ? `${inferred.message ? `${inferred.message}: ` : ''}${details.join('; ')}`
+        : undefined;
+
+    if (isGitHubRateLimitResponse(error.response)) {
+      return {
+        code: 'upstream.rate_limited',
+        retryable: true,
+        upstream: { code: GITHUB_RATE_LIMITED_CODE },
+        ...(message ? { message } : {})
+      };
+    }
+
+    return message ? { message } : undefined;
+  }
 };
 
 // Runtime axios instances reject with SlateError (the response interceptor consumes the raw

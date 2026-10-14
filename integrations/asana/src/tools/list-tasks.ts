@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asanaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
   key: 'list_tasks',
-  description: `List tasks filtered by project, section, or assignee. At least one filter must be provided. When filtering by assignee, a workspace GID is also required.`,
+  description: `List tasks filtered by exactly one of projectId, sectionId, or assigneeId (with workspaceId). Filters cannot be combined.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +17,12 @@ export let listTasks = SlateTool.create(spec, {
       projectId: z.string().optional().describe('Filter by project GID'),
       sectionId: z.string().optional().describe('Filter by section GID'),
       assigneeId: z.string().optional().describe('Filter by assignee GID or "me"'),
-      workspaceId: z.string().optional().describe('Required when filtering by assignee'),
+      workspaceId: z
+        .string()
+        .optional()
+        .describe(
+          'Workspace GID. Only used with assigneeId, and required when assigneeId is set.'
+        ),
       completedSince: z
         .string()
         .optional()
@@ -51,6 +57,20 @@ export let listTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let scopeFilterCount = [
+      ctx.input.projectId,
+      ctx.input.sectionId,
+      ctx.input.assigneeId
+    ].filter(Boolean).length;
+    if (scopeFilterCount !== 1) {
+      throw asanaServiceError(
+        'Provide exactly one filter: projectId, sectionId, or assigneeId (with workspaceId). Use list_projects or list_workspaces to find GIDs.'
+      );
+    }
+    if (ctx.input.assigneeId && !ctx.input.workspaceId) {
+      throw asanaServiceError('workspaceId is required when filtering tasks by assigneeId.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listTasks({
       project: ctx.input.projectId,

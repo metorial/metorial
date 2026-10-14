@@ -5,11 +5,15 @@ import { apifyValidationError } from '../lib/errors';
 import { spec } from '../spec';
 import {
   ensureAtLeastOne,
+  isTerminalUnsuccessfulRunStatus,
   jsonObjectSchema,
+  MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS,
   mapRun,
+  normalizeRunInput,
   paginationInput,
   pickDefined,
   requireString,
+  runtimeSafeWaitForFinish,
   validateRunOptions,
   validateWaitForFinish
 } from './shared';
@@ -43,12 +47,13 @@ export let manageTask = SlateTool.create(spec, {
     'Use action=create with actorId and name to save a reusable task.',
     'Use action=run with taskId and synchronous=false to start a run from saved task settings and receive a runId.',
     'For reliable follow-up, omit waitForFinish or set it to 0, then poll Get Run with the returned runId.',
-    'Use synchronous=true only for short task runs; it returns datasetItems without a runId and can lose run metadata if the client connection times out.',
+    'Use synchronous=true only for short task runs. The tool waits up to 20 seconds, returning datasetItems when complete or a runId for polling when still running.',
     'Do not recover a timed-out start by guessing from List Runs when concurrent requests may exist.'
   ],
   constraints: [
     'synchronous applies only to action=run.',
-    'waitForFinish applies only to asynchronous action=run calls and must be between 0 and 60 seconds.'
+    'waitForFinish applies only to action=run and must be between 0 and 60 seconds; values above 20 are capped at 20 to fit the tool runtime.',
+    'synchronous=true returns datasetItems when the run finishes during the bounded wait, otherwise it returns run metadata for polling.'
   ],
   tags: {
     destructive: true,
@@ -70,7 +75,7 @@ export let manageTask = SlateTool.create(spec, {
         .optional()
         .default(false)
         .describe(
-          'For action=run, wait for completion and return JSON dataset items directly'
+          'For action=run, wait briefly and return JSON dataset items when the run completes'
         ),
       timeout: z.number().optional().describe('Run timeout in seconds'),
       memory: z.number().optional().describe('Run memory in MB; must be a power of 2'),
@@ -79,7 +84,7 @@ export let manageTask = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Seconds to wait before returning the run object for asynchronous action=run, 0-60'
+          'Seconds to wait before returning the run object for action=run, 0-60; capped at 20 per call'
         ),
       maxItems: z.number().optional().describe('Maximum dataset items for a run'),
       maxTotalChargeUsd: z.number().optional().describe('Maximum total charge in USD'),
@@ -100,18 +105,15 @@ export let manageTask = SlateTool.create(spec, {
       modifiedAt: z.string().optional(),
       tasks: z.array(z.record(z.string(), z.any())).optional().describe('Task list'),
       total: z.number().optional().describe('Total tasks'),
-      runId: z.string().optional().describe('Run ID when asynchronous action=run starts'),
-      runStatus: z
-        .string()
-        .optional()
-        .describe('Run status when asynchronous action=run starts'),
+      runId: z.string().optional().describe('Run ID when action=run starts a run'),
+      runStatus: z.string().optional().describe('Run status when action=run starts a run'),
       defaultDatasetId: z.string().optional(),
       defaultKeyValueStoreId: z.string().optional(),
       defaultRequestQueueId: z.string().optional(),
       datasetItems: z
         .array(jsonObjectSchema)
         .optional()
-        .describe('JSON dataset items returned only for synchronous action=run'),
+        .describe('JSON dataset items returned when a synchronous action=run completes'),
       itemCount: z.number().optional().describe('Number of synchronous dataset items'),
       deleted: z.boolean().optional().describe('Whether the task was deleted')
     })
@@ -152,7 +154,7 @@ export let manageTask = SlateTool.create(spec, {
         actId: actorId,
         name,
         title: ctx.input.title,
-        input: ctx.input.input,
+        input: normalizeRunInput(ctx.input.input),
         options: taskOptions(ctx.input)
       });
       let task = await client.createTask(body);
@@ -167,7 +169,7 @@ export let manageTask = SlateTool.create(spec, {
       let body = pickDefined({
         name: ctx.input.name,
         title: ctx.input.title,
-        input: ctx.input.input,
+        input: normalizeRunInput(ctx.input.input),
         options: taskOptions(ctx.input)
       });
       ensureAtLeastOne(body, 'update the task');
@@ -189,50 +191,53 @@ export let manageTask = SlateTool.create(spec, {
 
     let taskId = requireString(ctx.input.taskId, 'taskId', 'run');
     validateRunOptions(ctx.input);
-    if (ctx.input.synchronous) {
-      let datasetItems = await client.runTaskSync(taskId, {
-        input: ctx.input.input,
-        timeout: ctx.input.timeout,
-        memory: ctx.input.memory,
-        build: ctx.input.build,
-        maxItems: ctx.input.maxItems,
-        maxTotalChargeUsd: ctx.input.maxTotalChargeUsd,
-        webhooks: ctx.input.webhooks
-      });
-
-      return {
-        output: {
-          taskId,
-          datasetItems,
-          itemCount: datasetItems.length
-        },
-        message: `Task \`${taskId}\` ran synchronously and returned **${datasetItems.length}** item(s).`
-      };
-    }
-
     validateWaitForFinish(ctx.input.waitForFinish);
+    let waitForFinish = runtimeSafeWaitForFinish(ctx.input.waitForFinish);
     let run = await client.runTask(taskId, {
-      input: ctx.input.input,
+      input: normalizeRunInput(ctx.input.input),
       timeout: ctx.input.timeout,
       memory: ctx.input.memory,
       build: ctx.input.build,
-      waitForFinish: ctx.input.waitForFinish,
+      waitForFinish: ctx.input.synchronous
+        ? (waitForFinish ?? MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS)
+        : waitForFinish,
       maxItems: ctx.input.maxItems,
       maxTotalChargeUsd: ctx.input.maxTotalChargeUsd,
       restartOnError: ctx.input.restartOnError,
       webhooks: ctx.input.webhooks
     });
     let mapped = mapRun(run);
+    let runOutput = {
+      taskId,
+      runId: mapped.runId,
+      runStatus: mapped.status,
+      defaultDatasetId: mapped.defaultDatasetId,
+      defaultKeyValueStoreId: mapped.defaultKeyValueStoreId,
+      defaultRequestQueueId: mapped.defaultRequestQueueId
+    };
+
+    if (ctx.input.synchronous) {
+      let datasetItems =
+        mapped.status === 'SUCCEEDED' && mapped.runId
+          ? await client.getRunDatasetItems(mapped.runId)
+          : undefined;
+
+      return {
+        output: {
+          ...runOutput,
+          datasetItems,
+          itemCount: datasetItems?.length
+        },
+        message: datasetItems
+          ? `Task \`${taskId}\` completed and returned **${datasetItems.length}** item(s). Run ID: \`${mapped.runId}\`.`
+          : isTerminalUnsuccessfulRunStatus(mapped.status)
+            ? `Task \`${taskId}\` run ended with status **${mapped.status}** and returned no items. Run ID: \`${mapped.runId}\`; use Get Run with includeLog for details.`
+            : `Task \`${taskId}\` run is **${mapped.status}** after the bounded wait. Run ID: \`${mapped.runId}\`; poll Get Run for completion.`
+      };
+    }
 
     return {
-      output: {
-        taskId,
-        runId: mapped.runId,
-        runStatus: mapped.status,
-        defaultDatasetId: mapped.defaultDatasetId,
-        defaultKeyValueStoreId: mapped.defaultKeyValueStoreId,
-        defaultRequestQueueId: mapped.defaultRequestQueueId
-      },
+      output: runOutput,
       message: `Task \`${taskId}\` run started. Run ID: \`${mapped.runId}\`, status: **${mapped.status}**.`
     };
   })

@@ -1009,7 +1009,10 @@ export const mapPscStatementListEnvelope = (
   }) as MappedPscStatementList;
 };
 
-export const mapDocumentMetadata = (value: unknown): MappedDocumentMetadata => {
+export const mapDocumentMetadata = (
+  value: unknown,
+  requestedDocumentId: string
+): MappedDocumentMetadata => {
   let record = asRecord(value) ?? {};
   let rawResources = asRecord(record.resources) ?? {};
   let resources: Record<string, MappedDocumentResource> = {};
@@ -1026,7 +1029,9 @@ export const mapDocumentMetadata = (value: unknown): MappedDocumentMetadata => {
   }
 
   return pickDefined({
-    documentId: requiredStringValue(record, ['id'], 'document metadata'),
+    // The Document API metadata resource does not include an id field; fall back to
+    // the identifier the record was requested by.
+    documentId: stringValue(record.id) ?? requestedDocumentId,
     companyNumber: stringValue(record.company_number),
     createdAt: stringValue(record.created_at),
     updatedAt: stringValue(record.updated_at),

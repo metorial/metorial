@@ -1,7 +1,7 @@
-import { createBase64Attachment, createTextAttachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { tableauServiceError } from '../lib/errors';
-import { createClient } from '../lib/helpers';
+import { addViewExportFile, createClient, EXPORT_FORMAT_LABELS } from '../lib/helpers';
 import { spec } from '../spec';
 
 let filterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -24,7 +24,7 @@ let pdfPageTypeSchema = z.enum([
 export let exportView = SlateTool.create(spec, {
   name: 'Export View',
   key: 'export_view',
-  description: `Export a Tableau view as CSV data, a PNG image, or a PDF file attachment. Supports Tableau view filter query parameters and cache max-age controls.`,
+  description: `Export a Tableau view as a downloadable CSV data, PNG image, or PDF file. Supports Tableau view filter query parameters and cache max-age controls.`,
   tags: { readOnly: true }
 })
   .input(
@@ -87,7 +87,8 @@ export let exportView = SlateTool.create(spec, {
     }
 
     let client = createClient(ctx.config, ctx.auth);
-    let result = await client.exportView(ctx.input.viewId, ctx.input.format, {
+    let view = await client.getView(ctx.input.viewId);
+    let file = client.viewExportFile(ctx.input.viewId, ctx.input.format, {
       maxAgeMinutes: ctx.input.maxAgeMinutes,
       filters: ctx.input.filters,
       imageResolution: ctx.input.imageResolution,
@@ -96,21 +97,17 @@ export let exportView = SlateTool.create(spec, {
       pdfPageType: ctx.input.pdfPageType,
       pdfOrientation: ctx.input.pdfOrientation
     });
+    await addViewExportFile(ctx, file);
 
-    let attachment =
-      ctx.input.format === 'csv'
-        ? createTextAttachment(result.data, 'text/csv')
-        : createBase64Attachment(result.data, result.contentType);
-
+    let label = view?.name ? `**${view.name}**` : `\`${ctx.input.viewId}\``;
     return {
       output: {
         viewId: ctx.input.viewId,
         format: ctx.input.format,
-        contentType: result.contentType,
+        contentType: file.mimeType,
         attachmentCount: 1
       },
-      attachments: [attachment],
-      message: `Exported Tableau view \`${ctx.input.viewId}\` as ${ctx.input.format}.`
+      message: `Prepared view ${label} as a ${EXPORT_FORMAT_LABELS[ctx.input.format]} for download.`
     };
   })
   .build();

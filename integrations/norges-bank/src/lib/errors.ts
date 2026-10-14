@@ -1,25 +1,20 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import {
+  type ApiErrorResponse,
+  createApiServiceError,
+  getApiErrorResponseWithBody,
+  isApiErrorRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  statusLabelForApiError,
+  truncateApiErrorMessage
+} from 'slates';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
-
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let addMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
-  }
-};
+let addMessage = (messages: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(messages, value, { includeNumbers: false });
 
 let collectMessages = (value: unknown, messages: string[]) => {
-  if (!isRecord(value)) {
+  if (!isApiErrorRecord(value)) {
     addMessage(messages, value);
     return;
   }
@@ -35,22 +30,27 @@ let collectMessages = (value: unknown, messages: string[]) => {
   }
 };
 
-let extractMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+let extractMessage = (error: unknown, response: ApiErrorResponse | undefined) => {
   let messages: string[] = [];
 
+  // createAxios rejects with a SlateError that keeps the upstream body
+  // (for example SDMX { errors: [{ code, message }] }) in data.baggage.response.
   collectMessages(response?.data, messages);
-
-  if (isRecord(error)) {
+  if (isApiErrorRecord(error)) {
     collectMessages(error.data, messages);
   }
 
   if (messages.length > 0) {
-    return messages.join(' - ');
+    return truncateApiErrorMessage(messages.join(' - '));
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    let message = error.message.trim();
+    if (looksLikeHtmlErrorBody(message)) {
+      return response?.statusText || 'upstream returned an HTML error page';
+    }
+
+    return truncateApiErrorMessage(message);
   }
 
   return 'Unknown error';
@@ -64,24 +64,16 @@ export let norgesBankApiError = (error: unknown, operation = 'request') => {
     return error;
   }
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+  // createAxios converts upstream failures into SlateError before this mapper runs,
+  // so the HTTP status lives in data.upstream.status / data.status and the raw
+  // response body only survives in data.baggage.response.
+  let response = getApiErrorResponseWithBody(error);
   let status =
     response?.status ??
-    (isRecord(error) && typeof error.status === 'number' ? error.status : undefined);
-  let statusText = response?.statusText;
-  let statusLabel =
-    status !== undefined ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}: ` : '';
+    (isApiErrorRecord(error) && typeof error.status === 'number' ? error.status : undefined);
 
-  let serviceError = norgesBankServiceError(
-    `Norges Bank API ${operation} failed: ${statusLabel}${extractMessage(error)}`
+  return createApiServiceError(
+    `Norges Bank API ${operation} failed: ${statusLabelForApiError(status, response?.statusText)}${extractMessage(error, response)}`,
+    { reason: 'norges_bank_api_error', upstreamStatus: status, parent: error }
   );
-
-  serviceError.data.reason = 'norges_bank_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
 };

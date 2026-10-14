@@ -141,6 +141,35 @@ describe('AuthConfigSecretRedactor.redactEmbedded', () => {
   });
 });
 
+describe('AuthConfigSecretRedactor filters', () => {
+  let authConfig = { token: 'secret-token', accountId: '123456', username: 'secret-token' };
+  let onlyToken = (_secret: string, path: string) => path === 'token';
+
+  it('limits whole-value replacement to fields that pass the filter', () => {
+    let redactor = new AuthConfigSecretRedactor(authConfig);
+
+    expect(redactor.redact(['123456', 'secret-token'], onlyToken)).toEqual([
+      '123456',
+      '$$MT$secret$authConfig$token'
+    ]);
+    expect(
+      redactor.redactEmbedded(['123456', 'secret-token'], () => false, onlyToken)
+    ).toEqual(['123456', '$$MT$secret$authConfig$token']);
+    expect(redactor.redactEmbedded('id 123456 / secret-token', onlyToken, onlyToken)).toBe(
+      'id 123456 / $$MT$secret$authConfig$token$$'
+    );
+  });
+
+  it('keeps replacing every field, last path first, without a filter', () => {
+    let redactor = new AuthConfigSecretRedactor(authConfig);
+
+    expect(redactor.redact(['123456', 'secret-token'])).toEqual([
+      '$$MT$secret$authConfig$accountId',
+      '$$MT$secret$authConfig$username'
+    ]);
+  });
+});
+
 describe('redactUrlAttachmentSecrets', () => {
   let authConfig = { token: '123SECRET', nested: { token2: 'also_secret' } };
 

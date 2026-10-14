@@ -1,4 +1,5 @@
-import { TableauClient } from './client';
+import type { SlateAddAttachmentInput } from 'slates';
+import { TableauClient, type ViewExportFile } from './client';
 import { normalizeApiVersion, normalizeServerUrl } from './connection';
 import { tableauServiceError } from './errors';
 
@@ -32,5 +33,28 @@ export let createClient = (
     token: auth.token,
     userId: auth.userId,
     expiresAt: auth.expiresAt
+  });
+};
+
+export let EXPORT_FORMAT_LABELS = {
+  csv: 'CSV file',
+  image: 'PNG image',
+  pdf: 'PDF file'
+} as const;
+
+// Tableau export URLs need the session token on every request; the stored auth value keeps
+// the file downloadable after Tableau sign-in sessions are renewed.
+export let addViewExportFile = async (
+  ctx: {
+    auth: { token: string };
+    addAttachment: (input: SlateAddAttachmentInput) => Promise<void>;
+  },
+  file: ViewExportFile
+) => {
+  await ctx.addAttachment({
+    type: 'url',
+    url: file.url,
+    mimeType: file.mimeType,
+    headers: { 'X-Tableau-Auth': ctx.auth.token }
   });
 };

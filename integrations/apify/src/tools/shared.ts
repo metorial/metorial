@@ -83,6 +83,21 @@ export let runtimeSafeWaitForFinish = (waitForFinish: number | undefined) =>
     ? undefined
     : Math.min(waitForFinish, MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS);
 
+// Accept run input sent as a JSON-encoded string by decoding it to the JSON object Apify expects.
+export let normalizeRunInput = (input: unknown) => {
+  if (typeof input !== 'string') return input;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    throw apifyValidationError('input must be a JSON object.');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw apifyValidationError('input must be a JSON object.');
+  }
+  return parsed;
+};
+
 export let pickDefined = (fields: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
 
@@ -90,6 +105,11 @@ let pickRunOutput = <T extends Record<string, unknown>>(fields: T): T =>
   Object.fromEntries(
     Object.entries(fields).filter(([, value]) => value !== undefined && value !== null)
   ) as T;
+
+let TERMINAL_UNSUCCESSFUL_RUN_STATUSES = new Set(['FAILED', 'ABORTED', 'TIMED-OUT']);
+
+export let isTerminalUnsuccessfulRunStatus = (status: unknown) =>
+  typeof status === 'string' && TERMINAL_UNSUCCESSFUL_RUN_STATUSES.has(status);
 
 export let mapRun = (run: Record<string, any>) =>
   pickRunOutput({

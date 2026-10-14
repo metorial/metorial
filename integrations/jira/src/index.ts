@@ -21,6 +21,7 @@ import {
   listFavouriteFiltersTool,
   listIssueLinkTypesTool,
   listProjectsTool,
+  listSitesTool,
   listSprintsTool,
   listVersionsTool,
   listWorklogsTool,
@@ -68,7 +69,8 @@ export let provider = Slate.create({
     deleteFilterTool,
     listFavouriteFiltersTool,
     searchUsersTool,
-    getTransitionsTool
+    getTransitionsTool,
+    listSitesTool
   ],
   triggers: []
 });

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { flattenSentryErrorResponse } from './errors';
 
 export type SentryRegion = 'us' | 'de';
 
@@ -17,6 +18,13 @@ export class Client {
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        extractResponseData: response =>
+          flattenSentryErrorResponse(response, {
+            organizationSlug: config.organizationSlug,
+            region: config.region
+          })
       }
     });
   }

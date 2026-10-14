@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
 import { resolveJiraIssueIdOrKey } from '../lib/errors';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let getIssueTool = SlateTool.create(spec, {
@@ -45,7 +45,8 @@ export let getIssueTool = SlateTool.create(spec, {
         .optional()
         .describe(
           'Additional data to expand (e.g., ["changelog", "transitions", "renderedFields"]). Pass an array; a single string is also accepted.'
-        )
+        ),
+      site: siteInputSchema
     })
   )
   .output(
@@ -82,11 +83,7 @@ export let getIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let issueIdOrKey = resolveJiraIssueIdOrKey(ctx.input);
     let issue = await client.getIssue(issueIdOrKey, {

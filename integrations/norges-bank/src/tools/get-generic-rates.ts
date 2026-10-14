@@ -25,8 +25,8 @@ export let getGenericRates = SlateTool.create(spec, {
   description:
     'Get raw Norges Bank generic-rate SDMX JSON for treasury bills and government bonds.',
   instructions: [
-    'Use frequency B with YYYY-MM-DD periods, M with YYYY-MM periods, and A with YYYY periods.',
-    'Treasury bills support 3M, 6M, and 12M tenors. Government bonds support 3Y, 5Y, 7Y, and 10Y tenors.'
+    'Use frequency B with YYYY-MM-DD periods, M with YYYY-MM periods, and A with YYYY periods. M and A also accept finer-grained periods such as YYYY-MM-DD; a finer-grained start period is widened to include its whole month or year.',
+    'Treasury bills (TBIL) support 3M, 6M, and 12M tenors. Government bonds (GBON) support 3Y, 5Y, 7Y, and 10Y tenors. Mixed selections return only the tenor and instrument combinations that exist.'
   ],
   tags: {
     readOnly: true,
@@ -45,10 +45,14 @@ export let getGenericRates = SlateTool.create(spec, {
         ),
       startPeriod: z
         .string()
-        .describe('Start period. Use YYYY-MM-DD for B, YYYY-MM for M, or YYYY for A.'),
+        .describe(
+          'Start period. Use YYYY-MM-DD for B, YYYY-MM for M, or YYYY for A. M and A also accept a finer-grained date; the containing month or year is included.'
+        ),
       endPeriod: z
         .string()
-        .describe('End period. Use YYYY-MM-DD for B, YYYY-MM for M, or YYYY for A.'),
+        .describe(
+          'End period. Use YYYY-MM-DD for B, YYYY-MM for M, or YYYY for A. M and A also accept a finer-grained date; the containing month or year is included.'
+        ),
       locale: localeSchema.optional().default('en').describe('Response locale')
     })
   )
@@ -56,7 +60,11 @@ export let getGenericRates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let tenors = uniqueValues(ctx.input.tenors);
     let instrumentTypes = uniqueValues(ctx.input.instrumentTypes);
-    validatePeriodRange(ctx.input.frequency, ctx.input.startPeriod, ctx.input.endPeriod);
+    let { startPeriod, endPeriod } = validatePeriodRange(
+      ctx.input.frequency,
+      ctx.input.startPeriod,
+      ctx.input.endPeriod
+    );
     validateGenericRateCombinations(tenors, instrumentTypes);
 
     let client = new NorgesBankClient();
@@ -64,8 +72,8 @@ export let getGenericRates = SlateTool.create(spec, {
       frequency: ctx.input.frequency,
       tenors,
       instrumentTypes,
-      startPeriod: ctx.input.startPeriod,
-      endPeriod: ctx.input.endPeriod,
+      startPeriod,
+      endPeriod,
       locale: ctx.input.locale
     });
 

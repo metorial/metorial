@@ -1,30 +1,28 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import {
+  type ApiErrorResponse,
+  createApiServiceError,
+  decodeApiErrorBody,
+  getApiErrorResponseWithBody,
+  isApiErrorRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  statusLabelForApiError,
+  truncateApiErrorMessage
+} from 'slates';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+let addMessage = (messages: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(messages, value, { includeNumbers: false });
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let addMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
-  }
-};
-
+// SSB PxWebApi v2 errors are RFC 7807-style bodies, for example
+// { type: "Parameter error", title: "Non-existent value", status: 400 }.
 let collectMessages = (value: unknown, messages: string[]) => {
-  if (!isRecord(value)) {
+  if (!isApiErrorRecord(value)) {
     addMessage(messages, value);
     return;
   }
 
-  for (let key of ['message', 'error', 'detail', 'description', 'title', 'type']) {
+  for (let key of ['title', 'detail', 'message', 'error', 'description', 'type']) {
     addMessage(messages, value[key]);
   }
 
@@ -35,25 +33,34 @@ let collectMessages = (value: unknown, messages: string[]) => {
   }
 };
 
-let extractMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+let extractMessage = (error: unknown, response: ApiErrorResponse | undefined) => {
   let messages: string[] = [];
 
   collectMessages(response?.data, messages);
 
-  if (isRecord(error)) {
-    collectMessages(error.data, messages);
+  if (messages.length === 0 && isApiErrorRecord(error) && isApiErrorRecord(error.data)) {
+    addMessage(messages, error.data.message);
   }
 
   if (messages.length > 0) {
-    return messages.join(' - ');
+    return truncateApiErrorMessage(messages.join(' - '));
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    return looksLikeHtmlErrorBody(error.message)
+      ? 'SSB returned an unexpected non-JSON error response.'
+      : truncateApiErrorMessage(error.message);
   }
 
   return 'Unknown error';
+};
+
+// csv/html/px requests use responseType=text and xlsx uses arraybuffer, so SSB's JSON
+// error bodies arrive as strings or binary buffers. Decode them before SlateError
+// sanitizes the body into baggage, so the upstream reason stays readable.
+export let decodeSsbErrorBody = (data: unknown): unknown => {
+  let decoded = decodeApiErrorBody(data);
+  return typeof decoded === 'string' ? truncateApiErrorMessage(decoded) : decoded;
 };
 
 export let ssbServiceError = (message: string) =>
@@ -64,24 +71,16 @@ export let ssbApiError = (error: unknown, operation = 'request') => {
     return error;
   }
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+  // createAxios converts upstream failures into SlateError before this mapper runs,
+  // so the HTTP status lives in data.upstream.status / data.status and the raw
+  // response body only survives in data.baggage.response.
+  let response = getApiErrorResponseWithBody(error);
   let status =
     response?.status ??
-    (isRecord(error) && typeof error.status === 'number' ? error.status : undefined);
-  let statusText = response?.statusText;
-  let statusLabel =
-    status !== undefined ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}: ` : '';
+    (isApiErrorRecord(error) && typeof error.status === 'number' ? error.status : undefined);
 
-  let serviceError = ssbServiceError(
-    `SSB PxWeb API ${operation} failed: ${statusLabel}${extractMessage(error)}`
+  return createApiServiceError(
+    `SSB PxWeb API ${operation} failed: ${statusLabelForApiError(status, response?.statusText)}${extractMessage(error, response)}`,
+    { reason: 'ssb_api_error', upstreamStatus: status, parent: error }
   );
-
-  serviceError.data.reason = 'ssb_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
 };

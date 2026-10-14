@@ -6,7 +6,6 @@ export const IDENTITY_BASE_URL = 'https://identity.company-information.service.g
 
 export const DEFAULT_ITEMS_PER_PAGE = 20;
 export const MAX_ITEMS_PER_PAGE = 100;
-export const MAX_DOCUMENT_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 
 export const SAFE_DOCUMENT_MIME_EXTENSIONS = {
   'application/pdf': 'pdf',

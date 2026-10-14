@@ -59,14 +59,32 @@ let configSchema = z.object({
 
 let platforms = ['android', 'ios', 'web'] as const;
 
+type AppPlatform = (typeof platforms)[number];
+
+let collectionPlatforms: Record<string, AppPlatform> = {
+  androidApps: 'android',
+  iosApps: 'ios',
+  webApps: 'web'
+};
+
+// Firebase app IDs look like "1:<projectNumber>:<android|ios|web>:<hash>" and
+// resource names like "projects/<project>/<androidApps|iosApps|webApps>/<appId>".
+let inferPlatformFromAppId = (appId: string): AppPlatform | undefined => {
+  let resourceMatch = appId.match(/^projects\/[^/]+\/(androidApps|iosApps|webApps)\//);
+  if (resourceMatch) return collectionPlatforms[resourceMatch[1]!];
+
+  let idPlatform = appId.split(':')[2];
+  return platforms.find(platform => platform === idPlatform);
+};
+
 export let getFirebaseApps = SlateTool.create(spec, {
   name: 'Get Firebase Apps',
   key: 'get_firebase_apps',
   description: `List Firebase Android, iOS, and Web apps in a project, retrieve a specific app, or download its SDK configuration artifact. Use this to discover app IDs, package or bundle identifiers, web config, and native google-services files.`,
   instructions: [
     'Use "list" to discover apps in the configured Firebase project.',
-    'Use "get" with platform and appId to retrieve one app.',
-    'Use "get_config" with platform and appId to download the app SDK config artifact.',
+    'Use "get" with appId to retrieve one app. platform is inferred from appId when omitted.',
+    'Use "get_config" with appId to download the app SDK config artifact. platform is inferred from appId when omitted.',
     'For appId you can pass either the Firebase app ID or the full resource name.'
   ],
   tags: {
@@ -81,7 +99,7 @@ export let getFirebaseApps = SlateTool.create(spec, {
         .enum(['all', 'android', 'ios', 'web'])
         .optional()
         .describe(
-          'App platform. Defaults to all platforms for list. Required for get/get_config.'
+          'App platform. Defaults to all platforms for list. For get/get_config it is inferred from appId when omitted.'
         ),
       appId: z
         .string()
@@ -158,10 +176,17 @@ export let getFirebaseApps = SlateTool.create(spec, {
       };
     }
 
-    if (!platform || platform === 'all') {
-      throw firebaseServiceError('platform is required for get and get_config operations');
-    }
     if (!appId) throw missingRequiredFieldError('appId', operation);
+
+    if (!platform || platform === 'all') {
+      let inferredPlatform = inferPlatformFromAppId(appId);
+      if (!inferredPlatform) {
+        throw firebaseServiceError(
+          'platform (android, ios, or web) is required for get and get_config operations when it cannot be inferred from appId'
+        );
+      }
+      platform = inferredPlatform;
+    }
 
     if (operation === 'get') {
       let app = await client.getApp(platform, appId);

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, takeWithinOutputBudget } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryMetrics = SlateTool.create(spec, {
@@ -11,7 +11,8 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
   instructions: [
     'The query uses Datadog metric query syntax, e.g. "avg:system.cpu.user{*}" or "sum:requests.count{service:web}.as_count()".',
     'Time range is specified as Unix timestamps in seconds.',
-    'Use "from" as the start time and "to" as the end time.'
+    'Use "from" as the start time and "to" as the end time.',
+    'Queries that return more series than fit in one response are cut off and marked truncated; narrow the scope, reduce the "by" grouping, or shorten the time range to see the rest.'
   ],
   tags: {
     readOnly: true
@@ -43,6 +44,14 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
           })
         )
         .describe('Timeseries data returned by the query'),
+      truncated: z
+        .boolean()
+        .optional()
+        .describe('True when some series were left out because the result was too large'),
+      totalSeries: z
+        .number()
+        .optional()
+        .describe('Total number of series the query returned before truncation'),
       fromDate: z.number().optional().describe('Query start timestamp'),
       toDate: z.number().optional().describe('Query end timestamp'),
       query: z.string().optional().describe('The query that was executed')
@@ -56,7 +65,7 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
       query: ctx.input.query
     });
 
-    let series = (result.series || []).map((s: any) => ({
+    let allSeries: any[] = (result.series || []).map((s: any) => ({
       metric: s.metric,
       displayName: s.display_name,
       pointlist: s.pointlist,
@@ -64,16 +73,23 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
       unit: s.unit,
       tagSet: s.tag_set
     }));
+    let { items: series, truncated } = takeWithinOutputBudget(allSeries);
 
     return {
       output: {
         status: result.status,
         series,
+        truncated: truncated || undefined,
+        totalSeries: truncated ? allSeries.length : undefined,
         fromDate: result.from_date,
         toDate: result.to_date,
         query: result.query
       },
-      message: `Queried metrics: **${ctx.input.query}** — returned ${series.length} series`
+      message: `Queried metrics: **${ctx.input.query}** — returned ${series.length} series${
+        truncated
+          ? ` (truncated from ${allSeries.length}; narrow the query or time range to see the rest)`
+          : ''
+      }`
     };
   })
   .build();

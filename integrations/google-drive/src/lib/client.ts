@@ -1,4 +1,12 @@
-import { createApiServiceError, createAxios } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  decodeApiErrorBody,
+  getApiErrorStatus,
+  isApiErrorRecord as isRecord,
+  readApiErrorText,
+  type SlateAxiosErrorOptions
+} from 'slates';
 import type {
   ChangeListResponse,
   CommentListResponse,
@@ -223,22 +231,92 @@ let mapChange = (raw: any): DriveChange => ({
   drive: raw.drive ? mapSharedDrive(raw.drive) : undefined
 });
 
+type DriveErrorDetail = { reason?: string; location?: string; message?: string };
+
+const MAX_DRIVE_ERROR_DETAILS = 5;
+
+let optionalString = (value: unknown) =>
+  readApiErrorText(value, { includeNumbers: false })?.slice(0, 200);
+
+const MAX_DECODED_ERROR_BODY_BYTES = 64 * 1024;
+const MAX_TEXT_ERROR_BODY_CHARS = 500;
+let decodedErrorBodies = new WeakMap<object, unknown>();
+
+// Export downloads use responseType=arraybuffer, so Drive's JSON error body arrives as bytes.
+let decodeDriveErrorBody = (data: unknown): unknown => {
+  let bytes = data instanceof ArrayBuffer || ArrayBuffer.isView(data) ? data : undefined;
+  if (bytes && decodedErrorBodies.has(bytes)) return decodedErrorBodies.get(bytes);
+  if (!bytes && typeof data !== 'string') return data;
+
+  let decoded = decodeApiErrorBody(data, { maxBytes: MAX_DECODED_ERROR_BODY_BYTES });
+  if (typeof decoded === 'string') {
+    // Prefer the HTTP status text over raw HTML error pages or empty bodies.
+    let text = readApiErrorText(decoded);
+    decoded = text ? text.slice(0, MAX_TEXT_ERROR_BODY_CHARS) : {};
+  }
+
+  if (bytes) decodedErrorBodies.set(bytes, decoded);
+  return decoded;
+};
+
+let collectDriveErrorDetails = (data: unknown): DriveErrorDetail[] => {
+  let errors = isRecord(data) && isRecord(data.error) ? data.error.errors : undefined;
+  if (!Array.isArray(errors)) return [];
+
+  let details: DriveErrorDetail[] = [];
+  for (let error of errors) {
+    if (!isRecord(error)) continue;
+    let detail: DriveErrorDetail = {
+      reason: optionalString(error.reason),
+      location: optionalString(error.location),
+      message: optionalString(error.message)
+    };
+    if (
+      details.some(
+        existing =>
+          existing.reason === detail.reason &&
+          existing.location === detail.location &&
+          existing.message === detail.message
+      )
+    ) {
+      continue;
+    }
+    details.push(detail);
+    if (details.length >= MAX_DRIVE_ERROR_DETAILS) break;
+  }
+  return details;
+};
+
+// createAxios rejects with SlateError (no `.response`), and its sanitized response
+// baggage truncates Drive's nested `error.errors[]` fields, so keep a flat copy.
+let driveErrorMapping: SlateAxiosErrorOptions = {
+  extractResponseData: response => decodeDriveErrorBody(response.data),
+  mapAxiosError: error => {
+    let driveErrors = collectDriveErrorDetails(decodeDriveErrorBody(error.response?.data));
+    return driveErrors.length > 0 ? { baggage: { driveErrors } } : undefined;
+  }
+};
+
 function httpStatusFromAxiosError(e: unknown): number | undefined {
-  let s = (e as { response?: { status?: number } })?.response?.status;
-  return typeof s === 'number' ? s : undefined;
+  let status = getApiErrorStatus(e);
+  return typeof status === 'number' ? status : undefined;
+}
+
+function driveErrorDetailsFromError(e: unknown): DriveErrorDetail[] {
+  if (!isRecord(e)) return [];
+  if (isRecord(e.response)) {
+    return collectDriveErrorDetails(decodeDriveErrorBody(e.response.data));
+  }
+  let baggage = isRecord(e.data) && isRecord(e.data.baggage) ? e.data.baggage : undefined;
+  return Array.isArray(baggage?.driveErrors)
+    ? (baggage.driveErrors as DriveErrorDetail[])
+    : [];
 }
 
 function isInvalidDriveQueryError(e: unknown): boolean {
-  let errors = (
-    e as {
-      response?: { data?: { error?: { errors?: Array<{ location?: unknown }> } } };
-    }
-  )?.response?.data?.error?.errors;
-
   return (
     httpStatusFromAxiosError(e) === 400 &&
-    Array.isArray(errors) &&
-    errors.some(error => error.location === 'q')
+    driveErrorDetailsFromError(e).some(error => error.location === 'q')
   );
 }
 
@@ -289,15 +367,16 @@ export function normalizeGoogleDriveChangesPageSize(pageSize?: number): number {
 }
 
 /** Replace generic axios 404 with something actionable (wrong id, wrong account, no access). */
-function driveFileNotFoundError(fileId: string) {
+function driveFileNotFoundError(fileId: string, parent?: unknown) {
   return createApiServiceError(
     `Drive returned 404 for file id "${fileId}". ` +
       `Google does not expose that id to the signed-in Google account (wrong id, deleted/trashed file, or different account than in the browser). ` +
-      `Copy the id from the open tab URL (/file/d/..., /document/d/..., etc.), confirm Slates Hub / this app uses the same Google user, ` +
+      `Copy the id from the open tab URL (/file/d/..., /document/d/..., etc.), confirm the connected Google account is the same user that can open the file, ` +
       `and check for typos (I vs l, O vs 0).`,
     {
       reason: 'drive_file_not_found',
-      upstreamStatus: 404
+      upstreamStatus: 404,
+      parent
     }
   );
 }
@@ -311,14 +390,16 @@ export class GoogleDriveClient {
       baseURL: 'https://www.googleapis.com/drive/v3',
       headers: {
         Authorization: `Bearer ${token}`
-      }
+      },
+      errorMapping: driveErrorMapping
     });
 
     this.uploadApi = createAxios({
       baseURL: 'https://www.googleapis.com/upload/drive/v3',
       headers: {
         Authorization: `Bearer ${token}`
-      }
+      },
+      errorMapping: driveErrorMapping
     });
   }
 
@@ -346,7 +427,7 @@ export class GoogleDriveClient {
       };
     } catch (e) {
       if (httpStatusFromAxiosError(e) === 404) {
-        throw driveFileNotFoundError(fileId);
+        throw driveFileNotFoundError(fileId, e);
       }
       throw e;
     }
@@ -383,7 +464,7 @@ export class GoogleDriveClient {
     } catch (e) {
       if (params.query && isInvalidDriveQueryError(e)) {
         throw createApiServiceError(
-          "Google Drive rejected the search query. Use Drive query syntax in the form `query_term operator value`; wrap string values in single quotes and escape apostrophes or backslashes with a backslash. For example: `name contains 'report' and trashed = false`.",
+          "Google Drive rejected the search query. Use Drive query syntax in the form `query_term operator value`; wrap string values in single quotes and escape apostrophes or backslashes with a backslash. For example: `name contains 'report' and trashed = false`. To search by keywords, use `fullText contains 'keyword'` or `name contains 'keyword'` instead of plain text.",
           {
             reason: 'invalid_search_query',
             upstreamStatus: 400,
@@ -391,7 +472,10 @@ export class GoogleDriveClient {
           }
         );
       }
-      if (pageToken && httpStatusFromAxiosError(e) === 400) {
+      let driveErrors = driveErrorDetailsFromError(e);
+      let isPageTokenError =
+        driveErrors.some(error => error.location === 'pageToken') || driveErrors.length === 0;
+      if (pageToken && httpStatusFromAxiosError(e) === 400 && isPageTokenError) {
         throw createApiServiceError(
           'Google Drive rejected pageToken. Discard the token and restart pagination by omitting pageToken; only reuse the exact nextPageToken from a previous response with the same query, orderBy, driveId, and spaces.',
           {
@@ -564,7 +648,7 @@ export class GoogleDriveClient {
       });
     } catch (e) {
       if (httpStatusFromAxiosError(e) === 404) {
-        throw driveFileNotFoundError(fileId);
+        throw driveFileNotFoundError(fileId, e);
       }
       throw e;
     }
@@ -595,7 +679,7 @@ export class GoogleDriveClient {
       });
     } catch (e) {
       if (httpStatusFromAxiosError(e) === 404) {
-        throw driveFileNotFoundError(fileId);
+        throw driveFileNotFoundError(fileId, e);
       }
       throw e;
     }

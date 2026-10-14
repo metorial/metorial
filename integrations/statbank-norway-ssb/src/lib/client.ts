@@ -1,5 +1,5 @@
 import { createAxios } from 'slates';
-import { ssbApiError } from './errors';
+import { decodeSsbErrorBody, ssbApiError } from './errors';
 
 export type SsbLanguage = 'en' | 'no';
 
@@ -58,14 +58,13 @@ export type TableDataResult = {
   contentType?: string;
 };
 
+// Each SsbClient method maps failures with ssbApiError so messages name the operation.
 let http = createAxios({
-  baseURL: 'https://data.ssb.no/api/pxwebapi/v2'
+  baseURL: 'https://data.ssb.no/api/pxwebapi/v2',
+  errorMapping: {
+    extractResponseData: response => decodeSsbErrorBody(response.data)
+  }
 });
-
-http.interceptors.response.use(
-  response => response,
-  error => Promise.reject(ssbApiError(error))
-);
 
 let cleanRecord = (value: Record<string, string | number | boolean | undefined>) => {
   let params: Record<string, string | number | boolean> = {};

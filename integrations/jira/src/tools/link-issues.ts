@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let linkIssuesTool = SlateTool.create(spec, {
@@ -20,7 +20,8 @@ export let linkIssuesTool = SlateTool.create(spec, {
         .string()
         .describe('The link type name (e.g., "Blocks", "Duplicate", "Relates").'),
       outwardIssueKey: z.string().describe('The source issue key (e.g., "PROJ-1").'),
-      inwardIssueKey: z.string().describe('The target issue key (e.g., "PROJ-2").')
+      inwardIssueKey: z.string().describe('The target issue key (e.g., "PROJ-2").'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -31,11 +32,7 @@ export let linkIssuesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.createIssueLink({
       type: { name: ctx.input.linkTypeName },
@@ -62,7 +59,7 @@ export let listIssueLinkTypesTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ site: siteInputSchema }))
   .output(
     z.object({
       linkTypes: z.array(
@@ -76,11 +73,7 @@ export let listIssueLinkTypesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let types = await client.getIssueLinkTypes();
 
@@ -109,7 +102,8 @@ export let deleteIssueLinkTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      issueLinkId: z.string().describe('The issue link ID to delete.')
+      issueLinkId: z.string().describe('The issue link ID to delete.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -118,11 +112,7 @@ export let deleteIssueLinkTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteIssueLink(ctx.input.issueLinkId);
 

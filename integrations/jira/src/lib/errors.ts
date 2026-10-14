@@ -1,67 +1,59 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import {
+  type ApiErrorResponse,
+  buildApiServiceError,
+  isApiErrorRecord as isRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail as pushDetail,
+  truncateApiErrorMessage
+} from '@slates/provider';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
-
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let addDetail = (details: string[], value: unknown) => {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    return;
-  }
-
-  let detail = String(value).trim();
-  if (detail && !details.includes(detail)) {
-    details.push(detail);
-  }
-};
-
-let collectJiraDetails = (value: unknown, details: string[]) => {
-  if (Array.isArray(value)) {
-    for (let item of value) {
-      collectJiraDetails(item, details);
-    }
-    return;
-  }
-
-  if (!isRecord(value)) {
-    addDetail(details, value);
-    return;
-  }
-
-  addDetail(details, value.message);
-  addDetail(details, value.error);
-  addDetail(details, value.error_description);
-
-  collectJiraDetails(value.errorMessages, details);
-  collectJiraDetails(value.errors, details);
-};
-
-let extractJiraMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let data = response?.data;
+// Jira REST errors look like { errorMessages: string[], errors: { field: message } };
+// Atlassian gateway/OAuth errors use message, error, and error_description.
+let extractJiraDataMessage = (data: unknown) => {
   let details: string[] = [];
 
-  collectJiraDetails(data, details);
+  if (typeof data === 'string') {
+    pushDetail(details, data);
+  } else if (isRecord(data)) {
+    pushDetail(details, data.message);
+    if (isRecord(data.error)) {
+      pushDetail(details, data.error.message);
+    } else {
+      pushDetail(details, data.error);
+    }
+    pushDetail(details, data.error_description);
 
-  if (details.length > 0) {
-    return details.join(' - ');
+    if (Array.isArray(data.errorMessages)) {
+      for (let message of data.errorMessages) {
+        pushDetail(details, message);
+      }
+    }
+
+    if (isRecord(data.errors)) {
+      for (let [field, message] of Object.entries(data.errors)) {
+        pushDetail(details, message, { field });
+      }
+    } else if (Array.isArray(data.errors)) {
+      for (let item of data.errors) {
+        pushDetail(details, isRecord(item) ? item.message : item);
+      }
+    }
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
+  return details.length > 0 ? truncateApiErrorMessage(details.join(' - ')) : undefined;
 };
 
-let statusLabelFor = (response?: ErrorResponse) =>
-  response?.status !== undefined
-    ? `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}: `
+let fallbackMessageFor = (error: unknown, response: ApiErrorResponse | undefined) => {
+  let message = error instanceof Error ? error.message.trim() : '';
+  if (message && !looksLikeHtmlErrorBody(message)) return truncateApiErrorMessage(message);
+  if (response?.statusText) return response.statusText;
+  return message ? 'Jira returned an unexpected non-JSON error response.' : 'Unknown error';
+};
+
+let scopeMismatchHint = (status: unknown, message: string) =>
+  (status === 401 || status === 403) && /scope does not match/i.test(message)
+    ? ' (reconnect the Jira account and grant all requested permissions)'
     : '';
 
 export let jiraServiceError = (message: string) =>
@@ -85,21 +77,29 @@ export let resolveJiraIssueIdOrKey = (input: {
   return issueIdOrKey;
 };
 
-export let jiraApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
+let notFoundHintFor = (status: unknown, hint: string | undefined) =>
+  hint && Number(status) === 404 ? hint : '';
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let serviceError = jiraServiceError(
-    `Jira API ${operation} failed: ${statusLabelFor(response)}${extractJiraMessage(error)}`
-  );
-  serviceError.data.reason = 'jira_api_error';
-  serviceError.data.upstreamStatus = response?.status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let jiraApiError = (
+  error: unknown,
+  operation = 'request',
+  options: { notFoundHint?: string } = {}
+) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Jira',
+    operation,
+    reason: 'jira_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    extractMessage: (input, helpers) => {
+      let response = helpers.getResponseWithBody(input);
+      return extractJiraDataMessage(response?.data) ?? fallbackMessageFor(input, response);
+    },
+    formatMessage: ({
+      providerLabel,
+      operation: requestOperation,
+      statusLabel,
+      message,
+      status
+    }) =>
+      `${providerLabel} API ${requestOperation} failed: ${statusLabel}${message}${scopeMismatchHint(status, message)}${notFoundHintFor(status, options.notFoundHint)}`
+  });

@@ -3,11 +3,21 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+// Bitbucket query language filters always use a comparison operator. Treat any
+// other value as plain text and match it against repository names.
+let toRepositoryQuery = (query: string | undefined) => {
+  let trimmed = query?.trim();
+  if (!trimmed) return undefined;
+  if (/[=~<>]/.test(trimmed)) return trimmed;
+
+  return `name ~ "${trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+};
+
 export let listRepositoriesTool = SlateTool.create(spec, {
   name: 'List Repositories',
   key: 'list_repositories',
   description: `List repositories in the configured workspace. Supports filtering by query and pagination.
-Use the **query** parameter for Bitbucket's query language filtering (e.g. \`name ~ "myrepo"\`).`,
+Use the **query** parameter for Bitbucket's query language filtering (e.g. \`name ~ "myrepo"\`), or pass plain text to match repository names.`,
   tags: {
     readOnly: true
   }
@@ -17,7 +27,9 @@ Use the **query** parameter for Bitbucket's query language filtering (e.g. \`nam
       query: z
         .string()
         .optional()
-        .describe('Bitbucket query language filter (e.g. name ~ "myrepo")'),
+        .describe(
+          'Bitbucket query language filter (e.g. name ~ "myrepo"). Plain text without an operator matches repository names.'
+        ),
       sort: z
         .string()
         .optional()
@@ -51,7 +63,7 @@ Use the **query** parameter for Bitbucket's query language filtering (e.g. \`nam
     let client = new Client({ token: ctx.auth.token, workspace: ctx.config.workspace });
 
     let result = await client.listRepositories({
-      query: ctx.input.query,
+      query: toRepositoryQuery(ctx.input.query),
       sort: ctx.input.sort,
       page: ctx.input.page,
       pageLen: ctx.input.pageLen

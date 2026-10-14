@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { mapGoogleAdsAxiosError } from './errors';
 
 let API_VERSION = 'v24';
 let BASE_URL = `https://googleads.googleapis.com/${API_VERSION}`;
@@ -37,7 +38,10 @@ export class GoogleAdsClient {
 
     this.http = createAxios({
       baseURL: BASE_URL,
-      headers
+      headers,
+      errorMapping: {
+        mapAxiosError: mapGoogleAdsAxiosError
+      }
     });
   }
 

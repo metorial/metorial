@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let listVersionsTool = SlateTool.create(spec, {
@@ -15,7 +15,8 @@ export let listVersionsTool = SlateTool.create(spec, {
     z.object({
       projectIdOrKey: z.string().describe('The project key or ID.'),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
-      maxResults: z.number().optional().default(50).describe('Maximum versions to return.')
+      maxResults: z.number().optional().default(50).describe('Maximum versions to return.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -35,11 +36,7 @@ export let listVersionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let result = await client.getProjectVersions(ctx.input.projectIdOrKey, {
       startAt: ctx.input.startAt,
@@ -87,7 +84,8 @@ export let createVersionTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to mark the version as released immediately.')
+        .describe('Whether to mark the version as released immediately.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -98,11 +96,7 @@ export let createVersionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let version = await client.createVersion({
       projectId: ctx.input.projectId,
@@ -140,7 +134,8 @@ export let updateVersionTool = SlateTool.create(spec, {
       startDate: z.string().optional().describe('New start date (YYYY-MM-DD).'),
       releaseDate: z.string().optional().describe('New release date (YYYY-MM-DD).'),
       released: z.boolean().optional().describe('Set to true to release, false to unrelease.'),
-      archived: z.boolean().optional().describe('Set to true to archive, false to unarchive.')
+      archived: z.boolean().optional().describe('Set to true to archive, false to unarchive.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -152,11 +147,7 @@ export let updateVersionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let fields: Record<string, any> = {};
     if (ctx.input.name !== undefined) fields.name = ctx.input.name;
@@ -199,7 +190,8 @@ export let deleteVersionTool = SlateTool.create(spec, {
       moveAffectedIssuesTo: z
         .string()
         .optional()
-        .describe('Version ID to move issues with this affected version to.')
+        .describe('Version ID to move issues with this affected version to.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -208,11 +200,7 @@ export let deleteVersionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteVersion(ctx.input.versionId, {
       moveFixIssuesTo: ctx.input.moveFixIssuesTo,

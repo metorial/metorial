@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SearchConsoleClient } from '../lib/client';
 import { googleSearchConsoleActionScopes } from '../scopes';
@@ -64,7 +64,9 @@ export let querySearchAnalytics = SlateTool.create(spec, {
       aggregationType: z
         .enum(['auto', 'byPage', 'byProperty', 'byNewsShowcasePanel'])
         .optional()
-        .describe('How to aggregate results. Defaults to "auto"'),
+        .describe(
+          'How to aggregate results. Defaults to "auto". "byProperty" and "byNewsShowcasePanel" cannot be used when grouping or filtering by page.'
+        ),
       rowLimit: z
         .number()
         .min(1)
@@ -103,6 +105,18 @@ export let querySearchAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let aggregationType = ctx.input.aggregationType;
+    if (aggregationType === 'byProperty' || aggregationType === 'byNewsShowcasePanel') {
+      let usesPage =
+        ctx.input.dimensions?.includes('page') ||
+        ctx.input.filters?.some(filter => filter.dimension === 'page');
+      if (usesPage) {
+        throw createApiServiceError(
+          `aggregationType "${aggregationType}" cannot be used when grouping or filtering by page. Use "auto" or "byPage" instead, or remove the page dimension and page filters.`
+        );
+      }
+    }
+
     let client = new SearchConsoleClient(ctx.auth.token);
 
     let dimensionFilterGroups =
@@ -117,7 +131,7 @@ export let querySearchAnalytics = SlateTool.create(spec, {
       dimensions: ctx.input.dimensions,
       searchType: ctx.input.searchType,
       dimensionFilterGroups,
-      aggregationType: ctx.input.aggregationType,
+      aggregationType,
       rowLimit: ctx.input.rowLimit,
       startRow: ctx.input.startRow,
       dataState: ctx.input.dataState

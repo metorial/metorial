@@ -139,21 +139,32 @@ let allowedGenericTenorsByInstrument: Record<GenericInstrumentType, readonly Gen
     GBON: ['3Y', '5Y', '7Y', '10Y']
   };
 
-let periodFormats: Record<Frequency, { pattern: RegExp; example: string; label: string }> = {
+// Norges Bank's SDMX API also accepts finer-grained periods for coarser
+// frequencies (for example 2026-08-31 with monthly data), so M and A accept them.
+// The API only includes periods whose first day is on or after startPeriod, so a
+// finer-grained startPeriod is normalized to its containing period (see
+// validatePeriodRange). A finer-grained endPeriod already includes its whole period.
+let periodFormats: Record<
+  Frequency,
+  { pattern: RegExp; example: string; label: string; length: number }
+> = {
   B: {
     pattern: /^\d{4}-\d{2}-\d{2}$/,
     example: '2025-05-12',
-    label: 'business-day'
+    label: 'business-day',
+    length: 10
   },
   M: {
-    pattern: /^\d{4}-\d{2}$/,
-    example: '2025-05',
-    label: 'monthly'
+    pattern: /^\d{4}-\d{2}(-\d{2})?$/,
+    example: '2025-05 (or a date such as 2025-05-31)',
+    label: 'monthly',
+    length: 7
   },
   A: {
-    pattern: /^\d{4}$/,
-    example: '2025',
-    label: 'annual'
+    pattern: /^\d{4}(-\d{2}(-\d{2})?)?$/,
+    example: '2025 (or a month or date such as 2025-05 or 2025-05-31)',
+    label: 'annual',
+    length: 4
   }
 };
 
@@ -200,23 +211,45 @@ export let validatePeriodRange = (
     }
   }
 
-  if (startPeriod > endPeriod) {
+  // Normalize startPeriod to the period that contains it so the first period is
+  // not silently dropped (e.g. M 2025-05-15 -> 2025-05).
+  let normalizedStartPeriod = startPeriod.slice(0, format.length);
+
+  if (normalizedStartPeriod > endPeriod.slice(0, format.length)) {
     throw norgesBankServiceError('startPeriod must be less than or equal to endPeriod.');
   }
+
+  return { startPeriod: normalizedStartPeriod, endPeriod };
 };
 
 export let validateGenericRateCombinations = (
   tenors: readonly GenericTenor[],
   instrumentTypes: readonly GenericInstrumentType[]
 ) => {
-  for (let instrumentType of instrumentTypes) {
-    let allowed = allowedGenericTenorsByInstrument[instrumentType];
-    let invalidTenors = tenors.filter(tenor => !allowed.includes(tenor));
+  // The API returns only the tenor/instrument series that exist, so mixed
+  // selections such as 3M + 10Y with TBIL + GBON are valid. Reject only
+  // selections that cannot match any series.
+  let supportedTenors = new Set(
+    instrumentTypes.flatMap(instrumentType => allowedGenericTenorsByInstrument[instrumentType])
+  );
+  let unmatchedTenors = tenors.filter(tenor => !supportedTenors.has(tenor));
+  let unmatchedInstrumentTypes = instrumentTypes.filter(
+    instrumentType =>
+      !tenors.some(tenor => allowedGenericTenorsByInstrument[instrumentType].includes(tenor))
+  );
 
-    if (invalidTenors.length > 0) {
-      throw norgesBankServiceError(
-        `${instrumentType} supports only ${formatList(allowed)} tenors. Invalid tenor selections: ${formatList(invalidTenors)}. Use separate calls for treasury bills and government bonds.`
-      );
-    }
+  if (unmatchedTenors.length > 0 || unmatchedInstrumentTypes.length > 0) {
+    let problems = [
+      unmatchedTenors.length > 0
+        ? `Selected tenors not available for the selected instrument types: ${formatList(unmatchedTenors)}.`
+        : undefined,
+      unmatchedInstrumentTypes.length > 0
+        ? `Instrument types with no matching selected tenor: ${formatList(unmatchedInstrumentTypes)}.`
+        : undefined
+    ].filter((value): value is string => value !== undefined);
+
+    throw norgesBankServiceError(
+      `${problems.join(' ')} TBIL (treasury bills) supports ${formatList(allowedGenericTenorsByInstrument.TBIL)}; GBON (government bonds) supports ${formatList(allowedGenericTenorsByInstrument.GBON)}.`
+    );
   }
 };

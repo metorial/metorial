@@ -19,7 +19,7 @@ export let queryUserCompositionTool = SlateTool.create(spec, {
       property: z
         .string()
         .describe(
-          'User property to analyze (for example country or platform). Prefix custom properties with gp:, for example gp:plan.'
+          'User property to analyze, for example country, platform, or a custom property such as plan or gp:plan. Custom property names get the gp: prefix automatically.'
         ),
       start: z.string().describe('Start date in YYYYMMDD format.'),
       end: z.string().describe('End date in YYYYMMDD format.')
