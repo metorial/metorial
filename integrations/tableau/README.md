@@ -10,7 +10,7 @@ Retrieve information about the current Tableau site, including name, URL, storag
 
 ### Get View Data
 
-Get the underlying data of a Tableau view as CSV text, optionally narrowed with view filters. Large results are cut at a row boundary and marked as truncated; use Export View for the full data as a downloadable file.
+Export the underlying data from a Tableau view as a downloadable CSV file. Useful for retrieving the tabular data behind a dashboard visualization.
 
 ### Export View
 
