@@ -30,6 +30,7 @@ import {
   getAuthMethod,
   getExposedAction,
   getExposedActions,
+  getExposedToolCategories,
   getExposedTriggerGroups,
   getTriggerGroup,
   getWebhookAutoRegistration,
@@ -38,6 +39,7 @@ import {
   mapAction,
   mapAdapter,
   mapAuthMethod,
+  mapToolCategory,
   mapTriggerGroup
 } from './spec';
 import { State } from './state';
@@ -415,7 +417,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         provider: {
           triggerGroups:
             (slate.triggerGroups?.length ?? 0) > 0 &&
-            (slate.actions ?? []).every(isMappableTrigger)
+            (slate.actions ?? []).every(isMappableTrigger),
+          toolCategories: (slate.toolCategories?.length ?? 0) > 0
         }
       }
     }));
@@ -925,6 +928,16 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       return {
         triggerGroups: getExposedTriggerGroups(slate, supportsAdapters()).map(mapTriggerGroup)
+      };
+    });
+
+    manager.onRequest('slates/tool_categories.list', async () => {
+      getContextBasic();
+
+      return {
+        toolCategories: getExposedToolCategories(slate, supportsAdapters()).map(
+          mapToolCategory
+        )
       };
     });
 

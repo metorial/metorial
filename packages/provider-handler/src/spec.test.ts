@@ -4,13 +4,15 @@ import { z } from 'zod';
 import {
   getExposedAction,
   getExposedActions,
+  getExposedToolCategories,
   getExposedTriggerGroups,
   getMappableAction,
   getTriggersForGroup,
   isMappableTrigger,
   mapAction,
   mapAdapter,
-  mapAuthMethod
+  mapAuthMethod,
+  mapToolCategory
 } from './spec';
 
 let baseAction = {
@@ -60,6 +62,36 @@ describe('mapAction', () => {
   it('maps a well-formed trigger', () => {
     let mapped = mapAction({} as any, validTrigger);
     expect(mapped).toMatchObject({ type: 'action.trigger', triggerGroupId: 'my_group' });
+  });
+
+  it('includes the tool categories a tool belongs to', () => {
+    let slate = { getToolCategoryKeys: () => ['crm', 'reporting'] } as any;
+
+    expect(mapAction(slate, toolAction)).toMatchObject({
+      type: 'action.tool',
+      toolCategoryIds: ['crm', 'reporting']
+    });
+  });
+
+  it('omits categories for tools without any, including on slates that predate them', () => {
+    expect(mapAction({ getToolCategoryKeys: () => [] } as any, toolAction)).not.toHaveProperty(
+      'toolCategoryIds'
+    );
+    expect(mapAction({} as any, toolAction)).not.toHaveProperty('toolCategoryIds');
+  });
+});
+
+describe('mapToolCategory', () => {
+  it('maps the category key to the protocol id', () => {
+    expect(
+      mapToolCategory({ key: 'crm', name: 'CRM', description: 'Records' } as any)
+    ).toEqual({ id: 'crm', name: 'CRM', description: 'Records', imageUrl: undefined });
+  });
+
+  it('includes the category image when one is set', () => {
+    expect(
+      mapToolCategory({ key: 'crm', name: 'CRM', imageUrl: 'https://cdn.test/crm.svg' } as any)
+    ).toMatchObject({ id: 'crm', imageUrl: 'https://cdn.test/crm.svg' });
   });
 });
 
@@ -127,6 +159,29 @@ describe('adapter exposure', () => {
   it('does not expose an adapter action directly when adapters are disabled', () => {
     expect(() => getExposedAction(slate, 'adapter_tool', false)).toThrow();
     expect(getExposedAction(slate, 'adapter_tool', true)).toBe(adapterTool);
+  });
+
+  it('only exposes tool categories that contain an exposed tool', () => {
+    let providerCategory = { key: 'provider_category', name: 'Provider' };
+    let adapterCategory = { key: 'adapter_category', name: 'Adapter' };
+    let emptyCategory = { key: 'empty_category', name: 'Empty' };
+    let categorizedSlate = {
+      ...slate,
+      toolCategories: [providerCategory, adapterCategory, emptyCategory],
+      getToolCategoryKeys: (key: string) =>
+        key === 'provider_tool'
+          ? ['provider_category']
+          : key === 'adapter_tool'
+            ? ['adapter_category']
+            : []
+    } as any;
+
+    expect(getExposedToolCategories(categorizedSlate, false)).toEqual([providerCategory]);
+    expect(getExposedToolCategories(categorizedSlate, true)).toEqual([
+      providerCategory,
+      adapterCategory
+    ]);
+    expect(getExposedToolCategories(slate, true)).toEqual([]);
   });
 
   it('only exposes trigger groups that contain an exposed trigger', () => {

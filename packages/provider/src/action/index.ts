@@ -4,5 +4,6 @@ export * from './getFileUrlTool';
 export * from './publicTool';
 export * from './scopes';
 export * from './tool';
+export * from './toolCategory';
 export * from './trigger';
 export * from './triggerGroup';

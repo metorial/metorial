@@ -3,12 +3,14 @@ import type {
   SlateAuthenticationMethod,
   SlatesAction,
   SlateAdapter as SlatesAdapter,
+  SlatesToolCategory,
   SlatesTriggerGroup
 } from '@slates/proto';
 import {
   type Slate,
   type SlateAdapter,
   SlateDefaultPollingIntervalSeconds,
+  type SlateToolCategory,
   type SlateTrigger
 } from '@slates/provider';
 import z from 'zod';
@@ -124,7 +126,7 @@ export let getActionWithType = <
 };
 
 export let mapAction = <ConfigType extends {}, AuthType extends {}>(
-  _slate: Slate<ConfigType, AuthType>,
+  slate: Slate<ConfigType, AuthType>,
   a: ReturnType<typeof getAction<ConfigType, AuthType>>
 ): SlatesAction => {
   let base = {
@@ -145,11 +147,14 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
   };
 
   if (a.type === 'tool') {
+    let toolCategoryIds = slate.getToolCategoryKeys?.(a.key) ?? [];
+
     return {
       ...base,
       type: 'action.tool',
       capabilities: {},
-      isPublic: a.isPublic
+      isPublic: a.isPublic,
+      ...(toolCategoryIds.length ? { toolCategoryIds } : {})
     };
   }
 
@@ -267,6 +272,29 @@ export let getWebhookManualRegistration = <ConfigType extends {}, AuthType exten
   }
 
   return group.webhook.manualRegistration;
+};
+
+export let mapToolCategory = (category: SlateToolCategory): SlatesToolCategory => ({
+  id: category.key,
+  name: category.name,
+  description: category.description,
+  imageUrl: category.imageUrl
+});
+
+// Like trigger groups, a category is only listed when the hub can see one of its tools.
+export let getExposedToolCategories = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  includeAdapterActions: boolean
+) => {
+  let exposedCategoryKeys = new Set(
+    getExposedActions(slate, includeAdapterActions)
+      .filter(action => action.type === 'tool')
+      .flatMap(action => slate.getToolCategoryKeys?.(action.key) ?? [])
+  );
+
+  return (slate.toolCategories ?? []).filter(category =>
+    exposedCategoryKeys.has(category.key)
+  );
 };
 
 export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(

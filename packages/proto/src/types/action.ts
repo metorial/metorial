@@ -42,7 +42,8 @@ export let slatesActionBase = z.object({
 export let slatesActionTool = slatesActionBase.extend({
   type: z.literal('action.tool'),
   capabilities: z.object({}),
-  isPublic: z.boolean()
+  isPublic: z.boolean(),
+  toolCategoryIds: z.array(z.string()).optional()
 });
 
 export let slatesActionTrigger = slatesActionBase.extend({
