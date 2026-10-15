@@ -18,6 +18,7 @@ import {
   type SlatesMessageConfigDefaultGetResponse,
   type SlatesMessageConfigSchemaGetResponse,
   type SlatesMessageProviderIdentifyResponse,
+  type SlatesMessageToolCategoriesListResponse,
   type SlatesMessageTriggerGroupGatewayConnectResponse,
   type SlatesMessageTriggerGroupGatewayReceiveResponse,
   type SlatesMessageTriggerGroupGetResponse,
@@ -363,6 +364,10 @@ export class SlatesProtocolClient {
       actionId,
       input
     });
+  }
+
+  async listToolCategories(): Promise<SlatesMessageToolCategoriesListResponse['result']> {
+    return this.request('slates/tool_categories.list', {});
   }
 
   async listTriggerGroups(): Promise<SlatesMessageTriggerGroupsListResponse['result']> {

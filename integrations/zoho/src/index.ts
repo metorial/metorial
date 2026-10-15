@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { biginTools } from './products/bigin';
 import { booksTools } from './products/books';
 import { crmTools } from './products/crm';
@@ -8,29 +9,18 @@ import { invoiceTools } from './products/invoice';
 import { mailTools } from './products/mail';
 import { spec } from './spec';
 import {
-  booksGetInvoices,
-  booksManageContact,
-  booksManageExpense,
-  booksManageInvoice,
-  crmGetModules,
-  crmGetRecords,
-  crmGetRelatedRecords,
-  crmManageRecord,
-  crmSearchRecords,
-  deskGetTickets,
-  deskManageContact,
-  deskManageTicket,
-  peopleManageEmployee,
-  projectsGetPortals,
-  projectsManageProject,
-  projectsManageTask
+  booksLegacyTools,
+  crmLegacyTools,
+  deskLegacyTools,
+  peopleTools,
+  projectsTools
 } from './tools';
 import { organizationDiscoveryTools, whoAmI } from './tools/discovery';
 
 export let provider = Slate.create({
   spec,
   tools: [
-    ...organizationDiscoveryTools,
+    ...Object.values(organizationDiscoveryTools),
     whoAmI,
     ...crmTools,
     ...biginTools,
@@ -39,23 +29,12 @@ export let provider = Slate.create({
     ...invoiceTools,
     ...deskTools,
     ...mailTools,
-
-    crmGetRecords,
-    crmManageRecord,
-    crmSearchRecords,
-    crmGetModules,
-    crmGetRelatedRecords,
-    deskGetTickets,
-    deskManageTicket,
-    deskManageContact,
-    booksGetInvoices,
-    booksManageInvoice,
-    booksManageContact,
-    booksManageExpense,
-    peopleManageEmployee,
-    projectsGetPortals,
-    projectsManageProject,
-    projectsManageTask
+    ...crmLegacyTools,
+    ...deskLegacyTools,
+    ...booksLegacyTools,
+    ...peopleTools,
+    ...projectsTools
   ],
-  triggers: []
+  triggers: [],
+  toolCategories
 });

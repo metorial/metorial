@@ -69,7 +69,8 @@ export let slatesMessageProviderCapabilitiesGetResponse = z.object({
         .optional(),
       provider: z
         .object({
-          triggerGroups: z.boolean().optional()
+          triggerGroups: z.boolean().optional(),
+          toolCategories: z.boolean().optional()
         })
         .optional()
     })

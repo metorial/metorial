@@ -4,9 +4,7 @@ import { createZohoAxios } from '../lib/client';
 import { getDeskBaseUrl, ZOHO_API_ORIGINS } from '../lib/urls';
 import { spec } from '../spec';
 
-export let organizationDiscoveryTools = (
-  ['books', 'inventory', 'invoice', 'desk'] as const
-).map(product =>
+let createOrganizationDiscoveryTool = (product: 'books' | 'inventory' | 'invoice' | 'desk') =>
   SlateTool.create(spec, {
     key: `${product}_list_organizations`,
     name: `${product === 'desk' ? 'Desk' : product.charAt(0).toUpperCase() + product.slice(1)} List Organizations`,
@@ -41,8 +39,14 @@ export let organizationDiscoveryTools = (
         message: `Retrieved ${organizations.length} organization(s).`
       };
     })
-    .build()
-);
+    .build();
+
+export let organizationDiscoveryTools = {
+  books: createOrganizationDiscoveryTool('books'),
+  inventory: createOrganizationDiscoveryTool('inventory'),
+  invoice: createOrganizationDiscoveryTool('invoice'),
+  desk: createOrganizationDiscoveryTool('desk')
+};
 
 export let whoAmI = SlateTool.create(spec, {
   key: 'who_am_i',
