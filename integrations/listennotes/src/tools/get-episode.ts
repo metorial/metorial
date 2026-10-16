@@ -25,6 +25,10 @@ Optionally include transcript if available (PRO/ENTERPRISE plans).`,
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       episodeId: z.string().describe('Episode ID.'),
       title: z.string().describe('Episode title.'),
       description: z.string().describe('Episode description.'),
@@ -48,7 +52,7 @@ Optionally include transcript if available (PRO/ENTERPRISE plans).`,
           publisher: z.string().describe('Parent podcast publisher.'),
           image: z.string().describe('Parent podcast image URL.'),
           listennotesUrl: z.string().describe('Parent podcast Listen Notes URL.'),
-          listenScore: z.number().describe('Parent podcast Listen Score.')
+          listenScore: z.number().optional().describe('Parent podcast Listen Score.')
         })
         .describe('Parent podcast metadata.')
     })
@@ -61,31 +65,33 @@ Optionally include transcript if available (PRO/ENTERPRISE plans).`,
 
     let data = await client.getEpisode({
       episodeId: ctx.input.episodeId,
-      showTranscript: ctx.input.showTranscript ? 1 : undefined
+      showTranscript:
+        ctx.input.showTranscript === undefined ? undefined : Number(ctx.input.showTranscript)
     });
 
     return {
       output: {
+        raw: data,
         episodeId: data.id,
         title: data.title,
         description: data.description,
         pubDateMs: data.pub_date_ms,
-        audio: data.audio || '',
+        audio: data.audio,
         audioLengthSec: data.audio_length_sec,
-        image: data.image || '',
-        thumbnail: data.thumbnail || '',
+        image: data.image,
+        thumbnail: data.thumbnail,
         explicitContent: data.explicit_content,
         listennotesUrl: data.listennotes_url,
-        link: data.link || '',
+        link: data.link,
         maybeAudioInvalid: data.maybe_audio_invalid,
-        transcript: data.transcript || undefined,
+        transcript: data.transcript ?? undefined,
         podcast: {
-          podcastId: data.podcast?.id || '',
-          title: data.podcast?.title || '',
-          publisher: data.podcast?.publisher || '',
-          image: data.podcast?.image || '',
-          listennotesUrl: data.podcast?.listennotes_url || '',
-          listenScore: data.podcast?.listen_score || 0
+          podcastId: data.podcast.id,
+          title: data.podcast.title,
+          publisher: data.podcast.publisher,
+          image: data.podcast.image,
+          listennotesUrl: data.podcast.listennotes_url,
+          listenScore: data.podcast.listen_score ?? undefined
         }
       },
       message: `Fetched episode **${data.title}** from podcast "${data.podcast?.title}".`

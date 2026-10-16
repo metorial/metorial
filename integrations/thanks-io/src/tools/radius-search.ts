@@ -8,7 +8,10 @@ export let radiusSearch = SlateTool.create(spec, {
   key: 'radius_search',
   description: `Search for recipients within a geographic radius of a given address and add them to a mailing list. Supports filtering by record type (new homeowner, absentee owner, renters, businesses, etc.) and optionally appending phone/email data.
 Results are added to an existing mailing list or a newly created one. Costs $0.05 per record.`,
-  constraints: ['Each record costs $0.05.', 'Maximum of 10,000 records per search.'],
+  constraints: [
+    'Each record costs $0.05.',
+    'Maximum of 2,500 records per purchase; API Test Mode allows at most 5.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -22,7 +25,7 @@ Results are added to an existing mailing list or a newly created one. Costs $0.0
         .number()
         .min(1)
         .max(10000)
-        .describe('Number of records to return (1-10000)'),
+        .describe('Number of records to purchase (1-2500; at most 5 in API Test Mode)'),
       mailingListId: z
         .number()
         .optional()
@@ -31,6 +34,8 @@ Results are added to an existing mailing list or a newly created one. Costs $0.0
         .enum([
           'all',
           'likelytomove',
+          'apartmentcomplex',
+          'likelytodownsize',
           'likelytorefi',
           'absenteeowner',
           'highnetworth',
@@ -68,6 +73,7 @@ Results are added to an existing mailing list or a newly created one. Costs $0.0
         .number()
         .optional()
         .describe('Mailing list ID where results were added'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the search was successful'),
       statusMessage: z.string().optional().describe('Status message')
     })
@@ -92,6 +98,7 @@ Results are added to an existing mailing list or a newly created one. Costs $0.0
       output: {
         mailingListId: result.mailing_list_id as number | undefined,
         success: !failed,
+        raw: result,
         statusMessage: result.message as string | undefined
       },
       message: failed

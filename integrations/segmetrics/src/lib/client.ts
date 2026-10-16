@@ -1,21 +1,55 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+
+let createSegMetricsClient = (baseURL: string, token?: string) => {
+  let client = createAuthenticatedAxios({
+    baseURL,
+    timeout: 30_000,
+    authHeader: token === undefined ? undefined : { value: token },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'SegMetrics',
+        reason: 'segmetrics_api_error'
+      })
+  });
+  client.interceptors.response.use(response => {
+    if (isApiErrorRecord(response.data) && response.data.status === 'error') {
+      throw buildApiServiceError(
+        { response: { data: response.data, status: response.status } },
+        { providerLabel: 'SegMetrics', reason: 'segmetrics_api_error' }
+      );
+    }
+    return response;
+  });
+  return client;
+};
+
+let validateContactSelector = (contactId: unknown, email: unknown) => {
+  if (
+    !(typeof contactId === 'string' && contactId.trim()) &&
+    !(typeof email === 'string' && email.trim())
+  ) {
+    throw createApiServiceError('Provide either contactId or email to identify the contact.');
+  }
+};
 
 export class ImportClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createSegMetricsClient>;
 
   constructor(config: { token: string; accountId: string; integrationId: string }) {
-    this.axios = createAxios({
-      baseURL: `https://import.segmetrics.io/api/v1/${config.accountId}/${config.integrationId}`,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.axios = createSegMetricsClient(
+      `https://import.segmetrics.io/api/v1/${encodeURIComponent(config.accountId)}/${encodeURIComponent(config.integrationId)}`,
+      config.token
+    );
   }
 
-  // --- Contacts ---
-
   async upsertContact(contact: Record<string, unknown>): Promise<Record<string, unknown>> {
+    validateContactSelector(contact.contact_id, contact.email);
     let response = await this.axios.post('/contact', contact);
     return response.data;
   }
@@ -25,35 +59,54 @@ export class ImportClient {
     return response.data;
   }
 
-  // --- Tags ---
-
-  async addTags(params: {
-    contactId?: string;
-    email?: string;
-    tags: unknown[];
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = { tags: params.tags };
-    if (params.contactId) body.contact_id = params.contactId;
-    if (params.email) body.email = params.email;
-    let response = await this.axios.post('/tags/add', body);
+  private async updateTags(
+    action: 'add' | 'remove',
+    params: { contactId?: string; email?: string; tags: unknown[] }
+  ): Promise<Record<string, unknown>> {
+    validateContactSelector(params.contactId, params.email);
+    if (
+      params.tags.length === 0 ||
+      params.tags.some(tag =>
+        typeof tag === 'string'
+          ? !tag.trim()
+          : !isApiErrorRecord(tag) ||
+            !(
+              (typeof tag.id === 'string' && tag.id.trim()) ||
+              (typeof tag.name === 'string' && tag.name.trim())
+            )
+      )
+    ) {
+      throw createApiServiceError('Provide at least one tag, with a nonempty ID or name.');
+    }
+    let response = await this.axios.post(
+      `/tags/${action}`,
+      pickDefined({ contact_id: params.contactId, email: params.email, tags: params.tags })
+    );
     return response.data;
   }
 
-  async removeTags(params: {
-    contactId?: string;
-    email?: string;
-    tags: unknown[];
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = { tags: params.tags };
-    if (params.contactId) body.contact_id = params.contactId;
-    if (params.email) body.email = params.email;
-    let response = await this.axios.post('/tags/remove', body);
-    return response.data;
+  async addTags(params: { contactId?: string; email?: string; tags: unknown[] }) {
+    return this.updateTags('add', params);
   }
 
-  // --- Invoices / Orders ---
+  async removeTags(params: { contactId?: string; email?: string; tags: unknown[] }) {
+    return this.updateTags('remove', params);
+  }
 
   async upsertInvoice(invoice: Record<string, unknown>): Promise<Record<string, unknown>> {
+    validateContactSelector(invoice.contact_id, invoice.email);
+    if (!Array.isArray(invoice.items) || invoice.items.length === 0) {
+      throw createApiServiceError('Provide at least one order line item.');
+    }
+    for (let item of invoice.items) {
+      if (
+        !isApiErrorRecord(item) ||
+        typeof item.product_id !== 'string' ||
+        !item.product_id.trim()
+      ) {
+        throw createApiServiceError('Each order line item requires productId.');
+      }
+    }
     let response = await this.axios.post('/invoice', invoice);
     return response.data;
   }
@@ -63,11 +116,23 @@ export class ImportClient {
     return response.data;
   }
 
-  // --- Subscriptions ---
-
   async upsertSubscription(
     subscription: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
+    validateContactSelector(subscription.contact_id, subscription.email);
+    if (
+      typeof subscription.last_bill_date !== 'string' ||
+      !subscription.last_bill_date.trim()
+    ) {
+      throw createApiServiceError('Provide lastBillDate, the last subscription billing date.');
+    }
+    if (
+      typeof subscription.frequency !== 'number' ||
+      !Number.isInteger(subscription.frequency) ||
+      subscription.frequency < 1
+    ) {
+      throw createApiServiceError('Subscription frequency must be a positive whole number.');
+    }
     let response = await this.axios.post('/subscription', subscription);
     return response.data;
   }
@@ -79,8 +144,6 @@ export class ImportClient {
     return response.data;
   }
 
-  // --- Products ---
-
   async upsertProduct(product: {
     id: string;
     name: string;
@@ -88,8 +151,6 @@ export class ImportClient {
     let response = await this.axios.post('/product', product);
     return response.data;
   }
-
-  // --- Ad Performance ---
 
   async recordAdPerformance(
     adPerformance: Record<string, unknown>
@@ -100,106 +161,103 @@ export class ImportClient {
 }
 
 export class ReportingClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createSegMetricsClient>;
+  private queryAxios: ReturnType<typeof createSegMetricsClient>;
 
   constructor(config: { token: string; accountId: string }) {
-    this.axios = createAxios({
-      baseURL: `https://api.segmetrics.io/${config.accountId}`,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
-    });
+    let accountId = encodeURIComponent(config.accountId);
+    this.axios = createSegMetricsClient(
+      `https://api.segmetrics.io/${accountId}`,
+      config.token
+    );
+    this.queryAxios = createSegMetricsClient(
+      `https://api.segmetrics.io/v2/${accountId}`,
+      config.token
+    );
   }
-
-  // --- Reports ---
 
   async getReport(params: {
     reportType: string;
-    reportId: string;
+    reportId?: string;
     start?: string;
     end?: string;
     scale?: string;
   }): Promise<Record<string, unknown>> {
-    let queryParams: Record<string, string> = {};
-    if (params.start) queryParams.start = params.start;
-    if (params.end) queryParams.end = params.end;
-    if (params.scale) queryParams.scale = params.scale;
-
-    let response = await this.axios.get(`/report/${params.reportType}/${params.reportId}`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  // --- Customer Journey ---
-
-  async getReportContacts(params: {
-    reportType: string;
-    reportId: string;
-    start?: string;
-    end?: string;
-    extend?: string[];
-    page?: number;
-  }): Promise<Record<string, unknown>> {
-    let queryParams: Record<string, string> = {};
-    if (params.start) queryParams.start = params.start;
-    if (params.end) queryParams.end = params.end;
-    if (params.extend && params.extend.length > 0)
-      queryParams.extend = params.extend.join(',');
-    if (params.page) queryParams.page = String(params.page);
-
     let response = await this.axios.get(
-      `/report/${params.reportType}/${params.reportId}/contacts`,
-      {
-        params: queryParams
-      }
+      `/report/${encodeURIComponent(params.reportType)}${params.reportId ? `/${encodeURIComponent(params.reportId)}` : ''}`,
+      { params: pickDefined({ start: params.start, end: params.end, scale: params.scale }) }
     );
     return response.data;
   }
 
-  // --- Contact ---
+  async getReportContacts(params: {
+    reportType: string;
+    reportId?: string;
+    start?: string;
+    end?: string;
+    extend?: string[];
+    page?: number;
+    limit?: number;
+  }): Promise<Record<string, unknown>> {
+    if (params.page !== undefined && (!Number.isInteger(params.page) || params.page < 1)) {
+      throw createApiServiceError('page must be a positive whole number.');
+    }
+    if (
+      params.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be a whole number from 1 to 100.');
+    }
+    let response = await this.axios.get(
+      `/report/${encodeURIComponent(params.reportType)}${params.reportId ? `/${encodeURIComponent(params.reportId)}` : ''}/contacts`,
+      {
+        params: pickDefined({
+          start: params.start,
+          end: params.end,
+          extend: params.extend?.join(','),
+          page: params.page,
+          limit: params.limit
+        })
+      }
+    );
+    return response.data;
+  }
 
   async getContact(params: {
     contactIdOrEmail: string;
     extend?: string[];
   }): Promise<Record<string, unknown>> {
-    let queryParams: Record<string, string> = {};
-    if (params.extend && params.extend.length > 0)
-      queryParams.extend = params.extend.join(',');
-
     let response = await this.axios.get(
       `/contact/${encodeURIComponent(params.contactIdOrEmail)}`,
-      {
-        params: queryParams
-      }
+      { params: pickDefined({ extend: params.extend?.join(',') }) }
     );
+    return response.data;
+  }
+
+  async runReportQuery(query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    let response = await this.queryAxios.post('/data/query', query);
     return response.data;
   }
 }
 
 export class TrackingClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios = createSegMetricsClient('https://track.segmetrics.io');
 
-  constructor(config: { accountId: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://track.segmetrics.io'
-    });
-    this.accountId = config.accountId;
-  }
-
-  private accountId: string;
+  constructor(private config: { accountId: string }) {}
 
   async identifyVisitor(params: {
-    segUid: string;
-    email: string;
-  }): Promise<Record<string, unknown>> {
+    segUid?: string;
+    email?: string;
+    contactId?: string;
+  }): Promise<unknown> {
+    validateContactSelector(params.contactId, params.email);
     let response = await this.axios.get('/identify', {
-      params: {
-        account_id: this.accountId,
-        seg_uid: params.segUid,
-        email: params.email
-      }
+      params: pickDefined({
+        a: this.config.accountId,
+        uid: params.segUid,
+        e: params.email,
+        cid: params.contactId
+      })
     });
     return response.data;
   }

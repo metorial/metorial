@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageDashboards = SlateTool.create(spec, {
@@ -13,13 +13,17 @@ export let manageDashboards = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      masterPassword: z
+        .string()
+        .optional()
+        .describe('Master password for an encrypted connection'),
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
       connectionId: z
         .string()
         .optional()
-        .describe('Connection ID (required for list and create)'),
+        .describe('Connection ID for every action. Call list_connections to discover IDs.'),
       dashboardId: z
         .string()
         .optional()
@@ -38,15 +42,17 @@ export let manageDashboards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let { action, connectionId, dashboardId, title } = ctx.input;
+    if (!connectionId)
+      throw createApiServiceError(
+        'connectionId is required for dashboard actions. Call list_connections to discover IDs.'
+      );
 
     if (action === 'list') {
-      if (!connectionId) throw new Error('connectionId is required for listing dashboards');
+      if (!connectionId)
+        throw createApiServiceError('connectionId is required for listing dashboards');
       let dashboards = await client.listDashboards(connectionId);
       return {
         output: { dashboards, success: true },
@@ -55,8 +61,8 @@ export let manageDashboards = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!dashboardId) throw new Error('dashboardId is required');
-      let dashboard = await client.getDashboard(dashboardId);
+      if (!dashboardId) throw createApiServiceError('dashboardId is required');
+      let dashboard = await client.getDashboard(connectionId, dashboardId);
       return {
         output: { dashboard, success: true },
         message: `Retrieved dashboard **${dashboardId}**.`
@@ -64,8 +70,9 @@ export let manageDashboards = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!connectionId) throw new Error('connectionId is required for creating a dashboard');
-      if (!title) throw new Error('title is required for creating a dashboard');
+      if (!connectionId)
+        throw createApiServiceError('connectionId is required for creating a dashboard');
+      if (!title) throw createApiServiceError('title is required for creating a dashboard');
       let dashboard = await client.createDashboard(connectionId, title);
       return {
         output: { dashboard, success: true },
@@ -74,9 +81,9 @@ export let manageDashboards = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!dashboardId) throw new Error('dashboardId is required for updating');
-      if (!title) throw new Error('title is required for updating a dashboard');
-      let dashboard = await client.updateDashboard(dashboardId, title);
+      if (!dashboardId) throw createApiServiceError('dashboardId is required for updating');
+      if (!title) throw createApiServiceError('title is required for updating a dashboard');
+      let dashboard = await client.updateDashboard(connectionId, dashboardId, title);
       return {
         output: { dashboard, success: true },
         message: `Dashboard **${dashboardId}** updated successfully.`
@@ -84,14 +91,14 @@ export let manageDashboards = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!dashboardId) throw new Error('dashboardId is required for deleting');
-      await client.deleteDashboard(dashboardId);
+      if (!dashboardId) throw createApiServiceError('dashboardId is required for deleting');
+      await client.deleteDashboard(connectionId, dashboardId);
       return {
         output: { success: true },
         message: `Dashboard **${dashboardId}** deleted successfully.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

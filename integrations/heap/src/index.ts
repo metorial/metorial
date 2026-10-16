@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteUser,
+  getDeletionStatus,
   identifyUser,
   manageAccountProperties,
   manageUserProperties,
@@ -9,6 +10,13 @@ import {
 } from './tools';
 export let provider = Slate.create({
   spec,
-  tools: [trackEvent, manageUserProperties, manageAccountProperties, identifyUser, deleteUser],
+  tools: [
+    trackEvent,
+    manageUserProperties,
+    manageAccountProperties,
+    identifyUser,
+    deleteUser,
+    getDeletionStatus
+  ],
   triggers: []
 });

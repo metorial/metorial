@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,10 @@ export let getClickCounters = SlateTool.create(spec, {
         .enum(['country', 'platform', 'browser', 'referer', 'isp', 'link_id', 'top_params'])
         .describe('Dimension to group clicks by'),
       linkId: z.number().optional().describe('Filter by a single link ID'),
-      linkIds: z.string().optional().describe('Filter by multiple link IDs (comma-separated)'),
+      linkIds: z
+        .string()
+        .optional()
+        .describe('Filter by multiple link IDs (comma- or hyphen-separated)'),
       start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       end: z.string().optional().describe('End date (YYYY-MM-DD)'),
       country: z.string().optional().describe('Filter by country (ISO 3166-1 alpha-2 code)'),
@@ -38,7 +41,16 @@ export let getClickCounters = SlateTool.create(spec, {
         .array(
           z.object({
             name: z.string().describe('Dimension value (e.g., country code, browser name)'),
-            count: z.number().describe('Click count for this value')
+            count: z.number().describe('Click count for this value'),
+            key: z
+              .string()
+              .optional()
+              .describe('Query parameter name when grouping by top_params'),
+            linkId: z.number().optional().describe('Link ID when grouping by link_id'),
+            link: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete link record when grouping by link_id')
           })
         )
         .describe('Click counts grouped by dimension')
@@ -52,18 +64,34 @@ export let getClickCounters = SlateTool.create(spec, {
 
     let result = await client.getClickCounters(ctx.input);
 
-    let counters: Array<{ name: string; count: number }> = [];
-    if (Array.isArray(result.values)) {
-      counters = result.values.map((v: any) => ({
-        name: v.value || v.name || String(v),
-        count: v.count || 0
-      }));
-    } else if (Array.isArray(result)) {
-      counters = result.map((v: any) => ({
-        name: v.value || v.name || String(v),
-        count: v.count || 0
-      }));
-    }
+    let values = Array.isArray(result.values)
+      ? result.values
+      : Array.isArray(result)
+        ? result
+        : [];
+    let counters = values.map(
+      (item: { value?: unknown; name?: string; key?: string; count?: number }) => {
+        if (typeof item.count !== 'number' || !Number.isFinite(item.count)) {
+          throw createApiServiceError(
+            'Linkly returned a click counter without a valid numeric count. Retry the request or check the provider response.',
+            { reason: 'linkly_invalid_response' }
+          );
+        }
+        let link =
+          ctx.input.counter === 'link_id' && isApiErrorRecord(item.value)
+            ? item.value
+            : undefined;
+        return {
+          name: link
+            ? String(link.full_url ?? link.name ?? link.id ?? link.url ?? '')
+            : String(item.value ?? item.name ?? ''),
+          count: item.count,
+          key: item.key,
+          linkId: typeof link?.id === 'number' ? link.id : undefined,
+          link
+        };
+      }
+    );
 
     return {
       output: {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let addRow = SlateTool.create(spec, {
@@ -13,7 +13,11 @@ export let addRow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table to insert into'),
       rowData: z
         .record(z.string(), z.unknown())
@@ -32,11 +36,7 @@ export let addRow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      masterPassword: ctx.input.masterPassword
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let row = await client.addRow(
       ctx.input.connectionId,

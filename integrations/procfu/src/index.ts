@@ -4,8 +4,11 @@ import {
   createPodioItem,
   deletePodioItem,
   filterPodioItems,
+  getAccountUsage,
+  getLastError,
   getPodioAppInfo,
   getPodioItem,
+  listPodioOrganizations,
   managePodioComment,
   manageVariables,
   podioRawApi,
@@ -14,7 +17,8 @@ import {
   searchPodioItems,
   sendOauthApiRequest,
   triggerPwaFlow,
-  updatePodioItem
+  updatePodioItem,
+  whoAmI
 } from './tools';
 
 export let provider = Slate.create({
@@ -33,7 +37,11 @@ export let provider = Slate.create({
     queryMysql,
     getPodioAppInfo,
     podioRawApi,
-    sendOauthApiRequest
+    sendOauthApiRequest,
+    whoAmI,
+    getAccountUsage,
+    getLastError,
+    listPodioOrganizations
   ],
   triggers: []
 });

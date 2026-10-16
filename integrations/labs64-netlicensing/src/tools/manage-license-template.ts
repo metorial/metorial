@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -71,7 +71,9 @@ export let manageLicenseTemplate = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!licenseTemplateNumber)
-        throw new Error('licenseTemplateNumber is required for delete');
+        throw createApiServiceError('licenseTemplateNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteLicenseTemplate(licenseTemplateNumber, forceCascade);
       return {
         output: { licenseTemplateNumber, deleted: true },
@@ -81,9 +83,14 @@ export let manageLicenseTemplate = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!licenseTemplateNumber)
-        throw new Error('licenseTemplateNumber is required for update');
+        throw createApiServiceError('licenseTemplateNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateLicenseTemplate(licenseTemplateNumber, params);
-      if (!result) throw new Error('Failed to update license template');
+      if (!result)
+        throw createApiServiceError('Failed to update license template', {
+          reason: 'invalid_response'
+        });
       return {
         output: {
           licenseTemplateNumber: result.number,
@@ -102,7 +109,10 @@ export let manageLicenseTemplate = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (licenseTemplateNumber) createParams.number = licenseTemplateNumber;
     let result = await client.createLicenseTemplate(createParams);
-    if (!result) throw new Error('Failed to create license template');
+    if (!result)
+      throw createApiServiceError('Failed to create license template', {
+        reason: 'invalid_response'
+      });
     return {
       output: {
         licenseTemplateNumber: result.number,

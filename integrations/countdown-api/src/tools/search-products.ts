@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 let ebayDomainSchema = z
@@ -32,7 +32,7 @@ let ebayDomainSchema = z
 export let searchProducts = SlateTool.create(spec, {
   name: 'Search eBay Products',
   key: 'search_products',
-  description: `Search for products on any of 20 supported eBay domains worldwide. Supports filtering by condition, listing type, sort order, sold/completed items, and more. Returns structured search results including listing titles, prices, conditions, seller info, and images.`,
+  description: `Search for products on supported eBay domains worldwide. Supports filtering by condition, listing type, sort order, sold/completed items, and more. Returns structured search results including listing titles, prices, conditions, seller info, and images.`,
   instructions: [
     'Provide either a `searchTerm` or a `url` to an eBay search results page.',
     'Use `categoryId` to narrow results to a specific eBay category.',
@@ -88,7 +88,7 @@ export let searchProducts = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Maximum page for auto-pagination. Retrieves pages 1 through maxPage in one request.'
+          'Maximum page for auto-pagination, up to 5. Retrieves from page (default 1) through maxPage.'
         ),
       num: z.enum(['60', '120', '240']).optional().describe('Number of results per page.'),
       soldItems: z.boolean().optional().describe('Filter to sold items only.'),
@@ -105,6 +105,10 @@ export let searchProducts = SlateTool.create(spec, {
         .describe('Filter to authenticity-verified items.'),
       dealsAndSavings: z.boolean().optional().describe('Filter to deals and savings items.'),
       saleItems: z.boolean().optional().describe('Filter to sale items only.'),
+      allowRewrittenResults: z
+        .boolean()
+        .optional()
+        .describe('Include results matching fewer words. Defaults to true at the provider.'),
       facets: z
         .string()
         .optional()
@@ -118,6 +122,10 @@ export let searchProducts = SlateTool.create(spec, {
         .describe(
           'Array of search result items with title, price, condition, seller info, images, etc.'
         ),
+      rawPagination: z
+        .any()
+        .optional()
+        .describe('Provider pagination metadata, preserving original total values.'),
       totalResults: z
         .number()
         .optional()
@@ -151,22 +159,35 @@ export let searchProducts = SlateTool.create(spec, {
       authenticityVerified: ctx.input.authenticityVerified,
       dealsAndSavings: ctx.input.dealsAndSavings,
       saleItems: ctx.input.saleItems,
-      facets: ctx.input.facets
+      facets: ctx.input.facets,
+      allowRewrittenResults: ctx.input.allowRewrittenResults
     });
 
-    let searchResults = result.search_results || [];
+    let searchResults = requireArray(result.search_results, 'search_results');
     let pagination = result.pagination || {};
+    let rawTotal = pagination.total_results;
+    let numericTotal =
+      typeof rawTotal === 'string' && /^\d+$/.test(rawTotal) ? Number(rawTotal) : rawTotal;
+    if (
+      numericTotal !== undefined &&
+      (typeof numericTotal !== 'number' ||
+        !Number.isSafeInteger(numericTotal) ||
+        numericTotal < 0)
+    ) {
+      throw createApiServiceError('Countdown API returned an invalid total_results.');
+    }
 
     return {
       output: {
         searchResults,
-        totalResults: pagination.total_results,
+        totalResults: numericTotal,
+        rawPagination: result.pagination,
         currentPage: pagination.current_page,
         totalPages: pagination.total_pages,
-        searchTerm: result.search_parameters?.search_term,
-        ebayUrl: result.search_parameters?.ebay_url
+        searchTerm: result.request_parameters?.search_term,
+        ebayUrl: result.request_metadata?.ebay_url
       },
-      message: `Found **${searchResults.length}** search results${ctx.input.searchTerm ? ` for "${ctx.input.searchTerm}"` : ''} on **${ebayDomain}**.${pagination.total_results ? ` Total: ${pagination.total_results} results across ${pagination.total_pages} pages.` : ''}`
+      message: `Found **${searchResults.length}** returned search results${ctx.input.searchTerm ? ` for "${ctx.input.searchTerm}"` : ''} on **${ebayDomain}**.${numericTotal !== undefined ? ` Provider total: ${numericTotal}.` : ''}`
     };
   })
   .build();

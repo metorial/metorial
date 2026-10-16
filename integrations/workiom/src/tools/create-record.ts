@@ -42,12 +42,14 @@ export let createRecord = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let record = await client.createRecord(ctx.input.listId, ctx.input.fields);
 
-    let recordId = record?._id ?? record?.id;
+    let id = record?._id ?? record?.id;
+    let recordId =
+      (typeof id === 'string' && id !== '') || typeof id === 'number' ? String(id) : undefined;
 
     return {
       output: {
         record,
-        recordId: recordId ? String(recordId) : undefined
+        recordId
       },
       message: `Created new record${recordId ? ` (ID: **${recordId}**)` : ''} in list **${ctx.input.listId}**.`
     };

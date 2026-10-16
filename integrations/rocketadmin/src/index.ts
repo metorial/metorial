@@ -5,6 +5,8 @@ import {
   deleteRow,
   exportCsv,
   getAuditLogs,
+  getCurrentUser,
+  getMyCompany,
   getRows,
   listConnections,
   listTables,
@@ -20,6 +22,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getMyCompany,
     listConnections,
     manageConnection,
     listTables,

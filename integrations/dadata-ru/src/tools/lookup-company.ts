@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let companyDetailSchema = z.object({
-  value: z.string().describe('Short company name'),
+  value: z.string().optional().describe('Short company name'),
   inn: z.string().nullable().describe('INN'),
   kpp: z.string().nullable().describe('KPP'),
   ogrn: z.string().nullable().describe('OGRN'),
@@ -57,11 +58,16 @@ Use this for precise lookups when you have a specific identifier, as opposed to 
       kpp: z.string().optional().describe('KPP to find a specific branch'),
       branchType: z.enum(['MAIN', 'BRANCH']).optional().describe('Filter by branch type'),
       type: z.enum(['LEGAL', 'INDIVIDUAL']).optional().describe('Filter by entity type'),
-      count: z.number().optional().describe('Number of results (max 20)')
+      status: z
+        .array(z.enum(['ACTIVE', 'LIQUIDATING', 'LIQUIDATED', 'REORGANIZING', 'BANKRUPT']))
+        .optional()
+        .describe('Filter by company status'),
+      count: z.number().optional().describe('Number of results (max 300)')
     })
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       companies: z.array(companyDetailSchema).describe('List of matched companies')
     })
   )
@@ -76,11 +82,12 @@ Use this for precise lookups when you have a specific identifier, as opposed to 
       kpp: ctx.input.kpp,
       branchType: ctx.input.branchType,
       type: ctx.input.type,
-      count: ctx.input.count
+      count: ctx.input.count,
+      status: ctx.input.status
     });
 
-    let companies = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let companies = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       inn: s.data?.inn ?? null,
       kpp: s.data?.kpp ?? null,
       ogrn: s.data?.ogrn ?? null,
@@ -118,7 +125,10 @@ Use this for precise lookups when you have a specific identifier, as opposed to 
     }));
 
     return {
-      output: { companies },
+      output: {
+        rawData: data,
+        companies
+      },
       message:
         companies.length > 0
           ? `Found **${companies.length}** company/companies for "${ctx.input.query}": ${companies.map((c: any) => c.value).join(', ')}`

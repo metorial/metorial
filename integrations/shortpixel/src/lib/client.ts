@@ -1,4 +1,16 @@
-import { createAxios } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  decodeApiErrorBody,
+  isApiErrorRecord
+} from 'slates';
+import {
+  assertSuccessfulEnvelope,
+  MAX_OPTIMIZED_IMAGE_BYTES,
+  readNumber,
+  readOptimizedImage,
+  shortPixelError
+} from './responses';
 import type {
   ApiStatusResponse,
   DomainCdnUsageResponse,
@@ -15,14 +27,19 @@ export class ShortPixelClient {
   }
 
   private getReducerAxios() {
-    return createAxios({
-      baseURL: 'https://api.shortpixel.com/v2'
+    return createAuthenticatedAxios({
+      baseURL: 'https://api.shortpixel.com/v2',
+      errorMapping: {
+        extractResponseData: response => decodeApiErrorBody(response.data, { maxBytes: 16384 })
+      },
+      errorAdapter: shortPixelError
     });
   }
 
   private getCdnAxios() {
-    return createAxios({
-      baseURL: 'https://no-cdn.shortpixel.ai'
+    return createAuthenticatedAxios({
+      baseURL: 'https://no-cdn.shortpixel.ai',
+      errorAdapter: shortPixelError
     });
   }
 
@@ -40,8 +57,16 @@ export class ShortPixelClient {
     refresh?: boolean;
     waitSeconds?: number;
   }): Promise<OptimizationResult[]> {
-    let axios = this.getReducerAxios();
+    let response = await this.getReducerAxios().post(
+      '/reducer.php',
+      this.buildReducerRequest(params)
+    );
+    return this.readOptimizationResults(response.data);
+  }
 
+  private buildReducerRequest(
+    params: Parameters<ShortPixelClient['optimizeByUrl']>[0]
+  ): ReducerRequest {
     let lossyValue =
       params.compression === 'lossy' ? 1 : params.compression === 'glossy' ? 2 : 0;
 
@@ -72,13 +97,25 @@ export class ShortPixelClient {
     }
     if (params.refresh) body.refresh = 1;
 
-    let response = await axios.post('/reducer.php', body);
+    return body;
+  }
 
-    let data = response.data;
-    if (Array.isArray(data)) {
-      return data as OptimizationResult[];
-    }
-    return [data as OptimizationResult];
+  async optimizeImageFile(
+    params: Omit<Parameters<ShortPixelClient['optimizeByUrl']>[0], 'urls'> & { url: string }
+  ) {
+    let body = this.buildReducerRequest({ ...params, urls: [params.url] });
+    let { urllist: _urls, ...options } = body;
+    let response = await this.getReducerAxios().post<ArrayBuffer>(
+      '/reducer-sync.php',
+      { ...options, url: params.url },
+      {
+        responseType: 'arraybuffer',
+        maxRedirects: 0,
+        maxContentLength: MAX_OPTIMIZED_IMAGE_BYTES,
+        timeout: 90000
+      }
+    );
+    return readOptimizedImage(response);
   }
 
   async pollOptimizationResult(params: {
@@ -104,11 +141,7 @@ export class ShortPixelClient {
 
     let response = await axios.post('/reducer.php', body);
 
-    let data = response.data;
-    if (Array.isArray(data)) {
-      return data as OptimizationResult[];
-    }
-    return [data as OptimizationResult];
+    return this.readOptimizationResults(response.data);
   }
 
   async getApiStatus(): Promise<ApiStatusResponse> {
@@ -118,49 +151,94 @@ export class ShortPixelClient {
       params: { key: this.apiKey }
     });
 
+    assertSuccessfulEnvelope(response.data);
+    if (!isApiErrorRecord(response.data) || !isApiErrorRecord(response.data.Status)) {
+      throw createApiServiceError('ShortPixel returned invalid credit usage data.');
+    }
     return response.data as ApiStatusResponse;
   }
 
   async readDomainStatus(domain: string): Promise<DomainStatusResponse> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/read-domain/${domain}`);
+    let response = await axios.get(`/read-domain/${encodeURIComponent(domain)}`);
     return response.data as DomainStatusResponse;
   }
 
   async readDomainCdnUsage(domain: string): Promise<DomainCdnUsageResponse> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/read-domain-cdn-usage/${domain}/${this.apiKey}`);
+    let response = await axios.get(
+      `/read-domain-cdn-usage/${encodeURIComponent(domain)}/${encodeURIComponent(this.apiKey)}`
+    );
+    assertSuccessfulEnvelope(response.data);
     return response.data as DomainCdnUsageResponse;
+  }
+
+  async addDomain(domain: string): Promise<unknown> {
+    let response = await this.getCdnAxios().get(
+      `/add-domain/${encodeURIComponent(domain)}/${encodeURIComponent(this.apiKey)}`
+    );
+    assertSuccessfulEnvelope(response.data);
+    return response.data;
   }
 
   async setDomain(domain: string): Promise<unknown> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/set-domain/${domain}/${this.apiKey}`);
+    let response = await axios.get(
+      `/set-domain/${encodeURIComponent(domain)}/${encodeURIComponent(this.apiKey)}`
+    );
+    assertSuccessfulEnvelope(response.data);
     return response.data;
   }
 
   async revokeDomain(domain: string): Promise<unknown> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/revoke-domain/${domain}/${this.apiKey}`);
+    let response = await axios.get(
+      `/revoke-domain/${encodeURIComponent(domain)}/${encodeURIComponent(this.apiKey)}`
+    );
+    assertSuccessfulEnvelope(response.data);
     return response.data;
   }
 
   async purgeStorageBulk(domain: string): Promise<unknown> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/purge-storage-bulk/${this.apiKey}/${domain}`);
+    let response = await axios.get(
+      `/purge-storage-bulk/${encodeURIComponent(this.apiKey)}/${encodeURIComponent(domain)}`
+    );
+    assertSuccessfulEnvelope(response.data);
     return response.data;
   }
 
   async purgeCdnCacheBulk(domain: string): Promise<unknown> {
     let axios = this.getCdnAxios();
 
-    let response = await axios.get(`/purge-cdn-cache-bulk/${this.apiKey}/${domain}`);
+    let response = await axios.get(
+      `/purge-cdn-cache-bulk/${encodeURIComponent(this.apiKey)}/${encodeURIComponent(domain)}`
+    );
+    assertSuccessfulEnvelope(response.data);
     return response.data;
+  }
+
+  private readOptimizationResults(data: unknown): OptimizationResult[] {
+    if (!Array.isArray(data)) assertSuccessfulEnvelope(data);
+    let results = Array.isArray(data) ? data : [data];
+    return results.map(result => {
+      if (
+        !isApiErrorRecord(result) ||
+        !isApiErrorRecord(result.Status) ||
+        typeof result.Status.Message !== 'string'
+      ) {
+        throw createApiServiceError('ShortPixel returned an invalid optimization result.');
+      }
+      return {
+        ...result,
+        Status: { ...result.Status, Code: readNumber(result.Status.Code, 'status code') }
+      } as OptimizationResult;
+    });
   }
 
   buildCdnUrl(params: {

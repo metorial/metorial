@@ -5,6 +5,7 @@ import {
   checkForUpdates,
   deleteBookmark,
   getBookmarkDates,
+  getBookmarkHashes,
   getBookmarks,
   getTagSuggestions,
   listAllBookmarks,
@@ -24,7 +25,8 @@ export let provider = Slate.create({
     listTags,
     manageTag,
     checkForUpdates,
-    getBookmarkDates
+    getBookmarkDates,
+    getBookmarkHashes
   ],
   triggers: []
 });

@@ -6,13 +6,15 @@ import { spec } from '../spec';
 export let recognizeVin = SlateTool.create(spec, {
   name: 'Recognize VIN',
   key: 'recognize_vin',
-  description: `Extract a Vehicle Identification Number (VIN) from an image. Submit an image of a VIN label, sticker, or windshield to decode the 17-character VIN code with confidence scores.`,
+  description: `DEPRECATED — use \`recognize_text\` instead. Extract a Vehicle Identification Number (VIN) from an image. Submit an image of a VIN label, sticker, or windshield to decode the 17-character VIN code with confidence scores.`,
   instructions: [
+    'Use recognize_text with type="vin" for the current OCR service. This compatibility tool continues to use the original VIN ID service.',
     'Provide either an imageUrl or imageBase64, not both.',
     'For best results, ensure the VIN is clearly visible in the image.'
   ],
   constraints: ['Maximum image size is 3 MB.'],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

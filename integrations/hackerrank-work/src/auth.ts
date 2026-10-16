@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -12,9 +12,13 @@ export let auth = SlateAuth.create()
     name: 'API Token',
     key: 'api_token',
     inputSchema: z.object({
-      apiToken: z.string()
+      apiToken: z
+        .string()
+        .describe('Personal API token generated in HackerRank for Work Settings > API')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim())
+        throw createApiServiceError('Enter a HackerRank for Work API token.');
       return {
         output: {
           token: ctx.input.apiToken

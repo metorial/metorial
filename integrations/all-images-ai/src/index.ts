@@ -10,7 +10,8 @@ import {
   listGenerations,
   retryGeneration,
   searchImages,
-  updateGeneration
+  updateGeneration,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -24,7 +25,8 @@ export let provider = Slate.create({
     updateGeneration,
     retryGeneration,
     deleteGenerations,
-    getCredits
+    getCredits,
+    whoAmI
   ],
   triggers: []
 });

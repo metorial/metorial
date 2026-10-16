@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,6 +18,7 @@ export let lookupWord = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       word: z.string().describe('The queried word'),
       valid: z.boolean().describe('Whether the word is valid'),
       definition: z.string().optional().describe('Definition of the word'),
@@ -33,14 +34,24 @@ export let lookupWord = SlateTool.create(spec, {
       client.getThesaurus(ctx.input.word)
     ]);
 
-    let synonyms = thesResult.synonyms ?? [];
-    let antonyms = thesResult.antonyms ?? [];
+    if (
+      typeof dictResult.valid !== 'boolean' ||
+      !Array.isArray(thesResult.synonyms) ||
+      !Array.isArray(thesResult.antonyms)
+    ) {
+      throw createApiServiceError(
+        'API Ninjas returned incomplete dictionary or thesaurus results. Retry the request.'
+      );
+    }
+    let synonyms = thesResult.synonyms;
+    let antonyms = thesResult.antonyms;
 
     return {
       output: {
+        raw: { dictionary: dictResult, thesaurus: thesResult },
         word: dictResult.word ?? ctx.input.word,
-        valid: dictResult.valid ?? false,
-        definition: dictResult.definition,
+        valid: dictResult.valid,
+        definition: dictResult.definition ?? undefined,
         synonyms,
         antonyms
       },

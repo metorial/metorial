@@ -8,7 +8,8 @@ let validatorSelectorSchema = z.object({
     .array(z.union([z.string(), z.number()]))
     .optional()
     .describe('Array of validator indices or public keys'),
-  dashboardId: z.number().optional().describe('Dashboard ID to select validators from')
+  dashboardId: z.number().optional().describe('Dashboard ID to select validators from'),
+  groupId: z.number().optional().describe('Optional group within dashboardId')
 });
 
 export let getValidatorPerformance = SlateTool.create(spec, {
@@ -32,6 +33,12 @@ Use aggregate mode for a summary across validators, or list mode for per-validat
         .enum(['aggregate', 'list'])
         .default('aggregate')
         .describe('Whether to return aggregated or per-validator performance'),
+      evaluationWindow: z
+        .enum(['24h', '7d', '30d', '90d', 'all_time'])
+        .optional()
+        .describe(
+          'Aggregate evaluation window. Defaults to 24h. List mode uses epoch instead.'
+        ),
       epoch: z
         .number()
         .optional()
@@ -39,7 +46,7 @@ Use aggregate mode for a summary across validators, or list mode for per-validat
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (list mode only, 1-100)'),
+        .describe('Number of results per page (list mode only, 1-10)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -59,13 +66,17 @@ Use aggregate mode for a summary across validators, or list mode for per-validat
 
     let selector = {
       validatorIdentifiers: ctx.input.validators.validatorIdentifiers,
-      dashboardId: ctx.input.validators.dashboardId
+      dashboardId: ctx.input.validators.dashboardId,
+      groupId: ctx.input.validators.groupId
     };
 
     let result: Record<string, any>;
 
     if (ctx.input.mode === 'aggregate') {
-      let response = await client.getValidatorPerformanceAggregate(selector);
+      let response = await client.getValidatorPerformanceAggregate(
+        selector,
+        ctx.input.evaluationWindow
+      );
       result = { performance: response };
     } else {
       let response = await client.getValidatorPerformanceList(selector, ctx.input.epoch, {

@@ -28,6 +28,7 @@ export let updateResource = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('Updated resource ID'),
       name: z.string().optional().describe('Updated name'),
       statusCode: z.number().optional().describe('Status code'),
@@ -37,7 +38,7 @@ export let updateResource = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.description !== undefined) body.description = ctx.input.description;
     if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
@@ -47,9 +48,10 @@ export let updateResource = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource ?? ctx.input.resourceId,
         name: result.name ?? ctx.input.name,
-        statusCode: result.status?.code ?? result.code,
+        statusCode: result.status?.code,
         statusMessage: result.status?.message
       },
       message: `Resource **${ctx.input.resourceId}** updated successfully.`

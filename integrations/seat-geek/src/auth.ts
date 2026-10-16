@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -14,9 +14,7 @@ export let auth = SlateAuth.create()
     key: 'client_credentials',
 
     inputSchema: z.object({
-      clientId: z
-        .string()
-        .describe('SeatGeek API client ID from seatgeek.com/account/develop'),
+      clientId: z.string().describe('SeatGeek API client ID from developer.seatgeek.com'),
       clientSecret: z
         .string()
         .optional()
@@ -24,9 +22,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let clientId = ctx.input.clientId.trim();
+      if (!clientId) throw createApiServiceError('A SeatGeek API client ID is required.');
       return {
         output: {
-          clientId: ctx.input.clientId,
+          clientId,
           clientSecret: ctx.input.clientSecret
         }
       };

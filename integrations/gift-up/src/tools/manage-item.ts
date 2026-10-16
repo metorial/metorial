@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,7 @@ export let manageItem = SlateTool.create(spec, {
   description: `Create a new item (product) for sale in the Gift Up! checkout, or update an existing item. Items define the gift card products available for purchase, including pricing, value, stock, and expiry settings.`,
   instructions: [
     'To create a new item, omit **itemId** and provide at least **name** and **backingType**.',
-    'To update an existing item, provide the **itemId** along with the fields to change.'
+    'To update an existing item, provide itemId. Only name, description, additionalTerms, price, value, detailsURL, sku, codes, stockLevel, and perOrderLimit can be updated; other fields are creation-only.'
   ]
 })
   .input(
@@ -76,7 +76,31 @@ export let manageItem = SlateTool.create(spec, {
     });
 
     if (ctx.input.itemId) {
-      // Update existing item
+      let creationOnlyFields = [
+        'backingType',
+        'priceType',
+        'units',
+        'equivalentValuePerUnit',
+        'minimumPrice',
+        'maximumPrice',
+        'availableFrom',
+        'availableUntil',
+        'overrideExpiry',
+        'expiresOn',
+        'expiresInMonths',
+        'expiresInDays',
+        'overrideValidFrom',
+        'validFrom',
+        'validFromInDays',
+        'groupId',
+        'artworkURL'
+      ] as const;
+      let unsupported = creationOnlyFields.filter(field => ctx.input[field] !== undefined);
+      if (unsupported.length > 0) {
+        throw createApiServiceError(
+          `These fields are supported only when creating an item: ${unsupported.join(', ')}.`
+        );
+      }
       let patchableFields: Record<string, string> = {
         name: '/name',
         description: '/description',
@@ -106,17 +130,41 @@ export let manageItem = SlateTool.create(spec, {
         };
       }
 
-      let updated = await client.updateItem(ctx.input.itemId, patches);
+      await client.updateItem(ctx.input.itemId, patches);
+      let updated = await client.getItem(ctx.input.itemId);
       return {
         output: { ...updated, itemId: updated.id },
         message: `Updated item **${updated.name}**`
       };
     } else {
-      // Create new item
+      if (!ctx.input.name?.trim() || !ctx.input.backingType) {
+        throw createApiServiceError('Provide name and backingType when creating an item.');
+      }
+      if (
+        (ctx.input.backingType === 'Currency' && ctx.input.priceType !== 'Custom') ||
+        ctx.input.backingType === 'Units'
+      ) {
+        if (ctx.input.price === undefined) {
+          throw createApiServiceError(
+            'Provide price for a specified-price currency item or a unit-backed item.'
+          );
+        }
+      }
+      if (ctx.input.backingType === 'Currency' && ctx.input.value === undefined) {
+        throw createApiServiceError('Provide value when creating a currency-backed item.');
+      }
+      if (
+        ctx.input.backingType === 'Units' &&
+        (ctx.input.units === undefined || ctx.input.equivalentValuePerUnit === undefined)
+      ) {
+        throw createApiServiceError(
+          'Provide units and equivalentValuePerUnit when creating a unit-backed item.'
+        );
+      }
       let item = await client.createItem({
-        name: ctx.input.name!,
+        name: ctx.input.name,
         description: ctx.input.description,
-        backingType: ctx.input.backingType!,
+        backingType: ctx.input.backingType,
         priceType: ctx.input.priceType,
         price: ctx.input.price,
         value: ctx.input.value,

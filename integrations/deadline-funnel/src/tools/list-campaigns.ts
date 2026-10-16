@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listCampaigns = SlateTool.create(spec, {
   name: 'List Campaigns',
   key: 'list_campaigns',
-  description: `Retrieve all Deadline Funnel campaigns in your account. Returns campaign IDs, names, types, and statuses. Use this to find the campaign ID needed for starting deadlines or tracking purchases.`,
+  description: `Retrieve Deadline Funnel campaigns returned by your account API. Returns campaign IDs, names, types, and statuses. Use this to find the campaign ID needed for starting deadlines or tracking purchases.`,
   tags: {
     destructive: false,
     readOnly: true

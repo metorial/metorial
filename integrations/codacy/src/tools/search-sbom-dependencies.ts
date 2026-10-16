@@ -39,6 +39,10 @@ export let searchSbomDependencies = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       dependencies: z
         .array(z.any())
         .describe('List of SBOM dependencies with vulnerability information.'),
@@ -65,6 +69,7 @@ export let searchSbomDependencies = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         dependencies,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

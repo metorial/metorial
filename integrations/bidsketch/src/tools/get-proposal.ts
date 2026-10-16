@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import {
+  readBidsketchBoolean,
+  readBidsketchNumber,
+  readBidsketchRecord,
+  readBidsketchString
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getProposal = SlateTool.create(spec, {
@@ -29,9 +35,9 @@ export let getProposal = SlateTool.create(spec, {
       isDraft: z.boolean().describe('Whether the proposal is a draft'),
       currency: z.string().nullable().describe('ISO 4217 currency code'),
       proposalDate: z.string().nullable().describe('Proposal date'),
-      tax: z.number().nullable().describe('Primary tax rate (decimal, e.g. 0.1 = 10%)'),
-      tax2: z.number().nullable().describe('Secondary tax rate'),
-      discount: z.number().nullable().describe('Discount percentage'),
+      tax: z.number().nullable().describe('Calculated primary tax amount'),
+      tax2: z.number().nullable().describe('Calculated secondary tax amount'),
+      discount: z.number().nullable().describe('Calculated discount amount'),
       total: z.number().nullable().describe('Total amount'),
       monthlyFees: z.number().nullable().describe('Monthly fees total'),
       yearlyFees: z.number().nullable().describe('Yearly fees total'),
@@ -73,9 +79,11 @@ export let getProposal = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BidsketchClient(ctx.auth.token);
 
-    let p = ctx.input.includeContent
-      ? await client.getProposalContent(ctx.input.proposalId)
-      : await client.getProposal(ctx.input.proposalId);
+    let p = await client.getProposal(ctx.input.proposalId);
+    if (ctx.input.includeContent) {
+      let expanded = await client.getProposalContent(ctx.input.proposalId);
+      p = { ...p, content: readBidsketchRecord(expanded.content, 'proposal content') };
+    }
 
     let settings = p.settings
       ? {
@@ -93,11 +101,11 @@ export let getProposal = SlateTool.create(spec, {
 
     return {
       output: {
-        proposalId: p.id,
-        name: p.name,
+        proposalId: readBidsketchNumber(p.id, 'id'),
+        name: readBidsketchString(p.name, 'name'),
         description: p.description ?? null,
-        status: p.status,
-        isDraft: p.is_draft,
+        status: readBidsketchString(p.status, 'status'),
+        isDraft: readBidsketchBoolean(p.is_draft, 'is_draft'),
         currency: p.currency ?? null,
         proposalDate: p.proposal_date ?? null,
         tax: p.tax ?? null,
@@ -110,18 +118,18 @@ export let getProposal = SlateTool.create(spec, {
         user: p.user ?? null,
         client: p.client
           ? {
-              clientId: p.client.id,
-              name: p.client.name,
-              url: p.client.url,
-              appUrl: p.client.app_url
+              clientId: readBidsketchNumber(p.client.id, 'client id'),
+              name: readBidsketchString(p.client.name, 'client name'),
+              url: readBidsketchString(p.client.url, 'client url'),
+              appUrl: readBidsketchString(p.client.app_url, 'client app_url')
             }
           : null,
         settings,
         content: p.content ?? null,
-        url: p.url,
-        appUrl: p.app_url,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at
+        url: readBidsketchString(p.url, 'url'),
+        appUrl: readBidsketchString(p.app_url, 'app_url'),
+        createdAt: readBidsketchString(p.created_at, 'created_at'),
+        updatedAt: readBidsketchString(p.updated_at, 'updated_at')
       },
       message: `Retrieved proposal **${p.name}** (Status: ${p.status}).`
     };

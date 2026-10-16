@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,9 @@ export let auth = SlateAuth.create()
         .describe('Your Pexels API key. Obtain one from your Pexels account settings.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a Pexels API key.');
+      }
       return {
         output: {
           token: ctx.input.apiKey

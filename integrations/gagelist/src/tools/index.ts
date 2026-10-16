@@ -8,6 +8,7 @@ export * from './get-gage';
 export * from './list-calibrations';
 export * from './list-gages';
 export * from './manage-account';
+export * from './manage-attachments';
 export * from './manage-custom-fields';
 export * from './manage-manufacturer';
 export * from './update-calibration';

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, eventFlag, validateSymplaOutput } from '../lib/client';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -34,6 +34,12 @@ let eventSchema = z.object({
   secondaryCategory: z.string().describe('Secondary category name')
 });
 
+let outputSchema = z.object({
+  events: z.array(eventSchema).describe('List of events'),
+  hasNextPage: z.boolean().describe('Whether more pages are available'),
+  totalQuantity: z.number().describe('Total number of results')
+});
+
 export let listEventsTool = SlateTool.create(spec, {
   name: 'List Events',
   key: 'list_events',
@@ -58,13 +64,7 @@ export let listEventsTool = SlateTool.create(spec, {
       sort: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
     })
   )
-  .output(
-    z.object({
-      events: z.array(eventSchema).describe('List of events'),
-      hasNextPage: z.boolean().describe('Whether more pages are available'),
-      totalQuantity: z.number().describe('Total number of results')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -79,37 +79,37 @@ export let listEventsTool = SlateTool.create(spec, {
 
     let events = result.data.map(e => ({
       eventId: e.id,
-      name: e.name ?? '',
-      detail: e.detail ?? '',
-      startDate: e.start_date ?? '',
-      endDate: e.end_date ?? '',
-      privateEvent: e.private_event === 1,
-      published: e.published === 1,
-      cancelled: e.cancelled === 1,
-      imageUrl: e.image ?? '',
-      eventUrl: e.url ?? '',
+      name: e.name,
+      detail: e.detail,
+      startDate: e.start_date,
+      endDate: e.end_date,
+      privateEvent: eventFlag(e.private_event),
+      published: eventFlag(e.published),
+      cancelled: eventFlag(e.cancelled),
+      imageUrl: e.image,
+      eventUrl: e.url,
       address: {
-        name: e.address?.name ?? '',
-        address: e.address?.address ?? '',
-        city: e.address?.city ?? '',
-        state: e.address?.state ?? '',
-        country: e.address?.country ?? '',
-        zipCode: e.address?.zip_code ?? ''
+        name: e.address?.name,
+        address: e.address?.address,
+        city: e.address?.city,
+        state: e.address?.state,
+        country: e.address?.country,
+        zipCode: e.address?.zip_code
       },
       host: {
-        name: e.host?.name ?? '',
-        description: e.host?.description ?? ''
+        name: e.host?.name,
+        description: e.host?.description
       },
-      primaryCategory: e.category_prim?.name ?? '',
-      secondaryCategory: e.category_sec?.name ?? ''
+      primaryCategory: e.category_prim?.name,
+      secondaryCategory: e.category_sec?.name
     }));
 
     return {
-      output: {
+      output: validateSymplaOutput(outputSchema, {
         events,
         hasNextPage: result.pagination.hasNext,
         totalQuantity: result.pagination.quantity
-      },
+      }),
       message: `Found **${events.length}** events.${result.pagination.hasNext ? ' More pages available.' : ''}`
     };
   })

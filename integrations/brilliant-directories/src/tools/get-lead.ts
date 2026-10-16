@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,10 @@ Returns lead data including contact information, categories, and timestamps.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       lead: z.any().describe('The lead record(s) returned.')
     })
   )
@@ -42,15 +46,18 @@ Returns lead data including contact information, categories, and timestamps.`,
     let result: any;
     if (ctx.input.leadId) {
       result = await client.getLead(ctx.input.leadId);
-    } else if (ctx.input.property && ctx.input.propertyValue) {
+    } else if (ctx.input.property && ctx.input.propertyValue !== undefined) {
       result = await client.getLeadByProperty(ctx.input.property, ctx.input.propertyValue);
     } else {
-      throw new Error('Either leadId or both property and propertyValue must be provided.');
+      throw createApiServiceError(
+        'Either leadId or both property and propertyValue must be provided.'
+      );
     }
 
     return {
       output: {
         status: result.status,
+        raw: result,
         lead: result.message
       },
       message: `Retrieved lead data successfully.`

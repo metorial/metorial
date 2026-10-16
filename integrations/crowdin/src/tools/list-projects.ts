@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProjectsTool = SlateTool.create(spec, {
@@ -26,6 +27,7 @@ export let listProjectsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       projects: z.array(
         z.object({
           projectId: z.number().describe('Project ID'),
@@ -36,7 +38,10 @@ export let listProjectsTool = SlateTool.create(spec, {
           type: z.number().describe('Project type (0=file-based, 1=string-based)'),
           description: z.string().optional().describe('Project description'),
           visibility: z.string().optional().describe('Project visibility'),
-          createdAt: z.string().describe('Creation timestamp')
+          createdAt: z
+            .string()
+            .optional()
+            .describe('Creation timestamp when provided by Crowdin')
         })
       ),
       pagination: z.object({
@@ -51,7 +56,12 @@ export let listProjectsTool = SlateTool.create(spec, {
     let result = await client.listProjects({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
-      hasManagerAccess: ctx.input.hasManagerAccess ? 1 : undefined
+      hasManagerAccess:
+        ctx.input.hasManagerAccess === undefined
+          ? undefined
+          : ctx.input.hasManagerAccess
+            ? 1
+            : 0
     });
 
     let projects = result.data.map((item: any) => ({
@@ -61,16 +71,13 @@ export let listProjectsTool = SlateTool.create(spec, {
       sourceLanguageId: item.data.sourceLanguageId,
       targetLanguageIds: item.data.targetLanguageIds || [],
       type: item.data.type,
-      description: item.data.description || undefined,
-      visibility: item.data.visibility || undefined,
-      createdAt: item.data.createdAt
+      description: item.data.description ?? undefined,
+      visibility: item.data.visibility ?? undefined,
+      createdAt: item.data.createdAt ?? undefined
     }));
 
     return {
-      output: {
-        projects,
-        pagination: result.pagination
-      },
+      output: { raw: client.lastResponse, projects, pagination: result.pagination },
       message: `Found **${projects.length}** projects.`
     };
   })

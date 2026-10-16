@@ -35,17 +35,17 @@ export let getOrderStatuses = SlateTool.create(spec, {
       client.getOrderSources()
     ]);
 
-    let statuses = (statusResult.statuses || []).map((s: any) => ({
+    let statuses = statusResult.statuses.map((s: any) => ({
       statusId: s.id,
-      name: s.name || '',
-      nameForCustomer: s.name_for_customer || '',
-      color: s.color || ''
+      name: s.name,
+      nameForCustomer: s.name_for_customer,
+      color: s.color
     }));
 
     return {
       output: {
         statuses,
-        sources: sourcesResult.sources || {}
+        sources: sourcesResult.sources
       },
       message: `Retrieved **${statuses.length}** order statuses.`
     };

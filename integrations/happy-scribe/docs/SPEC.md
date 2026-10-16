@@ -1,4 +1,4 @@
-# Slates Specification for Happy Scribe
+# Happy Scribe Specification
 
 ## Overview
 
@@ -75,3 +75,15 @@ Happy Scribe supports webhooks for order status changes. When creating a transcr
 - **Description**: Notifies when an order transitions between states such as submitted, fulfilled, failed, canceled, or locked.
 - **Configuration**: Set the `webhook_url` parameter when creating an order. The webhook is scoped to that specific order.
 - **Limitation**: Webhooks are configured per-order at creation time; there is no global webhook subscription mechanism.
+
+## Organization discovery and updates
+
+Use `list_organizations` to discover the authenticated account's organization IDs, names and membership roles. The optional saved organization setting remains supported. `update_transcription` renames, moves or changes public link sharing with the documented transcription update endpoint. `get_meeting_summary` reads generated notetaker summary text; no summary yet is a provider 404.
+
+## Export and media workflow
+
+`create_export` returns the provider's asynchronous export state without waiting or copying a temporary URL. `get_export` checks that state. The legacy `export_transcription` contract is preserved and deprecated. Exports additionally support the documented editing formats, CSV, XLSX, MP3 and MP4. Media exports require a single transcription, and MP4 requires video.
+
+`download_export` and `download_transcription_media` retrieve file bytes immediately and produce a downloadable file. Only the exact HTTPS `media.happyscribe.com` host is currently evidenced by the official API examples. Supported downloads are MP3, MP4, PDF, UTF-8 TXT, SRT, Facebook SRT, WebVTT and transcript JSON. Other hosts, formats, redirects, invalid file bodies, expired signed links and files above 100 MiB fail explicitly. Downloads for other hosts and unsupported body formats must be completed in Happy Scribe. The integration never recreates an expired export automatically. Reading export metadata does not renew a signed URL.
+
+Source: [Happy Scribe Product API](https://dev.happyscribe.com/sections/product/).

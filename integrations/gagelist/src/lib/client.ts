@@ -1,208 +1,243 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
-let BASE_URL = 'https://gagelist.net/GageList/api';
+export let BASE_URL = 'https://gagelist.net/GageList/api';
 let DEFAULT_PAGE_SIZE = 50;
 
+type RequestConfig = Parameters<ReturnType<typeof createAuthenticatedAxios>['request']>[0];
+
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token?.trim()) {
+      throw createApiServiceError('Connect GageList with valid API credentials.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      timeout: 30_000
     });
   }
 
-  // ── Account ───────────────────────────────────────────────
+  private async request(config: RequestConfig): Promise<any> {
+    let result = await requestAxiosData<any>(
+      config.url ?? 'request',
+      () => this.axios.request(config),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'GageList',
+          operation,
+          reason: 'gagelist_api_error'
+        })
+    );
+    if (!isApiErrorRecord(result)) {
+      throw createApiServiceError('GageList returned an invalid API response.');
+    }
+    if (result.success === false) {
+      throw createApiServiceError(
+        typeof result.message === 'string' && result.message
+          ? `GageList: ${result.message}`
+          : 'GageList could not complete the request.'
+      );
+    }
+    if (result.success !== true) {
+      throw createApiServiceError('GageList did not confirm the request succeeded.');
+    }
+    return result;
+  }
+
+  private async list(config: RequestConfig): Promise<any> {
+    let result = await this.request(config);
+    if (!Array.isArray(result.data) || !result.data.every(isApiErrorRecord)) {
+      throw createApiServiceError('GageList returned an invalid record list.');
+    }
+    return result;
+  }
+
+  private async detail(url: string): Promise<any> {
+    let result = await this.request({ url });
+    if (!isApiErrorRecord(result.data)) {
+      throw createApiServiceError('GageList did not return the requested record.');
+    }
+    return result;
+  }
+
+  private async create(url: string, data: Record<string, unknown>): Promise<any> {
+    let result = await this.request({ url, method: 'POST', data: pickDefined(data) });
+    if (typeof result.data !== 'number' || !Number.isFinite(result.data)) {
+      throw createApiServiceError('GageList did not return the created record ID.');
+    }
+    return result;
+  }
 
   async getAccountStatus(): Promise<any> {
-    let response = await this.axios.get('/Account/Status');
-    return response.data;
+    return this.detail('/Account/Status');
   }
 
   async getAccountSettings(): Promise<any> {
-    let response = await this.axios.get('/Account/Settings');
-    return response.data;
+    return this.detail('/Account/Settings');
   }
 
-  async updateAccountSettings(settings: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Account/Settings', settings);
-    return response.data;
+  async updateAccountSettings(settings: Record<string, unknown>): Promise<any> {
+    return this.request({
+      url: '/Account/Settings',
+      method: 'POST',
+      data: pickDefined(settings)
+    });
   }
-
-  // ── Gages ─────────────────────────────────────────────────
 
   async listGages(params?: { start?: number; recordNumber?: number }): Promise<any> {
-    let response = await this.axios.post('/Gage/List', null, {
+    return this.list({
+      url: '/Gage/List',
+      method: 'POST',
       params: {
         start: params?.start ?? 0,
         record_number: params?.recordNumber ?? DEFAULT_PAGE_SIZE
       }
     });
-    return response.data;
   }
 
   async getGage(gageId: number): Promise<any> {
-    let response = await this.axios.get(`/Gage/Detail/${gageId}`);
-    return response.data;
+    return this.detail(`/Gage/Detail/${gageId}`);
   }
 
-  async createGage(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Gage/Create', data);
-    return response.data;
+  async createGage(data: Record<string, unknown>): Promise<any> {
+    return this.create('/Gage/Create', data);
   }
 
-  async updateGage(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Gage/Update', data);
-    return response.data;
+  async updateGage(data: Record<string, unknown>): Promise<any> {
+    return this.request({ url: '/Gage/Update', method: 'POST', data: pickDefined(data) });
   }
 
   async deleteGage(gageId: number): Promise<any> {
-    let response = await this.axios.delete(`/Gage/Delete/${gageId}`);
-    return response.data;
+    return this.request({ url: `/Gage/Delete/${gageId}`, method: 'POST' });
   }
-
-  async getAllGages(): Promise<any[]> {
-    let allItems: any[] = [];
-    let start = 0;
-    while (true) {
-      let result = await this.listGages({ start, recordNumber: DEFAULT_PAGE_SIZE });
-      let items = result.data;
-      if (!items || items.length === 0) break;
-      allItems.push(...items);
-      start += DEFAULT_PAGE_SIZE;
-    }
-    return allItems;
-  }
-
-  // ── Calibrations ──────────────────────────────────────────
 
   async listCalibrations(params?: { start?: number; recordNumber?: number }): Promise<any> {
-    let response = await this.axios.post('/Calibration/List', null, {
+    return this.list({
+      url: '/Calibration/List',
+      method: 'POST',
       params: {
         start: params?.start ?? 0,
         record_number: params?.recordNumber ?? DEFAULT_PAGE_SIZE
       }
     });
-    return response.data;
   }
 
   async getCalibration(calibrationId: number): Promise<any> {
-    let response = await this.axios.get(`/Calibration/Detail/${calibrationId}`);
-    return response.data;
+    return this.detail(`/Calibration/Detail/${calibrationId}`);
   }
 
-  async createCalibration(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Calibration/Add', data);
-    return response.data;
+  async createCalibration(data: Record<string, unknown>): Promise<any> {
+    return this.create('/Calibration/Create', data);
   }
 
-  async updateCalibration(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Calibration/Update', data);
-    return response.data;
+  async updateCalibration(data: Record<string, unknown>): Promise<any> {
+    return this.request({
+      url: '/Calibration/Update',
+      method: 'POST',
+      data: pickDefined(data)
+    });
   }
 
   async deleteCalibration(calibrationId: number): Promise<any> {
-    let response = await this.axios.delete(`/Calibration/Delete/${calibrationId}`);
-    return response.data;
+    return this.request({ url: `/Calibration/Delete/${calibrationId}`, method: 'POST' });
   }
 
   async getCalibrationCertificate(calibrationId: number): Promise<any> {
-    let response = await this.axios.get(`/Calibration/GetCertificate/${calibrationId}`);
-    return response.data;
-  }
-
-  async getAllCalibrations(): Promise<any[]> {
-    let allItems: any[] = [];
-    let start = 0;
-    while (true) {
-      let result = await this.listCalibrations({ start, recordNumber: DEFAULT_PAGE_SIZE });
-      let items = result.data;
-      if (!items || items.length === 0) break;
-      allItems.push(...items);
-      start += DEFAULT_PAGE_SIZE;
+    let response = await requestAxiosData<any>(
+      'generate calibration certificate',
+      () => this.axios.get(`/Calibration/GetCertificate/${calibrationId}`),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'GageList',
+          operation,
+          reason: 'gagelist_api_error'
+        })
+    );
+    if (isApiErrorRecord(response) && response.success === false) {
+      throw createApiServiceError(
+        typeof response.message === 'string'
+          ? `GageList: ${response.message}`
+          : 'GageList could not generate the certificate.'
+      );
     }
-    return allItems;
+    if (
+      response === null ||
+      response === undefined ||
+      (typeof response === 'string' && !response.trimStart().startsWith('%PDF-'))
+    ) {
+      throw createApiServiceError('GageList did not return a calibration certificate.');
+    }
+    return response;
   }
-
-  // ── Manufacturers ─────────────────────────────────────────
 
   async listManufacturers(): Promise<any> {
-    let response = await this.axios.post('/Manufacturer/List');
-    return response.data;
+    return this.list({ url: '/Manufacturer/List', method: 'POST' });
   }
 
-  async addManufacturer(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Manufacturer/Add', data);
-    return response.data;
+  async addManufacturer(data: Record<string, unknown>): Promise<any> {
+    return this.create('/Manufacturer/Create', data);
   }
 
-  async updateManufacturer(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/Manufacturer/Update', data);
-    return response.data;
+  async updateManufacturer(data: Record<string, unknown>): Promise<any> {
+    return this.request({
+      url: '/Manufacturer/Update',
+      method: 'POST',
+      data: pickDefined(data)
+    });
   }
 
   async deleteManufacturer(manufacturerId: number): Promise<any> {
-    let response = await this.axios.delete(`/Manufacturer/Delete/${manufacturerId}`);
-    return response.data;
+    return this.request({ url: `/Manufacturer/Delete/${manufacturerId}`, method: 'POST' });
   }
 
-  // ── Custom Fields ─────────────────────────────────────────
-
   async getCustomFields(): Promise<any> {
-    let response = await this.axios.get('/CustomField/List');
-    return response.data;
+    return this.list({ url: '/CustomField/GetCustomFields' });
   }
 
   async getCustomFieldValues(recordId: number): Promise<any> {
-    let response = await this.axios.get(`/CustomField/Values/${recordId}`);
-    return response.data;
+    // The official article currently repeats the Account/Status route. Retain the
+    // existing route until the provider confirms the custom-values GET contract.
+    return this.list({ url: `/CustomField/Values/${recordId}` });
   }
 
-  async updateCustomFieldValues(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/CustomField/UpdateValues', data);
-    return response.data;
+  async updateCustomFieldValues(values: Record<string, unknown>[]): Promise<any> {
+    return this.request({
+      url: '/CustomField/UpdateCustomValues',
+      method: 'POST',
+      data: values
+    });
   }
 
-  // ── Attachments ───────────────────────────────────────────
-
-  async uploadGageAttachment(gageId: number, fileData: any): Promise<any> {
-    let response = await this.axios.post(
-      `/Attachment/UploadGageAttachment/${gageId}`,
-      fileData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }
+  async deleteAttachment(attachmentId: number): Promise<void> {
+    let result = await requestAxiosData<any>(
+      'delete attachment',
+      () => this.axios.post(`/Attachment/Delete/${attachmentId}`),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'GageList',
+          operation,
+          reason: 'gagelist_api_error'
+        })
     );
-    return response.data;
-  }
-
-  async uploadCalibrationAttachment(calibrationId: number, fileData: any): Promise<any> {
-    let response = await this.axios.post(
-      `/Attachment/UploadCalibrationAttachment/${calibrationId}`,
-      fileData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }
-    );
-    return response.data;
-  }
-
-  async getAttachment(attachmentId: number): Promise<any> {
-    let response = await this.axios.get(`/Attachment/${attachmentId}`);
-    return response.data;
-  }
-
-  async deleteAttachment(attachmentId: number): Promise<any> {
-    let response = await this.axios.delete(`/Attachment/Delete/${attachmentId}`);
-    return response.data;
+    if (!isApiErrorRecord(result)) {
+      throw createApiServiceError('GageList returned an invalid file-delete response.');
+    }
+    if (result.success === false) {
+      throw createApiServiceError(
+        typeof result.message === 'string'
+          ? `GageList: ${result.message}`
+          : 'GageList could not delete the attachment.'
+      );
+    }
   }
 }

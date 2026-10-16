@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asText, readItem } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getTransactionTool = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let getTransactionTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       transactionRef: z.string().optional().describe('Transaction reference number'),
       checkoutId: z.number().optional().describe('Checkout ID'),
       transactionDate: z.string().optional().describe('Transaction date'),
@@ -46,21 +48,18 @@ export let getTransactionTool = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.getTransaction(ctx.input.transactionIdOrRef);
-    let t = Array.isArray(data?.transactions)
-      ? data.transactions[0]
-      : Array.isArray(data)
-        ? data[0]
-        : data;
+    let t = readItem(data, 'transaction', 'transactions');
 
     let output = {
+      raw: data,
       transactionRef: t.refno ?? t.transaction_ref,
       checkoutId: t.checkout_id,
       transactionDate: t.transaction_date,
-      transactionAmount: t.transaction_amount,
-      ticketsInTransaction: t.tickets_in_transaction,
+      transactionAmount: asText(t.transaction_amount),
+      ticketsInTransaction: asText(t.tickets_in_transaction),
       eventDate: t.event_date,
       transactionStatus: t.transaction_status,
-      userId: t.user_id,
+      userId: t.user_id ?? t.buyer_id,
       eventId: t.event_id,
       eventTitle: t.title,
       email: t.email,
@@ -69,9 +68,9 @@ export let getTransactionTool = SlateTool.create(spec, {
       promoCode: t.promo_code,
       paymentType: t.payment_type,
       comments: t.comments,
-      transactionTax: t.transaction_tax,
-      transactionDiscount: t.transaction_discount,
-      eventzillaFee: t.eventzilla_fee
+      transactionTax: asText(t.transaction_tax),
+      transactionDiscount: asText(t.transaction_discount),
+      eventzillaFee: asText(t.eventzilla_fee)
     };
 
     return {

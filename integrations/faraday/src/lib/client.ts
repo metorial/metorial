@@ -1,15 +1,34 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class FaradayClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Faraday API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.faraday.ai/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Faraday',
+          reason: 'faraday_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          detailKeys: ['note', 'message', 'suggestion', 'error'],
+          nestedKeys: ['validationErrors', 'errors'],
+          extractUpstreamCode: (_error, response) => {
+            let body = response?.data;
+            return typeof body === 'object' &&
+              body !== null &&
+              'error' in body &&
+              typeof body.error === 'string'
+              ? body.error
+              : undefined;
+          }
+        })
     });
   }
 
@@ -33,7 +52,7 @@ export class FaradayClient {
   }
 
   async getDataset(datasetId: string): Promise<any> {
-    let response = await this.axios.get(`/datasets/${datasetId}`);
+    let response = await this.axios.get(`/datasets/${encodeURIComponent(datasetId)}`);
     return response.data;
   }
 
@@ -43,12 +62,14 @@ export class FaradayClient {
   }
 
   async updateDataset(datasetId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/datasets/${datasetId}`, data);
+    let response = await this.axios.patch(`/datasets/${encodeURIComponent(datasetId)}`, data, {
+      headers: { 'Content-Type': 'application/merge-patch+json' }
+    });
     return response.data;
   }
 
   async deleteDataset(datasetId: string): Promise<void> {
-    await this.axios.delete(`/datasets/${datasetId}`);
+    await this.axios.delete(`/datasets/${encodeURIComponent(datasetId)}`);
   }
 
   // ─── Streams ───────────────────────────────────────────────────────
@@ -59,7 +80,7 @@ export class FaradayClient {
   }
 
   async getStream(streamIdOrName: string): Promise<any> {
-    let response = await this.axios.get(`/streams/${streamIdOrName}`);
+    let response = await this.axios.get(`/streams/${encodeURIComponent(streamIdOrName)}`);
     return response.data;
   }
 
@@ -71,7 +92,7 @@ export class FaradayClient {
   }
 
   async getConnection(connectionId: string): Promise<any> {
-    let response = await this.axios.get(`/connections/${connectionId}`);
+    let response = await this.axios.get(`/connections/${encodeURIComponent(connectionId)}`);
     return response.data;
   }
 
@@ -81,12 +102,16 @@ export class FaradayClient {
   }
 
   async updateConnection(connectionId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/connections/${connectionId}`, data);
+    let response = await this.axios.patch(
+      `/connections/${encodeURIComponent(connectionId)}`,
+      data,
+      { headers: { 'Content-Type': 'application/merge-patch+json' } }
+    );
     return response.data;
   }
 
   async deleteConnection(connectionId: string): Promise<void> {
-    await this.axios.delete(`/connections/${connectionId}`);
+    await this.axios.delete(`/connections/${encodeURIComponent(connectionId)}`);
   }
 
   // ─── Cohorts ───────────────────────────────────────────────────────
@@ -97,7 +122,7 @@ export class FaradayClient {
   }
 
   async getCohort(cohortId: string): Promise<any> {
-    let response = await this.axios.get(`/cohorts/${cohortId}`);
+    let response = await this.axios.get(`/cohorts/${encodeURIComponent(cohortId)}`);
     return response.data;
   }
 
@@ -107,12 +132,14 @@ export class FaradayClient {
   }
 
   async updateCohort(cohortId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/cohorts/${cohortId}`, data);
+    let response = await this.axios.patch(`/cohorts/${encodeURIComponent(cohortId)}`, data, {
+      headers: { 'Content-Type': 'application/merge-patch+json' }
+    });
     return response.data;
   }
 
   async deleteCohort(cohortId: string): Promise<void> {
-    await this.axios.delete(`/cohorts/${cohortId}`);
+    await this.axios.delete(`/cohorts/${encodeURIComponent(cohortId)}`);
   }
 
   // ─── Outcomes ──────────────────────────────────────────────────────
@@ -123,7 +150,7 @@ export class FaradayClient {
   }
 
   async getOutcome(outcomeId: string): Promise<any> {
-    let response = await this.axios.get(`/outcomes/${outcomeId}`);
+    let response = await this.axios.get(`/outcomes/${encodeURIComponent(outcomeId)}`);
     return response.data;
   }
 
@@ -133,12 +160,14 @@ export class FaradayClient {
   }
 
   async updateOutcome(outcomeId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/outcomes/${outcomeId}`, data);
+    let response = await this.axios.patch(`/outcomes/${encodeURIComponent(outcomeId)}`, data, {
+      headers: { 'Content-Type': 'application/merge-patch+json' }
+    });
     return response.data;
   }
 
   async deleteOutcome(outcomeId: string): Promise<void> {
-    await this.axios.delete(`/outcomes/${outcomeId}`);
+    await this.axios.delete(`/outcomes/${encodeURIComponent(outcomeId)}`);
   }
 
   // ─── Persona Sets ─────────────────────────────────────────────────
@@ -149,7 +178,7 @@ export class FaradayClient {
   }
 
   async getPersonaSet(personaSetId: string): Promise<any> {
-    let response = await this.axios.get(`/persona_sets/${personaSetId}`);
+    let response = await this.axios.get(`/persona_sets/${encodeURIComponent(personaSetId)}`);
     return response.data;
   }
 
@@ -159,7 +188,11 @@ export class FaradayClient {
   }
 
   async updatePersonaSet(personaSetId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/persona_sets/${personaSetId}`, data);
+    let response = await this.axios.patch(
+      `/persona_sets/${encodeURIComponent(personaSetId)}`,
+      data,
+      { headers: { 'Content-Type': 'application/merge-patch+json' } }
+    );
     return response.data;
   }
 
@@ -171,7 +204,7 @@ export class FaradayClient {
   }
 
   async getRecommender(recommenderId: string): Promise<any> {
-    let response = await this.axios.get(`/recommenders/${recommenderId}`);
+    let response = await this.axios.get(`/recommenders/${encodeURIComponent(recommenderId)}`);
     return response.data;
   }
 
@@ -181,7 +214,11 @@ export class FaradayClient {
   }
 
   async updateRecommender(recommenderId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/recommenders/${recommenderId}`, data);
+    let response = await this.axios.patch(
+      `/recommenders/${encodeURIComponent(recommenderId)}`,
+      data,
+      { headers: { 'Content-Type': 'application/merge-patch+json' } }
+    );
     return response.data;
   }
 
@@ -193,7 +230,7 @@ export class FaradayClient {
   }
 
   async getScope(scopeId: string): Promise<any> {
-    let response = await this.axios.get(`/scopes/${scopeId}`);
+    let response = await this.axios.get(`/scopes/${encodeURIComponent(scopeId)}`);
     return response.data;
   }
 
@@ -203,7 +240,9 @@ export class FaradayClient {
   }
 
   async updateScope(scopeId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/scopes/${scopeId}`, data);
+    let response = await this.axios.patch(`/scopes/${encodeURIComponent(scopeId)}`, data, {
+      headers: { 'Content-Type': 'application/merge-patch+json' }
+    });
     return response.data;
   }
 
@@ -215,7 +254,7 @@ export class FaradayClient {
   }
 
   async getTarget(targetId: string): Promise<any> {
-    let response = await this.axios.get(`/targets/${targetId}`);
+    let response = await this.axios.get(`/targets/${encodeURIComponent(targetId)}`);
     return response.data;
   }
 
@@ -225,12 +264,17 @@ export class FaradayClient {
   }
 
   async updateTarget(targetId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/targets/${targetId}`, data);
+    let response = await this.axios.patch(`/targets/${encodeURIComponent(targetId)}`, data, {
+      headers: { 'Content-Type': 'application/merge-patch+json' }
+    });
     return response.data;
   }
 
   async lookupTarget(targetId: string, identity: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/targets/${targetId}/lookup`, identity);
+    let response = await this.axios.post(
+      `/targets/${encodeURIComponent(targetId)}/lookup`,
+      identity
+    );
     return response.data;
   }
 
@@ -259,13 +303,34 @@ export class FaradayClient {
   }
 
   async deleteWebhookEndpoint(webhookEndpointId: string): Promise<void> {
-    await this.axios.delete(`/webhook_endpoints/${webhookEndpointId}`);
+    await this.axios.delete(`/webhook_endpoints/${encodeURIComponent(webhookEndpointId)}`);
   }
 
   // ─── Graph ─────────────────────────────────────────────────────────
 
   async getGraph(): Promise<any[]> {
     let response = await this.axios.get('/graph');
+    return response.data;
+  }
+  async deletePersonaSet(personaSetId: string): Promise<void> {
+    await this.axios.delete(`/persona_sets/${encodeURIComponent(personaSetId)}`);
+  }
+
+  async deleteScope(scopeId: string): Promise<void> {
+    await this.axios.delete(`/scopes/${encodeURIComponent(scopeId)}`);
+  }
+
+  async deleteTarget(targetId: string): Promise<void> {
+    await this.axios.delete(`/targets/${encodeURIComponent(targetId)}`);
+  }
+
+  async previewTarget(targetId: string): Promise<{ target_id: string; message: string }> {
+    let response = await this.axios.post(`/targets/${encodeURIComponent(targetId)}/preview`);
+    return response.data;
+  }
+
+  async getOutcomeAnalysis(outcomeId: string): Promise<Record<string, unknown>> {
+    let response = await this.axios.get(`/outcomes/${encodeURIComponent(outcomeId)}/analysis`);
     return response.data;
   }
 }

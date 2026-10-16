@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,7 +32,7 @@ export let manageTag = SlateTool.create(spec, {
 
     if (ctx.input.action === 'rename') {
       if (!ctx.input.newTag) {
-        throw new Error('newTag is required when action is "rename"');
+        throw createApiServiceError('newTag is required when action is "rename".');
       }
       let result = await client.renameTag(ctx.input.tag, ctx.input.newTag);
       return {

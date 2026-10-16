@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,14 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Headout API key provided by Headout partnerships team')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError(
+          'Provide the Headout API key issued to your partner account.'
+        );
+      }
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

@@ -21,6 +21,7 @@ export let listUploads = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       uploads: z.array(
         z.object({
           uploadId: z.string().optional(),
@@ -46,6 +47,7 @@ export let listUploads = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: uploads,
         uploads: items.map((u: any) => ({
           uploadId: u.id,
           name: u.name,

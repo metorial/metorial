@@ -1,13 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredString, responseData, responseRecord, teamIdSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let startMediaUpload = SlateTool.create(spec, {
   name: 'Start Media Upload',
   key: 'start_media_upload',
   description: `Initiate a media file upload by requesting a pre-signed upload URL. After receiving the upload URL, PUT the file to that URL with the provided headers, then call "Finish Media Upload" to complete the process.
-This is step 1 of 2 for direct file uploads. For importing from a URL, use "Import Media" instead.`,
+This is step 1 of 2 for direct file uploads. For importing from a URL, use "Import Media" instead. Call list_teams to discover the team ID.`,
   instructions: [
     'After receiving the uploadUrl, PUT the file content to that URL using the provided headers.',
     'Then call "Finish Media Upload" with the returned mediaId to complete the upload.',
@@ -20,7 +21,7 @@ This is step 1 of 2 for direct file uploads. For importing from a URL, use "Impo
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to upload media for'),
+      teamId: teamIdSchema,
       contentLength: z.number().describe('File size in bytes'),
       contentType: z
         .string()
@@ -49,7 +50,11 @@ This is step 1 of 2 for direct file uploads. For importing from a URL, use "Impo
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.contentType && !ctx.input.fileName) {
-      throw new Error('Either contentType or fileName must be provided');
+      throw createApiServiceError('Either contentType or fileName must be provided');
+    }
+
+    if (!Number.isInteger(ctx.input.contentLength) || ctx.input.contentLength <= 0) {
+      throw createApiServiceError('contentLength must be a positive whole number of bytes.');
     }
 
     let result = await client.startUpload(
@@ -59,13 +64,24 @@ This is step 1 of 2 for direct file uploads. For importing from a URL, use "Impo
       ctx.input.fileName
     );
 
+    let data = responseRecord(responseData(result), 'upload authorization');
+    let mediaId = requiredString(data.mediaId, 'upload media ID');
+    let headers =
+      data.headers === undefined ? undefined : responseRecord(data.headers, 'upload headers');
+    let uploadHeaders: Record<string, string> | undefined = headers ? {} : undefined;
+    if (headers && uploadHeaders) {
+      for (let [name, value] of Object.entries(headers)) {
+        uploadHeaders[name] = requiredString(value, `upload header ${name}`);
+      }
+    }
+
     return {
       output: {
-        mediaId: result.mediaId,
-        uploadUrl: result.uploadUrl,
-        verb: result.verb || 'PUT',
-        headers: result.headers
+        mediaId,
+        uploadUrl: requiredString(data.uploadUrl, 'upload URL'),
+        verb: requiredString(data.verb, 'upload HTTP method'),
+        headers: uploadHeaders
       },
-      message: `Upload initiated. PUT the file to the provided URL, then call "Finish Media Upload" with mediaId: ${result.mediaId}.`
+      message: `Upload initiated. PUT the file to the provided URL, then call "Finish Media Upload" with mediaId: ${mediaId}.`
     };
   });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,12 @@ export let manageAppScan = SlateTool.create(spec, {
         .optional()
         .describe(
           'App configuration identifier (required for get_configuration, list_scans, create_scan)'
+        ),
+      start: z
+        .number()
+        .optional()
+        .describe(
+          'Offset for scan history pagination; use nextStart from the previous result.'
         ),
       pageSize: z
         .number()
@@ -71,6 +77,11 @@ export let manageAppScan = SlateTool.create(spec, {
         .optional()
         .describe('Single app configuration details'),
       scans: z.array(z.record(z.string(), z.any())).optional().describe('List of app scans'),
+      totalCount: z.number().optional().describe('Total number of matching scans'),
+      nextStart: z
+        .number()
+        .optional()
+        .describe('Offset to request next when more scans are available'),
       createdScan: z.record(z.string(), z.any()).optional().describe('Created scan result')
     })
   )
@@ -86,7 +97,8 @@ export let manageAppScan = SlateTool.create(spec, {
         };
       }
       case 'get_configuration': {
-        if (!ctx.input.appConfigurationId) throw new Error('appConfigurationId is required');
+        if (!ctx.input.appConfigurationId)
+          throw createApiServiceError('appConfigurationId is required');
         let config = await client.getAppConfiguration(ctx.input.appConfigurationId);
         return {
           output: { configuration: config },
@@ -94,23 +106,45 @@ export let manageAppScan = SlateTool.create(spec, {
         };
       }
       case 'list_scans': {
-        if (!ctx.input.appConfigurationId) throw new Error('appConfigurationId is required');
+        if (!ctx.input.appConfigurationId)
+          throw createApiServiceError('appConfigurationId is required');
         let scans = await client.listAppScans(ctx.input.appConfigurationId, {
+          start: ctx.input.start,
           pageSize: ctx.input.pageSize,
           createdSince: ctx.input.createdSince
         });
-        let scanList = Array.isArray(scans) ? scans : scans.data || [scans];
+        let scanList = Array.isArray(scans) ? scans : (scans.results ?? scans.data ?? [scans]);
         return {
-          output: { scans: scanList },
+          output: {
+            scans: scanList,
+            totalCount: scans.total,
+            nextStart: scans.query?.next
+              ? (ctx.input.start ?? 0) + (scans.query?.pageSize ?? ctx.input.pageSize ?? 100)
+              : undefined
+          },
           message: `Found **${scanList.length}** scan(s) for configuration \`${ctx.input.appConfigurationId}\`.`
         };
       }
       case 'create_scan': {
-        if (!ctx.input.appConfigurationId) throw new Error('appConfigurationId is required');
-        if (!ctx.input.scan) throw new Error('scan data is required');
+        if (!ctx.input.appConfigurationId)
+          throw createApiServiceError('appConfigurationId is required');
+        if (!ctx.input.scan) throw createApiServiceError('scan data is required');
+        if (
+          !Number.isInteger(ctx.input.scan.scanStatus) ||
+          ctx.input.scan.scanStatus < 0 ||
+          ctx.input.scan.scanStatus > 3
+        ) {
+          throw createApiServiceError('scanStatus must be 0, 1, 2, or 3.');
+        }
+        if (ctx.input.scan.scanStatus !== 3 && !ctx.input.scan.passId) {
+          throw createApiServiceError(
+            'passId is required when the scanned pass was found (scanStatus 0, 1, or 2).'
+          );
+        }
         let result = await client.createAppScan({
           appConfigurationId: ctx.input.appConfigurationId,
-          ...ctx.input.scan
+          ...ctx.input.scan,
+          passId: ctx.input.scan.passId ?? null
         });
         return {
           output: { createdScan: result },

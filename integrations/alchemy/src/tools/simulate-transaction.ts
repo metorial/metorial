@@ -6,14 +6,17 @@ import { spec } from '../spec';
 export let simulateTransaction = SlateTool.create(spec, {
   name: 'Simulate Transaction',
   key: 'simulate_transaction',
-  description: `Simulate a transaction to preview its effects before sending it on-chain. Returns asset changes, gas estimates, state changes, and potential errors.
-Use this to verify transaction safety, preview token transfers, estimate gas costs, or detect potential failures before spending gas.`,
+  description:
+    'DEPRECATED — Alchemy retired this API on September 30, 2026. The original simulation tool remains for existing workflows. Its legacy success result must not be used as a transaction safety guarantee.',
   instructions: [
+    'Alchemy retired alchemy_simulateExecution and alchemy_simulateAssetChanges on September 30, 2026. There is no direct replacement for the decoded asset-change simulation.',
+    'Use call_contract for a read-only contract call or gas estimation; it does not provide the retired simulation asset breakdown.',
     'Provide at minimum a from and to address. Include data for contract interactions.',
     'Value should be in hex-encoded wei (e.g., "0xde0b6b3a7640000" for 1 ETH).'
   ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

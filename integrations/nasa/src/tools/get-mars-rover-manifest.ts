@@ -7,6 +7,9 @@ export let getMarsRoverManifest = SlateTool.create(spec, {
   name: 'Get Mars Rover Manifest',
   key: 'get_mars_rover_manifest',
   description: `Retrieve the mission manifest for a NASA Mars rover. Returns mission status, launch/landing dates, total photos taken, and a breakdown of photos available per sol. Useful for discovering which sols and cameras have available photos before querying.`,
+  constraints: [
+    'NASA marks the Mars Rover API archived; availability of historical data is not guaranteed.'
+  ],
   tags: {
     readOnly: true
   }
@@ -18,6 +21,7 @@ export let getMarsRoverManifest = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       roverName: z.string().describe('Name of the rover'),
       landingDate: z.string().describe('Earth date the rover landed on Mars'),
       launchDate: z.string().describe('Earth date the rover was launched'),
@@ -52,6 +56,7 @@ export let getMarsRoverManifest = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         roverName: manifest.name,
         landingDate: manifest.landing_date,
         launchDate: manifest.launch_date,

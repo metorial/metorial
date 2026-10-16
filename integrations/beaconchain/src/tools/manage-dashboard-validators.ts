@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconchainClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,12 +51,21 @@ Dashboards and groups must be created through the Beaconcha.in web UI first.`,
       chain: ctx.config.chain
     });
 
-    let result: any;
+    if (!Number.isInteger(ctx.input.dashboardId) || ctx.input.dashboardId < 0) {
+      throw createApiServiceError('dashboardId must be a non-negative integer.');
+    }
+    if (
+      ctx.input.groupId !== undefined &&
+      (!Number.isInteger(ctx.input.groupId) || ctx.input.groupId < 0)
+    ) {
+      throw createApiServiceError('groupId must be a non-negative integer.');
+    }
+    let result: unknown;
 
     switch (ctx.input.action) {
       case 'add': {
         if (!ctx.input.validators || ctx.input.validators.length === 0) {
-          throw new Error('validators is required for the "add" action');
+          throw createApiServiceError('validators is required for the "add" action');
         }
         result = await client.addValidatorsToDashboard(
           ctx.input.dashboardId,
@@ -67,7 +76,7 @@ Dashboards and groups must be created through the Beaconcha.in web UI first.`,
       }
       case 'remove': {
         if (!ctx.input.validators || ctx.input.validators.length === 0) {
-          throw new Error('validators is required for the "remove" action');
+          throw createApiServiceError('validators is required for the "remove" action');
         }
         result = await client.removeValidatorsFromDashboard(
           ctx.input.dashboardId,
@@ -77,7 +86,7 @@ Dashboards and groups must be created through the Beaconcha.in web UI first.`,
       }
       case 'clear_group': {
         if (ctx.input.groupId === undefined) {
-          throw new Error('groupId is required for the "clear_group" action');
+          throw createApiServiceError('groupId is required for the "clear_group" action');
         }
         result = await client.removeValidatorsFromGroup(
           ctx.input.dashboardId,

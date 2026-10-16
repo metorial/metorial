@@ -5,6 +5,7 @@ import {
   getAccount,
   imageSearch,
   jobsSearch,
+  listSearchHistory,
   lookupLocations,
   mapsSearch,
   newsSearch,
@@ -31,7 +32,8 @@ export let provider = Slate.create({
     youtubeSearch,
     autocomplete,
     lookupLocations,
-    getAccount
+    getAccount,
+    listSearchHistory
   ],
   triggers: []
 });

@@ -33,9 +33,21 @@ export let createVm = SlateTool.create(spec, {
       billingAccountId: z
         .number()
         .optional()
-        .describe('Billing account ID (optional if using restricted token)'),
-      networkUuid: z.string().optional().describe('Private network UUID to place the VM in'),
-      designatedPoolUuid: z.string().optional().describe('Resource pool UUID (server class)'),
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID (optional if using restricted token)'
+        ),
+      networkUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Private network UUID to place the VM in. Call manage_networks with action="list" to discover networks.'
+        ),
+      designatedPoolUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Resource pool UUID (server class). Call list_platform_config with resource="host_pools" to discover pools.'
+        ),
       sourceVmUuid: z
         .string()
         .optional()
@@ -60,6 +72,7 @@ export let createVm = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response for this resource'),
       vmUuid: z.string().describe('UUID of the created VM'),
       name: z.string().describe('VM name'),
       status: z.string().describe('Initial VM status'),
@@ -97,11 +110,12 @@ export let createVm = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: vm,
         vmUuid: vm.uuid,
         name: vm.name,
         status: vm.status,
-        publicIp: vm.public_ipv4,
-        privateIp: vm.private_ipv4
+        publicIp: vm.public_ipv4 ?? undefined,
+        privateIp: vm.private_ipv4 ?? undefined
       },
       message: `Created VM **${vm.name}** (${vm.uuid}) with ${ctx.input.vcpu} vCPU(s) and ${ctx.input.ram} MB RAM.`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SkyfireClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,7 @@ export let manageAgent = SlateTool.create(spec, {
 
     if (action === 'set_source_ips') {
       if (!ctx.input.sourceIps)
-        throw new Error('sourceIps is required for set_source_ips action');
+        throw createApiServiceError('sourceIps is required for set_source_ips action');
       await client.setSourceIps(ctx.input.sourceIps);
       return {
         output: { sourceIps: ctx.input.sourceIps, success: true },
@@ -72,7 +72,7 @@ export let manageAgent = SlateTool.create(spec, {
 
     if (action === 'set_token_version') {
       if (!ctx.input.tokenVersion)
-        throw new Error('tokenVersion is required for set_token_version action');
+        throw createApiServiceError('tokenVersion is required for set_token_version action');
       await client.setTokenVersion(ctx.input.tokenVersion);
       return {
         output: { tokenVersion: ctx.input.tokenVersion, success: true },
@@ -80,6 +80,6 @@ export let manageAgent = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,7 +1,25 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput, responseArray, responseId } from '../lib/response';
 import { spec } from '../spec';
+
+let linkedinJobSearchOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  jobs: z
+    .array(
+      z.object({
+        jobId: z.string().optional(),
+        title: z.string().optional(),
+        url: z.string().optional(),
+        listDate: z.string().optional(),
+        companyName: z.string().optional(),
+        companyUrl: z.string().optional(),
+        location: z.string().optional()
+      })
+    )
+    .describe('List of matching job listings')
+});
 
 export let linkedinJobSearch = SlateTool.create(spec, {
   name: 'LinkedIn Job Search',
@@ -37,29 +55,28 @@ export let linkedinJobSearch = SlateTool.create(spec, {
       geoId: z
         .string()
         .optional()
-        .describe('LinkedIn geographic area ID (default: 92000000 for worldwide)'),
-      companyId: z.string().optional().describe('LinkedIn company ID to filter jobs by'),
-      page: z.number().optional().describe('Page number for pagination (default: 1)')
+        .describe(
+          'LinkedIn geographic area ID. Call linkedin_job_suggestions with location=true to discover IDs; default: 92000000 for worldwide'
+        ),
+      companyId: z
+        .string()
+        .optional()
+        .describe(
+          'LinkedIn company ID to filter jobs by. Call linkedin_company to discover the companyId'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe('Page number for pagination, up to 25 listings per page (default: 1)')
     })
   )
-  .output(
-    z.object({
-      jobs: z
-        .array(
-          z.object({
-            jobId: z.string().optional(),
-            title: z.string().optional(),
-            url: z.string().optional(),
-            listDate: z.string().optional(),
-            companyName: z.string().optional(),
-            companyUrl: z.string().optional(),
-            location: z.string().optional()
-          })
-        )
-        .describe('List of matching job listings')
-    })
-  )
+  .output(linkedinJobSearchOutputSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.distance !== undefined && !ctx.input.geoId) {
+      throw createApiServiceError(
+        'Provide geoId with distance. Call linkedin_job_suggestions to discover a location ID.'
+      );
+    }
     let client = new PiloterrClient(ctx.auth.token);
     let results = await client.searchLinkedInJobs({
       keyword: ctx.input.keyword,
@@ -73,10 +90,10 @@ export let linkedinJobSearch = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let jobsList = Array.isArray(results) ? results : [];
+    let jobsList = responseArray(results, 'LinkedIn jobs');
 
     let jobs = jobsList.map((job: any) => ({
-      jobId: job.id,
+      jobId: responseId(job.id),
       title: job.title,
       url: job.url,
       listDate: job.list_date,
@@ -86,7 +103,7 @@ export let linkedinJobSearch = SlateTool.create(spec, {
     }));
 
     return {
-      output: { jobs },
+      output: normalizeOutput(linkedinJobSearchOutputSchema, { raw: results, jobs }),
       message: `Found **${jobs.length} LinkedIn jobs** matching "${ctx.input.keyword ?? 'all'}" (page ${ctx.input.page ?? 1}).`
     };
   })

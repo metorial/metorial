@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let bankSuggestionSchema = z.object({
-  value: z.string().describe('Bank name'),
+  value: z.string().optional().describe('Bank name'),
   bic: z.string().nullable().describe('BIK (bank identification code)'),
   swift: z.string().nullable().describe('SWIFT code'),
   inn: z.string().nullable().describe('INN'),
@@ -58,6 +59,7 @@ Returns bank details including BIK, SWIFT, correspondent account, registration n
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       suggestions: z.array(bankSuggestionSchema).describe('List of bank suggestions')
     })
   )
@@ -76,8 +78,8 @@ Returns bank details including BIK, SWIFT, correspondent account, registration n
       locationsBoost: ctx.input.locationsBoost
     });
 
-    let suggestions = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let suggestions = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       bic: s.data?.bic ?? null,
       swift: s.data?.swift ?? null,
       inn: s.data?.inn ?? null,
@@ -94,7 +96,10 @@ Returns bank details including BIK, SWIFT, correspondent account, registration n
     }));
 
     return {
-      output: { suggestions },
+      output: {
+        rawData: data,
+        suggestions
+      },
       message: `Found **${suggestions.length}** bank suggestion(s) for "${ctx.input.query}".`
     };
   })

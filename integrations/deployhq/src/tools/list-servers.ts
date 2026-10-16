@@ -6,6 +6,10 @@ import { spec } from '../spec';
 let serverSchema = z.object({
   serverIdentifier: z.string().describe('Unique server identifier (UUID)'),
   name: z.string().describe('Server display name'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete provider server response'),
   protocolType: z.string().describe('Connection protocol (e.g., ssh, ftp, s3)'),
   serverPath: z.string().optional().describe('Deployment target path on server'),
   hostname: z.string().optional().describe('Server hostname'),
@@ -33,7 +37,9 @@ export let listServers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
@@ -56,14 +62,15 @@ export let listServers = SlateTool.create(spec, {
       protocolType: s.protocol_type,
       serverPath: s.server_path,
       hostname: s.hostname,
-      port: s.port,
+      port: typeof s.port === 'number' ? String(s.port) : s.port,
+      raw: s,
       username: s.username,
       preferredBranch: s.preferred_branch,
-      lastRevision: s.last_revision ?? null,
+      lastRevision: s.last_revision,
       autoDeploy: s.auto_deploy,
       autoDeployUrl: s.auto_deploy_url,
       environment: s.environment,
-      serverGroupIdentifier: s.server_group_identifier ?? null
+      serverGroupIdentifier: s.server_group_identifier
     }));
 
     return {

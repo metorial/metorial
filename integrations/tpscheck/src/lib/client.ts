@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.tpscheck.uk';
 
@@ -41,15 +41,18 @@ export interface StatusResponse {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(config: { token: string }) {
-    this.axios = createAxios({
+  constructor(config?: { token: string }) {
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Token ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: config ? { value: `Token ${config.token}` } : undefined,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'TPSCheck',
+          reason: 'tpscheck_request_failed',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 

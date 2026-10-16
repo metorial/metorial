@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let gradeSubmissionTool = SlateTool.create(spec, {
@@ -26,6 +26,7 @@ export let gradeSubmissionTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       submissionId: z.string().describe('Submission ID'),
       assignmentId: z.string().describe('Assignment ID'),
       userId: z.string().describe('Student user ID'),
@@ -37,10 +38,7 @@ export let gradeSubmissionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let result = await client.gradeSubmission(
       ctx.input.courseId,
@@ -55,6 +53,7 @@ export let gradeSubmissionTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         submissionId: String(result.id),
         assignmentId: String(result.assignment_id),
         userId: String(result.user_id),

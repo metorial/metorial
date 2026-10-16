@@ -1,6 +1,5 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-
 import {
   createClientTool,
   createProjectTool,
@@ -20,6 +19,7 @@ import {
   updateServiceTool,
   updateTimeEntryTool
 } from './tools';
+import { currentRecordTools } from './tools/current-records';
 
 export let provider = Slate.create({
   spec,
@@ -40,7 +40,8 @@ export let provider = Slate.create({
     getTimeEntryTool,
     createTimeEntryTool,
     updateTimeEntryTool,
-    deleteTimeEntryTool
+    deleteTimeEntryTool,
+    ...currentRecordTools
   ],
   triggers: []
 });

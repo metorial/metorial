@@ -16,7 +16,7 @@ export let generateMultiFormat = SlateTool.create(spec, {
     'Asynchronous — results are not immediately available.',
     'Rate limited. Do not flood this endpoint.',
     'Generation requests expire after 7 days.',
-    'Maximum processing time is 10 minutes.'
+    'Poll Get Generation Status or use a callback URL to receive completion results.'
   ],
   tags: {
     destructive: false,
@@ -39,7 +39,7 @@ export let generateMultiFormat = SlateTool.create(spec, {
           'Element overrides keyed by layer name. Each value is an object with element properties.'
         ),
       imageFileType: z
-        .enum(['png', 'jpeg', 'webp', 'avif', 'pdf', 'html5'])
+        .enum(['png', 'jpeg', 'webp', 'avif', 'pdf', 'html5', 'gif', 'mp4', 'auto'])
         .optional()
         .describe('Override default output file type.'),
       callbackUrl: z
@@ -76,12 +76,47 @@ export let generateMultiFormat = SlateTool.create(spec, {
             .describe('Include a static backup image in the HTML5 package')
         })
         .optional()
-        .describe('HTML5 banner-specific options. Only used when imageFileType is "html5".')
+        .describe('HTML5 banner-specific options. Only used when imageFileType is "html5".'),
+      fileCompressionLevel: z
+        .number()
+        .optional()
+        .describe('Output quality from 1 to 100; 100 is best quality.'),
+      originalVisualId: z
+        .string()
+        .optional()
+        .describe('Existing visual ID to regenerate in place; target one format.'),
+      gif: z
+        .object({
+          maxFps: z.number().optional().describe('GIF frame rate, an integer from 2 to 9.'),
+          repeat: z.number().optional().describe('Loop repetitions from -1 (infinite) to 100.')
+        })
+        .optional(),
+      video: z
+        .object({
+          fps: z.number().optional().describe('Video frame rate, an integer from 2 to 30.')
+        })
+        .optional(),
+      print: z
+        .object({
+          colorProfile: z
+            .string()
+            .optional()
+            .describe('Provider color profile UUID; omit to use the design profile.'),
+          displayCropMarks: z.boolean().optional()
+        })
+        .optional(),
+      pages: z
+        .record(z.string(), z.record(z.string(), z.record(z.string(), z.any())))
+        .optional()
+        .describe(
+          'Multipage print only: element overrides keyed by page ID and then layer name. Call get_design to inspect pages.'
+        )
     })
   )
   .output(
     z.object({
-      generationRequestId: z.string().describe('UUID to track this generation request')
+      generationRequestId: z.string().describe('UUID to track this generation request'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -92,7 +127,13 @@ export let generateMultiFormat = SlateTool.create(spec, {
       elements: ctx.input.elements,
       imageFileType: ctx.input.imageFileType,
       callbackUrl: ctx.input.callbackUrl,
-      html5: ctx.input.html5
+      html5: ctx.input.html5,
+      gif: ctx.input.gif,
+      video: ctx.input.video,
+      print: ctx.input.print,
+      pages: ctx.input.pages,
+      fileCompressionLevel: ctx.input.fileCompressionLevel,
+      originalVisualId: ctx.input.originalVisualId
     });
 
     let formatCount = ctx.input.templateFormatNames?.length;
@@ -100,7 +141,8 @@ export let generateMultiFormat = SlateTool.create(spec, {
 
     return {
       output: {
-        generationRequestId: result.generation_request_id
+        generationRequestId: result.generation_request_id,
+        raw: result
       },
       message: `Started async generation of ${formatDesc} for design \`${ctx.input.designId}\`. Generation request ID: \`${result.generation_request_id}\`. ${ctx.input.callbackUrl ? 'Results will be delivered via webhook.' : 'Use "Get Generation Status" to poll for results.'}`
     };

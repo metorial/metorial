@@ -24,6 +24,12 @@ export let getComplianceData = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z
         .string()
         .optional()
@@ -40,13 +46,22 @@ export let getComplianceData = SlateTool.create(spec, {
       complianceRecords: z
         .array(complianceRecordSchema)
         .describe('List of compliance records'),
-      count: z.number().describe('Number of compliance records returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of compliance records returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let compliance = await client.getCompliance({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
       expand: ctx.input.expand,
@@ -55,12 +70,14 @@ export let getComplianceData = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let results = Array.isArray(compliance) ? compliance : [compliance];
+    let results = compliance.records;
 
     return {
       output: {
         complianceRecords: results,
-        count: results.length
+        count: results.length,
+        nextLink: compliance.nextLink,
+        totalCount: compliance.totalCount
       },
       message: `Retrieved **${results.length}** compliance record(s).`
     };

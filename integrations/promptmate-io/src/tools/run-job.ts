@@ -19,7 +19,11 @@ export let runJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      appId: z.string().describe('The app to run the job for'),
+      appId: z
+        .string()
+        .describe(
+          'App ID. Call list_apps to discover apps, then get_app to inspect required data fields.'
+        ),
       data: z
         .array(z.record(z.string(), z.string()))
         .describe(
@@ -50,7 +54,7 @@ export let runJob = SlateTool.create(spec, {
       appId: ctx.input.appId,
       data: ctx.input.data,
       config:
-        ctx.input.language || ctx.input.country
+        ctx.input.language !== undefined || ctx.input.country !== undefined
           ? {
               language: ctx.input.language,
               country: ctx.input.country

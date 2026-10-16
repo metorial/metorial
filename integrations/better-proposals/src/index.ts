@@ -1,10 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createCompany,
   createCover,
   createDocumentType,
   createProposal,
+  createQuote,
+  editProposal,
+  generateDocumentLinks,
   getCompany,
+  getCurrency,
   getProposal,
   getProposalCount,
   getQuote,
@@ -20,6 +25,11 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    createCompany,
+    createQuote,
+    getCurrency,
+    generateDocumentLinks,
+    editProposal,
     createProposal,
     listProposals,
     getProposal,

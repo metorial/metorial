@@ -162,7 +162,7 @@ export let createReceipt = SlateTool.create(spec, {
 
     return {
       output: mapReceipt(result),
-      message: `Created receipt **${result.receipt_number}** for **${result.total_money}**.`
+      message: `Created receipt **${result.receipt_number}**${result.total_money !== undefined ? ` for **${result.total_money}**` : ''}.`
     };
   })
   .build();

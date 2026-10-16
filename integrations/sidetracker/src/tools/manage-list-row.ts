@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,7 +53,7 @@ export let manageListRow = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!rowId) {
-        throw new Error('rowId is required for update action');
+        throw createApiServiceError('rowId is required for update action');
       }
       let row = await client.updateListRow(listId, rowId, rowData ?? {});
       return {
@@ -77,9 +77,9 @@ export let manageListRow = SlateTool.create(spec, {
           message: `Deleted row \`${rowId}\` from list \`${listId}\`.`
         };
       }
-      throw new Error('Either rowId or sessionId is required for delete action');
+      throw createApiServiceError('Either rowId or sessionId is required for delete action');
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

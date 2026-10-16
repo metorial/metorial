@@ -87,7 +87,7 @@ export let createProposal = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         proposal: result.data
       },
       message: `Proposal created successfully.`

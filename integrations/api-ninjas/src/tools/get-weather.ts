@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { locationParams } from '../lib/location';
 import { spec } from '../spec';
 
 export let getWeather = SlateTool.create(spec, {
   name: 'Get Weather',
   key: 'get_weather',
-  description: `Retrieve current weather conditions for a location. You can specify the location by latitude/longitude coordinates, city name, or US zip code. Returns temperature, humidity, wind, and sunrise/sunset times.`,
+  description: `Retrieve current weather conditions for a location. You can specify the location by latitude/longitude coordinates, city name, or US zip code. Returns temperature, humidity, wind, and sunrise/sunset times. City and ZIP-code lookups require a premium plan.`,
   instructions: ['Provide either lat/lon, city, or zip — only one location method is needed.'],
   tags: {
     readOnly: true
@@ -24,6 +25,7 @@ export let getWeather = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       tempCelsius: z.number().describe('Current temperature in Celsius'),
       feelsLikeCelsius: z.number().describe('Perceived temperature in Celsius'),
       humidity: z.number().describe('Humidity percentage'),
@@ -37,24 +39,15 @@ export let getWeather = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let params: Record<string, string | number> = {};
-
-    if (ctx.input.lat !== undefined && ctx.input.lon !== undefined) {
-      params.lat = ctx.input.lat;
-      params.lon = ctx.input.lon;
-    }
-    if (ctx.input.city) params.city = ctx.input.city;
-    if (ctx.input.state) params.state = ctx.input.state;
-    if (ctx.input.country) params.country = ctx.input.country;
-    if (ctx.input.zip) params.zip = ctx.input.zip;
+    let params = locationParams(ctx.input, true);
 
     let result = await client.getWeather(params);
 
-    let locationLabel =
-      ctx.input.city ?? ctx.input.zip ?? `${ctx.input.lat}, ${ctx.input.lon}`;
+    let locationLabel = params.city ?? params.zip ?? `${params.lat}, ${params.lon}`;
 
     return {
       output: {
+        raw: result,
         tempCelsius: result.temp,
         feelsLikeCelsius: result.feels_like,
         humidity: result.humidity,

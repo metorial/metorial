@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -12,7 +12,7 @@ For episodes, provide Listen Notes episode IDs. Requires PRO/ENTERPRISE plan.`,
   instructions: [
     'Provide comma-separated values for the ID fields.',
     'For podcasts, you can mix different ID types in a single request.',
-    'Set showLatestEpisodes to true to include up to 10 latest episodes per podcast.'
+    'Set showLatestEpisodes to true to include the latest episodes across the requested podcasts.'
   ],
   constraints: ['Maximum of 10 items per batch request.', 'Requires PRO or ENTERPRISE plan.'],
   tags: {
@@ -41,6 +41,12 @@ For episodes, provide Listen Notes episode IDs. Requires PRO/ENTERPRISE plan.`,
         .boolean()
         .optional()
         .describe('Include latest episodes for each podcast (podcasts only).'),
+      nextEpisodePubDate: z
+        .number()
+        .optional()
+        .describe(
+          'Latest episode pagination cursor in milliseconds from a previous provider response; podcasts only.'
+        ),
       episodeIds: z
         .string()
         .optional()
@@ -49,6 +55,10 @@ For episodes, provide Listen Notes episode IDs. Requires PRO/ENTERPRISE plan.`,
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       podcasts: z.array(z.any()).optional().describe('Array of podcast metadata objects.'),
       episodes: z.array(z.any()).optional().describe('Array of episode metadata objects.'),
       latestEpisodes: z
@@ -58,6 +68,19 @@ For episodes, provide Listen Notes episode IDs. Requires PRO/ENTERPRISE plan.`,
     })
   )
   .handleInvocation(async ctx => {
+    let identifiers =
+      ctx.input.resourceType === 'podcast'
+        ? [ctx.input.podcastIds, ctx.input.rssUrls, ctx.input.itunesIds, ctx.input.spotifyIds]
+        : [ctx.input.episodeIds];
+    let count = identifiers.reduce(
+      (total, value) => total + (value?.split(',').filter(id => id.trim()).length ?? 0),
+      0
+    );
+    if (count === 0 || count > 10) {
+      throw createApiServiceError(
+        'Provide between 1 and 10 identifiers for the selected resource type.'
+      );
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -69,21 +92,29 @@ For episodes, provide Listen Notes episode IDs. Requires PRO/ENTERPRISE plan.`,
         rsses: ctx.input.rssUrls,
         itunesIds: ctx.input.itunesIds,
         spotifyIds: ctx.input.spotifyIds,
-        showLatestEpisodes: ctx.input.showLatestEpisodes ? 1 : undefined
+        showLatestEpisodes:
+          ctx.input.showLatestEpisodes === undefined
+            ? undefined
+            : Number(ctx.input.showLatestEpisodes),
+        nextEpisodePubDate: ctx.input.nextEpisodePubDate
       });
 
       return {
         output: {
+          raw: data,
           podcasts: data.podcasts,
           latestEpisodes: data.latest_episodes
         },
         message: `Fetched **${data.podcasts.length}** podcast(s).`
       };
     } else {
-      let data = await client.batchFetchEpisodes(ctx.input.episodeIds || '');
+      if (!ctx.input.episodeIds?.trim())
+        throw createApiServiceError('Provide episodeIds when resourceType is episode.');
+      let data = await client.batchFetchEpisodes(ctx.input.episodeIds);
 
       return {
         output: {
+          raw: data,
           episodes: data.episodes
         },
         message: `Fetched **${data.episodes.length}** episode(s).`

@@ -8,7 +8,8 @@ let validatorSelectorSchema = z.object({
     .array(z.union([z.string(), z.number()]))
     .optional()
     .describe('Array of validator indices or public keys'),
-  dashboardId: z.number().optional().describe('Dashboard ID to select validators from')
+  dashboardId: z.number().optional().describe('Dashboard ID to select validators from'),
+  groupId: z.number().optional().describe('Optional group within dashboardId')
 });
 
 export let getValidatorDuties = SlateTool.create(spec, {
@@ -43,7 +44,7 @@ Also supports finding the best maintenance window for validators to minimize mis
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (1-100, for historical duties)'),
+        .describe('Number of results per page (1-10, for historical duties)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -61,7 +62,8 @@ Also supports finding the best maintenance window for validators to minimize mis
 
     let selector = {
       validatorIdentifiers: ctx.input.validators.validatorIdentifiers,
-      dashboardId: ctx.input.validators.dashboardId
+      dashboardId: ctx.input.validators.dashboardId,
+      groupId: ctx.input.validators.groupId
     };
 
     let pagination = { pageSize: ctx.input.pageSize, cursor: ctx.input.cursor };

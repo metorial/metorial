@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireBoolean } from '../lib/client';
 import { spec } from '../spec';
 
 export let markInvoiceAsPaid = SlateTool.create(spec, {
@@ -17,7 +17,23 @@ export let markInvoiceAsPaid = SlateTool.create(spec, {
       date: z.string().describe('Payment date (YYYY-MM-DD)'),
       paymentMethod: z
         .string()
-        .describe('Payment method (e.g. BankTransfer, CreditCard, Cash, Check)'),
+        .describe(
+          'Transfer, Order, Check, Cash, Card, Bill, Usec, or Other. Legacy BankTransfer and CreditCard aliases are accepted.'
+        ),
+      amount: z
+        .number()
+        .optional()
+        .describe('Amount to pay; omit to pay the outstanding balance'),
+      paymentReference: z.string().optional(),
+      allowUpdate: z
+        .boolean()
+        .optional()
+        .describe('Allow updating metadata/reference on an already paid invoice'),
+      finalizationDate: z
+        .string()
+        .optional()
+        .describe('Finalization date (YYYY-MM-DD), distinct from payment date'),
+      dateAdjustment: z.enum(['None', 'MinimumDate', 'Today']).optional(),
       metadata: z
         .record(z.string(), z.any())
         .optional()
@@ -26,6 +42,7 @@ export let markInvoiceAsPaid = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       invoiceId: z.number(),
       paid: z.boolean()
     })
@@ -33,19 +50,16 @@ export let markInvoiceAsPaid = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    await client.markSaleInvoiceAsPaid({
-      invoiceId: ctx.input.invoiceId,
-      date: ctx.input.date,
-      paymentMethod: ctx.input.paymentMethod,
-      metadata: ctx.input.metadata
-    });
+    let result = await client.markSaleInvoiceAsPaid(ctx.input);
+    let paid = requireBoolean(result.isPaid, 'invoice paid state');
 
     return {
       output: {
-        invoiceId: ctx.input.invoiceId,
-        paid: true
+        raw: result,
+        invoiceId: result.id,
+        paid
       },
-      message: `Invoice **${ctx.input.invoiceId}** marked as paid on **${ctx.input.date}** via **${ctx.input.paymentMethod}**.`
+      message: `Invoice **${ctx.input.invoiceId}** payment recorded on **${ctx.input.date}** via **${ctx.input.paymentMethod}**.`
     };
   })
   .build();

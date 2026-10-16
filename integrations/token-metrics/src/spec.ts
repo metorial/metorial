@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'token-metrics',
   name: 'Token Metrics',
-  description: undefined,
+  description:
+    'Cryptocurrency market data, AI grades, signals, research, model indices, and Moonshot selections from Token Metrics',
   metadata: {},
   config,
   auth

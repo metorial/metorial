@@ -1,305 +1,149 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
-let api = createAxios({
-  baseURL: 'https://api.api-ninjas.com'
-});
+type Query = Record<string, unknown>;
 
 export class Client {
-  private token: string;
+  private api;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private headers() {
-    return { 'X-Api-Key': this.token };
-  }
-
-  // ── Finance ──
-
-  async getStockPrice(ticker: string) {
-    let res = await api.get('/v1/stockprice', {
-      params: { ticker },
-      headers: this.headers()
+    if (!config.token?.trim()) {
+      throw createApiServiceError('Connect an API Ninjas API key before making a request.');
+    }
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.api-ninjas.com',
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'API Ninjas',
+          reason: 'api_ninjas_request_failed',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
-    return res.data;
   }
 
-  async getExchangeRate(pair: string) {
-    let res = await api.get('/v1/exchangerate', {
-      params: { pair },
-      headers: this.headers()
-    });
-    return res.data;
+  private async get(path: string, params?: Query) {
+    let response = await this.api.get(path, { params });
+    let data: unknown = response.data;
+    if (
+      Array.isArray(data)
+        ? data.some(item => !isApiErrorRecord(item))
+        : !isApiErrorRecord(data)
+    ) {
+      throw createApiServiceError(
+        'API Ninjas returned an unexpected response. Retry the request.'
+      );
+    }
+    return response.data;
   }
 
-  async getCommodityPrice(name: string) {
-    let res = await api.get('/v1/commodityprice', {
-      params: { name },
-      headers: this.headers()
-    });
-    return res.data;
+  getStockPrice(ticker: string) {
+    return this.get('/v1/stockprice', { ticker });
   }
-
-  async getCryptoPrice(symbol: string) {
-    let res = await api.get('/v1/cryptoprice', {
-      params: { symbol },
-      headers: this.headers()
-    });
-    return res.data;
+  getExchangeRate(pair: string) {
+    return this.get('/v1/exchangerate', { pair });
   }
-
-  // ── Weather & Places ──
-
-  async getWeather(params: Record<string, string | number>) {
-    let res = await api.get('/v1/weather', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getCommodityPrice(name: string, params?: Query) {
+    return this.get('/v1/commodityprice', { ...params, name });
   }
-
-  async getAirQuality(params: Record<string, string | number>) {
-    let res = await api.get('/v1/airquality', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getCryptoPrice(symbol: string) {
+    return this.get('/v1/cryptoprice', { symbol });
   }
-
-  async geocode(params: Record<string, string>) {
-    let res = await api.get('/v1/geocoding', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getWeather(params: Query) {
+    return this.get('/v1/weather', params);
   }
-
-  async reverseGeocode(params: { lat: number; lon: number }) {
-    let res = await api.get('/v1/reversegeocoding', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getWeatherForecast(params: Query) {
+    return this.get('/v1/weatherforecast', params);
   }
-
-  async getCountry(params: Record<string, string | number>) {
-    let res = await api.get('/v1/country', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getAirQuality(params: Query) {
+    return this.get('/v1/airquality', params);
   }
-
-  async getCity(params: Record<string, string | number>) {
-    let res = await api.get('/v1/city', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  geocode(params: Query) {
+    return this.get('/v1/geocoding', params);
   }
-
-  async getWorldTime(params: Record<string, string | number>) {
-    let res = await api.get('/v1/worldtime', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  reverseGeocode(params: { lat: number; lon: number }) {
+    return this.get('/v1/reversegeocoding', params);
   }
-
-  // ── Text Processing ──
-
-  async getDictionary(word: string) {
-    let res = await api.get('/v1/dictionary', {
-      params: { word },
-      headers: this.headers()
-    });
-    return res.data;
+  getCountry(params: Query) {
+    return this.get('/v1/country', params);
   }
-
-  async getThesaurus(word: string) {
-    let res = await api.get('/v1/thesaurus', {
-      params: { word },
-      headers: this.headers()
-    });
-    return res.data;
+  getCity(params: Query) {
+    return this.get('/v1/city', params);
   }
-
-  async getSentiment(text: string) {
-    let res = await api.get('/v1/sentiment', {
-      params: { text },
-      headers: this.headers()
-    });
-    return res.data;
+  getWorldTime(params: Query) {
+    return this.get('/v1/worldtime', params);
+  }
+  getDictionary(word: string) {
+    return this.get('/v1/dictionary', { word });
+  }
+  getThesaurus(word: string) {
+    return this.get('/v1/thesaurus', { word });
+  }
+  getSentiment(text: string) {
+    return this.get('/v1/sentiment', { text });
   }
 
   async getTextSimilarity(text1: string, text2: string) {
-    let res = await api.post(
-      '/v1/textsimilarity',
-      {
-        text_1: text1,
-        text_2: text2
-      },
-      {
-        headers: { ...this.headers(), 'Content-Type': 'application/json' }
-      }
-    );
-    return res.data;
+    let response = await this.api.post('/v1/textsimilarity', { text_1: text1, text_2: text2 });
+    return response.data;
   }
 
-  // ── Health & Nutrition ──
-
-  async getNutrition(query: string) {
-    let res = await api.get('/v1/nutrition', {
-      params: { query },
-      headers: this.headers()
-    });
-    return res.data;
+  getNutrition(query: string) {
+    return this.get('/v1/nutrition', { query });
   }
-
-  async getExercises(params: Record<string, string | number>) {
-    let res = await api.get('/v1/exercises', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getExercises(params: Query) {
+    return this.get('/v1/exercises', params);
   }
-
-  // ── Entertainment ──
-
-  async getQuotes(params: Record<string, string | number>) {
-    let res = await api.get('/v2/quotes', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getQuotes(params: Query) {
+    return this.get('/v2/quotes', params);
   }
-
-  async getJokes(params?: Record<string, string | number>) {
-    let res = await api.get('/v1/jokes', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getJokes(params?: Query) {
+    return this.get('/v1/jokes', params);
   }
-
-  async getTrivia(params?: Record<string, string | number>) {
-    let res = await api.get('/v1/trivia', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getTrivia(params?: Query) {
+    return this.get('/v1/trivia', params);
   }
-
-  async getHistoricalEvents(params: Record<string, string | number>) {
-    let res = await api.get('/v1/historicalevents', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getHistoricalEvents(params: Query) {
+    return this.get('/v1/historicalevents', params);
   }
-
-  async getFacts(params?: Record<string, string | number>) {
-    let res = await api.get('/v1/facts', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getFacts(params?: Query) {
+    return this.get('/v1/facts', params);
   }
-
-  // ── Animals ──
-
-  async getAnimals(name: string) {
-    let res = await api.get('/v1/animals', {
-      params: { name },
-      headers: this.headers()
-    });
-    return res.data;
+  getAnimals(name: string) {
+    return this.get('/v1/animals', { name });
   }
-
-  // ── Internet & Tech ──
-
-  async getIpLookup(address: string) {
-    let res = await api.get('/v1/iplookup', {
-      params: { address },
-      headers: this.headers()
-    });
-    return res.data;
+  getIpLookup(address: string) {
+    return this.get('/v1/iplookup', { address });
   }
-
-  async getDnsLookup(domain: string) {
-    let res = await api.get('/v1/dnslookup', {
-      params: { domain },
-      headers: this.headers()
-    });
-    return res.data;
+  getDnsLookup(domain: string) {
+    return this.get('/v1/dnslookup', { domain });
   }
-
-  async getWhois(domain: string) {
-    let res = await api.get('/v1/whois', {
-      params: { domain },
-      headers: this.headers()
-    });
-    return res.data;
+  getWhois(domain: string) {
+    return this.get('/v1/whois', { domain });
   }
-
-  async validateEmail(email: string) {
-    let res = await api.get('/v1/emailvalidation', {
-      params: { email },
-      headers: this.headers()
-    });
-    return res.data;
+  validateEmail(email: string) {
+    return this.get('/v1/validateemail', { email });
   }
-
-  async validatePhone(number: string) {
-    let res = await api.get('/v1/validatephone', {
-      params: { number },
-      headers: this.headers()
-    });
-    return res.data;
+  validatePhone(number: string, country?: string) {
+    return this.get('/v1/validatephone', { number, country });
   }
-
-  async urlLookup(url: string) {
-    let res = await api.get('/v1/urllookup', {
-      params: { url },
-      headers: this.headers()
-    });
-    return res.data;
+  urlLookup(url: string) {
+    return this.get('/v1/urllookup', { url });
   }
-
-  // ── Transportation ──
-
-  async getCars(params: Record<string, string | number>) {
-    let res = await api.get('/v1/cars', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getCars(params: Query) {
+    return this.get('/v1/cars', params);
   }
-
-  async getAircraft(params: Record<string, string | number>) {
-    let res = await api.get('/v1/aircraft', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getAircraft(params: Query) {
+    return this.get('/v1/aircraft', params);
   }
-
-  // ── Miscellaneous ──
-
-  async getHolidays(params: Record<string, string | number>) {
-    let res = await api.get('/v1/holidays', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  getHolidays(params: Query) {
+    return this.get('/v2/holidays', params);
   }
-
-  async convertUnits(params: Record<string, string | number>) {
-    let res = await api.get('/v1/convertcurrency', {
-      params,
-      headers: this.headers()
-    });
-    return res.data;
+  convertCurrency(params: Query) {
+    return this.get('/v1/convertcurrency', params);
   }
 }

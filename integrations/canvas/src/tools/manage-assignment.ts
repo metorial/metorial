@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageAssignmentTool = SlateTool.create(spec, {
@@ -78,6 +78,7 @@ export let manageAssignmentTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       assignmentId: z.string().describe('Assignment ID'),
       courseId: z.string().describe('Course ID'),
       name: z.string().describe('Assignment name'),
@@ -89,14 +90,18 @@ export let manageAssignmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
+    if (ctx.input.position !== undefined && !Number.isInteger(ctx.input.position)) {
+      throw createApiServiceError('position must be an integer.');
+    }
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('name is required when creating an assignment.');
+    }
     let assignmentData: Record<string, any> = {};
-    if (ctx.input.name) assignmentData.name = ctx.input.name;
-    if (ctx.input.description) assignmentData.description = ctx.input.description;
+    if (ctx.input.name !== undefined) assignmentData.name = ctx.input.name;
+    if (ctx.input.description !== undefined)
+      assignmentData.description = ctx.input.description;
     if (ctx.input.dueAt !== undefined) assignmentData.due_at = ctx.input.dueAt;
     if (ctx.input.lockAt !== undefined) assignmentData.lock_at = ctx.input.lockAt;
     if (ctx.input.unlockAt !== undefined) assignmentData.unlock_at = ctx.input.unlockAt;
@@ -122,7 +127,8 @@ export let manageAssignmentTool = SlateTool.create(spec, {
       result = await client.createAssignment(ctx.input.courseId, assignmentData);
       actionDesc = 'Created';
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.assignmentId) throw new Error('assignmentId is required for update');
+      if (!ctx.input.assignmentId)
+        throw createApiServiceError('assignmentId is required for update');
       result = await client.updateAssignment(
         ctx.input.courseId,
         ctx.input.assignmentId,
@@ -130,13 +136,15 @@ export let manageAssignmentTool = SlateTool.create(spec, {
       );
       actionDesc = 'Updated';
     } else {
-      if (!ctx.input.assignmentId) throw new Error('assignmentId is required for delete');
+      if (!ctx.input.assignmentId)
+        throw createApiServiceError('assignmentId is required for delete');
       result = await client.deleteAssignment(ctx.input.courseId, ctx.input.assignmentId);
       actionDesc = 'Deleted';
     }
 
     return {
       output: {
+        raw: result,
         assignmentId: String(result.id),
         courseId: String(result.course_id),
         name: result.name,

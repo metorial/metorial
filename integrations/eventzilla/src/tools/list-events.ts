@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { readCollection, readPagination } from '../lib/responses';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -59,6 +60,7 @@ export let listEventsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       events: z.array(eventSchema).describe('List of events'),
       pagination: z
         .object({
@@ -80,12 +82,7 @@ export let listEventsTool = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let rawEvents = Array.isArray(data?.events)
-      ? data.events
-      : Array.isArray(data)
-        ? data
-        : [];
-    let rawPagination = data?.pagination?.[0] ?? data?.pagination;
+    let rawEvents = readCollection(data, 'events');
 
     let events = rawEvents.map((e: any) => ({
       eventId: e.id,
@@ -113,16 +110,10 @@ export let listEventsTool = SlateTool.create(spec, {
       language: e.language
     }));
 
-    let pagination = rawPagination
-      ? {
-          offset: rawPagination.offset,
-          limit: rawPagination.limit,
-          total: rawPagination.total
-        }
-      : undefined;
+    let pagination = readPagination(data);
 
     return {
-      output: { events, pagination },
+      output: { events, pagination, raw: data },
       message: `Found **${events.length}** event(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}${ctx.input.category ? ` in category "${ctx.input.category}"` : ''}.`
     };
   })

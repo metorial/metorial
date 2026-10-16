@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let orderPreviewSchema = z.object({
@@ -41,14 +41,16 @@ export let getOrderBatch = SlateTool.create(spec, {
       referenceId: z.string().describe('Display reference ID'),
       workspaceId: z.string().nullable().describe('Workspace ID'),
       workspaceName: z.string().nullable().describe('Workspace name'),
-      ordersPreview: z.array(orderPreviewSchema).describe('Preview of first 10 orders')
+      ordersPreview: z.array(orderPreviewSchema).describe('Preview of first 10 orders'),
+      customerReferenceId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Client reference used to prevent duplicate batches')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let b = await client.getOrderBatch(ctx.input.orderBatchId);
 
@@ -57,8 +59,8 @@ export let getOrderBatch = SlateTool.create(spec, {
       status: o.status,
       giftLink: o.individual_gift_link,
       recipientFirstName: o.recipient_first_name,
-      recipientLastName: o.recipient_last_name,
-      recipientEmail: o.recipient_email
+      recipientLastName: o.recipient_last_name ?? null,
+      recipientEmail: o.recipient_email ?? null
     }));
 
     return {
@@ -66,18 +68,19 @@ export let getOrderBatch = SlateTool.create(spec, {
         orderBatchId: b.id,
         sendStatus: b.send_status,
         fromName: b.from_name,
-        message: b.message,
+        message: b.message ?? null,
         ordersCount: b.orders_count,
         recipientsCount: b.recipients_count,
         sendMethod: b.send_method,
         isScheduledSend: b.is_scheduled_send,
-        scheduledSendOn: b.scheduled_send_on,
-        expiresAt: b.expires_at,
-        batchName: b.batch_name,
+        scheduledSendOn: b.scheduled_send_on ?? null,
+        expiresAt: b.expires_at ?? null,
+        batchName: b.batch_name ?? null,
         referenceId: b.reference_id,
-        workspaceId: b.workspace_id,
-        workspaceName: b.workspace_name,
-        ordersPreview
+        workspaceId: b.workspace_id ?? null,
+        workspaceName: b.workspace_name ?? null,
+        ordersPreview,
+        customerReferenceId: b.customer_reference_id ?? null
       },
       message: `Order batch **${b.reference_id}** — **${b.orders_count}** orders, status: **${b.send_status}**.`
     };

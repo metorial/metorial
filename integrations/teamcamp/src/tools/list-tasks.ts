@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredString, requireRecords } from '../lib/response';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
   key: 'list_tasks',
-  description: `Retrieve all tasks for a given project. Optionally filter by completion status. Returns a summary list with task IDs and names. Use **Get Task** for full task details.`,
+  description: `Call list_projects to discover project IDs. Retrieve all tasks for a given project. Optionally filter by completion status. Returns a summary list with task IDs and names. Use **Get Task** for full task details.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project whose tasks to list'),
+      projectId: projectIdSchema,
       complete: z
         .boolean()
         .optional()
@@ -24,6 +26,12 @@ export let listTasks = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       tasks: z.array(
         z.object({
           taskId: z.string().describe('Unique task identifier'),
@@ -36,13 +44,13 @@ export let listTasks = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let tasks = await client.listTasks(ctx.input.projectId, ctx.input.complete);
 
-    let mapped = (Array.isArray(tasks) ? tasks : []).map((t: any) => ({
-      taskId: t.taskId ?? '',
-      taskName: t.taskName ?? ''
+    let mapped = requireRecords(tasks).map(item => ({
+      taskId: requiredString(item.taskId, 'taskId'),
+      taskName: requiredString(item.taskName, 'taskName')
     }));
 
     return {
-      output: { tasks: mapped },
+      output: { tasks: mapped, raw: tasks },
       message: `Found **${mapped.length}** task(s) in project ${ctx.input.projectId}.`
     };
   })

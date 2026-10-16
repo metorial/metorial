@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getDocumentReference, getDocumentRefreshAt, getDocumentUrl } from '../lib/documents';
 import { spec } from '../spec';
 
 export let getDocuments = SlateTool.create(spec, {
   name: 'Get Documents',
   key: 'get_documents',
-  description: `Retrieve documents associated with a specific opportunity or award. Returns document metadata and time-limited download URLs for RFPs, federal schedules, protest decisions, and other related files. The **relatedKey** can be found in the \`document_path\` field of opportunity or award results.`,
+  description: `Retrieve documents associated with a specific opportunity. Returns document metadata and time-limited download URLs for RFPs, federal schedules, protest decisions, and other related files. The **relatedKey** can be found in the \`document_path\` field of opportunity results.`,
   instructions: [
-    'First search opportunities or awards to get the document_path / related_key value, then use it here to retrieve documents.',
+    'First search opportunities to get the document_path / related_key value, then use it here to retrieve documents.',
     'Download URLs expire after 60 minutes. Make a new request if the URL has expired.'
   ],
   constraints: ['Download URLs expire after 60 minutes.'],
@@ -21,7 +22,7 @@ export let getDocuments = SlateTool.create(spec, {
       relatedKey: z
         .string()
         .describe(
-          'Document-related key from the document_path field of an opportunity or award'
+          'Document-related key or the document_path URL returned by search_opportunities'
         ),
       ordering: z.string().optional().describe('Sort order for results'),
       pageNumber: z.number().optional().describe('Page number for pagination (starts at 1)'),
@@ -50,6 +51,16 @@ export let getDocuments = SlateTool.create(spec, {
       pageNumber: ctx.input.pageNumber,
       pageSize: ctx.input.pageSize
     });
+
+    let refreshAt = getDocumentRefreshAt();
+    for (let document of response.results) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: getDocumentUrl(document),
+        refreshReference: getDocumentReference(ctx.input, document, response.results),
+        refreshAt
+      });
+    }
 
     return {
       output: {

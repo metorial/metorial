@@ -7,13 +7,13 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Ably App ID. Required for Control API operations. Found in the Ably dashboard under Application Settings, or as the first part of your API key (e.g. "28AB6c" from key "28AB6c.DEFi0Q:...")'
+        'Optional legacy default App ID for Control API operations. Prefer tool input; call manage_apps with action list to discover IDs. Found in the Ably dashboard under Application Settings, or as the first part of your API key (e.g. "28AB6c" from key "28AB6c.DEFi0Q:...")'
       ),
     accountId: z
       .string()
       .optional()
       .describe(
-        'Ably Account ID. Required for account-level Control API operations like listing apps. Found in the Ably dashboard under Account Settings.'
+        'Optional legacy default Account ID for account-level Control API operations. Prefer tool input; call who_am_i to discover the account ID. Found in the Ably dashboard under Account Settings.'
       )
   })
 );

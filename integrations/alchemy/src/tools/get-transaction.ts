@@ -24,6 +24,10 @@ Use this to inspect a specific transaction, verify its status, or analyze its ef
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original transaction and receipt data, including pending null values'),
       transactionHash: z.string().describe('The transaction hash'),
       from: z.string().optional().describe('Sender address'),
       to: z
@@ -63,22 +67,20 @@ Use this to inspect a specific transaction, verify its status, or analyze its ef
     if (!tx) {
       return {
         output: {
+          raw: { transaction: tx },
           transactionHash: ctx.input.transactionHash
         },
         message: `Transaction \`${ctx.input.transactionHash}\` not found.`
       };
     }
 
-    let receipt: any = null;
+    let receipt: Awaited<ReturnType<AlchemyClient['getTransactionReceipt']>> | undefined;
     if (ctx.input.includeReceipt) {
-      try {
-        receipt = await client.getTransactionReceipt(ctx.input.transactionHash);
-      } catch {
-        // Receipt may not be available for pending transactions
-      }
+      receipt = await client.getTransactionReceipt(ctx.input.transactionHash);
     }
 
     let result = {
+      raw: { transaction: tx, receipt },
       transactionHash: tx.hash,
       from: tx.from,
       to: tx.to,
@@ -86,8 +88,8 @@ Use this to inspect a specific transaction, verify its status, or analyze its ef
       gasPrice: tx.gasPrice,
       gas: tx.gas,
       nonce: tx.nonce,
-      blockNumber: tx.blockNumber,
-      blockHash: tx.blockHash,
+      blockNumber: tx.blockNumber ?? undefined,
+      blockHash: tx.blockHash ?? undefined,
       input: tx.input,
       status: receipt?.status,
       gasUsed: receipt?.gasUsed,

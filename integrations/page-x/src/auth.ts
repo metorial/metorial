@@ -17,7 +17,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       pageXApiKey: z
         .string()
-        .describe('Your PageXCRM API key obtained from your PageXCRM account'),
+        .describe(
+          'Your PageXCRM API key from Integrations > API (https://www.pagexcrm.com/plugins/api)'
+        ),
       rapidApiKey: z
         .string()
         .describe('Your RapidAPI key obtained by subscribing to the PageXCRM API on RapidAPI')

@@ -39,7 +39,7 @@ Use this to discover available data providers and databases.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.listDatabases({
       perPage: ctx.input.perPage,
@@ -50,7 +50,7 @@ Use this to discover available data providers and databases.`,
       databaseId: db.id,
       databaseCode: db.database_code,
       name: db.name,
-      description: db.description || '',
+      description: db.description,
       datasetsCount: db.datasets_count,
       downloads: db.downloads,
       premium: db.premium

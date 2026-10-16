@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createCampaign = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let createCampaign = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name for the new dynamic video campaign')
     })
   )
@@ -21,15 +23,12 @@ export let createCampaign = SlateTool.create(spec, {
       campaignId: z.string(),
       name: z.string(),
       status: z.string().optional(),
-      createdAt: z.string().optional()
+      createdAt: z.string().optional(),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
     let result = await client.createCampaign(ctx.input.name);
 
@@ -41,7 +40,8 @@ export let createCampaign = SlateTool.create(spec, {
         campaignId: campaign._id,
         name: campaign.name,
         status: campaign.status,
-        createdAt: campaign.createdAt
+        createdAt: campaign.createdAt,
+        raw: result
       },
       message: `Created campaign **${campaign.name}** with ID \`${campaign._id}\`.`
     };

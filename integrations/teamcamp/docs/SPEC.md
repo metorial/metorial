@@ -1,65 +1,29 @@
-The search returned results for Microsoft Teams, not Teamcamp. Let me check the Teamcamp API docs more thoroughly for webhook/event support.# Slates Specification for Teamcamp
+# Teamcamp API guide
 
-## Overview
+Teamcamp's [documented API](https://api.teamcamp.app/api-reference/introduction) is in public beta. Requests use HTTPS and the `apiKey` header. Generate a key in [account settings](https://dash.teamcamp.app/settings/apikey); no workspace ID or separate configuration is needed. The key's [verification response](https://api.teamcamp.app/api-reference/auth/verifyApiKey) identifies the connected workspace. No OAuth refresh applies.
 
-Teamcamp is a project management platform for managing projects, tasks, team collaboration, time tracking, invoicing, and client portals. The Teamcamp API provides access to task, project, and team management functionalities programmatically. The API is currently in beta.
+## Discovery
 
-## Authentication
+- `get_workspace_identity`: verify the key and retrieve workspace identity.
+- `list_users` and `list_customers`: discover workspace users and customers.
+- `list_projects`: discover project IDs before project/task operations.
+- `list_project_groups`: retrieve group IDs for a selected project. `get_project` also retains its optional `includeGroups` behavior.
+- `get_project_details`: retrieve extended settings, members, labels, and custom status IDs for task writes.
 
-Teamcamp uses API key authentication. All requests must include an `apiKey` header with a valid API key.
+## Projects and tasks
 
-- **Method:** API Key via HTTP header
-- **Header name:** `apiKey`
-- **Base URL:** `https://api.teamcamp.app`
-- **Obtaining the key:** Generate your API key from your [Teamcamp Account Settings](https://dash.teamcamp.app/settings/apikey).
-- **Verification:** You can verify a valid API key by calling `GET /v1.0/verify`.
+`get_project`, `create_project`, `update_project`, and `delete_project` expose project management. Creation can associate a customer and use a known template ID. Project updates support dates, description, priority defaults, estimates, and milestone settings.
 
-Example request header:
+`list_tasks` accepts a project ID and an optional completion filter: `true` selects complete tasks, `false` selects incomplete tasks, and omission selects all tasks. `get_task`, `create_task`, and `update_task` cover task details and writes; `post_task_comment` posts comments. Priority inputs use 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low. Dates use `yyyy-MM-dd`.
 
-```
-apiKey: your-api-key-here
-```
+Most endpoints use `https://api.teamcamp.app/v1.0`. The official [task update](https://api.teamcamp.app/api-reference/task/updateTask) and [extended project detail](https://api.teamcamp.app/api-reference/project/getProjectDetails) examples instead specify `https://back.teamcamp.app/api/v1`; those operations use that host with the same documented authentication.
 
-The API is built on REST principles and is served over HTTPS. Unencrypted HTTP is not supported.
+Task file inputs reference existing files by type, URL, name, and numeric byte size; byte size is serialized as the provider's documented string. These tools do not upload or download file bytes.
 
-## Features
+## Response fidelity and limits
 
-### Workspace User & Customer Management
+Existing tool keys and schema types remain stable. Optional scalar summaries are emitted only for compatible provider values, including real empty strings, zero, and false. The complete provider JSON is preserved in `raw` for each resource/list response. For `get_project` with groups, `raw` contains both fetched responses. Task read/create documentation describes string priorities; the legacy numeric priority summary is omitted for those strings and the original value remains in `raw`. Numeric task milestone IDs retain their legacy string summary and original numeric value in `raw`.
 
-Retrieve information about workspace users and customers. Users include details such as email, admin/owner status. Customers include contact details (name, email, phone, address, company name) and associated client contacts.
+Required response fields are validated rather than fabricated. Unexpected responses raise a service error. After a write, inspect the resource before retrying because the operation may already have completed. Project deletion reports the HTTP success acknowledgement.
 
-- Users and customers are read-only through the API; they cannot be created or modified via the API.
-
-### Project Management
-
-Create, read, update, and delete projects within a workspace. Projects can be associated with a customer and configured with start and due dates.
-
-- Projects can be created from templates by providing a `templateId`.
-- Projects belong to a workspace and include metadata such as owner, associated users, and favorite users.
-- You can retrieve project lists, individual projects, and detailed project information including project groups.
-
-### Project Groups
-
-Retrieve the list of project groups (task groupings within a project). Groups help organize tasks within a project.
-
-- Project groups are read-only through the API.
-
-### Task Management
-
-Create, read, and update tasks within projects. Tasks support assignment to multiple users, priority levels, due dates, estimated time, milestones, statuses, file attachments, and grouping.
-
-- **Priority levels:** No Priority (0), Urgent (1), High (2), Medium (3), Low (4).
-- Tasks can be assigned to multiple users via `taskUsers`.
-- File attachments can be included at creation time with file type, URL, name, and size.
-- Tasks can be linked to milestones and custom statuses.
-- Task deletion is not available through the API.
-
-### Task Comments
-
-Post comments on tasks by specifying a task ID and comment content.
-
-- Comments are write-only; there is no API endpoint to retrieve existing comments.
-
-## Events
-
-The provider does not support events. The Teamcamp API does not offer webhooks, event subscriptions, or any built-in polling mechanism for change notifications.
+The current API reference lists no task-delete, comment-list, template-discovery, time-log, invoice, webhook, or event endpoints. Their availability outside this reference is unverified; no unsupported operations or event triggers are advertised. The documented list endpoints expose no pagination controls. API acceptance and live account behavior require separate verification.

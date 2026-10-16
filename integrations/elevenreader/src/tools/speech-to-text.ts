@@ -11,9 +11,9 @@ export let speechToTextTool = SlateTool.create(spec, {
     'Provide either "audioBase64" or "cloudStorageUrl", not both.',
     'Enable "diarize" to identify different speakers in the audio.'
   ],
-  constraints: ['File uploads must be under 3GB. Cloud storage URLs must be under 2GB.'],
+  constraints: ['File uploads must be under 5GB. Cloud storage URLs must be under 2GB.'],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -48,6 +48,7 @@ export let speechToTextTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       text: z.string().describe('Full transcribed text'),
       languageCode: z.string().optional().describe('Detected language code'),
       languageProbability: z.number().optional().describe('Confidence of language detection'),
@@ -82,23 +83,23 @@ export let speechToTextTool = SlateTool.create(spec, {
       tagAudioEvents: ctx.input.tagAudioEvents
     });
 
-    let wordCount = result.words?.length || 0;
     let textPreview = result.text?.substring(0, 100) || '';
 
     return {
       output: {
+        raw: result.raw,
         text: result.text,
-        languageCode: result.language_code,
-        languageProbability: result.language_probability,
-        words: result.words?.map((w: any) => ({
+        languageCode: result.language_code ?? undefined,
+        languageProbability: result.language_probability ?? undefined,
+        words: result.words?.map(w => ({
           text: w.text,
-          start: w.start,
-          end: w.end,
-          speaker: w.speaker_id,
-          type: w.type
+          start: w.start ?? undefined,
+          end: w.end ?? undefined,
+          speaker: w.speaker_id ?? undefined,
+          type: w.type ?? undefined
         }))
       },
-      message: `Transcribed audio to text (${wordCount} words). Language: ${result.language_code || 'auto-detected'}. Preview: "${textPreview}${result.text?.length > 100 ? '...' : ''}"`
+      message: `Transcribed audio to text. Language: ${result.language_code || 'auto-detected'}. Preview: "${textPreview}${result.text?.length > 100 ? '...' : ''}"`
     };
   })
   .build();

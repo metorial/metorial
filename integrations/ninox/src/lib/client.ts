@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import { resolveBaseUrl } from './settings';
 
 export interface NinoxTeam {
   id: string;
@@ -11,7 +17,7 @@ export interface NinoxDatabase {
 }
 
 export interface NinoxDatabaseSchema {
-  id: string;
+  id?: string;
   settings: Record<string, any>;
   schema: Record<string, any>;
 }
@@ -33,9 +39,9 @@ export interface NinoxRecord {
   id: number;
   sequence?: number;
   createdAt?: string;
-  createdBy?: string;
+  createdBy?: string | number;
   modifiedAt?: string;
-  modifiedBy?: string;
+  modifiedBy?: string | number;
   fields: Record<string, any>;
 }
 
@@ -43,7 +49,7 @@ export interface NinoxFileMetadata {
   name: string;
   contentType: string;
   size: number;
-  modifiedDate?: string;
+  modifiedDate?: string | number;
   modifiedUser?: string;
   seq?: number;
 }
@@ -88,17 +94,20 @@ export class Client {
   private token: string;
 
   constructor(config: { baseUrl: string; token: string }) {
-    this.baseUrl = config.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = resolveBaseUrl(config.baseUrl);
     this.token = config.token;
   }
 
   private createAxios() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: `${this.baseUrl}/v1`,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${this.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Ninox',
+          reason: 'ninox_api_error',
+          extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure)
+        })
     });
   }
 
@@ -112,7 +121,7 @@ export class Client {
 
   async getTeam(teamId: string): Promise<NinoxTeam> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}`);
+    let response = await ax.get(`/teams/${encodeURIComponent(teamId)}`);
     return response.data;
   }
 
@@ -120,13 +129,15 @@ export class Client {
 
   async listDatabases(teamId: string): Promise<NinoxDatabase[]> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases`);
+    let response = await ax.get(`/teams/${encodeURIComponent(teamId)}/databases`);
     return response.data;
   }
 
   async getDatabase(teamId: string, databaseId: string): Promise<NinoxDatabaseSchema> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases/${databaseId}`);
+    let response = await ax.get(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}`
+    );
     return response.data;
   }
 
@@ -134,13 +145,17 @@ export class Client {
 
   async listTables(teamId: string, databaseId: string): Promise<NinoxTable[]> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases/${databaseId}/tables`);
+    let response = await ax.get(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables`
+    );
     return response.data;
   }
 
   async getTable(teamId: string, databaseId: string, tableId: string): Promise<NinoxTable> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases/${databaseId}/tables/${tableId}`);
+    let response = await ax.get(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}`
+    );
     return response.data;
   }
 
@@ -169,11 +184,15 @@ export class Client {
       if (params.filters !== undefined) queryParams.filters = JSON.stringify(params.filters);
     }
 
-    let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records`,
+    let response = await ax.get<NinoxRecord | NinoxRecord[]>(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records`,
       { params: queryParams }
     );
-    return response.data;
+    if (Array.isArray(response.data)) return response.data;
+    if (isApiErrorRecord(response.data) && typeof response.data.id === 'number') {
+      return [response.data];
+    }
+    throw createApiServiceError('Ninox returned an invalid record list.');
   }
 
   async getRecord(
@@ -189,7 +208,7 @@ export class Client {
     if (params?.ids) queryParams.ids = params.ids;
 
     let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}`,
       { params: queryParams }
     );
     return response.data;
@@ -203,7 +222,7 @@ export class Client {
   ): Promise<NinoxRecord[]> {
     let ax = this.createAxios();
     let response = await ax.post(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records`,
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records`,
       records
     );
     return response.data;
@@ -218,7 +237,7 @@ export class Client {
   ): Promise<NinoxRecord> {
     let ax = this.createAxios();
     let response = await ax.put(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}`,
       { fields }
     );
     return response.data;
@@ -232,7 +251,7 @@ export class Client {
   ): Promise<any[]> {
     let ax = this.createAxios();
     let response = await ax.post(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records`,
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records`,
       records
     );
     return response.data;
@@ -246,7 +265,7 @@ export class Client {
   ): Promise<void> {
     let ax = this.createAxios();
     await ax.delete(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}`
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}`
     );
   }
 
@@ -257,26 +276,35 @@ export class Client {
     recordIds: number[]
   ): Promise<void> {
     let ax = this.createAxios();
-    await ax.delete(`/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records`, {
-      data: recordIds
-    });
+    await ax.delete(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records`,
+      {
+        data: recordIds
+      }
+    );
   }
 
   // --- Query & Exec ---
 
   async query(teamId: string, databaseId: string, queryStr: string): Promise<any> {
     let ax = this.createAxios();
-    let response = await ax.post(`/teams/${teamId}/databases/${databaseId}/query`, {
-      query: queryStr
-    });
+    let response = await ax.post(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/query`,
+      {
+        query: queryStr
+      }
+    );
     return response.data;
   }
 
   async exec(teamId: string, databaseId: string, queryStr: string): Promise<any> {
     let ax = this.createAxios();
-    let response = await ax.post(`/teams/${teamId}/databases/${databaseId}/exec`, {
-      query: queryStr
-    });
+    let response = await ax.post(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/exec`,
+      {
+        query: queryStr
+      }
+    );
     return response.data;
   }
 
@@ -290,7 +318,7 @@ export class Client {
   ): Promise<NinoxFileMetadata[]> {
     let ax = this.createAxios();
     let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}/files`
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}/files`
     );
     return response.data;
   }
@@ -304,9 +332,19 @@ export class Client {
   ): Promise<NinoxFileMetadata> {
     let ax = this.createAxios();
     let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}/files/${encodeURIComponent(fileName)}/metadata`
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}/files/${encodeURIComponent(fileName)}/metadata`
     );
     return response.data;
+  }
+
+  getFileDownloadUrl(
+    teamId: string,
+    databaseId: string,
+    tableId: string,
+    recordId: number,
+    fileName: string
+  ): string {
+    return `${this.baseUrl}/v1/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}/files/${encodeURIComponent(fileName)}`;
   }
 
   async deleteFile(
@@ -318,7 +356,7 @@ export class Client {
   ): Promise<void> {
     let ax = this.createAxios();
     await ax.delete(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/records/${recordId}/files/${encodeURIComponent(fileName)}`
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/records/${recordId}/files/${encodeURIComponent(fileName)}`
     );
   }
 
@@ -326,7 +364,9 @@ export class Client {
 
   async listDatabaseViews(teamId: string, databaseId: string): Promise<NinoxView[]> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases/${databaseId}/views`);
+    let response = await ax.get(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/views`
+    );
     return response.data;
   }
 
@@ -337,7 +377,7 @@ export class Client {
   ): Promise<NinoxView[]> {
     let ax = this.createAxios();
     let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/views`
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/views`
     );
     return response.data;
   }
@@ -350,9 +390,12 @@ export class Client {
     sinceSq: number
   ): Promise<NinoxChanges> {
     let ax = this.createAxios();
-    let response = await ax.get(`/teams/${teamId}/databases/${databaseId}/changes`, {
-      params: { sinceSq }
-    });
+    let response = await ax.get(
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/changes`,
+      {
+        params: { sinceSq }
+      }
+    );
     return response.data;
   }
 
@@ -364,9 +407,18 @@ export class Client {
   ): Promise<NinoxChanges> {
     let ax = this.createAxios();
     let response = await ax.get(
-      `/teams/${teamId}/databases/${databaseId}/tables/${tableId}/changes`,
+      `/teams/${encodeURIComponent(teamId)}/databases/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/changes`,
       { params: { sinceSq } }
     );
     return response.data;
   }
 }
+
+export let createClient = (ctx: {
+  auth: { token: string; baseUrl?: string };
+  config: Record<string, unknown>;
+}) =>
+  new Client({
+    token: ctx.auth.token,
+    baseUrl: resolveBaseUrl(ctx.auth.baseUrl, ctx.config.baseUrl)
+  });

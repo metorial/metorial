@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,19 +33,22 @@ export let checkinParticipantTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    if (!ctx.input.ticketId && !ctx.input.ticketNumber) {
-      throw new Error('Either ticketId or ticketNumber must be provided.');
+    if (ctx.input.ticketId === undefined && !ctx.input.ticketNumber?.trim()) {
+      throw createApiServiceError('Either ticketId or ticketNumber must be provided.', {
+        reason: 'sympla_missing_ticket'
+      });
     }
 
-    if (ctx.input.ticketId) {
+    if (ctx.input.ticketId !== undefined) {
       await client.checkinByTicketId(ctx.input.eventId, ctx.input.ticketId);
     } else {
       await client.checkinByTicketNumber(ctx.input.eventId, ctx.input.ticketNumber!);
     }
 
-    let identifier = ctx.input.ticketId
-      ? `ticket ID ${ctx.input.ticketId}`
-      : `ticket number ${ctx.input.ticketNumber}`;
+    let identifier =
+      ctx.input.ticketId !== undefined
+        ? `ticket ID ${ctx.input.ticketId}`
+        : `ticket number ${ctx.input.ticketNumber}`;
     return {
       output: {
         success: true

@@ -5,7 +5,9 @@ import {
   analogWrite,
   digitalRead,
   digitalWrite,
+  getDeviceOnlineStatus,
   getDeviceStatus,
+  getDeviceVersion,
   listDevices,
   restartDevice,
   servoControl,
@@ -16,6 +18,8 @@ export let provider = Slate.create({
   tools: [
     listDevices,
     getDeviceStatus,
+    getDeviceOnlineStatus,
+    getDeviceVersion,
     restartDevice,
     digitalWrite,
     digitalRead,

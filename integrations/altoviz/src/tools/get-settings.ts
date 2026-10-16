@@ -1,9 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireNumber } from '../lib/client';
 import { spec } from '../spec';
 
 let vatRateSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   vatId: z.number(),
   rate: z.number(),
   region: z.string().nullable().optional(),
@@ -11,6 +12,7 @@ let vatRateSchema = z.object({
 });
 
 let classificationSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   classificationId: z.number(),
   label: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -21,6 +23,7 @@ let classificationSchema = z.object({
 });
 
 let unitSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   unitId: z.number().optional(),
   label: z.string().nullable().optional()
 });
@@ -65,8 +68,9 @@ export let getSettings = SlateTool.create(spec, {
     if (ctx.input.includeVatRates !== false) {
       let rawVats = await client.getVatRates();
       vatRates = rawVats.map((v: any) => ({
+        raw: v,
         vatId: v.id,
-        rate: v.rate,
+        rate: requireNumber(v.rate, 'VAT rate'),
         region: v.region,
         label: v.label
       }));
@@ -76,6 +80,7 @@ export let getSettings = SlateTool.create(spec, {
     if (ctx.input.includeClassifications) {
       let rawClassifications = await client.getClassifications();
       classifications = rawClassifications.map((c: any) => ({
+        raw: c,
         classificationId: c.id,
         label: c.label,
         description: c.description,
@@ -90,8 +95,9 @@ export let getSettings = SlateTool.create(spec, {
     if (ctx.input.includeUnits) {
       let rawUnits = await client.getUnits();
       units = rawUnits.map((u: any) => ({
-        unitId: u.id,
-        label: u.label
+        raw: u,
+        unitId: typeof u.id === 'number' ? u.id : undefined,
+        label: u.name ?? u.label
       }));
     }
 

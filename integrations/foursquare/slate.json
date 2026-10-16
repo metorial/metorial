@@ -1,17 +1,17 @@
 {
   "name": "@metorial/foursquare",
-  "description": "Search, discover, and retrieve detailed information about places and venues from a global database of 100M+ points of interest across 200+ countries. Search places by keyword, category, chain, or geographic area with autocomplete support. Retrieve rich place details including addresses, coordinates, categories, hours, photos, reviews, ratings, and popularity. Match and enrich POI data using GeoTagging/Place Match. Propose edits and flag issues with place data. Manage geofences around venues, coordinates, or custom polygons with bulk operations. Provide personalized place recommendations based on user taste and visit history. Upload and manage geospatial datasets in Foursquare Studio. Access measurement data for campaign insights and optimization. Manage users and authentication tokens.",
+  "description": "Search and match Foursquare places, retrieve details, photos and tips, find geotagging candidates, confirm selections, and suggest place data changes. Current Places tools use a Service API Key. Legacy V3 tools and V2 OAuth user identity are also available.",
   "categories": ["apis-and-http-requests", "web-search"],
   "skills": [
     "search places by location",
     "retrieve place details",
-    "match and enrich POI data",
-    "manage geofences",
-    "personalized place recommendations",
-    "propose place edits",
-    "manage geospatial datasets",
-    "access measurement data",
-    "manage user authentication"
+    "match place records",
+    "retrieve photos and tips",
+    "find geotagging candidates",
+    "confirm geotagging selection",
+    "suggest place edits and new places",
+    "monitor place suggestions",
+    "retrieve signed-in user profile"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/foursquare.png"
 }

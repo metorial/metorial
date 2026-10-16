@@ -1,18 +1,17 @@
 {
   "name": "@metorial/borneo",
-  "description": "Discover, classify, and remediate sensitive data across cloud infrastructure, SaaS applications, and APIs. Scan structured and unstructured data sources to identify PII, PFI, PHI, API tokens, keys, and credentials using ML-based classifiers. Configure and schedule surface, audit, and forensic scans with customizable depth and resource selection. Manage data security posture with real-time visibility into data exposure and vulnerabilities. Perform data remediation through masking, encryption, and access changes. Create and manage data breach evaluation records. Generate Data Protection Impact Assessments (DPIAs) and export processing activities for GDPR, CCPA, DPDP, and HIPAA compliance. Export and manage inventory resources with filtering, sorting, and violation metrics. Manage organizational entities including employees, departments, headquarters, domains, and dashboard users. Create and manage legal documents and data recipients. Analyze code pull requests for sensitive data handling and test APIs for oversharing sensitive data.",
+  "description": "Manage Borneo sensitive-data scans, inspect scan findings, discover connected accounts and connectors, and maintain privacy operations records. Create and update breach records, processing activities, DPIAs, recipients, assets, and organisation records. Download inventory exports and dashboard reports.",
   "categories": ["apis-and-http-requests", "legal-and-compliance", "security"],
   "skills": [
-    "discover sensitive data",
-    "classify data with ML",
-    "schedule data scans",
-    "remediate data risks",
+    "schedule sensitive-data scans",
+    "inspect scan results",
+    "discover accounts and connectors",
     "manage breach evaluations",
-    "create privacy assessments",
-    "export compliance reports",
-    "manage inventory resources",
-    "manage organizational entities",
-    "analyze code for data privacy"
+    "maintain processing activities",
+    "manage privacy assessments",
+    "manage data recipients",
+    "export inventory and reports",
+    "manage organisation records"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/borneo.jpeg"
 }

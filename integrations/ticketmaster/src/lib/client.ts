@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -6,305 +12,251 @@ export interface ClientConfig {
   locale?: string;
 }
 
-export class DiscoveryClient {
-  private token: string;
-  private countryCode?: string;
-  private locale?: string;
-  private api: ReturnType<typeof createAxios>;
+type SearchParams = {
+  keyword?: string;
+  id?: string;
+  source?: string;
+  includeTest?: string;
+  sort?: string;
+  size?: number;
+  page?: number;
+};
 
-  constructor(config: ClientConfig) {
-    this.token = config.token;
-    this.countryCode = config.countryCode;
-    this.locale = config.locale;
-    this.api = createAxios({
-      baseURL: 'https://app.ticketmaster.com/discovery/v2'
+type ClassificationFilters = {
+  classificationName?: string;
+  classificationId?: string;
+  segmentId?: string;
+  segmentName?: string;
+  genreId?: string;
+  subGenreId?: string;
+  typeId?: string;
+  subTypeId?: string;
+  includeFamily?: string;
+};
+
+type LocationFilters = {
+  countryCode?: string;
+  stateCode?: string;
+  city?: string;
+  postalCode?: string;
+  latlong?: string;
+  geoPoint?: string;
+  radius?: string;
+  unit?: string;
+};
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Ticketmaster',
+    reason: 'ticketmaster_api_error',
+    extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure),
+    detailKeys: [
+      'faultstring',
+      'message',
+      'description',
+      'detail',
+      'error',
+      'errorcode',
+      'code'
+    ],
+    nestedKeys: ['fault', 'detail', 'errors'],
+    extractUpstreamCode: (_failure, response) => {
+      let data = response?.data;
+      if (!isApiErrorRecord(data)) return undefined;
+      let fault = data.fault;
+      if (isApiErrorRecord(fault) && isApiErrorRecord(fault.detail)) {
+        let code = fault.detail.errorcode;
+        if (typeof code === 'string') return code;
+      }
+      let firstError = Array.isArray(data.errors) ? data.errors[0] : undefined;
+      let code = isApiErrorRecord(firstError) ? firstError.code : data.code;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+    }
+  });
+
+let createClient = (baseURL: string, token: string) => {
+  if (!token.trim()) {
+    throw createApiServiceError('A Ticketmaster API key is required.', {
+      reason: 'missing_api_key'
     });
   }
+  return createAuthenticatedAxios({
+    baseURL,
+    params: { apikey: token.trim() },
+    timeout: 30000,
+    contentType: false,
+    errorAdapter: apiError
+  });
+};
 
-  private defaultParams(): Record<string, string> {
-    let params: Record<string, string> = { apikey: this.token };
-    if (this.countryCode) params.countryCode = this.countryCode;
-    if (this.locale) params.locale = this.locale;
-    return params;
+let resourceId = (value: string, label: string) => {
+  if (!value.trim()) {
+    throw createApiServiceError(`${label} must not be blank.`, {
+      reason: 'invalid_resource_id'
+    });
+  }
+  return encodeURIComponent(value.trim());
+};
+
+let validateSearch = (params: SearchParams & { unit?: string }) => {
+  let size = params.size ?? 20;
+  let page = params.page ?? 0;
+  if (!Number.isInteger(size) || size < 1 || size > 200) {
+    throw createApiServiceError('size must be a whole number between 1 and 200.', {
+      reason: 'invalid_pagination'
+    });
+  }
+  if (!Number.isInteger(page) || page < 0 || size * page >= 1000) {
+    throw createApiServiceError(
+      'page must be a non-negative whole number with size × page below 1000. Narrow the search to retrieve more results.',
+      { reason: 'invalid_pagination' }
+    );
+  }
+  if (params.unit !== undefined && !['miles', 'km'].includes(params.unit)) {
+    throw createApiServiceError('unit must be miles or km.', { reason: 'invalid_unit' });
+  }
+};
+
+export class DiscoveryClient {
+  private api: ReturnType<typeof createAuthenticatedAxios>;
+
+  constructor(private config: ClientConfig) {
+    this.api = createClient('https://app.ticketmaster.com/discovery/v2', config.token);
+  }
+
+  private async get(
+    path: string,
+    params: Record<string, unknown> = {},
+    location = false
+  ): Promise<any> {
+    let response = await this.api.get(path, {
+      params: pickDefined({
+        locale: this.config.locale,
+        ...(location ? { countryCode: this.config.countryCode } : {}),
+        ...params
+      }),
+      paramsSerializer: { indexes: null }
+    });
+    return response.data;
   }
 
   async searchEvents(
-    params: {
-      keyword?: string;
-      attractionId?: string;
-      venueId?: string;
-      promoterId?: string;
-      classificationName?: string;
-      classificationId?: string;
-      segmentId?: string;
-      segmentName?: string;
-      genreId?: string;
-      subGenreId?: string;
-      countryCode?: string;
-      stateCode?: string;
-      city?: string;
-      postalCode?: string;
-      dmaId?: string;
-      latlong?: string;
-      radius?: string;
-      unit?: string;
-      startDateTime?: string;
-      endDateTime?: string;
-      localStartDateTime?: string;
-      localEndDateTime?: string;
-      onsaleStartDateTime?: string;
-      onsaleEndDateTime?: string;
-      onsaleOnStartDate?: string;
-      onsaleOnAfterStartDate?: string;
+    params: SearchParams &
+      ClassificationFilters &
+      LocationFilters & {
+        attractionId?: string;
+        venueId?: string;
+        promoterId?: string;
+        marketId?: string;
+        dmaId?: string;
+        startDateTime?: string;
+        endDateTime?: string;
+        localStartDateTime?: string;
+        localEndDateTime?: string;
+        onsaleStartDateTime?: string;
+        onsaleEndDateTime?: string;
+        onsaleOnStartDate?: string;
+        onsaleOnAfterStartDate?: string;
+        includeTBA?: string;
+        includeTBD?: string;
+      } = {}
+  ): Promise<any> {
+    validateSearch(params);
+    return this.get('/events.json', pickDefined(params), true);
+  }
+
+  async getEventDetails(eventId: string): Promise<any> {
+    return this.get(`/events/${resourceId(eventId, 'Event ID')}.json`);
+  }
+
+  async searchAttractions(params: SearchParams & ClassificationFilters = {}): Promise<any> {
+    validateSearch(params);
+    return this.get('/attractions.json', pickDefined(params));
+  }
+
+  async getAttractionDetails(attractionId: string): Promise<any> {
+    return this.get(`/attractions/${resourceId(attractionId, 'Attraction ID')}.json`);
+  }
+
+  async searchVenues(params: SearchParams & LocationFilters = {}): Promise<any> {
+    validateSearch(params);
+    return this.get('/venues.json', pickDefined(params), true);
+  }
+
+  async getVenueDetails(venueId: string): Promise<any> {
+    return this.get(`/venues/${resourceId(venueId, 'Venue ID')}.json`);
+  }
+
+  async searchClassifications(params: SearchParams = {}): Promise<any> {
+    validateSearch(params);
+    return this.get('/classifications.json', pickDefined(params));
+  }
+
+  async getClassificationDetails(classificationId: string): Promise<any> {
+    return this.get(
+      `/classifications/${resourceId(classificationId, 'Classification ID')}.json`
+    );
+  }
+
+  async suggest(
+    params: LocationFilters & {
+      keyword: string;
+      resource?: string;
       source?: string;
       includeFamily?: string;
       includeTBA?: string;
       includeTBD?: string;
-      includeTest?: string;
-      sort?: string;
-      size?: number;
-      page?: number;
-    } = {}
-  ): Promise<any> {
-    let queryParams: Record<string, string> = { ...this.defaultParams() };
-
-    if (params.countryCode) queryParams.countryCode = params.countryCode;
-
-    let stringFields = [
-      'keyword',
-      'attractionId',
-      'venueId',
-      'promoterId',
-      'classificationName',
-      'classificationId',
-      'segmentId',
-      'segmentName',
-      'genreId',
-      'subGenreId',
-      'stateCode',
-      'city',
-      'postalCode',
-      'dmaId',
-      'latlong',
-      'radius',
-      'unit',
-      'startDateTime',
-      'endDateTime',
-      'localStartDateTime',
-      'localEndDateTime',
-      'onsaleStartDateTime',
-      'onsaleEndDateTime',
-      'onsaleOnStartDate',
-      'onsaleOnAfterStartDate',
-      'source',
-      'includeFamily',
-      'includeTBA',
-      'includeTBD',
-      'includeTest',
-      'sort'
-    ] as const;
-
-    for (let field of stringFields) {
-      if (params[field]) queryParams[field] = params[field];
-    }
-
-    if (params.size !== undefined) queryParams.size = String(params.size);
-    if (params.page !== undefined) queryParams.page = String(params.page);
-
-    let response = await this.api.get('/events.json', { params: queryParams });
-    return response.data;
-  }
-
-  async getEventDetails(eventId: string): Promise<any> {
-    let response = await this.api.get(`/events/${eventId}.json`, {
-      params: this.defaultParams()
-    });
-    return response.data;
-  }
-
-  async searchAttractions(
-    params: {
-      keyword?: string;
-      classificationName?: string;
-      classificationId?: string;
       segmentId?: string;
-      segmentName?: string;
-      genreId?: string;
-      subGenreId?: string;
-      source?: string;
-      includeFamily?: string;
-      includeTest?: string;
-      sort?: string;
       size?: number;
-      page?: number;
-    } = {}
-  ): Promise<any> {
-    let queryParams: Record<string, string> = { ...this.defaultParams() };
-
-    let stringFields = [
-      'keyword',
-      'classificationName',
-      'classificationId',
-      'segmentId',
-      'segmentName',
-      'genreId',
-      'subGenreId',
-      'source',
-      'includeFamily',
-      'includeTest',
-      'sort'
-    ] as const;
-
-    for (let field of stringFields) {
-      if (params[field]) queryParams[field] = params[field];
     }
-
-    if (params.size !== undefined) queryParams.size = String(params.size);
-    if (params.page !== undefined) queryParams.page = String(params.page);
-
-    let response = await this.api.get('/attractions.json', { params: queryParams });
-    return response.data;
-  }
-
-  async getAttractionDetails(attractionId: string): Promise<any> {
-    let response = await this.api.get(`/attractions/${attractionId}.json`, {
-      params: this.defaultParams()
-    });
-    return response.data;
-  }
-
-  async searchVenues(
-    params: {
-      keyword?: string;
-      countryCode?: string;
-      stateCode?: string;
-      city?: string;
-      postalCode?: string;
-      latlong?: string;
-      radius?: string;
-      unit?: string;
-      source?: string;
-      includeTest?: string;
-      sort?: string;
-      size?: number;
-      page?: number;
-    } = {}
   ): Promise<any> {
-    let queryParams: Record<string, string> = { ...this.defaultParams() };
-
-    if (params.countryCode) queryParams.countryCode = params.countryCode;
-
-    let stringFields = [
-      'keyword',
-      'stateCode',
-      'city',
-      'postalCode',
-      'latlong',
-      'radius',
-      'unit',
-      'source',
-      'includeTest',
-      'sort'
-    ] as const;
-
-    for (let field of stringFields) {
-      if (params[field]) queryParams[field] = params[field];
+    validateSearch(params);
+    if (!params.keyword.trim()) {
+      throw createApiServiceError('keyword must not be blank.', { reason: 'invalid_keyword' });
     }
-
-    if (params.size !== undefined) queryParams.size = String(params.size);
-    if (params.page !== undefined) queryParams.page = String(params.page);
-
-    let response = await this.api.get('/venues.json', { params: queryParams });
-    return response.data;
-  }
-
-  async getVenueDetails(venueId: string): Promise<any> {
-    let response = await this.api.get(`/venues/${venueId}.json`, {
-      params: this.defaultParams()
-    });
-    return response.data;
-  }
-
-  async searchClassifications(
-    params: { keyword?: string; sort?: string; size?: number; page?: number } = {}
-  ): Promise<any> {
-    let queryParams: Record<string, string> = { ...this.defaultParams() };
-
-    if (params.keyword) queryParams.keyword = params.keyword;
-    if (params.sort) queryParams.sort = params.sort;
-    if (params.size !== undefined) queryParams.size = String(params.size);
-    if (params.page !== undefined) queryParams.page = String(params.page);
-
-    let response = await this.api.get('/classifications.json', { params: queryParams });
-    return response.data;
-  }
-
-  async getClassificationDetails(classificationId: string): Promise<any> {
-    let response = await this.api.get(`/classifications/${classificationId}.json`, {
-      params: this.defaultParams()
-    });
-    return response.data;
-  }
-
-  async suggest(params: {
-    keyword: string;
-    resource?: string;
-    countryCode?: string;
-    source?: string;
-    includeFamily?: string;
-    size?: number;
-  }): Promise<any> {
-    let queryParams: Record<string, string> = { ...this.defaultParams() };
-
-    queryParams.keyword = params.keyword;
-    if (params.resource) queryParams.resource = params.resource;
-    if (params.countryCode) queryParams.countryCode = params.countryCode;
-    if (params.source) queryParams.source = params.source;
-    if (params.includeFamily) queryParams.includeFamily = params.includeFamily;
-    if (params.size !== undefined) queryParams.size = String(params.size);
-
-    let response = await this.api.get('/suggest.json', { params: queryParams });
-    return response.data;
+    return this.get('/suggest.json', pickDefined(params), true);
   }
 }
 
 export class CommerceClient {
-  private token: string;
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    this.token = config.token;
-    this.api = createAxios({
-      baseURL: 'https://app.ticketmaster.com/commerce/v2'
-    });
+    this.api = createClient('https://app.ticketmaster.com/commerce/v2', config.token);
   }
 
   async getEventOffers(eventId: string): Promise<any> {
-    let response = await this.api.get(`/events/${eventId}/offers.json`, {
-      params: { apikey: this.token }
-    });
+    let response = await this.api.get(
+      `/events/${resourceId(eventId, 'Event ID')}/offers.json`
+    );
     return response.data;
   }
 }
 
 export class InventoryStatusClient {
-  private token: string;
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    this.token = config.token;
-    this.api = createAxios({
-      baseURL: 'https://app.ticketmaster.com/inventory-status/v1'
-    });
+    this.api = createClient('https://app.ticketmaster.com/inventory-status/v1', config.token);
   }
 
   async getAvailability(eventIds: string[]): Promise<any> {
-    let response = await this.api.get('/availability', {
-      params: {
-        apikey: this.token,
-        events: eventIds.join(',')
-      }
-    });
+    if (eventIds.length === 0 || eventIds.some(id => !id.trim() || id.includes(','))) {
+      throw createApiServiceError('Provide at least one non-blank event ID without commas.', {
+        reason: 'invalid_event_ids'
+      });
+    }
+    let events = eventIds.map(id => id.trim()).join(',');
+    if (
+      new TextEncoder().encode(this.api.getUri({ url: '/availability', params: { events } }))
+        .length > 7000
+    ) {
+      throw createApiServiceError(
+        'The event ID list must fit within the 7 KB request limit. Split it into smaller batches.',
+        { reason: 'inventory_request_too_large' }
+      );
+    }
+    let response = await this.api.get('/availability', { params: { events } });
     return response.data;
   }
 }

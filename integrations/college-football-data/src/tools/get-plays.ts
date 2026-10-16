@@ -19,10 +19,7 @@ export let getPlays = SlateTool.create(spec, {
       offense: z.string().optional().describe('Offensive team to filter by'),
       defense: z.string().optional().describe('Defensive team to filter by'),
       conference: z.string().optional().describe('Conference abbreviation to filter by'),
-      playType: z
-        .string()
-        .optional()
-        .describe('Play type to filter by (e.g. "Rush", "Pass Reception")'),
+      playType: z.string().optional().describe('Provider play type abbreviation to filter by'),
       seasonType: z.enum(['regular', 'postseason', 'both']).optional().describe('Season type'),
       includeDrives: z
         .boolean()
@@ -59,7 +56,8 @@ export let getPlays = SlateTool.create(spec, {
         team: ctx.input.team,
         offense: ctx.input.offense,
         defense: ctx.input.defense,
-        conference: ctx.input.conference
+        conference: ctx.input.conference,
+        seasonType: ctx.input.seasonType
       });
     }
 

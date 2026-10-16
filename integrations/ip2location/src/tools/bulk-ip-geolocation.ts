@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { isIP } from 'node:net';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, checkProviderError } from '../lib/client';
+import { mapGeolocation, parseResponse, providerDataSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 let bulkEntrySchema = z.object({
@@ -15,7 +17,8 @@ let bulkEntrySchema = z.object({
   timeZone: z.string().describe('Timezone identifier'),
   asn: z.string().describe('Autonomous System Number'),
   asName: z.string().describe('Autonomous System name'),
-  isProxy: z.boolean().describe('Whether the IP is detected as a proxy')
+  isProxy: z.boolean().describe('Whether the IP is detected as a proxy'),
+  providerData: providerDataSchema
 });
 
 export let bulkIpGeolocation = SlateTool.create(spec, {
@@ -46,32 +49,42 @@ Useful for batch processing large lists of IP addresses efficiently instead of m
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let bulkResult = await client.getBulkGeolocation(
-      ctx.input.ipAddresses,
-      ctx.config.language
+    let bulkResult = parseResponse(
+      z.record(z.string(), z.unknown()),
+      await client.getBulkGeolocation(ctx.input.ipAddresses),
+      'bulk geolocation'
     );
-
-    let results = Object.entries(bulkResult).map(([ip, data]) => ({
-      ip,
-      countryCode: data.country_code || '',
-      countryName: data.country_name || '',
-      regionName: data.region_name || '',
-      cityName: data.city_name || '',
-      latitude: data.latitude || 0,
-      longitude: data.longitude || 0,
-      zipCode: data.zip_code || '',
-      timeZone: data.time_zone || '',
-      asn: data.asn || '',
-      asName: data.as || '',
-      isProxy: data.is_proxy || false
-    }));
+    if (!Object.keys(bulkResult).length) {
+      throw createApiServiceError(
+        'IP2Location returned no bulk geolocation records. Retry the lookup.',
+        {
+          reason: 'invalid_provider_response'
+        }
+      );
+    }
+    let results = Object.entries(bulkResult).map(([ip, data]) => {
+      if (!isIP(ip)) {
+        throw createApiServiceError(
+          'IP2Location returned a bulk record without a valid IP address.',
+          {
+            reason: 'invalid_provider_response'
+          }
+        );
+      }
+      checkProviderError(data, `bulk geolocation for ${ip}`);
+      return {
+        ip,
+        ...mapGeolocation(data),
+        providerData: isApiErrorRecord(data) ? data : undefined
+      };
+    });
 
     let countries = [...new Set(results.map(r => r.countryName).filter(Boolean))];
 
     return {
       output: {
         results,
-        totalQueried: results.length
+        totalQueried: ctx.input.ipAddresses.length
       },
       message: `Looked up **${results.length}** IP addresses across **${countries.length}** countries: ${countries.slice(0, 5).join(', ')}${countries.length > 5 ? `, and ${countries.length - 5} more` : ''}`
     };

@@ -34,7 +34,10 @@ Returns flipbook metadata including title, URL, thumbnail, page count, tags, and
             thumbnailUrl: z.string().describe('URL of the flipbook thumbnail.'),
             pdfUrl: z.string().describe('URL of the source PDF.'),
             pages: z.number().describe('Number of pages in the flipbook.'),
-            tags: z.string().describe('Comma-separated tags of the flipbook.'),
+            tags: z
+              .string()
+              .optional()
+              .describe('Comma-separated tags of the flipbook when provided.'),
             created: z.string().describe('Creation date of the flipbook.')
           })
         )
@@ -50,17 +53,17 @@ Returns flipbook metadata including title, URL, thumbnail, page count, tags, and
 
     let flipbooks = await client.listFlipbooks(ctx.input.search, ctx.input.tags);
 
-    let mapped = (Array.isArray(flipbooks) ? flipbooks : []).map(fb => ({
+    let mapped = flipbooks.map(fb => ({
       flipbookId: fb.id,
-      title: fb.title || '',
-      subtitle: fb.subtitle || '',
-      description: fb.description || '',
-      url: fb.url || '',
-      thumbnailUrl: fb.thumbnail || '',
-      pdfUrl: fb.pdf || '',
-      pages: fb.pages || 0,
-      tags: fb.tags || '',
-      created: fb.created || ''
+      title: fb.title,
+      subtitle: fb.subtitle,
+      description: fb.description,
+      url: fb.links.base,
+      thumbnailUrl: fb.links.thumbnail,
+      pdfUrl: fb.links.pdf,
+      pages: fb.pages,
+      tags: fb.tags,
+      created: fb.date
     }));
 
     return {

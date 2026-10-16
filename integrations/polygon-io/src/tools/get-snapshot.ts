@@ -1,9 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseObject, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let snapshotResultSchema = z.object({
+  error: z.string().optional().describe('Provider error for this ticker, if returned'),
+  message: z.string().optional().describe('Provider message for this ticker'),
+  marketStatus: z.string().optional().describe('Trading status for this asset'),
   ticker: z.string().optional().describe('Ticker symbol'),
   name: z.string().optional().describe('Name of the asset'),
   type: z.string().optional().describe('Asset type'),
@@ -51,14 +55,17 @@ let snapshotResultSchema = z.object({
     .optional()
     .describe('Previous day aggregate data'),
   changePercent: z.number().optional().describe('Percent change from previous close'),
-  updated: z.number().optional().describe('Last updated timestamp (nanoseconds)'),
+  updated: z
+    .number()
+    .optional()
+    .describe('Provider update timestamp; units vary by asset endpoint'),
   value: z.number().optional().describe('Current value (for indices)')
 });
 
 export let getSnapshot = SlateTool.create(spec, {
   name: 'Get Snapshot',
   key: 'get_snapshot',
-  description: `Get a unified real-time snapshot of current market data for one or more tickers. Includes last trade, last quote, day OHLCV, previous day data, and percent change. Supports stocks, options, forex, crypto, and indices.
+  description: `Get a current snapshot of market data for one or more tickers. Includes last trade, last quote, day OHLCV, previous day data, and percent change. Supports stocks, options, forex, crypto, and indices; freshness and available fields depend on the subscription. Multiple tickers use one request per symbol.
 Use this to quickly check current prices and daily statistics without fetching historical data.`,
   instructions: [
     'Provide one or more ticker symbols to get their current snapshot.',
@@ -83,142 +90,143 @@ Use this to quickly check current prices and daily statistics without fetching h
   )
   .output(
     z.object({
-      snapshots: z.array(snapshotResultSchema).describe('Array of ticker snapshots'),
-      count: z.number().describe('Number of snapshots returned')
+      snapshots: z
+        .array(snapshotResultSchema)
+        .optional()
+        .describe('Array of ticker snapshots'),
+      count: z.number().optional().describe('Number of snapshots returned')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let rawSnapshots: any[] = [];
-
+    if (ctx.input.direction && ctx.input.tickers?.length)
+      throw createApiServiceError(
+        'Choose ticker symbols or gainers/losers, rather than both.'
+      );
+    let rawSnapshots: Record<string, any>[] | undefined;
     if (ctx.input.direction) {
       let data = await client.getGainersLosers(ctx.input.direction, {
         includeOtc: ctx.input.includeOtc
       });
-      rawSnapshots = data.tickers || [];
-    } else if (ctx.input.tickers && ctx.input.tickers.length === 1) {
-      let ticker = ctx.input.tickers[0]!;
-
-      if (ticker.startsWith('I:')) {
-        let data = await client.getIndicesSnapshot({ tickerAnyOf: [ticker] });
-        rawSnapshots = data.results || [];
-      } else if (ticker.startsWith('X:')) {
-        let data = await client.getCryptoSnapshot(ticker);
-        rawSnapshots = data.ticker ? [data.ticker] : [];
-      } else if (ticker.startsWith('C:')) {
-        let data = await client.getForexSnapshot(ticker);
-        rawSnapshots = data.ticker ? [data.ticker] : [];
-      } else {
-        let data = await client.getTickerSnapshot(ticker);
-        rawSnapshots = data.ticker ? [data.ticker] : [];
-      }
-    } else if (ctx.input.tickers && ctx.input.tickers.length > 1) {
-      let hasIndices = ctx.input.tickers.some(t => t.startsWith('I:'));
-      if (hasIndices) {
-        let data = await client.getUniversalSnapshot({ tickerAnyOf: ctx.input.tickers });
-        rawSnapshots = data.results || [];
-      } else {
-        let data = await client.getAllTickersSnapshot({
-          tickers: ctx.input.tickers,
-          includeOtc: ctx.input.includeOtc
-        });
-        rawSnapshots = data.tickers || [];
+      rawSnapshots = responseRows(data.tickers, 'snapshots');
+    } else if (ctx.input.tickers?.length) {
+      for (let ticker of ctx.input.tickers) {
+        let rows: Record<string, any>[] | undefined;
+        if (ticker.startsWith('I:')) {
+          let data = await client.getIndicesSnapshot({ tickerAnyOf: [ticker] });
+          rows = responseRows(data.results, 'index snapshots');
+        } else if (ticker.startsWith('O:')) {
+          let data = await client.getUniversalSnapshot({ tickerAnyOf: [ticker] });
+          rows = responseRows(data.results, 'option snapshots');
+        } else {
+          let data = ticker.startsWith('X:')
+            ? await client.getCryptoSnapshot(ticker)
+            : ticker.startsWith('C:')
+              ? await client.getForexSnapshot(ticker)
+              : await client.getTickerSnapshot(ticker);
+          rows = data.ticker == null ? undefined : [responseObject(data.ticker, 'snapshot')];
+        }
+        if (rows) rawSnapshots = [...(rawSnapshots ?? []), ...rows];
       }
     } else {
-      let data = await client.getAllTickersSnapshot({
-        includeOtc: ctx.input.includeOtc
-      });
-      rawSnapshots = data.tickers || [];
+      let data = await client.getAllTickersSnapshot({ includeOtc: ctx.input.includeOtc });
+      rawSnapshots = responseRows(data.tickers, 'snapshots');
     }
 
-    let snapshots = rawSnapshots.map((s: any) => ({
-      ticker: s.ticker,
-      name: s.name,
-      type: s.type,
-      market: s.market,
+    let snapshots = rawSnapshots?.map((s: any) => ({
+      error: s.error ?? undefined,
+      message: s.message ?? undefined,
+      marketStatus: s.market_status ?? undefined,
+      ticker: s.ticker ?? undefined,
+      name: s.name ?? undefined,
+      type: s.type ?? undefined,
+      market: s.market ?? undefined,
       lastTrade: s.lastTrade
         ? {
-            price: s.lastTrade.p,
-            size: s.lastTrade.s,
-            timestamp: s.lastTrade.t,
-            conditions: s.lastTrade.c,
-            exchange: s.lastTrade.x
+            price: s.lastTrade.p ?? undefined,
+            size: s.lastTrade.s ?? undefined,
+            timestamp: s.lastTrade.t ?? undefined,
+            conditions: s.lastTrade.c ?? undefined,
+            exchange: s.lastTrade.x ?? undefined
           }
         : s.last_trade
           ? {
-              price: s.last_trade.price,
-              size: s.last_trade.size,
-              timestamp: s.last_trade.sip_timestamp || s.last_trade.timestamp
+              price: s.last_trade.price ?? undefined,
+              size: s.last_trade.size ?? undefined,
+              conditions: s.last_trade.conditions ?? undefined,
+              exchange: s.last_trade.exchange ?? undefined,
+              timestamp: s.last_trade.sip_timestamp ?? s.last_trade.last_updated ?? undefined
             }
           : undefined,
       lastQuote: s.lastQuote
         ? {
-            bidPrice: s.lastQuote.P || s.lastQuote.p,
-            bidSize: s.lastQuote.S || s.lastQuote.s,
-            askPrice: s.lastQuote.p,
-            askSize: s.lastQuote.s,
-            timestamp: s.lastQuote.t
+            bidPrice: s.lastQuote.p ?? s.lastQuote.b ?? undefined,
+            bidSize: s.lastQuote.s ?? undefined,
+            askPrice: s.lastQuote.P ?? s.lastQuote.a ?? undefined,
+            askSize: s.lastQuote.S ?? undefined,
+            timestamp: s.lastQuote.t ?? undefined
           }
         : s.last_quote
           ? {
-              bidPrice: s.last_quote.bid_price,
-              bidSize: s.last_quote.bid_size,
-              askPrice: s.last_quote.ask_price,
-              askSize: s.last_quote.ask_size,
-              timestamp: s.last_quote.sip_timestamp || s.last_quote.timestamp
+              bidPrice: s.last_quote.bid ?? undefined,
+              bidSize: s.last_quote.bid_size ?? undefined,
+              askPrice: s.last_quote.ask ?? undefined,
+              askSize: s.last_quote.ask_size ?? undefined,
+              timestamp: s.last_quote.last_updated ?? undefined
             }
           : undefined,
       day: s.day
         ? {
-            open: s.day.o,
-            high: s.day.h,
-            low: s.day.l,
-            close: s.day.c,
-            volume: s.day.v,
-            volumeWeighted: s.day.vw
+            open: s.day.o ?? undefined,
+            high: s.day.h ?? undefined,
+            low: s.day.l ?? undefined,
+            close: s.day.c ?? undefined,
+            volume: s.day.v ?? undefined,
+            volumeWeighted: s.day.vw ?? undefined
           }
         : s.session
           ? {
-              open: s.session.open,
-              high: s.session.high,
-              low: s.session.low,
-              close: s.session.close,
-              volume: s.session.volume
+              open: s.session.open ?? undefined,
+              high: s.session.high ?? undefined,
+              low: s.session.low ?? undefined,
+              close: s.session.close ?? undefined,
+              volume: s.session.volume ?? undefined,
+              volumeWeighted: s.session.vwap ?? undefined
             }
           : undefined,
       previousDay: s.prevDay
         ? {
-            open: s.prevDay.o,
-            high: s.prevDay.h,
-            low: s.prevDay.l,
-            close: s.prevDay.c,
-            volume: s.prevDay.v,
-            volumeWeighted: s.prevDay.vw
+            open: s.prevDay.o ?? undefined,
+            high: s.prevDay.h ?? undefined,
+            low: s.prevDay.l ?? undefined,
+            close: s.prevDay.c ?? undefined,
+            volume: s.prevDay.v ?? undefined,
+            volumeWeighted: s.prevDay.vw ?? undefined
           }
         : s.prev_day
           ? {
-              open: s.prev_day.o,
-              high: s.prev_day.h,
-              low: s.prev_day.l,
-              close: s.prev_day.c,
-              volume: s.prev_day.v,
-              volumeWeighted: s.prev_day.vw
+              open: s.prev_day.o ?? undefined,
+              high: s.prev_day.h ?? undefined,
+              low: s.prev_day.l ?? undefined,
+              close: s.prev_day.c ?? undefined,
+              volume: s.prev_day.v ?? undefined,
+              volumeWeighted: s.prev_day.vw ?? undefined
             }
           : undefined,
-      changePercent: s.todaysChangePerc ?? s.change_percent,
-      updated: s.updated,
-      value: s.value
+      changePercent: s.todaysChangePerc ?? s.session?.change_percent ?? undefined,
+      updated: s.updated ?? s.last_updated ?? s.session?.last_updated ?? undefined,
+      value: s.value ?? undefined
     }));
 
     return {
       output: {
         snapshots,
-        count: snapshots.length
+        count: snapshots?.length ?? undefined
       },
       message: ctx.input.direction
-        ? `Retrieved **${snapshots.length}** top ${ctx.input.direction}.`
-        : `Retrieved snapshots for **${snapshots.length}** ticker(s).`
+        ? `Retrieved **${snapshots?.length ?? 0}** top ${ctx.input.direction}.`
+        : `Retrieved snapshots for **${snapshots?.length ?? 0}** ticker(s).`
     };
   })
   .build();

@@ -1,85 +1,55 @@
-# Slates Specification for DaData.ru
+# DaData.ru operation reference
 
-## Overview
+## Authentication and API products
 
-DaData.ru is a Russian SaaS platform for standardization, validation, enrichment, and autocomplete of contact and business data. It specializes in the normalization and enrichment of contact data, including postal addresses, phone numbers, and customer names. It leverages national databases like KLADR and FIAS to ensure customer information is accurate, deduplicated, and thoroughly validated.
+The API key is sent as `Authorization: Token <API_KEY>`. Standardization, Company by Email, and account requests also send `X-Secret: <SECRET_KEY>`. Obtain both keys from the [DaData profile](https://dadata.ru/profile/). The original API Key & Secret Key connection remains available; the API Key (Suggestions Only) connection supports Suggestions operations. Missing credentials produce an actionable error before the request.
 
-## Authentication
+The integration uses these official API families:
 
-DaData.ru uses API keys for authentication. Two credentials are required:
+- **Suggestions**: `https://suggestions.dadata.ru/suggestions/api/4_1/rs`; autocomplete, identifier lookups, reference directories, and geolocation.
+- **Standardization**: `https://cleaner.dadata.ru/api/v1`; contact-data cleaning and address geocoding.
+- **Company by Email**: the Suggestions host, but a separately billed enrichment service requiring a secret key.
+- **Profile utilities**: `https://dadata.ru/api/v2`; cross-product account balance, daily usage, and reference-data versions.
 
-- **API Key**: Used for all API requests. Passed in the `Authorization` header as `Token <API_KEY>`.
-- **Secret Key**: Required for certain API methods (specifically the Cleaner/Standardization API and Profile API). Passed in the `X-Secret` header.
+The [API catalog](https://dadata.ru/api/) and [daily statistics documentation](https://dadata.ru/api/stat/) distinguish the service families. Profile endpoints return operational account data; the published [Profile OpenAPI](https://dadata.ru/files/openapi/profile.yml) has no current-user identity endpoint.
 
-The secret key is automatically generated along with the API key, and it's available in the Account page at `https://dadata.ru/profile/`.
+## Operations
 
-The API uses three base URLs depending on the type of operation:
+| Tool | Provider operation | Reference |
+| --- | --- | --- |
+| `suggest_address` | POST `/suggest/address` | [Address suggestions](https://dadata.ru/api/suggest/address/) |
+| `clean_address`, `geocode_address` | POST Cleaner `/clean/address` with one raw string in an array | [Address standardization](https://dadata.ru/api/clean/address/) |
+| `suggest_company` | POST `/suggest/party` | [Company suggestions](https://dadata.ru/api/suggest/party/) |
+| `lookup_company` | POST `/findById/party` | [Company by INN/OGRN](https://dadata.ru/api/find-party/) |
+| `find_affiliated_companies` | POST `/findAffiliated/party` | [Affiliations](https://dadata.ru/api/find-affiliated/) |
+| `lookup_company_by_email` | POST `/findByEmail/company` | [Company by email](https://dadata.ru/api/find-company/by-email/) |
+| `suggest_bank`, `lookup_bank` | POST `/suggest/bank`, `/findById/bank` | [Bank lookup](https://dadata.ru/api/find-bank/) |
+| `clean_contact_data` | POST Cleaner `/clean/name`, `/clean/phone`, `/clean/email`, `/clean/passport`, `/clean/birthdate`, or `/clean/vehicle` | [Standardization](https://dadata.ru/api/clean/) |
+| `reverse_geocode` | POST `/geolocate/address` | [Reverse geocoding](https://dadata.ru/api/geolocate/) |
+| `ip_geolocate` | POST `/iplocate/address` | [IP geolocation](https://dadata.ru/api/iplocate/) |
+| `lookup_address` | POST `/findById/address` | [Address lookup](https://dadata.ru/api/find-address/) |
+| `search_reference_directory` | POST `/suggest/{directory}` or `/findById/{directory}` | [Reference directories](https://dadata.ru/api/) |
+| `get_account_info` | GET Profile `/profile/balance`, `/stat/daily`, `/version` | [Balance](https://dadata.ru/api/balance/), [statistics](https://dadata.ru/api/stat/), [versions](https://dadata.ru/api/version/) |
+| `suggest_name` | POST `/suggest/fio` | [Personal-name suggestions](https://dadata.ru/api/suggest/name/) |
+| `suggest_email` | POST `/suggest/email` | [Email suggestions](https://dadata.ru/api/suggest/email/) |
+| `find_nearby_postal_offices` | POST `/geolocate/postal_unit` | [Postal offices](https://dadata.ru/api/suggest/postal_unit/) |
 
-- `https://suggestions.dadata.ru` — for suggestions/autocomplete API
-- `https://cleaner.dadata.ru` — for standardization/cleaning API (requires both API Key and Secret Key)
-- `https://dadata.ru/api/v2/` — for profile operations (balance, stats, versions)
+Directory types are `fns_unit`, `fms_unit`, `postal_unit`, `metro`, `country`, `currency`, `okved2`, `okpd2`, `oktmo`, `fts_unit`, `court`, and `mktu`. Individual FMS and metro pages document autocomplete, while OKTMO documents direct-ID lookup. The generic API schema exposes both mode routes without directory-name restrictions, so existing mode selections remain available; provider acceptance of undocumented combinations has not been verified. Filters apply to autocomplete mode; direct-ID mode rejects filters rather than silently ignoring them.
 
-**Header examples:**
+## Request and response behavior
 
-- Suggestions API: `Authorization: Token <API_KEY>`
-- Cleaner API: `Authorization: Token <API_KEY>` and `X-Secret: <SECRET_KEY>`
+Existing tool keys and input schema types remain available. Optional address `division` selects administrative or municipal division. Company suggestions can filter main offices and branches; company lookup adds status filtering; bank lookup adds a result count.
 
-## Features
+Counts are checked at runtime as integers from 1 to 20, except company identifier lookup and affiliations, which support up to 300 results. Queries cannot exceed 300 characters. Coordinate ranges and positive radii are validated, and reverse-address geocoding enforces the documented 1000-meter radius limit. Old numeric inputs retain their original number schemas.
 
-### Data Standardization (Cleaning)
+Every tool exposes optional `rawData` containing the complete provider response. Selected account responses are keyed by `balance`, `stats`, and `versions`. Cleaning returns exactly the provider's single-item array in `rawData`; normalized fields use that item's values. Nullable provider display strings, original sources, and metro details are omitted from their convenience fields when unavailable while preserving their original types. Actual empty strings and zeroes are preserved, and the raw response retains nulls.
 
-Corrects errors, normalizes formatting, and enriches data from raw input strings. Supports cleaning of addresses, phone numbers, passport numbers, personal names, emails, birthdates, and vehicle identifiers. Returns structured, standardized fields along with quality codes indicating confidence. Requires both API Key and Secret Key. Primarily for Russian data.
+Company by Email uses the documented `suggestions` wrapper. Employee count and income are represented as strings in the existing public fields, including numeric provider values, and a suggestion without a company does not report a company match.
 
-### Address Suggestions and Autocomplete
+Provider errors retain HTTP status, code, and message details, including responses normalized by the HTTP SDK. No files or webhooks are produced by these operations. Provider subscriptions, daily quotas, and per-operation billing still apply.
 
-Helps users quickly enter a correct address on a web form or in an application. Provides type-ahead suggestions as the user types. Results can be constrained by region (using KLADR/FIAS codes), by geographic coordinates and radius, or boosted for specific cities. Supports Russian and English language output. Suggestions can be bounded to specific granularity levels: region, area, city, settlement, street, or house.
+## Official schemas
 
-### Geocoding and Reverse Geocoding
-
-Determines coordinates from an address string, and also returns postal code and all other address data. Returns all information about an address by coordinates (reverse geocoding).
-
-### IP-based Geolocation
-
-Detects the user's address/location by IP address. If no IP is provided, it can attempt detection from the `X-Forwarded-For` header.
-
-### Company and Organization Lookup
-
-Finds a company or individual entrepreneur by INN, KPP, or OGRN, and returns company details, founders, executives, tax office information, pension fund, social insurance, financials, licenses, SME registry data, and more. Supports autocomplete suggestions for organizations. Finds organizations by the INN of their founders and executives, for both individuals and legal entities. Also supports finding affiliated companies by INN.
-
-### Company Identification by Email
-
-Extracts details about the organization that owns a corporate email address. Returns company name, INN, and other details based on the email domain.
-
-### Bank Lookup
-
-Finds a bank by BIK, SWIFT, INN, INN+KPP (for branches), or Bank of Russia registration number. Returns bank details, correspondent account, address, and status (active or in liquidation).
-
-### Reference Directory Search (Outward API)
-
-Provides search and lookup across various Russian government and reference directories, including:
-
-- Federal Tax Service (FNS) units
-- Federal Migration Service (FMS) units
-- Postal offices
-- Metro stations
-- Countries
-- OKVED (economic activity codes)
-- Delivery service city identifiers
-
-Requires only the API Key (no Secret Key needed).
-
-### Company Directories for Belarus and Kazakhstan
-
-Provides a directory of organizations and individual entrepreneurs for Belarus and Kazakhstan.
-
-### Data Anonymization
-
-Anonymizes customer databases for use in testing, analytics, and machine learning models by replacing real personal data with realistic but fake data.
-
-### Account Management
-
-Allows retrieving the current account balance, daily usage statistics, and data freshness versions for all reference directories used by the service.
-
-## Events
-
-The provider does not support events. DaData.ru is a stateless data enrichment and standardization service with no webhook or event subscription mechanism.
+- [Suggestions OpenAPI](https://dadata.ru/files/openapi/suggestions.yml)
+- [Cleaner OpenAPI](https://dadata.ru/files/openapi/cleaner.yml)
+- [Profile OpenAPI](https://dadata.ru/files/openapi/profile.yml)

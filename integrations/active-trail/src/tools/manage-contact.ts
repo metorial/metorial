@@ -1,6 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import {
+  ActiveTrailClient,
+  readId,
+  readList,
+  redactProviderData,
+  requireContactAddress,
+  toContactStatus,
+  toCustomerState
+} from '../lib/client';
 import { spec } from '../spec';
 
 let contactSchema = z
@@ -59,13 +67,13 @@ let mapContactToApi = (input: Record<string, any>) => {
   if (input.zipCode !== undefined) data.zip_code = input.zipCode;
   if (input.birthday !== undefined) data.birthday = input.birthday;
   if (input.anniversary !== undefined) data.anniversary = input.anniversary;
-  if (input.status !== undefined) data.status = input.status;
-  if (input.smsStatus !== undefined) data.sms_status = input.smsStatus;
+  if (input.status !== undefined) data.status = toContactStatus(input.status);
+  if (input.smsStatus !== undefined) data.sms_status = toContactStatus(input.smsStatus);
   return data;
 };
 
 let mapContactFromApi = (raw: any) => ({
-  contactId: raw.id,
+  contactId: readId(raw),
   email: raw.email,
   sms: raw.sms,
   firstName: raw.first_name,
@@ -77,7 +85,7 @@ let mapContactFromApi = (raw: any) => ({
   zipCode: raw.zip_code,
   birthday: raw.birthday,
   anniversary: raw.anniversary,
-  status: raw.status,
+  status: Object.hasOwn(raw, 'state') ? raw.state : raw.status,
   isDeleted: raw.is_deleted
 });
 
@@ -91,12 +99,16 @@ export let createContact = SlateTool.create(spec, {
   .output(contactOutputSchema)
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    requireContactAddress(ctx.input);
     let apiData = mapContactToApi(ctx.input);
     let result = await client.createContact(apiData);
-    return {
-      output: mapContactFromApi(result),
-      message: `Contact created with ID **${result.id}** (${result.email || result.sms}).`
-    };
+    return redactProviderData(
+      {
+        output: mapContactFromApi(result),
+        message: `Contact created with ID **${result.id}** (${result.email || result.sms}).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -117,10 +129,13 @@ export let updateContact = SlateTool.create(spec, {
     let client = new ActiveTrailClient(ctx.auth.token);
     let apiData = mapContactToApi(ctx.input.fields);
     let result = await client.updateContact(ctx.input.contactId, apiData);
-    return {
-      output: mapContactFromApi(result),
-      message: `Contact **${ctx.input.contactId}** updated.`
-    };
+    return redactProviderData(
+      {
+        output: mapContactFromApi(result),
+        message: `Contact **${ctx.input.contactId}** updated.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -143,10 +158,13 @@ export let deleteContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteContact(ctx.input.contactId);
-    return {
-      output: { success: true },
-      message: `Contact **${ctx.input.contactId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Contact **${ctx.input.contactId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -190,10 +208,13 @@ export let getContact = SlateTool.create(spec, {
       output.activities = await client.getContactActivity(ctx.input.contactId);
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved contact **${ctx.input.contactId}** (${contact.email || contact.sms}).`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved contact **${ctx.input.contactId}** (${contact.email || contact.sms}).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -227,18 +248,21 @@ export let listContacts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.listContacts({
-      customerStates: ctx.input.status,
+      customerStates: toCustomerState(ctx.input.status),
       searchTerm: ctx.input.searchTerm,
       fromDate: ctx.input.fromDate,
       toDate: ctx.input.toDate,
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let contacts = Array.isArray(result) ? result : [];
-    return {
-      output: { contacts: contacts.map(mapContactFromApi) },
-      message: `Found **${contacts.length}** contact(s).`
-    };
+    let contacts = readList(result);
+    return redactProviderData(
+      {
+        output: { contacts: contacts.map(mapContactFromApi) },
+        message: `Found **${contacts.length}** contact(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -262,11 +286,17 @@ export let importContacts = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    if (!ctx.input.contacts.length || ctx.input.contacts.length > 1000)
+      throw createApiServiceError('Import between 1 and 1,000 contacts per call.');
+    ctx.input.contacts.forEach(requireContactAddress);
     let apiContacts = ctx.input.contacts.map(mapContactToApi);
     let result = await client.importContacts(ctx.input.groupId, apiContacts);
-    return {
-      output: { result },
-      message: `Imported **${ctx.input.contacts.length}** contact(s) into group **${ctx.input.groupId}**.`
-    };
+    return redactProviderData(
+      {
+        output: { result },
+        message: `Imported **${ctx.input.contacts.length}** contact(s) into group **${ctx.input.groupId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

@@ -1,91 +1,87 @@
-export interface FileUploadResponse {
-  error: string | null;
-  file_id: string;
-}
+import { z } from 'zod';
 
-export interface FileInfo {
-  preview: boolean;
-  size: number;
-  name: string;
-  previewData: string[];
-}
+let error = z.string().nullable();
+let file = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    size: z.number(),
+    exists: z.boolean()
+  })
+  .passthrough();
 
-export interface TaskCreateRequest {
-  type: string;
-  options: Record<string, unknown>;
-  callbackUrl?: string;
-}
+export let fileUploadSchema = z.object({ error, file_id: z.string().min(1) }).passthrough();
+export let fileInfoSchema = z
+  .object({
+    preview: z.boolean(),
+    size: z.number(),
+    name: z.string(),
+    previewData: z.array(z.string()).optional()
+  })
+  .passthrough();
+export let taskCreateSchema = z
+  .object({
+    error,
+    task_id: z.string().min(1),
+    sandbox: z.boolean().optional(),
+    message: z.string().optional()
+  })
+  .passthrough();
+export let taskStatusSchema = z
+  .object({
+    error,
+    status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'ERROR']),
+    file_id: z.string().nullable(),
+    conversionProgress: z.number()
+  })
+  .passthrough();
+export let taskDetailSchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    status: z.enum(['PENDING', 'RUNNING', 'SUCCESS', 'ERROR']),
+    error,
+    url: z.string().nullable(),
+    dateCreated: z.string(),
+    dateFinished: z.string().nullable(),
+    conversionProgress: z.number(),
+    fileSource: file.optional(),
+    fileResult: file.nullable().optional(),
+    retentionMode: z.string(),
+    cleanupStatus: z.string(),
+    dateDeleted: z.string().nullable(),
+    dateExpires: z.string().nullable()
+  })
+  .passthrough();
+export let taskListSchema = z.object({ error, data: z.array(taskDetailSchema) }).passthrough();
+export let taskRetentionSchema = z
+  .object({
+    error,
+    retentionMode: z.string(),
+    dateExpires: z.string()
+  })
+  .passthrough();
+export let taskDeleteSchema = z
+  .object({
+    error,
+    message: z.string(),
+    dateDeleted: z.string()
+  })
+  .passthrough();
+export let configSchema = z
+  .object({
+    error,
+    conversions: z.array(
+      z
+        .object({
+          type: z.string(),
+          title: z.string(),
+          options: z.array(z.union([z.record(z.string(), z.unknown()), z.string()]))
+        })
+        .passthrough()
+    )
+  })
+  .passthrough();
+export let authSchema = z.object({ error, email: z.string().min(1) }).passthrough();
 
-export interface TaskCreateResponse {
-  error: string | null;
-  task_id: string;
-  sandbox?: boolean;
-  message?: string;
-}
-
-export interface TaskStatus {
-  error: string | null;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'ERROR';
-  file_id: string | null;
-  conversionProgress: number;
-}
-
-export interface TaskDetail {
-  id: string;
-  type: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'ERROR';
-  error: string | null;
-  url: string | null;
-  dateCreated: string;
-  dateFinished: string | null;
-  conversionProgress: number;
-  fileSource: {
-    id: string;
-    name: string;
-    size: number;
-    exists: boolean;
-  };
-  fileResult: {
-    id: string;
-    name: string;
-    size: number;
-    exists: boolean;
-  } | null;
-  retentionMode: string;
-  cleanupStatus: string;
-  dateDeleted: string | null;
-  dateExpires: string | null;
-}
-
-export interface TaskListResponse {
-  error: string | null;
-  data: TaskDetail[];
-}
-
-export interface TaskRetentionResponse {
-  error: string | null;
-  retentionMode: string;
-  dateExpires: string;
-}
-
-export interface TaskDeleteResponse {
-  error: string | null;
-  message: string;
-  dateDeleted: string;
-}
-
-export interface ConversionOption {
-  type: string;
-  title: string;
-  options: Record<string, unknown>[];
-}
-
-export interface ConfigResponse {
-  error: string | null;
-  conversions: ConversionOption[];
-}
-
-export interface AuthResponse {
-  error: string | null;
-  email: string;
-}
+export type TaskStatus = z.infer<typeof taskStatusSchema>;

@@ -24,6 +24,7 @@ export let updateProposal = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       proposalId: z.string(),
       title: z.string(),
       accountId: z.number(),
@@ -39,7 +40,7 @@ export let updateProposal = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let { proposalId, ...updateData } = ctx.input;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.updateProposal(proposalId, updateData);
 
     return {

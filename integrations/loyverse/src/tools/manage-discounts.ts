@@ -1,6 +1,6 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
@@ -65,6 +65,26 @@ export let listDiscounts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      discountIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return discounts with these IDs'),
+      createdAtMin: z
+        .string()
+        .optional()
+        .describe('Only return discounts created at or after this ISO 8601 UTC timestamp'),
+      createdAtMax: z
+        .string()
+        .optional()
+        .describe('Only return discounts created at or before this ISO 8601 UTC timestamp'),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return discounts updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe('Only return discounts updated at or before this ISO 8601 UTC timestamp'),
       limit: z.number().min(1).max(250).optional().describe('Number of discounts to return'),
       cursor: z.string().optional().describe('Pagination cursor'),
       showDeleted: z.boolean().optional().describe('Include deleted discounts')
@@ -79,6 +99,11 @@ export let listDiscounts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listDiscounts({
+      discountIds: joinIds(ctx.input.discountIds),
+      createdAtMin: ctx.input.createdAtMin,
+      createdAtMax: ctx.input.createdAtMax,
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted
@@ -185,11 +210,17 @@ export let createOrUpdateDiscount = SlateTool.create(spec, {
       }
     }
 
+    if (type === 'FIXED_PERCENT') {
+      requireForCreate(body.discount_percent, 'discountValue', 'fixed percentage discount');
+    } else if (type === 'FIXED_AMOUNT') {
+      requireForCreate(body.discount_amount, 'discountValue', 'fixed amount discount');
+    }
+
     let result = await client.createOrUpdateDiscount(body);
 
     return {
       output: mapDiscount(result),
-      message: `${isUpdate ? 'Updated' : 'Created'} discount **${result.name}**.`
+      message: `${isUpdate ? 'Updated' : 'Created'} discount **${result.name ?? result.id}**.`
     };
   })
   .build();

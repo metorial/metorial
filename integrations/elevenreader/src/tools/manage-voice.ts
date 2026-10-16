@@ -13,7 +13,9 @@ export let editVoiceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      voiceId: z.string().describe('ID of the voice to edit'),
+      voiceId: z
+        .string()
+        .describe('Voice ID to edit. Call list_voices to discover available voices.'),
       name: z.string().describe('New display name for the voice'),
       description: z.string().optional().describe('New description for the voice'),
       labels: z
@@ -24,20 +26,21 @@ export let editVoiceTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the update was successful')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ElevenLabsClient(ctx.auth.token);
 
-    await client.editVoice(ctx.input.voiceId, {
+    let result = await client.editVoice(ctx.input.voiceId, {
       name: ctx.input.name,
       description: ctx.input.description,
       labels: ctx.input.labels
     });
 
     return {
-      output: { success: true },
+      output: { success: true, raw: result.raw },
       message: `Updated voice \`${ctx.input.voiceId}\` with name **${ctx.input.name}**.`
     };
   })
@@ -53,21 +56,24 @@ export let deleteVoiceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      voiceId: z.string().describe('ID of the voice to delete')
+      voiceId: z
+        .string()
+        .describe('Voice ID to delete. Call list_voices to discover available voices.')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the deletion was successful')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ElevenLabsClient(ctx.auth.token);
 
-    await client.deleteVoice(ctx.input.voiceId);
+    let result = await client.deleteVoice(ctx.input.voiceId);
 
     return {
-      output: { success: true },
+      output: { success: true, raw: result.raw },
       message: `Deleted voice \`${ctx.input.voiceId}\`.`
     };
   })

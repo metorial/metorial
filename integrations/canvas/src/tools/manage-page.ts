@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let managePageTool = SlateTool.create(spec, {
@@ -36,6 +36,7 @@ export let managePageTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       pageUrl: z.string().describe('Page URL slug'),
       title: z.string().describe('Page title'),
       published: z.boolean().optional().describe('Whether published'),
@@ -46,17 +47,17 @@ export let managePageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
+    if (ctx.input.action === 'create' && !ctx.input.title?.trim()) {
+      throw createApiServiceError('title is required when creating a page.');
+    }
     let pageData: Record<string, any> = {};
-    if (ctx.input.title) pageData.title = ctx.input.title;
-    if (ctx.input.body) pageData.body = ctx.input.body;
+    if (ctx.input.title !== undefined) pageData.title = ctx.input.title;
+    if (ctx.input.body !== undefined) pageData.body = ctx.input.body;
     if (ctx.input.published !== undefined) pageData.published = ctx.input.published;
     if (ctx.input.frontPage !== undefined) pageData.front_page = ctx.input.frontPage;
-    if (ctx.input.editingRoles) pageData.editing_roles = ctx.input.editingRoles;
+    if (ctx.input.editingRoles !== undefined) pageData.editing_roles = ctx.input.editingRoles;
     if (ctx.input.notifyOfUpdate !== undefined)
       pageData.notify_of_update = ctx.input.notifyOfUpdate;
 
@@ -67,17 +68,18 @@ export let managePageTool = SlateTool.create(spec, {
       result = await client.createPage(ctx.input.courseId, pageData);
       actionDesc = 'Created';
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.pageUrl) throw new Error('pageUrl is required for update');
+      if (!ctx.input.pageUrl) throw createApiServiceError('pageUrl is required for update');
       result = await client.updatePage(ctx.input.courseId, ctx.input.pageUrl, pageData);
       actionDesc = 'Updated';
     } else {
-      if (!ctx.input.pageUrl) throw new Error('pageUrl is required for delete');
+      if (!ctx.input.pageUrl) throw createApiServiceError('pageUrl is required for delete');
       result = await client.deletePage(ctx.input.courseId, ctx.input.pageUrl);
       actionDesc = 'Deleted';
     }
 
     return {
       output: {
+        raw: result,
         pageUrl: result.url,
         title: result.title,
         published: result.published,

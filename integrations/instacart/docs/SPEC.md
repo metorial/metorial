@@ -1,170 +1,47 @@
-Now I have enough information to compile the specification. Let me also fetch the permissions/scopes page to get details on available scopes.# Slates Specification for Instacart
+# Instacart API coverage
 
-## Overview
+This integration exposes the Developer Platform and Connect as separate tool categories with different credentials.
 
-Instacart is a grocery delivery and pickup platform that connects customers with personal shoppers who pick and deliver items from local retailers. It offers two distinct API suites: the **Instacart Developer Platform (IDP)** for app developers to create shoppable recipe and shopping list experiences, and **Instacart Connect** for retailer partners to integrate fulfillment, advertising, transaction, and post-checkout capabilities into their e-commerce sites. The Developer Platform API is built for app developers, while Connect APIs are built for retailer partners who want to add Instacart fulfillment capabilities to their e-commerce sites.
+## Developer Platform
 
-## Authentication
+[Developer Platform](https://docs.instacart.com/developer_platform_api/api/overview/) uses an API key as an Authorization bearer token. The environment selects `https://connect.instacart.com` or `https://connect.dev.instacart.tools`.
 
-Instacart uses two different authentication methods depending on which API suite is being used:
+| Tool | Operation |
+| --- | --- |
+| `create_recipe_page` | `POST /idp/v1/products/recipe` |
+| `create_shopping_list_page` | `POST /idp/v1/products/products_link` |
+| `get_nearby_retailers` | `GET /idp/v1/retailers` |
 
-### Instacart Developer Platform (IDP) — API Key Authentication
+Page tools return the actual hosted page URL and complete provider response. These URLs are shopping pages, not file downloads. Reuse generated links until their contents change. Link expiration comes from the requested/provider policy; no expiration timestamp is fabricated.
 
-API keys are used to authenticate requests to the Instacart Developer Platform. Keys are created via the Instacart Developer Dashboard and passed as a Bearer token in the `Authorization` header.
+The [recipe reference](https://docs.instacart.com/developer_platform_api/api/products/create_recipe_page/) documents ingredient measurements, brand and health filters, creator credit, and optional page settings. Legacy brand names map to `brand_filters`; legacy health attributes map to `health_filters`. New filter arrays take precedence when supplied. Values remain unmodified, including case. Product IDs and UPCs are mutually exclusive according to the API.
 
-- API keys can be configured with different permission levels: Read-only (retrieve data only), Read-write (full access to create, read, update resources), and Admin (full access including sensitive operations).
-- Keys can be designated for Development or Production environments.
-- Development server: `https://connect.dev.instacart.tools`
-- Production server: `https://connect.instacart.com`
-- Example header: `Authorization: Bearer <API-key>`
+The [shopping-list reference](https://docs.instacart.com/developer_platform_api/api/products/create_shopping_list_page/) recommends `line_item_measurements`. The original quantity and unit inputs remain available. The [retailer reference](https://docs.instacart.com/developer_platform_api/api/retailers/get_nearby_retailers/) permits omitted retailer keys, names, and logo URLs; returned values are preserved when present.
 
-### Instacart Connect — OAuth 2.0 (Client Credentials)
+## Connect fulfillment
 
-The Connect APIs use OAuth 2.0 to authenticate requests and authorize access to resources. Each OAuth application has a set of credentials (client ID and secret) that authenticate users and define permissions. You exchange these credentials for a bearer token and then present that token in Connect API requests.
+[Connect](https://docs.instacart.com/connect/) is for retailer fulfillment. [Client credentials](https://docs.instacart.com/connect/api/access_tokens/) are exchanged with `POST /v2/oauth/token`. Access-token expiration uses the returned `expires_in`; renewal repeats the client-credentials grant with the saved scopes and server. No refresh-token grant is assumed. API keys do not use this renewal flow.
 
-**Token endpoint:** `POST https://connect.instacart.com/v2/oauth/token`
+The optional authentication server overrides tool environment routing. Without it, legacy token exchange remains on the production server and tool requests retain their environment fallback. [Permissions](https://docs.instacart.com/connect/api/permissions_scopes/) associate fulfillment with `connect:fulfillment`. Post-checkout and account linking use other grant types and are not exposed by these credentials.
 
-**Request body parameters:**
+| Tools | API resources |
+| --- | --- |
+| `create_user`, `get_connect_user` | User address validation and lookup |
+| `find_stores` | Delivery, pickup, and last-mile stores |
+| `preview_service_options`, `list_cart_service_options` | Preview or completed-cart time slots |
+| `reserve_time_slot` | Current ID or desired-window-reference reservation |
+| `reserve_service_option` | Legacy cart-validation reservation |
+| `create_order`, `get_order`, `cancel_order` | Delivery/pickup order creation and order retrieval/cancellation |
+| `sandbox_advance_order` | Sandbox shoppers, batches, and workflow progression |
 
-- `client_id` — Your client ID provided by Instacart
-- `client_secret` — Your client secret provided by Instacart
-- `grant_type` — Typically `client_credentials`; can also be `authorization_code` or `fulfillment_user_assertion` depending on the API
-- `scope` — The API scope to access (see below)
+The [fulfillment overview](https://docs.instacart.com/connect/api/fulfillment/overview/) describes these resources. Cart requests accept an optional delivery address and current `item` codes. Existing `productCodes` requests retain their original representation for compatibility. Runtime validation applies to new code-selection and reservation branches. Original optional inputs and falsy omission behavior remain available.
 
-The token is valid for 24 hours. During this period, reuse the same token. After 24 hours, you must generate a new token.
+Pickup previews accept `locationCode`, discovered with `find_stores` and `fulfillmentType: pickup`. The provider requires this store code; it remains optional in the tool for compatibility. Omitted or empty values retain the previous request behavior. Delivery previews ignore it.
 
-**Available scopes:**
+Service-option IDs are represented as strings for compatibility with existing tools; the complete numeric provider ID remains in raw data. Immediate windows can omit scheduled start/end timestamps. Store flags are read from `flags`; undocumented store address and phone values are returned only when provided. Complete responses retain coverage flags, warnings, item metadata, and monetary amounts without currency conversion or invented fees.
 
-- `connect:fulfillment` — Access stores, service options, orders, and order management
-- `connect:compliance` — Manage customer data in accordance with privacy laws
-- `connect:post_checkout` — Access order detail and status (uses `fulfillment_user_assertion` grant type)
-- `connect:ian` — Carrot Ads API for serving and tracking advertisements
-- `connect:data_ingestion` — Catalog data ingestion
-- `Connect::Orders::RatingService` — Order feedback
-- `account_linking` — Link Connect user accounts to Instacart accounts (uses `authorization_code` grant type)
+[Get order](https://docs.instacart.com/connect/api/fulfillment/delivery/get_order/) accepts a retailer-generated order ID. Omitting it invokes the [deprecated list endpoint](https://docs.instacart.com/connect/api/fulfillment/delivery/get_orders/). The legacy [cart reservation](https://docs.instacart.com/connect/api/fulfillment/delivery/create_service_option_hold_with_cart/) remains available; [current reservation](https://docs.instacart.com/connect/api/fulfillment/delivery/create_service_option_hold/) and [desired-window reservation](https://docs.instacart.com/connect/api/fulfillment/delivery/create_desired_window_hold/) are exposed through `reserve_time_slot`. The current tool returns the provider's nested hold ID and actual expiration. The deprecated `reserve_service_option` input/output schemas, handler, route interpolation, and client method are frozen exactly to the prior release, including its flat response-field mapping and empty-expiry fallback. Those legacy mappings are compatibility debt and are not evidence of the current API response. It also retains environment routing rather than the optional assigned authentication server. Use `reserve_time_slot` for current ID/reference reservations; it does not accept cart or address fields. Reservations replace the user's prior hold.
 
-You can specify more than one scope if the grant type is the same. Separate the scope values with a comma.
+The [sandbox API](https://docs.instacart.com/connect/api/sandbox/overview/) requires a development server. Batch creation sends an orders array and numeric shopper ID; progression returns `workflow_state`. Optional batch type selects delivery, pickup, last-mile, or pickup-runner workflows.
 
-## Features
-
-### Recipe & Shopping List Pages (Developer Platform)
-
-Create recipe pages complete with ingredient matching and shopping list generation. You provide recipe details (title, image, ingredients, instructions) and the API returns a hosted link on Instacart Marketplace where users can match ingredients to available products and add them to their cart. Generate smart shopping lists that map to available products at nearby retailers, with real-time inventory and pricing.
-
-- Users are redirected to Instacart to complete checkout.
-- Developers using the IDP Public API cannot access Instacart data but receive a link to an Instacart-hosted landing page.
-- Can filter by retailer using retailer keys obtained from the retailers API.
-
-### Retailer Discovery (Developer Platform)
-
-Look up nearby retailers available on Instacart Marketplace by postal code and country code. Useful for customizing recipe or shopping list pages to show products from a specific store.
-
-### Order Fulfillment (Connect — Retailers Only)
-
-The Fulfillment API brings together grocery, delivery, and pickup capabilities. Retailers can offer full-service shopping (where Instacart shoppers pick items and suggest replacements) and same-day or scheduled delivery and pickup options.
-
-- Manage user accounts for customers on the retailer's site.
-- Query available stores and service options (delivery time slots, pickup windows, ETAs).
-- Create, update, and cancel orders with item details.
-- Support for delivery, pickup, last mile delivery, and dispatch last mile delivery workflows.
-- When an order transitions to a new status, you can notify customers to keep them up to date.
-- Includes order feedback (ratings) collection.
-- Connect APIs (Fulfillment, Post-checkout, etc.) are for retailers only and not available to developer partners.
-
-### Post-Checkout Experience (Connect — Retailers Only)
-
-Offer customers an order status page where they can interact with shoppers and track their orders. Requires a user-scoped access token.
-
-### Transaction Reporting (Connect — Retailers Only)
-
-Send point of sale transaction information to Instacart. No specific scope is required; uses `client_credentials` grant type.
-
-### Carrot Ads (Connect — Retailers/Publishers)
-
-Serve banner ads and promotional content across your storefront, creating additional revenue streams. Features include:
-
-- Sponsored product ads that integrate into product grids.
-- Brand pages: create custom branded shopping experiences that showcase a brand's full product catalog and promotional content.
-- Performance tracking and analytics: monitor ad impressions, clicks, conversions, and revenue.
-- Requires a retailer ID and Connect user accounts for ad targeting.
-
-### Catalog Management (Connect — Retailers Only)
-
-Ingest and manage product catalog data into the Instacart platform. Authenticated with the `connect:data_ingestion` scope.
-
-### Compliance / Privacy (Connect — Retailers Only)
-
-Manage Storefront Pro customer data in accordance with privacy laws. Uses the `connect:compliance` scope.
-
-### Account Linking (Connect — Retailers Only)
-
-Link a customer's retailer-side Connect user account to their existing Instacart account. Uses the OAuth `authorization_code` grant type with the `account_linking` scope.
-
-### Sandbox / Testing (Connect — Retailers Only)
-
-Simulate order status changes and callbacks while testing your integration, both programmatically via the Sandbox API and through a UI-based testing center.
-
-## Events
-
-Instacart Connect can notify you of order status change events through callbacks (webhooks). To get notifications about specific events, you need to set up one or more webhooks. Webhooks are configured via a self-service configuration tool in the Instacart Developer Dashboard. To enable event callbacks, OAuth v2.0 must be enabled on the callback endpoint.
-
-Events are only available for the **Connect APIs** (retailer partners). The Developer Platform API does not support webhooks.
-
-### Order Lifecycle Events
-
-Notifications for key order state transitions across delivery, pickup, and last mile delivery workflows:
-
-- **Brand New** — Order successfully created in Instacart's system.
-- **Acknowledged** — Order acknowledged by a shopper.
-- **Picking** — Shopper begins fulfilling the order (delivery and pickup only).
-- **Checkout** — All picking for the order is completed (delivery and pickup only).
-- **Staged** — Order placed in the staging area after shopping is complete.
-- **Delivering** — Order has left the store and is en route (delivery and last mile only).
-- **Delivered** — Order successfully delivered or picked up.
-- **Rescheduled** — Order rescheduled to another time.
-- **Canceled** — Order canceled, with detailed cancellation reason and type.
-
-### Item-Level Events
-
-Real-time updates on individual item statuses during the picking process (delivery and pickup only):
-
-- **Item Found** — Shopper marks an item as found.
-- **Item Replaced** — Shopper substitutes an item with a replacement.
-- **Item Refunded** — Refund initiated on an item.
-- **Item Not Picked** — Item status moves from found to not found.
-- **Order Item Replacement** — Aggregated event when a shopper replaces an item (includes all order items).
-- **Order Item Refund** — Aggregated event when a shopper refunds an item (includes all order items).
-
-### Delivery Tracking Events
-
-Location and timing updates during the delivery phase (delivery and/or last mile only):
-
-- **Order Location** — Periodic shopper GPS coordinates during delivery. Frequency is configured per account.
-- **Late Delivery** / **Late Pickup** — Delivery or pickup time window has changed.
-- **Customer Missing** — Shopper cannot find the customer at the delivery address.
-- **At Store ETA** — Periodic shopper ETA updates to the store (last mile only, every 2 minutes).
-
-### Pickup-Specific Events
-
-Events specific to the pickup workflow:
-
-- **Customer Acknowledged** — Runner is collecting bags from staging.
-- **Pickup Runner Started** — Runner heading outside with bags.
-- **Unable to Find Customer** — Runner cannot locate the customer.
-- **Runner Not Found** — No pickup runner available; curbside transitions to in-store pickup.
-- **Pickup Geofence Reached** — Customer arrives at the store's virtual geofence.
-
-### Last Mile Delivery Events
-
-Events specific to last mile delivery workflows:
-
-- **At Store** — Shopper arrives at the store.
-- **Acknowledged for Delivery** — Shopper acknowledges the last mile order.
-- **Bags Verified** — Shopper verifies bags at the store.
-- **Arrival at Customer** — Shopper arrives at the customer's location.
-
-### Post-Delivery Events
-
-- **Tip Adjustment** — Tip updated after delivery completion (delivery and last mile only).
-- **Rating Updated** — Order rating created or updated.
-- **Rating Reminder** — Sent one hour after delivery if no rating has been assigned.
+Connect customer lookup retrieves the customer ID supplied by the retailer. Neither documented product exposes a suitable credential-owner self/profile endpoint, so this integration does not fabricate an identity tool. It registers no webhook triggers. No live orders, payments, or sandbox actions were executed for this refresh.

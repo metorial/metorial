@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,6 +39,10 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
         .describe(
           'Unique message ID for idempotent publishing. If not provided, Ably generates one.'
         ),
+      encoding: z
+        .string()
+        .optional()
+        .describe('Encoding applied to messageData, for example base64 for binary data'),
       extras: z
         .record(z.string(), z.any())
         .optional()
@@ -55,14 +59,18 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
                   name: z.string().optional(),
                   data: z.any().optional(),
                   clientId: z.string().optional(),
-                  id: z.string().optional()
+                  id: z.string().optional(),
+                  encoding: z.string().optional(),
+                  extras: z.record(z.string(), z.any()).optional()
                 }),
                 z.array(
                   z.object({
                     name: z.string().optional(),
                     data: z.any().optional(),
                     clientId: z.string().optional(),
-                    id: z.string().optional()
+                    id: z.string().optional(),
+                    encoding: z.string().optional(),
+                    extras: z.record(z.string(), z.any()).optional()
                   })
                 )
               ])
@@ -77,6 +85,7 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider publication result'),
       channel: z
         .string()
         .optional()
@@ -86,12 +95,14 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
     if (ctx.input.batch && ctx.input.batch.length > 0) {
       let batchSpecs = ctx.input.batch.map((spec, index) => {
         if (spec.channels === undefined || spec.messages === undefined) {
-          throw new Error(`batch[${index}] requires both "channels" and "messages".`);
+          throw createApiServiceError(
+            `batch[${index}] requires both "channels" and "messages".`
+          );
         }
         return {
           channels: spec.channels,
@@ -101,6 +112,7 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
       let results = await client.batchPublish(batchSpecs);
       return {
         output: {
+          raw: results,
           batchResults: results
         },
         message: `Batch published messages to ${ctx.input.batch.length} channel spec(s).`
@@ -108,7 +120,7 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
     }
 
     if (!ctx.input.channelId) {
-      throw new Error(
+      throw createApiServiceError(
         'channelId is required for single message publishing. Use batch array for batch publishing.'
       );
     }
@@ -118,11 +130,13 @@ Use batch mode by providing multiple channel-message pairs for efficient multi-c
       data: ctx.input.messageData,
       clientId: ctx.input.clientId,
       id: ctx.input.messageId,
-      extras: ctx.input.extras
+      extras: ctx.input.extras,
+      encoding: ctx.input.encoding
     });
 
     return {
       output: {
+        raw: result,
         channel: result.channel,
         messageId: result.messageId
       },

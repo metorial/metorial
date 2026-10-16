@@ -8,6 +8,7 @@ export let executePython = SlateTool.create(spec, {
   key: 'execute_python',
   description: `Executes custom Python code on the CustomJS platform and returns the result. Suitable for data analysis, API interactions, or any logic better suited to Python.`,
   instructions: [
+    'Legacy action: the current native API reference documents JavaScript only; Python availability depends on provider support.',
     'Write inline Python code that produces output.',
     'Access input data via the `input` variable.'
   ],
@@ -34,7 +35,7 @@ export let executePython = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ExecutionClient({ token: ctx.auth.token });
 
-    // Python execution uses the same execution endpoint with a wrapper
+    // Retain the legacy route; current public API docs do not specify Python execution.
     let result = await client.executeCode({
       code: ctx.input.code,
       input: ctx.input.input,

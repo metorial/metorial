@@ -20,6 +20,7 @@ export let getTaxonomies = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       taxonomies: z.array(taxonomySchema).describe('List of all taxonomies')
     })
   )
@@ -51,7 +52,7 @@ export let getTaxonomies = SlateTool.create(spec, {
     }
 
     return {
-      output: { taxonomies },
+      output: { raw: response, taxonomies },
       message: summaryParts.join('\n')
     };
   })

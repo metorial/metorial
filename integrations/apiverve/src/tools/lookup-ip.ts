@@ -18,6 +18,7 @@ export let lookupIp = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       ipAddress: z.string().describe('The queried IP address'),
       country: z.string().describe('Two-letter country code'),
       countryName: z.string().describe('Full country name'),
@@ -33,14 +34,11 @@ export let lookupIp = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.lookupIp(ctx.input.ipAddress);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'IP lookup failed');
-    }
-
     let data = result.data;
     let coords = data.coordinates ?? [];
 
     let output = {
+      rawData: data,
       ipAddress: data.ip,
       country: data.country,
       countryName: data.countryName,
@@ -55,8 +53,10 @@ export let lookupIp = SlateTool.create(spec, {
     let locationParts = [data.city, data.regionName, data.countryName].filter(Boolean);
 
     return {
-      output,
-      message: `IP \`${data.ip}\` is located in **${locationParts.join(', ')}** (${data.timezone}).`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `IP \`${data.ip}\` is located in **${locationParts.join(', ')}** (${data.timezone}).`
+      )
     };
   })
   .build();

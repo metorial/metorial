@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let textToSpeechTool = SlateTool.create(spec, {
   name: 'Text to Speech',
   key: 'text_to_speech',
-  description: `Convert text into lifelike audio using AI voices. Returns base64-encoded audio data. Supports multiple models (Flash, Turbo, Multilingual v2, v3), various output formats (MP3, PCM, opus, ulaw), and fine-grained voice settings for stability, similarity, style, and speed.`,
+  description: `DEPRECATED — use \`generate_speech\` instead. Convert text into lifelike audio using AI voices. Returns base64-encoded audio data. Supports multiple models (Flash, Turbo, Multilingual v2, v3), various output formats (MP3, PCM, opus, ulaw), and fine-grained voice settings for stability, similarity, style, and speed.`,
   instructions: [
+    'Use generate_speech for downloadable audio with metadata output.',
     'Use the "eleven_multilingual_v2" model for high-quality multilingual speech. Use "eleven_flash_v2_5" for low-latency real-time applications.',
     'Voice settings: stability (0-1), similarityBoost (0-1), style (0-1), speed (0.25-4.0).'
   ],
@@ -16,6 +17,7 @@ export let textToSpeechTool = SlateTool.create(spec, {
     'MP3 192kbps requires Creator tier+. PCM/WAV 44.1kHz require Pro tier+.'
   ],
   tags: {
+    deprecated: true,
     readOnly: false
   }
 })

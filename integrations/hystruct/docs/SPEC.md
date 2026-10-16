@@ -1,4 +1,4 @@
-# Slates Specification for Hystruct
+# Hystruct Integration Specification
 
 ## Overview
 

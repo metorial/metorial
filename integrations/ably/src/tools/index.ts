@@ -1,7 +1,9 @@
 export * from './get-channel-status';
+export * from './get-control-statistics';
 export * from './get-message-history';
 export * from './get-presence';
 export * from './get-presence-history';
+export * from './get-service-time';
 export * from './get-statistics';
 export * from './manage-apps';
 export * from './manage-keys';
@@ -11,3 +13,4 @@ export * from './manage-rules';
 export * from './publish-message';
 export * from './request-token';
 export * from './revoke-tokens';
+export * from './who-am-i';

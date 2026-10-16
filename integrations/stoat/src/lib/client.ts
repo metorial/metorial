@@ -1,7 +1,19 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export let toServiceError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Stoat',
+    reason: 'stoat_api_error',
+    detailKeys: ['type', 'msg', 'message', 'error', 'permission', 'with'],
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    extractUpstreamCode: (_error, response, helpers) =>
+      helpers.isRecord(response?.data) && typeof response.data.type === 'string'
+        ? response.data.type
+        : undefined
+  });
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(
     private config: {
@@ -10,17 +22,13 @@ export class Client {
       baseUrl: string;
     }
   ) {
-    this.http = createAxios({
-      baseURL: config.baseUrl
-    });
-
-    this.http.interceptors.request.use(reqConfig => {
-      if (config.authType === 'bot') {
-        reqConfig.headers['X-Bot-Token'] = config.token;
-      } else {
-        reqConfig.headers['X-Session-Token'] = config.token;
-      }
-      return reqConfig;
+    this.http = createAuthenticatedAxios({
+      baseURL: config.baseUrl,
+      authHeader: {
+        name: config.authType === 'bot' ? 'X-Bot-Token' : 'X-Session-Token',
+        value: config.token
+      },
+      errorAdapter: toServiceError
     });
   }
 
@@ -414,7 +422,7 @@ export class Client {
     return response.data;
   }
 
-  async setDefaultPermission(serverId: string, permissions: { allow: number; deny: number }) {
+  async setDefaultPermission(serverId: string, permissions: number) {
     let response = await this.http.put(`/servers/${serverId}/permissions/default`, {
       permissions
     });
@@ -450,8 +458,17 @@ export class Client {
       }> | null;
     }
   ) {
-    let http = createAxios({ baseURL: this.config.baseUrl });
-    let response = await http.post(`/webhooks/${webhookId}/${webhookToken}`, data);
+    let http = createAuthenticatedAxios({
+      baseURL: this.config.baseUrl,
+      errorAdapter: toServiceError
+    });
+    let response = await http.post(`/webhooks/${webhookId}/${webhookToken}`, {
+      ...data,
+      masquerade:
+        data.username !== undefined || data.avatar !== undefined
+          ? { name: data.username, avatar: data.avatar }
+          : undefined
+    });
     return response.data;
   }
 
@@ -467,12 +484,15 @@ export class Client {
     return response.data;
   }
 
-  async createEmoji(data: {
-    name: string;
-    parent: { type: string; id: string };
-    nsfw?: boolean;
-  }) {
-    let response = await this.http.put(`/custom/emoji/${data.parent.id}`, {
+  async createEmoji(
+    emojiId: string,
+    data: {
+      name: string;
+      parent: { type: string; id: string };
+      nsfw?: boolean;
+    }
+  ) {
+    let response = await this.http.put(`/custom/emoji/${emojiId}`, {
       name: data.name,
       parent: data.parent,
       nsfw: data.nsfw
@@ -559,11 +579,27 @@ export class Client {
 
   async setChannelDefaultPermission(
     channelId: string,
-    permissions: { allow: number; deny: number }
+    permissions: { allow: number; deny: number } | number
   ) {
     let response = await this.http.put(`/channels/${channelId}/permissions/default`, {
       permissions
     });
     return response.data;
+  }
+  async editWebhook(
+    webhookId: string,
+    data: {
+      name?: string;
+      avatar?: string;
+      permissions?: number;
+      remove?: string[];
+    }
+  ) {
+    let response = await this.http.patch(`/webhooks/${webhookId}`, data);
+    return response.data;
+  }
+
+  async deleteWebhook(webhookId: string) {
+    await this.http.delete(`/webhooks/${webhookId}`);
   }
 }

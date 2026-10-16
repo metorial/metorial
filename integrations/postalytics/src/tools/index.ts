@@ -1,3 +1,4 @@
+export * from './create-campaign';
 export * from './create-login-link';
 export * from './get-campaign-events';
 export * from './manage-account';
@@ -8,3 +9,4 @@ export * from './manage-suppression-lists';
 export * from './manage-templates';
 export * from './manage-webhooks';
 export * from './send-mail';
+export * from './who-am-i';

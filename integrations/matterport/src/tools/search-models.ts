@@ -31,6 +31,13 @@ export let searchModels = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().default('*').describe('Search query string. Use "*" for all models.'),
+      pageSize: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum models per page, up to 1000'),
       offset: z
         .string()
         .optional()
@@ -59,10 +66,11 @@ export let searchModels = SlateTool.create(spec, {
 
     let result = await client.searchModels(ctx.input.query, {
       offset: ctx.input.offset,
-      include: ctx.input.includeType
+      include: ctx.input.includeType,
+      pageSize: ctx.input.pageSize
     });
 
-    let models = (result.results || []).map((m: any) => ({
+    let models = result.results.map((m: any) => ({
       modelId: m.id,
       name: m.name,
       description: m.description,
@@ -73,11 +81,11 @@ export let searchModels = SlateTool.create(spec, {
 
     return {
       output: {
-        totalResults: result.totalResults || 0,
-        nextOffset: result.nextOffset || null,
+        totalResults: result.totalResults,
+        nextOffset: result.nextOffset ?? null,
         models
       },
-      message: `Found **${result.totalResults || 0}** models matching "${ctx.input.query}".`
+      message: `Found **${result.totalResults}** models matching "${ctx.input.query}".`
     };
   })
   .build();

@@ -1,50 +1,29 @@
-# Slates Specification for Gender API
+# Gender API Integration
 
-## Overview
+This integration uses API v2 bearer-token authentication. Create a token in the [account dashboard](https://gender-api.com/en/account/auth-tokens). The connection stores only the existing `token` credential and has no required configuration fields.
 
-Gender API (gender-api.com) is a service that predicts the gender of a person based on their first name, full name, or email address. It provides gender classification with accuracy/probability scores and supports localization by country for improved results. The API also offers country-of-origin prediction for given names.
+## Tools
 
-## Authentication
+- `detect_gender`: classify a first name, full name, or email address with optional country, browser locale, or IP localization. Existing single-query routes and the legacy `strict` parameter are retained. Current documentation only guarantees strict surname handling on the v1 split endpoint; the existing v2 option is forwarded unchanged.
+- `country_of_origin`: return country probabilities and regions, plus the name language, meaning, ethnic group distribution, and complete provider response. The interactive map link is returned only when the provider supplies it.
+- `account_statistics`: report the remaining credits, limit state, request cost, and previous month's usage. `creditsUsed` is the cost of the statistics request, not current-month usage.
+- `detect_gender_batch`: submit 1–100 first-name queries to the documented unified `/v2/gender` endpoint with optional per-entry localization and correlation IDs. Some tokens restrict batches to three queries. Each lookup costs one credit. Results retain the provider's original fields.
 
-Gender API uses **API key** authentication. Users obtain an API key from their Gender API account.
+The service provides statistical name-based predictions rather than a person's self-reported identity. Unknown results and missing name metadata must be handled by callers. Country-of-origin lookups cost two credits. The API documents no suitable current-user profile endpoint, webhooks, or event subscriptions. Account statistics provide the available account-level read operation.
 
-- **API v1**: The API key is passed as a query parameter `key` on every request.
-  - Example: `GET https://gender-api.com/get?name=Elizabeth&key=YOUR_API_KEY`
-- **API v2**: The API key is passed as a Bearer token in the `Authorization` header.
-  - Example header: `Authorization: Bearer YOUR_API_KEY`
+## Compatibility and errors
 
-No OAuth or additional credentials are required. The API key is available from the account dashboard after registration.
+The original tool keys and input types, optionalness, defaults, and request precedence remain available. Multiple identifiers in `detect_gender` retain the existing firstName, fullName, email precedence; callers should submit one identifier. Origin requests retain the existing fields. Omitted surname and map values are not replaced with invented strings. Sparse full-name metadata and map links may be absent as shown in the provider's complete examples.
 
-## Features
+HTTP errors and explicit failure envelopes use structured service errors, retaining provider messages and error codes. Credit exhaustion is preserved as the provider's `limit-exceeded` condition, including any upgrade URL in its error details. No OAuth refresh or file delivery is involved.
 
-### Gender Detection by First Name
+## Official references
 
-Determine the likely gender (male, female, or unknown) of a given first name. The response includes the predicted gender, an accuracy score indicating reliability, and the number of matching samples in the database.
+- [API v2](https://gender-api.com/en/api-docs/v2)
+- [Name splitting and sparse full-name response](https://gender-api.com/en/split-first-and-last-name)
+- [Country-of-origin response](https://gender-api.com/en/api-docs/v2/country-of-origin)
+- [Account statistics](https://gender-api.com/en/api-docs/v2/statistic)
+- [Error codes and account limits](https://gender-api.com/en/api-docs/v2/error-codes)
+- [Bulk lookup limits](https://gender-api.com/en/bulk-gender-lookup)
 
-### Gender Detection by Full Name
-
-Accepts a full name (e.g., "Theresa Miller") and automatically splits it into first and last name components before determining gender. A `strict` mode option controls whether last names not found in the database are still extracted or returned as null.
-
-### Gender Detection by Email Address
-
-You can query gender using an email address. The API extracts the first and last name from the email address and returns the predicted gender along with the detected mail provider.
-
-### Localization
-
-Improve prediction accuracy by providing geographic context. Localization can be specified via:
-
-- **Country code**: An ISO 3166-1 alpha-2 country code (e.g., `IT` for Italy, `DE` for Germany). This is important because some names differ by country — for example, "Andrea" is predicted as male in Italy but female in Germany.
-- **IP address**: The API geolocates the IP to determine the country.
-- **Browser locale**: A locale string (e.g., `en_US`, `de_DE`) is used to infer the country.
-
-### Country of Origin Prediction
-
-This feature returns the most likely countries of origin for a given first name, with probability scores for each country, along with continental and statistical region information. The response also includes a link to an interactive map visualization. This feature is marked as experimental and may not deliver consistent quality across all regions.
-
-### Account Statistics
-
-Retrieve account usage statistics including remaining request credits, monthly starting credits, and purchased credits. This is useful for monitoring consumption and avoiding service interruptions.
-
-## Events
-
-The provider does not support events. Gender API is a stateless lookup service with no webhooks or event subscription mechanisms.
+Verification in this refresh is offline. Provider execution and credit/account-specific behavior have not been live-tested.

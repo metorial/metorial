@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Apilio
 
-Manage smart home automation logic by creating and updating variables (boolean, string, numeric), evaluating conditions, and triggering logicblocks. Set, toggle, or clear variable values to reflect device states or contextual information. Retrieve and evaluate conditions that compare variables against expected states using AND/OR/NOT logic. Trigger, activate, or deactivate logicblocks that execute action chains — including delayed actions, cross-brand device commands, and outgoing webhooks — based on positive or negative evaluation results. Coordinate devices across brands like Tuya, Philips Hue, Sonoff, and Tado through complex multi-condition automation.
+Read and update existing Apilio boolean, string, and numeric variables; discover variable, time, and Tuya conditions; check condition states; and list, evaluate, activate, or deactivate logicblocks. Coordinate smart home automation through the Apilio REST API.
 
 ## License
 

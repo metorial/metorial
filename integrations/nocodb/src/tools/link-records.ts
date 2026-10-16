@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageInfoSchema, responseList, validatePagination } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let linkRecords = SlateTool.create(spec, {
@@ -37,7 +38,9 @@ export let linkRecords = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('List of linked records (for list action)'),
-      success: z.boolean().describe('Whether the operation succeeded')
+      success: z.boolean().describe('Whether the operation succeeded'),
+      pageInfo: pageInfoSchema.optional(),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -45,41 +48,49 @@ export let linkRecords = SlateTool.create(spec, {
     let { action, tableId, linkFieldId, recordId, targetRecordIds, limit, offset } = ctx.input;
 
     if (action === 'list') {
+      validatePagination(limit, offset);
       let result = await client.listLinkedRecords(tableId, linkFieldId, recordId, {
         limit,
         offset
       });
-      let linkedRecords = result?.list ?? result ?? [];
+      let linkedRecords = responseList(result, 'linked records');
       return {
         output: {
-          linkedRecords: Array.isArray(linkedRecords) ? linkedRecords : [],
-          success: true
+          linkedRecords,
+          success: true,
+          pageInfo: result?.pageInfo,
+          raw: result
         },
-        message: `Found **${Array.isArray(linkedRecords) ? linkedRecords.length : 0}** linked record(s).`
+        message: `Found **${linkedRecords.length}** linked record(s).`
       };
     }
 
     if (action === 'link') {
-      if (!targetRecordIds?.length) throw new Error('targetRecordIds is required for linking');
+      if (!targetRecordIds?.length)
+        throw createApiServiceError('targetRecordIds is required for linking');
       let ids = targetRecordIds.map(id => ({ Id: id }));
-      await client.linkRecords(tableId, linkFieldId, recordId, ids);
+      let result = await client.linkRecords(tableId, linkFieldId, recordId, ids);
+      if (result === false)
+        throw createApiServiceError('NocoDB did not confirm the link operation.');
       return {
-        output: { success: true },
+        output: { success: true, raw: result },
         message: `Linked **${targetRecordIds.length}** record(s) to record \`${recordId}\`.`
       };
     }
 
     if (action === 'unlink') {
       if (!targetRecordIds?.length)
-        throw new Error('targetRecordIds is required for unlinking');
+        throw createApiServiceError('targetRecordIds is required for unlinking');
       let ids = targetRecordIds.map(id => ({ Id: id }));
-      await client.unlinkRecords(tableId, linkFieldId, recordId, ids);
+      let result = await client.unlinkRecords(tableId, linkFieldId, recordId, ids);
+      if (result === false)
+        throw createApiServiceError('NocoDB did not confirm the unlink operation.');
       return {
-        output: { success: true },
+        output: { success: true, raw: result },
         message: `Unlinked **${targetRecordIds.length}** record(s) from record \`${recordId}\`.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

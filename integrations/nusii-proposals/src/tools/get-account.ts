@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccount = SlateTool.create(spec, {
   name: 'Get Account',
   key: 'get_account',
-  description: `Retrieve your Nusii account information including company name, default currency, locale, and theme. Also lists all users on the account and available themes.`,
+  description: `Retrieve your Nusii account information including company name, default currency, locale, and theme. Also returns the first page of account users and available themes. Use list_users for further pages.`,
   tags: {
     readOnly: true
   }
@@ -14,11 +14,12 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       accountId: z.string(),
       company: z.string(),
       currency: z.string(),
-      locale: z.string(),
-      theme: z.string(),
+      locale: z.string().optional(),
+      theme: z.string().optional(),
       users: z.array(
         z.object({
           userId: z.string(),
@@ -35,7 +36,7 @@ export let getAccount = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let [account, usersResult, themes] = await Promise.all([
       client.getAccount(),
@@ -46,6 +47,7 @@ export let getAccount = SlateTool.create(spec, {
     return {
       output: {
         ...account,
+        raw: { account: account.raw, users: usersResult.raw, themes },
         users: usersResult.items,
         themes
       },

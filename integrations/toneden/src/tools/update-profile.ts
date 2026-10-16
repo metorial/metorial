@@ -26,7 +26,8 @@ export let updateProfile = SlateTool.create(spec, {
       displayName: z.string().optional().describe('Updated display name'),
       username: z.string().optional().describe('Updated username'),
       email: z.string().optional().describe('Updated email'),
-      avatarUrl: z.string().optional().describe('Updated avatar URL')
+      avatarUrl: z.string().optional().describe('Updated avatar URL'),
+      raw: z.record(z.string(), z.any()).optional().describe('Original provider profile')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,7 +50,8 @@ export let updateProfile = SlateTool.create(spec, {
         displayName: user.display_name,
         username: user.username,
         email: user.email,
-        avatarUrl: user.avatar_url
+        avatarUrl: user.avatar_url,
+        raw: user
       },
       message: `Updated profile for **${user.display_name || user.username}** (ID: ${user.id}).`
     };

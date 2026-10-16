@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 let questionSummary = z.object({
@@ -81,8 +82,8 @@ export let getUserActivity = SlateTool.create(spec, {
         score: q.score,
         answerCount: q.answer_count,
         viewCount: q.view_count,
-        tags: q.tags ?? [],
-        creationDate: new Date(q.creation_date * 1000).toISOString()
+        tags: q.tags,
+        creationDate: providerDate(q.creation_date)
       }));
       return {
         output: { questions, hasMore: result.hasMore },
@@ -96,8 +97,8 @@ export let getUserActivity = SlateTool.create(spec, {
         answerId: a.answer_id,
         questionId: a.question_id,
         score: a.score,
-        isAccepted: a.is_accepted ?? false,
-        creationDate: new Date(a.creation_date * 1000).toISOString()
+        isAccepted: a.is_accepted,
+        creationDate: providerDate(a.creation_date)
       }));
       return {
         output: { answers, hasMore: result.hasMore },
@@ -111,7 +112,7 @@ export let getUserActivity = SlateTool.create(spec, {
       postId: r.post_id,
       reputationChange: r.reputation_change,
       voteType: r.vote_type,
-      onDate: new Date(r.on_date * 1000).toISOString()
+      onDate: providerDate(r.on_date)
     }));
     return {
       output: { reputationChanges, hasMore: result.hasMore },

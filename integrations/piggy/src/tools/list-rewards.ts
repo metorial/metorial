@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let rewardSchema = z
@@ -47,15 +48,16 @@ export let listRewards = SlateTool.create(spec, {
       contactUuid: ctx.input.contactUuid
     });
 
-    let rewards = (result.data || []).map((r: any) => ({
-      rewardUuid: r.uuid,
-      title: r.title,
-      description: r.description,
-      requiredCredits: r.required_credits,
-      active: r.active,
-      rewardType: r.reward_type,
-      ...r
-    }));
+    let rewards = result.data.map((r: any) =>
+      mapEntity(r, {
+        rewardUuid: requiredString(r.uuid, 'rewardUuid'),
+        title: r.title,
+        description: r.description,
+        requiredCredits: r.required_credits,
+        active: r.is_active ?? r.active,
+        rewardType: r.reward_type
+      })
+    );
 
     return {
       output: { rewards },

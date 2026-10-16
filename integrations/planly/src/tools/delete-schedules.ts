@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,6 +23,9 @@ export let deleteSchedules = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.scheduleIds.length === 0 || ctx.input.scheduleIds.some(id => !id.trim())) {
+      throw createApiServiceError('Provide at least one nonempty scheduleIds value.');
+    }
     let client = new Client({ token: ctx.auth.token });
     await client.deleteSchedules(ctx.input.scheduleIds);
 

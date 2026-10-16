@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HeapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -61,7 +61,12 @@ Requires Account ID to be configured in your Heap project settings before use.`,
       datacenter: ctx.config.datacenter
     });
 
-    if (ctx.input.accounts && ctx.input.accounts.length > 0) {
+    if (ctx.input.accounts !== undefined) {
+      if (ctx.input.accountId !== undefined || ctx.input.properties !== undefined) {
+        throw createApiServiceError(
+          'Provide accounts for bulk updates or top-level fields for a single update, not both.'
+        );
+      }
       ctx.info(`Bulk updating properties for ${ctx.input.accounts.length} accounts`);
       await client.bulkAddAccountProperties(ctx.input.accounts);
 
@@ -75,7 +80,7 @@ Requires Account ID to be configured in your Heap project settings before use.`,
     }
 
     if (!ctx.input.accountId || !ctx.input.properties) {
-      throw new Error(
+      throw createApiServiceError(
         'Either provide "accountId" and "properties" for a single update, or "accounts" array for bulk updates.'
       );
     }

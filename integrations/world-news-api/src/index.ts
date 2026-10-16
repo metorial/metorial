@@ -8,7 +8,8 @@ import {
   retrieveArticleTool,
   searchNewsSourcesTool,
   searchNewsTool,
-  topNewsTool
+  topNewsTool,
+  websiteToRssTool
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -20,7 +21,8 @@ export let provider = Slate.create({
     extractNewsLinksTool,
     searchNewsSourcesTool,
     newspaperFrontPagesTool,
-    geoCoordinatesTool
+    geoCoordinatesTool,
+    websiteToRssTool
   ],
   triggers: []
 });

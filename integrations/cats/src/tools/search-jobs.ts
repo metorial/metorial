@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchJobs = SlateTool.create(spec, {
@@ -41,8 +42,11 @@ export let searchJobs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.query !== undefined && ctx.input.filters !== undefined) {
+      throw createApiServiceError('Provide query or filters, not both.');
+    }
     let data: any;
-    if (ctx.input.filters) {
+    if (ctx.input.filters !== undefined) {
       data = await client.filterJobs(ctx.input.filters, {
         page: ctx.input.page,
         perPage: ctx.input.perPage
@@ -54,19 +58,19 @@ export let searchJobs = SlateTool.create(spec, {
       });
     }
 
-    let jobs = (data?._embedded?.jobs ?? []).map((j: any) => ({
-      jobId: j.id?.toString() ?? '',
-      title: j.title,
-      city: j.city,
-      state: j.state,
-      isActive: j.is_active,
-      isHot: j.is_hot
+    let jobs = collection(data, 'jobs').map((j: any) => ({
+      jobId: requiredId(j.id, 'record'),
+      title: j.title ?? undefined,
+      city: j.location?.city ?? undefined,
+      state: j.location?.state ?? undefined,
+      isActive: j.is_active ?? undefined,
+      isHot: j.is_hot ?? undefined
     }));
 
     return {
       output: {
         jobs,
-        totalCount: data?.total ?? jobs.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Found **${jobs.length}** job(s).`

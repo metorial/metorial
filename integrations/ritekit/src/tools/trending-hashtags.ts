@@ -11,7 +11,8 @@ let trendingSchema = z.object({
   images: z.number().describe('Percentage of tweets with images'),
   links: z.number().describe('Percentage of tweets with links'),
   mentions: z.number().describe('Percentage of tweets with mentions'),
-  color: z.number().describe('Color grade')
+  color: z.number().describe('Color grade'),
+  photos: z.number().optional().describe('Provider-reported proportion of posts with photos')
 });
 
 export let trendingHashtags = SlateTool.create(spec, {
@@ -35,6 +36,7 @@ Use this to discover popular hashtags to include in your content for maximum vis
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       hashtags: z.array(trendingSchema).describe('List of currently trending hashtags')
     })
   )
@@ -42,10 +44,10 @@ Use this to discover popular hashtags to include in your content for maximum vis
     let client = new RiteKitClient({ token: ctx.auth.token });
     let result = await client.trendingHashtags(ctx.input.greenOnly, ctx.input.latinOnly);
 
-    let tags = result.tags || [];
+    let tags = (result.tags || []).map(tag => ({ ...tag, images: tag.images ?? tag.photos }));
 
     return {
-      output: { hashtags: tags },
+      output: { hashtags: tags, raw: { ...result } },
       message: `Found **${tags.length}** trending hashtags. Top: ${tags
         .slice(0, 5)
         .map(t => `#${t.tag}`)

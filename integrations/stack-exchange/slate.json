@@ -1,6 +1,6 @@
 {
   "name": "@metorial/stack-exchange",
-  "description": "Access Stack Overflow and 170+ Stack Exchange Q&A sites programmatically. Search and retrieve questions, answers, and comments across any site. Post, edit, and delete questions, answers, and comments. Browse user profiles, reputation history, badges, and activity timelines. Search questions by keywords, tags, and advanced filters. Access a user's global inbox and notifications. Retrieve tag metadata, synonyms, top answerers, and related tags. View suggested edits and post revision history. Query network-wide site metadata and user associations across the Stack Exchange network.",
+  "description": "Search and read Stack Exchange questions, answers, tags, user profiles, reputation changes, and post revisions. Create and edit questions and answers, accept answers, manage comments, and access your inbox and notifications with OAuth. Discover community sites and configure the site to query.",
   "categories": ["education-and-learning", "email-and-messaging"],
   "skills": [
     "search questions by keywords",
@@ -10,7 +10,7 @@
     "access inbox and notifications",
     "browse and filter tags",
     "view post revision history",
-    "retrieve badges and reputation",
+    "review user reputation changes",
     "search across Stack Exchange sites"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/stack-exchange.png"

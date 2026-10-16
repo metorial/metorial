@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,12 +33,14 @@ export let sendPushNotification = SlateTool.create(spec, {
       templateId: z
         .string()
         .optional()
-        .describe('Template identifier for scheduling a template-wide notification'),
+        .describe(
+          'Template identifier for scheduling a template-wide notification; requires scheduledDate'
+        ),
       scheduledDate: z
         .string()
         .optional()
         .describe(
-          'Date/time to schedule the notification in "Y-m-d H:i" format (requires templateId)'
+          'Date/time to schedule the notification in "Y-m-d H:i" format (required when templateId is provided)'
         )
     })
   )
@@ -54,8 +56,27 @@ export let sendPushNotification = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    let targetCount =
+      Number(Boolean(ctx.input.passId)) +
+      Number(Boolean(ctx.input.passIds?.length)) +
+      Number(Boolean(ctx.input.templateId));
+    if (targetCount !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one target: passId, nonempty passIds, or templateId.'
+      );
+    }
+    if (ctx.input.scheduledDate && !ctx.input.templateId) {
+      throw createApiServiceError('scheduledDate requires templateId.');
+    }
+    if (ctx.input.passIds && ctx.input.passIds.length > 500) {
+      throw createApiServiceError('Send notifications to at most 500 passes per request.');
+    }
+
     // Template-wide scheduled notification
     if (ctx.input.templateId) {
+      if (!ctx.input.scheduledDate?.trim()) {
+        throw createApiServiceError('scheduledDate is required when templateId is provided.');
+      }
       let result = await client.scheduleTemplateNotification(ctx.input.templateId, {
         pushNotificationText: ctx.input.notificationText,
         publicationDate: ctx.input.scheduledDate
@@ -65,9 +86,7 @@ export let sendPushNotification = SlateTool.create(spec, {
           sent: true,
           notificationId: result.notificationId
         },
-        message: ctx.input.scheduledDate
-          ? `Scheduled notification for template \`${ctx.input.templateId}\` at ${ctx.input.scheduledDate}.`
-          : `Sent notification to all passes in template \`${ctx.input.templateId}\`.`
+        message: `Scheduled notification for template \`${ctx.input.templateId}\` at ${ctx.input.scheduledDate}.`
       };
     }
 
@@ -89,9 +108,6 @@ export let sendPushNotification = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { sent: false },
-      message: 'No target specified. Provide passId, passIds, or templateId.'
-    };
+    throw createApiServiceError('Provide passId, passIds, or templateId.');
   })
   .build();

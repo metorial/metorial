@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchGrantAwards = SlateTool.create(spec, {
@@ -23,6 +23,7 @@ export let searchGrantAwards = SlateTool.create(spec, {
         .enum(['prime', 'subgrant'])
         .default('prime')
         .describe('Type of grant award to search'),
+      awardId: z.string().optional().describe('Government award ID (prime grants only)'),
       awardeeKey: z.number().optional().describe('HigherGov awardee key'),
       awardeeKeyParent: z.number().optional().describe('HigherGov parent-level awardee key'),
       awardeeUei: z.string().optional().describe('Awardee UEI (Unique Entity Identifier)'),
@@ -68,7 +69,16 @@ export let searchGrantAwards = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let input = ctx.input;
 
-    let response: any;
+    if (input.awardType === 'subgrant') {
+      for (let field of ['awardId', 'cfdaProgramNumber', 'searchId'] as const) {
+        if (input[field] !== undefined)
+          throw createApiServiceError(
+            `${field} is supported only for prime grants. Choose awardType prime or omit this filter.`
+          );
+      }
+    }
+
+    let response: PaginatedResponse<Record<string, unknown>>;
     if (input.awardType === 'subgrant') {
       response = await client.getSubgrants({
         awardeeKey: input.awardeeKey,
@@ -84,6 +94,7 @@ export let searchGrantAwards = SlateTool.create(spec, {
       });
     } else {
       response = await client.getGrants({
+        awardId: input.awardId,
         awardeeKey: input.awardeeKey,
         awardeeKeyParent: input.awardeeKeyParent,
         awardeeUei: input.awardeeUei,

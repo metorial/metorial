@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export type AlgoliaRegion = 'us' | 'de';
 
@@ -9,14 +9,12 @@ export interface AlgoliaClientConfig {
 }
 
 export class AlgoliaClient {
-  private searchClient: ReturnType<typeof createAxios>;
-  private analyticsClient: ReturnType<typeof createAxios>;
-  private insightsClient: ReturnType<typeof createAxios>;
-  private monitoringClient: ReturnType<typeof createAxios>;
-  private applicationId: string;
+  private searchClient: ReturnType<typeof createAuthenticatedAxios>;
+  private analyticsClient: ReturnType<typeof createAuthenticatedAxios>;
+  private insightsClient: ReturnType<typeof createAuthenticatedAxios>;
+  private monitoringClient: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: AlgoliaClientConfig) {
-    this.applicationId = config.applicationId;
     let region = config.analyticsRegion || 'us';
 
     let headers = {
@@ -25,24 +23,33 @@ export class AlgoliaClient {
       'Content-Type': 'application/json'
     };
 
-    this.searchClient = createAxios({
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Algolia',
+        reason: 'algolia_api_error',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        detailKeys: ['message', 'reason', 'error', 'detail']
+      });
+    let clientOptions = { headers, timeout: 30_000, errorAdapter };
+
+    this.searchClient = createAuthenticatedAxios({
       baseURL: `https://${config.applicationId}.algolia.net`,
-      headers
+      ...clientOptions
     });
 
-    this.analyticsClient = createAxios({
+    this.analyticsClient = createAuthenticatedAxios({
       baseURL: `https://analytics.${region}.algolia.com`,
-      headers
+      ...clientOptions
     });
 
-    this.insightsClient = createAxios({
+    this.insightsClient = createAuthenticatedAxios({
       baseURL: `https://insights.${region}.algolia.io`,
-      headers
+      ...clientOptions
     });
 
-    this.monitoringClient = createAxios({
+    this.monitoringClient = createAuthenticatedAxios({
       baseURL: `https://status.algolia.com`,
-      headers
+      ...clientOptions
     });
   }
 
@@ -273,7 +280,7 @@ export class AlgoliaClient {
     if (forwardToReplicas !== undefined) params.forwardToReplicas = forwardToReplicas;
     let res = await this.searchClient.put(
       `/1/indexes/${encodeURIComponent(indexName)}/synonyms/${encodeURIComponent(objectId)}`,
-      synonym,
+      { ...synonym, objectID: objectId },
       { params }
     );
     return res.data;
@@ -349,7 +356,7 @@ export class AlgoliaClient {
     if (forwardToReplicas !== undefined) params.forwardToReplicas = forwardToReplicas;
     let res = await this.searchClient.put(
       `/1/indexes/${encodeURIComponent(indexName)}/rules/${encodeURIComponent(objectId)}`,
-      rule,
+      { ...rule, objectID: objectId },
       { params }
     );
     return res.data;
@@ -528,25 +535,57 @@ export class AlgoliaClient {
     return res.data;
   }
 
-  async getLatency(): Promise<any> {
-    let res = await this.monitoringClient.get(`/1/latency/${this.applicationId}`);
+  async getServers(): Promise<any> {
+    let res = await this.monitoringClient.get('/1/inventory/servers');
     return res.data;
   }
 
-  async getIndexingTime(): Promise<any> {
-    let res = await this.monitoringClient.get(`/1/indexing/${this.applicationId}`);
+  private async resolveClusters(clusters?: string[]): Promise<string> {
+    if (clusters?.length) return clusters.join(',');
+    let result = await this.getServers();
+    let names = Array.from(
+      new Set<string>(
+        (result.inventory ?? [])
+          .map((server: { cluster?: string }) => server.cluster)
+          .filter(
+            (cluster: unknown): cluster is string =>
+              typeof cluster === 'string' && cluster.length > 0
+          )
+      )
+    );
+    if (!names.length) {
+      throw createApiServiceError(
+        'No clusters were found for this application. Provide clusters from monitoring with metric "status".',
+        { reason: 'algolia_clusters_not_found' }
+      );
+    }
+    return names.join(',');
+  }
+
+  async getLatency(clusters?: string[]): Promise<any> {
+    let selected = await this.resolveClusters(clusters);
+    let res = await this.monitoringClient.get(`/1/latency/${encodeURIComponent(selected)}`);
     return res.data;
   }
 
-  async getReachability(): Promise<any> {
-    let res = await this.monitoringClient.get(`/1/reachability/${this.applicationId}/probes`);
+  async getIndexingTime(clusters?: string[]): Promise<any> {
+    let selected = await this.resolveClusters(clusters);
+    let res = await this.monitoringClient.get(`/1/indexing/${encodeURIComponent(selected)}`);
     return res.data;
   }
 
-  async getInfrastructure(params?: Record<string, any>): Promise<any> {
-    let res = await this.monitoringClient.get(`/1/infrastructure/${this.applicationId}`, {
-      params
-    });
+  async getReachability(clusters?: string[]): Promise<any> {
+    let selected = await this.resolveClusters(clusters);
+    let res = await this.monitoringClient.get(
+      `/1/reachability/${encodeURIComponent(selected)}/probes`
+    );
+    return res.data;
+  }
+
+  async getInfrastructure(metric: string = '*', period: string = 'hour'): Promise<any> {
+    let res = await this.monitoringClient.get(
+      `/1/infrastructure/${encodeURIComponent(metric)}/period/${encodeURIComponent(period)}`
+    );
     return res.data;
   }
 

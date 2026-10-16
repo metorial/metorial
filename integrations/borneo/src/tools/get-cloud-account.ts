@@ -14,7 +14,15 @@ export let getCloudAccount = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      accountId: z.string().describe('Cloud account ID to retrieve')
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
+      accountId: z
+        .string()
+        .describe(
+          'Cloud account ID to retrieve. Use list_accounts to discover connected accounts.'
+        )
     })
   )
   .output(
@@ -27,11 +35,12 @@ export let getCloudAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let result = await client.getCloudAccount(ctx.input.accountId);
-    let data = result?.data ?? result;
+    let data = result;
 
     return {
       output: { account: data },

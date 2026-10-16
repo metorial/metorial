@@ -13,6 +13,10 @@ export let listFlows = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       flowUuid: z.string().optional().describe('Filter by a specific flow UUID'),
       type: z.enum(['message', 'voice', 'survey']).optional().describe('Filter by flow type'),
       archived: z.boolean().optional().describe('Filter by archived status'),
@@ -52,6 +56,8 @@ export let listFlows = SlateTool.create(spec, {
           modifiedOn: z.string()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -59,6 +65,7 @@ export let listFlows = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listFlows({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.flowUuid,
       type: ctx.input.type,
       archived: ctx.input.archived,
@@ -85,6 +92,8 @@ export let listFlows = SlateTool.create(spec, {
     return {
       output: {
         flows,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${flows.length}** flow(s)${result.next ? ' (more results available)' : ''}.`

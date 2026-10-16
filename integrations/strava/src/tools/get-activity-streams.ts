@@ -26,6 +26,7 @@ export let getActivityStreams = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       streams: z
         .array(
           z.object({
@@ -47,18 +48,22 @@ export let getActivityStreams = SlateTool.create(spec, {
       ctx.input.streamTypes
     );
 
-    let streams = Array.isArray(rawStreams)
-      ? rawStreams.map((s: any) => ({
-          type: s.type,
-          seriesType: s.series_type,
-          originalSize: s.original_size,
-          resolution: s.resolution,
-          data: s.data
-        }))
-      : [];
+    let entries: [string, any][] = Array.isArray(rawStreams)
+      ? rawStreams.map((stream: any) => [stream.type, stream])
+      : Object.entries(rawStreams);
+    let streams = entries.map(([key, s]) => ({
+      type: s.type ?? key,
+      seriesType: s.series_type,
+      originalSize: s.original_size,
+      resolution: s.resolution,
+      data: s.data
+    }));
 
     return {
-      output: { streams },
+      output: {
+        raw: rawStreams,
+        streams
+      },
       message: `Retrieved **${streams.length}** stream(s) for activity ${ctx.input.activityId}: ${streams.map(s => s.type).join(', ')}.`
     };
   })

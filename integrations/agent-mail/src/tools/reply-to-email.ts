@@ -29,6 +29,18 @@ export let replyToEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Unique send key. Reuse the same key only when retrying the same email within 24 hours.'
+        ),
+      trackOpens: z
+        .boolean()
+        .optional()
+        .describe(
+          'Track the first open; requires HTML and a custom domain with tracking enabled.'
+        ),
       inboxId: z.string().describe('Inbox containing the message to reply to'),
       messageId: z.string().describe('ID of the message to reply to'),
       text: z.string().optional().describe('Plain text reply body'),
@@ -56,6 +68,8 @@ export let replyToEmail = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
     let result = await client.replyToMessage(ctx.input.inboxId, ctx.input.messageId, {
+      idempotencyKey: ctx.input.idempotencyKey,
+      trackOpens: ctx.input.trackOpens,
       text: ctx.input.text,
       html: ctx.input.html,
       replyAll: ctx.input.replyAll,

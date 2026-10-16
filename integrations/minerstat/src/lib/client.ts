@@ -1,47 +1,81 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+import {
+  collectMinerstatRequestSecrets,
+  minerstatApiError,
+  parseMinerstatResponse,
+  requireMinerstatCredential,
+  validateMinerstatResponse
+} from './response';
 
 let BASE_URL = 'https://api.minerstat.com/v2';
 
 export class DeveloperClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { developerApiKey: string }) {
-    this.axios = createAxios({
+    config.developerApiKey = requireMinerstatCredential(
+      config.developerApiKey,
+      'Developer API key'
+    );
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      timeout: 30_000,
+      errorAdapter: error => minerstatApiError(error, [config.developerApiKey]),
       headers: {
         'X-API-Key': config.developerApiKey,
         'Content-Type': 'application/json'
       }
     });
+    this.axios.interceptors.response.use(response => {
+      validateMinerstatResponse(response.data, response.status, [config.developerApiKey]);
+      return response;
+    });
   }
 
   async getCoins(params?: { list?: string; algo?: string }): Promise<CoinData[]> {
     let response = await this.axios.get('/coins', { params });
-    return response.data;
+    return parseMinerstatResponse(
+      z.array(z.record(z.string(), z.any())),
+      response.data
+    ) as CoinData[];
   }
 
   async getHardware(params?: { type?: string; brand?: string }): Promise<HardwareData[]> {
     let response = await this.axios.get('/hardware', { params });
-    return response.data;
+    return parseMinerstatResponse(
+      z.array(z.record(z.string(), z.any())),
+      response.data
+    ) as HardwareData[];
   }
 
   async getPools(params?: { coin?: string; type?: string }): Promise<PoolData[]> {
     let response = await this.axios.get('/pools', { params });
-    return response.data;
+    return parseMinerstatResponse(
+      z.array(z.record(z.string(), z.any())),
+      response.data
+    ) as PoolData[];
   }
 }
 
 export class MonitoringClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private accessKey: string;
 
   constructor(config: { accessKey: string }) {
-    this.accessKey = config.accessKey;
-    this.axios = createAxios({
+    config.accessKey = requireMinerstatCredential(config.accessKey, 'Monitoring access key');
+    this.accessKey = encodeURIComponent(config.accessKey);
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      timeout: 30_000,
+      errorAdapter: error => minerstatApiError(error, [config.accessKey]),
       headers: {
         'Content-Type': 'application/json'
       }
+    });
+    this.axios.interceptors.response.use(response => {
+      validateMinerstatResponse(response.data, response.status, [config.accessKey]);
+      return response;
     });
   }
 
@@ -51,7 +85,9 @@ export class MonitoringClient {
   }
 
   async getWorker(workerName: string): Promise<Record<string, WorkerData>> {
-    let response = await this.axios.get(`/stats/${this.accessKey}/${workerName}`);
+    let response = await this.axios.get(
+      `/stats/${this.accessKey}/${encodeURIComponent(workerName)}`
+    );
     return response.data;
   }
 
@@ -59,9 +95,12 @@ export class MonitoringClient {
     workerName: string,
     params?: { tz?: string }
   ): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/stats/${this.accessKey}/${workerName}/hashrate`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/stats/${this.accessKey}/${encodeURIComponent(workerName)}/hashrate`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
@@ -69,14 +108,25 @@ export class MonitoringClient {
     workerName: string,
     params?: { tz?: string }
   ): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/stats/${this.accessKey}/${workerName}/statistics`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/stats/${this.accessKey}/${encodeURIComponent(workerName)}/statistics`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
-  async getWorkerActivity(workerName: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/stats/${this.accessKey}/${workerName}/activity`);
+  async getWorkerActivity(
+    workerName: string,
+    params?: { tz?: string }
+  ): Promise<Record<string, any>> {
+    let response = await this.axios.get(
+      `/stats-activity/${this.accessKey}/${encodeURIComponent(workerName)}`,
+      {
+        params: { timezone: params?.tz }
+      }
+    );
     return response.data;
   }
 
@@ -84,9 +134,12 @@ export class MonitoringClient {
     groupName: string,
     params?: { tz?: string }
   ): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/stats/${this.accessKey}/group/${groupName}`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/stats/${this.accessKey}/group/${encodeURIComponent(groupName)}`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
@@ -107,15 +160,27 @@ export class MonitoringClient {
 }
 
 export class ManagementClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    config.token = requireMinerstatCredential(config.token, 'Bearer token');
+    let secrets = [config.token];
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      timeout: 30_000,
+      errorAdapter: error => minerstatApiError(error, secrets),
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
       }
+    });
+    this.axios.interceptors.request.use(request => {
+      collectMinerstatRequestSecrets(request.data, secrets);
+      return request;
+    });
+    this.axios.interceptors.response.use(response => {
+      validateMinerstatResponse(response.data, response.status, secrets);
+      return response;
     });
   }
 

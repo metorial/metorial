@@ -6,9 +6,11 @@ import { spec } from '../spec';
 export let getEtfDetails = SlateTool.create(spec, {
   name: 'Get ETF Details',
   key: 'get_etf_details',
-  description: `Retrieve detailed ETF information including profile data and top holdings.
+  description: `DEPRECATED — use \`get_fund_data\` instead. Retrieve detailed ETF information including profile data and top holdings.
 Use this to analyze ETF composition, expense ratios, assets under management, and underlying holdings.`,
+  instructions: ['Use get_fund_data for the current documented endpoint contract.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

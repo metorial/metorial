@@ -33,10 +33,11 @@ let blockPriceSchema = z.object({
 export let estimateGasPrice = SlateTool.create(spec, {
   name: 'Estimate Gas Price',
   key: 'estimate_gas_price',
-  description: `Estimates the gas price needed for a transaction to be included in the next block across 40+ supported chains. Returns confidence-based predictions for both pre-EIP-1559 (Type 0) and EIP-1559 (Type 2) transactions. Supports custom confidence levels and chain selection via chain ID or system/network identifiers.`,
+  description: `Estimates the gas price needed for a transaction to be included within the chain-specific prediction horizon. Returns confidence-based predictions for both pre-EIP-1559 (Type 0) and EIP-1559 (Type 2) transactions. Supports custom confidence levels and chain selection via chain ID or system/network identifiers. Use list_supported_chains to discover chain metadata.`,
   instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.',
     'Default confidence levels are 99, 95, 90, 80, 70. You can override with up to 5 custom levels.',
-    'Specify the chain using chainId (e.g., 1 for Ethereum, 137 for Polygon) or system/network identifiers.',
+    'Call list_supported_chains to discover chainId and system/network identifiers, then select the desired chain.',
     'If no chain is specified, defaults to Ethereum mainnet (chainId=1).'
   ],
   constraints: [
@@ -53,7 +54,7 @@ export let estimateGasPrice = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Numeric chain ID (e.g., 1 for Ethereum, 137 for Polygon, 42161 for Arbitrum). Defaults to 1.'
+          'Numeric chain ID from list_supported_chains (e.g., 1 for Ethereum, 137 for Polygon). Defaults to 1.'
         ),
       system: z
         .string()

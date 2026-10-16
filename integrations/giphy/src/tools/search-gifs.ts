@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, paginationSchema, ratingEnum } from '../lib/types';
+import {
+  gifSchema,
+  paginationSchema,
+  ratingEnum,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let searchGifs = SlateTool.create(spec, {
@@ -9,7 +15,7 @@ export let searchGifs = SlateTool.create(spec, {
   key: 'search_gifs',
   description: `Search GIPHY's library of millions of GIFs and stickers by keyword or phrase. Supports filtering by content type (GIF or sticker), content rating, and language. Results include multiple image renditions in various sizes and formats.`,
   instructions: [
-    'Use specific, descriptive search terms for best results.',
+    "Forward the user's exact search terms without correction or enhancement.",
     'Set contentType to "stickers" to search for transparent sticker images instead of GIFs.'
   ],
   constraints: [
@@ -22,7 +28,21 @@ export let searchGifs = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...requestContextFields,
       query: z.string().describe('Search query term or phrase'),
+      bundle: z
+        .string()
+        .optional()
+        .describe('Optional documented rendition bundle, such as messaging_non_clips'),
+      removeLowContrast: z
+        .boolean()
+        .optional()
+        .describe('Exclude low-contrast items when true'),
+      channelIds: z
+        .array(z.number().int().positive())
+        .max(5)
+        .optional()
+        .describe('Filter by up to five channel IDs from Search Channels'),
       contentType: z
         .enum(['gifs', 'stickers'])
         .default('gifs')
@@ -40,12 +60,13 @@ export let searchGifs = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       results: z.array(gifSchema).describe('Array of matching GIFs or stickers'),
       pagination: paginationSchema.describe('Pagination information')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
     let rating = ctx.input.rating || ctx.config.rating;
     let lang = ctx.input.lang || ctx.config.language;
 
@@ -55,13 +76,13 @@ export let searchGifs = SlateTool.create(spec, {
         limit: ctx.input.limit,
         offset: ctx.input.offset,
         rating,
+        bundle: ctx.input.bundle,
+        removeLowContrast: ctx.input.removeLowContrast,
+        channelIds: ctx.input.channelIds,
         lang
       });
       return {
-        output: {
-          results: result.stickers,
-          pagination: result.pagination
-        },
+        output: { raw: result.raw, results: result.stickers, pagination: result.pagination },
         message: `Found ${result.stickers.length} stickers for "${ctx.input.query}"${result.pagination.totalCount ? ` (${result.pagination.totalCount} total)` : ''}.`
       };
     }
@@ -71,13 +92,13 @@ export let searchGifs = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       rating,
+      bundle: ctx.input.bundle,
+      removeLowContrast: ctx.input.removeLowContrast,
+      channelIds: ctx.input.channelIds,
       lang
     });
     return {
-      output: {
-        results: result.gifs,
-        pagination: result.pagination
-      },
+      output: { raw: result.raw, results: result.gifs, pagination: result.pagination },
       message: `Found ${result.gifs.length} GIFs for "${ctx.input.query}"${result.pagination.totalCount ? ` (${result.pagination.totalCount} total)` : ''}.`
     };
   })

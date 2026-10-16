@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { flag, mapTask, numeric, objects, optionalNumber, rawSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -14,7 +15,11 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot to list tasks for'),
+      robotId: z
+        .string()
+        .describe(
+          'ID of the robot to list tasks for. Call list_robots to discover robot IDs.'
+        ),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z.number().optional().describe('Number of tasks per page (1–10)'),
       status: z
@@ -33,18 +38,32 @@ export let listTasks = SlateTool.create(spec, {
       bulkRunId: z
         .string()
         .optional()
-        .describe('Filter tasks belonging to a specific bulk run')
+        .describe('Filter tasks belonging to a specific bulk run'),
+      includeRetried: z
+        .boolean()
+        .optional()
+        .describe('Set false to exclude tasks that have been retried')
     })
   )
   .output(
     z.object({
       totalCount: z.number().describe('Total number of matching tasks'),
       page: z.number().describe('Current page number'),
-      pageSize: z.number().describe('Number of tasks per page'),
+      pageSize: z.number().optional().describe('Provider-reported page size, when included'),
       tasks: z
         .array(
           z.object({
             taskId: z.string().describe('ID of the task'),
+            robotId: z.string().optional().describe('Robot that owns the task'),
+            startedAt: z.number().optional().describe('Task start timestamp in milliseconds'),
+            userFriendlyError: z
+              .string()
+              .optional()
+              .describe('Provider error explaining a failed task'),
+            videoUrl: z
+              .string()
+              .optional()
+              .describe('Recorded debugging video URL when available'),
             status: z.string().describe('Task status'),
             capturedTexts: z
               .record(z.string(), z.any())
@@ -58,41 +77,67 @@ export let listTasks = SlateTool.create(spec, {
               .number()
               .optional()
               .describe('Unix timestamp when the task was created'),
-            finishedAt: z.number().optional().describe('Unix timestamp when the task finished')
+            finishedAt: z
+              .number()
+              .optional()
+              .describe('Unix timestamp when the task finished'),
+            capturedLists: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Extracted tables and lists'),
+            inputParameters: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Input parameters used for the task'),
+            robotBulkRunId: z.string().optional().describe('Bulk run that created the task'),
+            runByTaskMonitorId: z
+              .string()
+              .optional()
+              .describe('Monitor that created the task'),
+            retriedOriginalTaskId: z
+              .string()
+              .optional()
+              .describe('Original failed task in this retry chain'),
+            retriedByTaskId: z.string().optional().describe('Task that retried this task'),
+            capturedDataTemporaryUrl: z
+              .string()
+              .optional()
+              .describe(
+                'Temporary URL for data exceeding 100 KB; use Download Task Data for a downloadable result'
+              ),
+            raw: rawSchema.optional()
           })
         )
-        .describe('List of tasks')
+        .describe('List of tasks'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.listTasks(ctx.input.robotId, {
+    let result = await new Client(ctx.auth).listTasks(ctx.input.robotId, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize,
       status: ctx.input.status,
       fromDate: ctx.input.fromDate,
       toDate: ctx.input.toDate,
       sort: ctx.input.sort,
-      robotBulkRunId: ctx.input.bulkRunId
+      robotBulkRunId: ctx.input.bulkRunId,
+      includeRetried: ctx.input.includeRetried
     });
-
-    let tasks = (result.items ?? []).map((t: any) => ({
-      taskId: t.id,
-      status: t.status,
-      capturedTexts: t.capturedTexts,
-      capturedScreenshots: t.capturedScreenshots,
-      createdAt: t.createdAt,
-      finishedAt: t.finishedAt
-    }));
-
+    let tasks = objects(result.items, 'tasks').map(mapTask);
     return {
       output: {
-        totalCount: result.totalCount ?? tasks.length,
-        page: result.page ?? ctx.input.page ?? 1,
-        pageSize: result.pageSize ?? ctx.input.pageSize ?? 10,
-        tasks
+        totalCount: numeric(result.totalCount, 'task total count'),
+        page: numeric(result.pageNumber ?? result.page, 'task page number'),
+        ...pickDefined({
+          pageSize: optionalNumber(result.pageSize, 'task page size'),
+          hasMore:
+            result.hasMore == null ? undefined : flag(result.hasMore, 'task pagination flag')
+        }),
+        tasks,
+        raw: result
       },
-      message: `Found **${result.totalCount ?? tasks.length}** task(s), showing page ${result.page ?? ctx.input.page ?? 1}.`
+      message: `Retrieved **${tasks.length}** task(s).`
     };
   })
   .build();

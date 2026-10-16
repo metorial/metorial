@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmDownloadsClient } from '../lib/client';
+import { array, number, optionalText, record, text } from '../lib/response';
 import { spec } from '../spec';
 
 export let getDownloads = SlateTool.create(spec, {
@@ -11,13 +12,13 @@ export let getDownloads = SlateTool.create(spec, {
     'Use named periods like "last-day", "last-week", "last-month" or date ranges in "YYYY-MM-DD:YYYY-MM-DD" format.',
     'Bulk queries support up to 128 unscoped packages at a time.',
     'Per-version downloads are only available for the previous 7 days.',
-    'Data is capped at ~18 months per request. For longer periods, split into multiple requests.'
+    'Bulk queries allow at most 365 days; other point/range queries allow at most 18 months. Split longer periods into multiple requests.'
   ],
   constraints: [
     'Scoped packages are not supported in bulk queries.',
     'Maximum 128 packages per bulk query.',
     'Data available from January 10, 2015 onwards.',
-    'Maximum ~18 months of data per request.'
+    'Maximum 365 days per bulk query; 18 months for other point/range queries.'
   ],
   tags: {
     readOnly: true
@@ -53,6 +54,12 @@ export let getDownloads = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawDownloads: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Unmodified provider response, including null entries for unavailable bulk packages'
+        ),
       totalDownloads: z
         .number()
         .optional()
@@ -87,103 +94,104 @@ export let getDownloads = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new NpmDownloadsClient();
-    let mode = ctx.input.mode || 'point';
-    let period = ctx.input.period || 'last-week';
-
+    let mode = ctx.input.mode ?? 'point';
+    let period = ctx.input.period ?? 'last-week';
+    if (
+      !/^(last-(day|week|month|year)|\d{4}-\d{2}-\d{2}(:\d{4}-\d{2}-\d{2})?)$/.test(period) &&
+      mode !== 'per-version'
+    ) {
+      throw createApiServiceError(
+        'period must be last-day, last-week, last-month, last-year, a date, or a date range.'
+      );
+    }
     if (mode === 'per-version') {
-      if (!ctx.input.packageName) {
-        throw new Error('packageName is required for per-version download counts.');
-      }
-      let data = await client.getVersionDownloads(ctx.input.packageName);
-      let versionDownloads: Record<string, number> = {};
-      if (data.downloads) {
-        for (let [ver, count] of Object.entries(data.downloads)) {
-          versionDownloads[ver] = count as number;
-        }
-      }
+      if (!ctx.input.packageName)
+        throw createApiServiceError(
+          'packageName is required for per-version download counts.'
+        );
+      if (ctx.input.packages?.length)
+        throw createApiServiceError(
+          'Bulk packages cannot be used with per-version mode. Use packageName.'
+        );
+      let data = record(
+        await client.getVersionDownloads(ctx.input.packageName),
+        'version downloads'
+      );
+      let versionDownloads = Object.fromEntries(
+        Object.entries(record(data.downloads, 'version download counts')).map(
+          ([version, count]) => [version, number(count, 'version download count')]
+        )
+      );
       return {
-        output: {
-          versionDownloads
-        },
-        message: `Retrieved per-version download counts for **${ctx.input.packageName}** (last 7 days). ${Object.keys(versionDownloads).length} version(s) with downloads.`
+        output: { versionDownloads, rawDownloads: data },
+        message: `Retrieved per-version download counts for **${ctx.input.packageName}** (last 7 days).`
       };
     }
-
-    if (ctx.input.packages && ctx.input.packages.length > 0) {
-      if (mode === 'point') {
-        let data = await client.getBulkPointDownloads(period, ctx.input.packages);
-        let bulkResults: Record<
-          string,
-          { totalDownloads: number; start?: string; end?: string }
-        > = {};
-        for (let [pkg, stats] of Object.entries(data || {})) {
-          let s = stats as any;
-          if (s) {
-            bulkResults[pkg] = {
-              totalDownloads: s.downloads || 0,
-              start: s.start,
-              end: s.end
-            };
-          }
-        }
-        return {
-          output: { bulkResults },
-          message: `Retrieved bulk download counts for **${ctx.input.packages.length}** package(s) over "${period}".`
-        };
-      } else {
-        let data = await client.getBulkRangeDownloads(period, ctx.input.packages);
-        let bulkResults: Record<
-          string,
-          { totalDownloads: number; start?: string; end?: string }
-        > = {};
-        for (let [pkg, stats] of Object.entries(data || {})) {
-          let s = stats as any;
-          if (s) {
-            let total = (s.downloads || []).reduce(
-              (sum: number, d: any) => sum + (d.downloads || 0),
-              0
-            );
-            bulkResults[pkg] = {
-              totalDownloads: total,
-              start: s.start,
-              end: s.end
-            };
-          }
-        }
-        return {
-          output: { bulkResults },
-          message: `Retrieved bulk range download data for **${ctx.input.packages.length}** package(s) over "${period}".`
+    if (ctx.input.packages !== undefined) {
+      if (ctx.input.packages.length === 0 || ctx.input.packages.length > 128)
+        throw createApiServiceError('Provide between 1 and 128 packages for a bulk query.');
+      if (ctx.input.packages.some(pkg => !pkg || pkg.startsWith('@')))
+        throw createApiServiceError(
+          'Bulk download queries require non-empty unscoped package names.'
+        );
+      let response =
+        mode === 'point'
+          ? await client.getBulkPointDownloads(period, ctx.input.packages)
+          : await client.getBulkRangeDownloads(period, ctx.input.packages);
+      let data = record(response, 'bulk download response');
+      // A single name uses the ordinary endpoint response, rather than a package map.
+      let results =
+        ctx.input.packages.length === 1 ? { [ctx.input.packages[0]!]: data } : data;
+      let bulkResults: Record<
+        string,
+        { totalDownloads: number; start?: string; end?: string }
+      > = {};
+      for (let [pkg, value] of Object.entries(results)) {
+        if (value === null) continue;
+        let stats = record(value, 'bulk package statistics');
+        bulkResults[pkg] = {
+          totalDownloads:
+            mode === 'point'
+              ? number(stats.downloads, 'package downloads')
+              : daily(stats.downloads).reduce((sum, item) => sum + item.downloads, 0),
+          start: optionalText(stats.start, 'download start date'),
+          end: optionalText(stats.end, 'download end date')
         };
       }
-    }
-
-    if (mode === 'point') {
-      let data = await client.getPointDownloads(period, ctx.input.packageName);
       return {
-        output: {
-          totalDownloads: data.downloads,
-          start: data.start,
-          end: data.end
-        },
-        message: `**${ctx.input.packageName || 'All packages'}** had **${(data.downloads || 0).toLocaleString()}** downloads from ${data.start} to ${data.end}.`
+        output: { bulkResults, rawDownloads: data },
+        message: `Retrieved download data for **${Object.keys(bulkResults).length}** of **${ctx.input.packages.length}** package(s) over "${period}". Unavailable package results remain in the provider response.`
       };
     }
-
-    let data = await client.getRangeDownloads(period, ctx.input.packageName);
-    let dailyDownloads = (data.downloads || []).map((d: any) => ({
-      day: d.day,
-      downloads: d.downloads
-    }));
-    let total = dailyDownloads.reduce((sum: number, d: any) => sum + d.downloads, 0);
-
+    let data = record(
+      mode === 'point'
+        ? await client.getPointDownloads(period, ctx.input.packageName)
+        : await client.getRangeDownloads(period, ctx.input.packageName),
+      'download statistics'
+    );
+    let dailyDownloads = mode === 'range' ? daily(data.downloads) : undefined;
+    let totalDownloads = dailyDownloads
+      ? dailyDownloads.reduce((sum, item) => sum + item.downloads, 0)
+      : number(data.downloads, 'download count');
     return {
       output: {
-        totalDownloads: total,
-        start: data.start,
-        end: data.end,
-        dailyDownloads
+        totalDownloads,
+        start: optionalText(data.start, 'download start date'),
+        end: optionalText(data.end, 'download end date'),
+        dailyDownloads,
+        rawDownloads: data
       },
-      message: `**${ctx.input.packageName || 'All packages'}** had **${total.toLocaleString()}** total downloads from ${data.start} to ${data.end} (${dailyDownloads.length} days).`
+      message: `**${ctx.input.packageName ?? 'All packages'}** had **${totalDownloads.toLocaleString()}** downloads over "${period}".`
     };
   })
   .build();
+
+function daily(value: unknown) {
+  return array(value, 'daily downloads').map(item => {
+    let row = record(item, 'daily download row');
+    return {
+      day: text(row.day, 'download date'),
+      downloads: number(row.downloads, 'daily download count')
+    };
+  });
+}

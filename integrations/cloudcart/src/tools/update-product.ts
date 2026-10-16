@@ -33,6 +33,7 @@ export let updateProduct = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       productId: z.string(),
       name: z.string().optional(),
       dateModified: z.string().optional()
@@ -65,9 +66,10 @@ export let updateProduct = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         productId: p.id,
-        name: p.attributes.name,
-        dateModified: p.attributes.date_modified
+        name: p.attributes.name ?? undefined,
+        dateModified: p.attributes.date_modified ?? undefined
       },
       message: `Updated product **${p.attributes.name || p.id}**.`
     };

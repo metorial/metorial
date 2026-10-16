@@ -93,7 +93,7 @@ export let getGroup = SlateTool.create(spec, {
         })),
         inviteLink: g.invite_link
       },
-      message: `Retrieved group **${g.name}** with ${g.members?.length || 0} member(s)`
+      message: `Retrieved group **${g.name}**`
     };
   })
   .build();

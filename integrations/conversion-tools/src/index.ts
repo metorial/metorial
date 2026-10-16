@@ -3,12 +3,14 @@ import { spec } from './spec';
 import {
   captureWebsite,
   convertFile,
+  downloadFile,
   getAccount,
   getFileInfo,
   getTask,
   listConversions,
   listTasks,
-  manageTask
+  manageTask,
+  uploadFile
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -20,7 +22,9 @@ export let provider = Slate.create({
     manageTask,
     getFileInfo,
     captureWebsite,
-    getAccount
+    getAccount,
+    uploadFile,
+    downloadFile
   ],
   triggers: []
 });

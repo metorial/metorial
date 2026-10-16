@@ -28,6 +28,7 @@ export let listFolders = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       folders: z
         .array(
           z.object({
@@ -54,7 +55,7 @@ export let listFolders = SlateTool.create(spec, {
         });
         let items = Array.isArray(renders) ? renders : [];
         return {
-          output: { renders: items },
+          output: { renders: items, raw: renders },
           message: `Found **${items.length}** render(s) in folder \`${ctx.input.folderId}\`.`
         };
       } else {
@@ -65,7 +66,7 @@ export let listFolders = SlateTool.create(spec, {
         });
         let items = Array.isArray(templates) ? templates : [];
         return {
-          output: { templates: items },
+          output: { templates: items, raw: templates },
           message: `Found **${items.length}** template(s) in folder \`${ctx.input.folderId}\`.`
         };
       }
@@ -81,6 +82,7 @@ export let listFolders = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: folders,
         folders: items.map((f: any) => ({
           folderId: f.id,
           folderName: f.name,

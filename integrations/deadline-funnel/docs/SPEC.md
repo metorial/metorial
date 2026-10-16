@@ -1,67 +1,40 @@
-# Slates Specification for Deadline Funnel
-
-## Overview
-
-Deadline Funnel is a marketing tool that creates personalized countdown timers and deadlines for sales pages and evergreen campaigns. It enables users to add countdown timers and deadlines directly on sales pages, commonly used to drive sales for new product launches and evergreen campaigns. It integrates with email service providers and page builders to trigger and track individual subscriber deadlines.
+# Deadline Funnel Integration
 
 ## Authentication
 
-Deadline Funnel uses **API Key** authentication. Users generate an API key from their Deadline Funnel dashboard by navigating to the API section. The API key is passed as a Bearer token in the `Authorization` header.
+Existing REST operations retain API-key authentication using `Authorization: Bearer {api_key}` at `https://app.deadlinefunnel.com/api/v1`. No OAuth scopes or refresh token are used. Configuration is empty, with no duplicate auth properties or required resource IDs.
 
-- **Base URL:** `https://app.deadlinefunnel.com/api/v1`
-- **Header:** `Authorization: Bearer {api_key}`
+The public Deadline Funnel help center does not provide a reference confirming this REST authentication mechanism, base URL, routes, response shapes, pagination, or a current-user endpoint. These legacy operations remain available for compatibility; their acceptance has not been verified.
 
-For third-party integrations (e.g., Teachable), you add your Deadline Funnel API Key from your Deadline Funnel account.
+## Tools
 
-Deadline Funnel also generates **per-campaign webhook URLs** that are used to receive incoming data (e.g., from email platforms). To find a webhook URL, navigate to the Integrations tab in the top menu, identify the campaign, and click 'Edit Integration'. These webhook URLs are unique to each campaign and integration.
+| Tool | Purpose |
+| --- | --- |
+| `list_campaigns` | Return campaigns and their IDs from the existing account REST operation. Missing or malformed required campaign fields cause a clear error. |
+| `start_deadline` | Submit an email and optional first name to the existing campaign deadline REST operation. Use `list_campaigns` to discover the campaign ID. |
+| `track_purchase` | Submit an email, purchase amount, currency, and optional first name to the existing campaign sales REST operation. |
+| `create_custom_event` | Submit an event name, email, and optional contact name to the existing custom-event REST operation. |
+| `start_deadline_webhook` | Submit a subscriber email to a campaign's documented custom webhook. |
 
-## Features
+## Documented custom webhook workflow
 
-### Deadline Tracking Management
+1. Open the campaign editor and select **Emails → Custom API**.
+2. Copy the private HTTPS webhook URL, with the pattern `https://code.deadlinefunnel.com/listener/{campaign}/custom/{secret}`.
+3. Call `start_deadline_webhook` with that URL and the subscriber email.
+4. The tool sends a POST with a URL-encoded `email` field as a plain-text body. It sends no API-key authorization header and does not follow redirects.
+5. Confirm the new tracking record in campaign Analytics. HTTP acceptance is reported separately from tracking-record creation.
+6. Use Deadline Funnel email links in campaign emails to connect the subscriber's email to their browser and deadline.
 
-Start personalized deadline countdowns for individual subscribers/leads. You can use webhooks to start the tracking for a subscriber in one of your campaigns. This only works for starting the deadline tracking, and isn't currently possible with sales tracking via custom code. Each lead is identified by email address. You choose the Deadline Funnel campaign/promotion to trigger and select the email address field to capture emails.
+The webhook tool accepts only the documented Deadline Funnel host and custom-listener path. It does not accept a sales webhook: purchase values are configured separately in **Sales Tracking Setup**.
 
-- Requires specifying which campaign to associate the deadline with.
-- For the integration to work, subscribers must click Deadline Funnel email links before reaching a page with a countdown timer. This is necessary to ensure each subscriber is assigned the correct deadline.
+## Capability limits
 
-### Sales Tracking
+The help center documents custom-event setup in the dashboard and sales tracking through campaign-specific webhooks or automation services. It does not establish a public REST contract for account/profile discovery, portal CRUD, event listing, form-submission listing, or webhook subscription management. No endpoints have been guessed for those capabilities, and no outbound triggers are registered.
 
-Sales Tracking works through a webhook. Instead of creating a tracking record under 'Tracking Started' and assigning a deadline, it creates a tracking record under the 'Sales Tracked' section. This record includes the subscriber's email, date of purchase, and the amount and currency specified.
+## Official references
 
-- Amount and currency are configured when creating the sales tracking webhook.
-- Deadline Funnel does not have the ability to store two separate webhooks inside of one campaign, so tracking multiple price points requires generating webhooks sequentially.
-
-### Email Platform Integrations
-
-Connect Deadline Funnel to email service providers to automatically start deadlines based on automation triggers. Supported platforms include ActiveCampaign, AWeber, ConvertKit (Kit), Drip, GetResponse, HighLevel, HubSpot, Keap, Mailchimp, MailerLite, Ontraport, Sendlane, and others. With the API connection you can trigger and start a Deadline Funnel campaign any time your email service provider runs a rule or automation in the background.
-
-### ConvertHub / Portal
-
-Deadline Funnel includes ConvertHub, an app that allows you to use Portal functionality outside of a Deadline Funnel campaign. Portal features include social proof display, opt-in forms, microsurveys, custom events, and analytics.
-
-- Portal can be added to any website page.
-- Custom Events can be created and displayed in Portal's Social Proof widget.
-
-### Custom Events
-
-Custom Events can be created in Deadline Funnel (e.g., via Zapier's "Create Custom Event" action). These events can be used for social proof displays and analytics tracking.
-
-## Events
-
-Deadline Funnel has limited event/webhook support. It primarily acts as a **webhook receiver** (accepting inbound webhooks to trigger deadlines and sales tracking) rather than a webhook sender.
-
-The following outbound triggers are available (primarily through Zapier):
-
-### New ConvertHub Portal Created
-
-Triggers when a new portal is created.
-
-### New Custom Event
-
-Triggers when a new custom event is created in Deadline Funnel. This can be used to react to events tracked within campaigns.
-
-### New ConvertHub Opt-in Form Submission
-
-Triggers when a new subscriber submits a ConvertHub opt-in form.
-
-Note: These outbound event triggers appear to be available through Zapier's polling mechanism rather than native webhooks sent by Deadline Funnel. Deadline Funnel does not appear to offer a native outbound webhook configuration through its own API for arbitrary event subscriptions.
+- [Custom Webhook Integration](https://docs.deadlinefunnel.com/en/articles/4429309-custom-webhook-integration)
+- [Make.com integration](https://docs.deadlinefunnel.com/en/articles/11132731-how-to-integrate-deadline-funnel-with-make-com)
+- [Sales Tracking](https://docs.deadlinefunnel.com/en/articles/4160232-how-to-set-up-sales-tracking-in-deadline-funnel)
+- [Sales Tracking with Custom API](https://docs.deadlinefunnel.com/en/articles/12166196-how-to-set-up-sales-tracking-in-deadline-funnel-with-custom-api)
+- [Custom Events for Portal Social Proof](https://docs.deadlinefunnel.com/en/articles/6362084-how-to-create-custom-events-to-display-in-portal-s-social-proof)

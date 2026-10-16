@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,6 +18,9 @@ export let auth = SlateAuth.create()
         .describe('Your Promptmate.io API key. You can find it in your account settings.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Enter your Promptmate.io API key.');
+      }
       return {
         output: {
           token: ctx.input.apiKey
@@ -24,21 +28,26 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.promptmate.io/v1',
-        headers: {
-          'x-api-key': ctx.output.token
-        }
-      });
-
-      let response = await http.get('/userInfo');
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getUserInfo();
+      let email = typeof user.email === 'string' ? user.email : undefined;
+      let id = typeof user.userId === 'string' && user.userId ? user.userId : email;
+      let name = [user.userName, user.name, user.displayName].find(
+        (value): value is string => typeof value === 'string' && value.length > 0
+      );
+      if (!id) {
+        throw createApiServiceError(
+          'Promptmate.io returned account information without an email or user ID.',
+          {
+            reason: 'promptmate_invalid_profile'
+          }
+        );
+      }
 
       return {
         profile: {
-          id: user.userId,
-          name: user.userName || user.name,
-          email: user.email
+          id,
+          name,
+          email
         }
       };
     }

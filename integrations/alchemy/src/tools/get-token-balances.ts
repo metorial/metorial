@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlchemyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,6 +31,7 @@ Use this to check what tokens a wallet holds and their balances.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Provider balance response'),
       walletAddress: z.string().describe('The queried wallet address'),
       tokenBalances: z
         .array(
@@ -66,9 +67,16 @@ Use this to check what tokens a wallet holds and their balances.`,
       decimals?: number;
     }[] = [];
 
-    let balances = result.tokenBalances || [];
+    let balances = result.tokenBalances;
     for (let tb of balances) {
-      if (tb.tokenBalance === '0x0' || tb.tokenBalance === '0x') continue;
+      if (tb.tokenBalance === null) {
+        throw createApiServiceError(
+          `Alchemy could not read the balance for ${tb.contractAddress}.`
+        );
+      }
+      if (!/^0x[0-9a-f]*$/i.test(tb.tokenBalance))
+        throw createApiServiceError('Alchemy returned an invalid token balance.');
+      if (tb.tokenBalance === '0x' || BigInt(tb.tokenBalance) === 0n) continue;
       let metadata: any = {};
       try {
         metadata = await client.getTokenMetadata(tb.contractAddress);
@@ -78,17 +86,18 @@ Use this to check what tokens a wallet holds and their balances.`,
       tokenBalances.push({
         contractAddress: tb.contractAddress,
         balance: tb.tokenBalance,
-        name: metadata.name || undefined,
-        symbol: metadata.symbol || undefined,
+        name: metadata.name ?? undefined,
+        symbol: metadata.symbol ?? undefined,
         decimals: metadata.decimals ?? undefined
       });
     }
 
     return {
       output: {
+        raw: result,
         walletAddress: ctx.input.walletAddress,
         tokenBalances,
-        pageKey: result.pageKey || undefined
+        pageKey: result.pageKey ?? undefined
       },
       message: `Found **${tokenBalances.length}** token balance(s) for \`${ctx.input.walletAddress}\`${
         tokenBalances.length > 0

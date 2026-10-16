@@ -8,7 +8,7 @@ export let deleteImage = SlateTool.create(spec, {
   key: 'delete_image',
   description: `Delete a previously generated image from DynaPictures. Provide the image path (the subpath portion from the image URL after the domain). This permanently removes the generated image.`,
   instructions: [
-    'The imagePath is the path portion after "https://api.dynapictures.com/images/" in the generated image URL.'
+    'Use the subpath from the returned image URL, for example workspace/image.png. For URLs on api.dynapictures.com/images/, remove the /images/ prefix as well.'
   ],
   tags: {
     destructive: true,

@@ -73,9 +73,9 @@ export let getNft = SlateTool.create(spec, {
       imageUrl: nft.image_url ?? null,
       animationUrl: nft.animation_url ?? null,
       metadataUrl: nft.metadata_url ?? null,
-      collection: nft.collection ?? '',
-      contract: nft.contract ?? ctx.input.contractAddress,
-      tokenStandard: nft.token_standard ?? 'unknown',
+      collection: nft.collection,
+      contract: nft.contract,
+      tokenStandard: nft.token_standard,
       owners: (nft.owners ?? []).map((o: any) => ({
         address: o.address,
         quantity: o.quantity

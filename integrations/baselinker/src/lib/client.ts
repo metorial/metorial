@@ -1,38 +1,60 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export class BaseLinkerClient {
-  private token: string;
+  private http;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token.trim()) {
+      throw createApiServiceError('A nonempty BaseLinker API token is required.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.baselinker.com',
+      authHeader: { name: 'X-BLToken', value: config.token },
+      contentType: 'application/x-www-form-urlencoded',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BaseLinker',
+          reason: 'baselinker_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['error_message', 'error_code', 'message'],
+          extractUpstreamCode: (_error, response, helpers) => {
+            let body = response?.data;
+            return helpers.isRecord(body) && typeof body.error_code === 'string'
+              ? body.error_code
+              : undefined;
+          }
+        })
+    });
   }
 
   private async request<T = any>(
     method: string,
     parameters: Record<string, any> = {}
   ): Promise<T> {
-    let axiosInstance = createAxios({
-      baseURL: 'https://api.baselinker.com'
-    });
-
     let params = new URLSearchParams();
     params.append('method', method);
     params.append('parameters', JSON.stringify(parameters));
+    let response = await this.http.post('/connector.php', params.toString());
+    let data: unknown = response.data;
 
-    let response = await axiosInstance.post('/connector.php', params.toString(), {
-      headers: {
-        'X-BLToken': this.token,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    let data = response.data;
-
-    if (data.status === 'ERROR') {
-      throw new Error(`BaseLinker API error (${data.error_code}): ${data.error_message}`);
+    // Some account-disabled methods can return an empty response; preserve it.
+    if (isApiErrorRecord(data) && data.status === 'ERROR') {
+      throw createApiServiceError(
+        typeof data.error_message === 'string'
+          ? `BaseLinker API ${method} failed: ${data.error_message}`
+          : `BaseLinker API ${method} failed.`,
+        {
+          reason: 'baselinker_api_error',
+          upstreamCode: typeof data.error_code === 'string' ? data.error_code : undefined
+        }
+      );
     }
-
-    return data;
+    return data as T;
   }
 
   // ── Orders ──
@@ -46,9 +68,14 @@ export class BaseLinkerClient {
       getUnconfirmedOrders?: boolean;
       statusId?: number;
       filterEmail?: string;
+      filterShopOrderId?: number;
+      filterExternalOrderId?: string;
       filterOrderSource?: string;
       filterOrderSourceId?: number;
       includeCustomExtraFields?: boolean;
+      includeCommissions?: boolean;
+      includeConnectData?: boolean;
+      includeDiscountsData?: boolean;
     } = {}
   ): Promise<any> {
     return this.request('getOrders', {
@@ -59,9 +86,14 @@ export class BaseLinkerClient {
       get_unconfirmed_orders: params.getUnconfirmedOrders,
       status_id: params.statusId,
       filter_email: params.filterEmail,
+      filter_shop_order_id: params.filterShopOrderId,
+      filter_external_order_id: params.filterExternalOrderId,
       filter_order_source: params.filterOrderSource,
       filter_order_source_id: params.filterOrderSourceId,
-      include_custom_extra_fields: params.includeCustomExtraFields
+      include_custom_extra_fields: params.includeCustomExtraFields,
+      include_commissions: params.includeCommissions,
+      include_connect_data: params.includeConnectData,
+      include_discounts_data: params.includeDiscountsData
     });
   }
 
@@ -371,12 +403,14 @@ export class BaseLinkerClient {
     paymentDone: number;
     paymentDate?: number;
     paymentComment?: string;
+    externalPaymentId?: string;
   }): Promise<any> {
     return this.request('setOrderPayment', {
       order_id: params.orderId,
       payment_done: params.paymentDone,
       payment_date: params.paymentDate,
-      payment_comment: params.paymentComment
+      payment_comment: params.paymentComment,
+      external_payment_id: params.externalPaymentId
     });
   }
 
@@ -557,8 +591,8 @@ export class BaseLinkerClient {
     });
   }
 
-  async getInventoryManufacturers(): Promise<any> {
-    return this.request('getInventoryManufacturers');
+  async getInventoryManufacturers(page?: number): Promise<any> {
+    return this.request('getInventoryManufacturers', { page });
   }
 
   async addInventoryManufacturer(params: {
@@ -577,7 +611,19 @@ export class BaseLinkerClient {
     });
   }
 
+  async getInventoryWarehouses(): Promise<any> {
+    return this.request('getInventoryWarehouses');
+  }
+
+  async getInventoryPriceGroups(): Promise<any> {
+    return this.request('getInventoryPriceGroups');
+  }
+
   // ── Courier Shipments ──
+
+  async getCourierAccounts(courierCode: string): Promise<any> {
+    return this.request('getCourierAccounts', { courier_code: courierCode });
+  }
 
   async getCouriersList(): Promise<any> {
     return this.request('getCouriersList');
@@ -610,7 +656,13 @@ export class BaseLinkerClient {
     courierCode: string;
     accountId?: number;
     fields?: Array<{ id: string; value: string }>;
-    packages: Array<{ weight: number; sizeX?: number; sizeY?: number; sizeZ?: number }>;
+    packages: Array<{
+      weight: number;
+      sizeX?: number;
+      sizeY?: number;
+      sizeZ?: number;
+      fields?: Record<string, string | number | boolean>;
+    }>;
   }): Promise<any> {
     return this.request('createPackage', {
       order_id: params.orderId,
@@ -621,7 +673,8 @@ export class BaseLinkerClient {
         weight: p.weight,
         size_x: p.sizeX,
         size_y: p.sizeY,
-        size_z: p.sizeZ
+        size_z: p.sizeZ,
+        ...p.fields
       }))
     });
   }
@@ -631,19 +684,26 @@ export class BaseLinkerClient {
     courierCode: string;
     packageNumber: string;
     pickupDate?: number;
+    returnShipment?: boolean;
   }): Promise<any> {
     return this.request('createPackageManual', {
       order_id: params.orderId,
       courier_code: params.courierCode,
       package_number: params.packageNumber,
-      pickup_date: params.pickupDate
+      pickup_date: params.pickupDate,
+      return_shipment: params.returnShipment
     });
   }
 
-  async getLabel(courierCode: string, packageId: number): Promise<any> {
+  async getLabel(
+    courierCode: string,
+    packageId?: number,
+    packageNumber?: string
+  ): Promise<any> {
     return this.request('getLabel', {
       courier_code: courierCode,
-      package_id: packageId
+      package_id: packageId,
+      package_number: packageNumber
     });
   }
 
@@ -671,26 +731,72 @@ export class BaseLinkerClient {
     });
   }
 
+  async getOrderReturnOptions(): Promise<any> {
+    let [reasons, statuses] = await Promise.all([
+      this.request('getOrderReturnReasonsList'),
+      this.request('getOrderReturnStatusList')
+    ]);
+    return { reasons, statuses };
+  }
+
   async getOrderReturnReasons(): Promise<any> {
     return this.request('getOrderReturnReasons');
   }
 
   async addOrderReturn(params: {
-    orderId: number;
+    orderId?: number;
+    statusId?: number;
+    dateAdd?: number;
+    currency?: string;
+    refunded?: boolean;
     reasonId?: number;
     adminComments?: string;
     products?: Array<{
       orderProductId: number;
       quantity: number;
+      name?: string;
+      sku?: string;
+      storage?: string;
+      storageId?: number;
+      variantId?: number;
+      ean?: string;
+      location?: string;
+      warehouseId?: number;
+      attributes?: string;
+      weight?: number;
+      productId?: string;
+      priceBrutto?: number;
+      taxRate?: number;
+      returnReasonId?: number;
+      statusId?: number;
     }>;
   }): Promise<any> {
     return this.request('addOrderReturn', {
       order_id: params.orderId,
+      status_id: params.statusId,
+      date_add: params.dateAdd,
+      currency: params.currency,
+      refunded: params.refunded,
       reason_id: params.reasonId,
       admin_comments: params.adminComments,
       products: params.products?.map(p => ({
         order_product_id: p.orderProductId,
-        quantity: p.quantity
+        quantity: p.quantity,
+        name: p.name,
+        sku: p.sku,
+        storage: p.storage,
+        storage_id: p.storageId,
+        variant_id: p.variantId,
+        ean: p.ean,
+        location: p.location,
+        warehouse_id: p.warehouseId,
+        attributes: p.attributes,
+        weight: p.weight,
+        product_id: p.productId,
+        price_brutto: p.priceBrutto,
+        tax_rate: p.taxRate,
+        return_reason_id: p.returnReasonId,
+        status_id: p.statusId
       }))
     });
   }

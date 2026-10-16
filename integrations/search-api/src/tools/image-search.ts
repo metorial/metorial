@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let imageResultSchema = z.object({
@@ -88,6 +88,7 @@ export let imageSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       images: z.array(imageResultSchema).describe('Image search results'),
       suggestions: z.array(z.string()).optional().describe('Search suggestions')
@@ -104,7 +105,25 @@ export let imageSearch = SlateTool.create(spec, {
       hl: ctx.input.language,
       device: ctx.input.device,
       page: ctx.input.page,
-      size: ctx.input.size,
+      size: ctx.input.size
+        ? ((
+            {
+              qsvga: 'larger_than_400x300',
+              vga: 'larger_than_640x480',
+              svga: 'larger_than_800x600',
+              xga: 'larger_than_1024x768',
+              '2mp': 'larger_than_2mp',
+              '4mp': 'larger_than_4mp',
+              '6mp': 'larger_than_6mp',
+              '8mp': 'larger_than_8mp',
+              '12mp': 'larger_than_12mp',
+              '15mp': 'larger_than_15mp',
+              '20mp': 'larger_than_20mp',
+              '40mp': 'larger_than_40mp',
+              '70mp': 'larger_than_70mp'
+            } as Record<string, string>
+          )[ctx.input.size] ?? ctx.input.size)
+        : undefined,
       color: ctx.input.color,
       image_type: ctx.input.imageType,
       time_period: ctx.input.timePeriod,
@@ -112,28 +131,29 @@ export let imageSearch = SlateTool.create(spec, {
       safe: ctx.input.safeSearch
     });
 
-    let images = (data.images || []).map((img: any) => ({
+    let images = resultArray(data.images, 'images').map((img: any) => ({
       position: img.position,
       title: img.title,
-      link: img.link,
-      source: img.source,
-      original: img.original,
-      originalWidth: img.original_width,
-      originalHeight: img.original_height,
+      link: img.link ?? img.source?.link,
+      source: typeof img.source === 'string' ? img.source : img.source?.name,
+      original: typeof img.original === 'string' ? img.original : img.original?.link,
+      originalWidth: img.original?.width ?? img.original_width,
+      originalHeight: img.original?.height ?? img.original_height,
       thumbnail: img.thumbnail
     }));
 
-    let suggestions = (data.suggestions || [])
+    let suggestions = resultArray(data.suggestions, 'suggestions', true)
       .map((s: any) => s.query || s.title || s)
       .filter(Boolean);
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         images,
         suggestions: suggestions.length > 0 ? suggestions : undefined
       },
-      message: `Found ${images.length} image${images.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${images.length} image${images.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

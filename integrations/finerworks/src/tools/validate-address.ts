@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 export let validateAddress = SlateTool.create(spec, {
@@ -30,6 +30,7 @@ export let validateAddress = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       valid: z.boolean().describe('Whether the address is valid'),
       address: z
         .object({
@@ -60,42 +61,43 @@ export let validateAddress = SlateTool.create(spec, {
     let data = await client.validateRecipientAddress({
       first_name: ctx.input.firstName,
       last_name: ctx.input.lastName,
-      company_name: ctx.input.companyName ?? '',
+      company_name: ctx.input.companyName,
       address_1: ctx.input.address1,
-      address_2: ctx.input.address2 ?? '',
-      address_3: ctx.input.address3 ?? '',
+      address_2: ctx.input.address2,
+      address_3: ctx.input.address3,
       city: ctx.input.city,
-      state_code: ctx.input.stateCode ?? '',
-      province: ctx.input.province ?? '',
+      state_code: ctx.input.stateCode,
+      province: ctx.input.province,
       zip_postal_code: ctx.input.zipPostalCode,
       country_code: ctx.input.countryCode,
-      phone: ctx.input.phone ?? '',
-      email: ctx.input.email ?? '',
-      address_order_po: ''
+      phone: ctx.input.phone,
+      email: ctx.input.email,
+      address_order_po: undefined
     });
 
-    let valid = data.status?.success ?? false;
+    let valid = data.status.success;
     let addr = data.address;
 
     return {
       output: {
+        raw: data,
         valid,
         address: addr
           ? {
-              firstName: addr.first_name ?? '',
-              lastName: addr.last_name ?? '',
-              companyName: addr.company_name || undefined,
-              address1: addr.address_1 ?? '',
-              address2: addr.address_2 || undefined,
-              address3: addr.address_3 || undefined,
-              city: addr.city ?? '',
-              stateCode: addr.state_code || undefined,
-              province: addr.province || undefined,
-              zipPostalCode: addr.zip_postal_code ?? '',
-              countryCode: addr.country_code ?? ''
+              firstName: requiredString(addr.first_name, 'first_name'),
+              lastName: requiredString(addr.last_name, 'last_name'),
+              companyName: addr.company_name ?? undefined,
+              address1: requiredString(addr.address_1, 'address_1'),
+              address2: addr.address_2 ?? undefined,
+              address3: addr.address_3 ?? undefined,
+              city: requiredString(addr.city, 'city'),
+              stateCode: addr.state_code ?? undefined,
+              province: addr.province ?? undefined,
+              zipPostalCode: requiredString(addr.zip_postal_code, 'zip_postal_code'),
+              countryCode: requiredString(addr.country_code, 'country_code')
             }
           : undefined,
-        message: data.status?.message || undefined
+        message: data.status?.message ?? undefined
       },
       message: valid
         ? `Address is **valid**: ${addr?.address_1}, ${addr?.city}, ${addr?.state_code} ${addr?.zip_postal_code}, ${addr?.country_code}`

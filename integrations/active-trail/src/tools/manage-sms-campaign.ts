@@ -1,18 +1,22 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readId, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 export let listSmsCampaigns = SlateTool.create(spec, {
   name: 'List SMS Campaigns',
   key: 'list_sms_campaigns',
-  description: `List all SMS campaigns in your account with pagination.`,
+  description: `List SMS campaigns in your account with pagination. Set includeNotSent to true to discover draft campaigns for estimates or updates.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
     z.object({
       page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      limit: z.number().optional().describe('Results per page'),
+      includeNotSent: z
+        .boolean()
+        .optional()
+        .describe('Include campaigns that have not been sent. ActiveTrail defaults to false.')
     })
   )
   .output(
@@ -33,20 +37,24 @@ export let listSmsCampaigns = SlateTool.create(spec, {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.listSmsCampaigns({
       page: ctx.input.page,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      includeNotSent: ctx.input.includeNotSent
     });
-    let campaigns = Array.isArray(result) ? result : [];
-    return {
-      output: {
-        campaigns: campaigns.map((c: any) => ({
-          campaignId: c.id,
-          name: c.name,
-          statusName: c.status_name,
-          totalSent: c.total_sent
-        }))
+    let campaigns = readList(result);
+    return redactProviderData(
+      {
+        output: {
+          campaigns: campaigns.map((c: any) => ({
+            campaignId: readId(c),
+            name: c.name,
+            statusName: c.status_name,
+            totalSent: c.total_sent
+          }))
+        },
+        message: `Found **${campaigns.length}** SMS campaign(s).`
       },
-      message: `Found **${campaigns.length}** SMS campaign(s).`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -76,19 +84,22 @@ export let getSmsCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let campaign = await client.getSmsCampaign(ctx.input.campaignId);
-    return {
-      output: {
-        campaignId: campaign.id,
-        name: campaign.name,
-        content: campaign.content,
-        fromName: campaign.from_name,
-        statusName: campaign.status_name,
-        totalSent: campaign.total_sent,
-        scheduling: campaign.scheduling,
-        segment: campaign.segment
+    return redactProviderData(
+      {
+        output: {
+          campaignId: readId(campaign),
+          name: campaign.name,
+          content: campaign.content,
+          fromName: campaign.from_name,
+          statusName: campaign.status_name,
+          totalSent: campaign.total_sent,
+          scheduling: campaign.scheduling,
+          segment: campaign.segment
+        },
+        message: `Retrieved SMS campaign **${campaign.name || ctx.input.campaignId}**.`
       },
-      message: `Retrieved SMS campaign **${campaign.name || ctx.input.campaignId}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -135,6 +146,8 @@ export let createSmsCampaign = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    if (!ctx.input.fromName?.trim() && ctx.input.smsSendingProfileId === undefined)
+      throw createApiServiceError('Provide a sender name or SMS sending profile ID.');
     let data: Record<string, any> = {
       name: ctx.input.name,
       content: ctx.input.content,
@@ -155,13 +168,16 @@ export let createSmsCampaign = SlateTool.create(spec, {
     };
 
     let result = await client.createSmsCampaign(data);
-    return {
-      output: {
-        campaignId: result.id,
-        name: result.name,
-        statusName: result.status_name
+    return redactProviderData(
+      {
+        output: {
+          campaignId: readId(result),
+          name: result.name,
+          statusName: result.status_name
+        },
+        message: `SMS campaign **${ctx.input.name}** created with ID **${result.id}**.`
       },
-      message: `SMS campaign **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();

@@ -2,9 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   calculateCo2Offset,
+  compareChargeOrFuel,
   createEnergySchedule,
   getBestHour,
+  getCo2Advice,
+  getCo2Meter,
   getDispatch,
+  getEnergySchedule,
   getGreenPowerIndex,
   getMarketData,
   getMeritOrder,
@@ -12,7 +16,10 @@ import {
   getStromkontoBalances,
   getStrommix,
   getTariffInfo,
-  submitMeterReading
+  reportEnergyScheduleConsumption,
+  submitMeterReading,
+  updateCo2Meter,
+  updateEnergyScheduleRequirements
 } from './tools';
 
 export let provider = Slate.create({
@@ -29,7 +36,14 @@ export let provider = Slate.create({
     submitMeterReading,
     getStromkontoBalances,
     getTariffInfo,
-    calculateCo2Offset
+    calculateCo2Offset,
+    compareChargeOrFuel,
+    getCo2Advice,
+    getCo2Meter,
+    updateCo2Meter,
+    getEnergySchedule,
+    updateEnergyScheduleRequirements,
+    reportEnergyScheduleConsumption
   ],
   triggers: []
 });

@@ -24,7 +24,9 @@ export let listCalendarEvents = SlateTool.create(spec, {
             description: z.string().optional().describe('Event description'),
             startDateTime: z.string().optional().describe('Start date/time'),
             endDateTime: z.string().optional().describe('End date/time'),
-            isAllDayEvent: z.boolean().optional().describe('Whether this is an all-day event')
+            isAllDayEvent: z.boolean().optional().describe('Whether this is an all-day event'),
+            startDay: z.string().optional().describe('Start day for an all-day event'),
+            endDay: z.string().optional().describe('Exclusive end day for an all-day event')
           })
         )
         .describe('List of calendar events')
@@ -37,11 +39,13 @@ export let listCalendarEvents = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let events = items.map((e: any) => ({
       calendarEventId: String(e.CalendarEventId),
-      title: e.Title,
-      description: e.Description,
-      startDateTime: e.StartDateTime,
-      endDateTime: e.EndDateTime,
-      isAllDayEvent: e.IsAllDayEvent
+      title: e.Title ?? undefined,
+      description: e.Description ?? undefined,
+      startDateTime: e.StartDateTime ?? undefined,
+      endDateTime: e.EndDateTime ?? undefined,
+      isAllDayEvent: e.IsAllDayEvent ?? undefined,
+      startDay: e.StartDay ?? undefined,
+      endDay: e.EndDay ?? undefined
     }));
 
     return {
@@ -87,7 +91,7 @@ export let createCalendarEvent = SlateTool.create(spec, {
     return {
       output: {
         calendarEventId: String(result.CalendarEventId),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Created calendar event **${result.Title}** (ID: ${result.CalendarEventId}).`
     };
@@ -135,7 +139,7 @@ export let updateCalendarEvent = SlateTool.create(spec, {
     return {
       output: {
         calendarEventId: String(result.CalendarEventId),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Updated calendar event **${result.Title}** (ID: ${result.CalendarEventId}).`
     };

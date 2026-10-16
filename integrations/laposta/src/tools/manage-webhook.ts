@@ -1,31 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  mapWebhook,
+  webhookNullableModifiedOutputSchema,
+  webhookOutputSchema
+} from '../lib/maps';
 import { spec } from '../spec';
-
-let webhookOutputSchema = z.object({
-  webhookId: z.string().describe('Unique identifier of the webhook'),
-  listId: z.string().describe('ID of the list the webhook is bound to'),
-  event: z.string().describe('Event type: subscribed, modified, or deactivated'),
-  url: z.string().describe('Target URL for webhook delivery'),
-  blocked: z.boolean().describe('Whether the webhook is currently blocked'),
-  secret: z.string().describe('Secret used for HMAC-SHA256 signature verification'),
-  state: z.string().describe('Current state of the webhook'),
-  created: z.string().describe('Creation timestamp'),
-  modified: z.string().describe('Last modified timestamp')
-});
-
-let mapWebhook = (w: any) => ({
-  webhookId: w.webhook_id,
-  listId: w.list_id,
-  event: w.event,
-  url: w.url,
-  blocked: w.blocked,
-  secret: w.secret,
-  state: w.state,
-  created: w.created,
-  modified: w.modified
-});
 
 export let getWebhooks = SlateTool.create(spec, {
   name: 'Get Webhooks',
@@ -43,7 +24,7 @@ export let getWebhooks = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      webhooks: z.array(webhookOutputSchema).describe('Retrieved webhooks')
+      webhooks: z.array(webhookNullableModifiedOutputSchema).describe('Retrieved webhooks')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,7 +32,7 @@ export let getWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.webhookId) {
       let result = await client.getWebhook(ctx.input.webhookId, ctx.input.listId);
-      let webhook = mapWebhook(result.webhook);
+      let webhook = mapWebhook(result.webhook, webhookNullableModifiedOutputSchema);
       return {
         output: { webhooks: [webhook] },
         message: `Retrieved webhook for **${webhook.event}** event → ${webhook.url}.`
@@ -59,7 +40,9 @@ export let getWebhooks = SlateTool.create(spec, {
     }
 
     let results = await client.getWebhooks(ctx.input.listId);
-    let webhooks = results.map(r => mapWebhook(r.webhook));
+    let webhooks = results.map(r =>
+      mapWebhook(r.webhook, webhookNullableModifiedOutputSchema)
+    );
     return {
       output: { webhooks },
       message: `Retrieved ${webhooks.length} webhook(s).`
@@ -90,7 +73,7 @@ export let createWebhook = SlateTool.create(spec, {
         .describe('Whether to create the webhook in a blocked state')
     })
   )
-  .output(webhookOutputSchema)
+  .output(webhookNullableModifiedOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.createWebhook({
@@ -100,7 +83,7 @@ export let createWebhook = SlateTool.create(spec, {
       blocked: ctx.input.blocked
     });
 
-    let webhook = mapWebhook(result.webhook);
+    let webhook = mapWebhook(result.webhook, webhookNullableModifiedOutputSchema);
     return {
       output: webhook,
       message: `Created webhook for **${webhook.event}** events → ${webhook.url}.`
@@ -139,7 +122,7 @@ export let updateWebhook = SlateTool.create(spec, {
       blocked: ctx.input.blocked
     });
 
-    let webhook = mapWebhook(result.webhook);
+    let webhook = mapWebhook(result.webhook, webhookOutputSchema);
     return {
       output: webhook,
       message: `Updated webhook ${webhook.webhookId} for **${webhook.event}** events.`
@@ -162,11 +145,11 @@ export let deleteWebhook = SlateTool.create(spec, {
       webhookId: z.string().describe('ID of the webhook to delete')
     })
   )
-  .output(webhookOutputSchema)
+  .output(webhookNullableModifiedOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.deleteWebhook(ctx.input.webhookId, ctx.input.listId);
-    let webhook = mapWebhook(result.webhook);
+    let webhook = mapWebhook(result.webhook, webhookNullableModifiedOutputSchema);
     return {
       output: webhook,
       message: `Deleted webhook ${webhook.webhookId} from list ${webhook.listId}.`

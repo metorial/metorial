@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, redactProviderData, requireInteger } from '../lib/client';
 import { spec } from '../spec';
 
 export let sendEmailOperationalMessage = SlateTool.create(spec, {
@@ -45,6 +45,8 @@ export let sendEmailOperationalMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    if (!ctx.input.emails.length || ctx.input.emails.length > 500)
+      throw createApiServiceError('Provide between 1 and 500 email recipients.');
     let data: Record<string, any> = {
       details: {
         name: ctx.input.name,
@@ -61,18 +63,21 @@ export let sendEmailOperationalMessage = SlateTool.create(spec, {
       }))
     };
     if (ctx.input.bccEmails?.length) {
-      data.bcc = { emails: ctx.input.bccEmails };
+      data.bcc = { bcc_emails: ctx.input.bccEmails };
     }
 
     let result = await client.sendOperationalMessage(data);
-    return {
-      output: {
-        campaignId: result.campaign_id,
-        messageId: result.message_id,
-        emailSendCount: result.email_send
+    return redactProviderData(
+      {
+        output: {
+          campaignId: requireInteger(result.campaign_id, 'ActiveTrail campaign_id'),
+          messageId: requireInteger(result.message_id, 'ActiveTrail message_id'),
+          emailSendCount: requireInteger(result.email_send, 'ActiveTrail email_send', 0)
+        },
+        message: `Sent operational email to **${ctx.input.emails.length}** recipient(s). Message ID: **${result.message_id}**.`
       },
-      message: `Sent operational email to **${ctx.input.emails.length}** recipient(s). Message ID: **${result.message_id}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -87,7 +92,10 @@ export let sendSmsOperationalMessage = SlateTool.create(spec, {
       content: z.string().describe('SMS message content'),
       phoneNumbers: z.array(z.string()).describe('List of recipient phone numbers'),
       fromName: z.string().optional().describe('Sender name (max 11 English letters)'),
-      smsSendingProfileId: z.number().optional().describe('SMS sending profile ID')
+      smsSendingProfileId: z.number().optional().describe('SMS sending profile ID'),
+      name: z.string().optional().describe('Internal message name'),
+      unsubscribeText: z.string().optional().describe('Unsubscribe wording'),
+      canUnsubscribe: z.boolean().optional().describe('Include an unsubscribe link')
     })
   )
   .output(
@@ -97,17 +105,30 @@ export let sendSmsOperationalMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    if (!ctx.input.phoneNumbers.length || ctx.input.phoneNumbers.some(phone => !phone.trim()))
+      throw createApiServiceError('Provide at least one non-empty recipient phone number.');
+    if (!ctx.input.fromName?.trim() && ctx.input.smsSendingProfileId === undefined)
+      throw createApiServiceError('Provide a sender name or SMS sending profile ID.');
     let data: Record<string, any> = {
-      content: ctx.input.content,
-      phones: ctx.input.phoneNumbers,
-      from_name: ctx.input.fromName,
-      sms_sending_profile_id: ctx.input.smsSendingProfileId
+      details: {
+        name: ctx.input.name ?? 'Operational SMS',
+        content: ctx.input.content,
+        from_name: ctx.input.fromName,
+        sms_sending_profile_id: ctx.input.smsSendingProfileId,
+        unsubscribe_text: ctx.input.unsubscribeText,
+        can_unsubscribe: ctx.input.canUnsubscribe
+      },
+      scheduling: { send_now: true },
+      mobiles: ctx.input.phoneNumbers.map(phone => ({ phone_number: phone }))
     };
 
     let result = await client.sendSmsOperationalMessage(data);
-    return {
-      output: { result },
-      message: `Sent operational SMS to **${ctx.input.phoneNumbers.length}** recipient(s).`
-    };
+    return redactProviderData(
+      {
+        output: { result },
+        message: `Sent operational SMS to **${ctx.input.phoneNumbers.length}** recipient(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();

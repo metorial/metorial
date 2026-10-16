@@ -14,10 +14,13 @@ export interface Outcome {
   description?: string;
   link?: string;
   sid?: string;
+  bet_limit?: number;
 }
 
 export interface Market {
   key: string;
+  link?: string | null;
+  sid?: string | null;
   last_update?: string;
   outcomes: Outcome[];
 }
@@ -25,7 +28,8 @@ export interface Market {
 export interface Bookmaker {
   key: string;
   title: string;
-  last_update: string;
+  last_update?: string;
+  sid?: string;
   link?: string;
   markets: Market[];
 }
@@ -37,10 +41,16 @@ export interface Event {
   commence_time: string;
   home_team: string | null;
   away_team: string | null;
+  home_rotation?: number | null;
+  away_rotation?: number | null;
 }
 
 export interface EventWithOdds extends Event {
   bookmakers: Bookmaker[];
+}
+
+export interface SportEventWithOdds extends Event {
+  bookmakers: (Bookmaker & { last_update: string })[];
 }
 
 export interface Score {

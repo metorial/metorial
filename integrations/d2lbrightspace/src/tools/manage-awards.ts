@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -45,8 +45,8 @@ export let listAwards = SlateTool.create(spec, {
         awardId: String(a.Award?.AwardId || a.AwardId),
         title: a.Award?.Title || a.Title,
         description: a.Award?.Description || a.Description,
-        awardType: a.Award?.AwardType,
-        issuedDate: a.IssuedDate,
+        awardType: a.Award?.AwardType ?? undefined,
+        issuedDate: a.IssuedDate ?? undefined,
         issuedId: a.IssuedId ? String(a.IssuedId) : undefined
       }));
 
@@ -60,9 +60,9 @@ export let listAwards = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let awards = items.map((a: any) => ({
       awardId: String(a.AwardId),
-      title: a.Title,
-      description: a.Description,
-      awardType: a.AwardType
+      title: a.Title ?? undefined,
+      description: a.Description ?? undefined,
+      awardType: a.AwardType ?? undefined
     }));
 
     return {
@@ -97,9 +97,16 @@ export let issueAward = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
+    if (!ctx.input.criteria?.trim() || !ctx.input.evidence?.trim())
+      throw createApiServiceError(
+        'Provide nonempty criteria and evidence to issue a Brightspace award.',
+        { reason: 'brightspace_award_issuance' }
+      );
+
     let issueData: any = {
       AwardId: ctx.input.awardId,
-      UserId: ctx.input.userId
+      IssuedToUserId: ctx.input.userId,
+      IssuedDate: null
     };
     if (ctx.input.criteria) issueData.Criteria = ctx.input.criteria;
     if (ctx.input.evidence) issueData.Evidence = ctx.input.evidence;
@@ -109,8 +116,8 @@ export let issueAward = SlateTool.create(spec, {
     return {
       output: {
         issuedId: String(result.IssuedId),
-        awardId: String(result.AwardId || ctx.input.awardId),
-        userId: String(result.UserId || ctx.input.userId)
+        awardId: String(result.Award?.AwardId ?? result.AwardId ?? ctx.input.awardId),
+        userId: String(result.IssuedToUserId ?? ctx.input.userId)
       },
       message: `Issued award **${ctx.input.awardId}** to user **${ctx.input.userId}** (Issued ID: ${result.IssuedId}).`
     };

@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   lineItemId: z.string(),
   sectionId: z.number(),
   name: z.string(),
@@ -49,6 +50,7 @@ export let listLineItems = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       lineItems: z.array(lineItemSchema),
       currentPage: z.number().nullable(),
       totalPages: z.number().nullable(),
@@ -56,7 +58,7 @@ export let listLineItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.sectionId) {
       let items = await client.listLineItemsBySection(ctx.input.sectionId);
@@ -75,6 +77,7 @@ export let listLineItems = SlateTool.create(spec, {
     return {
       output: {
         lineItems: result.items,
+        raw: result.raw,
         currentPage: result.pagination.currentPage,
         totalPages: result.pagination.totalPages,
         totalCount: result.pagination.totalCount
@@ -91,7 +94,7 @@ export let createLineItem = SlateTool.create(spec, {
   instructions: [
     'For "fixed" cost type, only set amount.',
     'For "recurring" cost type, also set recurringType (e.g. "monthly", "yearly", "hourly").',
-    'For "per" cost type, set perType (e.g. "per_unit", "per_hour") and quantity.'
+    'For "per" cost type, set perType (e.g. "unit", "hour") and quantity.'
   ]
 })
   .input(
@@ -106,12 +109,12 @@ export let createLineItem = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Interval for recurring items (e.g. monthly, yearly, hourly, weekly, quarterly)'
+          'Interval for recurring items (e.g. monthly, yearly, hourly, weekly, trimester)'
         ),
       perType: z
         .string()
         .optional()
-        .describe('Unit type for per-unit items (e.g. per_unit, per_hour, per_item)'),
+        .describe('Unit type for per-unit items (e.g. unit, hour, item)'),
       position: z.number().optional().describe('Position/order within the section'),
       quantity: z.number().optional().describe('Quantity for per-unit items'),
       amount: z.number().optional().describe('Amount in cents (e.g. 10000 = $100.00)')
@@ -120,7 +123,7 @@ export let createLineItem = SlateTool.create(spec, {
   .output(lineItemSchema)
   .handleInvocation(async ctx => {
     let { sectionId, ...data } = ctx.input;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.createLineItem(sectionId, data);
 
     return {
@@ -153,7 +156,7 @@ export let updateLineItem = SlateTool.create(spec, {
   .output(lineItemSchema)
   .handleInvocation(async ctx => {
     let { lineItemId, ...updateData } = ctx.input;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.updateLineItem(lineItemId, updateData);
 
     return {
@@ -178,11 +181,12 @@ export let deleteLineItem = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteLineItem(ctx.input.lineItemId);
 
     return {

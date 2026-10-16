@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listAutoresponders = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listAutoresponders = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       page: z.number().optional().default(1).describe('Page number for pagination')
     })
   )
@@ -30,11 +32,11 @@ export let listAutoresponders = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listAutoresponders(ctx.input.page);
-    let autoresponders = result?.data ?? (Array.isArray(result) ? result : []);
+    let autoresponders = getCollection(result);
 
     return {
       output: {

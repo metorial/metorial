@@ -8,7 +8,8 @@ let validatorSelectorSchema = z.object({
     .array(z.union([z.string(), z.number()]))
     .optional()
     .describe('Array of validator indices or public keys'),
-  dashboardId: z.number().optional().describe('Dashboard ID to select validators from')
+  dashboardId: z.number().optional().describe('Dashboard ID to select validators from'),
+  groupId: z.number().optional().describe('Optional group within dashboardId')
 });
 
 export let getValidatorRewards = SlateTool.create(spec, {
@@ -17,7 +18,7 @@ export let getValidatorRewards = SlateTool.create(spec, {
   description: `Retrieve detailed staking reward breakdowns for Ethereum validators. Returns per-validator, per-epoch rewards including attestation rewards (head, source, target), sync committee rewards, block proposal rewards (execution and consensus layer), and penalties.
 Use the aggregate mode for cumulative totals or the list mode for epoch-by-epoch detail.`,
   instructions: [
-    'Use "aggregate" mode for a summary of cumulative rewards across all epochs.',
+    'Use "aggregate" mode for a summary of cumulative rewards over evaluationWindow (all_time by default).',
     'Use "list" mode for a per-epoch breakdown. Optionally filter by a specific epoch.',
     'Pagination is available in list mode via cursor and pageSize.'
   ],
@@ -33,14 +34,20 @@ Use the aggregate mode for cumulative totals or the list mode for epoch-by-epoch
         .enum(['list', 'aggregate'])
         .default('list')
         .describe('Whether to return per-epoch list or cumulative aggregate'),
+      evaluationWindow: z
+        .enum(['24h', '7d', '30d', '90d', 'all_time'])
+        .optional()
+        .describe(
+          'Aggregate evaluation window. Defaults to all_time. List mode uses epoch instead.'
+        ),
       epoch: z
         .number()
         .optional()
-        .describe('Specific epoch to filter rewards for (list mode only)'),
+        .describe('Epoch for list mode. If omitted, resolves the latest finalized epoch.'),
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (1-100, default 10)'),
+        .describe('Number of results per page (1-10, default 10)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -64,13 +71,17 @@ Use the aggregate mode for cumulative totals or the list mode for epoch-by-epoch
 
     let selector = {
       validatorIdentifiers: ctx.input.validators.validatorIdentifiers,
-      dashboardId: ctx.input.validators.dashboardId
+      dashboardId: ctx.input.validators.dashboardId,
+      groupId: ctx.input.validators.groupId
     };
 
     let result: Record<string, any>;
 
     if (ctx.input.mode === 'aggregate') {
-      let response = await client.getValidatorRewardsAggregate(selector);
+      let response = await client.getValidatorRewardsAggregate(
+        selector,
+        ctx.input.evaluationWindow
+      );
       result = { rewards: response };
     } else {
       let response = await client.getValidatorRewardsList(selector, ctx.input.epoch, {

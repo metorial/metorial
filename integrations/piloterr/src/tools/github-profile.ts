@@ -1,7 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let githubProfileOutputSchema = z.object({
+  githubId: z.number().optional(),
+  login: z.string().optional(),
+  emails: z.array(z.string()).optional(),
+  publicGistsText: z.string().optional(),
+  name: z.string().optional(),
+  email: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  avatarUrl: z.string().optional(),
+  followers: z.number().optional(),
+  following: z.number().optional(),
+  publicRepos: z.number().optional(),
+  publicGists: z.number().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let githubProfile = SlateTool.create(spec, {
   name: 'GitHub Profile',
@@ -16,34 +36,20 @@ export let githubProfile = SlateTool.create(spec, {
       usernameOrUrl: z.string().describe('GitHub username, profile URL, or email address')
     })
   )
-  .output(
-    z.object({
-      githubId: z.number().optional(),
-      login: z.string().optional(),
-      name: z.string().optional(),
-      email: z.string().nullable().optional(),
-      company: z.string().nullable().optional(),
-      location: z.string().nullable().optional(),
-      avatarUrl: z.string().optional(),
-      followers: z.number().optional(),
-      following: z.number().optional(),
-      publicRepos: z.number().optional(),
-      publicGists: z.number().optional(),
-      createdAt: z.string().optional(),
-      updatedAt: z.string().optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(githubProfileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.getGithubUser({ query: ctx.input.usernameOrUrl });
 
     return {
-      output: {
+      output: normalizeOutput(githubProfileOutputSchema, {
         githubId: result.id,
         login: result.login,
         name: result.name,
         email: result.email,
+        emails: Array.isArray(result.email) ? result.email : undefined,
+        publicGistsText:
+          typeof result.public_gists === 'string' ? result.public_gists : undefined,
         company: result.company,
         location: result.location,
         avatarUrl: result.avatar_url,
@@ -54,8 +60,9 @@ export let githubProfile = SlateTool.create(spec, {
         createdAt: result.created_at,
         updatedAt: result.updated_at,
         raw: result
-      },
-      message: `Retrieved GitHub profile **${result.login ?? result.name ?? ctx.input.usernameOrUrl}**: **${result.public_repos ?? 0} repos**, **${result.followers ?? 0} followers**.`
+      }),
+      message:
+        'Retrieved public GitHub profile data. The provider currently documents degraded availability for this endpoint.'
     };
   })
   .build();

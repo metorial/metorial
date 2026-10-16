@@ -1,6 +1,6 @@
 {
   "name": "@metorial/more-trees",
-  "description": "Plant trees and purchase carbon credits through global reforestation projects. Retrieve account details, credit balances, and forest statistics including trees planted and CO2 captured. Browse active projects and available tree types, plant trees for yourself or gift them to others by email or account code, and track cumulative carbon offset figures.",
+  "description": "Plant trees through global reforestation projects. Retrieve account details, credit balances, and forest statistics. Browse projects and tree types, plant trees for yourself or gift them by email or account code, and retrieve carbon offset figures.",
   "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
   "skills": [
     "plant trees",

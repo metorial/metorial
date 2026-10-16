@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,21 +26,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://felt.com/api/v2'
-      });
-
-      let response = await axios.get('/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
 
       return {
         profile: {
-          id: response.data.id,
-          name: response.data.name,
-          email: response.data.email
+          id: user.id,
+          name: user.name,
+          email: user.email
         }
       };
     }

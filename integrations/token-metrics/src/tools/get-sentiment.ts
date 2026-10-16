@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSentiment = SlateTool.create(spec, {
   name: 'Get Market Sentiment',
   key: 'get_sentiment',
-  description: `Retrieve crypto market sentiment analysis collected from Twitter, Reddit, and Telegram. Includes sentiment grades and labels for each platform, along with news summaries. Useful for gauging the overall market mood and social media discussion trends.`,
+  description: `Retrieve provider-returned sentiment records from the retained sentiments endpoint. Current endpoint availability depends on the provider and the connected key.`,
   tags: {
     readOnly: true
   }
@@ -19,6 +19,10 @@ export let getSentiment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       sentiments: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of sentiment records with platform-specific grades and summaries')
@@ -32,10 +36,10 @@ export let getSentiment = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let sentiments = result?.data ?? [];
+    let sentiments = getRecords(result);
 
     return {
-      output: { sentiments },
+      output: { sentiments, raw: result },
       message: `Retrieved **${sentiments.length}** sentiment record(s).`
     };
   })

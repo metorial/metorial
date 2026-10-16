@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getIssueTool = SlateTool.create(spec, {
   name: 'Get Issue',
   key: 'get_issue',
-  description: `Retrieve detailed information about a specific Jira issue by its key or ID. Returns the full issue fields including summary, description, status, assignee, comments, transitions, and SLA information for service desk requests.`,
+  description: `Retrieve detailed information about a specific Jira issue by its key or ID. Returns issue details including summary, description, status, and assignee. Optionally includes available workflow transitions. Use Get SLA Information for service desk SLA metrics.`,
   tags: {
     readOnly: true
   }
@@ -63,10 +63,7 @@ export let getIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let issue = await client.getIssue(ctx.input.issueIdOrKey, ctx.input.fields);
 
@@ -100,7 +97,7 @@ export let getIssueTool = SlateTool.create(spec, {
       components: issue.fields?.components?.map((c: any) => c.name),
       created: issue.fields?.created,
       updated: issue.fields?.updated,
-      resolutionDate: issue.fields?.resolutiondate,
+      resolutionDate: issue.fields?.resolutiondate ?? undefined,
       resolution: issue.fields?.resolution?.name,
       transitions
     };

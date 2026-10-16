@@ -1,8 +1,15 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
-let BASE_URL = 'https://www.hackerrank.com/x/api/v3';
+export let BASE_URL = 'https://www.hackerrank.com/x/api/v3';
 
 export interface PaginationParams {
+  [key: string]: unknown;
   limit?: number;
   offset?: number;
 }
@@ -16,41 +23,103 @@ export interface PaginatedResponse<T> {
   next?: string;
   first?: string;
   last?: string;
+  raw?: Record<string, unknown>;
 }
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(params: { token: string }) {
+    if (!params.token.trim())
+      throw createApiServiceError('A HackerRank API token is required.');
     this.axios = createAxios({
       baseURL: BASE_URL,
-      auth: {
-        username: params.token,
-        password: ''
-      },
+      timeout: 20_000,
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json'
+        Accept: 'application/json',
+        Authorization: `Bearer ${params.token}`
       }
     });
+  }
+
+  private async request<T = any>(
+    method: string,
+    url: string,
+    options: { data?: unknown; params?: Record<string, unknown>; signal?: AbortSignal } = {}
+  ): Promise<T> {
+    try {
+      let response = await this.axios.request<T>({ method, url, ...options });
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'HackerRank',
+        reason: 'hackerrank_api_error',
+        operation: `${method.toUpperCase()} ${url}`,
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+        detailKeys: ['message', 'detail', 'error', 'error_description', 'code'],
+        nestedKeys: ['errors', 'messages', 'error'],
+        extractUpstreamCode: (_error, response, helpers) =>
+          helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+            ? response.data.code
+            : undefined
+      });
+    }
+  }
+
+  private async page(
+    url: string,
+    params?: PaginationParams & Record<string, unknown>
+  ): Promise<PaginatedResponse<any>> {
+    for (let [key, value] of Object.entries({
+      limit: params?.limit,
+      offset: params?.offset
+    })) {
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(value) ||
+          value < (key === 'limit' ? 1 : 0) ||
+          (key === 'limit' && value > 100))
+      ) {
+        throw createApiServiceError(
+          `${key} must be an integer ${key === 'limit' ? 'between 1 and 100' : 'of zero or greater'}.`
+        );
+      }
+    }
+    let result = await this.request('get', url, {
+      params: {
+        ...pickDefined(params ?? {}),
+        limit: params?.limit ?? 100,
+        offset: params?.offset ?? 0
+      }
+    });
+    if (!isApiErrorRecord(result) || !Array.isArray(result.data))
+      throw createApiServiceError('HackerRank returned an invalid paginated response.');
+    function count(key: string) {
+      let value = result[key];
+      let numeric = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+      if (typeof numeric !== 'number' || !Number.isSafeInteger(numeric) || numeric < 0)
+        throw createApiServiceError(`HackerRank returned an invalid ${key} count.`);
+      return numeric;
+    }
+    return {
+      ...result,
+      data: result.data,
+      total: count('total'),
+      offset: count('offset'),
+      page_total: count('page_total'),
+      raw: result
+    };
   }
 
   // ---- Tests ----
 
   async listTests(params?: PaginationParams & { fields?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/tests', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.fields ? { fields: params.fields } : {})
-      }
-    });
-    return response.data;
+    return this.page('/tests', params);
   }
 
   async getTest(testId: string) {
-    let response = await this.axios.get<any>(`/tests/${testId}`);
-    return response.data;
+    return this.request('get', `/tests/${resourceId(testId)}`);
   }
 
   async createTest(data: {
@@ -58,7 +127,12 @@ export class Client {
     duration?: number;
     instructions?: string;
     languages?: string[];
-    experience?: string;
+    experience?: string[];
+    role_ids?: string[];
+    questions?: string[];
+    draft?: boolean;
+    starttime?: string;
+    endtime?: string;
     candidate_tab_switch?: boolean;
     custom_acknowledge_text?: string;
     cutoff_score?: number;
@@ -66,44 +140,34 @@ export class Client {
     hide_compile_test?: boolean;
     tags?: string[];
   }) {
-    let response = await this.axios.post<any>('/tests', data);
-    return response.data;
+    return this.request('post', '/tests', { data });
   }
 
   async updateTest(testId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(`/tests/${testId}`, data);
-    return response.data;
+    await this.request('put', `/tests/${resourceId(testId)}`, { data });
+    return this.getTest(testId);
   }
 
   async deleteTest(testId: string) {
-    let response = await this.axios.delete<any>(`/tests/${testId}`);
-    return response.data;
+    return this.request('delete', `/tests/${resourceId(testId)}`);
   }
 
   async archiveTest(testId: string) {
-    let response = await this.axios.post<any>(`/tests/${testId}/archive`);
-    return response.data;
+    return this.request('post', `/tests/${resourceId(testId)}/archive`);
   }
 
   // ---- Candidates ----
 
   async listCandidates(testId: string, params?: PaginationParams & { fields?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>(
-      `/tests/${testId}/candidates`,
-      {
-        params: {
-          limit: params?.limit ?? 100,
-          offset: params?.offset ?? 0,
-          ...(params?.fields ? { fields: params.fields } : {})
-        }
-      }
-    );
-    return response.data;
+    return this.page(`/tests/${resourceId(testId)}/candidates`, params);
   }
 
-  async getCandidate(testId: string, candidateId: string) {
-    let response = await this.axios.get<any>(`/tests/${testId}/candidates/${candidateId}`);
-    return response.data;
+  async getCandidate(testId: string, candidateId: string, signal?: AbortSignal) {
+    return this.request(
+      'get',
+      `/tests/${resourceId(testId)}/candidates/${resourceId(candidateId)}`,
+      { signal }
+    );
   }
 
   async inviteCandidate(
@@ -114,96 +178,84 @@ export class Client {
       force?: boolean;
       send_email?: boolean;
       tags?: string[];
-      accommodate?: Record<string, any>;
+      accommodations?: Record<string, unknown>;
+      invite_valid_from?: string;
+      invite_valid_to?: string;
+      template?: string;
+      invite_metadata?: Record<string, unknown>;
+      force_reattempt?: boolean;
     }
   ) {
-    let response = await this.axios.post<any>(`/tests/${testId}/candidates`, data);
-    return response.data;
+    return this.request('post', `/tests/${resourceId(testId)}/candidates`, { data });
   }
 
   async updateCandidate(testId: string, candidateId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(
-      `/tests/${testId}/candidates/${candidateId}`,
-      data
+    return this.request(
+      'put',
+      `/tests/${resourceId(testId)}/candidates/${resourceId(candidateId)}`,
+      { data }
     );
-    return response.data;
   }
 
-  async getCandidateReportUrl(testId: string, candidateId: string) {
-    let response = await this.axios.get<any>(
-      `/tests/${testId}/candidates/${candidateId}/pdf`,
+  async getCandidateReportUrl(testId: string, candidateId: string, signal?: AbortSignal) {
+    return this.request(
+      'get',
+      `/tests/${resourceId(testId)}/candidates/${resourceId(candidateId)}/pdf`,
       {
-        params: { format: 'url' }
+        params: { format: 'url' },
+        signal
       }
     );
-    return response.data;
   }
 
   // ---- Interviews ----
 
-  async listInterviews(params?: PaginationParams & { fields?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/interviews', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.fields ? { fields: params.fields } : {})
-      }
-    });
-    return response.data;
+  async listInterviews(
+    params?: PaginationParams & { fields?: string; [key: string]: unknown }
+  ) {
+    return this.page('/interviews', params);
   }
 
   async getInterview(interviewId: string) {
-    let response = await this.axios.get<any>(`/interviews/${interviewId}`);
-    return response.data;
+    return this.request('get', `/interviews/${resourceId(interviewId)}`);
   }
 
   async createInterview(data: {
     title?: string;
-    candidate?: string;
+    candidate?: { email: string; name?: string };
     interviewers?: string[];
     send_email?: boolean;
-    interview_template_id?: string;
+    interview_template_id?: number;
     timezone?: string;
-    interview_metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
+    resume_url?: string;
     notes?: string;
     from?: string;
     to?: string;
   }) {
-    let response = await this.axios.post<any>('/interviews', data);
-    return response.data;
+    return this.request('post', '/interviews', { data });
   }
 
   async updateInterview(interviewId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(`/interviews/${interviewId}`, data);
-    return response.data;
+    return this.request('put', `/interviews/${resourceId(interviewId)}`, { data });
   }
 
   async deleteInterview(interviewId: string) {
-    let response = await this.axios.delete<any>(`/interviews/${interviewId}`);
-    return response.data;
+    return this.request('delete', `/interviews/${resourceId(interviewId)}`);
   }
 
   async getInterviewTranscript(interviewId: string) {
-    let response = await this.axios.get<any>(`/interviews/${interviewId}/transcript`);
-    return response.data;
+    return this.request('get', `/interviews/${resourceId(interviewId)}/transcript`);
   }
 
   // ---- Users ----
 
   async listUsers(params?: PaginationParams & { fields?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/users', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.fields ? { fields: params.fields } : {})
-      }
-    });
-    return response.data;
+    return this.page('/users', params);
   }
 
   async getUser(userId: string) {
-    let response = await this.axios.get<any>(`/users/${userId}`);
-    return response.data;
+    return this.request('get', `/users/${resourceId(userId)}`);
   }
 
   async createUser(data: {
@@ -214,92 +266,62 @@ export class Client {
     country?: string;
     phone?: string;
     timezone?: string;
+    teams?: { id: string }[];
+    send_email?: boolean;
   }) {
-    let response = await this.axios.post<any>('/users', data);
-    return response.data;
+    return this.request('post', '/users', { data });
   }
 
   async updateUser(userId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(`/users/${userId}`, data);
-    return response.data;
+    await this.request('put', `/users/${resourceId(userId)}`, { data });
+    return this.getUser(userId);
   }
 
   async deleteUser(userId: string) {
-    let response = await this.axios.delete<any>(`/users/${userId}`);
-    return response.data;
+    return this.request('delete', `/users/${resourceId(userId)}`);
   }
 
   async searchUsers(query: string, params?: PaginationParams) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/users/search', {
-      params: {
-        search: query,
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0
-      }
-    });
-    return response.data;
+    return this.page('/users/search', { ...params, search: query });
   }
 
   // ---- Teams ----
 
   async listTeams(params?: PaginationParams & { fields?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/teams', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.fields ? { fields: params.fields } : {})
-      }
-    });
-    return response.data;
+    return this.page('/teams', params);
   }
 
   async getTeam(teamId: string) {
-    let response = await this.axios.get<any>(`/teams/${teamId}`);
-    return response.data;
+    return this.request('get', `/teams/${resourceId(teamId)}`);
   }
 
-  async createTeam(data: { name: string; description?: string }) {
-    let response = await this.axios.post<any>('/teams', data);
-    return response.data;
+  async createTeam(data: { name: string; [key: string]: unknown }) {
+    return this.request('post', '/teams', { data });
   }
 
   async updateTeam(teamId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(`/teams/${teamId}`, data);
-    return response.data;
+    await this.request('put', `/teams/${resourceId(teamId)}`, { data });
+    return this.getTeam(teamId);
   }
 
   async deleteTeam(teamId: string) {
-    let response = await this.axios.delete<any>(`/teams/${teamId}`);
-    return response.data;
+    return this.request('delete', `/teams/${resourceId(teamId)}`);
   }
 
   async listTeamMembers(teamId: string, params?: PaginationParams) {
-    let response = await this.axios.get<PaginatedResponse<any>>(`/teams/${teamId}/users`, {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0
-      }
-    });
-    return response.data;
+    return this.page(`/teams/${resourceId(teamId)}/users`, params);
   }
 
   // ---- Questions ----
 
-  async listQuestions(params?: PaginationParams & { fields?: string; type?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/questions', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.fields ? { fields: params.fields } : {}),
-        ...(params?.type ? { type: params.type } : {})
-      }
-    });
-    return response.data;
+  async listQuestions(
+    params?: PaginationParams & { fields?: string; type?: string; [key: string]: unknown }
+  ) {
+    return this.page('/questions', params);
   }
 
   async getQuestion(questionId: string) {
-    let response = await this.axios.get<any>(`/questions/${questionId}`);
-    return response.data;
+    return this.request('get', `/questions/${resourceId(questionId)}`);
   }
 
   async createQuestion(data: {
@@ -310,25 +332,53 @@ export class Client {
     tags?: string[];
     [key: string]: any;
   }) {
-    let response = await this.axios.post<any>('/questions', data);
-    return response.data;
+    return this.request('post', '/questions', { data });
   }
 
   async updateQuestion(questionId: string, data: Record<string, any>) {
-    let response = await this.axios.put<any>(`/questions/${questionId}`, data);
-    return response.data;
+    return this.request('put', `/questions/${resourceId(questionId)}`, { data });
   }
 
   // ---- Audit Logs ----
 
   async listAuditLogs(params?: PaginationParams & { userId?: string }) {
-    let response = await this.axios.get<PaginatedResponse<any>>('/audit_log', {
-      params: {
-        limit: params?.limit ?? 100,
-        offset: params?.offset ?? 0,
-        ...(params?.userId ? { user_id: params.userId } : {})
-      }
-    });
-    return response.data;
+    return this.page('/audit_log', { ...params, user_id: params?.userId, userId: undefined });
   }
+  async cancelCandidateInvite(testId: string, candidateId: string) {
+    return this.request(
+      'delete',
+      `/tests/${resourceId(testId)}/candidates/${resourceId(candidateId)}/invite`
+    );
+  }
+
+  async addTeamMember(teamId: string, userId: string, license?: string) {
+    await this.request('post', `/teams/${resourceId(teamId)}/users/${resourceId(userId)}`, {
+      params: pickDefined({ license })
+    });
+    return this.request('get', `/teams/${resourceId(teamId)}/users/${resourceId(userId)}`);
+  }
+
+  async removeTeamMember(teamId: string, userId: string) {
+    return this.request('delete', `/teams/${resourceId(teamId)}/users/${resourceId(userId)}`);
+  }
+
+  async listInterviewTemplates(params?: PaginationParams & { filter?: string }) {
+    return this.page('/interview_templates', params);
+  }
+
+  async getInterviewTemplate(templateId: string) {
+    return this.request('get', `/interview_templates/${resourceId(templateId)}`);
+  }
+
+  async listInviteTemplates(params?: PaginationParams & { access?: string }) {
+    return this.page('/templates', params);
+  }
+}
+
+function resourceId(value: string) {
+  if (!value.trim())
+    throw createApiServiceError(
+      'A non-empty resource ID is required. Use the corresponding list tool to discover IDs.'
+    );
+  return encodeURIComponent(value);
 }

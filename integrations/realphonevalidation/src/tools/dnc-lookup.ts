@@ -14,6 +14,8 @@ export let dncLookup = SlateTool.create(spec, {
   description: `Checks if a phone number is on the National, State, or Direct Marketing Association (DMA) Do Not Call lists. Also identifies TCPA litigators/serial plaintiffs and phone type. Two modes available: **standard** returns DNC status and phone type; **plus** additionally includes connection status (connected/disconnected).`,
   constraints: [
     'Phone number must be exactly 10 numeric digits (US only).',
+    'A Subscription Account Number (SAN) is required by the provider before using DNC services.',
+    'Unresolved list checks are reported as errors instead of a negative list result.',
     'API rate limit of 10 requests per second.'
   ],
   tags: {
@@ -48,7 +50,16 @@ export let dncLookup = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Connection status: connected or disconnected (plus mode only)'),
-      errorText: z.string().optional().describe('Error or response message')
+      errorText: z.string().optional().describe('Error or response message'),
+      phoneType: z.string().optional().describe('Phone line type: Mobile, Landline, or VoIP'),
+      lookupId: z
+        .string()
+        .optional()
+        .describe('Provider transaction identifier, when returned'),
+      providerResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider lookup response')
     })
   )
   .handleInvocation(async ctx => {
@@ -63,6 +74,7 @@ export let dncLookup = SlateTool.create(spec, {
       let dmaDnc = result.dma === 'Y';
       let isLitigator = result.litigator === 'Y';
       let isMobile = result.iscell === 'Y';
+      let phoneType = isMobile ? 'Mobile' : result.iscell === 'V' ? 'VoIP' : 'Landline';
 
       let dncLists = [
         nationalDnc ? 'National' : null,
@@ -78,9 +90,11 @@ export let dncLookup = SlateTool.create(spec, {
           isLitigator,
           isMobile,
           connectionStatus: result.status,
-          errorText: errorText || undefined
+          errorText: errorText || undefined,
+          phoneType,
+          providerResponse: result
         },
-        message: `Phone **${ctx.input.phone}** is **${result.status}**. DNC: ${dncLists.length > 0 ? dncLists.join(', ') : 'not on any DNC list'}. ${isLitigator ? '⚠️ Known TCPA litigator.' : ''} Type: ${isMobile ? 'Mobile' : 'Landline'}.`
+        message: `Phone **${ctx.input.phone}** is **${result.status}**. DNC: ${dncLists.length > 0 ? dncLists.join(', ') : 'not on any DNC list'}. ${isLitigator ? '⚠️ Known TCPA litigator.' : ''} Type: ${phoneType}.`
       };
     } else {
       let result = await client.dncLookup(ctx.input.phone);
@@ -91,6 +105,7 @@ export let dncLookup = SlateTool.create(spec, {
       let dmaDnc = result.dma === 'Y';
       let isLitigator = result.litigator === 'Y';
       let isMobile = result.iscell === 'Y';
+      let phoneType = isMobile ? 'Mobile' : result.iscell === 'V' ? 'VoIP' : 'Landline';
 
       let dncLists = [
         nationalDnc ? 'National' : null,
@@ -105,9 +120,12 @@ export let dncLookup = SlateTool.create(spec, {
           dmaDnc,
           isLitigator,
           isMobile,
-          errorText: responseMsg || undefined
+          errorText: responseMsg || undefined,
+          phoneType,
+          lookupId: typeof result.id === 'string' ? result.id : undefined,
+          providerResponse: result
         },
-        message: `Phone **${ctx.input.phone}**: DNC: ${dncLists.length > 0 ? dncLists.join(', ') : 'not on any DNC list'}. ${isLitigator ? '⚠️ Known TCPA litigator.' : ''} Type: ${isMobile ? 'Mobile' : 'Landline'}.`
+        message: `Phone **${ctx.input.phone}**: DNC: ${dncLists.length > 0 ? dncLists.join(', ') : 'not on any DNC list'}. ${isLitigator ? '⚠️ Known TCPA litigator.' : ''} Type: ${phoneType}.`
       };
     }
   })

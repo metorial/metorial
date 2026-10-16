@@ -1,86 +1,47 @@
-Now let me get more details on the webhook event types and the comments/users API sections:# Slates Specification for Felt
+# Felt Integration
 
-## Overview
-
-Felt is a collaborative, web-based GIS (Geographic Information System) platform for creating, sharing, and managing interactive maps. Its REST API allows users to interact with the platform via code, performing actions such as creating new maps, adding data to maps, styling layers, and more. The API enables integration of Felt's mapping capabilities into external workflows, allowing manipulation of Maps, Layers, Elements, Sources, Projects and more.
+Felt provides collaborative maps, geographic layers, annotations, projects, and external data sources. The integration uses the current REST API at `https://felt.com/api/v2`.
 
 ## Authentication
 
-Felt uses **API token (Personal Access Token)** authentication via Bearer tokens.
+Use a workspace-scoped API token from Workspace Settings → Developers. Every request uses `Authorization: Bearer <token>`. Felt documents REST API access for Enterprise customers. The current-user endpoint validates the connection and supplies the profile. API-token authentication has no OAuth refresh flow.
 
-- All calls to the Felt API must be authenticated. The easiest way to authenticate is by creating an API token and providing it as a Bearer token in the request header.
-- You can create an API token in the Developers tab of the Workspace Settings page. You can generate as many API tokens as you need.
-- Tokens follow the format: `felt_pat_ABCDEFUDQPAGGNBmX40YNhkCRvvLI3f8/BCwD/g8`
-- The token is passed as an `Authorization: Bearer <token>` header on every request.
-- API tokens are created per-workspace. If you wish to interact with several workspaces via the Felt API, you must create a different API token for each one.
-- The API base URL is `https://felt.com/api/v2/`.
-- This feature is available to customers on the Enterprise plan.
+## Tools
 
-## Features
+- Maps: `create_map`, `get_map`, `update_map`, `delete_map`, `move_map`, `duplicate_map`.
+- Layers: `list_layers`, `manage_layer`, `import_layer`, `export_layer`.
+- Annotations: `list_elements`, `manage_elements`. Ungrouped features and each group's features are returned separately.
+- Comments: `manage_comments` exports JSON, CSV, or GeoJSON, resolves threads, and deletes comments.
+- Projects: `list_projects`, `get_project`, `manage_project`. Project lookup returns maps and their stable IDs.
+- Sources: `list_sources`, `get_source`, `manage_source`. After creating, updating, or syncing a source, poll `get_source` until `syncStatus` is `completed` or `failed`.
+- Identity and embeds: `get_current_user`, `create_embed_token`. Embed tokens last 12 hours; mint one for every page load and associate it with a workspace member's email.
 
-### Map Management
+## Behavior and compatibility
 
-Maps are the centerpiece of Felt. You can create, retrieve, update, delete, move, and duplicate maps programmatically.
+Existing tool keys, input/output field types, optional fields, and enum values are preserved. Layer ordering is accepted as a numeric string and sent to Felt as an integer; layer list ordering and source list timestamps retain their existing string output types. The source detail tool additionally exposes the provider's numeric sync timestamp without conversion.
 
-- When creating a map, you can configure title, description, initial coordinates (lat/lon), zoom level, and public access level.
-- Basemap options include "default", "light", "dark", "satellite", a custom raster tile URL, or a hex color string.
-- Access levels include: private, view_only, view_and_comment, and view_comment_and_edit.
-- Maps can be moved to a different project or folder within the same workspace.
-- Maps can be duplicated with all their layers, elements, and configuration.
+Map movement requires exactly one project or folder destination. Deletions are separate from updates. Project deletion removes all contained maps and folders. Source deletion leaves its layers in place, but stops their refreshes. Multi-operation layer updates run sequentially and can partially apply before a later request fails.
 
-### Layer Management
+Layer exports and comment exports provide downloadable files. Existing `downloadUrl` and `comments` output fields remain available. Layer export links are regenerated for later downloads because Felt does not publish their lifetime.
 
-Layers represent geographic data on a map. You can upload data, style layers, refresh live data, and organize layers into groups.
+## Limits
 
-- Felt supports many kinds of file and URL imports, including GeoJSON, CSV, shapefiles, and live data feed URLs.
-- Layers can be styled using the Felt Style Language (FSL), a JSON-based specification that controls color, opacity, size, stroke, legends, labels, and popups.
-- You can set a schedule for layer refresh frequency, specify the geometry attribute, and update layer metadata.
-- Layers can be organized into layer groups with names, ordering, and subtitles.
+Felt's upload endpoint requires a display name. The existing optional `import_layer.name` contract remains optional for compatibility; provide it to satisfy Felt. Public URL imports are supported. File upload and file-backed refresh completion are outside the current tool surface; a refresh response requiring a replacement upload produces an actionable error.
 
-### Elements (Annotations)
+Source creation, updates, and sync are asynchronous. An accepted request is not proof of successful ingestion. Felt limits POST payloads to 1 MB, and may simplify complex annotation geometry.
 
-Elements enable you to annotate maps with custom shapes, text, and markers. You can create, update, and delete map elements.
+Layer and annotation group mutation, source credential administration, custom export jobs, and webhook delivery are not exposed by this integration.
 
-- Elements are represented as GeoJSON features and can include points, lines, polygons, notes, and text.
-- Elements can be organized into element groups with custom colors and symbols.
-- The maximum payload size is 1MB, and complex element geometry may be automatically simplified.
+## Official references
 
-### Data Sources
-
-You can configure data source connections, credentials, and sync settings to create live maps.
-
-- Supported source types include S3 buckets, Azure Blob Storage, and others.
-- Sources can be configured with credentials (e.g., AWS IAM roles, Azure connection strings, key pairs) for secure access.
-- Sources support automatic syncing to keep map data up to date.
-
-### Comments
-
-The API allows reading and managing comments on maps, enabling collaboration among map viewers and editors.
-
-### Users
-
-You can retrieve information about users in your workspace.
-
-### Embed Tokens
-
-You can create short-lived (15-minute) tokens for authenticating visitors to view private embedded maps without being logged into Felt. You must provide a user_email to associate the token with the end user.
-
-- Each end user should be a member of your Felt workspace with a viewer, editor, or admin role assigned.
-
-### Project Organization
-
-You can move maps to projects or folders programmatically, enabling automated organization of mapping assets.
-
-## Events
-
-Felt supports webhooks for receiving real-time notifications when maps change.
-
-### Map Updates
-
-You can trigger a workflow whenever something changes on a map. Instead of polling, you set up a webhook where Felt sends a notification any time a map is updated.
-
-- Webhooks are configured per-map through the Webhooks tab in workspace settings.
-- Workspace admins can set up webhooks in the Webhooks tab of their workspace.
-- Updates are sent whenever something on the map changes, including adding elements, drawing annotations, changing colors, or updating sharing permissions.
-- The webhook payload includes the event type (`map:update`), a timestamp, and the map ID.
-- Webhooks are delivered as POST requests to the configured URL.
+- [Getting started](https://developers.felt.com/rest-api/getting-started)
+- [Maps](https://developers.felt.com/rest-api/api-reference/maps)
+- [Layers](https://developers.felt.com/rest-api/api-reference/layers)
+- [Layer uploads](https://developers.felt.com/rest-api/api-reference/layers/layer-uploads)
+- [Layer exports](https://developers.felt.com/rest-api/api-reference/layers/layer-exports)
+- [Elements](https://developers.felt.com/rest-api/api-reference/elements)
+- [Comments](https://developers.felt.com/rest-api/api-reference/comments)
+- [Projects](https://developers.felt.com/rest-api/api-reference/projects)
+- [Sources](https://developers.felt.com/rest-api/api-reference/sources)
+- [Users](https://developers.felt.com/rest-api/api-reference/users)
+- [Embed tokens](https://developers.felt.com/rest-api/api-reference/embed-tokens)

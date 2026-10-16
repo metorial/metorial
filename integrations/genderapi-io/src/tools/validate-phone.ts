@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireText } from '../lib/client';
 import { spec } from '../spec';
 
 export let validatePhone = SlateTool.create(spec, {
@@ -62,6 +62,14 @@ Supports phone numbers from 242 countries and territories.`,
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    requireText(ctx.input.phoneNumber, 'phoneNumber');
+    if (ctx.input.address !== undefined) requireText(ctx.input.address, 'address');
+    if (!ctx.input.phoneNumber.trim().startsWith('+') && !ctx.input.address?.trim()) {
+      throw createApiServiceError(
+        'Provide address context for a phone number without an international + prefix.'
+      );
+    }
 
     let result = await client.validatePhoneNumber({
       number: ctx.input.phoneNumber,

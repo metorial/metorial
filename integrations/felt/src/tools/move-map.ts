@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,12 @@ export let moveMap = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.folderId)) {
+      throw createApiServiceError(
+        'Provide exactly one destination: projectId or folderId. Call list_projects and get_project to discover projects and map folders.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let map = await client.moveMap(ctx.input.mapId, {

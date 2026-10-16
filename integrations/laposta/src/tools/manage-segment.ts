@@ -1,19 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  mapSegment,
+  segmentDeleteOutputSchema,
+  segmentOutputSchema,
+  segmentReadOutputSchema
+} from '../lib/maps';
 import { spec } from '../spec';
-
-let segmentOutputSchema = z.object({
-  segmentId: z.string().describe('Unique identifier of the segment'),
-  listId: z.string().describe('ID of the list the segment belongs to'),
-  name: z.string().describe('Name of the segment'),
-  definition: z
-    .string()
-    .describe('JSON-formatted segment definition based on custom field conditions'),
-  state: z.string().describe('Current state of the segment'),
-  created: z.string().describe('Creation timestamp'),
-  modified: z.string().describe('Last modified timestamp')
-});
 
 export let getSegments = SlateTool.create(spec, {
   name: 'Get Segments',
@@ -31,7 +25,7 @@ export let getSegments = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      segments: z.array(segmentOutputSchema).describe('Retrieved segments')
+      segments: z.array(segmentReadOutputSchema).describe('Retrieved segments')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,17 +36,7 @@ export let getSegments = SlateTool.create(spec, {
       let seg = result.segment;
       return {
         output: {
-          segments: [
-            {
-              segmentId: seg.segment_id,
-              listId: seg.list_id,
-              name: seg.name,
-              definition: seg.definition,
-              state: seg.state,
-              created: seg.created,
-              modified: seg.modified
-            }
-          ]
+          segments: [mapSegment(seg, segmentReadOutputSchema)]
         },
         message: `Retrieved segment **${seg.name}**.`
       };
@@ -61,15 +45,7 @@ export let getSegments = SlateTool.create(spec, {
     let results = await client.getSegments(ctx.input.listId);
     let segments = results.map(r => {
       let seg = r.segment;
-      return {
-        segmentId: seg.segment_id,
-        listId: seg.list_id,
-        name: seg.name,
-        definition: seg.definition,
-        state: seg.state,
-        created: seg.created,
-        modified: seg.modified
-      };
+      return mapSegment(seg, segmentReadOutputSchema);
     });
 
     return {
@@ -82,7 +58,7 @@ export let getSegments = SlateTool.create(spec, {
 export let createSegment = SlateTool.create(spec, {
   name: 'Create Segment',
   key: 'create_segment',
-  description: `Creates a new segment on a Laposta mailing list based on custom field conditions. Segment definitions use JSON format referencing field values.`,
+  description: `Creates a new segment on a Laposta mailing list based on custom field conditions. Segment definitions use Laposta expressions referencing custom field values.`,
   instructions: [
     'Segment definitions are best composed in the Laposta UI first, then retrieved and reused via the API.'
   ],
@@ -95,7 +71,11 @@ export let createSegment = SlateTool.create(spec, {
     z.object({
       listId: z.string().describe('ID of the list to create the segment on'),
       name: z.string().describe('Name of the segment'),
-      definition: z.string().describe('JSON-formatted segment definition string')
+      definition: z
+        .string()
+        .describe(
+          'Laposta segment expression; retrieve an existing expression with get_segments'
+        )
     })
   )
   .output(segmentOutputSchema)
@@ -109,15 +89,7 @@ export let createSegment = SlateTool.create(spec, {
 
     let seg = result.segment;
     return {
-      output: {
-        segmentId: seg.segment_id,
-        listId: seg.list_id,
-        name: seg.name,
-        definition: seg.definition,
-        state: seg.state,
-        created: seg.created,
-        modified: seg.modified
-      },
+      output: mapSegment(seg, segmentOutputSchema),
       message: `Created segment **${seg.name}** on list ${seg.list_id}.`
     };
   })
@@ -137,7 +109,7 @@ export let updateSegment = SlateTool.create(spec, {
       listId: z.string().describe('ID of the list the segment belongs to'),
       segmentId: z.string().describe('ID of the segment to update'),
       name: z.string().optional().describe('New name for the segment'),
-      definition: z.string().optional().describe('New JSON-formatted segment definition')
+      definition: z.string().optional().describe('New Laposta segment expression')
     })
   )
   .output(segmentOutputSchema)
@@ -151,15 +123,7 @@ export let updateSegment = SlateTool.create(spec, {
 
     let seg = result.segment;
     return {
-      output: {
-        segmentId: seg.segment_id,
-        listId: seg.list_id,
-        name: seg.name,
-        definition: seg.definition,
-        state: seg.state,
-        created: seg.created,
-        modified: seg.modified
-      },
+      output: mapSegment(seg, segmentOutputSchema),
       message: `Updated segment **${seg.name}**.`
     };
   })
@@ -180,22 +144,14 @@ export let deleteSegment = SlateTool.create(spec, {
       segmentId: z.string().describe('ID of the segment to delete')
     })
   )
-  .output(segmentOutputSchema)
+  .output(segmentDeleteOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.deleteSegment(ctx.input.segmentId, ctx.input.listId);
 
     let seg = result.segment;
     return {
-      output: {
-        segmentId: seg.segment_id,
-        listId: seg.list_id,
-        name: seg.name,
-        definition: seg.definition,
-        state: seg.state,
-        created: seg.created,
-        modified: seg.modified
-      },
+      output: mapSegment(seg, segmentDeleteOutputSchema),
       message: `Deleted segment **${seg.name}** from list ${seg.list_id}.`
     };
   })

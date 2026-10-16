@@ -1,9 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let scopeSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   scopeId: z.string().describe('Unique identifier of the scope'),
   name: z.string().describe('Human-readable name of the scope'),
   status: z
@@ -32,6 +36,7 @@ export let listScopes = SlateTool.create(spec, {
     let scopes = await client.listScopes();
 
     let mapped = scopes.map((s: any) => ({
+      raw: s,
       scopeId: s.id,
       name: s.name,
       status: s.status,
@@ -76,6 +81,7 @@ export let getScope = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: s,
         scopeId: s.id,
         name: s.name,
         status: s.status,
@@ -95,7 +101,7 @@ export let createScope = SlateTool.create(spec, {
   key: 'create_scope',
   description: `Create a new scope to define a prediction deployment. A scope combines a target population (cohorts), optional exclusion cohorts, and a payload of predictions (outcomes, persona sets, recommenders, cohort memberships, traits) into a deployable unit.`,
   instructions: [
-    'Population must include at least one cohort ID.',
+    'An empty population.cohortIds list selects the entire US population. Set preview explicitly: true for a limited unbilled preview or false for a full scope.',
     'Payload defines what predictions to generate. Include outcome IDs for propensity scores, persona set IDs for segmentation, etc.'
   ],
   tags: { readOnly: false, destructive: false }
@@ -152,6 +158,12 @@ export let createScope = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FaradayClient({ token: ctx.auth.token });
 
+    if (ctx.input.preview === undefined) {
+      throw createApiServiceError(
+        'Faraday requires preview when creating a scope. Set preview to true for a limited unbilled preview, or false for a full scope.'
+      );
+    }
+
     let body: Record<string, any> = {
       name: ctx.input.name,
       population: {
@@ -178,6 +190,7 @@ export let createScope = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: s,
         scopeId: s.id,
         name: s.name,
         status: s.status,

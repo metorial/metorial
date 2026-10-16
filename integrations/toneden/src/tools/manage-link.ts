@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ToneDenClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,8 @@ let linkOutputSchema = z.object({
   clickCount: z.number().optional().describe('Total clicks'),
   clickthroughCount: z.number().optional().describe('Total clickthroughs'),
   header: z.string().optional().describe('Landing page header text'),
-  callToAction: z.string().optional().describe('Button call-to-action text')
+  callToAction: z.string().optional().describe('Button call-to-action text'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let manageLink = SlateTool.create(spec, {
@@ -34,7 +35,27 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
         .enum(['create', 'get', 'update', 'delete', 'expand', 'validate_path'])
         .describe('Operation to perform'),
       linkId: z.number().optional().describe('Link ID (required for get, update, delete)'),
+      musicUpc: z
+        .string()
+        .optional()
+        .describe('UPC for future music-service rescans on create or update'),
+      musicIsrc: z
+        .string()
+        .optional()
+        .describe('ISRC for future music-service rescans on create or update'),
       title: z.string().optional().describe('Link title'),
+      author: z.string().optional().describe('Content author displayed on the landing page'),
+      useSavedService: z
+        .boolean()
+        .optional()
+        .describe('Send returning music listeners to their saved service'),
+      autoplayPreview: z
+        .boolean()
+        .optional()
+        .describe('Autoplay a YouTube preview on the landing page'),
+      date: z.string().optional().describe('Event date for event links'),
+      location: z.string().optional().describe('Event location for event links'),
+      price: z.string().optional().describe('Ticket price text for event links'),
       targetType: z
         .enum([
           'music',
@@ -90,7 +111,10 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
       bgColor: z.string().optional().describe('Background color'),
       bgUrl: z.string().optional().describe('Background image URL'),
       imageUrl: z.string().optional().describe('Link image URL'),
-      previewUrl: z.string().optional().describe('Preview image URL'),
+      previewUrl: z
+        .string()
+        .optional()
+        .describe('Playable YouTube, Vimeo, or audio preview URL'),
       url: z
         .string()
         .optional()
@@ -108,7 +132,15 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
         .boolean()
         .optional()
         .describe('Whether the path is available (validate_path action)'),
-      pathValidReason: z.string().optional().describe('Reason for path validation result')
+      pathValidReason: z.string().optional().describe('Reason for path validation result'),
+      pathInvalidField: z
+        .string()
+        .optional()
+        .describe('Provider field rejected by path validation'),
+      rawPathValidation: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Original path validation result')
     })
   )
   .handleInvocation(async ctx => {
@@ -126,11 +158,13 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
       clickCount: l.click_count,
       clickthroughCount: l.clickthrough_count,
       header: l.header,
-      callToAction: l.call_to_action
+      callToAction: l.call_to_action,
+      raw: l
     });
 
     if (action === 'expand') {
-      if (!ctx.input.targetType) throw new Error('targetType is required for expand action');
+      if (!ctx.input.targetType)
+        throw createApiServiceError('targetType is required for expand action');
       let link = await client.expandLink({
         targetType: ctx.input.targetType,
         url: ctx.input.url,
@@ -144,14 +178,20 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
     }
 
     if (action === 'validate_path') {
-      if (!ctx.input.path) throw new Error('path is required for validate_path action');
+      if (!ctx.input.path)
+        throw createApiServiceError('path is required for validate_path action');
       let result = await client.validateLinkPath({
         path: ctx.input.path,
         subdomain: ctx.input.subdomain,
         linkId: ctx.input.linkId
       });
       return {
-        output: { pathValid: result.valid, pathValidReason: result.reason },
+        output: {
+          pathValid: result.valid,
+          pathValidReason: result.reason,
+          pathInvalidField: result.type,
+          rawPathValidation: result
+        },
         message: result.valid
           ? `Path "${ctx.input.path}" is **available**.`
           : `Path "${ctx.input.path}" is **not available**: ${result.reason}.`
@@ -159,7 +199,7 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
     }
 
     if (action === 'get') {
-      if (!linkId) throw new Error('linkId is required for get action');
+      if (!linkId) throw createApiServiceError('linkId is required for get action');
       let link = await client.getLink(linkId);
       return {
         output: { link: mapLink(link) },
@@ -168,7 +208,7 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
     }
 
     if (action === 'delete') {
-      if (!linkId) throw new Error('linkId is required for delete action');
+      if (!linkId) throw createApiServiceError('linkId is required for delete action');
       await client.deleteLink(linkId);
       return {
         output: { deleted: true },
@@ -177,6 +217,16 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
     }
 
     let data: Record<string, any> = {};
+    if (ctx.input.musicUpc !== undefined) data.upc = ctx.input.musicUpc;
+    if (ctx.input.musicIsrc !== undefined) data.isrc = ctx.input.musicIsrc;
+    if (ctx.input.author !== undefined) data.author = ctx.input.author;
+    if (ctx.input.useSavedService !== undefined)
+      data.use_saved_service = ctx.input.useSavedService;
+    if (ctx.input.autoplayPreview !== undefined)
+      data.autoplay_preview = ctx.input.autoplayPreview;
+    if (ctx.input.date !== undefined) data.date = ctx.input.date;
+    if (ctx.input.location !== undefined) data.location = ctx.input.location;
+    if (ctx.input.price !== undefined) data.price = ctx.input.price;
     if (ctx.input.title) data.title = ctx.input.title;
     if (ctx.input.targetType) data.target_type = ctx.input.targetType;
     if (ctx.input.targetUrl) data.target_url = ctx.input.targetUrl;
@@ -213,7 +263,7 @@ Links can include tracking pixels, email capture forms, social sharing metadata,
     }
 
     // update
-    if (!linkId) throw new Error('linkId is required for update action');
+    if (!linkId) throw createApiServiceError('linkId is required for update action');
     let link = await client.updateLink(linkId, data);
     return {
       output: { link: mapLink(link) },

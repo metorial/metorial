@@ -34,7 +34,7 @@ export let listTemplates = SlateTool.create(spec, {
 
     let templates = await client.listTemplates();
 
-    let mapped = (Array.isArray(templates) ? templates : []).map((template: any) => ({
+    let mapped = templates.map(template => ({
       templateId: template._id,
       name: template.name,
       width: template.width,

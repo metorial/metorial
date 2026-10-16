@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  requiredArray,
+  requiredNumber,
+  requiredString,
+  requireInteger
+} from '../lib/client';
 import { spec } from '../spec';
 
 let imageProductSchema = z.object({
@@ -52,7 +58,7 @@ export let listImages = SlateTool.create(spec, {
         .max(100)
         .optional()
         .default(25)
-        .describe('Results per page'),
+        .describe('Results per page; the current API accepts at most 50'),
       sortField: z
         .enum(['id', 'title', 'date_added'])
         .optional()
@@ -81,9 +87,10 @@ export let listImages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       images: z.array(imageSchema).describe('Image files'),
       pageNumber: z.number().describe('Current page number'),
-      perPage: z.number().describe('Results per page'),
+      perPage: z.number().describe('Results per page; the current API accepts at most 50'),
       totalCount: z.number().describe('Total number of images')
     })
   )
@@ -107,42 +114,39 @@ export let listImages = SlateTool.create(spec, {
       active: ctx.input.activeOnly ?? null
     });
 
-    if (!data.status?.success) {
-      throw new Error(data.status?.message || 'Failed to list images');
-    }
-
-    let images = (data.images ?? []).map((img: any) => ({
-      imageId: img.id,
-      guid: img.guid ?? '',
-      title: img.title || undefined,
-      description: img.description || undefined,
-      fileName: img.file_name || undefined,
-      fileSize: img.file_size || undefined,
-      thumbnailUrl: img.public_thumbnail_uri || undefined,
-      previewUrl: img.public_preview_uri || undefined,
-      hiresUrl: img.private_hires_uri || undefined,
-      pixelWidth: img.pix_w || undefined,
-      pixelHeight: img.pix_h || undefined,
-      dateAdded: img.date_added || undefined,
-      active: img.active,
-      products: (img.products ?? []).map((p: any) => ({
-        sku: p.sku ?? '',
+    let images = requiredArray(data.images, 'images').map((img: any) => ({
+      imageId: img.id ?? undefined,
+      guid: requiredString(img.guid, 'guid'),
+      title: img.title ?? undefined,
+      description: img.description ?? undefined,
+      fileName: img.file_name ?? undefined,
+      fileSize: img.file_size ?? undefined,
+      thumbnailUrl: img.public_thumbnail_uri ?? undefined,
+      previewUrl: img.public_preview_uri ?? undefined,
+      hiresUrl: img.private_hires_uri ?? undefined,
+      pixelWidth: img.pix_w ?? undefined,
+      pixelHeight: img.pix_h ?? undefined,
+      dateAdded: img.date_added ?? undefined,
+      active: img.active ?? undefined,
+      products: img.products?.map((p: any) => ({
+        sku: requiredString(p.sku, 'sku'),
         productCode: p.product_code,
-        perItemPrice: p.per_item_price,
-        totalPrice: p.total_price,
-        askingPrice: p.asking_price,
-        imageGuid: p.image_guid
+        perItemPrice: p.per_item_price ?? undefined,
+        totalPrice: p.total_price ?? undefined,
+        askingPrice: p.asking_price ?? undefined,
+        imageGuid: p.image_guid ?? undefined
       }))
     }));
 
     return {
       output: {
+        raw: data,
         images,
-        pageNumber: data.page_number ?? ctx.input.pageNumber ?? 1,
-        perPage: data.per_page ?? ctx.input.perPage ?? 25,
-        totalCount: data.count ?? 0
+        pageNumber: requiredNumber(data.page_number, 'page_number'),
+        perPage: requiredNumber(data.per_page, 'per_page'),
+        totalCount: requiredNumber(data.count, 'count')
       },
-      message: `Found **${images.length}** image(s) (page ${ctx.input.pageNumber ?? 1}, ${data.count ?? 0} total). ${images
+      message: `Found **${images.length}** image(s) (page ${ctx.input.pageNumber ?? 1}, ${requiredNumber(data.count, 'count')} total). ${images
         .slice(0, 5)
         .map((i: any) => `"${i.title ?? i.fileName ?? i.guid}"`)
         .join(', ')}${images.length > 5 ? '...' : ''}`
@@ -185,6 +189,7 @@ export let addImages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the upload was successful'),
       images: z.array(imageSchema).optional().describe('Uploaded images with assigned GUIDs')
     })
@@ -196,43 +201,55 @@ export let addImages = SlateTool.create(spec, {
       testMode: ctx.config.testMode
     });
 
+    for (let image of ctx.input.images) {
+      requireInteger(image.pixelWidth, 'Pixel width');
+      requireInteger(image.pixelHeight, 'Pixel height');
+      if (image.fileSize !== undefined) requireInteger(image.fileSize, 'File size', 0);
+    }
     let apiImages = ctx.input.images.map(img => ({
-      title: img.title,
-      description: img.description ?? '',
+      title: img.title ?? undefined,
+      description: img.description,
       file_name: img.fileName,
-      file_size: img.fileSize ?? 0,
-      thumbnail_file_name: '',
-      preview_file_name: '',
-      hires_file_name: '',
-      public_thumbnail_uri: img.publicThumbnailUri ?? '',
-      public_preview_uri: img.publicPreviewUri ?? '',
+      file_size: img.fileSize,
+      thumbnail_file_name: undefined,
+      preview_file_name: undefined,
+      hires_file_name: undefined,
+      public_thumbnail_uri: img.publicThumbnailUri,
+      public_preview_uri: img.publicPreviewUri,
       private_hires_uri: img.privateHiresUri,
       pix_w: img.pixelWidth,
       pix_h: img.pixelHeight
     }));
 
     let data = await client.addImages(apiImages);
-    let success = data.status?.success ?? false;
+    let success = data.status.success;
 
-    let images = (data.images ?? []).map((img: any) => ({
-      imageId: img.id,
-      guid: img.guid ?? '',
-      title: img.title || undefined,
-      description: img.description || undefined,
-      fileName: img.file_name || undefined,
-      fileSize: img.file_size || undefined,
-      thumbnailUrl: img.public_thumbnail_uri || undefined,
-      previewUrl: img.public_preview_uri || undefined,
-      hiresUrl: img.private_hires_uri || undefined,
-      pixelWidth: img.pix_w || undefined,
-      pixelHeight: img.pix_h || undefined,
-      dateAdded: img.date_added || undefined,
-      active: img.active,
-      products: []
+    let images = requiredArray(data.images, 'images').map((img: any) => ({
+      imageId: img.id ?? undefined,
+      guid: requiredString(img.guid, 'guid'),
+      title: img.title ?? undefined,
+      description: img.description ?? undefined,
+      fileName: img.file_name ?? undefined,
+      fileSize: img.file_size ?? undefined,
+      thumbnailUrl: img.public_thumbnail_uri ?? undefined,
+      previewUrl: img.public_preview_uri ?? undefined,
+      hiresUrl: img.private_hires_uri ?? undefined,
+      pixelWidth: img.pix_w ?? undefined,
+      pixelHeight: img.pix_h ?? undefined,
+      dateAdded: img.date_added ?? undefined,
+      active: img.active ?? undefined,
+      products: img.products?.map((product: any) => ({
+        sku: requiredString(product.sku, 'sku'),
+        productCode: product.product_code,
+        perItemPrice: product.per_item_price ?? undefined,
+        totalPrice: product.total_price ?? undefined,
+        askingPrice: product.asking_price ?? undefined,
+        imageGuid: product.image_guid ?? undefined
+      }))
     }));
 
     return {
-      output: { success, images },
+      output: { success, images, raw: data },
       message: success
         ? `Successfully added **${images.length}** image(s): ${images.map((i: any) => `"${i.title}" (${i.guid})`).join(', ')}`
         : `Failed to add images: ${data.status?.message ?? 'Unknown error'}`
@@ -268,6 +285,7 @@ export let updateImages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the update was successful'),
       message: z.string().optional().describe('API response message')
     })
@@ -280,12 +298,13 @@ export let updateImages = SlateTool.create(spec, {
     });
 
     let data = await client.updateImages(ctx.input.images);
-    let success = data.status?.success ?? false;
+    let success = data.status.success;
 
     return {
       output: {
+        raw: data,
         success,
-        message: data.status?.message || undefined
+        message: data.status?.message ?? undefined
       },
       message: success
         ? `Updated **${ctx.input.images.length}** image(s): ${ctx.input.images.map(i => `\`${i.guid}\``).join(', ')}`
@@ -313,6 +332,7 @@ export let deleteImages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the deletion was successful'),
       message: z.string().optional().describe('API response message')
     })
@@ -325,12 +345,13 @@ export let deleteImages = SlateTool.create(spec, {
     });
 
     let data = await client.deleteImages(ctx.input.imageGuids);
-    let success = data.status?.success ?? false;
+    let success = data.status.success;
 
     return {
       output: {
+        raw: data,
         success,
-        message: data.status?.message || undefined
+        message: data.status?.message ?? undefined
       },
       message: success
         ? `Deleted **${ctx.input.imageGuids.length}** image(s)`

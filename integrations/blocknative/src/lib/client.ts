@@ -1,11 +1,25 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let gasApi = createAxios({
-  baseURL: 'https://api.blocknative.com'
+let handleApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Blocknative',
+    reason: 'blocknative_api_error',
+    detailKeys: ['msg', 'message', 'detail', 'error', 'error_description', 'code'],
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+  });
+
+let gasApi = createAuthenticatedAxios({
+  baseURL: 'https://api.blocknative.com',
+  timeout: 30000,
+  contentType: false,
+  errorAdapter: handleApiError
 });
 
-let ethernowApi = createAxios({
-  baseURL: 'https://api.ethernow.xyz'
+let ethernowApi = createAuthenticatedAxios({
+  baseURL: 'https://api.ethernow.xyz',
+  timeout: 30000,
+  contentType: false,
+  errorAdapter: handleApiError
 });
 
 export interface GasPriceParams {
@@ -102,7 +116,7 @@ export interface BatchDecodeParams {
 export interface BatchDecodeResponse {
   network: string;
   chainId: number;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export interface BlobArchiveParams {
@@ -117,7 +131,7 @@ export interface BlobResponse {
     proof: string;
     zeroBytes: number;
     nonZeroBytes: number;
-    data: string;
+    data?: string;
   };
 }
 
@@ -187,6 +201,12 @@ export class BlocknativeClient {
   }
 
   async decodeBatch(params: BatchDecodeParams): Promise<BatchDecodeResponse> {
+    if (!params.transactionHash.trim()) {
+      throw createApiServiceError('Provide the L1 transaction hash of the batch to decode.', {
+        reason: 'blocknative_missing_transaction_hash'
+      });
+    }
+
     let queryParams: Record<string, string> = {};
 
     if (params.batchIndex !== undefined) {
@@ -196,23 +216,35 @@ export class BlocknativeClient {
       queryParams.initialStateDiffs = String(params.initialStateDiffs);
     }
 
-    let response = await ethernowApi.get(`/v1/batch/${params.transactionHash}`, {
-      params: queryParams
-    });
+    let response = await ethernowApi.get(
+      `/v1/batch/${encodeURIComponent(params.transactionHash)}`,
+      {
+        params: queryParams
+      }
+    );
 
     return response.data;
   }
 
   async getBlob(params: BlobArchiveParams): Promise<BlobResponse> {
+    if (!params.versionedHash.trim()) {
+      throw createApiServiceError('Provide the versioned hash of the blob to retrieve.', {
+        reason: 'blocknative_missing_versioned_hash'
+      });
+    }
+
     let queryParams: Record<string, string> = {};
 
     if (params.includeData !== undefined) {
       queryParams.data = String(params.includeData);
     }
 
-    let response = await ethernowApi.get(`/v1/blob/${params.versionedHash}`, {
-      params: queryParams
-    });
+    let response = await ethernowApi.get(
+      `/v1/blob/${encodeURIComponent(params.versionedHash)}`,
+      {
+        params: queryParams
+      }
+    );
 
     return response.data;
   }

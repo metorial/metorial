@@ -1,6 +1,10 @@
 # Twelve Data
 
-Retrieve real-time and historical market data for stocks, forex, cryptocurrencies, ETFs, indices, mutual funds, and commodities across 50+ global exchanges. Look up price quotes, OHLCV time series, and end-of-day prices. Perform currency exchange rate lookups and conversions. Access fundamental data including income statements, balance sheets, cash flow statements, company profiles, dividends, splits, earnings calendars, and logos. Retrieve analyst estimates, price targets, and revenue forecasts. Get ETF and mutual fund holdings, profiles, and risk assessments. Compute 100+ technical indicators (MACD, RSI, Bollinger Bands, EMA, SMA, etc.) on any time series. Search and look up symbols, exchanges, and instrument types. Stream real-time tick-by-tick price updates via WebSocket subscriptions.
+Retrieve available market quotes, OHLCV history, end-of-day closes, currency rates and conversions, company fundamentals, corporate actions, earnings, analyst estimates, and global ETF or mutual-fund data. Discover symbols, exchanges, technical indicators, market session state, and API credit usage.
+
+Connect with a Twelve Data API key. Coverage, freshness, and access depend on the instrument, exchange, subscription, and data entitlements. Use quote timestamps and market-session state to assess availability; the price-only endpoint does not return a timestamp. Daily and longer time-series intervals use exchange local time, even when an intraday timezone is supplied.
+
+Use `get_earnings_history` for the documented earnings periods `latest` and `next`, and `get_fund_data` for current global ETF and mutual-fund datasets. The legacy `get_earnings`, `get_etf_details`, and `get_mutual_fund_details` tools remain registered for existing workflows and are deprecated. This integration exposes REST tools and does not provide streaming subscriptions or triggers.
 
 ## License
 

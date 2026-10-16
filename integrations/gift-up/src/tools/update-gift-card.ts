@@ -71,7 +71,8 @@ export let updateGiftCard = SlateTool.create(spec, {
       };
     }
 
-    let updated = await client.updateGiftCard(ctx.input.code, patches);
+    await client.updateGiftCard(ctx.input.code, patches);
+    let updated = await client.getGiftCard(ctx.input.code);
 
     let updatedFields = patches.map(p => p.path.replace('/', '')).join(', ');
     return {

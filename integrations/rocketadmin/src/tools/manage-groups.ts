@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageGroups = SlateTool.create(spec, {
@@ -13,10 +13,18 @@ export let manageGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      masterPassword: z
+        .string()
+        .optional()
+        .describe('Master password for an encrypted connection'),
       action: z
         .enum(['list', 'create', 'delete', 'add_user', 'remove_user', 'list_users'])
         .describe('Action to perform'),
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       groupId: z
         .string()
         .optional()
@@ -40,10 +48,7 @@ export let manageGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let { action, connectionId, groupId, title, email } = ctx.input;
 
@@ -56,7 +61,7 @@ export let manageGroups = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!title) throw new Error('title is required for creating a group');
+      if (!title) throw createApiServiceError('title is required for creating a group');
       let group = await client.createGroup(connectionId, title);
       return {
         output: { group, success: true },
@@ -65,7 +70,7 @@ export let manageGroups = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!groupId) throw new Error('groupId is required for deleting a group');
+      if (!groupId) throw createApiServiceError('groupId is required for deleting a group');
       await client.deleteGroup(connectionId, groupId);
       return {
         output: { success: true },
@@ -74,8 +79,8 @@ export let manageGroups = SlateTool.create(spec, {
     }
 
     if (action === 'add_user') {
-      if (!groupId) throw new Error('groupId is required');
-      if (!email) throw new Error('email is required');
+      if (!groupId) throw createApiServiceError('groupId is required');
+      if (!email) throw createApiServiceError('email is required');
       let group = await client.addUserToGroup(groupId, email);
       return {
         output: { group, success: true },
@@ -84,8 +89,8 @@ export let manageGroups = SlateTool.create(spec, {
     }
 
     if (action === 'remove_user') {
-      if (!groupId) throw new Error('groupId is required');
-      if (!email) throw new Error('email is required');
+      if (!groupId) throw createApiServiceError('groupId is required');
+      if (!email) throw createApiServiceError('email is required');
       await client.removeUserFromGroup(groupId, email);
       return {
         output: { success: true },
@@ -94,7 +99,7 @@ export let manageGroups = SlateTool.create(spec, {
     }
 
     if (action === 'list_users') {
-      if (!groupId) throw new Error('groupId is required');
+      if (!groupId) throw createApiServiceError('groupId is required');
       let users = await client.getUsersInGroup(groupId);
       return {
         output: { users, success: true },
@@ -102,6 +107,6 @@ export let manageGroups = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

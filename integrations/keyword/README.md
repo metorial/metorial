@@ -1,6 +1,6 @@
 # Keyword
 
-Track keyword rankings across Google SERP and AI search platforms. Create and manage tracking projects, monitor keyword positions by location and device type, and retrieve historical SERP data. Analyze share of voice, competitor visibility, search volume, and search intent. Track brand visibility across AI platforms including ChatGPT, Perplexity, AI Mode, and Gemini. Export ranking data and generate shareable performance reports.
+Track keyword rankings across Google SERP and AI search platforms. Create and manage tracking projects, monitor keyword positions by location and device type, and retrieve historical SERP data. Analyze share of voice, competitor visibility, search volume, and search intent. Track brand visibility across AI platforms including ChatGPT, Perplexity, AI Mode, and Gemini. Retrieve current account usage, project details, competitor SERPs, and share of voice.
 
 ## License
 

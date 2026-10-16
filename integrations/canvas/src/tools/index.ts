@@ -18,4 +18,5 @@ export * from './manage-discussion';
 export * from './manage-enrollment';
 export * from './manage-module';
 export * from './manage-page';
+export * from './read-workflows';
 export * from './send-message';

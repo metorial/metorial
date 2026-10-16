@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Alchemy
 
-Interact with 80+ blockchain networks including Ethereum, Polygon, Solana, and Bitcoin via JSON-RPC node APIs. Query token balances, metadata, and allowances. Fetch historical transfers and transactions for any address. Retrieve real-time and historical token prices. Look up NFT ownership, metadata, sales history, and spam classification. Simulate transactions to preview gas costs and state changes. Manage smart wallets with account abstraction, gas sponsorship, and social login. Configure webhooks for real-time notifications on address activity, NFT transfers, and custom on-chain events using GraphQL filters.
+Query EVM blockchain balances, blocks, transactions, logs, and smart contracts through Alchemy. Read ERC-20 metadata and spending allowances, search historical transfers, inspect NFT holdings and ownership, and look up current token prices. Broadcast signed transactions. Legacy transaction simulation remains registered for compatibility after its provider retirement.
+
+Configure an Alchemy API key and an EVM network identifier (default `eth-mainnet`). API availability depends on the selected network and your plan; NFT spam checks require a paid plan. Wallet tools query public blockchain addresses and do not manage private keys or identify the Alchemy account owner.
+
+Alchemy retired its `alchemy_simulate*` APIs on September 30, 2026. The deprecated simulation tool remains for saved workflows, with its original interface. Use the contract call tool for read-only execution or gas estimation; it cannot reproduce the retired decoded asset-change breakdown. See the [provider retirement guidance](https://support.alchemy.com/articles/8324617353-what-to-use-instead-of-the-deprecated-alchemy-simulate-methods).
 
 ## License
 

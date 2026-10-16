@@ -1,91 +1,28 @@
-Based on my research, I now have enough information to write the specification. Note that Borneo (borneo.io) is a data security and privacy platform — distinct from the Oracle NoSQL "borneo" Python package. The Pridatect/Borneo GDPR product at pridatect.com also seems related (formerly Pridatect, rebranded to Borneo). I'll focus on the borneo.io data security platform.
+# Borneo integration
 
-# Slates Specification for Borneo
+The integration exposes 24 registered tools for one Borneo API product. It uses the deployment-specific HTTPS API endpoint and a bearer token in `Authorization`. An optional `organisationId` selects an authorised organisation through `x-selected-organisation-id`; `get_current_user` discovers organisation membership. New connections store the endpoint with authentication. Parsed legacy configuration retains a previously stored `baseUrl`, which is used only when authentication has no endpoint.
 
-## Overview
+| Workflow | Tools and actions | Vendor API families |
+| --- | --- | --- |
+| Identity and discovery | `get_current_user`, `list_accounts`, `list_connectors` | `/dashboard-users/current`, `/accounts`, `/connector` |
+| Scanning | `create_and_schedule_scan`, `manage_scan`, `list_scan_iterations`, `get_scan_iteration`, `list_inspection_results` | `/scan`, `/scan/list`, `/scan/{id}`, PUT scan controls, `/scan-iteration`, `/insight/list` |
+| Privacy records | `manage_data_breach`, `manage_processing_activity`, `manage_dpia`, `manage_recipient`, `manage_asset` | Breach, processing-activity, DPIA, recipient, discovered-recipient, and asset APIs |
+| Organisation records | `manage_employee`, `manage_department`, `manage_headquarter`, `manage_domain`, `manage_dashboard_user` | Employee, department, headquarters, domain, and dashboard-user APIs |
+| Classification and legal documents | `manage_infotype_category`, `manage_legal_document` | `/categories`, `/legal-document` |
+| Files and statistics | `export_inventory`, `download_report`, processing-activity export, `get_resource_statistics` | `/resource/inventory/list/export`, `/dashboard-report`, `/processing-activities/list/export`, `/resource/data-stats` |
 
-Borneo is a data security and privacy platform that provides sensitive data discovery, classification, remediation, and compliance across cloud infrastructure, SaaS applications, and APIs. It is a single platform for discovery, security, governance, and privacy compliance across your data lifecycle. Borneo offers end-to-end data security, covering discovery, privacy, compliance, safe AI, remediation, and governance across multi-cloud environments.
+List requests use the vendor's POST routes and provider response collection keys. Page size, sorting, and continuation tokens are translated to the documented body or query positions. Existing `page` inputs use zero-based continuation traversal. Missing list data produces an explicit error; totals are emitted only when supplied by the provider. Entity responses retain provider fields and nulls. Lists also retain the provider response as `raw`. Known credentials are redacted from public results.
 
-## Authentication
+Existing input fields and types remain available. Legacy scan schedule values translate to `once` and `cron`. `resourceIds` becomes `resources.resourceIds`; inline inspection policy and scan-limit options are available. Breach title, date, and affected-subject fields map to the vendor's `shortDescription`, epoch-second dates, and `numberAffectedPeople`. Processing-activity descriptions map to `additionalInfo` and retention-policy text to `retentionPeriodComment`. DPIA risk levels map to their dimension's `baselineSeverity`. Export formats are lowercased for the provider. Dashboard-user organisation ID strings translate to numeric membership objects using only explicitly supplied documented roles; the optional `memberships` field supports different roles and departments for each organisation. Unsupported IDs, absent membership roles, and ambiguous membership inputs fail before any request. Unsupported legacy parameters receive an explicit validation error; they are not sent under guessed provider fields.
 
-Borneo uses **API Key authentication** for its APIs. To obtain an API Key, navigate to AWS Console → API Gateway → select the relevant API gateway → open API Keys → unmask the API Key. Copy this API Key and use it in every request as the `X-API-KEY` header.
+Inventory export retains the required `resources` array by also retrieving the selected page from the documented inventory list API. Its count and continuation token come from that actual list response. File outputs deliver the provider's actual URL, with current bearer authentication only for URLs inside the configured API endpoint. Signed external URLs are delivered intact; their credential parameters are redacted in ordinary results. Expiry metadata is absent from the vendor contract, so an expired link requires a fresh export.
 
-Optionally, multiple API Keys can be created for use between different applications by navigating to the Usage Plans section in the API Gateway and creating additional keys.
+No triggers or webhook registration are claimed. OAuth is not used; the supplied bearer token is not automatically renewed.
 
-The platform also supports **Single Sign-On (SSO)** for dashboard access. Users authenticate securely using Single Sign-On, which leverages zero-trust security principles for enhanced protection.
+## Sources and deployment limits
 
-For dashboard user management via API, users are created with specified roles, organizational access, and authentication settings. Email verification is completed via a token-based flow.
+- [Vendor-authored SDK and README](https://www.npmjs.com/package/@borneodata/borneo-client), version 3.19.4, marked deprecated by its publisher.
+- [Generated REST serializers](https://cdn.jsdelivr.net/npm/@borneodata/borneo-client@3.19.4/dist-es/protocols/Aws_restJson1.js) and [model declarations](https://cdn.jsdelivr.net/npm/@borneodata/borneo-client@3.19.4/dist-types/models/models_0.d.ts), used as published API-contract evidence.
+- Current API documentation is hosted by each customer deployment at `https://<your-stack>/docs/api`; no authenticated deployment documentation or live API was accessed.
 
-**Note:** Borneo's public API documentation is limited. The exact base URL and full authentication details may vary depending on deployment type (SaaS vs. private deployment). Contact Borneo for deployment-specific API credentials and endpoints.
-
-## Features
-
-### Sensitive Data Discovery and Classification
-
-Scan structured and unstructured data sources across cloud environments and SaaS applications to discover sensitive data including PII, PFI, PHI, API tokens, keys, and credentials. Automatically discover all sensitive data across databases, clouds and SaaS apps, and categorize it with ML-based classifiers to act on them based on their severity score.
-
-- Choose between Surface scans, Audit scans, and in-depth Forensic Scans, designed to provide control over inspection depth and resource efficiency.
-- Scans can be configured and scheduled across various cloud resources, supporting both one-time and recurring scans with customization options for resource selection, data inspection policies, and scan limits.
-- Custom infotype categories can be created to organize and group related sensitive data types.
-
-### Data Security Posture Management (DSPM)
-
-Get real-time visibility into data exposure, usage, and vulnerabilities while continuously assessing and monitoring your data's security posture.
-
-- Maintain privacy baselines and detect anomalies.
-- Global search allows querying across the entire data footprint.
-
-### Data Remediation
-
-Supports data masking, access changes, and encryption — automatically fix data risks by implementing the right security controls.
-
-- Reduce risk surface area by getting timely triggers for automatic anonymization of sensitive data.
-
-### Data Breach Management
-
-Manage and track data breach evaluation records for compliance and risk management purposes.
-
-- Create, retrieve, and delete data breach evaluation records.
-
-### Privacy Compliance and DPIA
-
-Manage personal data responsibly and comply with global privacy regulations (GDPR, CCPA, DPDP, HIPAA) through automated processes, continuous compliance monitoring, and reporting.
-
-- Create Data Protection Impact Assessments (DPIAs) for processing activities, including comprehensive risk assessments for confidentiality, integrity, and availability.
-- Export processing activities in specified formats and languages.
-
-### Inventory and Asset Management
-
-Export filtered and sorted lists of inventory resources with customization including field selection, sorting, and filtering based on account, region, resource type, and tags, with options to include violation metrics and framework exception counts.
-
-- Create and manage assets within the platform.
-
-### Organizational Management
-
-Manage organizational entities including:
-
-- **Employees**: Create employee records with personal information, job-related data, and organizational structure for HR systems integration.
-- **Departments**: Create departments with translation support.
-- **Headquarters**: Register office locations.
-- **Domains**: Create domains with polling frequency for automatic polling and management of connected systems or applications.
-- **Dashboard Users**: Create users with specified roles and organizational access.
-
-### Legal Document Management
-
-Create and manage legal documents with associated metadata within the platform.
-
-### Recipient Management
-
-Manage discovered data recipients — add discovered recipients as confirmed recipients or archive them.
-
-### Application Data Privacy Management
-
-Borneo Code Analyser analyzes code pull requests and adds intelligent nudges for code reviewers to pay attention to sensitive data handling, identifying code handling sensitive data ahead of production with context for remediation.
-
-- Data Privacy Test Suite pinpoints APIs that are oversharing sensitive data via their responses based on approved data sharing guidelines.
-
-## Events
-
-Based on available documentation, Borneo does not appear to expose a webhook or event subscription API for external consumers. However, the platform supports self-service workflows with customizable notifications and can pipe incident alerts to external tools for quick remediation, integrating with your existing stack for real-time notifications. These notifications appear to be configured within the Borneo dashboard rather than through a programmatic webhook registration API.
-
-The provider does not support a documented, programmatic event/webhook subscription mechanism via its API.
+This audit establishes compatibility with the published SDK contract, not verification of a current customer deployment. Live provider behaviour, bearer-token lifetime, and deployed download delivery remain unverified.

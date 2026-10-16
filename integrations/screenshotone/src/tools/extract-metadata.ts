@@ -8,11 +8,14 @@ export let extractMetadata = SlateTool.create(spec, {
   key: 'extract_metadata',
   description: `Extract metadata from a web page including page title, Open Graph tags, favicon, fonts used, HTTP response status/headers, and page content as HTML or Markdown.
 
-Use this to scrape structured information from web pages without needing to process raw screenshots. Useful for link previews, content extraction, SEO analysis, and page auditing.`,
+Page content is returned as a downloadable file URL when extraction succeeds. Use this to scrape structured information from web pages without needing to process raw screenshots. Useful for link previews, content extraction, SEO analysis, and page auditing.`,
   instructions: [
+    'For a downloadable image, PDF, HTML, or Markdown file, use render_file directly. This tool preserves the original metadata and temporary-link response.',
+    'Each explicit capture can consume provider quota; no extra capture is performed automatically.',
     'Provide a **url** to extract metadata from a live web page, or provide **html** content.',
     'Enable the specific metadata fields you need — all are disabled by default.',
-    'Use **contentFormat** set to "markdown" to get page content as clean Markdown text.'
+    'Use **contentFormat** set to "markdown" to get page content as a Markdown file.',
+    'Download returned files promptly. Content extraction can be unavailable for some pages.'
   ],
   tags: {
     readOnly: true
@@ -101,9 +104,21 @@ Use this to scrape structured information from web pages without needing to proc
         .record(z.string(), z.unknown())
         .optional()
         .describe(
-          'Extracted metadata including requested fields (page_title, open_graph, icon, fonts, image_size, content, http_response_status_code, http_response_headers)'
+          'Extracted page_title, open_graph, icon, fonts, and image_size fields when requested; content files and HTTP details are returned separately'
         ),
-      cacheUrl: z.string().optional().describe('CDN cache URL if caching was enabled')
+      cacheUrl: z.string().optional().describe('CDN cache URL if caching was enabled'),
+      content: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Provider content file metadata, including its actual URL, expiration, and format when available'
+        ),
+      httpResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Target website HTTP response status code and headers when requested and available'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -121,7 +136,7 @@ Use this to scrape structured information from web pages without needing to proc
       metadataContent: ctx.input.content,
       metadataContentFormat: ctx.input.contentFormat,
       metadataHttpResponseStatusCode: ctx.input.httpResponseStatusCode,
-      metadataHttpResponseStatusHeaders: ctx.input.httpResponseHeaders,
+      metadataHttpResponseHeaders: ctx.input.httpResponseHeaders,
       waitUntil: ctx.input.waitUntil,
       delay: ctx.input.delay,
       timeout: ctx.input.timeout,
@@ -149,7 +164,9 @@ Use this to scrape structured information from web pages without needing to proc
       output: {
         screenshotUrl: result.screenshotUrl,
         metadata: result.metadata,
-        cacheUrl: result.cacheUrl
+        cacheUrl: result.cacheUrl,
+        content: result.content,
+        httpResponse: result.httpResponse
       },
       message: `Metadata extracted from ${source}. Fields: ${fields.length > 0 ? fields.join(', ') : 'none requested'}.`
     };

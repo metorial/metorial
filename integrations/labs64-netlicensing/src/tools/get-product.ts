@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,10 @@ export let getProduct = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let result = await client.getProduct(ctx.input.productNumber);
-    if (!result) throw new Error(`Product ${ctx.input.productNumber} not found`);
+    if (!result)
+      throw createApiServiceError(`Product ${ctx.input.productNumber} not found`, {
+        reason: 'invalid_response'
+      });
     return {
       output: {
         productNumber: result.number,

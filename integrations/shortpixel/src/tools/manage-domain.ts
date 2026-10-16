@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShortPixelClient } from '../lib/client';
+import { readNumber, readOptionalNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageDomain = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let manageDomain = SlateTool.create(spec, {
   description: `Manage domains associated with your ShortPixel API key for CDN usage. Supports associating a domain, revoking a domain, checking domain status, reading CDN usage statistics, purging storage, and purging CDN cache.
 Use this to set up domains for ShortPixel Adaptive Images or to manage existing domain associations.`,
   instructions: [
-    'Use "associate" to link a domain to your API key before using ShortPixel CDN.',
+    'Use "add" to register a new domain and associate it with your API key. Use "associate" to link an existing domain.',
     'Use "status" to check if a domain is properly associated and has available credits.',
     'Use "cdn_usage" to view optimization statistics for a domain.',
     'It may take up to 5 minutes after associating a domain for the CDN to start serving images.',
@@ -24,6 +25,7 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
     z.object({
       action: z
         .enum([
+          'add',
           'associate',
           'revoke',
           'status',
@@ -63,6 +65,9 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
   .handleInvocation(async ctx => {
     let client = new ShortPixelClient({ token: ctx.auth.token });
     let { action, domain } = ctx.input;
+    if (!domain || /[\s/\\?#:@]/.test(domain)) {
+      throw createApiServiceError('Provide a domain name without a scheme, path, or port.');
+    }
 
     let statusCodeToMessage = (code: number): string => {
       switch (code) {
@@ -81,11 +86,19 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
       }
     };
 
+    if (action === 'add') {
+      let result = await client.addDomain(domain);
+      return {
+        output: { action, domain, rawResponse: result },
+        message: `ShortPixel returned the domain registration response for **${domain}**.`
+      };
+    }
+
     if (action === 'associate') {
       let result = await client.setDomain(domain);
       return {
         output: { action, domain, rawResponse: result },
-        message: `Domain **${domain}** has been associated with your API key. It may take up to 5 minutes for the CDN to start serving images.`
+        message: `ShortPixel returned the domain association response for **${domain}**.`
       };
     }
 
@@ -93,13 +106,13 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
       let result = await client.revokeDomain(domain);
       return {
         output: { action, domain, rawResponse: result },
-        message: `Domain **${domain}** association has been revoked.`
+        message: `ShortPixel returned the domain revocation response for **${domain}**.`
       };
     }
 
     if (action === 'status') {
       let result = await client.readDomainStatus(domain);
-      let code = result.Status ?? 0;
+      let code = readNumber(result.Status, 'domain status');
       let message = statusCodeToMessage(code);
       return {
         output: {
@@ -119,11 +132,14 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
         output: {
           action,
           domain,
-          monthlyApiCalls: result.PaidAPICalls ?? 0,
-          oneTimeApiCalls: result.PaidAPICallsOneTime ?? 0,
+          monthlyApiCalls: readOptionalNumber(result.PaidAPICalls, 'monthly domain calls'),
+          oneTimeApiCalls: readOptionalNumber(
+            result.PaidAPICallsOneTime,
+            'one-time domain calls'
+          ),
           rawResponse: result
         },
-        message: `Domain **${domain}** CDN usage: **${result.PaidAPICalls ?? 0}** monthly calls, **${result.PaidAPICallsOneTime ?? 0}** one-time calls.`
+        message: `Retrieved the CDN usage response for domain **${domain}**.`
       };
     }
 
@@ -131,7 +147,7 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
       let result = await client.purgeStorageBulk(domain);
       return {
         output: { action, domain, rawResponse: result },
-        message: `Storage purged for domain **${domain}**.`
+        message: `ShortPixel returned the storage purge response for **${domain}**.`
       };
     }
 
@@ -139,13 +155,10 @@ Use this to set up domains for ShortPixel Adaptive Images or to manage existing 
       let result = await client.purgeCdnCacheBulk(domain);
       return {
         output: { action, domain, rawResponse: result },
-        message: `CDN cache purged for domain **${domain}**.`
+        message: `ShortPixel returned the CDN cache purge response for **${domain}**.`
       };
     }
 
-    return {
-      output: { action, domain },
-      message: `Unknown action: ${action}`
-    };
+    throw createApiServiceError('Unsupported domain action.');
   })
   .build();

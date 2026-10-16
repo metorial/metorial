@@ -4,22 +4,32 @@ import {
   addImages,
   browseCatalog,
   browseFraming,
+  buildFrame,
   deleteImages,
+  getOrder,
   getOrderStatus,
   getPrices,
   getProductDetails,
   getShippingOptions,
   listImages,
   listOrderStatusDefinitions,
+  listOrders,
+  listVirtualInventory,
   submitOrder,
   updateCustomer,
   updateImages,
   updateOrder,
-  validateAddress
+  validateAddress,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
+    listOrders,
+    getOrder,
+    listVirtualInventory,
+    buildFrame,
     submitOrder,
     getOrderStatus,
     updateOrder,

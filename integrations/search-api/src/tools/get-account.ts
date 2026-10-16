@@ -22,7 +22,12 @@ export let getAccount = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Maximum searches allowed per month'),
-      remainingSearches: z.number().optional().describe('Remaining search credits')
+      remainingSearches: z.number().optional().describe('Remaining search credits'),
+      searchesThisHour: z.number().optional().describe('Searches performed this hour'),
+      hourlyRateLimit: z.number().optional().describe('Hourly search limit'),
+      subscriptionPeriodStart: z.string().optional().describe('Subscription period start'),
+      subscriptionPeriodEnd: z.string().optional().describe('Subscription period end'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,17 +35,20 @@ export let getAccount = SlateTool.create(spec, {
 
     let data = await client.getAccount();
 
-    let total = data.total_searches_this_month ?? data.total_searches;
-    let max = data.max_searches_per_month ?? data.plan_searches_per_month;
-    let remaining =
-      data.remaining_searches ??
-      (max !== undefined && total !== undefined ? max - total : undefined);
+    let total = data.account.current_month_usage;
+    let max = data.account.monthly_allowance;
+    let remaining = data.account.remaining_credits;
 
     return {
       output: {
         totalSearchesThisMonth: total,
         maxSearchesPerMonth: max,
-        remainingSearches: remaining
+        remainingSearches: remaining,
+        searchesThisHour: data.api_usage?.searches_this_hour,
+        hourlyRateLimit: data.api_usage?.hourly_rate_limit,
+        subscriptionPeriodStart: data.subscription?.period_start,
+        subscriptionPeriodEnd: data.subscription?.period_end,
+        raw: data
       },
       message: `Account usage: ${total ?? 'N/A'} / ${max ?? 'N/A'} searches used this month. ${remaining ?? 'N/A'} remaining.`
     };

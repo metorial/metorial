@@ -1,8 +1,8 @@
-# Slates Specification for Interzoid
+# Interzoid API Integration Specification
 
 ## Overview
 
-Interzoid is an AI-powered data quality platform that provides REST/JSON APIs for data matching, data standardization, data enrichment, and data validation. Interzoid's APIs allow you to match records, enrich attributes, normalize and standardize fields, and verify data across multiple domains. It offers 30+ APIs accessible via a single API key.
+Interzoid is an AI-powered data quality platform that provides REST/JSON APIs for data matching, data standardization, data enrichment, and data validation. Interzoid's APIs allow you to match records, enrich attributes, normalize and standardize fields, and verify data across multiple domains. Its real-time Cloud Data APIs are accessible via a single API key.
 
 ## Authentication
 
@@ -35,7 +35,7 @@ Compare two values and receive a match score (0–100) indicating the likelihood
 
 Define exactly what data you need, and the AI will retrieve and structure it for you. The custom data enrichment API accepts a topic, a lookup value, and a list of desired output fields (e.g., headquarters, CEO, revenue) and returns structured JSON.
 
-- Additional specialized enrichment APIs provide: business information, parent company info, executive profiles, email trust scores, IP address profiles, phone number profiles, company/organization verification, stock analysis by ticker, and X/Twitter handle/profile data.
+- Additional specialized enrichment APIs provide: business information, parent company info, executive profiles, email trust scores, IP address profiles, phone number profiles, company/organization verification, stock analysis by ticker.
 - These are premium APIs that consume multiple credits per call.
 
 ### Data Standardization and Normalization
@@ -67,18 +67,20 @@ Parse addresses into their component parts (street, city, state, zip, etc.) for 
 
 ### Utility APIs
 
-- **Global page/API load performance**: Measure page load times or API response times from 20+ global locations.
+- **Global page/API load performance**: Measure page load times or API response times from supported geographic origins.
 - **Live currency exchange rates**: Retrieve real-time exchange rates for 150+ global currencies.
 - **Weather information**: Get current weather data by US zip code or global location.
 - **Remaining credits**: Check remaining API credit balance for your account.
 
-### Batch / Full Dataset Processing
+### Additional Record Matching and Lookup Tools
 
-Process entire data tables, datasets, and files with a single API call. Generate match reports, append similarity keys to tables and files, append and enrich entire datasets with new columns, and more.
+- Match a full name and address, company and address, or company and full name with a combined similarity key.
+- Retrieve standardized country names with country, currency, internet, and calling codes.
+- Retrieve canonical organization names through `/getorgstandard`.
+- Retrieve parent-company information by company name or domain through `/getparentcompanyinfo`.
 
-- Supports CSV/TSV files, and connections to cloud databases (Snowflake, Postgres, MySQL, Azure SQL, AWS RDS, etc.).
-- The `connect.interzoid.com` endpoint accepts parameters for function, source, connection, table, and column to run batch jobs.
+The legacy company standardization, parent-company, and global page performance requests are retained for existing callers. The documented organization standardization and parent-company information endpoints have separate tools. Dataset and file batch processing is not exposed by this integration.
 
 ## Events
 
-The provider does not support events. Interzoid is a stateless, request-response API platform with no webhook or event subscription mechanism.
+The integration exposes request-response tools and does not register event triggers.

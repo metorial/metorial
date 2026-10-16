@@ -39,7 +39,13 @@ export let recognizeBoat = SlateTool.create(spec, {
               .describe('Text orientation (horizontal or vertical)')
           })
         )
-        .describe('Detected boat ID results')
+        .describe('Detected boat ID results'),
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response including recognition confidence and image metadata'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -80,7 +86,8 @@ export let recognizeBoat = SlateTool.create(spec, {
       output: {
         processingTime: result.processing_time,
         filename: result.filename,
-        results: mappedResults
+        results: mappedResults,
+        raw: result
       },
       message: codes
         ? `Recognized boat ID: **${codes}** (processed in ${result.processing_time}ms)`

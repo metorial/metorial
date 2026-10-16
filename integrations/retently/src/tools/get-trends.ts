@@ -35,19 +35,17 @@ Supports various date range presets (today, past-week, past-month, etc.) or cust
           'custom'
         ])
         .optional()
-        .describe('Date range preset (required when groupId is provided)'),
+        .describe('Date range preset (optional when groupId is provided)'),
       startDate: z
         .string()
         .optional()
         .describe(
-          'Custom start date (ISO 8601 or UNIX timestamp, required when date is "custom")'
+          'Custom start date (YYYY-MM-DD or ISO 8601; used only when date is "custom")'
         ),
       endDate: z
         .string()
         .optional()
-        .describe(
-          'Custom end date (ISO 8601 or UNIX timestamp, required when date is "custom")'
-        )
+        .describe('Custom end date (YYYY-MM-DD or ISO 8601; used only when date is "custom")')
     })
   )
   .output(

@@ -13,11 +13,12 @@ export let getVoiceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      voiceId: z.string().describe('The unique identifier of the voice to retrieve')
+      voiceId: z.string().describe('Voice ID. Call list_voices to discover available voices.')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       voiceId: z.string().describe('Unique voice identifier'),
       name: z.string().describe('Display name of the voice'),
       category: z
@@ -60,28 +61,29 @@ export let getVoiceTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: v.raw,
         voiceId: v.voice_id,
         name: v.name,
-        category: v.category,
-        description: v.description,
-        previewUrl: v.preview_url,
-        labels: v.labels,
+        category: v.category ?? undefined,
+        description: v.description ?? undefined,
+        previewUrl: v.preview_url ?? undefined,
+        labels: v.labels ?? undefined,
         settings: v.settings
           ? {
-              stability: v.settings.stability,
-              similarityBoost: v.settings.similarity_boost,
-              style: v.settings.style,
-              useSpeakerBoost: v.settings.use_speaker_boost,
-              speed: v.settings.speed
+              stability: v.settings.stability ?? undefined,
+              similarityBoost: v.settings.similarity_boost ?? undefined,
+              style: v.settings.style ?? undefined,
+              useSpeakerBoost: v.settings.use_speaker_boost ?? undefined,
+              speed: v.settings.speed ?? undefined
             }
           : undefined,
         fineTuning: v.fine_tuning
           ? {
-              isAllowedToFineTune: v.fine_tuning.is_allowed_to_fine_tune,
-              state: v.fine_tuning.state
+              isAllowedToFineTune: v.fine_tuning.is_allowed_to_fine_tune ?? undefined,
+              state: v.fine_tuning.state ?? undefined
             }
           : undefined,
-        createdAtUnix: v.created_at_unix
+        createdAtUnix: v.created_at_unix ?? undefined
       },
       message: `Voice **${v.name}** (\`${v.voice_id}\`), category: ${v.category || 'unknown'}.`
     };

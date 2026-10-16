@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'linguapop',
   name: 'Linguapop',
   description:
-    'CEFR-aligned language proficiency placement testing platform. Send placement tests to candidates and receive detailed proficiency results including CEFR levels, numeric ratings, and reading/listening scores.',
+    'Discover available languages and create CEFR-aligned placement test invitations with email, kiosk, reading, listening, and completion callback options.',
   metadata: {},
   config,
   auth

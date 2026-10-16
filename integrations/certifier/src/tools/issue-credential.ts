@@ -9,7 +9,8 @@ export let issueCredential = SlateTool.create(spec, {
   description: `Issue a draft credential, changing its status from "draft" to "issued". Optionally sends the credential to the recipient via email after issuing.`,
   instructions: [
     'Only credentials with status "draft" can be issued.',
-    'Set send to true to also deliver the credential via email after issuing.'
+    'Set send to true to also deliver the credential via email after issuing.',
+    'Issuing and sending are separate operations. If sending fails after issuance, retry delivery with send_credential.'
   ],
   tags: {
     destructive: false,

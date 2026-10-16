@@ -42,7 +42,7 @@ export let listApps = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      token: ctx.auth.organizationToken ?? ctx.auth.token,
       appId: ctx.config.appId
     });
 
@@ -68,14 +68,16 @@ export let getApp = SlateTool.create(spec, {
     z.object({
       targetAppId: z
         .string()
-        .describe('App ID to retrieve (defaults to the configured App ID if omitted)')
+        .describe(
+          'App ID to retrieve (defaults to the legacy default App ID if omitted; call list_apps to discover IDs)'
+        )
         .optional()
     })
   )
   .output(appOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      token: ctx.auth.organizationToken ?? ctx.auth.token,
       appId: ctx.config.appId
     });
 
@@ -107,7 +109,7 @@ export let createApp = SlateTool.create(spec, {
       apnsKeyId: z.string().optional().describe('iOS APNs Key ID (p8 auth)'),
       apnsTeamId: z.string().optional().describe('iOS APNs Team ID'),
       apnsBundleId: z.string().optional().describe('iOS APNs Bundle ID'),
-      apnsP8: z.string().optional().describe('iOS APNs p8 key contents'),
+      apnsP8: z.string().optional().describe('Base64-encoded iOS APNs p8 key contents'),
       fcmV1ServiceAccountJson: z
         .string()
         .optional()
@@ -117,7 +119,7 @@ export let createApp = SlateTool.create(spec, {
   .output(appOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      token: ctx.auth.organizationToken ?? ctx.auth.token,
       appId: ctx.config.appId
     });
 
@@ -125,13 +127,14 @@ export let createApp = SlateTool.create(spec, {
       name: ctx.input.name,
       organization_id: ctx.input.organizationId
     };
-    if (ctx.input.siteName) body.site_name = ctx.input.siteName;
-    if (ctx.input.chromeWebOrigin) body.chrome_web_origin = ctx.input.chromeWebOrigin;
-    if (ctx.input.apnsKeyId) body.apns_key_id = ctx.input.apnsKeyId;
-    if (ctx.input.apnsTeamId) body.apns_team_id = ctx.input.apnsTeamId;
-    if (ctx.input.apnsBundleId) body.apns_bundle_id = ctx.input.apnsBundleId;
-    if (ctx.input.apnsP8) body.apns_p8 = ctx.input.apnsP8;
-    if (ctx.input.fcmV1ServiceAccountJson)
+    if (ctx.input.siteName !== undefined) body.site_name = ctx.input.siteName;
+    if (ctx.input.chromeWebOrigin !== undefined)
+      body.chrome_web_origin = ctx.input.chromeWebOrigin;
+    if (ctx.input.apnsKeyId !== undefined) body.apns_key_id = ctx.input.apnsKeyId;
+    if (ctx.input.apnsTeamId !== undefined) body.apns_team_id = ctx.input.apnsTeamId;
+    if (ctx.input.apnsBundleId !== undefined) body.apns_bundle_id = ctx.input.apnsBundleId;
+    if (ctx.input.apnsP8 !== undefined) body.apns_p8 = ctx.input.apnsP8;
+    if (ctx.input.fcmV1ServiceAccountJson !== undefined)
       body.fcm_v1_service_account_json = ctx.input.fcmV1ServiceAccountJson;
 
     let result = await client.createApp(body);
@@ -161,7 +164,7 @@ export let updateApp = SlateTool.create(spec, {
       apnsKeyId: z.string().optional().describe('iOS APNs Key ID'),
       apnsTeamId: z.string().optional().describe('iOS APNs Team ID'),
       apnsBundleId: z.string().optional().describe('iOS APNs Bundle ID'),
-      apnsP8: z.string().optional().describe('iOS APNs p8 key contents'),
+      apnsP8: z.string().optional().describe('Base64-encoded iOS APNs p8 key contents'),
       fcmV1ServiceAccountJson: z
         .string()
         .optional()
@@ -171,19 +174,20 @@ export let updateApp = SlateTool.create(spec, {
   .output(appOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      token: ctx.auth.organizationToken ?? ctx.auth.token,
       appId: ctx.config.appId
     });
 
     let body: Record<string, any> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.siteName) body.site_name = ctx.input.siteName;
-    if (ctx.input.chromeWebOrigin) body.chrome_web_origin = ctx.input.chromeWebOrigin;
-    if (ctx.input.apnsKeyId) body.apns_key_id = ctx.input.apnsKeyId;
-    if (ctx.input.apnsTeamId) body.apns_team_id = ctx.input.apnsTeamId;
-    if (ctx.input.apnsBundleId) body.apns_bundle_id = ctx.input.apnsBundleId;
-    if (ctx.input.apnsP8) body.apns_p8 = ctx.input.apnsP8;
-    if (ctx.input.fcmV1ServiceAccountJson)
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.siteName !== undefined) body.site_name = ctx.input.siteName;
+    if (ctx.input.chromeWebOrigin !== undefined)
+      body.chrome_web_origin = ctx.input.chromeWebOrigin;
+    if (ctx.input.apnsKeyId !== undefined) body.apns_key_id = ctx.input.apnsKeyId;
+    if (ctx.input.apnsTeamId !== undefined) body.apns_team_id = ctx.input.apnsTeamId;
+    if (ctx.input.apnsBundleId !== undefined) body.apns_bundle_id = ctx.input.apnsBundleId;
+    if (ctx.input.apnsP8 !== undefined) body.apns_p8 = ctx.input.apnsP8;
+    if (ctx.input.fcmV1ServiceAccountJson !== undefined)
       body.fcm_v1_service_account_json = ctx.input.fcmV1ServiceAccountJson;
 
     let result = await client.updateApp(ctx.input.targetAppId, body);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,10 @@ export let manageLicensee = SlateTool.create(spec, {
     let { action, licenseeNumber, forceCascade, ...params } = ctx.input;
 
     if (action === 'delete') {
-      if (!licenseeNumber) throw new Error('licenseeNumber is required for delete');
+      if (!licenseeNumber)
+        throw createApiServiceError('licenseeNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteLicensee(licenseeNumber, forceCascade);
       return {
         output: { licenseeNumber, deleted: true },
@@ -57,9 +60,15 @@ export let manageLicensee = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!licenseeNumber) throw new Error('licenseeNumber is required for update');
+      if (!licenseeNumber)
+        throw createApiServiceError('licenseeNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateLicensee(licenseeNumber, params);
-      if (!result) throw new Error('Failed to update licensee');
+      if (!result)
+        throw createApiServiceError('Failed to update licensee', {
+          reason: 'invalid_response'
+        });
       return {
         output: {
           licenseeNumber: result.number,
@@ -76,7 +85,8 @@ export let manageLicensee = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (licenseeNumber) createParams.number = licenseeNumber;
     let result = await client.createLicensee(createParams);
-    if (!result) throw new Error('Failed to create licensee');
+    if (!result)
+      throw createApiServiceError('Failed to create licensee', { reason: 'invalid_response' });
     return {
       output: {
         licenseeNumber: result.number,

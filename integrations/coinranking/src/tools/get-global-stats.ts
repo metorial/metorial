@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getGlobalStats = SlateTool.create(spec, {
@@ -22,6 +23,9 @@ export let getGlobalStats = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       totalCoins: z.number().describe('Total number of coins'),
       totalMarkets: z.number().describe('Total number of markets'),
       totalExchanges: z.number().describe('Total number of exchanges'),
@@ -62,23 +66,24 @@ export let getGlobalStats = SlateTool.create(spec, {
 
     let stats = result.data;
 
-    let mapCoinSummary = (c: any) => ({
+    let mapCoinSummary = (c: (typeof stats.bestCoins)[number]) => ({
       coinUuid: c.uuid,
       symbol: c.symbol,
       name: c.name,
-      iconUrl: c.iconUrl || null
+      iconUrl: c.iconUrl ?? null
     });
 
     return {
       output: {
+        rawData: result.data,
         totalCoins: stats.totalCoins,
         totalMarkets: stats.totalMarkets,
         totalExchanges: stats.totalExchanges,
         totalMarketCap: stats.totalMarketCap,
         total24hVolume: stats.total24hVolume,
         btcDominance: stats.btcDominance,
-        bestCoins: (stats.bestCoins || []).map(mapCoinSummary),
-        newestCoins: (stats.newestCoins || []).map(mapCoinSummary)
+        bestCoins: stats.bestCoins.map(mapCoinSummary),
+        newestCoins: stats.newestCoins.map(mapCoinSummary)
       },
       message: `**Global Crypto Stats** — Total market cap: ${stats.totalMarketCap}, 24h volume: ${stats.total24hVolume}, Coins: ${stats.totalCoins}, BTC dominance: ${stats.btcDominance}%`
     };

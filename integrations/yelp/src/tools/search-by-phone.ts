@@ -1,8 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
 import { businessSchema, mapBusiness } from './search-businesses';
+
+let outputSchema = z.object({
+  total: z.number().describe('Total number of matching businesses'),
+  businesses: z.array(businessSchema).describe('Matching businesses')
+});
 
 export let searchByPhone = SlateTool.create(spec, {
   name: 'Search by Phone',
@@ -20,28 +26,25 @@ export let searchByPhone = SlateTool.create(spec, {
       locale: z.string().optional().describe('Locale code (e.g., "en_US")')
     })
   )
-  .output(
-    z.object({
-      total: z.number().describe('Total number of matching businesses'),
-      businesses: z.array(businessSchema).describe('Matching businesses')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.searchByPhone(ctx.input.phone, ctx.input.locale);
 
-    let businesses = (result.businesses || []).map(mapBusiness);
+    return mapYelpOutput(outputSchema, () => {
+      let businesses = result.businesses.map(mapBusiness);
 
-    return {
-      output: {
-        total: result.total,
-        businesses
-      },
-      message:
-        businesses.length > 0
-          ? `Found **${result.total}** business(es) matching phone number ${ctx.input.phone}. Top result: **${businesses[0].name}**`
-          : `No businesses found for phone number ${ctx.input.phone}.`
-    };
+      return {
+        output: {
+          total: result.total,
+          businesses
+        },
+        message:
+          businesses.length > 0
+            ? `Found **${result.total}** business(es) matching phone number ${ctx.input.phone}. Top result: **${businesses[0].name}**`
+            : `No businesses found for phone number ${ctx.input.phone}.`
+      };
+    });
   })
   .build();

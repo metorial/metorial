@@ -14,7 +14,9 @@ export let deleteDraft = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      socialSetId: z.string().describe('ID of the social set'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       draftId: z.string().describe('ID of the draft to delete')
     })
   )

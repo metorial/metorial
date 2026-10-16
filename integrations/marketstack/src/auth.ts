@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Marketstack API access key from your account dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A Marketstack API access key is required.');
       return {
         output: {
           token: ctx.input.token

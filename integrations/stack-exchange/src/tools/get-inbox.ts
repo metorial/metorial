@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate } from '../lib/response';
 import { spec } from '../spec';
 
 let inboxItemSchema = z.object({
@@ -60,9 +61,7 @@ export let getInbox = SlateTool.create(spec, {
       body: item.body,
       link: item.link,
       isUnread: item.is_unread,
-      creationDate: item.creation_date
-        ? new Date(item.creation_date * 1000).toISOString()
-        : undefined,
+      creationDate: optionalProviderDate(item.creation_date),
       site: item.site?.name
     }));
 

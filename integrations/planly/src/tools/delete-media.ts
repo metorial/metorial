@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireConfirmed } from '../lib/responses';
 import { spec } from '../spec';
 
 export let deleteMedia = SlateTool.create(spec, {
@@ -23,8 +24,11 @@ export let deleteMedia = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.mediaIds.length === 0 || ctx.input.mediaIds.some(id => !id.trim())) {
+      throw createApiServiceError('Provide at least one nonempty mediaIds value.');
+    }
     let client = new Client({ token: ctx.auth.token });
-    await client.deleteMedia(ctx.input.mediaIds);
+    requireConfirmed(await client.deleteMedia(ctx.input.mediaIds));
 
     return {
       output: { success: true },

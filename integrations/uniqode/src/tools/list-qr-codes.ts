@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listQrCodes = SlateTool.create(spec, {
   name: 'List QR Codes',
   key: 'list_qr_codes',
-  description: `List and search QR codes in your Beaconstac account. Supports searching by name, filtering by organization, and sorting by various fields. Returns paginated results with QR code details including their campaign type, URL, and metadata.`,
+  description: `List and search QR codes in your Uniqode account. Supports searching by name, filtering by organization, and sorting by various fields. Returns paginated results with QR code details including their campaign type, URL, and metadata.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +14,22 @@ export let listQrCodes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Page number for current API pagination'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of results per page for current API pagination'),
+      organizationId: z
+        .string()
+        .optional()
+        .describe('Organization ID from list_organizations; overrides the configured default'),
       search: z.string().optional().describe('Search by QR code name'),
       ordering: z
         .string()
@@ -30,6 +46,7 @@ export let listQrCodes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of QR codes matching the query'),
       qrCodes: z
         .array(
@@ -59,7 +76,9 @@ export let listQrCodes = SlateTool.create(spec, {
     let result = await client.listQrCodes({
       search: ctx.input.search,
       ordering: ctx.input.ordering,
-      organization: ctx.config.organizationId,
+      organization: ctx.input.organizationId ?? ctx.config.organizationId,
+      page: ctx.input.page,
+      pageSize: ctx.input.pageSize,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -68,15 +87,17 @@ export let listQrCodes = SlateTool.create(spec, {
       qrCodeId: qr.id,
       name: qr.name,
       qrType: qr.qr_type,
-      url: qr.url,
-      campaignContentType: qr.campaign?.content_type,
-      placeId: qr.place,
-      createdAt: qr.created,
-      updatedAt: qr.updated
+      url: typeof qr.url === 'string' ? qr.url : undefined,
+      campaignContentType:
+        typeof qr.campaign?.content_type === 'number' ? qr.campaign?.content_type : undefined,
+      placeId: typeof qr.place === 'number' ? qr.place : undefined,
+      createdAt: typeof qr.created === 'string' ? qr.created : undefined,
+      updatedAt: typeof qr.updated === 'string' ? qr.updated : undefined
     }));
 
     return {
       output: {
+        raw: result,
         totalCount: result.count,
         qrCodes
       },

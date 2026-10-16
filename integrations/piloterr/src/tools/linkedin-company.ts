@@ -1,7 +1,27 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput, responseId } from '../lib/response';
 import { spec } from '../spec';
+
+let linkedinCompanyOutputSchema = z.object({
+  companyId: z.string().optional(),
+  companyUrl: z.string().optional(),
+  companyName: z.string().optional(),
+  logoUrl: z.string().optional(),
+  website: z.string().optional(),
+  industry: z.string().optional(),
+  tagline: z.string().optional(),
+  description: z.string().optional(),
+  founded: z.any().optional(),
+  staffCount: z.number().optional(),
+  staffRange: z.string().optional(),
+  followerCount: z.number().optional(),
+  specialities: z.array(z.string()).optional(),
+  headquarter: z.any().optional(),
+  locations: z.array(z.any()).optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let linkedinCompany = SlateTool.create(spec, {
   name: 'LinkedIn Company',
@@ -20,36 +40,20 @@ export let linkedinCompany = SlateTool.create(spec, {
         .describe('Company domain for reverse lookup (e.g., "apple.com")')
     })
   )
-  .output(
-    z.object({
-      companyId: z.string().optional(),
-      companyUrl: z.string().optional(),
-      companyName: z.string().optional(),
-      logoUrl: z.string().optional(),
-      website: z.string().optional(),
-      industry: z.string().optional(),
-      tagline: z.string().optional(),
-      description: z.string().optional(),
-      founded: z.any().optional(),
-      staffCount: z.number().optional(),
-      staffRange: z.string().optional(),
-      followerCount: z.number().optional(),
-      specialities: z.array(z.string()).optional(),
-      headquarter: z.any().optional(),
-      locations: z.array(z.any()).optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(linkedinCompanyOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
+    if ((!ctx.input.query && !ctx.input.domain) || (ctx.input.query && ctx.input.domain)) {
+      throw createApiServiceError('Provide exactly one of query or domain.');
+    }
     let result = await client.getLinkedInCompany({
       query: ctx.input.query,
       domain: ctx.input.domain
     });
 
     return {
-      output: {
-        companyId: result.company_id,
+      output: normalizeOutput(linkedinCompanyOutputSchema, {
+        companyId: responseId(result.company_id),
         companyUrl: result.company_url,
         companyName: result.company_name,
         logoUrl: result.logo_url,
@@ -65,7 +69,7 @@ export let linkedinCompany = SlateTool.create(spec, {
         headquarter: result.headquarter,
         locations: result.locations,
         raw: result
-      },
+      }),
       message: `Retrieved LinkedIn company data for **${result.company_name ?? ctx.input.query ?? ctx.input.domain}**.`
     };
   })

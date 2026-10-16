@@ -17,6 +17,23 @@ export let sendBroadcast = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      attachments: z
+        .record(z.string(), z.array(z.string()))
+        .optional()
+        .describe('Media UUID translations by language, at most 10 per language.'),
+      quickReplies: z
+        .record(
+          z.string(),
+          z.array(
+            z.object({
+              type: z.enum(['text', 'form', 'url', 'location']).optional(),
+              text: z.string(),
+              extra: z.string().optional()
+            })
+          )
+        )
+        .optional()
+        .describe('Quick reply translations by language, at most 10 per language.'),
       text: z
         .record(z.string(), z.string())
         .describe(
@@ -36,6 +53,7 @@ export let sendBroadcast = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       broadcastUuid: z.string().describe('UUID of the created broadcast'),
       status: z.string().describe('Status of the broadcast'),
       createdOn: z.string().describe('When the broadcast was created')
@@ -46,6 +64,8 @@ export let sendBroadcast = SlateTool.create(spec, {
 
     let broadcast = await client.sendBroadcast({
       text: ctx.input.text,
+      attachments: ctx.input.attachments,
+      quick_replies: ctx.input.quickReplies,
       urns: ctx.input.urns,
       contacts: ctx.input.contactUuids,
       groups: ctx.input.groupUuids,
@@ -54,6 +74,7 @@ export let sendBroadcast = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: broadcast,
         broadcastUuid: broadcast.uuid,
         status: broadcast.status,
         createdOn: broadcast.created_on

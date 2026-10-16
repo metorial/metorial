@@ -1,49 +1,26 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { getAccount } from './lib/client';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
-      apiKey: z
-        .string()
-        .describe(
-          'Your CustomJS API key. Found on the right-hand side of your dashboard at https://app.customjs.io'
-        )
+      apiKey: z.string().describe('Your CustomJS API key from https://app.customjs.space.')
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Provide your CustomJS API key.');
+      return { output: { token: ctx.input.apiKey } };
     },
-
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.app.customjs.io'
-      });
-
-      let response = await client.get(`/core/api-key/${ctx.output.token}`, {
-        headers: {
-          'x-api-key': ctx.output.token
-        }
-      });
-
-      let data = response.data;
-
+      let data = await getAccount(ctx.output.token);
       return {
         profile: {
-          id: data.workspaceId || data.id,
+          id: data.workspaceId || data.id || data.userId,
           name: data.workspaceName || data.name,
           email: data.email
         }

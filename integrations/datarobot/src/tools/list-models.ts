@@ -1,9 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let modelSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
   modelId: z.string().describe('Unique model identifier'),
   modelType: z.string().optional().describe('Type/algorithm of the model'),
   modelCategory: z.string().optional().describe('Model category'),
@@ -19,10 +24,14 @@ let modelSchema = z.object({
   metrics: z.record(z.string(), z.any()).optional().describe('Model performance metrics')
 });
 
+let outputSchema = z.object({
+  models: z.array(modelSchema).describe('List of trained models')
+});
+
 export let listModels = SlateTool.create(spec, {
   name: 'List Models',
   key: 'list_models',
-  description: `List trained models in a DataRobot project, including the recommended model. Returns model types, training details, and performance metrics from the leaderboard.`,
+  description: `List trained models in a DataRobot project. Returns model types, training details, and performance metrics from the leaderboard.`,
   tags: {
     readOnly: true
   }
@@ -38,15 +47,11 @@ export let listModels = SlateTool.create(spec, {
         .describe('Sort field (e.g. "metric" for best performing first)')
     })
   )
-  .output(
-    z.object({
-      models: z.array(modelSchema).describe('List of trained models')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let models = await client.listModels(ctx.input.projectId, {
@@ -55,8 +60,9 @@ export let listModels = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     });
 
-    let mapped = (Array.isArray(models) ? models : []).map((m: any) => ({
-      modelId: m.id || m.modelId,
+    let mapped = models.map((m: any) => ({
+      raw: m,
+      modelId: m.id ?? m.modelId,
       modelType: m.modelType,
       modelCategory: m.modelCategory,
       blueprintId: m.blueprintId,
@@ -68,7 +74,7 @@ export let listModels = SlateTool.create(spec, {
     }));
 
     return {
-      output: { models: mapped },
+      output: parseOutput(outputSchema, { models: mapped }),
       message: `Found **${mapped.length}** model(s) in the project leaderboard.`
     };
   })

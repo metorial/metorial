@@ -32,17 +32,19 @@ Useful for populating dropdowns, validating currency inputs, or discovering avai
             thousandsSeparator: z.string().describe('Character used as thousands separator')
           })
         )
-        .describe('List of all supported currencies')
+        .describe('List of all supported currencies'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let currencies = await client.listCurrencies();
+    let { currencies, raw } = await client.listCurrencies();
 
     return {
       output: {
-        currencies
+        currencies,
+        raw
       },
       message: `Retrieved **${currencies.length}** supported currencies.`
     };

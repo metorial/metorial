@@ -9,7 +9,7 @@ export let createCheck = SlateTool.create(spec, {
   key: 'create_check',
   description: `Create a new uptime monitoring check. Monitors a URL by periodically sending HTTP requests and alerting when the site is unresponsive or returns errors. Supports HTTPS, HTTP, ICMP, TCP, and pulse (heartbeat) check types.`,
   instructions: [
-    'For pulse checks, set type to "pulse" — no URL is required for heartbeat monitoring.',
+    'For heartbeat monitoring without a URL, use create_pulse_check. This tool retains its required url input.',
     'The period must be between 15 and 3600 seconds for regular checks, or up to 2592000 (1 month) for pulse checks.',
     'Use disabledLocations to exclude specific monitoring nodes (e.g. "lan", "mia", "fra", "tok", "syd").',
     'Set muteUntil to an ISO 8601 timestamp, "recovery", or "forever" to mute alerts.'
@@ -21,7 +21,7 @@ export let createCheck = SlateTool.create(spec, {
       type: z
         .enum(['https', 'http', 'icmp', 'tcp', 'tcps', 'pulse'])
         .optional()
-        .describe('Protocol type. Defaults to https.'),
+        .describe('Protocol type. Inferred from the URL scheme when omitted.'),
       period: z
         .number()
         .optional()

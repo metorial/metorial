@@ -30,7 +30,7 @@ export let getQuote = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         quote: result.data
       },
       message: `Retrieved quote **${ctx.input.quoteId}**.`

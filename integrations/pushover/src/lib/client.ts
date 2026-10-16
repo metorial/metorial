@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 export class PushoverClient {
   private axios;
@@ -9,8 +9,49 @@ export class PushoverClient {
     this.token = config.token;
     this.userKey = config.userKey;
     this.axios = createAxios({
-      baseURL: 'https://api.pushover.net/1'
+      baseURL: 'https://api.pushover.net/1',
+      timeout: 30_000,
+      validateStatus: () => true
     });
+    this.axios.interceptors.response.use(
+      response => {
+        let body = response.data;
+        let credentialFailure =
+          body?.token === 'invalid' ||
+          (Array.isArray(body?.errors) &&
+            body.errors.some(
+              (detail: unknown) =>
+                typeof detail === 'string' && /token|application/i.test(detail)
+            ));
+        // Recipient validation may return status 0 without any error details.
+        if (
+          response.config.url === '/users/validate.json' &&
+          (response.status === 200 || response.status === 400) &&
+          body?.status === 0 &&
+          !credentialFailure
+        ) {
+          return response;
+        }
+        if (response.status !== 200 || body?.status !== 1) {
+          throw buildApiServiceError(
+            { response },
+            {
+              providerLabel: 'Pushover',
+              reason: 'pushover_api_error',
+              operation: response.config.url ?? 'request'
+            }
+          );
+        }
+        return response;
+      },
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'Pushover',
+            reason: 'pushover_api_error'
+          })
+        )
+    );
   }
 
   // ─── Messages ──────────────────────────────────────────────
@@ -82,7 +123,7 @@ export class PushoverClient {
     calledBackAt: number;
     request: string;
   }> {
-    let response = await this.axios.get(`/receipts/${receiptId}.json`, {
+    let response = await this.axios.get(`/receipts/${encodeURIComponent(receiptId)}.json`, {
       params: { token: this.token }
     });
     let d = response.data;
@@ -102,16 +143,22 @@ export class PushoverClient {
   }
 
   async cancelReceipt(receiptId: string): Promise<{ status: number; request: string }> {
-    let response = await this.axios.post(`/receipts/${receiptId}/cancel.json`, {
-      token: this.token
-    });
+    let response = await this.axios.post(
+      `/receipts/${encodeURIComponent(receiptId)}/cancel.json`,
+      {
+        token: this.token
+      }
+    );
     return response.data;
   }
 
   async cancelReceiptByTag(tag: string): Promise<{ status: number; request: string }> {
-    let response = await this.axios.post(`/receipts/cancel_by_tag/${tag}.json`, {
-      token: this.token
-    });
+    let response = await this.axios.post(
+      `/receipts/cancel_by_tag/${encodeURIComponent(tag)}.json`,
+      {
+        token: this.token
+      }
+    );
     return response.data;
   }
 
@@ -144,14 +191,16 @@ export class PushoverClient {
     name: string;
     users: Array<{
       user: string;
-      device: string;
-      memo: string;
+      device: string | null;
+      memo: string | null;
       disabled: boolean;
+      name?: string;
+      email?: string;
     }>;
     status: number;
     request: string;
   }> {
-    let response = await this.axios.get(`/groups/${groupKey}.json`, {
+    let response = await this.axios.get(`/groups/${encodeURIComponent(groupKey)}.json`, {
       params: { token: this.token }
     });
     return response.data;
@@ -172,7 +221,10 @@ export class PushoverClient {
     if (params.device !== undefined) data.device = params.device;
     if (params.memo !== undefined) data.memo = params.memo;
 
-    let response = await this.axios.post(`/groups/${groupKey}/add_user.json`, data);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupKey)}/add_user.json`,
+      data
+    );
     return response.data;
   }
 
@@ -189,7 +241,10 @@ export class PushoverClient {
     };
     if (params.device !== undefined) data.device = params.device;
 
-    let response = await this.axios.post(`/groups/${groupKey}/remove_user.json`, data);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupKey)}/remove_user.json`,
+      data
+    );
     return response.data;
   }
 
@@ -206,7 +261,10 @@ export class PushoverClient {
     };
     if (params.device !== undefined) data.device = params.device;
 
-    let response = await this.axios.post(`/groups/${groupKey}/disable_user.json`, data);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupKey)}/disable_user.json`,
+      data
+    );
     return response.data;
   }
 
@@ -223,7 +281,10 @@ export class PushoverClient {
     };
     if (params.device !== undefined) data.device = params.device;
 
-    let response = await this.axios.post(`/groups/${groupKey}/enable_user.json`, data);
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupKey)}/enable_user.json`,
+      data
+    );
     return response.data;
   }
 
@@ -231,10 +292,13 @@ export class PushoverClient {
     groupKey: string,
     name: string
   ): Promise<{ status: number; request: string }> {
-    let response = await this.axios.post(`/groups/${groupKey}/rename.json`, {
-      token: this.token,
-      name
-    });
+    let response = await this.axios.post(
+      `/groups/${encodeURIComponent(groupKey)}/rename.json`,
+      {
+        token: this.token,
+        name
+      }
+    );
     return response.data;
   }
 

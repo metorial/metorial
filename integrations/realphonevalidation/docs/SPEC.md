@@ -1,70 +1,37 @@
-Let me get more details on the authentication and the email verification API.Now let me fetch the email verification API doc for completeness:# Slates Specification for Realphonevalidation
+# RealPhoneValidation API integration
 
-## Overview
+## Authentication and transport
 
-RealPhoneValidation is a B2B data validation service that provides real-time phone number validation, Do Not Call list lookup, phone type identification, fraud risk scoring, reassigned number detection, and email verification. It dispositions US phone numbers 100% of the time and is US-only for most services. The real-time API uses live telco data — pinging the phone switch — for up-to-the-minute accuracy.
+Use the API token supplied by RealValidation. Requests send `token` and `output=json` to `https://api.realvalidation.com/rpvWebService/` over HTTPS. JSON results and documented XML responses are accepted; XML text values remain strings. No OAuth, scopes, account IDs, or connection config are needed. Empty tokens are rejected before a request. The provider recommends no more than 10 calls per second; the client does not retry billable lookups automatically.
 
-## Authentication
+## Tools
 
-RealPhoneValidation uses **token-based authentication**. It requires an Authorization Token provided by RealPhoneValidation to utilize their API services.
+| Tool | Provider endpoint and behavior |
+| --- | --- |
+| `validate_phone` | Full mode uses `TurboV3.php` for connection status, phone type, carrier, caller name, and caller type. Standard mode retains `RealPhoneValidationTurbo.php`, the legacy Turbo endpoint that returns `iscell` and carrier. The current Turbo Standard service is a different response contract. |
+| `scrub_phone` | Plus mode uses `ScrubPlus.php`. Basic mode uses `RealPhoneValidationScrub.php`; phone type and carrier can depend on account options. |
+| `check_phone_active` | `RealPhoneValidationActive.php` returns L/C/V for active landline/mobile/VoIP, or N for inactive. Active carrier assignment does not prove subscriber connectivity. |
+| `identify_phone_type` | `WirelessID.php` returns the provider phone-type code. |
+| `dnc_lookup` | `DNCLookup.php` or `DNCPlus.php`. The provider requires a SAN before using these services. Unknown or missing list checks fail explicitly; they are never reported as false. Plus mode also returns connection status. |
+| `score_fraud_risk` | `RealPhoneValidationFraudChk.php` returns risk score, recommendation, phone/carrier details, and location. The complete provider response includes numbering details and partial-transaction metadata. |
+| `check_reassigned_number` | `ReassignedNumberLookup.php` sends `phone` and `contact_date` in YYYY-MM-DD format. Returns reassignment status and transaction ID. |
+| `verify_email` | Retains legacy `EmailVerify.php` and its validity, disposable, and connected-network fields. |
+| `validate_email_lightning` | Current `RealEmailLightning.php` returns reachability, catch-all, disposable, free-service, ISP, and caution flags with transaction ID and complete response. Y/N/? results remain provider strings; ? means unknown. |
 
-- The token is a UUID-format string (e.g., `1234ABCD-1234-ABCD-1234-123456ABCDEF`) passed as a `token` query parameter or POST field on every API request.
-- The token is obtained upon creating and activating a RealPhoneValidation account.
-- There are no OAuth flows, scopes, or additional credentials — the single token is used across all API services.
-- All API calls must be made over HTTPS with TLS v1.2+.
-- Base URL: `https://api.realvalidation.com/rpvWebService/`
+Phone services accept exactly 10 numeric US digits. Consent dates must be valid calendar dates. Provider HTTP failures, error return codes, incomplete required results, and unresolved DNC checks raise an actionable service error. Validation outcomes such as disconnected phone numbers and invalid email status remain results when the provider successfully completed the request. No absent risk score or identifier is synthesized.
 
-Example request:
+## Capability boundaries
 
-```
-https://api.realvalidation.com/rpvWebService/TurboV3.php?phone=7275555555&token=YOUR_TOKEN
-```
+The public API catalog documents request-response validation services, with no suitable current-account/profile endpoint, REST batch lifecycle, or event/webhook API. Portal and FTP bulk validation are outside these tools. No file output is produced. The legacy Turbo carrier contract is preserved rather than silently changing existing standard-mode output fields.
 
-## Features
+## Official references
 
-### Phone Number Validation (Turbo)
-
-Real-time phone number validation best used in web forms and apps when a complete overview of phone data is required. Returns connection status (connected/disconnected), phone type (mobile, landline, VoIP), carrier information, subscriber name (when available), and subscriber type (business or consumer).
-
-- **Turbo V3**: Full data set including subscriber name and type.
-- **Turbo Standard**: Best used when only connection status and phone type are needed.
-- Input: 10-digit US phone number. Output can be XML or JSON.
-
-### Phone Number Validation (Scrub)
-
-Designed for list providers, data companies, and organizations with large lists/databases and tight budgets.
-
-- **Scrub Plus**: Returns connection status and phone type.
-- **Scrub**: Returns connection status only.
-- May disposition up to 5% of US numbers as unknown.
-
-### Active Number Check
-
-Determines the basic usability of a phone number — whether it is active on a "still in business" phone service provider. Not to be confused with whether a phone is "connected" to an actual customer. This is a lower-cost alternative to Turbo/Scrub for basic checks.
-
-### Wireless/Phone Type Identification
-
-Identifies if the number is a cell phone, useful for staying TCPA compliant. Returns whether the number is mobile, landline, or VoIP.
-
-### Do Not Call (DNC) Lookup
-
-Determines if the number is on the National, State, or Direct Marketing Association Do Not Call lists. It also identifies phone type and if the number is associated with a known litigator or serial plaintiff.
-
-- **DNC Lookup**: DNC status and phone type only.
-- **DNC Plus**: Combines DNC Lookup with RPV Scrub to also return connection status, phone type, and TCPA litigator identification.
-
-### Fraud Risk Scoring
-
-Provides a phone risk score and other actionable data points, allowing you to identify possible fraud before it happens. You can customize your risk tolerance based on your specific needs.
-
-### Reassigned Number Lookup
-
-Determines if a phone number has been reassigned (changed ownership) since your last date of consent. Requires a `contact_date` parameter representing when consent was originally obtained.
-
-### Email Verification
-
-Validates email addresses in real-time to identify incorrect, disposable, and bogus addresses at the point of collection. Returns validity status (valid, invalid, unknown, accept_all), whether the email is connected to active online networks, and whether it is a disposable email address.
-
-## Events
-
-The provider does not support events. RealPhoneValidation is a request-response validation service with no webhook or event subscription mechanism.
+- [API catalog](https://realphonevalidation.com/api-documentation/)
+- [API best practices](https://realphonevalidation.com/api-best-practices/)
+- [Turbo V3](https://realphonevalidation.com/api-documentation/turbo-v3-api-doc/) and [legacy Turbo](https://realphonevalidation.com/api-documentation/turbo-api/)
+- [Scrub Plus](https://realphonevalidation.com/api-documentation/scrub-plus-api-doc/) and [Scrub](https://realphonevalidation.com/api-documentation/scrub-api/)
+- [Active](https://realphonevalidation.com/api-documentation/active-api/) and [Wireless ID](https://realphonevalidation.com/api-documentation/wireless-id-api-doc/)
+- [DNC Lookup](https://realphonevalidation.com/api-documentation/dnc-lookup-api-doc/) and [DNC Plus](https://realphonevalidation.com/api-documentation/dnc-plus-api-doc/)
+- [Fraud Check](https://realphonevalidation.com/api-documentation/fraud-check-api-doc/)
+- [Reassigned Number](https://realphonevalidation.com/api-documentation/reassigned-number-api-doc/)
+- [Legacy Email Verification](https://realphonevalidation.com/api-documentation/email-verification-api-doc/) and [REV Lightning](https://realphonevalidation.com/api-documentation/email-validation-api-doc/)

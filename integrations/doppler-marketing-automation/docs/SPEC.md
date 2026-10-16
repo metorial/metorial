@@ -1,72 +1,29 @@
-Note: The webhook results from docs.doppler.com are for Doppler (the secrets management platform), NOT Doppler Marketing Automation (fromdoppler.com). These are two completely different products. Let me check if Doppler Marketing Automation specifically supports webhooks.Now I have enough information to compile the specification. Let me note that:
+# Doppler Marketing Automation API
 
-1. Doppler Marketing Automation (fromdoppler.com) is different from Doppler (doppler.com) the secrets management platform.
-2. Authentication is via API Key, passed as a token in the Authorization header.
-3. The API base URL is `https://restapi.fromdoppler.com`
-4. The API is account-scoped, requiring the account name (email) in URLs.
-5. No native webhooks/event subscriptions exist for the marketing platform (the webhook results were for doppler.com, the secrets manager). The only callback mechanism is a per-import callback URL.
+This package targets the email marketing API at `https://restapi.fromdoppler.com`, documented by the [official Swagger contract](https://restapi.fromdoppler.com/swagger/current/swagger.json) and [resource relations](https://restapi.fromdoppler.com/docs/rels/).
 
-# Slates Specification for Doppler Marketing Automation
+## Authentication and account scope
 
-## Overview
+Use `Authorization: token <API_KEY>`. The [authentication guide](https://restapi.fromdoppler.com/docs/gettingstarted) recommends the header instead of an `access_token` query parameter. The account email is a known login value, configured once and encoded into `/accounts/{accountName}`. API keys have no documented token-refresh lifecycle.
 
-Doppler Marketing Automation (fromdoppler.com) is a multi-channel marketing platform primarily focused on email marketing, with additional support for SMS, WhatsApp, and automation workflows. The API allows users to automate email marketing campaigns, manage subscriber lists, and analyze the performance of email marketing efforts. It is a leading platform in the Spanish-speaking market.
+`get_account_home` reads the selected account's documented home resource and preserves its message and links. This is not a synthesized user profile. The provider's detailed `UserAccount` resources belong to Client Manager APIs and require a manager account name plus a managed user ID.
 
-## Authentication
+## Surface
 
-Doppler Marketing Automation uses **API Key** authentication.
+- Lists: paginated collection, single read, create, rename, delete.
+- Subscribers: single read, paginated list membership, account search with `keyword` and `updatedAfter`, add/update membership, remove membership, account unsubscribe, asynchronous list imports, task status.
+- Fields: definitions and the create/edit/delete relations documented by the provider. Field mutation relations are absent from the current Swagger routes, so their availability remains unverified without a live account.
+- Campaigns: paginated and single reads, draft creation, partial-update preservation, deletion, immediate/scheduled shipping, HTML replacement/download, recipient list/segment replacement and inspection.
+- Reporting: campaign results summary combined with campaign identity; unsubscribed contacts with date filters.
 
-- To use all API services, you need your API Key, which must be included in each request. It is an alphanumeric code associated with your Doppler account.
-- To obtain your API Key, go to the Control Panel of your Doppler account and select the Doppler API option in the Advanced Preferences section.
+The API uses `page` and `per_page`. Subscriber endpoints support pages up to 100. Account-search `resumeFrom` is an int64 continuation value and accepts positive integers up to JavaScript's exactly representable limit, independently of int32 resource IDs. The campaign status filter is named `state`; the list membership endpoint has no documented date filter. Existing `from`/`to` inputs there remain present and produce a clear validation error rather than silently returning unfiltered data.
 
-**Authentication method:** The API Key is passed in the `Authorization` header as a token:
+## Provider mappings
 
-```
-Authorization: token YOUR_API_KEY
-```
+Creation results contain string IDs; list and campaign IDs are validated and converted to the existing numeric tool outputs. Custom-field `sample` is preserved; older `sampleValue` responses are accepted as a fallback. Both aliases are validated when present. Subscriber `unsubscribedDate` and older `unsubscriptionDate` map to the existing `unsubscriptionDate` output while the original property and value stay in raw. Campaign reports use `/campaigns/{id}/results-summary`; `totalTimesOpened`, `totalHardBounces`, `totalSoftBounces`, and `totalUnsubscribers` map to the existing tool names. The native `totalShipped` metric is required and preserved; recipient counts never substitute for shipped counts. Delivery rate is `successFullDeliveries / totalRecipients * 100` and is omitted for a zero denominator.
 
-You can also include the API Key as a query parameter (`access_token`), though using the Authorization header is the cleaner and more secure approach.
+Read tools retain the provider response in `raw`, with credential values removed. Nullable optional scalars are omitted from the original scalar-only fields and retained exactly in `raw`; absent values are not replaced with empty strings, zero, false, or invented status values. Missing required collection/identity/metric data fails explicitly. Campaign HTML is delivered as an authenticated downloadable file.
 
-**Account name (required):** All API requests are scoped to an account. The API base URL includes the account name (your Doppler email address) in the path, e.g., `https://restapi.fromdoppler.com/accounts/{account_email}/...`
+## Boundaries
 
-So authentication requires two credentials:
-
-1. **API Key** — obtained from the Doppler Control Panel under Advanced Preferences.
-2. **Account name** — the email address associated with your Doppler account, used in the URL path.
-
-## Features
-
-### Subscriber List Management
-
-Create, edit, and delete Lists and retrieve collections of existing ones. Lists serve as the primary organizational structure for contacts/subscribers.
-
-### Subscriber Management
-
-Import, edit, and remove Subscribers. Subscribers can be added individually or imported in bulk into specific lists. When adding subscribers, you can set custom fields, tags, and language preference. You can also retrieve subscriber profiles by email, showing list membership, custom field values, and activity status. The API includes an endpoint for fetching removed subscribers within a date range.
-
-- Bulk import supports an optional **callback URL** that receives a POST request when the import process completes.
-
-### Custom Fields
-
-Create, edit, and delete Custom Fields. Custom fields allow storing additional subscriber data such as names, birthdates, and other attributes. These can be used for personalization in campaigns and segmentation.
-
-- Field types include boolean, string, number, date, and others, each with specific formatting requirements.
-
-### Campaign Management
-
-Build, edit, send, and delete Campaigns. This includes creating email campaigns, configuring their content and recipients, and triggering sends programmatically.
-
-### Campaign Reporting and Analytics
-
-Access the Summary Report of all your shipments. You can access data such as: unique and total opens, last open date, unique and total clicks, last click date, total unopened emails, hard bounces, soft bounces, and total unsubscribes generated by a campaign.
-
-- Available metrics include Delivery Rate, Opens, Clicks, Bounces, Removals, Geolocation, and more.
-- Reports can be filtered by date range.
-
-### Unsubscribed Contacts
-
-Get listings of removed contacts, Lists, Subscribers, Campaigns, and Custom Fields. You can retrieve unsubscribed contacts filtered by date range using `from` and `to` parameters with timezone-aware datetime values.
-
-## Events
-
-The provider does not support webhooks or event subscriptions. The only asynchronous notification mechanism available is a **per-request callback URL** on bulk subscriber import operations, which sends a POST request to a specified URL when an import task completes. This is not a general-purpose event system and does not cover other types of events such as subscriber activity, campaign status changes, or engagement events.
+No SMS, WhatsApp, general webhook subscription, or automation-building tools are claimed by this email surface. The per-import callback is a completion notification, not a general event system. Account creation, Client Manager administration, integrations access credentials, legacy SOAP APIs, and specialist reports remain outside this package.

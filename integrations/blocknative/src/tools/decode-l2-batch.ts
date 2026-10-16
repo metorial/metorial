@@ -8,6 +8,7 @@ export let decodeL2Batch = SlateTool.create(spec, {
   key: 'decode_l2_batch',
   description: `Decodes an Ethereum L2 batch transaction into human-readable format. Accepts an L1 transaction hash of a batch (pending or confirmed) and returns decoded calldata and blobdata. Supports Optimism, Base, zkSync, Arbitrum, Mode, Zora, Kroma, and Blast batches.`,
   instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.',
     'Provide the L1 transaction hash of the batch to decode.',
     'Use batchIndex for pagination on Optimism (frame number) or Arbitrum (sequence number) batches.',
     'Use includeStateDiffs for zkSync batches to control whether state diffs are included.'

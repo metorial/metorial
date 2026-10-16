@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateComponents } from '../lib/components';
 import { spec } from '../spec';
 
 let componentSchema = z
@@ -72,6 +73,17 @@ export let createThread = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    validateComponents(ctx.input.components);
+    if (
+      ctx.input.priority !== undefined &&
+      (!Number.isInteger(ctx.input.priority) ||
+        ctx.input.priority < 0 ||
+        ctx.input.priority > 3)
+    ) {
+      throw createApiServiceError(
+        'Priority must be a whole number from 0 (urgent) to 3 (low)'
+      );
+    }
 
     let input: any = {
       title: ctx.input.title,

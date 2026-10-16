@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listAttendance = SlateTool.create(spec, {
@@ -38,12 +38,12 @@ export let listAttendance = SlateTool.create(spec, {
       details: ctx.input.details,
       type: ctx.input.type
     });
-    let attendanceArray = Array.isArray(attendance) ? attendance : [];
+    let attendanceArray = requireList(attendance, 'list-attendance');
 
     let eligible: unknown[] | undefined;
     if (ctx.input.includeEligible) {
       let result = await client.listEligiblePeople(ctx.input.instanceId);
-      eligible = Array.isArray(result) ? result : [];
+      eligible = requireList(result, 'list-attendance');
     }
 
     return {

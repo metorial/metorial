@@ -1,94 +1,134 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { InventoryStatusClient } from '../lib/client';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let priceRangeSchema = z
+  .object({
+    min: z.number().nullable(),
+    max: z.number().nullable(),
+    currency: z.string(),
+    listingsExtendBeyondMax: z.boolean().optional()
+  })
+  .nullable();
 
 let eventAvailabilitySchema = z.object({
   eventId: z.string(),
-  status: z.string().describe('Availability status: available, not_available, limited'),
+  status: z
+    .string()
+    .describe(
+      'Primary inventory status: TICKETS_AVAILABLE, FEW_TICKETS_LEFT, TICKETS_NOT_AVAILABLE, UNKNOWN'
+    ),
   primaryStatus: z.string(),
   resaleStatus: z.string(),
-  primaryPriceRange: z
-    .object({
-      min: z.number().nullable(),
-      max: z.number().nullable(),
-      currency: z.string()
-    })
-    .nullable(),
-  resalePriceRange: z
-    .object({
-      min: z.number().nullable(),
-      max: z.number().nullable(),
-      currency: z.string()
-    })
-    .nullable()
+  primaryPriceRange: priceRangeSchema,
+  resalePriceRange: priceRangeSchema,
+  statusDetail: z.string().optional(),
+  resaleStatusDetail: z.string().optional()
 });
+
+let price = (value: unknown) => {
+  if (value === undefined || value === null) return null;
+  let numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim()
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(numeric)) {
+    throw createApiServiceError('Ticketmaster returned an invalid inventory price.', {
+      reason: 'invalid_inventory_response'
+    });
+  }
+  return numeric;
+};
+
+let priceRange = (event: Record<string, any>, type: 'primary' | 'resale') => {
+  let documented = Array.isArray(event.priceRanges)
+    ? event.priceRanges.find(
+        (range: any) => typeof range?.type === 'string' && range.type.toLowerCase() === type
+      )
+    : undefined;
+  let range = documented ?? event[type]?.priceRange ?? event[`${type}PriceRange`];
+  if (!isApiErrorRecord(range)) return null;
+  return {
+    min: price(range.minPrice ?? range.min),
+    max: price(range.maxPrice ?? range.max),
+    currency: range.currency ?? event.currency ?? undefined,
+    listingsExtendBeyondMax:
+      typeof range.listingsExtendBeyondMax === 'boolean'
+        ? range.listingsExtendBeyondMax
+        : undefined
+  };
+};
+
+let outputSchema = z.object({ events: z.array(eventAvailabilitySchema) });
 
 export let checkInventoryStatusTool = SlateTool.create(spec, {
   name: 'Check Inventory Status',
   key: 'check_inventory_status',
-  description: `Check real-time ticket availability status for one or more Ticketmaster events. Returns primary and resale inventory status along with price ranges. Updates happen near real-time. Supports querying multiple events in a single request.`,
+  description:
+    'Check near real-time primary and resale ticket availability for Ticketmaster events, with price ranges when available.',
   instructions: [
-    'Price ranges are currently only available for US, CA, AU, NZ, and MX markets.'
+    'Batch only events from the same ticketing source and country. Mixing sources or countries can produce incorrect statuses.',
+    'Prices are refreshed at most once per hour. A maximum price of 2000 with listingsExtendBeyondMax=true means higher-priced inventory exists.'
   ],
   constraints: [
-    'This API requires authorized access. Contact devportalinquiry@ticketmaster.com for access.'
+    'Requires separately authorized Inventory Status API access.',
+    'The event ID list must fit within the 7 KB request limit (approximately 350 IDs). Price ranges depend on market support.'
   ],
-  tags: {
-    readOnly: true
-  }
+  tags: { readOnly: true }
 })
   .input(
     z.object({
       eventIds: z
         .array(z.string())
         .min(1)
-        .describe('One or more Ticketmaster event IDs to check')
+        .describe('Universal event IDs from a single ticketing source and country')
     })
   )
-  .output(
-    z.object({
-      events: z.array(eventAvailabilitySchema)
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new InventoryStatusClient({
-      token: ctx.auth.token
-    });
-
+    let client = new InventoryStatusClient({ token: ctx.auth.token });
     let response = await client.getAvailability(ctx.input.eventIds);
-
-    let rawEvents = Array.isArray(response) ? response : response?.events || [];
-    let events = rawEvents.map((e: any) => ({
-      eventId: e.eventId || e.id || '',
-      status: e.status || '',
-      primaryStatus: e.primary?.status || e.primaryStatus || '',
-      resaleStatus: e.resale?.status || e.resaleStatus || '',
-      primaryPriceRange:
-        e.primary?.priceRange || e.primaryPriceRange
-          ? {
-              min: e.primary?.priceRange?.min ?? e.primaryPriceRange?.min ?? null,
-              max: e.primary?.priceRange?.max ?? e.primaryPriceRange?.max ?? null,
-              currency: e.primary?.priceRange?.currency ?? e.primaryPriceRange?.currency ?? ''
-            }
-          : null,
-      resalePriceRange:
-        e.resale?.priceRange || e.resalePriceRange
-          ? {
-              min: e.resale?.priceRange?.min ?? e.resalePriceRange?.min ?? null,
-              max: e.resale?.priceRange?.max ?? e.resalePriceRange?.max ?? null,
-              currency: e.resale?.priceRange?.currency ?? e.resalePriceRange?.currency ?? ''
-            }
-          : null
-    }));
-
-    let availableCount = events.filter(
-      (e: any) => e.status === 'available' || e.primaryStatus === 'available'
+    let rawEvents = Array.isArray(response) ? response : response?.events;
+    if (!Array.isArray(rawEvents)) {
+      throw createApiServiceError('Ticketmaster returned an invalid inventory response.', {
+        reason: 'invalid_inventory_response'
+      });
+    }
+    let events = rawEvents.map((event: any) => {
+      let eventId = event?.eventId ?? event?.eventid ?? event?.id;
+      let status = event?.status ?? event?.primary?.status ?? event?.primaryStatus;
+      if (
+        !isApiErrorRecord(event) ||
+        typeof eventId !== 'string' ||
+        typeof status !== 'string'
+      ) {
+        throw createApiServiceError(
+          'Ticketmaster returned an inventory item without its event ID or status.',
+          { reason: 'invalid_inventory_response' }
+        );
+      }
+      let eventData: Record<string, any> = event;
+      return {
+        eventId,
+        status,
+        primaryStatus: eventData.primary?.status ?? eventData.primaryStatus ?? status,
+        resaleStatus: eventData.resaleStatus ?? eventData.resale?.status ?? undefined,
+        primaryPriceRange: priceRange(eventData, 'primary'),
+        resalePriceRange: priceRange(eventData, 'resale'),
+        statusDetail: eventData.statusDetail ?? undefined,
+        resaleStatusDetail: eventData.resaleStatusDetail ?? undefined
+      };
+    });
+    let availableCount = events.filter(event =>
+      ['TICKETS_AVAILABLE', 'FEW_TICKETS_LEFT', 'available', 'limited'].includes(event.status)
     ).length;
-
     return {
-      output: { events },
-      message: `Checked **${events.length}** events: **${availableCount}** available.`
+      output: parseTicketmasterOutput(outputSchema, { events }, 'check-inventory-status'),
+      message: `Checked **${events.length}** events: **${availableCount}** have primary tickets available.`
     };
   })
   .build();

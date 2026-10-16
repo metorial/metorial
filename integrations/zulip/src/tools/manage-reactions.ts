@@ -18,6 +18,14 @@ export let manageReactions = SlateTool.create(spec, {
       emojiName: z
         .string()
         .describe('Name of the emoji to add or remove (e.g., "thumbs_up", "heart", "tada")'),
+      emojiCode: z
+        .string()
+        .optional()
+        .describe('Exact emoji code returned on an existing reaction'),
+      reactionType: z
+        .enum(['unicode_emoji', 'realm_emoji', 'zulip_extra_emoji'])
+        .optional()
+        .describe('Emoji namespace returned on an existing reaction'),
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the reaction')
     })
   )
@@ -34,9 +42,15 @@ export let manageReactions = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'add') {
-      await client.addReaction(ctx.input.messageId, ctx.input.emojiName);
+      await client.addReaction(ctx.input.messageId, ctx.input.emojiName, {
+        emojiCode: ctx.input.emojiCode,
+        reactionType: ctx.input.reactionType
+      });
     } else {
-      await client.removeReaction(ctx.input.messageId, ctx.input.emojiName);
+      await client.removeReaction(ctx.input.messageId, ctx.input.emojiName, {
+        emojiCode: ctx.input.emojiCode,
+        reactionType: ctx.input.reactionType
+      });
     }
 
     return {

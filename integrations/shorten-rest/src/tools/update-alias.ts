@@ -30,7 +30,8 @@ export let updateAlias = SlateTool.create(spec, {
   key: 'update_alias',
   description: `Updates an existing shortened URL's destinations, meta tags, or tracking snippets. Provide only the fields you want to change; omitted fields remain unchanged.`,
   instructions: [
-    'When updating destinations, provide the complete list of destinations (including unchanged ones), as the update replaces the entire destinations array.'
+    'Every supplied array replaces that entire property. Include unchanged entries you want to keep in destinations, metatags, and snippets. Omitted properties remain unchanged.',
+    'Provide at least one of destinations, metatags, or snippets.'
   ],
   tags: {
     destructive: false,

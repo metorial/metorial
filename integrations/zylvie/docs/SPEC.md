@@ -1,80 +1,49 @@
-Now let me look at the actual API documentation to understand the endpoints and webhook capabilities.Now let me fetch the webhook event pages to get complete details:I now have enough information to write the specification.
+# Zylvie Integration Specification
 
-# Slates Specification for Zylvie
+## Authentication and identity
 
-## Overview
+Use an API key from **Settings > API** as an HTTP Bearer token. The base URL is `https://api.zylvie.com`. Authentication profile lookup and `get_account` use the documented `GET /me` endpoint, returning the authenticated account email and brand. There are no OAuth scopes or refresh tokens and no connection configuration fields.
 
-Zylvie is a checkout and digital commerce platform for creators, coaches, and small businesses to sell digital products and subscriptions. It provides sales pages, checkout flows, coupon management, license key generation, affiliate tracking, and integrations with payment processors like Stripe and PayPal. It charges zero commission fees on sales.
+## Tool surface
 
-## Authentication
+| Area | Tools | Provider routes |
+| --- | --- | --- |
+| Identity | `get_account` | `GET /me` |
+| Products | `create_product`, `update_product`, `delete_product` | `POST /products/create`, `PUT /products/update`, `DELETE /products/delete` |
+| Coupons | `create_coupon`, `update_coupon`, `delete_coupon`, `list_coupons` | `POST /coupons/create`, `PUT /coupons/update`, `DELETE /coupons/delete`, `GET /coupons/list` |
+| Eligibility | `grant_coupon_eligibility`, `get_coupon_eligibility` | `POST /coupons/grants`, `GET /coupons/grants` |
+| Licenses | `verify_license_key`, `redeem_license_key`, `refund_license_key` | `GET /licensekeys/verify`, `POST /licensekeys/redeem`, `POST /licensekeys/refund` |
+| Subscriptions | `verify_subscription` | `GET /subscriptions/verify` |
 
-Zylvie uses **Bearer token authentication** via API keys.
+All original tool keys and schema field types are retained. Existing normalized fields remain available; additive `raw` outputs retain provider metadata, with account credentials removed. Required response fields are validated without manufacturing empty collections, boolean values, timestamps, or nulls.
 
-- The Zylvie API is a RESTful API that uses bearer authentication. Each API call must be authenticated using your API key found under your Settings > API page.
-- The API key must be included in the `Authorization` header as `Bearer <API_KEY>`.
-- Base URL: `https://api.zylvie.com`
+## Product workflows
 
-**Example:**
+Products support one-time, subscription, and delayed pricing. Creating subscription pricing requires a billing interval and integer interval count. Updates only send explicitly supplied fields. Supplied category, tag, image, and file arrays replace the existing arrays. `useUploadedLicenseCodes` enables the dashboard’s uploaded CSV code pool when license issuance is enabled. Product file URL inputs configure fulfillment; no tool exports or downloads customer files.
 
-```
-Authorization: Bearer e97f0aafe4884bc380c81fdb2347dc55
-```
+Deletion can archive products with paid transactions or active subscriptions. The actual provider status and message are returned without claiming deletion when an archive occurred.
 
-No OAuth or additional scopes are required. A single API key provides access to all API features for the authenticated account.
+## Coupon workflows
 
-## Features
+Create/update support percentage or fixed discounts, product scoping, usage limits, dates, affiliates, subscription restrictions, `limitOnePerEmail`, and `validForDays`. `durationInMonths` is passed through to the provider: its documentation describes discounted charges and warns that repeating discounts for weekly/yearly products do not always map one-to-one to charges. Existing number input schemas remain numbers; integer provider fields are checked at runtime.
 
-### Product Management
+`list_coupons` returns all coupons in the selected active or archived group; the documented endpoint has no pagination controls. Setting `includeArchived` to true retrieves archived coupons instead of merging groups.
 
-Create, update, and delete digital products in your store. Products support configurable pricing models including one-time payments, recurring subscriptions, and delayed payments via credit card pre-authorization. You can set display visibility (featured, listed, unlisted, unpublished), attach images and downloadable files, define categories and tags, configure shipping options, and customize post-purchase emails and gated member pages. Products can also be configured to auto-generate license keys for software sales.
+Eligibility tools accept a coupon ID from `list_coupons` or a coupon code and a customer email. The grant operation can optionally specify an ISO eligibility timestamp. Repeating a grant keeps the original grant date; it does not renew a window. The global coupon end date still applies. Coupon deletion can archive previously used coupons, reflected in the provider’s message.
 
-- **Pricing models:** `one-time`, `subscription`, `delayed`
-- **Subscription options:** configurable interval (day/week/month/year), interval count, and free trial period in days
-- **Fulfillment:** downloadable files with customizable download emails, success redirect URLs, success emails with merge fields, and gated page content
-- Products can be excluded from workflow automations if needed
+## Licenses and subscriptions
 
-### Coupon Management
+License keys may be auto-generated UUIDs or uploaded custom strings. Verification includes product and purchaser identity. Redeem/refund recognize provider error bodies even when an HTTP request succeeds. Refunding invalidates the software key; it is not documented as a payment refund. Subscription verification returns the provider’s billing amount in the smallest currency unit, status, dates, and product/customer data. Exact returned nulls are preserved.
 
-Create, update, delete, and list discount coupons. Coupons support both percentage and fixed-amount discount types. They can be scoped to specific products or applied storewide, with optional usage limits, start/end dates, and duration limits for subscription discounts. Coupons can also be associated with specific affiliates or restricted to active subscribers of a particular subscription product.
+## API boundaries
 
-### License Key Management
+HTTP and provider-declared errors become structured service failures, preserving upstream status/code and nested validation paths where available. No webhook triggers are registered. Provider webhook APIs exist separately; this integration does not advertise an event subscription surface.
 
-Manage software license keys that are automatically generated upon purchase. You can:
+## Official references
 
-- **Verify** a license key to check its validity, redemption status, and refund status for a specific product
-- **Redeem** a license key to mark it as activated
-- **Refund** a license key to invalidate it
-
-Each license key is unique and in UUID format.
-
-### Subscription Verification
-
-Verify the existence and status of a subscription or multiple subscriptions by subscriber email. Returns subscription details including status (incomplete, trialing, active, past_due, canceled, unpaid), billing interval, trial dates, cancellation dates, and subscriber information.
-
-### Account Information
-
-Retrieve details about the authenticated user/account via the `/me` endpoint.
-
-## Events
-
-Zylvie supports webhooks that can be subscribed to either via the Workflows page in the dashboard or programmatically through the API. Each webhook is signed using HMAC-SHA1 with a unique per-workflow secret key, passed in the `Zylvie-Signature` header. Failed deliveries are retried up to 3 times.
-
-### New Sale
-
-Triggered when a buyer completes a purchase where money is transacted. Includes full transaction details such as amount, currency, buyer information, purchased products, applied coupon, subscription details (if applicable), custom fields, affiliate/referrer data, commission info, and any generated license keys.
-
-### New Lead
-
-Triggered when a user submits their name and email to receive a free product or lead magnet. Includes buyer contact information, the free product(s) requested, and any custom fields.
-
-### New Affiliate Sign-Up
-
-Triggered when a visitor signs up to be an affiliate or accepts an invitation to become an affiliate.
-
-### New Subscription
-
-Triggered when a user subscribes to a subscription product, whether starting with a free trial or a paid subscription.
-
-### Subscription Cancellation
-
-Triggered when an existing subscriber cancels their subscription to a subscription product.
+- [Authentication](https://developers.zylvie.com/)
+- [Account](https://developers.zylvie.com/me)
+- [Create product](https://developers.zylvie.com/products/create), [update product](https://developers.zylvie.com/products/update), [delete product](https://developers.zylvie.com/products/delete)
+- [Create coupon](https://developers.zylvie.com/coupons/create), [update coupon](https://developers.zylvie.com/coupons/update), [delete coupon](https://developers.zylvie.com/coupons/delete), [list coupons](https://developers.zylvie.com/coupons/list), [email grants](https://developers.zylvie.com/coupons/grants)
+- [Verify license](https://developers.zylvie.com/licensekeys/verify), [redeem license](https://developers.zylvie.com/licensekeys/redeem), [invalidate license](https://developers.zylvie.com/licensekeys/refund)
+- [Verify subscriptions](https://developers.zylvie.com/subscriptions/verify)

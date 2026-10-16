@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let replyToConversation = SlateTool.create(spec, {
@@ -11,7 +12,13 @@ export let replyToConversation = SlateTool.create(spec, {
   .input(
     z.object({
       conversationId: z.string().describe('ID of the conversation to reply to'),
-      body: z.string().describe('Message body (HTML supported)'),
+      body: z.string().describe('Message text'),
+      teammateId: z
+        .string()
+        .optional()
+        .describe(
+          'Authoring teammate ID. Call list_teams to discover teammates. Omit to reply as a bot.'
+        ),
       isNote: z
         .boolean()
         .optional()
@@ -20,6 +27,7 @@ export let replyToConversation = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       messageId: z.string().describe('ID of the sent message'),
       body: z.string().optional(),
       createdAt: z.string().optional()
@@ -29,20 +37,22 @@ export let replyToConversation = SlateTool.create(spec, {
     let client = new GistClient({ token: ctx.auth.token });
 
     let payload: Record<string, any> = {
-      body: ctx.input.body
+      body: ctx.input.body,
+      message_type: ctx.input.isNote ? 'note' : 'reply',
+      from: ctx.input.teammateId
+        ? { type: 'teammate', teammate_id: ctx.input.teammateId }
+        : { type: 'bot' }
     };
-    if (ctx.input.isNote) {
-      payload.type = 'note';
-    }
 
     let data = await client.replyToConversation(ctx.input.conversationId, payload);
     let msg = data.message || data;
 
     return {
       output: {
-        messageId: String(msg.id),
+        rawResponse: client.responses,
+        messageId: requiredId(msg.id),
         body: msg.body,
-        createdAt: msg.created_at ? String(msg.created_at) : undefined
+        createdAt: msg.created_at !== undefined ? String(msg.created_at) : undefined
       },
       message: ctx.input.isNote
         ? `Added an internal note to conversation **${ctx.input.conversationId}**.`

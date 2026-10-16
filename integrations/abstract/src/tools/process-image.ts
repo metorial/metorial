@@ -31,6 +31,10 @@ export let processImage = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including unavailable values'),
       originalUrl: z.string().describe('Original image URL'),
       compressedUrl: z.string().optional().describe('URL of the compressed/optimized image'),
       originalSize: z.number().optional().describe('Original image file size in bytes'),
@@ -48,14 +52,24 @@ export let processImage = SlateTool.create(spec, {
     });
 
     let output = {
+      rawResponse: result,
       originalUrl: result.original_url ?? ctx.input.url,
       compressedUrl: result.compressed_url ?? result.url ?? undefined,
       originalSize: result.original_size != null ? Number(result.original_size) : undefined,
       compressedSize:
-        result.compressed_size != null ? Number(result.compressed_size) : undefined,
+        (result.final_size ?? result.compressed_size) != null
+          ? Number(result.final_size ?? result.compressed_size)
+          : undefined,
       savedPercentage:
-        result.saved_percentage != null ? Number(result.saved_percentage) : undefined
+        result.saved_percentage != null
+          ? Number(result.saved_percentage)
+          : result.bytes_saved != null && Number(result.original_size) > 0
+            ? (Number(result.bytes_saved) / Number(result.original_size)) * 100
+            : undefined
     };
+
+    if (output.compressedUrl)
+      await ctx.addAttachment({ type: 'url', url: output.compressedUrl });
 
     return {
       output,

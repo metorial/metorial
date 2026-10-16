@@ -43,6 +43,10 @@ export let getCountriesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       countries: z.array(countrySchema),
       count: z.number().describe('Number of countries returned')
     })
@@ -65,6 +69,7 @@ export let getCountriesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         countries: results,
         count: results.length
       },

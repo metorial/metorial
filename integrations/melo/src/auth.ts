@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your Melo API key. Obtain one from your account settings at melo.io.')
+        .describe(
+          'Your Melo or Stream Estate API key, created on the API Keys page in your console.'
+        )
     }),
     getOutput: async ctx => {
       return {

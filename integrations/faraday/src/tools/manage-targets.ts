@@ -1,9 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let targetSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   targetId: z.string().describe('Unique identifier of the target'),
   name: z.string().describe('Human-readable name of the target'),
   status: z
@@ -41,6 +45,7 @@ export let listTargets = SlateTool.create(spec, {
     let targets = await client.listTargets();
 
     let mapped = targets.map((t: any) => ({
+      raw: t,
       targetId: t.id,
       name: t.name,
       status: t.status,
@@ -77,6 +82,7 @@ export let getTarget = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: t,
         targetId: t.id,
         name: t.name,
         status: t.status,
@@ -114,6 +120,12 @@ export let createTarget = SlateTool.create(spec, {
           mode: z
             .enum(['hashed', 'referenced', 'identified', 'aggregated'])
             .describe('Output format mode'),
+          reference: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe(
+              'Required for referenced mode; provider reference configuration with dataset_id and column_name.'
+            ),
           aggregate: z
             .string()
             .optional()
@@ -147,6 +159,27 @@ export let createTarget = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FaradayClient({ token: ctx.auth.token });
 
+    if (
+      (ctx.input.representation.mode === 'identified' ||
+        ctx.input.representation.mode === 'aggregated') &&
+      ctx.input.representation.aggregate === undefined
+    ) {
+      throw createApiServiceError(
+        'representation.aggregate is required for identified or aggregated mode.'
+      );
+    }
+    if (
+      ctx.input.representation.mode === 'referenced' &&
+      ctx.input.representation.reference === undefined
+    ) {
+      throw createApiServiceError('representation.reference is required for referenced mode.');
+    }
+    if (typeof ctx.input.options.type !== 'string' || !ctx.input.options.type) {
+      throw createApiServiceError(
+        'options.type is required, such as lookup_api or hosted_csv.'
+      );
+    }
+
     let body: Record<string, any> = {
       name: ctx.input.name,
       scope_id: ctx.input.scopeId,
@@ -162,6 +195,7 @@ export let createTarget = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: t,
         targetId: t.id,
         name: t.name,
         status: t.status,

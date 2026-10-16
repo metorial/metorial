@@ -41,7 +41,7 @@ export let getTemplate = SlateTool.create(spec, {
         name: template.name,
         width: template.width,
         height: template.height,
-        params: template.params || [],
+        params: template.params,
         createdAt: template.createdAt,
         updatedAt: template.updatedAt
       },

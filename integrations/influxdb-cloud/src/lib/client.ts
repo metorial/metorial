@@ -1,23 +1,133 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export const influxError = (message: string) =>
+  createApiServiceError(message, {
+    reason: 'invalid_influxdb_response'
+  });
+
+export function requireRecord(value: unknown): Record<string, any> {
+  if (!isApiErrorRecord(value))
+    throw influxError('InfluxDB returned an invalid response object.');
+  return value;
+}
+
+export function requireArray(value: unknown, key: string): any[] {
+  const record = requireRecord(value);
+  if (!Array.isArray(record[key]))
+    throw influxError(`InfluxDB returned no valid ${key} collection.`);
+  return record[key];
+}
+
+export function resource(value: unknown, required: string[]): Record<string, any> {
+  const record = requireRecord(value);
+  for (const key of required) {
+    if (typeof record[key] !== 'string')
+      throw influxError(`InfluxDB returned no valid ${key} value.`);
+  }
+  return record;
+}
+
+export function requireNoContent(response: { status: number }) {
+  if (response.status !== 204)
+    throw influxError(
+      'InfluxDB did not return the documented mutation acknowledgement (HTTP 204).'
+    );
+}
+
+// Inspect complete CSV records so quoted multiline data cannot look like an error table.
+export function hasQueryError(csv: string): boolean {
+  let cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index <= csv.length; index++) {
+    const character = csv[index];
+    if (character === '"') {
+      if (quoted && csv[index + 1] === '"') {
+        cell += '"';
+        index++;
+      } else quoted = !quoted;
+    } else if (
+      !quoted &&
+      (character === ',' || character === '\n' || character === undefined)
+    ) {
+      cells.push(cell.replace(/\r$/, ''));
+      cell = '';
+      if (character !== ',') {
+        if (
+          cells.length === 3 &&
+          cells[0] === '' &&
+          cells[1] === 'error' &&
+          cells[2] === 'reference'
+        )
+          return true;
+        cells = [];
+      }
+    } else if (character !== undefined) cell += character;
+  }
+  if (quoted) throw influxError('InfluxDB returned incomplete CSV query data.');
+  return false;
+}
+
+export const optionalString = (value: unknown) =>
+  typeof value === 'string' ? value : undefined;
+
+export const requiredOrg = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw createApiServiceError('Provide orgId from list_organizations for this operation.', {
+      reason: 'missing_organization'
+    });
+  }
+  return value;
+};
 
 export interface ClientConfig {
   baseUrl: string;
   token: string;
-  orgId: string;
+  orgId?: string;
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-  private orgId: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private orgId?: string;
 
   constructor(config: ClientConfig) {
     this.orgId = config.orgId;
-    this.axios = createAxios({
+    if (!config.token.trim() || /[\r\n]/.test(config.token)) {
+      throw createApiServiceError('Provide a nonempty InfluxDB API token.', {
+        reason: 'invalid_token'
+      });
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: config.baseUrl,
-      headers: {
-        Authorization: `Token ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 120000,
+      authHeader: { value: `Token ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'InfluxDB Cloud',
+          reason: 'influxdb_api_error',
+          extractResponse: (input, helpers) => {
+            const response = helpers.getResponseWithBody(input);
+            if (typeof response?.data === 'string') {
+              try {
+                return { ...response, data: JSON.parse(response.data) };
+              } catch {
+                return response;
+              }
+            }
+            return response;
+          },
+          detailKeys: ['message', 'code', 'err', 'op'],
+          extractUpstreamCode: (_error, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        })
     });
   }
 
@@ -35,26 +145,37 @@ export class Client {
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getBucket(bucketId: string) {
-    let response = await this.axios.get(`/api/v2/buckets/${bucketId}`);
-    return response.data;
+    let response = await this.axios.get(`/api/v2/buckets/${encodeURIComponent(bucketId)}`);
+    return requireRecord(response.data);
   }
 
   async createBucket(data: { name: string; description?: string; retentionSeconds?: number }) {
-    let retentionRules = data.retentionSeconds
-      ? [{ type: 'expire' as const, everySeconds: data.retentionSeconds }]
-      : [];
+    if (
+      data.retentionSeconds !== undefined &&
+      (!Number.isSafeInteger(data.retentionSeconds) || data.retentionSeconds < 0)
+    ) {
+      throw createApiServiceError(
+        'retentionSeconds must be a nonnegative integer number of seconds.',
+        {
+          reason: 'invalid_retention'
+        }
+      );
+    }
+    let retentionRules = [
+      { type: 'expire' as const, everySeconds: data.retentionSeconds ?? 2592000 }
+    ];
 
     let response = await this.axios.post('/api/v2/buckets', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       name: data.name,
       description: data.description,
       retentionRules
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateBucket(
@@ -69,15 +190,28 @@ export class Client {
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
     if (data.retentionSeconds !== undefined) {
+      if (!Number.isSafeInteger(data.retentionSeconds) || data.retentionSeconds < 0) {
+        throw createApiServiceError(
+          'retentionSeconds must be a nonnegative integer number of seconds.',
+          {
+            reason: 'invalid_retention'
+          }
+        );
+      }
       body.retentionRules = [{ type: 'expire', everySeconds: data.retentionSeconds }];
     }
 
-    let response = await this.axios.patch(`/api/v2/buckets/${bucketId}`, body);
-    return response.data;
+    let response = await this.axios.patch(
+      `/api/v2/buckets/${encodeURIComponent(bucketId)}`,
+      body
+    );
+    return requireRecord(response.data);
   }
 
   async deleteBucket(bucketId: string) {
-    await this.axios.delete(`/api/v2/buckets/${bucketId}`);
+    requireNoContent(
+      await this.axios.delete(`/api/v2/buckets/${encodeURIComponent(bucketId)}`)
+    );
   }
 
   // ─── Write ───
@@ -87,26 +221,35 @@ export class Client {
     precision?: 'ns' | 'us' | 'ms' | 's';
     lineProtocol: string;
   }) {
-    await this.axios.post('/api/v2/write', data.lineProtocol, {
-      params: {
-        org: this.orgId,
-        bucket: data.bucket,
-        precision: data.precision || 'ns'
-      },
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    });
+    requireNoContent(
+      await this.axios.post('/api/v2/write', data.lineProtocol, {
+        params: {
+          org: this.orgId,
+          bucket: data.bucket,
+          precision: data.precision || 'ns'
+        },
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      })
+    );
   }
 
   // ─── Query ───
 
-  async queryData(data: { query: string; type?: 'flux' }) {
+  async queryData(data: {
+    query: string;
+    type?: 'flux';
+    params?: Record<string, string | number | boolean>;
+    now?: string;
+  }) {
     let response = await this.axios.post(
       '/api/v2/query',
       {
         query: data.query,
         type: data.type || 'flux',
+        params: data.params,
+        now: data.now,
         dialect: {
           header: true,
           delimiter: ',',
@@ -114,6 +257,8 @@ export class Client {
         }
       },
       {
+        responseType: 'text',
+        transformResponse: [data => data],
         params: {
           orgID: this.orgId
         },
@@ -123,25 +268,41 @@ export class Client {
         }
       }
     );
+    if (typeof response.data !== 'string')
+      throw influxError('InfluxDB returned non-CSV query data.');
+    if (hasQueryError(response.data)) {
+      throw influxError(`InfluxDB reported a query error: ${response.data.slice(0, 2000)}`);
+    }
+    const contentType = String(response.headers['content-type'] ?? '')
+      .toLowerCase()
+      .split(';')[0]
+      ?.trim();
+    if (contentType !== 'application/csv' && contentType !== 'text/csv') {
+      throw influxError(
+        'InfluxDB returned an unexpected content type instead of CSV query results.'
+      );
+    }
     return response.data;
   }
 
   // ─── Delete ───
 
   async deleteData(data: { bucket: string; start: string; stop: string; predicate?: string }) {
-    await this.axios.post(
-      '/api/v2/delete',
-      {
-        start: data.start,
-        stop: data.stop,
-        predicate: data.predicate
-      },
-      {
-        params: {
-          org: this.orgId,
-          bucket: data.bucket
+    requireNoContent(
+      await this.axios.post(
+        '/api/v2/delete',
+        {
+          start: data.start,
+          stop: data.stop,
+          predicate: data.predicate
+        },
+        {
+          params: {
+            org: this.orgId,
+            bucket: data.bucket
+          }
         }
-      }
+      )
     );
   }
 
@@ -149,6 +310,7 @@ export class Client {
 
   async listTasks(params?: {
     name?: string;
+    after?: string;
     limit?: number;
     offset?: number;
     status?: string;
@@ -159,12 +321,12 @@ export class Client {
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getTask(taskId: string) {
-    let response = await this.axios.get(`/api/v2/tasks/${taskId}`);
-    return response.data;
+    let response = await this.axios.get(`/api/v2/tasks/${encodeURIComponent(taskId)}`);
+    return requireRecord(response.data);
   }
 
   async createTask(data: {
@@ -176,8 +338,13 @@ export class Client {
     cron?: string;
     offset?: string;
   }) {
+    if (data.every !== undefined && data.cron !== undefined) {
+      throw createApiServiceError('Provide either every or cron, not both.', {
+        reason: 'invalid_task_schedule'
+      });
+    }
     let response = await this.axios.post('/api/v2/tasks', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       name: data.name,
       description: data.description,
       flux: data.flux,
@@ -186,7 +353,7 @@ export class Client {
       cron: data.cron,
       offset: data.offset
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateTask(
@@ -201,44 +368,58 @@ export class Client {
       offset?: string;
     }
   ) {
-    let response = await this.axios.patch(`/api/v2/tasks/${taskId}`, data);
-    return response.data;
+    if (data.every !== undefined && data.cron !== undefined) {
+      throw createApiServiceError('Provide either every or cron, not both.', {
+        reason: 'invalid_task_schedule'
+      });
+    }
+    let response = await this.axios.patch(`/api/v2/tasks/${encodeURIComponent(taskId)}`, data);
+    return requireRecord(response.data);
   }
 
   async deleteTask(taskId: string) {
-    await this.axios.delete(`/api/v2/tasks/${taskId}`);
+    requireNoContent(await this.axios.delete(`/api/v2/tasks/${encodeURIComponent(taskId)}`));
   }
 
   async getTaskRuns(
     taskId: string,
     params?: { limit?: number; afterTime?: string; beforeTime?: string }
   ) {
-    let response = await this.axios.get(`/api/v2/tasks/${taskId}/runs`, { params });
-    return response.data;
+    let response = await this.axios.get(`/api/v2/tasks/${encodeURIComponent(taskId)}/runs`, {
+      params
+    });
+    return requireRecord(response.data);
   }
 
   async runTask(taskId: string, scheduledFor?: string) {
-    let response = await this.axios.post(`/api/v2/tasks/${taskId}/runs`, {
+    let response = await this.axios.post(`/api/v2/tasks/${encodeURIComponent(taskId)}/runs`, {
       scheduledFor
     });
-    return response.data;
+    return requireRecord(response.data);
+  }
+
+  async getTaskRunLogs(taskId: string, runId: string) {
+    let response = await this.axios.get(
+      `/api/v2/tasks/${encodeURIComponent(taskId)}/runs/${encodeURIComponent(runId)}/logs`
+    );
+    return requireRecord(response.data);
   }
 
   // ─── Organizations ───
 
   async listOrganizations(params?: { limit?: number; offset?: number }) {
     let response = await this.axios.get('/api/v2/orgs', { params });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getOrganization(orgId: string) {
-    let response = await this.axios.get(`/api/v2/orgs/${orgId}`);
-    return response.data;
+    let response = await this.axios.get(`/api/v2/orgs/${encodeURIComponent(orgId)}`);
+    return requireRecord(response.data);
   }
 
   async getOrganizationMembers(orgId: string) {
-    let response = await this.axios.get(`/api/v2/orgs/${orgId}/members`);
-    return response.data;
+    let response = await this.axios.get(`/api/v2/orgs/${encodeURIComponent(orgId)}/members`);
+    return requireRecord(response.data);
   }
 
   // ─── Authorizations ───
@@ -250,12 +431,14 @@ export class Client {
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getAuthorization(authId: string) {
-    let response = await this.axios.get(`/api/v2/authorizations/${authId}`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/authorizations/${encodeURIComponent(authId)}`
+    );
+    return requireRecord(response.data);
   }
 
   async createAuthorization(data: {
@@ -271,12 +454,12 @@ export class Client {
     status?: 'active' | 'inactive';
   }) {
     let response = await this.axios.post('/api/v2/authorizations', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       description: data.description,
       permissions: data.permissions,
       status: data.status || 'active'
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateAuthorization(
@@ -286,12 +469,17 @@ export class Client {
       status?: 'active' | 'inactive';
     }
   ) {
-    let response = await this.axios.patch(`/api/v2/authorizations/${authId}`, data);
-    return response.data;
+    let response = await this.axios.patch(
+      `/api/v2/authorizations/${encodeURIComponent(authId)}`,
+      data
+    );
+    return requireRecord(response.data);
   }
 
   async deleteAuthorization(authId: string) {
-    await this.axios.delete(`/api/v2/authorizations/${authId}`);
+    requireNoContent(
+      await this.axios.delete(`/api/v2/authorizations/${encodeURIComponent(authId)}`)
+    );
   }
 
   // ─── Labels ───
@@ -300,19 +488,19 @@ export class Client {
     let response = await this.axios.get('/api/v2/labels', {
       params: { orgID: this.orgId }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async createLabel(data: { name: string; color?: string; description?: string }) {
     let response = await this.axios.post('/api/v2/labels', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       name: data.name,
       properties: {
         color: data.color,
         description: data.description
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateLabel(
@@ -323,18 +511,18 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.axios.patch(`/api/v2/labels/${labelId}`, {
+    let response = await this.axios.patch(`/api/v2/labels/${encodeURIComponent(labelId)}`, {
       name: data.name,
       properties: {
         color: data.color,
         description: data.description
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async deleteLabel(labelId: string) {
-    await this.axios.delete(`/api/v2/labels/${labelId}`);
+    requireNoContent(await this.axios.delete(`/api/v2/labels/${encodeURIComponent(labelId)}`));
   }
 
   // ─── Checks ───
@@ -342,20 +530,20 @@ export class Client {
   async listChecks(params?: { limit?: number; offset?: number }) {
     let response = await this.axios.get('/api/v2/checks', {
       params: {
-        orgID: this.orgId,
+        orgID: requiredOrg(this.orgId),
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getCheck(checkId: string) {
-    let response = await this.axios.get(`/api/v2/checks/${checkId}`);
-    return response.data;
+    let response = await this.axios.get(`/api/v2/checks/${encodeURIComponent(checkId)}`);
+    return requireRecord(response.data);
   }
 
   async deleteCheck(checkId: string) {
-    await this.axios.delete(`/api/v2/checks/${checkId}`);
+    requireNoContent(await this.axios.delete(`/api/v2/checks/${encodeURIComponent(checkId)}`));
   }
 
   // ─── Notification Endpoints ───
@@ -363,20 +551,26 @@ export class Client {
   async listNotificationEndpoints(params?: { limit?: number; offset?: number }) {
     let response = await this.axios.get('/api/v2/notificationEndpoints', {
       params: {
-        orgID: this.orgId,
+        orgID: requiredOrg(this.orgId),
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getNotificationEndpoint(endpointId: string) {
-    let response = await this.axios.get(`/api/v2/notificationEndpoints/${endpointId}`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/notificationEndpoints/${encodeURIComponent(endpointId)}`
+    );
+    return requireRecord(response.data);
   }
 
   async deleteNotificationEndpoint(endpointId: string) {
-    await this.axios.delete(`/api/v2/notificationEndpoints/${endpointId}`);
+    requireNoContent(
+      await this.axios.delete(
+        `/api/v2/notificationEndpoints/${encodeURIComponent(endpointId)}`
+      )
+    );
   }
 
   // ─── Notification Rules ───
@@ -384,20 +578,24 @@ export class Client {
   async listNotificationRules(params?: { limit?: number; offset?: number }) {
     let response = await this.axios.get('/api/v2/notificationRules', {
       params: {
-        orgID: this.orgId,
+        orgID: requiredOrg(this.orgId),
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getNotificationRule(ruleId: string) {
-    let response = await this.axios.get(`/api/v2/notificationRules/${ruleId}`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/notificationRules/${encodeURIComponent(ruleId)}`
+    );
+    return requireRecord(response.data);
   }
 
   async deleteNotificationRule(ruleId: string) {
-    await this.axios.delete(`/api/v2/notificationRules/${ruleId}`);
+    requireNoContent(
+      await this.axios.delete(`/api/v2/notificationRules/${encodeURIComponent(ruleId)}`)
+    );
   }
 
   // ─── Dashboards ───
@@ -409,21 +607,23 @@ export class Client {
         ...params
       }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getDashboard(dashboardId: string) {
-    let response = await this.axios.get(`/api/v2/dashboards/${dashboardId}`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/dashboards/${encodeURIComponent(dashboardId)}`
+    );
+    return requireRecord(response.data);
   }
 
   async createDashboard(data: { name: string; description?: string }) {
     let response = await this.axios.post('/api/v2/dashboards', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       name: data.name,
       description: data.description
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateDashboard(
@@ -433,29 +633,46 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.axios.patch(`/api/v2/dashboards/${dashboardId}`, data);
-    return response.data;
+    let response = await this.axios.patch(
+      `/api/v2/dashboards/${encodeURIComponent(dashboardId)}`,
+      data
+    );
+    return requireRecord(response.data);
   }
 
   async deleteDashboard(dashboardId: string) {
-    await this.axios.delete(`/api/v2/dashboards/${dashboardId}`);
+    requireNoContent(
+      await this.axios.delete(`/api/v2/dashboards/${encodeURIComponent(dashboardId)}`)
+    );
   }
 
   // ─── Secrets ───
 
   async listSecretKeys() {
-    let response = await this.axios.get(`/api/v2/orgs/${this.orgId}/secrets`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/orgs/${encodeURIComponent(requiredOrg(this.orgId))}/secrets`
+    );
+    return requireRecord(response.data);
   }
 
   async putSecrets(secrets: Record<string, string>) {
-    await this.axios.patch(`/api/v2/orgs/${this.orgId}/secrets`, secrets);
+    requireNoContent(
+      await this.axios.patch(
+        `/api/v2/orgs/${encodeURIComponent(requiredOrg(this.orgId))}/secrets`,
+        secrets
+      )
+    );
   }
 
   async deleteSecrets(keys: string[]) {
-    await this.axios.post(`/api/v2/orgs/${this.orgId}/secrets/delete`, {
-      secrets: keys
-    });
+    requireNoContent(
+      await this.axios.post(
+        `/api/v2/orgs/${encodeURIComponent(requiredOrg(this.orgId))}/secrets/delete`,
+        {
+          secrets: keys
+        }
+      )
+    );
   }
 
   // ─── Telegraf Configurations ───
@@ -464,22 +681,27 @@ export class Client {
     let response = await this.axios.get('/api/v2/telegrafs', {
       params: { orgID: this.orgId }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async getTelegraf(telegrafId: string) {
-    let response = await this.axios.get(`/api/v2/telegrafs/${telegrafId}`);
-    return response.data;
+    let response = await this.axios.get(
+      `/api/v2/telegrafs/${encodeURIComponent(telegrafId)}`,
+      {
+        headers: { Accept: 'application/json' }
+      }
+    );
+    return requireRecord(response.data);
   }
 
   async createTelegraf(data: { name: string; description?: string; config: string }) {
     let response = await this.axios.post('/api/v2/telegrafs', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       name: data.name,
       description: data.description,
       config: data.config
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async updateTelegraf(
@@ -490,15 +712,20 @@ export class Client {
       config?: string;
     }
   ) {
-    let response = await this.axios.put(`/api/v2/telegrafs/${telegrafId}`, {
-      orgID: this.orgId,
-      ...data
-    });
-    return response.data;
+    let response = await this.axios.put(
+      `/api/v2/telegrafs/${encodeURIComponent(telegrafId)}`,
+      {
+        orgID: requiredOrg(this.orgId),
+        ...data
+      }
+    );
+    return requireRecord(response.data);
   }
 
   async deleteTelegraf(telegrafId: string) {
-    await this.axios.delete(`/api/v2/telegrafs/${telegrafId}`);
+    requireNoContent(
+      await this.axios.delete(`/api/v2/telegrafs/${encodeURIComponent(telegrafId)}`)
+    );
   }
 
   // ─── DBRP Mappings ───
@@ -507,7 +734,7 @@ export class Client {
     let response = await this.axios.get('/api/v2/dbrps', {
       params: { orgID: this.orgId }
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async createDBRP(data: {
@@ -517,30 +744,27 @@ export class Client {
     isDefault?: boolean;
   }) {
     let response = await this.axios.post('/api/v2/dbrps', {
-      orgID: this.orgId,
+      orgID: requiredOrg(this.orgId),
       bucketID: data.bucketId,
       database: data.database,
       retention_policy: data.retentionPolicy,
       default: data.isDefault ?? false
     });
-    return response.data;
+    return requireRecord(response.data);
   }
 
   async deleteDBRP(dbrpId: string) {
-    await this.axios.delete(`/api/v2/dbrps/${dbrpId}`, {
-      params: { orgID: this.orgId }
-    });
+    requireNoContent(
+      await this.axios.delete(`/api/v2/dbrps/${encodeURIComponent(dbrpId)}`, {
+        params: { orgID: this.orgId }
+      })
+    );
   }
 
   // ─── Users ───
 
-  async listUsers() {
-    let response = await this.axios.get('/api/v2/users');
-    return response.data;
-  }
-
   async getMe() {
     let response = await this.axios.get('/api/v2/me');
-    return response.data;
+    return requireRecord(response.data);
   }
 }

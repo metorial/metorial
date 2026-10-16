@@ -5,10 +5,15 @@ import {
   createDivision,
   createJobTitle,
   createLocation,
+  getCalendar,
+  getEmployee,
+  getTimeOffBudgets,
   hireEmployee,
   listEmployees,
   listJobApplications,
+  listJobPositions,
   listOrganizationalStructure,
+  listReferenceData,
   listTimeOffRequests,
   respondTimeOffRequest,
   updateEmployee
@@ -16,6 +21,11 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getEmployee,
+    listJobPositions,
+    getTimeOffBudgets,
+    getCalendar,
+    listReferenceData,
     hireEmployee,
     updateEmployee,
     listEmployees,

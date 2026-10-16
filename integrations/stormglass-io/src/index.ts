@@ -4,6 +4,7 @@ import {
   getAstronomyDataTool,
   getBioDataTool,
   getElevationTool,
+  getHistoricalWeatherTool,
   getMarineDataTool,
   getSolarDataTool,
   getTideDataTool,
@@ -15,6 +16,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     getWeatherTool,
+    getHistoricalWeatherTool,
     getMarineDataTool,
     getTideDataTool,
     listTideStationsTool,

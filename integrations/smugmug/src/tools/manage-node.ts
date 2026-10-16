@@ -70,36 +70,36 @@ export let getNodeTool = SlateTool.create(spec, {
         count: ctx.input.childrenCount
       });
       children = result.items.map((child: any) => ({
-        nodeId: child.NodeID || '',
-        type: child.Type || undefined,
-        name: child.Name || '',
-        description: child.Description || undefined,
-        urlName: child.UrlName || undefined,
-        webUri: child.WebUri || undefined,
-        privacy: child.Privacy || undefined,
-        dateAdded: child.DateAdded || undefined,
-        dateModified: child.DateModified || undefined,
-        hasChildren: child.HasChildren || undefined
+        nodeId: child.NodeID,
+        type: child.Type ?? undefined,
+        name: child.Name,
+        description: child.Description ?? undefined,
+        urlName: child.UrlName ?? undefined,
+        webUri: child.WebUri ?? undefined,
+        privacy: child.Privacy ?? undefined,
+        dateAdded: child.DateAdded ?? undefined,
+        dateModified: child.DateModified ?? undefined,
+        hasChildren: child.HasChildren ?? undefined
       }));
       totalChildren = result.pages.total;
     }
 
     return {
       output: {
-        nodeId: node?.NodeID || ctx.input.nodeId,
-        type: node?.Type || undefined,
-        name: node?.Name || '',
-        description: node?.Description || undefined,
-        urlName: node?.UrlName || undefined,
-        webUri: node?.WebUri || undefined,
-        privacy: node?.Privacy || undefined,
-        dateAdded: node?.DateAdded || undefined,
-        dateModified: node?.DateModified || undefined,
-        hasChildren: node?.HasChildren || undefined,
+        nodeId: node?.NodeID,
+        type: node?.Type ?? undefined,
+        name: node?.Name,
+        description: node?.Description ?? undefined,
+        urlName: node?.UrlName ?? undefined,
+        webUri: node?.WebUri ?? undefined,
+        privacy: node?.Privacy ?? undefined,
+        dateAdded: node?.DateAdded ?? undefined,
+        dateModified: node?.DateModified ?? undefined,
+        hasChildren: node?.HasChildren ?? undefined,
         children,
         totalChildren
       },
-      message: `Retrieved ${node?.Type || 'node'} **${node?.Name || ctx.input.nodeId}**${children ? ` with ${children.length} children` : ''}`
+      message: `Retrieved ${node?.Type || 'node'} **${node?.Name}**${children ? ` with ${children.length} children` : ''}`
     };
   })
   .build();
@@ -144,16 +144,16 @@ export let createNodeTool = SlateTool.create(spec, {
 
     return {
       output: {
-        nodeId: node?.NodeID || '',
-        type: node?.Type || ctx.input.type,
-        name: node?.Name || ctx.input.name,
-        description: node?.Description || undefined,
-        urlName: node?.UrlName || undefined,
-        webUri: node?.WebUri || undefined,
-        privacy: node?.Privacy || undefined,
-        dateAdded: node?.DateAdded || undefined,
-        dateModified: node?.DateModified || undefined,
-        hasChildren: node?.HasChildren || false
+        nodeId: node?.NodeID,
+        type: node?.Type ?? undefined,
+        name: node?.Name,
+        description: node?.Description ?? undefined,
+        urlName: node?.UrlName ?? undefined,
+        webUri: node?.WebUri ?? undefined,
+        privacy: node?.Privacy ?? undefined,
+        dateAdded: node?.DateAdded ?? undefined,
+        dateModified: node?.DateModified ?? undefined,
+        hasChildren: node?.HasChildren ?? undefined
       },
       message: `Created ${ctx.input.type.toLowerCase()} **${ctx.input.name}**`
     };
@@ -209,18 +209,18 @@ export let updateNodeTool = SlateTool.create(spec, {
 
     return {
       output: {
-        nodeId: node?.NodeID || ctx.input.nodeId,
-        type: node?.Type || undefined,
-        name: node?.Name || '',
-        description: node?.Description || undefined,
-        urlName: node?.UrlName || undefined,
-        webUri: node?.WebUri || undefined,
-        privacy: node?.Privacy || undefined,
-        dateAdded: node?.DateAdded || undefined,
-        dateModified: node?.DateModified || undefined,
-        hasChildren: node?.HasChildren || undefined
+        nodeId: node?.NodeID,
+        type: node?.Type ?? undefined,
+        name: node?.Name,
+        description: node?.Description ?? undefined,
+        urlName: node?.UrlName ?? undefined,
+        webUri: node?.WebUri ?? undefined,
+        privacy: node?.Privacy ?? undefined,
+        dateAdded: node?.DateAdded ?? undefined,
+        dateModified: node?.DateModified ?? undefined,
+        hasChildren: node?.HasChildren ?? undefined
       },
-      message: `Updated node **${node?.Name || ctx.input.nodeId}**`
+      message: `Updated node **${node?.Name}**`
     };
   })
   .build();

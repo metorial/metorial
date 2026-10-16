@@ -21,6 +21,12 @@ export let listOrganizations = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z
         .string()
         .optional()
@@ -29,30 +35,43 @@ export let listOrganizations = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Comma-separated list of fields to return (OData $select)'),
-      top: z.number().optional().describe('Maximum number of records to return')
+      top: z.number().optional().describe('Maximum number of records to return'),
+      skip: z.number().optional().describe('Number of records to skip for pagination')
     })
   )
   .output(
     z.object({
       organizations: z.array(organizationSchema).describe('List of organizations'),
-      count: z.number().describe('Number of organizations returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of organizations returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let organizations = await client.getOrganizations({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
-      top: ctx.input.top
+      top: ctx.input.top,
+      skip: ctx.input.skip
     });
 
-    let results = Array.isArray(organizations) ? organizations : [organizations];
+    let results = organizations.records;
 
     return {
       output: {
         organizations: results,
-        count: results.length
+        count: results.length,
+        nextLink: organizations.nextLink,
+        totalCount: organizations.totalCount
       },
       message: `Retrieved **${results.length}** organization(s).`
     };

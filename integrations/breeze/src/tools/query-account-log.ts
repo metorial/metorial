@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryAccountLog = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let queryAccountLog = SlateTool.create(spec, {
   key: 'query_account_log',
   description: `Query the account activity log to find historical records of actions performed in the Breeze account. Filter by action type, date range, and user. Useful for auditing changes across people, contributions, events, tags, forms, volunteers, and more.`,
   instructions: [
-    'The "action" parameter is required. Common action types include: person_created, person_updated, person_deleted, contribution_added, contribution_updated, event_created, event_updated, tag_created, tag_assigned, tag_unassigned, form_entry_updated, volunteer_role_created, user_created, and more.'
+    'The "action" parameter is required. Common action types include: person_created, person_updated, person_deleted, contribution_added, contribution_updated, event_created, event_updated, tag_created, tag_assign, tag_unassign, form_entry_updated, volunteer_role_created, user_created, and more.'
   ],
   tags: {
     readOnly: true
@@ -47,7 +47,7 @@ export let queryAccountLog = SlateTool.create(spec, {
       details: ctx.input.details,
       limit: ctx.input.limit
     });
-    let entriesArray = Array.isArray(entries) ? entries : [];
+    let entriesArray = requireList(entries, 'query-account-log');
 
     return {
       output: { logEntries: entriesArray },

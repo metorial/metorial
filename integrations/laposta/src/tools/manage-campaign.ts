@@ -1,45 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  campaignCreateOutputSchema,
+  campaignDeleteOutputSchema,
+  campaignOutputSchema,
+  contentOutputSchema,
+  mapCampaign,
+  mapContent
+} from '../lib/maps';
 import { spec } from '../spec';
-
-let campaignOutputSchema = z.object({
-  campaignId: z.string().describe('Unique identifier of the campaign'),
-  name: z.string().describe('Internal name of the campaign'),
-  subject: z.string().describe('Email subject line'),
-  state: z.string().describe('Current state of the campaign'),
-  type: z.string().describe('Campaign type (e.g. regular)'),
-  fromName: z.string().describe('Sender display name'),
-  fromEmail: z.string().describe('Sender email address'),
-  replyTo: z.string().describe('Reply-to email address'),
-  listIds: z.array(z.string()).describe('Target mailing list IDs'),
-  googleAnalytics: z.string().describe('Google Analytics tracking status'),
-  mtrack: z.string().describe('Mtrack tracking status'),
-  deliveryRequested: z.string().nullable().describe('Scheduled delivery date/time'),
-  deliveryStarted: z.string().nullable().describe('Actual delivery start time'),
-  deliveryEnded: z.string().nullable().describe('Delivery completion time'),
-  created: z.string().describe('Creation timestamp'),
-  modified: z.string().describe('Last modified timestamp')
-});
-
-let mapCampaign = (c: any) => ({
-  campaignId: c.campaign_id,
-  name: c.name,
-  subject: c.subject,
-  state: c.state,
-  type: c.type,
-  fromName: c.from?.name ?? '',
-  fromEmail: c.from?.email ?? '',
-  replyTo: c.reply_to ?? '',
-  listIds: c.list_ids ?? [],
-  googleAnalytics: c.stats?.ga ?? '',
-  mtrack: c.stats?.mtrack ?? '',
-  deliveryRequested: c.delivery_requested ?? null,
-  deliveryStarted: c.delivery_started ?? null,
-  deliveryEnded: c.delivery_ended ?? null,
-  created: c.created,
-  modified: c.modified
-});
 
 export let getCampaigns = SlateTool.create(spec, {
   name: 'Get Campaigns',
@@ -64,15 +34,15 @@ export let getCampaigns = SlateTool.create(spec, {
 
     if (ctx.input.campaignId) {
       let result = await client.getCampaign(ctx.input.campaignId);
-      let campaign = mapCampaign(result.campaign);
+      let campaign = mapCampaign(result.campaign, campaignOutputSchema);
       return {
         output: { campaigns: [campaign] },
-        message: `Retrieved campaign **${campaign.name}** (${campaign.state}).`
+        message: `Retrieved campaign **${campaign.name}**.`
       };
     }
 
     let results = await client.getCampaigns();
-    let campaigns = results.map(r => mapCampaign(r.campaign));
+    let campaigns = results.map(r => mapCampaign(r.campaign, campaignOutputSchema));
     return {
       output: { campaigns },
       message: `Retrieved ${campaigns.length} campaign(s).`
@@ -93,6 +63,7 @@ export let createCampaign = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Internal name for the campaign'),
       subject: z.string().describe('Email subject line'),
+      previewText: z.string().optional().describe('Inbox preview text, up to 120 characters'),
       fromName: z.string().describe('Sender display name'),
       fromEmail: z.string().describe('Sender email address (must be pre-approved)'),
       replyTo: z.string().optional().describe('Reply-to email address'),
@@ -101,13 +72,14 @@ export let createCampaign = SlateTool.create(spec, {
       mtrack: z.boolean().optional().describe('Enable Mtrack tracking')
     })
   )
-  .output(campaignOutputSchema)
+  .output(campaignCreateOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.createCampaign({
       type: 'regular',
       name: ctx.input.name,
       subject: ctx.input.subject,
+      previewText: ctx.input.previewText,
       fromName: ctx.input.fromName,
       fromEmail: ctx.input.fromEmail,
       replyTo: ctx.input.replyTo,
@@ -116,7 +88,7 @@ export let createCampaign = SlateTool.create(spec, {
       mtrack: ctx.input.mtrack
     });
 
-    let campaign = mapCampaign(result.campaign);
+    let campaign = mapCampaign(result.campaign, campaignCreateOutputSchema);
     return {
       output: campaign,
       message: `Created campaign **${campaign.name}** (${campaign.campaignId}).`
@@ -138,6 +110,10 @@ export let updateCampaign = SlateTool.create(spec, {
       campaignId: z.string().describe('ID of the campaign to update'),
       name: z.string().optional().describe('New internal name'),
       subject: z.string().optional().describe('New email subject line'),
+      previewText: z
+        .string()
+        .optional()
+        .describe('New inbox preview text, up to 120 characters'),
       fromName: z.string().optional().describe('New sender display name'),
       fromEmail: z
         .string()
@@ -158,6 +134,7 @@ export let updateCampaign = SlateTool.create(spec, {
     let result = await client.updateCampaign(ctx.input.campaignId, {
       name: ctx.input.name,
       subject: ctx.input.subject,
+      previewText: ctx.input.previewText,
       fromName: ctx.input.fromName,
       fromEmail: ctx.input.fromEmail,
       replyTo: ctx.input.replyTo,
@@ -166,7 +143,7 @@ export let updateCampaign = SlateTool.create(spec, {
       mtrack: ctx.input.mtrack
     });
 
-    let campaign = mapCampaign(result.campaign);
+    let campaign = mapCampaign(result.campaign, campaignOutputSchema);
     return {
       output: campaign,
       message: `Updated campaign **${campaign.name}**.`
@@ -188,11 +165,11 @@ export let deleteCampaign = SlateTool.create(spec, {
       campaignId: z.string().describe('ID of the campaign to delete')
     })
   )
-  .output(campaignOutputSchema)
+  .output(campaignDeleteOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.deleteCampaign(ctx.input.campaignId);
-    let campaign = mapCampaign(result.campaign);
+    let campaign = mapCampaign(result.campaign, campaignDeleteOutputSchema);
     return {
       output: campaign,
       message: `Deleted campaign **${campaign.name}** (${campaign.campaignId}).`
@@ -220,14 +197,7 @@ export let setCampaignContent = SlateTool.create(spec, {
         .describe('Whether to inline CSS when importing from a URL')
     })
   )
-  .output(
-    z.object({
-      campaignId: z.string().describe('ID of the campaign'),
-      html: z.string().describe('Campaign HTML content'),
-      plaintext: z.string().describe('Automatically generated plaintext version'),
-      importUrl: z.string().describe('Import URL if used')
-    })
-  )
+  .output(contentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.setCampaignContent(ctx.input.campaignId, {
@@ -238,12 +208,7 @@ export let setCampaignContent = SlateTool.create(spec, {
 
     let content = result.campaign;
     return {
-      output: {
-        campaignId: content.campaign_id,
-        html: content.html,
-        plaintext: content.plaintext,
-        importUrl: content.import_url
-      },
+      output: mapContent(content),
       message: `Set content for campaign ${content.campaign_id}.`
     };
   })
@@ -284,23 +249,23 @@ export let sendCampaign = SlateTool.create(spec, {
   .output(campaignOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: Awaited<ReturnType<Client['sendCampaign']>>;
 
     if (ctx.input.action === 'send') {
       result = await client.sendCampaign(ctx.input.campaignId);
     } else if (ctx.input.action === 'schedule') {
       if (!ctx.input.scheduledTime) {
-        throw new Error('scheduledTime is required when action is "schedule"');
+        throw createApiServiceError('scheduledTime is required when action is "schedule"');
       }
       result = await client.scheduleCampaign(ctx.input.campaignId, ctx.input.scheduledTime);
     } else {
       if (!ctx.input.testEmail) {
-        throw new Error('testEmail is required when action is "test"');
+        throw createApiServiceError('testEmail is required when action is "test"');
       }
       result = await client.sendTestEmail(ctx.input.campaignId, ctx.input.testEmail);
     }
 
-    let campaign = mapCampaign(result.campaign);
+    let campaign = mapCampaign(result.campaign, campaignOutputSchema);
     let actionMsg =
       ctx.input.action === 'send'
         ? 'Sent'

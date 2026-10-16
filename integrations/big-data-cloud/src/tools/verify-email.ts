@@ -53,7 +53,7 @@ export let verifyEmailTool = SlateTool.create(spec, {
     let warnings: string[] = [];
     if (result.isDisposable) warnings.push('disposable');
     if (result.isKnownSpammerDomain) warnings.push('spam domain');
-    if (!result.isMailServerDefined) warnings.push('no mail server');
+    if (result.isMailServerDefined === false) warnings.push('no mail server');
 
     let warningText = warnings.length > 0 ? ` Warnings: ${warnings.join(', ')}.` : '';
 

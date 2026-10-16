@@ -8,13 +8,14 @@ let forumSchema = z.object({
   name: z.string().describe('Name of the forum'),
   welcomeMessage: z.string().nullable().describe('Welcome message displayed to users'),
   prompt: z.string().nullable().describe('Prompt text for idea submission'),
-  isPublic: z.boolean().describe('Whether the forum is publicly accessible'),
-  isPrivate: z.boolean().describe('Whether the forum is private'),
-  suggestionsCount: z.number().describe('Total number of suggestions'),
-  openSuggestionsCount: z.number().describe('Number of open suggestions'),
+  isPublic: z.boolean().optional().describe('Whether the forum is publicly accessible'),
+  isPrivate: z.boolean().optional().describe('Whether the forum is private'),
+  suggestionsCount: z.number().optional().describe('Total number of suggestions'),
+  openSuggestionsCount: z.number().optional().describe('Number of open suggestions'),
   portalUrl: z.string().nullable().describe('Public URL of the forum'),
-  createdAt: z.string().describe('When the forum was created'),
-  updatedAt: z.string().describe('When the forum was last updated')
+  createdAt: z.string().optional().describe('When the forum was created'),
+  updatedAt: z.string().optional().describe('When the forum was last updated'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listForums = SlateTool.create(spec, {
@@ -31,15 +32,16 @@ export let listForums = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      forums: z.array(forumSchema),
-      totalRecords: z.number().describe('Total number of forums'),
-      totalPages: z.number().describe('Total number of pages')
+      forums: z.array(forumSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of forums'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listForums({
@@ -47,27 +49,28 @@ export let listForums = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let forums = result.forums.map((f: any) => ({
+    let forums = result.forums?.map((f: any) => ({
       forumId: f.id,
       name: f.name,
-      welcomeMessage: f.welcome_message || null,
-      prompt: f.prompt || null,
-      isPublic: f.is_public ?? true,
-      isPrivate: f.is_private ?? false,
-      suggestionsCount: f.suggestions_count || 0,
-      openSuggestionsCount: f.open_suggestions_count || 0,
-      portalUrl: f.portal_url || null,
-      createdAt: f.created_at,
-      updatedAt: f.updated_at
+      welcomeMessage: f.welcome_message ?? null,
+      prompt: f.prompt ?? null,
+      isPublic: f.is_public,
+      isPrivate: f.is_private,
+      suggestionsCount: f.suggestions_count,
+      openSuggestionsCount: f.open_suggestions_count,
+      portalUrl: f.portal_url ?? null,
+      createdAt: f.created_at ?? undefined,
+      updatedAt: f.updated_at ?? undefined,
+      raw: f
     }));
 
     return {
       output: {
         forums,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages
       },
-      message: `Found **${forums.length}** forums.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

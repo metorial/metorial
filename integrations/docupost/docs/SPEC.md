@@ -1,48 +1,30 @@
-# Slates Specification for Docupost
-
-## Overview
-
-DocuPost is an online service that allows users to send postal mail, including letters, postcards, and checks, directly from their computer. Users can upload or compose their documents online, specify addresses, and choose mailing options. The service is HIPAA-compliant.
+# DocuPost integration reference
 
 ## Authentication
 
-DocuPost uses API token authentication.
+Use an API token from the DocuPost Developer page. Requests include `api_token` in the query string, as required by the [token guide](https://help.docupost.com/developer-documentation/generate-api-token). The connection stores the existing `token` field; no configuration values or OAuth flow are required. Token creation and revocation remain dashboard operations.
 
-- An API token is a unique key required for authenticating API requests to DocuPost.
-- To generate a token: navigate to the Developer page in your DocuPost account, click Generate API Token, copy the generated token, and store the token securely.
-- To use the API token in your requests, include it in the query string of your HTTP request as the `api_token` parameter. For example: `https://app.docupost.com/api/1.1/wf/sendletter?api_token={YOUR_API_TOKEN}&...`
-- You can revoke or generate a new token from your Developer page. Regenerating your API token will provide you with a new token, and the old one will become invalid.
+## Tools
 
-There are no OAuth flows, scopes, or additional credentials required. Only the single API token is needed.
+- `send_letter`: POST to `/api/1.1/wf/sendletter`. Supply exactly one of `pdfUrl` and `html`. HTML goes in the JSON body; addresses and printing options go in query parameters. Certified service uses first-class mail. Choose at most one return-envelope option. Existing field types, optionality, mail-class values, and limits are preserved.
+- `send_postcard`: POST to `/api/1.1/wf/sendpostcard`. Supply sender/recipient addresses and front/back image URLs. The API guide specifies 1875 by 1275 images, recommends PNG, and lists `4x6` and `6x9` sizes.
+- `get_account_balance`: preserves the original POST `/api/1.1/wf/getbalance` request. This route is not documented in the current public API guide and has not been verified against a provider account. Use the dashboard Funds section if it is unavailable. The existing `balance` field retains the actual nested balance value, including null or zero, when present; otherwise it retains the complete provider result. `response` always retains the actual result.
 
-## Features
+The send tools return `status` from the provider's top-level string status, when present. Otherwise `status` is the actual HTTP code as text. The additive `httpStatus` exposes the numeric HTTP code, and the existing `response` contains the complete actual API response. No mail identifiers, costs, or delivery states are fabricated. A completed HTTP request does not confirm printing or delivery. Failures use safe messages without echoing tokens, recipient details, or document content. A timed-out mailing may still have been accepted: check the dashboard before retrying.
 
-### Send Letters
+## API boundaries
 
-Use the Send Letter API to programmatically send letters via U.S. mail through DocuPost.
+Current developer documentation describes letter and postcard submission, but provides no response-field schema or documented API routes for listing/retrieving mail jobs, cancellation, account identity, address books, webhooks, or file exports. Those capabilities were not inferred from dashboard features. Existing balance behavior is retained rather than declared invalid because its route is absent from the current guide.
 
-- Requires recipient and sender address details (name, address lines, city, 2-letter state abbreviation, ZIP code).
-- Prepare query string parameters required for your letter, such as recipient and sender details and document URL.
-- Content can be provided as a PDF URL or as raw HTML content, which can be useful when you need more flexibility in creating the layout and design of your letter directly within your application.
-- Recipient and sender names must be less than 40 characters. Address lines must be in the correct format, and states should use 2-letter abbreviations.
-- To cancel a letter, you must do it within an hour of sending.
+Track mail and cancel eligible submissions from their detail pages in the dashboard. Cancellation availability varies and is not guaranteed. Export PDFs or CSVs and manage address-book entries in the dashboard. No downloadable-result tool or event trigger is registered.
 
-### Send Postcards
+## Official references
 
-Use the Send Postcard API to programmatically send postcards via U.S. mail.
+- [Send Letter API](https://help.docupost.com/developer-documentation/send-letter-api)
+- [Send Postcard API](https://help.docupost.com/developer-documentation/send-postcard-api)
+- [Track Sent Letters](https://help.docupost.com/letters/track-sent-letters)
+- [Cancel Sent Letter](https://help.docupost.com/letters/cancel-sent-letter)
+- [Manage Recipients](https://help.docupost.com/address-book/manage-recipients)
+- [Export Data](https://help.docupost.com/data-and-legal/export-data)
 
-- Requires recipient and sender address details, plus front and back images for the postcard.
-- Images must be 1875 x 1275 pixels and in PNG format.
-- If the address is invalid, your mail will fail to send. Ensure all required address fields are correctly filled, including the correct 2-letter U.S. state abbreviation.
-
-### Check Account Balance
-
-The API provides an endpoint to retrieve your current account balance programmatically (`getbalance`). Ensure your account balance is adequate before sending mail, as mailings are charged against your prepaid balance.
-
-### Send Checks (Dashboard Only)
-
-To print and mail checks with DocuPost, you need to sign up for the premium plan. This allows you to use all the features required for sending checks. DocuPost gives a convenient and professional touch for mailing checks. Ensure you have a verified bank account before proceeding. Note: Based on available documentation, check sending appears to be a dashboard feature only and is not exposed through a public API endpoint.
-
-## Events
-
-The provider does not support events. DocuPost's API is action-oriented (send letter, send postcard, check balance) and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+Only static and local verification was performed for this refresh. No operational provider requests or paid mail submissions were made.

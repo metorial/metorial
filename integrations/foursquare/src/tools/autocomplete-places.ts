@@ -94,14 +94,16 @@ let autocompleteResultSchema = z.object({
 export let autocompletePlaces = SlateTool.create(spec, {
   name: 'Autocomplete Places',
   key: 'autocomplete_places',
-  description: `Provides type-ahead search suggestions for places, addresses, and geographic areas. Returns a mix of result types as the user types, ideal for building search-as-you-type experiences.`,
+  description: `DEPRECATED — use \`autocomplete_places_current\` instead. Provides type-ahead search suggestions for places, addresses, and geographic areas. Returns a mix of result types as the user types, ideal for building search-as-you-type experiences.`,
   instructions: [
+    'Use autocomplete_places_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Use the types parameter to filter result types: "place", "address", "search", "geo", or comma-separated combinations.',
     'Provide ll (latitude,longitude) for location-biased results.',
     'Use session_token to group autocomplete requests for billing purposes.'
   ],
   constraints: ['Maximum 10 results per request.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

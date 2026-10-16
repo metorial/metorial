@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireRecords, requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let managePortal = SlateTool.create(spec, {
@@ -43,16 +44,16 @@ export let managePortal = SlateTool.create(spec, {
 
     if (action === 'list') {
       let data = await client.listPortals();
-      let portals = data?.portals || data?.items || [];
+      let portals = requireRecords(data?.portals ?? data?.items, 'portal');
       return {
-        output: { success: true, portals },
+        output: { success: requireSuccess(data), portals },
         message: `Found **${portals.length}** portals.`
       };
     }
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for create action');
+        throw createApiServiceError('name is required for create action');
       }
       let data = await client.createPortal({
         name: ctx.input.name,
@@ -60,7 +61,7 @@ export let managePortal = SlateTool.create(spec, {
       });
       return {
         output: {
-          success: data.success === true,
+          success: requireSuccess(data),
           portalId: data.portal_id || data.id
         },
         message: `Portal **${ctx.input.name}** created.`
@@ -69,7 +70,7 @@ export let managePortal = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.portalId) {
-        throw new Error('portalId is required for update action');
+        throw createApiServiceError('portalId is required for update action');
       }
       let data = await client.updatePortal({
         portalId: ctx.input.portalId,
@@ -77,33 +78,33 @@ export let managePortal = SlateTool.create(spec, {
         description: ctx.input.description
       });
       return {
-        output: { success: data.success === true, portalId: ctx.input.portalId },
+        output: { success: requireSuccess(data), portalId: data.portal_id ?? data.id },
         message: `Portal \`${ctx.input.portalId}\` updated.`
       };
     }
 
     if (action === 'deactivate') {
       if (!ctx.input.portalId) {
-        throw new Error('portalId is required for deactivate action');
+        throw createApiServiceError('portalId is required for deactivate action');
       }
       let data = await client.deactivatePortal(ctx.input.portalId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Portal \`${ctx.input.portalId}\` deactivated.`
       };
     }
 
     if (action === 'remove') {
       if (!ctx.input.portalId) {
-        throw new Error('portalId is required for remove action');
+        throw createApiServiceError('portalId is required for remove action');
       }
       let data = await client.deletePortal(ctx.input.portalId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Portal \`${ctx.input.portalId}\` permanently removed.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

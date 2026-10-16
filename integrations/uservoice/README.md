@@ -1,8 +1,27 @@
 # <img src="https://provider-logos.metorial-cdn.com/uservoice.png" height="20"> Uservoice
 
-Manage product feedback, feature requests, and customer ideas. Create, update, and organize suggestions across forums. Track votes and supporters on ideas. Update suggestion statuses through their lifecycle (under review, planned, completed). Manage users, accounts, and teams. Organize feedback with labels and categories. Link suggestions to features for roadmap planning. Upload file attachments to suggestions and notes. Retrieve NPS ratings data. Create and manage internal notes and public comments. Import external users and accounts in bulk. Configure webhooks for suggestion, vote, and status change events.
+Manage product feedback, suggestions, forums, supporters, labels, categories, users,
+features and NPS ratings. Read the connected user's profile, internal notes and
+public status history. Create notes, import external users, and update suggestion
+statuses. Connect with a trusted API client's credentials or an existing bearer token.
+
+The subdomain is configured with the credentials. Existing saved connection settings
+remain supported. API credential connections can renew their tokens; bearer tokens
+must be replaced when revoked or invalidated.
 
 ## Tools
+
+### Get Current User
+
+Retrieve the user represented by the connected credentials.
+
+### List Notes
+
+Read internal notes, optionally for one suggestion, with pagination and date filters.
+
+### List Status Updates
+
+Read public status update history, status links, and notification metadata.
 
 ### Add Note
 

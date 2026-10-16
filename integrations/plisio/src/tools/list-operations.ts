@@ -1,7 +1,42 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlisioClient } from '../lib/client';
+import {
+  optionalValue,
+  readArray,
+  readRecord,
+  validateOutput,
+  validatePage
+} from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  operations: z
+    .array(
+      z.object({
+        operationId: z.string().describe('Operation ID'),
+        type: z.string().describe('Operation type'),
+        status: z.string().describe('Current status'),
+        currency: z.string().optional().describe('Cryptocurrency code'),
+        amount: z.string().optional().describe('Operation amount'),
+        fee: z.string().optional().describe('Transaction fee'),
+        walletHash: z.string().optional().describe('Wallet address'),
+        txUrl: z.string().optional().describe('Block explorer URL'),
+        transactionUrls: z
+          .array(z.string())
+          .optional()
+          .describe('All block explorer URLs when the provider returns multiple links'),
+        sourceCurrency: z.string().optional().describe('Fiat currency code'),
+        sourceRate: z.string().optional().describe('Exchange rate')
+      })
+    )
+    .describe('List of operations'),
+  totalCount: z.number().optional().describe('Total number of matching operations'),
+  pageCount: z.number().optional().describe('Total number of pages'),
+  currentPage: z.number().optional().describe('Current page number'),
+  perPage: z.number().optional().describe('Number of results per page'),
+  raw: z.unknown().describe('Original provider response with credentials removed')
+});
 
 export let listOperations = SlateTool.create(spec, {
   name: 'List Operations',
@@ -18,7 +53,7 @@ export let listOperations = SlateTool.create(spec, {
       limit: z.number().optional().describe('Number of results per page'),
       shopId: z.string().optional().describe('Filter by shop ID'),
       type: z
-        .enum(['cash_in', 'cash_out', 'mass_cash_out', 'invoice'])
+        .enum(['cash_in', 'cash_out', 'mass_cash_out', 'invoice', 'pay_in'])
         .optional()
         .describe('Filter by operation type'),
       status: z
@@ -41,67 +76,52 @@ export let listOperations = SlateTool.create(spec, {
         .describe('Search by transaction ID, order number, or email')
     })
   )
-  .output(
-    z.object({
-      operations: z
-        .array(
-          z.object({
-            operationId: z.string().describe('Operation ID'),
-            type: z.string().describe('Operation type'),
-            status: z.string().describe('Current status'),
-            currency: z.string().optional().describe('Cryptocurrency code'),
-            amount: z.string().optional().describe('Operation amount'),
-            fee: z.string().optional().describe('Transaction fee'),
-            walletHash: z.string().optional().describe('Wallet address'),
-            txUrl: z.string().optional().describe('Block explorer URL'),
-            sourceCurrency: z.string().optional().describe('Fiat currency code'),
-            sourceRate: z.string().optional().describe('Exchange rate')
-          })
-        )
-        .describe('List of operations'),
-      totalCount: z.number().optional().describe('Total number of matching operations'),
-      pageCount: z.number().optional().describe('Total number of pages'),
-      currentPage: z.number().optional().describe('Current page number'),
-      perPage: z.number().optional().describe('Number of results per page')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
+    validatePage(ctx.input.page, 'Page');
+    validatePage(ctx.input.limit, 'Limit');
     let client = new PlisioClient({ token: ctx.auth.token });
 
-    let result = await client.listOperations({
-      page: ctx.input.page,
-      limit: ctx.input.limit,
-      shopId: ctx.input.shopId,
-      type: ctx.input.type,
-      status: ctx.input.status,
-      currency: ctx.input.currency,
-      search: ctx.input.search
-    });
+    let result = readRecord(
+      await client.listOperations({
+        page: ctx.input.page,
+        limit: ctx.input.limit,
+        shopId: ctx.input.shopId,
+        type: ctx.input.type,
+        status: ctx.input.status,
+        currency: ctx.input.currency,
+        search: ctx.input.search
+      })
+    );
 
-    let operations = (result.operations || []).map((op: any) => ({
+    let operations = readArray(result.operations).map(op => ({
       operationId: op.id,
       type: op.type,
-      status: op.status,
+      status: optionalValue(op.status),
       currency: op.currency ?? op.psys_cid,
-      amount: op.amount,
-      fee: op.fee,
-      walletHash: op.wallet_hash,
-      txUrl: op.tx_url,
-      sourceCurrency: op.source_currency,
-      sourceRate: op.source_rate
+      amount: optionalValue(op.amount),
+      fee: optionalValue(op.fee),
+      walletHash: optionalValue(op.wallet_hash),
+      txUrl: typeof op.tx_url === 'string' ? op.tx_url : undefined,
+      transactionUrls: Array.isArray(op.tx_url) ? op.tx_url : undefined,
+      sourceCurrency: optionalValue(op.source_currency),
+      sourceRate: optionalValue(op.source_rate)
     }));
 
-    let meta = result._meta || {};
+    let meta = result._meta === undefined ? {} : readRecord(result._meta);
 
     return {
-      output: {
+      output: validateOutput(outputSchema, {
         operations,
         totalCount: meta.totalCount,
         pageCount: meta.pageCount,
         currentPage: meta.currentPage,
-        perPage: meta.perPage
-      },
-      message: `Found **${meta.totalCount ?? operations.length}** operations (page ${meta.currentPage ?? 1} of ${meta.pageCount ?? 1}).`
+        perPage: meta.perPage,
+        raw: result
+      }),
+      message: client.redact(
+        `Retrieved **${operations.length}** operations${meta.currentPage !== undefined ? ` on page ${meta.currentPage}` : ''}.`
+      )
     };
   })
   .build();

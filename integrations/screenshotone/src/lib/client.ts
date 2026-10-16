@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.screenshotone.com';
 
@@ -11,6 +17,7 @@ export interface TakeScreenshotParams {
   // Output format
   format?: string;
   responseType?: string;
+  includeShadowDom?: boolean;
   imageQuality?: number;
   omitBackground?: boolean;
 
@@ -117,7 +124,7 @@ export interface TakeScreenshotParams {
   metadataContent?: boolean;
   metadataContentFormat?: string;
   metadataHttpResponseStatusCode?: boolean;
-  metadataHttpResponseStatusHeaders?: boolean;
+  metadataHttpResponseHeaders?: boolean;
 
   // Async / Webhooks
   async?: boolean;
@@ -166,52 +173,125 @@ let buildParams = (params: Record<string, unknown>): Record<string, unknown> => 
   let result: Record<string, unknown> = {};
   for (let [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
-    let snakeKey = camelToSnake(key);
-    if (Array.isArray(value)) {
-      result[snakeKey] = value;
-    } else {
-      result[snakeKey] = value;
-    }
+    result[camelToSnake(key)] = value;
   }
   return result;
 };
 
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'ScreenshotOne',
+    reason: 'screenshotone_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    detailKeys: [
+      'error_message',
+      'message',
+      'detail',
+      'error',
+      'error_description',
+      'code',
+      'error_code'
+    ],
+    nestedKeys: ['error', 'errors'],
+    extractUpstreamCode: (_error, response) => {
+      let body = response?.data;
+      if (!isApiErrorRecord(body)) return undefined;
+      if (typeof body.error_code === 'string') return body.error_code;
+      return isApiErrorRecord(body.error) && typeof body.error.code === 'string'
+        ? body.error.code
+        : undefined;
+    }
+  });
+
+let checkFailure = (data: unknown, status: number) => {
+  if (
+    isApiErrorRecord(data) &&
+    (data.is_successful === false || data.error || typeof data.error_code === 'string')
+  ) {
+    throw apiError({ response: { status, data } });
+  }
+};
+
+let validateSource = (params: TakeScreenshotParams) => {
+  if (![params.url, params.html, params.markdown].some(value => value?.trim())) {
+    throw createApiServiceError('Provide a URL, HTML, or Markdown content to render.');
+  }
+};
+
+export interface ScreenshotResponse {
+  screenshotUrl?: string;
+  storeLocation?: string;
+  metadata?: Record<string, unknown>;
+  cacheUrl?: string;
+  statusCode?: number;
+  content?: Record<string, unknown>;
+  httpResponse?: Record<string, unknown>;
+  vision?: unknown;
+}
+
 export class Client {
   private accessKey: string;
+  private http;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A ScreenshotOne access key is required.');
+    }
     this.accessKey = config.token;
+    this.http = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      errorAdapter: apiError,
+      errorMapping: {
+        extractResponseData: response => {
+          let data: unknown = response.data;
+          if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+            let bytes =
+              data instanceof ArrayBuffer
+                ? new Uint8Array(data)
+                : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+            let text = new TextDecoder().decode(bytes);
+            try {
+              return JSON.parse(text);
+            } catch {
+              return text;
+            }
+          }
+          return data;
+        }
+      }
+    });
   }
 
-  async takeScreenshot(params: TakeScreenshotParams): Promise<{
-    screenshotUrl?: string;
-    storeLocation?: string;
-    metadata?: Record<string, unknown>;
-    cacheUrl?: string;
-    statusCode?: number;
-  }> {
-    let http = createAxios({ baseURL: BASE_URL });
-
+  async takeScreenshot(params: TakeScreenshotParams): Promise<ScreenshotResponse> {
+    validateSource(params);
     let apiParams = buildParams(params as Record<string, unknown>);
     apiParams.access_key = this.accessKey;
     apiParams.response_type = 'json';
 
-    let response = await http.post('/take', apiParams, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    let response = await this.http.post('/take', apiParams);
+    checkFailure(response.data, response.status);
+    if (!isApiErrorRecord(response.data)) {
+      throw createApiServiceError('ScreenshotOne returned an invalid JSON response.');
+    }
 
-    let cacheUrl = response.headers?.['x-screenshotone-cache-url'] as string | undefined;
-
-    let data = response.data as Record<string, unknown>;
+    let data = response.data;
+    let store = isApiErrorRecord(data.store) ? data.store : undefined;
     return {
-      screenshotUrl: data.screenshot_url as string | undefined,
+      screenshotUrl: typeof data.screenshot_url === 'string' ? data.screenshot_url : undefined,
       storeLocation:
-        ((data.store as Record<string, unknown> | undefined)?.location as
-          | string
-          | undefined) ?? (data.store_location as string | undefined),
-      metadata: data.metadata as Record<string, unknown> | undefined,
-      cacheUrl,
-      statusCode: response.status
+        typeof store?.location === 'string'
+          ? store.location
+          : typeof data.store_location === 'string'
+            ? data.store_location
+            : undefined,
+      metadata: isApiErrorRecord(data.metadata) ? data.metadata : undefined,
+      cacheUrl:
+        getResponseHeaderValue(response.headers, 'x-screenshotone-cache-url') ??
+        (typeof data.cache_url === 'string' ? data.cache_url : undefined),
+      statusCode: response.status,
+      content: isApiErrorRecord(data.content) ? data.content : undefined,
+      httpResponse: isApiErrorRecord(data.http_response) ? data.http_response : undefined,
+      vision: data.vision
     };
   }
 
@@ -220,40 +300,122 @@ export class Client {
     contentType: string;
     cacheUrl?: string;
   }> {
-    let http = createAxios({ baseURL: BASE_URL });
-
+    validateSource(params);
     let apiParams = buildParams(params as Record<string, unknown>);
     apiParams.access_key = this.accessKey;
 
-    // Don't override response_type - let it default to by_format for binary
-    if (!apiParams.response_type) {
-      apiParams.response_type = undefined;
+    // Preserve the legacy binary default when no response type is supplied.
+    if (!apiParams.response_type) apiParams.response_type = undefined;
+    let response = await this.http.post('/take', apiParams, { responseType: 'arraybuffer' });
+    let buffer = Buffer.from(response.data as ArrayBuffer);
+    let contentType = getResponseHeaderValue(response.headers, 'content-type') || 'image/png';
+    if (contentType.includes('json')) {
+      let data: unknown;
+      try {
+        data = JSON.parse(buffer.toString('utf8'));
+      } catch {
+        throw createApiServiceError('ScreenshotOne returned invalid JSON instead of a file.');
+      }
+      checkFailure(data, response.status);
     }
 
-    let response = await http.post('/take', apiParams, {
-      headers: { 'Content-Type': 'application/json' },
-      responseType: 'arraybuffer'
-    });
+    return {
+      imageBase64: buffer.toString('base64'),
+      contentType,
+      cacheUrl: getResponseHeaderValue(response.headers, 'x-screenshotone-cache-url')
+    };
+  }
 
-    let buffer = Buffer.from(response.data as ArrayBuffer);
-    let base64 = buffer.toString('base64');
-    let contentType = (response.headers?.['content-type'] as string) || 'image/png';
-    let cacheUrl = response.headers?.['x-screenshotone-cache-url'] as string | undefined;
+  async renderFile(params: TakeScreenshotParams): Promise<{
+    file: Response;
+    mimeType: string;
+    size: number;
+    cacheUrl?: string;
+    storeLocation?: string;
+  }> {
+    validateSource(params);
+    let apiParams = buildParams(params as Record<string, unknown>);
+    apiParams.access_key = this.accessKey;
+    apiParams.response_type = 'by_format';
+
+    // This is the only capture: use its returned bytes, never a second render or URL fetch.
+    let response = await this.http.post('/take', apiParams, { responseType: 'arraybuffer' });
+    if (response.status < 200 || response.status >= 300) {
+      throw apiError({ response: { status: response.status, data: response.data } });
+    }
+    let data: unknown = response.data;
+    if (!(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) {
+      throw createApiServiceError('ScreenshotOne did not return the requested file bytes.');
+    }
+    let bytes =
+      data instanceof ArrayBuffer
+        ? new Uint8Array(data)
+        : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (bytes.byteLength === 0) {
+      throw createApiServiceError('ScreenshotOne returned an empty file.');
+    }
+    let contentType = getResponseHeaderValue(response.headers, 'content-type');
+    let mimeType = contentType?.split(';')[0]?.trim().toLowerCase();
+    if (mimeType === 'application/json' || mimeType?.endsWith('+json')) {
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(new TextDecoder().decode(bytes));
+      } catch {
+        throw createApiServiceError('ScreenshotOne returned invalid JSON instead of a file.');
+      }
+      checkFailure(errorBody, response.status);
+      throw createApiServiceError(
+        'ScreenshotOne returned JSON instead of the requested file.'
+      );
+    }
+    let format = params.format ?? 'jpg';
+    let expectedMimeTypes: Record<string, string[]> = {
+      png: ['image/png'],
+      jpeg: ['image/jpeg', 'image/jpg'],
+      jpg: ['image/jpeg', 'image/jpg'],
+      webp: ['image/webp'],
+      gif: ['image/gif'],
+      jp2: ['image/jp2', 'image/jpeg2000', 'image/jpx'],
+      tiff: ['image/tiff'],
+      avif: ['image/avif'],
+      heif: ['image/heif', 'image/heic'],
+      pdf: ['application/pdf'],
+      html: ['text/html'],
+      markdown: ['text/markdown', 'text/plain']
+    };
+    let expectedType = mimeType && expectedMimeTypes[format]?.includes(mimeType);
+    if (!contentType || !mimeType || !expectedType) {
+      throw createApiServiceError('ScreenshotOne returned an unexpected file content type.');
+    }
 
     return {
-      imageBase64: base64,
-      contentType,
-      cacheUrl
+      file: new Response(new Uint8Array(bytes), { headers: { 'Content-Type': contentType } }),
+      mimeType,
+      size: bytes.byteLength,
+      cacheUrl: getResponseHeaderValue(response.headers, 'x-screenshotone-cache-url'),
+      storeLocation: getResponseHeaderValue(response.headers, 'x-screenshotone-store-location')
     };
   }
 
   async getUsage(): Promise<UsageResponse> {
-    let http = createAxios({ baseURL: BASE_URL });
-
-    let response = await http.get('/usage', {
+    let response = await this.http.get('/usage', {
       params: { access_key: this.accessKey }
     });
-
-    return response.data as UsageResponse;
+    checkFailure(response.data, response.status);
+    let data = response.data;
+    if (
+      !isApiErrorRecord(data) ||
+      !isApiErrorRecord(data.concurrency) ||
+      ![
+        data.total,
+        data.available,
+        data.used,
+        data.concurrency.limit,
+        data.concurrency.remaining
+      ].every(value => typeof value === 'number' && Number.isFinite(value))
+    ) {
+      throw createApiServiceError('ScreenshotOne returned invalid usage data.');
+    }
+    return data as unknown as UsageResponse;
   }
 }

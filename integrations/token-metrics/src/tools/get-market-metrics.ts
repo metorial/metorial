@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getMarketMetrics = SlateTool.create(spec, {
@@ -22,6 +22,10 @@ export let getMarketMetrics = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       metrics: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of market metric records')
@@ -37,10 +41,10 @@ export let getMarketMetrics = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let metrics = result?.data ?? [];
+    let metrics = getRecords(result);
 
     return {
-      output: { metrics },
+      output: { metrics, raw: result },
       message: `Retrieved **${metrics.length}** market metric record(s).`
     };
   })

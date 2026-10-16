@@ -1,4 +1,12 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 export interface Campaign {
   campaignId: string;
@@ -9,75 +17,186 @@ export interface Campaign {
   updatedAt: string;
 }
 
-export interface Portal {
-  portalId: string;
-  name: string;
-  createdAt: string;
-}
+let requireValue = (value: string, label: string) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw createApiServiceError(`${label} must not be blank.`, {
+      reason: 'deadline_funnel_invalid_input'
+    });
+  }
+};
 
-export interface CustomEvent {
-  eventId: string;
-  name: string;
-  email: string;
-  createdAt: string;
-}
+let requireEmail = (email: string) => {
+  requireValue(email, 'Email address');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw createApiServiceError('Provide a valid subscriber email address.', {
+      reason: 'deadline_funnel_invalid_input'
+    });
+  }
+};
 
-export interface FormSubmission {
-  submissionId: string;
-  portalId: string;
-  email: string;
-  name: string;
-  createdAt: string;
-}
+let scrub = (value: unknown, secrets: string[], depth = 0): unknown => {
+  if (depth > 8) return '[truncated]';
+  if (typeof value === 'string') {
+    let result = value;
+    for (let secret of secrets.filter(Boolean)) {
+      result = result.split(secret).join('[redacted]');
+      result = result.split(encodeURIComponent(secret)).join('[redacted]');
+    }
+    return result.replace(/Bearer\s+[^\s"'<>]+/gi, 'Bearer [redacted]').slice(0, 2000);
+  }
+  if (Array.isArray(value)) return value.map(item => scrub(item, secrets, depth + 1));
+  if (isApiErrorRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        /authorization|api[_-]?key|token|secret|password/i.test(key)
+          ? '[redacted]'
+          : scrub(item, secrets, depth + 1)
+      ])
+    );
+  }
+  return value;
+};
+
+let apiError = (error: unknown, operation: string, secrets: string[]) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Deadline Funnel',
+    reason: 'deadline_funnel_api_error',
+    operation,
+    fallbackMessage: 'The provider reported an unsuccessful request.',
+    extractResponse: (value, helpers) => {
+      let response = helpers.getResponseWithBody(value);
+      return response ? { ...response, data: scrub(response.data, secrets) } : undefined;
+    },
+    extractMessage: (value, helpers) => {
+      let response = helpers.getResponseWithBody(value);
+      let details: string[] = [];
+      helpers.collectDetails(response?.data, details);
+      return String(
+        scrub(
+          details.length > 0
+            ? details.join(' - ')
+            : helpers.extractMessage(value, {
+                fallbackMessage: 'The provider reported an unsuccessful request.'
+              }),
+          secrets
+        )
+      );
+    },
+    // Do not retain an upstream exception containing credentials in request metadata.
+    parent: {}
+  });
+
+let hasError = (value: unknown): boolean => {
+  if (value === undefined || value === null || value === false || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isApiErrorRecord(value)) return Object.keys(value).length > 0;
+  return true;
+};
+
+let assertSuccess = (data: unknown, operation: string, secrets: string[]) => {
+  if (
+    data === false ||
+    (isApiErrorRecord(data) &&
+      (data.success === false ||
+        data.success === 'false' ||
+        data.status === 'error' ||
+        data.status === 'failed' ||
+        hasError(data.error) ||
+        hasError(data.errors)))
+  ) {
+    throw apiError({ response: { data } }, operation, secrets);
+  }
+};
+
+let invalidResponse = (detail: string) =>
+  createApiServiceError(`Deadline Funnel returned an invalid response: ${detail}.`, {
+    reason: 'deadline_funnel_invalid_response'
+  });
+
+let campaignString = (
+  campaign: Record<string, unknown>,
+  aliases: string[],
+  field: string,
+  allowNumber = false
+) => {
+  let value = aliases.map(alias => campaign[alias]).find(value => value !== undefined);
+  if (typeof value === 'string' && value.trim()) return value;
+  if (allowNumber && typeof value === 'number' && Number.isFinite(value)) return String(value);
+  throw invalidResponse(`campaign ${field} is missing or malformed`);
+};
 
 export class DeadlineFunnelClient {
-  private axios: ReturnType<typeof createAxios>;
+  private http;
+  private token: string;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    requireValue(config.token, 'Deadline Funnel API key');
+    this.token = config.token;
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://app.deadlinefunnel.com/api/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      maxRedirects: 0,
+      authHeader: { value: `Bearer ${config.token}` }
     });
   }
 
-  // ---- Campaigns ----
+  private async request(
+    operation: string,
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown
+  ) {
+    let data = await requestAxiosData<unknown>(
+      operation,
+      () => this.http.request({ method, url: path, data: body }),
+      (error, action) => apiError(error, action, [this.token])
+    );
+    assertSuccess(data, operation, [this.token]);
+    if (
+      data !== undefined &&
+      data !== null &&
+      data !== '' &&
+      !isApiErrorRecord(data) &&
+      !Array.isArray(data)
+    ) {
+      throw invalidResponse('expected a JSON object or array');
+    }
+    return data;
+  }
 
   async listCampaigns(): Promise<Campaign[]> {
-    let response = await this.axios.get('/campaigns');
-    let data = response.data;
-    let campaigns = Array.isArray(data) ? data : data?.campaigns || data?.data || [];
-    return campaigns.map((c: any) => ({
-      campaignId: String(c.id || c.campaign_id || ''),
-      name: String(c.name || c.title || ''),
-      campaignType: String(c.campaign_type || c.type || ''),
-      status: String(c.status || 'active'),
-      createdAt: String(c.created_at || c.createdAt || ''),
-      updatedAt: String(c.updated_at || c.updatedAt || '')
-    }));
-  }
-
-  // ---- Deadline Tracking ----
-
-  async startDeadline(params: {
-    campaignId: string;
-    email: string;
-    firstName?: string;
-  }): Promise<{ success: boolean; email: string; campaignId: string }> {
-    await this.axios.post(`/campaigns/${params.campaignId}/deadlines`, {
-      email: params.email,
-      first_name: params.firstName
+    let data = await this.request('list campaigns', 'GET', '/campaigns');
+    let campaigns = Array.isArray(data)
+      ? data
+      : isApiErrorRecord(data)
+        ? (data.campaigns ?? data.data)
+        : undefined;
+    if (!Array.isArray(campaigns)) throw invalidResponse('expected a campaigns array');
+    return campaigns.map(campaign => {
+      if (!isApiErrorRecord(campaign)) throw invalidResponse('campaign is not an object');
+      return {
+        campaignId: campaignString(campaign, ['id', 'campaign_id'], 'ID', true),
+        name: campaignString(campaign, ['name', 'title'], 'name'),
+        campaignType: campaignString(campaign, ['campaign_type', 'type'], 'type'),
+        status: campaignString(campaign, ['status'], 'status'),
+        createdAt: campaignString(campaign, ['created_at', 'createdAt'], 'creation timestamp'),
+        updatedAt: campaignString(campaign, ['updated_at', 'updatedAt'], 'update timestamp')
+      };
     });
-    return {
-      success: true,
-      email: params.email,
-      campaignId: params.campaignId
-    };
   }
 
-  // ---- Sales Tracking ----
+  async startDeadline(params: { campaignId: string; email: string; firstName?: string }) {
+    requireValue(params.campaignId, 'Campaign ID');
+    requireEmail(params.email);
+    await this.request(
+      'start deadline',
+      'POST',
+      `/campaigns/${encodeURIComponent(params.campaignId)}/deadlines`,
+      pickDefined({ email: params.email, first_name: params.firstName })
+    );
+    return { success: true, email: params.email, campaignId: params.campaignId };
+  }
 
   async trackPurchase(params: {
     campaignId: string;
@@ -85,19 +204,30 @@ export class DeadlineFunnelClient {
     amount: number;
     currency: string;
     firstName?: string;
-  }): Promise<{
-    success: boolean;
-    email: string;
-    campaignId: string;
-    amount: number;
-    currency: string;
-  }> {
-    await this.axios.post(`/campaigns/${params.campaignId}/sales`, {
-      email: params.email,
-      amount: params.amount,
-      currency: params.currency,
-      first_name: params.firstName
-    });
+  }) {
+    requireValue(params.campaignId, 'Campaign ID');
+    requireEmail(params.email);
+    if (!Number.isFinite(params.amount) || params.amount < 0) {
+      throw createApiServiceError('Purchase amount must be a finite, non-negative number.', {
+        reason: 'deadline_funnel_invalid_input'
+      });
+    }
+    if (!/^[A-Za-z]{3}$/.test(params.currency)) {
+      throw createApiServiceError('Provide a three-letter ISO 4217 currency code.', {
+        reason: 'deadline_funnel_invalid_input'
+      });
+    }
+    await this.request(
+      'track purchase',
+      'POST',
+      `/campaigns/${encodeURIComponent(params.campaignId)}/sales`,
+      pickDefined({
+        email: params.email,
+        amount: params.amount,
+        currency: params.currency,
+        first_name: params.firstName
+      })
+    );
     return {
       success: true,
       email: params.email,
@@ -107,94 +237,58 @@ export class DeadlineFunnelClient {
     };
   }
 
-  // ---- Custom Events ----
-
-  async createCustomEvent(params: {
-    eventName: string;
-    email: string;
-    name?: string;
-  }): Promise<{ success: boolean; eventName: string; email: string }> {
-    await this.axios.post('/custom-events', {
-      event_name: params.eventName,
-      email: params.email,
-      name: params.name
-    });
-    return {
-      success: true,
-      eventName: params.eventName,
-      email: params.email
-    };
-  }
-
-  async listCustomEvents(params?: {
-    since?: string;
-    page?: number;
-    perPage?: number;
-  }): Promise<CustomEvent[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.since) queryParams.since = params.since;
-    if (params?.page !== undefined) queryParams.page = String(params.page);
-    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
-
-    let response = await this.axios.get('/custom-events', { params: queryParams });
-    let data = response.data;
-    let events = Array.isArray(data)
-      ? data
-      : data?.events || data?.custom_events || data?.data || [];
-    return events.map((e: any) => ({
-      eventId: String(e.id || e.event_id || ''),
-      name: String(e.name || e.event_name || ''),
-      email: String(e.email || ''),
-      createdAt: String(e.created_at || e.createdAt || '')
-    }));
-  }
-
-  // ---- ConvertHub Portals ----
-
-  async listPortals(params?: {
-    since?: string;
-    page?: number;
-    perPage?: number;
-  }): Promise<Portal[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.since) queryParams.since = params.since;
-    if (params?.page !== undefined) queryParams.page = String(params.page);
-    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
-
-    let response = await this.axios.get('/portals', { params: queryParams });
-    let data = response.data;
-    let portals = Array.isArray(data) ? data : data?.portals || data?.data || [];
-    return portals.map((p: any) => ({
-      portalId: String(p.id || p.portal_id || ''),
-      name: String(p.name || p.title || ''),
-      createdAt: String(p.created_at || p.createdAt || '')
-    }));
-  }
-
-  // ---- ConvertHub Form Submissions ----
-
-  async listFormSubmissions(params?: {
-    portalId?: string;
-    since?: string;
-    page?: number;
-    perPage?: number;
-  }): Promise<FormSubmission[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.since) queryParams.since = params.since;
-    if (params?.page !== undefined) queryParams.page = String(params.page);
-    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
-
-    let path = params?.portalId ? `/portals/${params.portalId}/submissions` : '/submissions';
-
-    let response = await this.axios.get(path, { params: queryParams });
-    let data = response.data;
-    let submissions = Array.isArray(data) ? data : data?.submissions || data?.data || [];
-    return submissions.map((s: any) => ({
-      submissionId: String(s.id || s.submission_id || ''),
-      portalId: String(s.portal_id || s.portalId || ''),
-      email: String(s.email || ''),
-      name: String(s.name || s.first_name || ''),
-      createdAt: String(s.created_at || s.createdAt || '')
-    }));
+  async createCustomEvent(params: { eventName: string; email: string; name?: string }) {
+    requireValue(params.eventName, 'Event name');
+    requireEmail(params.email);
+    await this.request(
+      'create custom event',
+      'POST',
+      '/custom-events',
+      pickDefined({ event_name: params.eventName, email: params.email, name: params.name })
+    );
+    return { success: true, eventName: params.eventName, email: params.email };
   }
 }
+
+export let startDeadlineWebhook = async (params: { webhookUrl: string; email: string }) => {
+  requireEmail(params.email);
+  let url: URL;
+  try {
+    url = new URL(params.webhookUrl);
+  } catch {
+    throw createApiServiceError(
+      'Provide the custom webhook URL from your campaign Emails tab.',
+      {
+        reason: 'deadline_funnel_invalid_input'
+      }
+    );
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname !== 'code.deadlinefunnel.com' ||
+    url.port ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !/^\/listener\/\d+\/custom\/[A-Za-z0-9_-]+$/.test(url.pathname)
+  ) {
+    throw createApiServiceError(
+      'Use the HTTPS custom webhook URL from Emails → Custom API in your Deadline Funnel campaign.',
+      { reason: 'deadline_funnel_invalid_input' }
+    );
+  }
+  let secret = url.pathname.split('/').at(-1)!;
+  let http = createAxios({
+    timeout: 30000,
+    maxRedirects: 0,
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  let data = await requestAxiosData<unknown>(
+    'submit deadline webhook',
+    () => http.post(url.toString(), new URLSearchParams({ email: params.email }).toString()),
+    (error, action) => apiError(error, action, [params.webhookUrl, secret])
+  );
+  assertSuccess(data, 'submit deadline webhook', [params.webhookUrl, secret]);
+  return { accepted: true, email: params.email };
+};

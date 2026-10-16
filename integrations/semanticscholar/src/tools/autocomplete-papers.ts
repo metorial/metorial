@@ -14,7 +14,7 @@ export let autocompletePapers = SlateTool.create(spec, {
   name: 'Autocomplete Papers',
   key: 'autocomplete_papers',
   description: `Get autocomplete suggestions for a partial paper query. Useful for building search interfaces or quickly finding papers by partial title.`,
-  constraints: ['Query is limited to 100 characters.'],
+  constraints: ['Queries longer than 100 characters are truncated by the provider.'],
   tags: {
     readOnly: true
   }
@@ -33,7 +33,7 @@ export let autocompletePapers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.autocompletePapers(ctx.input.query);
-    let suggestions = result.matches || result.data || [];
+    let suggestions = result.matches;
 
     return {
       output: { suggestions },

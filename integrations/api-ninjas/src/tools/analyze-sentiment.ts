@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,7 @@ export let analyzeSentiment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       sentiment: z
         .string()
         .describe(
@@ -31,11 +32,15 @@ export let analyzeSentiment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.text.trim() || ctx.input.text.length > 2000) {
+      throw createApiServiceError('Provide text between 1 and 2000 characters.');
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getSentiment(ctx.input.text);
 
     return {
       output: {
+        raw: result,
         sentiment: result.sentiment,
         score: result.score,
         text: result.text

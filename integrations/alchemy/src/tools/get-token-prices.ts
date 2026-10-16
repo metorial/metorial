@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getTokenPrices = SlateTool.create(spec, {
   name: 'Get Token Prices',
   key: 'get_token_prices',
-  description: `Retrieve current prices for tokens by their contract addresses and networks. Returns prices in USD and other currencies.
+  description: `Retrieve current prices for tokens by their contract addresses and networks. Returns current USD prices when available.
 Use this to look up real-time token prices, compare token values, or build price feeds.`,
   tags: {
     readOnly: true
@@ -31,6 +31,7 @@ Use this to look up real-time token prices, compare token values, or build price
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Provider price response'),
       prices: z
         .array(
           z.object({
@@ -58,17 +59,17 @@ Use this to look up real-time token prices, compare token values, or build price
       }))
     });
 
-    let prices = (result.data || []).map((item: any) => ({
+    let prices = result.data.map(item => ({
       network: item.network,
       address: item.address,
       currency: item.prices?.[0]?.currency,
       price: item.prices?.[0]?.value,
       lastUpdated: item.prices?.[0]?.lastUpdatedAt,
-      error: item.error || undefined
+      error: item.error ?? undefined
     }));
 
     return {
-      output: { prices },
+      output: { prices, raw: result },
       message: `Retrieved prices for **${prices.length}** token(s).${prices
         .filter((p: any) => p.price)
         .map((p: any) => ` ${p.address.slice(0, 8)}...: $${p.price}`)

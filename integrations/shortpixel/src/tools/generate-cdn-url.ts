@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShortPixelClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,20 @@ The generated URL can be used directly in HTML, CSS, or any context where an ima
     })
   )
   .handleInvocation(async ctx => {
+    let originalUrl: URL;
+    try {
+      originalUrl = new URL(ctx.input.originalUrl);
+    } catch {
+      throw createApiServiceError('Provide a valid HTTP or HTTPS original image URL.');
+    }
+    if (!['http:', 'https:'].includes(originalUrl.protocol)) {
+      throw createApiServiceError('The original image URL must use HTTP or HTTPS.');
+    }
+    for (let dimension of [ctx.input.width, ctx.input.height]) {
+      if (dimension !== undefined && (!Number.isFinite(dimension) || dimension <= 0)) {
+        throw createApiServiceError('Image dimensions must be positive pixel values.');
+      }
+    }
     let client = new ShortPixelClient({ token: ctx.auth.token });
 
     let cdnUrl = client.buildCdnUrl({

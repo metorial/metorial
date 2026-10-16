@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getReplyContent } from '../lib/components';
 import { spec } from '../spec';
 
 export let replyToThread = SlateTool.create(spec, {
   name: 'Reply to Thread',
   key: 'reply_to_thread',
-  description: `Send a reply to an existing thread. The reply is composed of UI components (text, spacers, link buttons). Optionally impersonate a customer when replying.`,
+  description: `Send a reply to an existing thread. Text, spacer, and link components are converted to text and Markdown for the thread's channel. Optionally impersonate a customer when replying.`,
   instructions: [
     'At minimum, include at least one componentText in the components array.',
     'Use impersonation to reply as a customer (e.g., when building a support portal).'
@@ -92,7 +93,7 @@ export let replyToThread = SlateTool.create(spec, {
 
     let input: any = {
       threadId: ctx.input.threadId,
-      components: ctx.input.components
+      ...getReplyContent(ctx.input.components)
     };
 
     if (ctx.input.impersonation) {

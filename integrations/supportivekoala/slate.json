@@ -9,8 +9,7 @@
     "list available templates",
     "retrieve generated images",
     "export in multiple formats",
-    "populate dynamic template parameters",
-    "browse public templates"
+    "populate dynamic template parameters"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/supportivekoala.png"
 }

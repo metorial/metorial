@@ -1,29 +1,86 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
-let api = createAxios({
-  baseURL: 'https://www.eventbriteapi.com/v3'
-});
+export let eventbriteApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Eventbrite',
+    reason: 'eventbrite_api_error',
+    detailKeys: ['error_description', 'error', 'message', 'detail'],
+    nestedKeys: ['errors', 'arguments'],
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    extractUpstreamCode: (_error, response) =>
+      isApiErrorRecord(response?.data) && typeof response.data.error === 'string'
+        ? response.data.error
+        : undefined
+  });
+
+let assertOperation = (result: unknown, field: string) => {
+  if (
+    result === true ||
+    (isApiErrorRecord(result) && (result[field] === true || result.success === true))
+  )
+    return result;
+  throw createApiServiceError(
+    `Eventbrite did not confirm ${field}. Retrieve the resource to check its current state before trying again.`
+  );
+};
+
+let jsonCurrency = (cost?: string) => {
+  if (cost === undefined) return undefined;
+  let match = /^([A-Z]{3}),(\d+)$/.exec(cost);
+  if (!match || !Number.isSafeInteger(Number(match[2]))) {
+    throw createApiServiceError(
+      'Cost must use a currency code and an integer minor-unit amount, for example USD,1000.'
+    );
+  }
+  return { currency: match[1], value: Number(match[2]) };
+};
 
 export class Client {
-  private headers: Record<string, string>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      Authorization: `Bearer ${config.token}`
-    };
+    let token = config.token.trim();
+    if (!token) throw createApiServiceError('An Eventbrite access token is required.');
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://www.eventbriteapi.com/v3',
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 30_000,
+      errorAdapter: eventbriteApiError
+    });
+    this.api.interceptors.response.use(response => {
+      if (
+        isApiErrorRecord(response.data) &&
+        (response.data.error || response.data.success === false)
+      ) {
+        throw eventbriteApiError({
+          response: {
+            status: response.data.status_code ?? 400,
+            data: {
+              error_description: 'Eventbrite did not complete the requested operation.',
+              ...response.data
+            }
+          }
+        });
+      }
+      return response;
+    });
   }
 
   // ─── Users ──────────────────────────────────────────────
 
   async getMe() {
-    let response = await api.get('/users/me/', { headers: this.headers });
+    let response = await this.api.get('/users/me/', {});
     return response.data;
   }
 
-  async getMyOrganizations(params?: { page?: number }) {
-    let response = await api.get('/users/me/organizations/', {
-      headers: this.headers,
-      params
+  async getMyOrganizations(params?: { page?: number; continuation?: string }) {
+    let response = await this.api.get('/users/me/organizations/', {
+      params: params?.continuation ? { ...params, page: undefined } : params
     });
     return response.data;
   }
@@ -31,7 +88,7 @@ export class Client {
   // ─── Events ─────────────────────────────────────────────
 
   async getEvent(eventId: string) {
-    let response = await api.get(`/events/${eventId}/`, { headers: this.headers });
+    let response = await this.api.get(`/events/${encodeURIComponent(eventId)}/`);
     return response.data;
   }
 
@@ -40,15 +97,21 @@ export class Client {
     params?: {
       status?: string;
       order_by?: string;
+      name_filter?: string;
+      venue_filter?: string;
+      organizer_filter?: string;
       page?: number;
+      continuation?: string;
       page_size?: number;
       time_filter?: string;
     }
   ) {
-    let response = await api.get(`/organizations/${organizationId}/events/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/organizations/${encodeURIComponent(organizationId)}/events/`,
+      {
+        params: params?.continuation ? { ...params, page: undefined } : params
+      }
+    );
     return response.data;
   }
 
@@ -70,12 +133,9 @@ export class Client {
       format_id?: string;
     }
   ) {
-    let response = await api.post(
-      `/organizations/${organizationId}/events/`,
-      { event },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/organizations/${encodeURIComponent(organizationId)}/events/`,
+      { event }
     );
     return response.data;
   }
@@ -98,51 +158,39 @@ export class Client {
       format_id?: string;
     }
   ) {
-    let response = await api.post(
-      `/events/${eventId}/`,
-      { event },
-      {
-        headers: this.headers
-      }
-    );
+    let response = await this.api.post(`/events/${encodeURIComponent(eventId)}/`, { event });
     return response.data;
   }
 
   async publishEvent(eventId: string) {
-    let response = await api.post(
-      `/events/${eventId}/publish/`,
-      {},
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    let response = await this.api.post(`/events/${encodeURIComponent(eventId)}/publish/`, {});
+    return assertOperation(response.data, 'published');
   }
 
   async unpublishEvent(eventId: string) {
-    let response = await api.post(
-      `/events/${eventId}/unpublish/`,
-      {},
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/events/${encodeURIComponent(eventId)}/unpublish/`,
+      {}
     );
-    return response.data;
+    return assertOperation(response.data, 'unpublished');
   }
 
   // ─── Ticket Classes ─────────────────────────────────────
 
-  async listTicketClasses(eventId: string) {
-    let response = await api.get(`/events/${eventId}/ticket_classes/`, {
-      headers: this.headers
-    });
+  async listTicketClasses(eventId: string, params?: { page?: number; continuation?: string }) {
+    let response = await this.api.get(
+      `/events/${encodeURIComponent(eventId)}/ticket_classes/`,
+      {
+        params: params?.continuation ? { ...params, page: undefined } : params
+      }
+    );
     return response.data;
   }
 
   async getTicketClass(eventId: string, ticketClassId: string) {
-    let response = await api.get(`/events/${eventId}/ticket_classes/${ticketClassId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(
+      `/events/${encodeURIComponent(eventId)}/ticket_classes/${encodeURIComponent(ticketClassId)}/`
+    );
     return response.data;
   }
 
@@ -160,14 +208,12 @@ export class Client {
       sales_start?: string;
       sales_end?: string;
       hidden?: boolean;
+      inventory_tier_id?: string;
     }
   ) {
-    let response = await api.post(
-      `/events/${eventId}/ticket_classes/`,
-      { ticket_class: ticketClass },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/events/${encodeURIComponent(eventId)}/ticket_classes/`,
+      { ticket_class: { ...ticketClass, cost: jsonCurrency(ticketClass.cost) } }
     );
     return response.data;
   }
@@ -187,23 +233,21 @@ export class Client {
       sales_start?: string;
       sales_end?: string;
       hidden?: boolean;
+      inventory_tier_id?: string;
     }
   ) {
-    let response = await api.post(
-      `/events/${eventId}/ticket_classes/${ticketClassId}/`,
-      { ticket_class: ticketClass },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/events/${encodeURIComponent(eventId)}/ticket_classes/${encodeURIComponent(ticketClassId)}/`,
+      { ticket_class: { ...ticketClass, cost: jsonCurrency(ticketClass.cost) } }
     );
     return response.data;
   }
 
   async deleteTicketClass(eventId: string, ticketClassId: string) {
-    let response = await api.delete(`/events/${eventId}/ticket_classes/${ticketClassId}/`, {
-      headers: this.headers
-    });
-    return response.data;
+    let response = await this.api.delete(
+      `/events/${encodeURIComponent(eventId)}/ticket_classes/${encodeURIComponent(ticketClassId)}/`
+    );
+    return assertOperation(response.data, 'deleted');
   }
 
   // ─── Orders ─────────────────────────────────────────────
@@ -214,11 +258,11 @@ export class Client {
       status?: string;
       changed_since?: string;
       page?: number;
+      continuation?: string;
     }
   ) {
-    let response = await api.get(`/events/${eventId}/orders/`, {
-      headers: this.headers,
-      params
+    let response = await this.api.get(`/events/${encodeURIComponent(eventId)}/orders/`, {
+      params: params?.continuation ? { ...params, page: undefined } : params
     });
     return response.data;
   }
@@ -229,19 +273,20 @@ export class Client {
       status?: string;
       changed_since?: string;
       page?: number;
+      continuation?: string;
     }
   ) {
-    let response = await api.get(`/organizations/${organizationId}/orders/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/organizations/${encodeURIComponent(organizationId)}/orders/`,
+      {
+        params: params?.continuation ? { ...params, page: undefined } : params
+      }
+    );
     return response.data;
   }
 
   async getOrder(orderId: string) {
-    let response = await api.get(`/orders/${orderId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(`/orders/${encodeURIComponent(orderId)}/`);
     return response.data;
   }
 
@@ -250,39 +295,44 @@ export class Client {
   async listEventAttendees(
     eventId: string,
     params?: {
+      last_item_seen?: string;
+      attendee_ids?: string;
       status?: string;
       changed_since?: string;
       page?: number;
+      continuation?: string;
     }
   ) {
-    let response = await api.get(`/events/${eventId}/attendees/`, {
-      headers: this.headers,
-      params
+    let response = await this.api.get(`/events/${encodeURIComponent(eventId)}/attendees/`, {
+      params: params?.continuation ? { ...params, page: undefined } : params
     });
     return response.data;
   }
 
   async getAttendee(eventId: string, attendeeId: string) {
-    let response = await api.get(`/events/${eventId}/attendees/${attendeeId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(
+      `/events/${encodeURIComponent(eventId)}/attendees/${encodeURIComponent(attendeeId)}/`
+    );
     return response.data;
   }
 
   // ─── Venues ─────────────────────────────────────────────
 
   async getVenue(venueId: string) {
-    let response = await api.get(`/venues/${venueId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(`/venues/${encodeURIComponent(venueId)}/`);
     return response.data;
   }
 
-  async listOrganizationVenues(organizationId: string, params?: { page?: number }) {
-    let response = await api.get(`/organizations/${organizationId}/venues/`, {
-      headers: this.headers,
-      params
-    });
+  async listOrganizationVenues(
+    organizationId: string,
+    params?: { page?: number; continuation?: string }
+  ) {
+    let response = await this.api.get(
+      `/organizations/${encodeURIComponent(organizationId)}/venues/`,
+      {
+        params: params?.continuation ? { ...params, page: undefined } : params
+      }
+    );
     return response.data;
   }
 
@@ -301,12 +351,9 @@ export class Client {
       capacity?: number;
     }
   ) {
-    let response = await api.post(
-      `/organizations/${organizationId}/venues/`,
-      { venue },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/organizations/${encodeURIComponent(organizationId)}/venues/`,
+      { venue }
     );
     return response.data;
   }
@@ -314,9 +361,7 @@ export class Client {
   // ─── Organizers ─────────────────────────────────────────
 
   async getOrganizer(organizerId: string) {
-    let response = await api.get(`/organizers/${organizerId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(`/organizers/${encodeURIComponent(organizerId)}/`);
     return response.data;
   }
 
@@ -329,12 +374,9 @@ export class Client {
       website?: string;
     }
   ) {
-    let response = await api.post(
-      `/organizations/${organizationId}/organizers/`,
-      { organizer },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/organizations/${encodeURIComponent(organizationId)}/organizers/`,
+      { organizer }
     );
     return response.data;
   }
@@ -345,14 +387,21 @@ export class Client {
     organizationId: string,
     params?: {
       scope?: string;
+      event_id?: string;
+      code?: string;
+      code_filter?: string;
+      type?: string;
       page?: number;
+      continuation?: string;
       page_size?: number;
     }
   ) {
-    let response = await api.get(`/organizations/${organizationId}/discounts/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.api.get(
+      `/organizations/${encodeURIComponent(organizationId)}/discounts/`,
+      {
+        params: params?.continuation ? { ...params, page: undefined } : params
+      }
+    );
     return response.data;
   }
 
@@ -370,20 +419,15 @@ export class Client {
       end_date?: string;
     }
   ) {
-    let response = await api.post(
-      `/organizations/${organizationId}/discounts/`,
-      { discount },
-      {
-        headers: this.headers
-      }
+    let response = await this.api.post(
+      `/organizations/${encodeURIComponent(organizationId)}/discounts/`,
+      { discount }
     );
     return response.data;
   }
 
   async getDiscount(discountId: string) {
-    let response = await api.get(`/discounts/${discountId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(`/discounts/${encodeURIComponent(discountId)}/`);
     return response.data;
   }
 
@@ -397,22 +441,52 @@ export class Client {
       quantity_available?: number;
       start_date?: string;
       end_date?: string;
+      event_id?: string;
+      ticket_class_ids?: string[];
     }
   ) {
-    let response = await api.post(
-      `/discounts/${discountId}/`,
-      { discount },
-      {
-        headers: this.headers
-      }
-    );
+    let response = await this.api.post(`/discounts/${encodeURIComponent(discountId)}/`, {
+      discount
+    });
     return response.data;
   }
 
   async deleteDiscount(discountId: string) {
-    let response = await api.delete(`/discounts/${discountId}/`, {
-      headers: this.headers
-    });
+    let response = await this.api.delete(`/discounts/${encodeURIComponent(discountId)}/`);
+    return assertOperation(response.data, 'deleted');
+  }
+
+  async getEventDescription(eventId: string) {
+    let response = await this.api.get(`/events/${encodeURIComponent(eventId)}/description/`);
+    return response.data;
+  }
+
+  async cancelEvent(eventId: string) {
+    let response = await this.api.post(`/events/${encodeURIComponent(eventId)}/cancel/`, {});
+    return assertOperation(response.data, 'canceled');
+  }
+
+  async deleteEvent(eventId: string) {
+    let response = await this.api.delete(`/events/${encodeURIComponent(eventId)}/`);
+    return assertOperation(response.data, 'deleted');
+  }
+
+  async updateVenue(
+    venueId: string,
+    venue: {
+      name?: string;
+      address?: {
+        address_1?: string;
+        address_2?: string;
+        city?: string;
+        region?: string;
+        postal_code?: string;
+        country?: string;
+      };
+      capacity?: number;
+    }
+  ) {
+    let response = await this.api.post(`/venues/${encodeURIComponent(venueId)}/`, { venue });
     return response.data;
   }
 
@@ -426,23 +500,22 @@ export class Client {
       event_id?: string;
     }
   ) {
-    let response = await api.post(`/organizations/${organizationId}/webhooks/`, webhook, {
-      headers: this.headers
-    });
+    let response = await this.api.post(
+      `/organizations/${encodeURIComponent(organizationId)}/webhooks/`,
+      webhook
+    );
     return response.data;
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await api.delete(`/webhooks/${webhookId}/`, {
-      headers: this.headers
-    });
-    return response.data;
+    let response = await this.api.delete(`/webhooks/${encodeURIComponent(webhookId)}/`);
+    return assertOperation(response.data, 'deleted');
   }
 
   async listWebhooks(organizationId: string) {
-    let response = await api.get(`/organizations/${organizationId}/webhooks/`, {
-      headers: this.headers
-    });
+    let response = await this.api.get(
+      `/organizations/${encodeURIComponent(organizationId)}/webhooks/`
+    );
     return response.data;
   }
 }

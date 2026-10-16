@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ToneDenClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,8 @@ let attachmentOutputSchema = z.object({
   message: z.string().optional().describe('Landing page message text'),
   isPrivate: z.boolean().optional().describe('Whether the attachment is private'),
   isHidden: z.boolean().optional().describe('Whether the attachment is hidden'),
-  actions: z.number().optional().describe('Number of actions/entries')
+  actions: z.number().optional().describe('Number of actions/entries'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let manageAttachment = SlateTool.create(spec, {
@@ -81,11 +82,13 @@ export let manageAttachment = SlateTool.create(spec, {
       message: a.message,
       isPrivate: a.is_private,
       isHidden: a.is_hidden,
-      actions: a.actions
+      actions: a.actions,
+      raw: a
     });
 
     if (action === 'get') {
-      if (!attachmentId) throw new Error('attachmentId is required for get action');
+      if (!attachmentId)
+        throw createApiServiceError('attachmentId is required for get action');
       let attachment = await client.getAttachment(attachmentId);
       return {
         output: { attachment: mapAttachment(attachment) },
@@ -94,7 +97,8 @@ export let manageAttachment = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!attachmentId) throw new Error('attachmentId is required for delete action');
+      if (!attachmentId)
+        throw createApiServiceError('attachmentId is required for delete action');
       await client.deleteAttachment(attachmentId);
       return {
         output: { deleted: true },
@@ -126,7 +130,8 @@ export let manageAttachment = SlateTool.create(spec, {
     }
 
     // update
-    if (!attachmentId) throw new Error('attachmentId is required for update action');
+    if (!attachmentId)
+      throw createApiServiceError('attachmentId is required for update action');
     let attachment = await client.updateAttachment(attachmentId, data);
     return {
       output: { attachment: mapAttachment(attachment) },

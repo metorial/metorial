@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList, validatePagination } from '../lib/response';
 import { spec } from '../spec';
 
 export let listCampaigns = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let listCampaigns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       campaigns: z.array(
         z.object({
           campaignId: z.string(),
@@ -32,6 +34,7 @@ export let listCampaigns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination({ page: ctx.input.page, perPage: ctx.input.perPage });
     let client = new GistClient({ token: ctx.auth.token });
 
     let data = await client.listCampaigns({
@@ -39,18 +42,18 @@ export let listCampaigns = SlateTool.create(spec, {
       per_page: ctx.input.perPage
     });
 
-    let campaigns = (data.campaigns || []).map((c: any) => ({
-      campaignId: String(c.id),
+    let campaigns = responseList(data.campaigns).map((c: any) => ({
+      campaignId: requiredId(c.id),
       name: c.name,
       status: c.status,
       openRate: c.open_rate,
       clickRate: c.click_rate,
       subscriberCount: c.subscriber_count,
-      createdAt: c.created_at ? String(c.created_at) : undefined
+      createdAt: c.created_at !== undefined ? String(c.created_at) : undefined
     }));
 
     return {
-      output: { campaigns, pages: data.pages },
+      output: { rawResponse: client.responses, campaigns, pages: data.pages },
       message: `Found **${campaigns.length}** campaigns.`
     };
   })

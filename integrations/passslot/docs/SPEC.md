@@ -1,94 +1,52 @@
-Now let me get the events documentation:# Slates Specification for Passslot
-
-## Overview
-
-PassSlot is a cloud service for creating and managing mobile wallet passes (coupons, loyalty cards, event tickets, boarding passes, etc.) for Apple Wallet, Android Pay, and HTML5. It helps users build their own mobile wallet using Apple Wallet (Passbook), Android Pay (Google Wallet) and HTML5 to distribute mobile passes to all major platforms. It supports all Apple Wallet pass styles: Coupons, Store Cards, Event Tickets, Membership / Generic Cards and Boarding Passes.
+# PassSlot integration
 
 ## Authentication
 
-PassSlot uses App Key-based authentication. You can create multiple app keys with different access permissions to your pass templates and/or pass type IDs. The app key can be sent as the username in HTTP Basic Authorization (with an empty password) or directly in the Authorization header of your request.
+Use a PassSlot App Key from the dashboard. Requests use HTTPS at `https://api.passslot.com/v1`, with the key as the HTTP Basic username and an empty password. App Keys can be restricted to templates or pass type IDs; scanner operations require full access. Wallet file downloads use the documented alternative of placing the App Key directly in the Authorization header. No OAuth token refresh or connection configuration is required.
 
-- **Base URL:** `https://api.passslot.com/v1`
-- **Method:** HTTP Basic Auth with the App Key as the username and an empty password
-- Example: `curl -u <APP-KEY>: https://api.passslot.com/v1`
+## Supported tools
 
-All communication with the API must be encrypted using HTTPS. You should verify the SSL certificate on the client side to prevent key theft.
+| Tool | Behavior |
+| --- | --- |
+| `list_templates` | List template metadata, placeholders, and pass descriptions. |
+| `get_template` | Read a template and its distribution link. |
+| `create_template` | Create a template using a pass type identifier and pass description. |
+| `update_template` | Update a template description, name, pass type, actions, branding, restrictions, or payment settings. |
+| `delete_template` | Delete a template. |
+| `generate_pass` | Generate a pass by template ID or name, returning a downloadable `.pkpass` file and distribution link. Template ID takes precedence if both are supplied. |
+| `download_pass` | Download an existing signed `.pkpass` file and retrieve its distribution link. |
+| `list_passes` | List all passes or filter by pass type identifier. |
+| `get_pass` | Read distribution link, placeholder values, status, and full pass JSON. Provider failures are reported. |
+| `update_pass` | Update placeholder values or status, or explicitly send a push notification. |
+| `delete_pass` | Delete a pass. |
+| `email_pass` | Send a pass to a recipient email address. |
+| `list_pass_types` | Discover pass type identifiers and certificate metadata. |
+| `get_template_settings` | Read template actions or distribution restrictions before editing them. |
+| `list_scanners` | List scanner IDs, types, and template permissions. |
+| `get_scanner` | Read full scanner configuration, including authorization details or PIN. |
+| `manage_scanner` | Create, update, or delete a scanner. |
 
-App keys are created and managed from the PassSlot dashboard.
+## Behavior notes
 
-## Features
+- Use `list_templates`, `list_passes`, `list_pass_types`, and `list_scanners` to discover resource identifiers. Lists return complete provider arrays; the documented endpoints expose no pagination parameters.
+- Template updates send a complete template object, preserving the current name, pass type, and description when those fields are omitted. Description objects replace the description; include every description field that should remain.
+- Actions and restrictions use their dedicated endpoints. Restrictions replace the previous restriction set: omitted restriction properties disable those restrictions, and an empty object clears them.
+- Branding settings accept text and colors. Footer image upload and removal use a separate provider API and are not exposed here. Branding may require an account upgrade.
+- Payment settings require the Professional plan. Provider values are case sensitive: `PayPalNVP`, `Stripe`, or `PAYMILL`. PayPalNVP requires `username`, `password`, and `signature`; Stripe requires `publishableKey` and `secretKey`; PAYMILL requires `publicKey` and `privateKey` in `providerSettings`.
+- Pass status values are `valid`, `invalid`, `redeemed`, `unpaid`, `locked`, and `incomplete`. Status changes alone do not send push notifications. Value updates normally send notifications automatically; request manual push only when needed.
+- Scanner types are `PassVerifier` or `Browser` and can only be set during creation. Scanner updates support name, fullAccess, and allowedTemplates. Supply allowedTemplates whenever explicitly setting fullAccess to false.
+- Multi-section updates execute sequentially. A later provider error can occur after earlier sections were applied; read the current state before retrying.
 
-### Pass Template Management
+## Scope
 
-Templates define the entire appearance and configuration of a pass, including style, colors, images, text fields, barcode settings, locations, verification/redemption settings, branding, and payment integration. Templates allow you to manage thousands of individual passes without updating them one by one — all changes to a template are applied to all generated individual passes of that template.
+Pass-specific images, template image upload/removal, custom pass pricing, branding footer images, and webhook subscriptions are not exposed as tools. No suitable account/profile identity endpoint is listed in the official REST resources.
 
-- Create, read, update, and delete pass templates.
-- Configure template images (logo, icon, strip, etc.) at various resolutions.
-- Configure template actions (verification/redemption behavior).
-- Configure custom branding settings (e.g., footer images).
-- Set distribution restrictions on templates.
-- Configure payment settings with built-in support for PayPal, Stripe, or PAYMILL.
+## Official references
 
-### Pass Generation and Management
-
-The system generates an individual, unique pass based on a chosen template for every user that requests it. With the placeholder system, every pass can be customized and personalized.
-
-- Generate passes from templates by ID or by template name, with custom placeholder values and optional images.
-- Download passes as `.pkpass` files or retrieve their JSON representation.
-- Get short distribution URLs for passes.
-- Send passes to users via email.
-- Delete passes.
-
-### Pass Updates
-
-Passes can be updated after they were generated.
-
-- Update placeholder values on individual passes (e.g., balance, name, status).
-- Update or replace pass-specific images.
-- Update pass status (e.g., void/invalidate a pass).
-- Set custom pricing per pass.
-- By default, PassSlot automatically sends push notifications to Apple Wallet when you change a pass value. Manual push triggers are also available.
-
-### Pass Scanning and Redemption
-
-Together with the free Pass Verifier app you can scan, validate, redeem passes or change fields of the passes.
-
-- Create and manage scanner configurations via the API.
-- Scanners support actions like scan, redeem, reactivate, and field update.
-
-### Pass Type ID Management
-
-- List and view available Apple Wallet pass type identifiers associated with your account.
-
-## Events
-
-PassSlot supports webhooks. You register a URL that PassSlot will POST to anytime an event happens to your Wallet passes. When the event occurs, PassSlot creates an event object containing all relevant information and sends it as an HTTP POST request to your registered URLs.
-
-Webhooks can be configured in the webhooks section of the PassSlot dashboard, where you can add multiple receiving URLs. Events are digitally signed with HMAC-SHA1 using a shared secret, with the signature included in the `X-Passslot-Signature` HTTP header.
-
-### Pass Events
-
-Events related to pass lifecycle:
-
-- **pass.created** — A pass was generated.
-- **pass.updated** — A pass was updated.
-- **pass.downloaded** — A pass was downloaded.
-
-Data includes the pass serial number, pass type identifier, template ID, and distribution URL.
-
-### Registration Events
-
-Events related to device registrations (Apple Wallet installations):
-
-- **registration.created** — A device registered to receive push notifications for a pass (pass added to Apple Wallet).
-- **registration.deleted** — A device unregistered (pass removed from Apple Wallet or notifications disabled).
-
-Data includes the device library identifier, pass serial number, pass type identifier, and template ID.
-
-### Scan Events
-
-Events related to pass scanning and redemption:
-
-- **scan.performed** — A pass was scanned using the PassSlot redemption system.
-
-Data includes the scanner ID, pass identifiers, the action performed (scan, redeem, reactivate, or update), timestamp, authorization status, and optional field update details.
+- [Authentication and error codes](https://www.passslot.com/developer/api/start)
+- [REST resources](https://www.passslot.com/developer/api/resources)
+- [Template updates](https://www.passslot.com/developer/api/resources/updateTemplate)
+- [Pass generation](https://www.passslot.com/developer/api/resources/createPassFromTemplate)
+- [Pass downloads](https://www.passslot.com/developer/api/resources/showPass)
+- [Pass status updates](https://www.passslot.com/developer/api/resources/updatePassStatus)
+- [Scanner updates](https://www.passslot.com/developer/api/resources/updateScanner)

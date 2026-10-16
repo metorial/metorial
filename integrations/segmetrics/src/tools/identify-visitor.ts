@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrackingClient } from '../lib/client';
+import { resolveReportingConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let identifyVisitor = SlateTool.create(spec, {
   name: 'Identify Visitor',
   key: 'identify_visitor',
-  description: `Identifies a website visitor by connecting a SegMetrics session UID to a contact email address. This is the server-side equivalent of the JavaScript \`identify\` command.
+  description: `Identifies a website visitor by connecting a SegMetrics session UID to a contact email address or external contact ID. This is the server-side equivalent of the JavaScript \`identify\` command.
 Useful for identifying contacts from webhooks or backend systems without the JavaScript snippet.
 The session UID is available in the browser via \`_segs.data.uid\`.`,
   tags: {
@@ -18,8 +19,18 @@ The session UID is available in the browser via \`_segs.data.uid\`.`,
     z.object({
       segUid: z
         .string()
-        .describe('The SegMetrics session UID (available in the browser via _segs.data.uid).'),
-      email: z.string().describe('Email address to associate with the session.')
+        .optional()
+        .describe(
+          'Optional SegMetrics session UID (available via _segs.data.uid). Omit to derive it from the email or contact ID.'
+        ),
+      email: z
+        .string()
+        .optional()
+        .describe('Email address to associate. Required unless contactId is supplied.'),
+      contactId: z
+        .string()
+        .optional()
+        .describe('External contact ID to associate. Required unless email is supplied.')
     })
   )
   .output(
@@ -29,13 +40,12 @@ The session UID is available in the browser via \`_segs.data.uid\`.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrackingClient({
-      accountId: ctx.config.accountId
-    });
+    let client = new TrackingClient(resolveReportingConfig(ctx));
 
     let response = await client.identifyVisitor({
       segUid: ctx.input.segUid,
-      email: ctx.input.email
+      email: ctx.input.email,
+      contactId: ctx.input.contactId
     });
 
     return {
@@ -43,7 +53,7 @@ The session UID is available in the browser via \`_segs.data.uid\`.`,
         success: true,
         response
       },
-      message: `Visitor session **${ctx.input.segUid}** has been identified as **${ctx.input.email}**.`
+      message: `Visitor ${ctx.input.segUid ? `session **${ctx.input.segUid}** ` : ''}has been identified as **${ctx.input.email || ctx.input.contactId}**.`
     };
   })
   .build();

@@ -32,7 +32,7 @@ export let createJobTitle = SlateTool.create(spec, {
     return {
       output: {
         jobTitleId: response.data.id,
-        name: ctx.input.name,
+        name: response.data.name,
         rawResponse: response
       },
       message: `Successfully created job title **${ctx.input.name}**.`

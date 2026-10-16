@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { bookingSchema, mapBooking } from '../lib/booking';
 import { Client } from '../lib/client';
+import { requireHeadoutId } from '../lib/response';
 import { spec } from '../spec';
 
 let customerInputFieldSchema = z.object({
@@ -26,15 +28,16 @@ export let createBooking = SlateTool.create(spec, {
   name: 'Create Booking',
   key: 'create_booking',
   description: `Create a new booking on Headout using a two-step flow. Step 1 creates the booking in UNCAPTURED state to confirm availability. Step 2 captures the booking to confirm the charge.
-Set **captureImmediately** to true to automatically capture after creation, or set it to false to handle capture separately.`,
+Set **captureImmediately** to true to automatically capture after creation, or set it to false and later use capture_booking to start fulfillment.`,
   instructions: [
     'First use "Get Product Details" to find variant IDs and required input fields.',
     'Then use "Get Inventory & Pricing" to find available inventoryId and confirm pricing.',
+    'Always include priceAmount and priceCurrencyCode from the selected inventory pricing, as recommended by Headout.',
     'The primary customer must have email, full name, and phone number in their inputFields.',
     'Bookings can fail if inventory has become stale between fetching and booking.'
   ],
   constraints: [
-    'Cancellations are not supported via API — contact Headout support.',
+    'Capture within one hour of creation. Use cancel_booking to submit a cancellation request subject to the booking policy.',
     'Production API key bookings are treated as real, billable bookings.'
   ],
   tags: {
@@ -43,6 +46,10 @@ Set **captureImmediately** to true to automatically capture after creation, or s
 })
   .input(
     z.object({
+      productId: z
+        .string()
+        .optional()
+        .describe('Parent product ID from get_product. Include this when creating a booking.'),
       variantId: z.string().describe('Product variant ID to book'),
       inventoryId: z.string().describe('Inventory slot ID from the inventory lookup'),
       customers: z
@@ -67,32 +74,7 @@ Set **captureImmediately** to true to automatically capture after creation, or s
         .describe('Your own reference ID for this booking')
     })
   )
-  .output(
-    z.object({
-      bookingId: z.string().describe('Headout booking identifier'),
-      partnerReferenceId: z.string().optional().describe('Partner reference ID'),
-      status: z
-        .string()
-        .describe('Booking status (UNCAPTURED, PENDING, COMPLETED, CANCELLED)'),
-      variantId: z.string().optional(),
-      inventoryId: z.string().optional(),
-      startDateTime: z.string().optional().describe('Experience start time'),
-      productName: z.string().optional(),
-      variantName: z.string().optional(),
-      priceAmount: z.number().optional(),
-      priceCurrencyCode: z.string().optional(),
-      voucherUrl: z.string().optional().describe('URL to the booking voucher'),
-      tickets: z
-        .array(
-          z.object({
-            publicId: z.string().optional(),
-            url: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Ticket PDF links')
-    })
-  )
+  .output(bookingSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
@@ -101,9 +83,32 @@ Set **captureImmediately** to true to automatically capture after creation, or s
       currencyCode: ctx.config.currencyCode
     });
 
-    let bookingBody: any = {
+    if (ctx.input.customers.length === 0) {
+      throw createApiServiceError('At least one customer is required to create a booking.');
+    }
+    let priceCurrencyCode = ctx.input.priceCurrencyCode ?? ctx.config.currencyCode;
+    if (
+      (ctx.input.priceAmount !== undefined && !priceCurrencyCode) ||
+      (ctx.input.priceAmount === undefined && ctx.input.priceCurrencyCode !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide priceAmount and priceCurrencyCode together, or configure a default currency when providing priceAmount.'
+      );
+    }
+
+    let bookingBody: Parameters<Client['createBooking']>[0] = {
+      productId: ctx.input.productId,
+      partnerReferenceId: ctx.input.partnerReferenceId,
       variantId: ctx.input.variantId,
       inventoryId: ctx.input.inventoryId,
+      variantInputFields: ctx.input.variantInputFields?.map(f => ({
+        id: f.fieldId,
+        value: f.value
+      })),
+      price:
+        ctx.input.priceAmount !== undefined && priceCurrencyCode
+          ? { amount: ctx.input.priceAmount, currencyCode: priceCurrencyCode }
+          : undefined,
       customersDetails: {
         count: ctx.input.customers.length,
         customers: ctx.input.customers.map(c => ({
@@ -117,51 +122,52 @@ Set **captureImmediately** to true to automatically capture after creation, or s
       }
     };
 
-    if (ctx.input.variantInputFields) {
-      bookingBody.variantInputFields = ctx.input.variantInputFields.map(f => ({
-        id: f.fieldId,
-        value: f.value
-      }));
-    }
-
-    if (ctx.input.priceAmount !== undefined && ctx.input.priceCurrencyCode) {
-      bookingBody.price = {
-        amount: ctx.input.priceAmount,
-        currencyCode: ctx.input.priceCurrencyCode
-      };
-    }
-
     ctx.progress('Creating booking (step 1: UNCAPTURED)...');
     let booking = await client.createBooking(bookingBody);
 
-    let bookingId = String(booking.bookingId ?? booking.itineraryId ?? booking.id ?? '');
+    let providerBookingId = booking?.bookingId ?? booking?.itineraryId ?? booking?.id;
+    if (providerBookingId == null || providerBookingId === '') {
+      throw createApiServiceError(
+        'Headout did not return a booking ID. Use get_booking to check existing bookings before retrying creation.'
+      );
+    }
+    let bookingId = requireHeadoutId(providerBookingId, 'booking ID');
     let status = booking.status ?? 'UNCAPTURED';
 
     let captureImmediately = ctx.input.captureImmediately !== false;
 
     if (captureImmediately && bookingId) {
       ctx.progress('Capturing booking (step 2: confirming charge)...');
-      let captured = await client.captureBooking(bookingId, {
-        partnerReferenceId: ctx.input.partnerReferenceId
-      });
-      booking = { ...booking, ...captured };
-      status = captured.status ?? 'PENDING';
+      try {
+        let captured = await client.captureBooking(bookingId, {
+          partnerReferenceId: ctx.input.partnerReferenceId
+        });
+        booking = { ...booking, ...captured };
+        status = captured.status ?? 'PENDING';
+      } catch (error) {
+        throw createApiServiceError(
+          `Booking ${bookingId} was created, but capture could not be confirmed. Check get_booking and use capture_booking for this ID rather than creating another booking.`,
+          {
+            reason: 'headout_capture_unconfirmed',
+            parent: error
+          }
+        );
+      }
     }
 
-    let output = {
+    let output = mapBooking({
+      ...booking,
       bookingId,
-      partnerReferenceId: booking.partnerReferenceId ?? ctx.input.partnerReferenceId,
       status,
       variantId: booking.variantId ?? ctx.input.variantId,
       inventoryId: booking.inventoryId ?? ctx.input.inventoryId,
-      startDateTime: booking.startDateTime,
-      productName: booking.product?.name,
-      variantName: booking.product?.variant?.name,
-      priceAmount: booking.price?.amount,
-      priceCurrencyCode: booking.price?.currencyCode,
-      voucherUrl: booking.voucherUrl,
-      tickets: booking.tickets
-    };
+      partnerReferenceId: booking.partnerReferenceId ?? ctx.input.partnerReferenceId
+    });
+    for (let ticket of booking.tickets ?? []) {
+      if (ticket.type === 'PDF_URL' && ticket.url) {
+        await ctx.addAttachment({ type: 'url', url: ticket.url, mimeType: 'application/pdf' });
+      }
+    }
 
     return {
       output,

@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getRoute = SlateTool.create(spec, {
   name: 'Get Route',
   key: 'get_route',
-  description: `Retrieve details about a route, optionally including its streams (lat/lng, distance, altitude) or an export in GPX or TCX format.`,
+  description: ` DEPRECATED — use \`get_route_details\` instead. Retrieve details about a route, optionally including its streams (lat/lng, distance, altitude) or an export in GPX or TCX format.`,
+  instructions: [
+    'Use get_route_details for route details and a downloadable GPX or TCX file.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecommendationScore, type QueryParams } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecommendations = SlateTool.create(spec, {
@@ -50,7 +50,7 @@ For **performer recommendations**, geolocation is optional.`,
       geoIp: z
         .string()
         .optional()
-        .describe('IP address for geolocation, or "true" to auto-detect'),
+        .describe('IP address for geolocation, or "true" to geolocate the requesting server'),
       range: z
         .string()
         .optional()
@@ -71,6 +71,7 @@ For **performer recommendations**, geolocation is optional.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       recommendations: z
         .array(
           z.object({
@@ -111,22 +112,23 @@ For **performer recommendations**, geolocation is optional.`,
       referralId: ctx.config.referralId
     });
 
-    let params: Record<string, string> = {};
+    let params: QueryParams = {};
 
     if (ctx.input.seedPerformerIds?.length)
-      params['performers.id'] = ctx.input.seedPerformerIds.join(',');
-    if (ctx.input.seedEventId) params['events.id'] = String(ctx.input.seedEventId);
+      params['performers.id'] = ctx.input.seedPerformerIds.map(String);
+    if (ctx.input.seedEventId !== undefined)
+      params['events.id'] = String(ctx.input.seedEventId);
     if (ctx.input.postalCode) params.postal_code = ctx.input.postalCode;
-    if (ctx.input.latitude) params.lat = String(ctx.input.latitude);
-    if (ctx.input.longitude) params.lon = String(ctx.input.longitude);
+    if (ctx.input.latitude !== undefined) params.lat = String(ctx.input.latitude);
+    if (ctx.input.longitude !== undefined) params.lon = String(ctx.input.longitude);
     if (ctx.input.geoIp) params.geoip = ctx.input.geoIp;
     if (ctx.input.range) params.range = ctx.input.range;
     if (ctx.input.dateFrom) params['datetime_utc.gte'] = ctx.input.dateFrom;
     if (ctx.input.dateTo) params['datetime_utc.lte'] = ctx.input.dateTo;
     if (ctx.input.taxonomyName) params['taxonomies.name'] = ctx.input.taxonomyName;
-    if (ctx.input.venueId) params['venue.id'] = String(ctx.input.venueId);
-    if (ctx.input.page) params.page = String(ctx.input.page);
-    if (ctx.input.perPage) params.per_page = String(ctx.input.perPage);
+    if (ctx.input.venueId !== undefined) params['venue.id'] = String(ctx.input.venueId);
+    if (ctx.input.page !== undefined) params.page = String(ctx.input.page);
+    if (ctx.input.perPage !== undefined) params.per_page = String(ctx.input.perPage);
 
     let isPerformerRecs = ctx.input.recommendationType === 'performers';
 
@@ -134,7 +136,7 @@ For **performer recommendations**, geolocation is optional.`,
       let response = await client.getPerformerRecommendations(params);
 
       let recommendations = response.recommendations.map(r => ({
-        affinity: r.affinity,
+        affinity: getRecommendationScore(r),
         performerId: r.performer.id,
         performerName: r.performer.name,
         performerUrl: r.performer.url,
@@ -159,14 +161,14 @@ For **performer recommendations**, geolocation is optional.`,
       }
 
       return {
-        output: { recommendations, total, page, perPage },
+        output: { raw: response, recommendations, total, page, perPage },
         message: summaryParts.join('\n')
       };
     } else {
       let response = await client.getEventRecommendations(params);
 
       let recommendations = response.recommendations.map(r => ({
-        affinity: r.affinity,
+        affinity: getRecommendationScore(r),
         eventId: r.event.id,
         eventTitle: r.event.title,
         eventUrl: r.event.url,
@@ -192,7 +194,7 @@ For **performer recommendations**, geolocation is optional.`,
       }
 
       return {
-        output: { recommendations, total, page, perPage },
+        output: { raw: response, recommendations, total, page, perPage },
         message: summaryParts.join('\n')
       };
     }

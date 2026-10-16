@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,9 @@ export let getInventoryProducts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      inventoryId: z.number().describe('Catalog (inventory) ID'),
+      inventoryId: z
+        .number()
+        .describe('Catalog ID. Call get_inventories to discover catalog IDs.'),
       mode: z
         .enum(['list', 'detail'])
         .describe('"list" for browsing/filtering, "detail" for full product data by IDs'),
@@ -44,13 +46,22 @@ export let getInventoryProducts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('page must be a positive integer.');
+    }
     if (ctx.input.mode === 'detail') {
+      if (!ctx.input.productIds?.length) {
+        throw createApiServiceError('Provide at least one productId in detail mode.');
+      }
       let result = await client.getInventoryProductsData({
         inventoryId: ctx.input.inventoryId,
-        products: ctx.input.productIds || []
+        products: ctx.input.productIds
       });
 
-      let products = result.products || {};
+      let products = result.products;
       let count = Object.keys(products).length;
 
       return {
@@ -73,7 +84,7 @@ export let getInventoryProducts = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let products = result.products || {};
+    let products = result.products;
     let count = Object.keys(products).length;
 
     return {

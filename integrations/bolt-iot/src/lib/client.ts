@@ -1,14 +1,15 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  requestAxiosData
+} from 'slates';
 
 export interface BoltResponse {
   success: string;
   value: string;
-}
-
-export interface BoltDevice {
-  id: string;
-  name: string;
-  status: string;
+  [key: string]: unknown;
 }
 
 export class Client {
@@ -36,15 +37,54 @@ export class Client {
     }
     queryParams.set('deviceName', this.deviceName);
 
-    let url = `/remote/${this.apiKey}/${command}?${queryParams.toString()}`;
-    let response = await this.http.get(url);
-    return response.data as BoltResponse;
+    let response = await this.get(command, queryParams);
+    if (
+      !isApiErrorRecord(response) ||
+      typeof response.success !== 'string' ||
+      typeof response.value !== 'string'
+    ) {
+      throw createApiServiceError(`Bolt IoT API ${command} returned an invalid response.`, {
+        reason: 'invalid_response'
+      });
+    }
+    return response as BoltResponse;
   }
 
   private async requestNoDevice(command: string): Promise<any> {
-    let url = `/remote/${this.apiKey}/${command}`;
-    let response = await this.http.get(url);
-    return response.data;
+    return this.get(command);
+  }
+
+  private async get(command: string, queryParams?: URLSearchParams): Promise<unknown> {
+    let url = `/remote/${this.apiKey}/${command}${queryParams ? `?${queryParams.toString()}` : ''}`;
+    let response = await requestAxiosData<unknown>(
+      command,
+      () => this.http.get(url),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Bolt IoT',
+          operation,
+          reason: 'upstream_error',
+          detailKeys: ['value', 'message', 'error'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
+    );
+
+    if (
+      isApiErrorRecord(response) &&
+      (response.success === '0' || response.success === 0 || response.success === false)
+    ) {
+      throw buildApiServiceError(
+        { response: { data: response } },
+        {
+          providerLabel: 'Bolt IoT',
+          operation: command,
+          reason: 'upstream_error',
+          detailKeys: ['value', 'message', 'error'],
+          fallbackMessage: 'The provider rejected the command.'
+        }
+      );
+    }
+    return response;
   }
 
   // Device Management
@@ -55,6 +95,11 @@ export class Client {
 
   async isAlive(): Promise<BoltResponse> {
     return this.request('isAlive');
+  }
+
+  async isOnline(): Promise<unknown> {
+    let queryParams = new URLSearchParams({ deviceName: this.deviceName });
+    return this.get('isOnline', queryParams);
   }
 
   async getVersion(): Promise<BoltResponse> {

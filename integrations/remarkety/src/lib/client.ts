@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 let webhookAxios = createAxios({
   baseURL: 'https://webhooks.remarkety.com'
@@ -7,6 +13,33 @@ let webhookAxios = createAxios({
 let appAxios = createAxios({
   baseURL: 'https://app.remarkety.com'
 });
+
+for (let http of [webhookAxios, appAxios]) {
+  http.interceptors.response.use(
+    response => {
+      if (isApiErrorRecord(response.data) && response.data.success === false) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data: response.data } },
+          {
+            providerLabel: 'Remarkety',
+            reason: 'remarkety_api_error'
+          }
+        );
+      }
+      return response;
+    },
+    error =>
+      Promise.reject(
+        buildApiServiceError(error, {
+          providerLabel: 'Remarkety',
+          reason: 'remarkety_api_error',
+          detailKeys: ['message', 'detail', 'error', 'reason', 'code'],
+          nestedKeys: ['errors', 'failedReason'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
+      )
+  );
+}
 
 export class RemarketyClient {
   private storeId: string;
@@ -20,6 +53,9 @@ export class RemarketyClient {
     storeDomain?: string;
     platform?: string;
   }) {
+    if (!config.token.trim() || !config.storeId.trim()) {
+      throw createApiServiceError('A Remarkety API key and Store ID are required.');
+    }
     this.token = config.token;
     this.storeId = config.storeId;
     this.storeDomain = config.storeDomain;
@@ -69,6 +105,23 @@ export class RemarketyClient {
 
   async subscribeNewsletter(data: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.sendEvent('newsletter/subscribe', data);
+  }
+
+  async unsubscribeContactApi(data: {
+    email?: string;
+    smsPhoneNumber?: string;
+    reason?: string;
+  }): Promise<unknown> {
+    let response = await appAxios.post(
+      `/api/v1/stores/${encodeURIComponent(this.storeId)}/contacts/unsubscribe`,
+      pickDefined({
+        email: data.email,
+        sms_phone_number_e164: data.smsPhoneNumber,
+        reason: data.reason
+      }),
+      { headers: { 'Content-Type': 'application/json', 'x-api-key': this.token } }
+    );
+    return response.data;
   }
 
   async createOrUpdateOrder(

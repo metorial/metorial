@@ -4,7 +4,9 @@ import {
   aiChat,
   autocomplete,
   getBusinessDetails,
+  getCategory,
   getReviews,
+  listCategories,
   matchBusiness,
   searchBusinesses,
   searchByPhone,
@@ -21,7 +23,9 @@ export let provider = Slate.create({
     matchBusiness,
     searchByPhone,
     searchTransactions,
-    aiChat
+    aiChat,
+    listCategories,
+    getCategory
   ],
   triggers: []
 });

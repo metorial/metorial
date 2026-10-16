@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'dub',
   name: 'Dub',
   description:
-    'Link attribution platform for short links, conversion tracking, and affiliate programs.',
+    'Manage short links, attribution analytics, conversion events, customers, domains, tags, folders, and QR codes.',
   metadata: {},
   config,
   auth

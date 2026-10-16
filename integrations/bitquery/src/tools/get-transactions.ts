@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BitqueryClient } from '../lib/client';
 import { spec } from '../spec';
@@ -62,7 +62,7 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     let { blockchain, fromAddress, toAddress, since, till, limit } = ctx.input;
@@ -70,7 +70,14 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
 
     let transactions: z.infer<typeof transactionOutputSchema>[] = [];
 
+    if (blockchain === 'solana' && toAddress) {
+      throw createApiServiceError(
+        'Solana transactions do not have a single recipient. Use get_token_transfers with receiverAddress to find incoming transfers.'
+      );
+    }
+
     if (blockchain === 'solana') {
+      client.requireV2('Solana convenience queries');
       let txFilters: string[] = [];
       if (fromAddress) txFilters.push('Signer: {is: $fromAddress}');
 
@@ -114,14 +121,13 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
       let raw = data?.Solana?.Transactions || [];
 
       transactions = raw.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Slot,
-        transactionHash: t.Transaction?.Signature || '',
+        transactionHash: t.Transaction?.Signature,
         from: t.Transaction?.Signer,
-        value: t.Transaction?.Fee?.toString(),
         success: t.Transaction?.Result?.Success
       }));
-    } else if (ctx.config.apiVersion === 'v1') {
+    } else if (ctx.auth.apiVersion === 'v1') {
       let networkMap: Record<string, string> = {
         eth: 'ethereum',
         bsc: 'bsc',
@@ -129,7 +135,7 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
         arbitrum: 'arbitrum',
         base: 'base',
         optimism: 'optimism',
-        avalanche: 'avalanche_c',
+        avalanche: 'avalanche',
         fantom: 'fantom',
         cronos: 'cronos'
       };
@@ -153,9 +159,9 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
     transactions(${filters.join(', ')}) {
       block { timestamp { iso8601 } height }
       hash
-      txFrom { address }
-      txTo { address }
-      value
+      txFrom: sender { address }
+      txTo: to { address }
+      value: amount
       gas
       gasPrice
       success
@@ -176,9 +182,9 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
       let raw = data?.ethereum?.transactions || [];
 
       transactions = raw.map((t: any) => ({
-        blockTime: t.block?.timestamp?.iso8601 || '',
+        blockTime: t.block?.timestamp?.iso8601,
         blockNumber: t.block?.height,
-        transactionHash: t.hash || '',
+        transactionHash: t.hash,
         from: t.txFrom?.address,
         to: t.txTo?.address,
         value: t.value?.toString(),
@@ -217,6 +223,7 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
       Transaction {
         Hash From To Value Gas GasPrice Type
       }
+      TransactionStatus { Success }
     }
   }
 }`;
@@ -231,14 +238,15 @@ Use this to audit wallet activity, monitor address transactions, or investigate 
       let raw = data?.EVM?.Transactions || [];
 
       transactions = raw.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Number,
-        transactionHash: t.Transaction?.Hash || '',
+        transactionHash: t.Transaction?.Hash,
         from: t.Transaction?.From,
         to: t.Transaction?.To,
         value: t.Transaction?.Value?.toString(),
         gas: t.Transaction?.Gas?.toString(),
-        gasPrice: t.Transaction?.GasPrice?.toString()
+        gasPrice: t.Transaction?.GasPrice?.toString(),
+        success: t.TransactionStatus?.Success
       }));
     }
 

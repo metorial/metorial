@@ -6,7 +6,7 @@ import { spec } from '../spec';
 let leagueSchema = z.object({
   leagueId: z.number().describe('Unique league ID'),
   name: z.string().describe('League name'),
-  type: z.string().describe('League type (e.g., League, Cup)'),
+  type: z.string().optional().describe('League type, when returned by the sport API'),
   logo: z.string().nullable().describe('URL of the league logo'),
   country: z.string().nullable().describe('Country name'),
   countryCode: z.string().nullable().describe('Country code'),
@@ -14,10 +14,18 @@ let leagueSchema = z.object({
   seasons: z
     .array(
       z.object({
-        year: z.number().describe('Season year'),
+        year: z.number().optional().describe('Numeric season year, when provided'),
+        season: z
+          .string()
+          .optional()
+          .describe('Original string season identifier, including split-year seasons'),
         start: z.string().nullable().describe('Season start date'),
         end: z.string().nullable().describe('Season end date'),
-        current: z.boolean().describe('Whether this is the current season')
+        current: z
+          .boolean()
+          .optional()
+          .describe('Whether this is the current season, when provided'),
+        coverage: z.unknown().optional().describe('Available data for this season')
       })
     )
     .describe('Available seasons')
@@ -50,6 +58,10 @@ export let searchLeaguesTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe('Exact string basketball season from get_seasons; use instead of season'),
       leagueId: z.number().optional().describe('Get a specific league by ID'),
       name: z.string().optional().describe('Exact league name to search for'),
       country: z.string().optional().describe('Country name to filter leagues by'),
@@ -64,6 +76,10 @@ export let searchLeaguesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       leagues: z.array(leagueSchema),
       count: z.number().describe('Total number of leagues returned')
     })
@@ -76,7 +92,7 @@ export let searchLeaguesTool = SlateTool.create(spec, {
       leagueId: ctx.input.leagueId,
       name: ctx.input.name,
       country: ctx.input.country,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
       type: ctx.input.type,
       current: ctx.input.current,
       search: ctx.input.search
@@ -85,21 +101,34 @@ export let searchLeaguesTool = SlateTool.create(spec, {
     let results = (data.response ?? []).map((item: any) => ({
       leagueId: item.league?.id ?? item.id,
       name: item.league?.name ?? item.name,
-      type: item.league?.type ?? item.type ?? 'unknown',
+      type: item.league?.type ?? item.type,
       logo: item.league?.logo ?? item.logo ?? null,
       country: item.country?.name ?? null,
       countryCode: item.country?.code ?? null,
       countryFlag: item.country?.flag ?? null,
       seasons: (item.seasons ?? []).map((s: any) => ({
-        year: s.year,
+        year:
+          typeof s.year === 'number'
+            ? s.year
+            : typeof s.season === 'number'
+              ? s.season
+              : undefined,
+        season:
+          typeof s.season === 'string'
+            ? s.season
+            : typeof s.year === 'string'
+              ? s.year
+              : undefined,
         start: s.start ?? null,
         end: s.end ?? null,
-        current: s.current ?? false
+        current: s.current,
+        coverage: s.coverage
       }))
     }));
 
     return {
       output: {
+        raw: data,
         leagues: results,
         count: results.length
       },

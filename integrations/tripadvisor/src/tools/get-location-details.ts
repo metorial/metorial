@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ContentClient } from '../lib/client';
+import { ContentClient, optionalNumber, optionalString, providerId } from '../lib/client';
 import { spec } from '../spec';
 
 let rankingDataSchema = z
@@ -150,13 +150,13 @@ export let getLocationDetails = SlateTool.create(spec, {
           name: sub.name,
           localizedName: sub.localized_name,
           ratingImageUrl: sub.rating_image_url,
-          value: sub.value
+          value: optionalNumber(sub.value)
         });
       }
     }
 
     let output = {
-      locationId: String(loc.location_id),
+      locationId: providerId(loc.location_id),
       name: loc.name,
       description: loc.description,
       webUrl: loc.web_url,
@@ -164,15 +164,15 @@ export let getLocationDetails = SlateTool.create(spec, {
       email: loc.email,
       website: loc.website,
       writeReviewUrl: loc.write_review,
-      latitude: loc.latitude ? Number(loc.latitude) : undefined,
-      longitude: loc.longitude ? Number(loc.longitude) : undefined,
+      latitude: optionalNumber(loc.latitude),
+      longitude: optionalNumber(loc.longitude),
       timezone: loc.timezone,
-      rating: loc.rating ? Number(loc.rating) : undefined,
+      rating: optionalNumber(loc.rating),
       ratingImageUrl: loc.rating_image_url,
       numReviews: loc.num_reviews,
       reviewRatingCount: loc.review_rating_count,
       priceLevel: loc.price_level,
-      photoCount: loc.photo_count,
+      photoCount: optionalNumber(loc.photo_count),
       seeAllPhotosUrl: loc.see_all_photos,
       address: loc.address_obj
         ? {
@@ -187,19 +187,17 @@ export let getLocationDetails = SlateTool.create(spec, {
         : undefined,
       rankingData: loc.ranking_data
         ? {
-            geoLocationId: loc.ranking_data.geo_location_id
-              ? String(loc.ranking_data.geo_location_id)
-              : undefined,
+            geoLocationId: optionalString(loc.ranking_data.geo_location_id),
             rankingString: loc.ranking_data.ranking_string,
             geoLocationName: loc.ranking_data.geo_location_name,
-            rankingOutOf: loc.ranking_data.ranking_out_of,
-            ranking: loc.ranking_data.ranking
+            rankingOutOf: optionalNumber(loc.ranking_data.ranking_out_of),
+            ranking: optionalNumber(loc.ranking_data.ranking)
           }
         : undefined,
       subratings: subratings.length > 0 ? subratings : undefined,
       awards: loc.awards?.map((a: any) => ({
         awardType: a.award_type,
-        year: a.year,
+        year: optionalNumber(a.year),
         displayName: a.display_name,
         categories: a.categories
       })),
@@ -231,7 +229,7 @@ export let getLocationDetails = SlateTool.create(spec, {
       })),
       styles: loc.styles,
       neighborhoodInfo: loc.neighborhood_info?.map((n: any) => ({
-        locationId: String(n.location_id),
+        locationId: n.location_id == null ? undefined : providerId(n.location_id),
         name: n.name
       })),
       brand: loc.brand,
@@ -239,7 +237,7 @@ export let getLocationDetails = SlateTool.create(spec, {
     };
 
     let ratingStr = output.rating
-      ? ` (${output.rating}/5, ${output.numReviews || 0} reviews)`
+      ? ` (${output.rating}/5, ${output.numReviews === undefined ? 'review count unavailable' : `${output.numReviews} reviews`})`
       : '';
     let rankStr = output.rankingData?.rankingString
       ? ` - ${output.rankingData.rankingString}`

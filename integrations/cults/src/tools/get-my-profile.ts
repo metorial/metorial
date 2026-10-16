@@ -39,7 +39,7 @@ export let getMyProfile = SlateTool.create(spec, {
         followersCount: profile.followersCount,
         creationsCount: profile.creationsCount
       },
-      message: `Profile for **${profile.nick}**: ${profile.creationsCount ?? 0} creations, ${profile.followersCount ?? 0} followers.`
+      message: `Retrieved profile for **${profile.nick}**.`
     };
   })
   .build();

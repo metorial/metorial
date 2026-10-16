@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'nasdaq',
   name: 'Nasdaq',
   description:
-    'Access Nasdaq Data Link for historical and real-time financial market data including equities, options, futures, economics, and alternative data.',
+    'Query Nasdaq Data Link historical datasets and tables, prepare bulk downloads, and retrieve real-time or delayed equities, options, and index data from the Nasdaq Cloud REST API.',
   metadata: {},
   config,
   auth

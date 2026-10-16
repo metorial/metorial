@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BoltResponse, Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let uartCommunicate = SlateTool.create(spec, {
@@ -8,16 +9,17 @@ export let uartCommunicate = SlateTool.create(spec, {
   key: 'uart_communicate',
   description: `Perform UART (serial) communication with a device connected to the Bolt module. Supports initializing the serial interface, sending data, reading data, or sending and reading in one step. Choose the appropriate operation for your use case.`,
   instructions: [
-    'Use "initialize" to set the baud rate before any serial operations.',
+    'Use "initialize" to set the baud rate before any serial operations. Supply baudRateBps for a rate in bits per second, or baudRate for the legacy index.',
     'Use "write" to send a string over the serial TX line.',
     'Use "read" to receive data from the serial RX line.',
     'Use "writeRead" to send data and immediately capture the response.',
-    'Baud rate index: 0 = 9600, 1 = 9600, 2 = 9600, 3 = 115200 (refer to Bolt documentation for exact mapping).',
+    'The legacy baudRate input forwards the Bolt Cloud baud index (0–3) unchanged. The documented example uses index 2 for 9600 baud.',
     'The "till" parameter specifies the ASCII code of the character to read until (e.g., 10 for newline).'
   ]
 })
   .input(
     z.object({
+      deviceName,
       operation: z
         .enum(['initialize', 'write', 'read', 'writeRead'])
         .describe('The serial operation to perform'),
@@ -27,6 +29,12 @@ export let uartCommunicate = SlateTool.create(spec, {
         .max(3)
         .optional()
         .describe('Baud rate index (0–3) for "initialize" operation'),
+      baudRateBps: z
+        .number()
+        .optional()
+        .describe(
+          'Baud rate in bits per second for "initialize", for example 9600 as used in the official SDK. Overrides baudRate when provided.'
+        ),
       serialData: z
         .string()
         .optional()
@@ -41,6 +49,7 @@ export let uartCommunicate = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponse,
       success: z.string().describe('Whether the operation was successful ("1" for success)'),
       resultValue: z.string().describe('Response value from the serial operation')
     })
@@ -48,16 +57,24 @@ export let uartCommunicate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
-    let response: any;
+    let response: BoltResponse;
     let operationDesc: string;
 
     switch (ctx.input.operation) {
       case 'initialize':
+        if (ctx.input.baudRateBps !== undefined) {
+          if (!Number.isInteger(ctx.input.baudRateBps) || ctx.input.baudRateBps <= 0) {
+            throw createApiServiceError('baudRateBps must be a positive integer.');
+          }
+          response = await client.serialBegin(ctx.input.baudRateBps);
+          operationDesc = `Serial initialized at ${ctx.input.baudRateBps} baud`;
+          break;
+        }
         if (ctx.input.baudRate === undefined) {
-          throw new Error('baudRate is required for the "initialize" operation');
+          throw createApiServiceError('baudRate is required for the "initialize" operation');
         }
         response = await client.serialBegin(ctx.input.baudRate);
         operationDesc = `Serial initialized with baud rate index ${ctx.input.baudRate}`;
@@ -65,7 +82,7 @@ export let uartCommunicate = SlateTool.create(spec, {
 
       case 'write':
         if (!ctx.input.serialData) {
-          throw new Error('serialData is required for the "write" operation');
+          throw createApiServiceError('serialData is required for the "write" operation');
         }
         response = await client.serialWrite(ctx.input.serialData);
         operationDesc = `Sent "${ctx.input.serialData}" over serial TX`;
@@ -78,7 +95,7 @@ export let uartCommunicate = SlateTool.create(spec, {
 
       case 'writeRead':
         if (!ctx.input.serialData) {
-          throw new Error('serialData is required for the "writeRead" operation');
+          throw createApiServiceError('serialData is required for the "writeRead" operation');
         }
         response = await client.serialWriteRead(ctx.input.serialData, ctx.input.till);
         operationDesc = `Sent "${ctx.input.serialData}" and read response`;
@@ -87,6 +104,7 @@ export let uartCommunicate = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         success: response.success,
         resultValue: response.value
       },

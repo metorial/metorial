@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageFamily = SlateTool.create(spec, {
@@ -42,7 +42,7 @@ export let manageFamily = SlateTool.create(spec, {
         break;
       case 'add':
         if (!ctx.input.targetPersonId) {
-          throw new Error('targetPersonId is required for the "add" action');
+          throw createApiServiceError('targetPersonId is required for the "add" action');
         }
         result = await client.addToFamily(ctx.input.personIds, ctx.input.targetPersonId);
         break;
@@ -54,10 +54,7 @@ export let manageFamily = SlateTool.create(spec, {
         break;
     }
 
-    let success =
-      typeof result === 'object' && result !== null && 'success' in result
-        ? (result as { success: boolean }).success
-        : true;
+    let success = requireSuccess(result);
 
     return {
       output: { success },

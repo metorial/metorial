@@ -27,6 +27,14 @@ export let listLinks = SlateTool.create(spec, {
         .optional()
         .describe('Field to sort by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort order'),
+      startingAfter: z
+        .string()
+        .optional()
+        .describe('Return records after this ID; mutually exclusive with endingBefore'),
+      endingBefore: z
+        .string()
+        .optional()
+        .describe('Return records before this ID; mutually exclusive with startingAfter'),
       page: z.number().optional().describe('Page number (starts at 1)'),
       pageSize: z.number().optional().describe('Items per page (max 100)')
     })
@@ -73,6 +81,8 @@ export let listLinks = SlateTool.create(spec, {
       showArchived: ctx.input.showArchived,
       sortBy: ctx.input.sortBy,
       sortOrder: ctx.input.sortOrder,
+      startingAfter: ctx.input.startingAfter,
+      endingBefore: ctx.input.endingBefore,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
@@ -90,7 +100,7 @@ export let listLinks = SlateTool.create(spec, {
           sales: l.sales,
           archived: l.archived,
           createdAt: l.createdAt,
-          tags: l.tags.map(t => ({ tagId: t.id, name: t.name, color: t.color }))
+          tags: (l.tags ?? []).map(t => ({ tagId: t.id, name: t.name, color: t.color }))
         })),
         count: links.length
       },

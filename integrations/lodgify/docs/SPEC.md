@@ -1,4 +1,4 @@
-# Slates Specification for Lodgify
+# Lodgify Integration Specification
 
 ## Overview
 
@@ -40,7 +40,7 @@ The API allows you to read or modify booking calendars, keeping your availabilit
 
 ### Rates & Pricing
 
-You can update prices and set seasonal rates, giving you more control over your pricing strategy without logging into the platform daily. Rate management covers room type rates for specified date periods, with a nightly price plus optional minimum stay, maximum stay, and per-additional-guest pricing. Pricing is nightly only; there are no weekly or monthly rate fields. Note that a rate period's end date is exclusive on write, while the end date on the rates calendar read is inclusive, and that overlapping rate periods are rejected.
+You can update prices and set seasonal rates, giving you more control over your pricing strategy without logging into the platform daily. Pricing settings can also be read on their own with only a property ID, without selecting room types or dates. Rate management covers room type rates for specified date periods, with a nightly price plus optional minimum stay, maximum stay, and per-additional-guest pricing. Pricing is nightly only; there are no weekly or monthly rate fields. Note that a rate period's end date is exclusive on write, while the end date on the rates calendar read is inclusive, and that overlapping rate periods are rejected.
 
 ### Quotes & Payment Links
 
@@ -48,7 +48,7 @@ You can calculate a quote for a prospective stay, create a quote for an existing
 
 ### Guest Communication
 
-The API can automate messages like booking confirmations or check-in instructions, ensuring a consistent and timely guest experience. You can send a message on a booking or an enquiry, optionally notifying the guest, and supply an idempotency key so a retried send does not duplicate the message. You can also read a full message thread, including each message's delivery status, channel, and attachments, and whether the thread is closed to further replies.
+The API can automate messages like booking confirmations or check-in instructions, ensuring a consistent and timely guest experience. You can send a message on a booking or an enquiry, optionally notifying the guest, and supply an idempotency key so a retried send does not duplicate the message. When omitted, the integration generates and returns a UUID that can be reused for a subsequent retry. You can also read a full message thread, including each message's delivery status, channel, and files, and whether the thread is closed to further replies.
 
 ## Events
 

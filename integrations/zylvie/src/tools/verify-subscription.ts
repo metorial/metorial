@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 let subscriptionSchema = z.object({
@@ -40,6 +41,7 @@ export let verifySubscription = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.array(rawResponseSchema).describe('Provider subscription responses'),
       subscriptions: z
         .array(subscriptionSchema)
         .describe('List of subscriptions for this email'),
@@ -51,36 +53,35 @@ export let verifySubscription = SlateTool.create(spec, {
 
     let results = await client.verifySubscription(ctx.input.email);
 
-    let subscriptions = (Array.isArray(results) ? results : []).map(
-      (sub: Record<string, unknown>) => {
-        let product = (sub.product || {}) as Record<string, unknown>;
-        let subscriber = (sub.subscriber || {}) as Record<string, unknown>;
+    let subscriptions = results.map((sub: Record<string, unknown>) => {
+      let product = sub.product as Record<string, unknown>;
+      let subscriber = (sub.subscriber ?? {}) as Record<string, unknown>;
 
-        return {
-          subscriptionId: sub.subscription_id as string,
-          createdAt: String(sub.created_at),
-          cancelAt: sub.cancel_at ? String(sub.cancel_at) : null,
-          canceledAt: sub.canceled_at ? String(sub.canceled_at) : null,
-          trialEnd: sub.trial_end ? String(sub.trial_end) : null,
-          trialStart: sub.trial_start ? String(sub.trial_start) : null,
-          currency: sub.currency as string,
-          amount: sub.amount as number,
-          interval: sub.interval as string,
-          intervalCount: sub.interval_count as number,
-          status: sub.status as string,
-          productTitle: product.title as string,
-          subscriberName: subscriber.name as string | undefined,
-          subscriberEmail: subscriber.email as string | undefined
-        };
-      }
-    );
+      return {
+        subscriptionId: sub.subscription_id as string,
+        createdAt: sub.created_at as string,
+        cancelAt: sub.cancel_at as string | null,
+        canceledAt: sub.canceled_at as string | null,
+        trialEnd: sub.trial_end as string | null,
+        trialStart: sub.trial_start as string | null,
+        currency: sub.currency as string,
+        amount: sub.amount as number,
+        interval: sub.interval as string,
+        intervalCount: sub.interval_count as number,
+        status: sub.status as string,
+        productTitle: product.title as string,
+        subscriberName: subscriber.name as string | undefined,
+        subscriberEmail: subscriber.email as string | undefined
+      };
+    });
 
     return {
       output: {
+        raw: results,
         subscriptions,
         count: subscriptions.length
       },
-      message: `Found **${subscriptions.length}** subscription(s) for **${ctx.input.email}**.`
+      message: `Found **${subscriptions.length}** subscription(s).`
     };
   })
   .build();

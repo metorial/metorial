@@ -1,9 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DataRobotClient } from '../lib/client';
+import { DataRobotClient, responseItems } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let deploymentSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
   deploymentId: z.string().describe('Unique deployment identifier'),
   label: z.string().optional().describe('Deployment label/name'),
   description: z.string().optional().describe('Deployment description'),
@@ -22,6 +27,11 @@ let deploymentSchema = z.object({
     .describe('Prediction usage statistics')
 });
 
+let outputSchema = z.object({
+  deployments: z.array(deploymentSchema).describe('List of deployments'),
+  totalCount: z.number().optional().describe('Total number of deployments')
+});
+
 export let listDeployments = SlateTool.create(spec, {
   name: 'List Deployments',
   key: 'list_deployments',
@@ -38,16 +48,11 @@ export let listDeployments = SlateTool.create(spec, {
       status: z.string().optional().describe('Filter by deployment status')
     })
   )
-  .output(
-    z.object({
-      deployments: z.array(deploymentSchema).describe('List of deployments'),
-      totalCount: z.number().optional().describe('Total number of deployments')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let result = await client.listDeployments({
@@ -57,27 +62,28 @@ export let listDeployments = SlateTool.create(spec, {
       status: ctx.input.status
     });
 
-    let items = result.data || result;
-    let deployments = (Array.isArray(items) ? items : []).map((d: any) => ({
-      deploymentId: d.id || d.deploymentId,
+    let items = responseItems(result, 'deployments');
+    let deployments = items.map((d: any) => ({
+      raw: d,
+      deploymentId: d.id ?? d.deploymentId,
       label: d.label,
-      description: d.description,
+      description: d.description === null ? undefined : d.description,
       status: d.status,
       importance: d.importance,
-      modelId: d.model?.id || d.modelId,
-      modelPackageId: d.modelPackage?.id || d.modelPackageId,
+      modelId: d.model?.id ?? d.modelId,
+      modelPackageId: d.modelPackage?.id ?? d.modelPackageId,
       createdAt: d.createdAt,
-      serviceHealth: d.serviceHealth?.status,
-      modelHealth: d.modelHealth?.status,
-      accuracyHealth: d.accuracyHealth?.status,
+      serviceHealth: d.serviceHealth === null ? null : d.serviceHealth?.status,
+      modelHealth: d.modelHealth === null ? null : d.modelHealth?.status,
+      accuracyHealth: d.accuracyHealth === null ? null : d.accuracyHealth?.status,
       predictionUsage: d.predictionUsage
     }));
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         deployments,
-        totalCount: result.totalCount || result.count || deployments.length
-      },
+        totalCount: result.totalCount
+      }),
       message: `Found **${deployments.length}** deployment(s).`
     };
   })

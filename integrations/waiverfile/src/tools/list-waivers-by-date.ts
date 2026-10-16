@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaiverFileClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let listWaiversByDate = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      waivers: z.any().describe('Array of waiver data records')
+      waivers: z.any().describe('Complete waiver data response')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,6 +46,12 @@ export let listWaiversByDate = SlateTool.create(spec, {
       siteId: ctx.auth.siteId
     });
 
+    if (!Number.isInteger(ctx.input.pageIndex) || ctx.input.pageIndex < 0) {
+      throw createApiServiceError('pageIndex must be a non-negative integer.');
+    }
+    if (!Number.isInteger(ctx.input.pageSize) || ctx.input.pageSize < 1) {
+      throw createApiServiceError('pageSize must be a positive integer.');
+    }
     let pageSize = Math.min(ctx.input.pageSize, 500);
 
     let waivers = await client.getWaiverData({
@@ -57,11 +63,9 @@ export let listWaiversByDate = SlateTool.create(spec, {
       pageSize
     });
 
-    let results = Array.isArray(waivers) ? waivers : [waivers];
-
     return {
-      output: { waivers: results },
-      message: `Retrieved **${results.length}** waiver(s) for page ${ctx.input.pageIndex} (${ctx.input.startDate} to ${ctx.input.endDate}).`
+      output: { waivers },
+      message: 'Retrieved the requested page of waiver data.'
     };
   })
   .build();

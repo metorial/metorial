@@ -19,9 +19,20 @@ export let listJobsTool = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Filter by job status (e.g., info_received, dispatched, completed, failed)'),
+        .describe('Filter by job status (e.g., info_recv, dispatched, completed, failed)'),
+      doNumber: z.string().optional().describe('Filter by delivery order number'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Search D.O. number, address, contact, notification email, assigned driver, tracking number and zone'
+        ),
+      sort: z
+        .string()
+        .optional()
+        .describe('Field to sort by; prefix with - for descending order'),
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      limit: z.number().optional().describe('Number of results per page')
+      limit: z.number().optional().describe('Number of results per page, up to 100')
     })
   )
   .output(
@@ -40,8 +51,9 @@ export let listJobsTool = SlateTool.create(spec, {
           })
         )
         .describe('List of jobs'),
-      total: z.number().describe('Total number of jobs matching the filter'),
-      page: z.number().describe('Current page number')
+      total: z.number().optional().describe('Total number of jobs matching the filter'),
+      page: z.number().describe('Current page number'),
+      links: z.record(z.string(), z.unknown()).optional().describe('Provider pagination links')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,14 +64,17 @@ export let listJobsTool = SlateTool.create(spec, {
       type: ctx.input.type,
       assign_to: ctx.input.assignTo,
       status: ctx.input.status,
+      do_number: ctx.input.doNumber,
+      query: ctx.input.query,
+      sort: ctx.input.sort,
       page: ctx.input.page,
       limit: ctx.input.limit
     });
 
     let jobs = result.jobs.map(j => ({
       jobId: j.id ? String(j.id) : undefined,
-      doNumber: String(j.do_number ?? ''),
-      date: String(j.date ?? ''),
+      doNumber: j.do_number,
+      date: j.date,
       type: j.type ? String(j.type) : undefined,
       status: j.status ? String(j.status) : undefined,
       assignTo: j.assign_to ? String(j.assign_to) : undefined,
@@ -71,9 +86,10 @@ export let listJobsTool = SlateTool.create(spec, {
       output: {
         jobs,
         total: result.total,
-        page: result.page
+        page: result.page,
+        links: result.links
       },
-      message: `Found **${result.total}** job(s) (page ${result.page}). Showing ${jobs.length} result(s).`
+      message: `Showing **${jobs.length}** job(s) on page ${result.page}.${result.total !== undefined ? ` Total matching jobs: ${result.total}.` : ''}`
     };
   })
   .build();

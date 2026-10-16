@@ -44,7 +44,7 @@ export let getSessions = SlateTool.create(spec, {
     }
 
     let result = await client.getSessions(ctx.input.roomId);
-    let sessions = Array.isArray(result) ? result : [];
+    let sessions = result;
 
     return {
       output: { sessions },

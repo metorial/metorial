@@ -1,6 +1,12 @@
 # <img src="logo.png" height="20"> Sensibo
 
-Control and monitor smart climate devices including air conditioners and air purifiers. Set AC states (power, mode, temperature, fan level, swing), read environmental sensor data (temperature, humidity, air quality), and retrieve historical measurements. Create and manage schedules and timers for automated AC control. Configure Climate React automations that adjust AC based on temperature or humidity thresholds. Retrieve door/window sensor events. Manage devices, users, and bulk operations across commercial organizations via Airbend.
+Discover Sensibo devices, inspect their current AC state and supported capabilities, control compatible air conditioners, and read environmental measurements and device events. Manage timers and schedules and configure Climate React rules.
+
+Generate an API key at [Sensibo account settings](https://home.sensibo.com/me/api). Start with `list_devices`, then use `get_device` to inspect the selected device's capabilities before changing AC settings. Supported settings depend on the paired AC model.
+
+Use `manage_recurring_schedule` for scheduling with an explicit local time and IANA timezone. Its update action enables or disables an existing schedule. Use `get_door_sensor_history` with the Door/Window Sensor's `ds_` ID. The older `manage_schedule` and `get_door_sensor_events` tools remain available for compatibility with their original request format.
+
+Historical availability depends on the device and account. Airbend organization administration and bulk operations are outside this integration's tool surface.
 
 ## License
 

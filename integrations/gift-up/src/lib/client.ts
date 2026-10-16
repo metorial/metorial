@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -9,8 +9,25 @@ export class Client {
   private axios;
 
   constructor(private config: ClientConfig) {
-    this.axios = createAxios({
-      baseURL: 'https://api.giftup.app'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.giftup.app',
+      timeout: 30_000,
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Gift Up!',
+          reason: 'gift_up_api_error',
+          extractMessage: (error, helpers) => {
+            let data = helpers.getResponse(error)?.data;
+            let flags = helpers.isRecord(data)
+              ? Object.entries(data)
+                  .filter(([, value]) => value === true)
+                  .map(([key]) => key)
+              : [];
+            return flags.length > 0 ? flags.join(', ') : helpers.extractMessage(error);
+          }
+        })
     });
   }
 
@@ -93,6 +110,7 @@ export class Client {
       units?: number;
       reason?: string;
       locationId?: string;
+      redeemedOn?: string;
       metadata?: Record<string, string>;
     }
   ) {
@@ -109,6 +127,7 @@ export class Client {
     body: {
       reason?: string;
       locationId?: string;
+      redeemedOn?: string;
       metadata?: Record<string, string>;
     } = {}
   ) {
@@ -200,6 +219,19 @@ export class Client {
   }
 
   // ==================== Orders ====================
+
+  async listOrders(
+    params: {
+      createdOnOrAfter?: string;
+      purchaserEmail?: string;
+      source?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ) {
+    let response = await this.axios.get('/orders', { headers: this.getHeaders(), params });
+    return response.data;
+  }
 
   async createOrder(body: {
     orderDate?: string;
@@ -297,12 +329,13 @@ export class Client {
     return response.data;
   }
 
-  async markOrderPosted(orderId: string, body?: { codes?: string[] }) {
-    let response = await this.axios.post(
-      `/orders/${encodeURIComponent(orderId)}/post`,
-      body || {},
-      { headers: this.getJsonHeaders() }
-    );
+  async markOrderPosted(
+    orderId: string,
+    body: { codes: Array<{ oldCode: string; newCode: string }> }
+  ) {
+    let response = await this.axios.post(`/orders/${encodeURIComponent(orderId)}/post`, body, {
+      headers: this.getJsonHeaders()
+    });
     return response.data;
   }
 
@@ -426,22 +459,29 @@ export class Client {
     return response.data;
   }
 
+  async listPromotions() {
+    let response = await this.axios.get('/promotions', { headers: this.getHeaders() });
+    return response.data;
+  }
+
   // ==================== Reports ====================
 
   async listTransactions(
     params: {
-      createdOnOrAfter?: string;
-      updatedOnOrAfter?: string;
-      giftCardCode?: string;
-      eventType?: string;
-      locationId?: string;
+      eventOccurredOnOrAfter?: string;
+      eventOccurredOnOrBefore?: string;
+      code?: string;
+      events?: string[];
+      users?: string[];
+      locations?: string[];
       limit?: number;
       offset?: number;
     } = {}
   ) {
     let response = await this.axios.get('/reports/transactions', {
       headers: this.getHeaders(),
-      params
+      params,
+      paramsSerializer: { indexes: null }
     });
     return response.data;
   }
@@ -480,9 +520,19 @@ export class Client {
     locationId?: string;
     showOnRedeemApp?: boolean;
   }) {
-    let response = await this.axios.post('/users/invite', body, {
-      headers: this.getJsonHeaders()
-    });
+    let response = await this.axios.post(
+      '/users',
+      {
+        email: body.email,
+        name: body.name,
+        isAdministrator: body.isAdministrator,
+        pin: body.pin,
+        locations: body.locationId ? [{ id: body.locationId }] : undefined,
+        hiddenInRedeemApp:
+          body.showOnRedeemApp === undefined ? undefined : !body.showOnRedeemApp
+      },
+      { headers: this.getJsonHeaders() }
+    );
     return response.data;
   }
 
@@ -503,14 +553,14 @@ export class Client {
   // ==================== Webhooks ====================
 
   async listWebhooks() {
-    let response = await this.axios.get('/webhooks', {
+    let response = await this.axios.get('/hooks', {
       headers: this.getHeaders()
     });
     return response.data;
   }
 
   async getWebhook(webhookId: string) {
-    let response = await this.axios.get(`/webhooks/${encodeURIComponent(webhookId)}`, {
+    let response = await this.axios.get(`/hooks/${encodeURIComponent(webhookId)}`, {
       headers: this.getHeaders()
     });
     return response.data;
@@ -522,14 +572,30 @@ export class Client {
     secret?: string;
     testMode?: boolean;
   }) {
-    let response = await this.axios.post('/webhooks', body, {
-      headers: this.getJsonHeaders()
-    });
+    let eventPaths: Record<string, string> = {
+      OrderCreated: 'order-created',
+      GiftCardCreated: 'gift-card-created',
+      GiftCardUpdated: 'gift-card-updated',
+      GiftCardRedeemed: 'gift-card-redeemed'
+    };
+    let event = eventPaths[body.eventType] ?? body.eventType;
+    if (!Object.values(eventPaths).includes(event)) {
+      throw createApiServiceError('Unsupported Gift Up! webhook event type.');
+    }
+    let response = await this.axios.post(
+      `/hooks/${encodeURIComponent(event)}/subscribe`,
+      {
+        targetUrl: body.targetUrl,
+        secret: body.secret,
+        isTestMode: body.testMode
+      },
+      { headers: this.getJsonHeaders() }
+    );
     return response.data;
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await this.axios.delete(`/webhooks/${encodeURIComponent(webhookId)}`, {
+    let response = await this.axios.delete(`/hooks/${encodeURIComponent(webhookId)}`, {
       headers: this.getHeaders()
     });
     return response.data;

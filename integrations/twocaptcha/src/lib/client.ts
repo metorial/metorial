@@ -1,17 +1,22 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
-export interface CreateTaskResponse {
+export interface CreateTaskResponse extends Record<string, unknown> {
   errorId: number;
   errorCode?: string;
   errorDescription?: string;
-  taskId?: number;
+  taskId: number;
 }
 
-export interface TaskResultResponse {
+export interface TaskResultResponse extends Record<string, unknown> {
   errorId: number;
   errorCode?: string;
   errorDescription?: string;
-  status?: string;
+  status: string;
   solution?: Record<string, unknown>;
   cost?: string;
   ip?: string;
@@ -20,18 +25,18 @@ export interface TaskResultResponse {
   solveCount?: number;
 }
 
-export interface BalanceResponse {
+export interface BalanceResponse extends Record<string, unknown> {
   errorId: number;
   errorCode?: string;
   errorDescription?: string;
-  balance?: number;
+  balance: number;
 }
 
-export interface ReportResponse {
+export interface ReportResponse extends Record<string, unknown> {
   errorId: number;
   errorCode?: string;
   errorDescription?: string;
-  status?: string;
+  status: string;
 }
 
 export interface ProxyConfig {
@@ -50,62 +55,143 @@ export class TwoCaptchaClient {
     this.clientKey = config.token;
     this.axios = createAxios({
       baseURL: 'https://api.2captcha.com',
+      timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
       }
     });
   }
 
+  private redact(value: string): string {
+    return this.clientKey ? value.split(this.clientKey).join('[redacted]') : value;
+  }
+
+  private async post(
+    path: string,
+    body: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    let result: unknown;
+    try {
+      // Submit once: retrying createTask after a transport failure can create another paid task.
+      result = (await this.axios.post(path, { clientKey: this.clientKey, ...body })).data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: '2Captcha',
+        operation: path.slice(1),
+        reason: 'twocaptcha_request_failed',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        detailKeys: ['errorCode', 'errorDescription'],
+        extractMessage: (error, helpers) => {
+          let providerDetails: string[] = [];
+          helpers.collectDetails(helpers.getResponseWithBody(error)?.data, providerDetails, {
+            detailKeys: ['errorCode', 'errorDescription']
+          });
+          let details =
+            providerDetails.join(' - ') ||
+            helpers.extractMessage(error, {
+              fallbackMessage: 'Request failed'
+            });
+          details = this.redact(details);
+          return path === '/createTask'
+            ? `${details}. Submission may have been accepted. Check your callback or account before submitting again to avoid duplicate charges.`
+            : details;
+        },
+        extractUpstreamCode: (_error, response) =>
+          isApiErrorRecord(response?.data) && typeof response.data.errorCode === 'string'
+            ? this.redact(response.data.errorCode)
+            : undefined
+      });
+    }
+    if (!isApiErrorRecord(result) || typeof result.errorId !== 'number') {
+      let message = `2Captcha returned an invalid ${path.slice(1)} response.`;
+      if (path === '/createTask') {
+        message +=
+          ' Submission may have been accepted. Check your callback or account before submitting again to avoid duplicate charges.';
+      }
+      throw createApiServiceError(message, { reason: 'twocaptcha_invalid_response' });
+    }
+    if (result.errorId !== 0) {
+      let details = [result.errorCode, result.errorDescription]
+        .filter((value): value is string => typeof value === 'string')
+        .join(' - ');
+      details = this.redact(details);
+      throw createApiServiceError(
+        `2Captcha ${path.slice(1)} failed: ${details || `error ${result.errorId}`}`,
+        {
+          reason: 'twocaptcha_api_error',
+          upstreamCode:
+            typeof result.errorCode === 'string' ? this.redact(result.errorCode) : undefined
+        }
+      );
+    }
+    return result;
+  }
+
   async createTask(
     task: Record<string, unknown>,
-    options?: {
-      callbackUrl?: string;
-      languagePool?: string;
-      softId?: number;
-    }
+    options?: { callbackUrl?: string; languagePool?: string; softId?: number }
   ): Promise<CreateTaskResponse> {
-    let body: Record<string, unknown> = {
-      clientKey: this.clientKey,
-      task
-    };
-
+    let body: Record<string, unknown> = { task };
     if (options?.callbackUrl) body.callbackUrl = options.callbackUrl;
-    if (options?.languagePool) body.languagePool = options.languagePool;
+    if (options?.languagePool)
+      body.languagePool = options.languagePool === 'rn' ? 'ru' : options.languagePool;
     if (options?.softId) body.softId = options.softId;
-
-    let response = await this.axios.post('/createTask', body);
-    return response.data as CreateTaskResponse;
+    let result = await this.post('/createTask', body);
+    if (
+      typeof result.taskId !== 'number' ||
+      !Number.isSafeInteger(result.taskId) ||
+      result.taskId <= 0
+    ) {
+      throw createApiServiceError(
+        '2Captcha returned no valid task ID. Submission may have been accepted. Check your callback or account before submitting again to avoid duplicate charges.',
+        {
+          reason: 'twocaptcha_invalid_task_id'
+        }
+      );
+    }
+    return result as CreateTaskResponse;
   }
 
   async getTaskResult(taskId: number): Promise<TaskResultResponse> {
-    let response = await this.axios.post('/getTaskResult', {
-      clientKey: this.clientKey,
-      taskId
-    });
-    return response.data as TaskResultResponse;
+    let result = await this.post('/getTaskResult', { taskId });
+    if (typeof result.status !== 'string' || !result.status) {
+      throw createApiServiceError('2Captcha returned no task status.', {
+        reason: 'twocaptcha_invalid_response'
+      });
+    }
+    return result as TaskResultResponse;
   }
 
   async getBalance(): Promise<BalanceResponse> {
-    let response = await this.axios.post('/getBalance', {
-      clientKey: this.clientKey
-    });
-    return response.data as BalanceResponse;
+    let result = await this.post('/getBalance', {});
+    if (typeof result.balance !== 'number' || !Number.isFinite(result.balance)) {
+      throw createApiServiceError('2Captcha returned no valid account balance.', {
+        reason: 'twocaptcha_invalid_response'
+      });
+    }
+    return result as BalanceResponse;
+  }
+
+  private async report(
+    path: '/reportCorrect' | '/reportIncorrect',
+    taskId: number
+  ): Promise<ReportResponse> {
+    let result = await this.post(path, { taskId });
+    if (typeof result.status !== 'string' || !result.status) {
+      throw createApiServiceError(
+        '2Captcha returned no report status. The report may have been accepted.',
+        { reason: 'twocaptcha_invalid_response' }
+      );
+    }
+    return result as ReportResponse;
   }
 
   async reportCorrect(taskId: number): Promise<ReportResponse> {
-    let response = await this.axios.post('/reportCorrect', {
-      clientKey: this.clientKey,
-      taskId
-    });
-    return response.data as ReportResponse;
+    return this.report('/reportCorrect', taskId);
   }
 
   async reportIncorrect(taskId: number): Promise<ReportResponse> {
-    let response = await this.axios.post('/reportIncorrect', {
-      clientKey: this.clientKey,
-      taskId
-    });
-    return response.data as ReportResponse;
+    return this.report('/reportIncorrect', taskId);
   }
 
   buildRecaptchaV2Task(params: {
@@ -113,6 +199,8 @@ export class TwoCaptchaClient {
     websiteKey: string;
     isInvisible?: boolean;
     recaptchaDataSValue?: string;
+    isEnterprise?: boolean;
+    enterprisePayload?: Record<string, unknown>;
     apiDomain?: string;
     userAgent?: string;
     cookies?: string;
@@ -124,6 +212,12 @@ export class TwoCaptchaClient {
       websiteKey: params.websiteKey
     };
 
+    if (params.isEnterprise) {
+      task.type = params.proxy
+        ? 'RecaptchaV2EnterpriseTask'
+        : 'RecaptchaV2EnterpriseTaskProxyless';
+      if (params.enterprisePayload) task.enterprisePayload = params.enterprisePayload;
+    }
     if (params.isInvisible !== undefined) task.isInvisible = params.isInvisible;
     if (params.recaptchaDataSValue) task.recaptchaDataSValue = params.recaptchaDataSValue;
     if (params.apiDomain) task.apiDomain = params.apiDomain;
@@ -143,8 +237,14 @@ export class TwoCaptchaClient {
     apiDomain?: string;
     proxy?: ProxyConfig;
   }): Record<string, unknown> {
+    if (params.proxy) {
+      throw createApiServiceError(
+        '2Captcha does not support proxies for reCAPTCHA V3 or Enterprise V3. Remove proxy and use the proxyless task.',
+        { reason: 'twocaptcha_unsupported_proxy' }
+      );
+    }
     let task: Record<string, unknown> = {
-      type: params.proxy ? 'RecaptchaV3Task' : 'RecaptchaV3TaskProxyless',
+      type: 'RecaptchaV3TaskProxyless',
       websiteURL: params.websiteUrl,
       websiteKey: params.websiteKey
     };
@@ -209,6 +309,7 @@ export class TwoCaptchaClient {
     challenge?: string;
     geetestApiServerSubdomain?: string;
     geetestGetLib?: string;
+    riskType?: string;
     version?: number;
     initParameters?: Record<string, unknown>;
     proxy?: ProxyConfig;
@@ -219,6 +320,7 @@ export class TwoCaptchaClient {
       gt: params.gt
     };
 
+    if (params.riskType) task.riskType = params.riskType;
     if (params.challenge) task.challenge = params.challenge;
     if (params.geetestApiServerSubdomain)
       task.geetestApiServerSubdomain = params.geetestApiServerSubdomain;

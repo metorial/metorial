@@ -24,6 +24,7 @@ export let calculateCo2Offset = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       co2Kg: z.number().optional().describe('CO2 amount in kilograms'),
       treesNeeded: z.number().optional().describe('Number of trees needed for compensation')
     })
@@ -36,10 +37,7 @@ export let calculateCo2Offset = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        co2Kg: result.co2Kg,
-        treesNeeded: result.trees
-      },
+      output: { raw: result, co2Kg: result.co2Kg, treesNeeded: result.trees },
       message: `To offset **${ctx.input.co2Kg} kg** of CO2${ctx.input.activityType ? ` from **${ctx.input.activityType}**` : ''}, approximately **${result.trees ?? 'N/A'}** trees are needed.`
     };
   })

@@ -1,6 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import {
+  finageNumber,
+  finagePreviousClose,
+  finageRecord,
+  finageSymbol
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getForexPrice = SlateTool.create(spec, {
@@ -18,6 +24,7 @@ export let getForexPrice = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Forex pair symbol'),
       ask: z.number().optional().describe('Ask price'),
       bid: z.number().optional().describe('Bid price'),
@@ -36,37 +43,26 @@ export let getForexPrice = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let symbol = ctx.input.symbol.toUpperCase();
-
-    let [quoteResult, prevCloseResult] = await Promise.allSettled([
+    let symbol = finageSymbol(ctx.input.symbol);
+    let [primaryData, previousData] = await Promise.all([
       client.getForexLastQuote(symbol),
       client.getForexPreviousClose(symbol)
     ]);
+    let quote = finageRecord(primaryData);
 
-    let quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
-    let prevClose = prevCloseResult.status === 'fulfilled' ? prevCloseResult.value : null;
-    let prevBar = prevClose?.results?.[0] ?? prevClose;
-
-    let output = {
+    let output = pickDefined({
       symbol,
-      ask: quote?.ask,
-      bid: quote?.bid,
-      timestamp: quote?.timestamp,
-      previousClose: prevBar
-        ? {
-            open: prevBar.o,
-            high: prevBar.h,
-            low: prevBar.l,
-            close: prevBar.c,
-            volume: prevBar.v
-          }
-        : undefined
-    };
-
-    let rateStr = output.bid ? output.bid.toFixed(5) : 'N/A';
+      ask: finageNumber(quote.ask),
+      bid: finageNumber(quote.bid),
+      timestamp: finageNumber(quote.timestamp),
+      previousClose: finagePreviousClose(previousData),
+      raw: { quote: primaryData, previousClose: previousData }
+    });
+    if (output.ask === undefined && output.bid === undefined)
+      throw createApiServiceError('Finage returned no current pricing for this symbol.');
     return {
-      output,
-      message: `**${symbol}** bid: ${rateStr}${output.previousClose?.close ? `, previous close: ${output.previousClose.close.toFixed(5)}` : ''}`
+      output: { ...output, symbol },
+      message: `Retrieved latest pricing and previous close for **${symbol}**.`
     };
   })
   .build();

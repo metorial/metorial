@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity } from '../lib/response';
 import { spec } from '../spec';
 
 let prepaidTransactionSchema = z
@@ -32,7 +33,10 @@ export let managePrepaid = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Transaction amount in cents (required for transact)'),
-      shopUuid: z.string().optional().describe('Shop UUID (required for transact)'),
+      shopUuid: z
+        .string()
+        .optional()
+        .describe('Shop UUID from list_shops (required for transact)'),
       limit: z.number().optional().describe('Items per page for list'),
       page: z.number().optional().describe('Page number for list')
     })
@@ -56,7 +60,7 @@ export let managePrepaid = SlateTool.create(spec, {
 
     if (action === 'balance') {
       let result = await client.getContactPrepaidBalance(contactUuid);
-      let data = result.data || result;
+      let data = result.data;
       return {
         output: {
           balanceInCents: data.balance_in_cents,
@@ -73,15 +77,16 @@ export let managePrepaid = SlateTool.create(spec, {
         limit: ctx.input.limit,
         page: ctx.input.page
       });
-      let transactions = (result.data || []).map((t: any) => ({
-        transactionUuid: t.uuid,
-        amountInCents: t.amount_in_cents,
-        balanceInCents: t.prepaid_balance?.balance_in_cents,
-        contactUuid: t.contact?.uuid || contactUuid,
-        shopUuid: t.shop?.uuid,
-        createdAt: t.created_at,
-        ...t
-      }));
+      let transactions = result.data.map((t: any) =>
+        mapEntity(t, {
+          transactionUuid: t.uuid,
+          amountInCents: t.amount_in_cents,
+          balanceInCents: t.prepaid_balance?.balance_in_cents,
+          contactUuid: t.contact?.uuid || contactUuid,
+          shopUuid: t.shop?.uuid,
+          createdAt: t.created_at
+        })
+      );
       return {
         output: { transactions },
         message: `Retrieved **${transactions.length}** prepaid transaction(s) for contact ${contactUuid}.`
@@ -90,29 +95,28 @@ export let managePrepaid = SlateTool.create(spec, {
 
     // transact
     if (ctx.input.amountInCents === undefined)
-      throw new Error('amountInCents is required for transact');
+      throw createApiServiceError('amountInCents is required for transact');
     let shopUuid = ctx.input.shopUuid || ctx.config.shopUuid;
-    if (!shopUuid) throw new Error('shopUuid is required for transact');
+    if (!shopUuid) throw createApiServiceError('shopUuid is required for transact');
 
     let result = await client.createPrepaidTransaction({
       contactUuid,
       amountInCents: ctx.input.amountInCents,
       shopUuid
     });
-    let t = result.data || result;
+    let t = result.data;
     return {
       output: {
         balanceInCents: t.prepaid_balance?.balance_in_cents,
         balance: t.prepaid_balance?.balance,
-        transaction: {
+        transaction: mapEntity(t, {
           transactionUuid: t.uuid,
           amountInCents: t.amount_in_cents,
           balanceInCents: t.prepaid_balance?.balance_in_cents,
           contactUuid,
           shopUuid,
-          createdAt: t.created_at,
-          ...t
-        }
+          createdAt: t.created_at
+        })
       },
       message: `Prepaid transaction of **${ctx.input.amountInCents}** cents for contact ${contactUuid}. New balance: ${t.prepaid_balance?.balance || `${t.prepaid_balance?.balance_in_cents} cents`}.`
     };

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteGeneration,
   generateImage,
   generatePdf,
   generateVideo,
@@ -20,7 +21,8 @@ export let provider = Slate.create({
     manageCollections,
     uploadMedia,
     mergePdfs,
-    getGenerationStatus
+    getGenerationStatus,
+    deleteGeneration
   ],
   triggers: []
 });

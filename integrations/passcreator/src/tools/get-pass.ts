@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,9 +45,26 @@ export let getPass = SlateTool.create(spec, {
 
     let uris: { iPhoneUri?: string; androidUri?: string } | undefined;
     try {
-      uris = await client.getPassUris(ctx.input.passId);
-    } catch {
-      // URIs may not be available for all passes
+      let result = await client.getPassUris(pass.identifier);
+      uris = {
+        iPhoneUri: result.iPhoneUri ?? undefined,
+        androidUri: result.androidUri ?? result.AndroidUri ?? undefined
+      };
+    } catch (error) {
+      if (
+        !isApiErrorRecord(error) ||
+        !isApiErrorRecord(error.data) ||
+        Number(error.data.upstreamStatus) !== 404
+      ) {
+        throw error;
+      }
+    }
+    if (uris?.iPhoneUri) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: uris.iPhoneUri,
+        mimeType: 'application/vnd.apple.pkpass'
+      });
     }
 
     return {

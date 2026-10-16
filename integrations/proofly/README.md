@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Proofly
 
-Manage social proof notification campaigns and retrieve lead and conversion data. List, inspect, and toggle campaigns. Retrieve notification performance statistics including impressions, clicks, and leads. Access collected lead data with visitor details and geolocation. Add external conversions to notifications from third-party systems. View account activity logs and user information.
+Manage social proof campaigns and retrieve notification settings, performance statistics, and collected leads. Discover campaigns and notifications, toggle campaign status, and inspect account activity, impression usage, and pixel settings.
+
+Authenticate with the API key shown on the [Proofly developers page](https://proofly.io/developers). Use `list_campaigns` to discover campaign IDs, then `get_campaign_notifications` to discover notification IDs for `get_notification` and `get_notification_data`.
+
+The existing `create_conversion` tool is retained for compatibility. Its endpoint is absent from the current public API reference, and a successful result requires Proofly to explicitly acknowledge the operation. The [REST API guide](https://proofly.io/helpdesk/proofly-rest-api) lists a separate lead-ingestion endpoint without specifying its payload or response schema; that endpoint is not substituted for the existing conversion tool.
 
 ## License
 

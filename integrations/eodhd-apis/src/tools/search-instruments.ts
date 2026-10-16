@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let searchResultSchema = z.object({
@@ -51,7 +51,7 @@ export let searchInstruments = SlateTool.create(spec, {
       exchange: ctx.input.exchange
     });
 
-    let resultsArray = Array.isArray(results) ? results : [];
+    let resultsArray = eodhdArray(results, 'search-instruments');
 
     return {
       output: {

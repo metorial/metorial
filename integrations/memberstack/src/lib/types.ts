@@ -48,7 +48,12 @@ export let memberSchema = z.object({
   planConnections: z
     .array(planConnectionSchema)
     .optional()
-    .describe('Array of plan connections')
+    .describe('Array of plan connections'),
+  teams: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe('Team memberships when requested'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider member data')
 });
 
 export type Member = z.infer<typeof memberSchema>;
@@ -59,5 +64,26 @@ export let tokenVerificationSchema = z.object({
   issuedAt: z.number().optional().describe('Token issued at (Unix timestamp)'),
   expiresAt: z.number().optional().describe('Token expiration (Unix timestamp)'),
   audience: z.string().optional().describe('Token audience (app ID)'),
-  issuer: z.string().optional().describe('Token issuer')
+  issuer: z.string().optional().describe('Token issuer'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete verified token claims')
+});
+
+export let tableKeySchema = z
+  .string()
+  .min(1)
+  .describe(
+    'Data table key or ID. Call list_data_tables to discover tables and get_data_table to inspect field keys.'
+  );
+
+export let dataRecordSchema = z.object({
+  id: z.string().describe('Record ID'),
+  tableKey: z.string().optional(),
+  createdByMemberId: z.string().nullable().optional(),
+  data: z
+    .record(z.string(), z.unknown())
+    .describe('Actual field values returned by the provider'),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  internalOrder: z.number().optional(),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider record')
 });

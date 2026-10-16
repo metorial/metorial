@@ -74,7 +74,7 @@ export let getTemplate = SlateTool.create(spec, {
           property: p.property
         }))
       },
-      message: `Retrieved template **${template.name}** (\`${template.identifier}\`) with ${template.properties?.length ?? 0} configurable properties.`
+      message: `Retrieved template **${template.name}** (\`${template.identifier}\`) ${template.properties === undefined ? '(property definitions were not returned)' : `with ${template.properties.length} configurable properties`}.`
     };
   })
   .build();

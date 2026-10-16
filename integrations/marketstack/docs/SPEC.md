@@ -1,78 +1,41 @@
-# Slates Specification for Marketstack
+# Marketstack specification
 
-## Overview
+Marketstack provides a single market-data API. This integration uses HTTPS and API-key authentication through the `access_key` query parameter. Obtain a key from the Marketstack dashboard. There is no OAuth refresh flow, resource-scoping configuration, or documented current-account identity endpoint.
 
-Marketstack is a REST API providing real-time, intraday, and historical stock market data. It covers 30,000+ stock tickers from 50+ countries across 70+ stock exchanges, along with commodity prices, government bonds, ETF holdings, market indices, and SEC EDGAR filings data.
+## Current capabilities
 
-## Authentication
+- End-of-day data: `/v2/eod` and `/v2/eod/latest`, preserving raw and adjusted OHLCV values.
+- Intraday data: `/v2/intraday` and `/v2/intraday/latest`, including interval, sort, and optional after-hours filtering. Some IEX quote fields can be null without entitlement; the provider's complete payload remains in `raw`.
+- Tickers and exchanges: `/v2/tickerslist`, `/v2/tickers/{symbol}`, `/v2/tickerinfo`, and `/v2/exchanges`.
+- Corporate actions: `/v2/splits` and `/v2/dividends`.
+- Commodity prices: explicit `commodityName` selects `/v2/commodities`; dates or `frequency` select `/v2/commoditieshistory`. Results use provider commodity names, not invented ticker identifiers. Sorting and pagination are local for the named-commodity branch.
+- Indices: `/v2/indexlist` plus `/v2/indexinfo`. The existing list tool retrieves one page and enriches every benchmark on it before applying its name/country filter. `get_market_index` queries a known benchmark directly. List pagination describes the original provider list page, not the enriched or filtered results.
+- Government bonds: `/v2/bondlist` plus `/v2/bond`, retrieving each matching country on one list page. List pagination describes the original provider country-list page.
+- ETFs: `/v2/etflist` and `/v2/etfholdings`. Each request counts as 20 provider API calls. Holdings preserve the nested investment-security data in `raw`; individual ticker/date aliases are omitted when absent.
+- Ratings: `get_company_ratings` makes exactly one `/v2/companyratings` request for one ticker, with optional date and buy/sell/hold filters. The provider limits this endpoint to one API call per minute; callers must space separate invocations accordingly. Company metadata, consensus, and individual rating records retain their provider shape, with the complete response in `raw`. The original multi-symbol `get_analyst_ratings` tool is formally deprecated in favor of this genuine single-ticker replacement; its original handler, schemas, `/v2/analysts` request, parameter omission, and request defaults are preserved. This integration-level deprecation does not assert provider retirement of `/v2/analysts`.
+- SEC: `/v2/cik_code`, `/v2/submissions`, `/v2/company_facts`, and `/v2/frames/accounts_payable/{unit}`. Numeric CIK inputs are zero-padded to the provider's ten-digit representation. Company-name lookup retains the first-match behavior; use an exact CIK for ambiguous names. Filing-date/report-date/accession filters use provider parameters; form/limit/offset filters apply locally to the returned recent-filing arrays. Full submission metadata and references to older filing files remain in `raw`. Company facts are flattened by actual taxonomy/concept/unit; taxonomy/tag filters apply locally to the returned facts.
+- Reference data: `/v2/currencies` and `/v2/timezones`.
+- `download_catalog` delivers the provider-published supported-ticker CSV, end-of-day ticker workbook, or commodity workbook as a downloadable file using the exact documented public URL.
 
-Marketstack uses **API key authentication**. Every request must include an `access_key` query parameter with your API key.
+## Compatibility and missing provider fields
 
-- **Obtaining a key:** Sign up at marketstack.com and retrieve your API access key from the account dashboard.
-- **Usage:** Append `access_key=YOUR_ACCESS_KEY` as a query parameter on every API request.
-- **Example:** `https://api.marketstack.com/v2/eod?access_key=YOUR_ACCESS_KEY&symbols=AAPL`
-- **HTTPS:** Available on the free plan and all paid plans. Always use the `https://` protocol.
-- **Key rotation:** If compromised, the access key can be reset from the account dashboard.
+All 13 original tool keys and original input types, requiredness, enums, defaults, and constraints remain present. Output scalar types are preserved. Fields absent or explicitly null in current provider payloads are omitted through narrow optional aliases, with complete payloads retained in `raw`. Pagination objects remain present; absent provider pagination values are omitted rather than synthesized.
 
-No OAuth, tokens, or additional credentials are required. There are no scopes or tenant-specific inputs.
+Three legacy requests remain unverified because the current reference does not establish their supported behavior or retirement:
 
-## Features
+- `get_commodities` without `commodityName` retains the original `/v2/commodities` request with `symbols`, `date_from`, `date_to`, `sort`, `limit`, and `offset`. Empty optional string parameters remain omitted. Date and local-pagination validation apply only when `commodityName` explicitly selects the current documented API; do not combine it with `symbols`.
+- Deprecated `get_analyst_ratings` retains the original multi-symbol `/v2/analysts` request and unchanged response mapping. Use `get_company_ratings` for the current documented single-ticker operation.
+- The `frames` mode in `get_sec_financial_data` retains `/v2/sec/frames` with its original generalized taxonomy/tag/unit/period request. `get_accounts_payable_frames` provides the separate documented accounts-payable capability. No claim is made that generalized frames are supported or retired.
 
-### End-of-Day Stock Data
+The current documentation provides a v2 OpenAPI specification. The official v1 reference explicitly states that v1 endpoints are deprecated for use after June 30, 2025; this integration uses v2. That notice does not establish the status of the three uncertain v2 requests described above. The integration has no webhook/event subscription API.
 
-Retrieve daily closing prices (open, high, low, close, volume) for stocks, including adjusted prices that account for splits and dividends. Supports 500,000+ tickers from major exchanges (NASDAQ, NYSE, etc.). Data can be filtered by symbol(s), exchange, and date range. Up to 15 years of historical data is available.
+## Sources
 
-### Intraday Stock Data
+- [Current official reference](https://docs.apilayer.com/marketstack/docs/api-documentation)
+- [Official v2 OpenAPI specification](https://api.swaggerhub.com/apis/apilayer-863/MarketstackAPIv2/2.0.0/swagger.json)
+- [Official v1 deprecation notice](https://docs.apilayer.com/marketstack/docs/api-endpoints-v1)
+- [Getting started](https://docs.apilayer.com/marketstack/docs/getting-started)
+- [Plans and entitlement](https://marketstack.com/pricing/)
+- [EDGAR overview](https://marketstack.com/edgar)
 
-Access intraday price data for US stock tickers on the IEX exchange with intervals from 1 minute to 24 hours. Includes derived real-time reference prices calculated by Marketstack. After-hours trading data can optionally be included. Available on Basic plan and higher; sub-15-minute intervals require Professional plan.
-
-### Real-Time Stock Prices
-
-Get live stock prices across major global exchanges (NYSE, NASDAQ, LON, WSE, NSE, and more). Returns the last known price, currency, and timestamp per exchange for a given ticker. Available on Professional plan and higher.
-
-### Commodity Prices
-
-Retrieve current and historical prices for 70+ commodities across energy, metals, industrial, agricultural, and livestock categories. Historical data supports daily or monthly frequency and goes back up to 15 years. Available on Professional plan and higher.
-
-### Stock Splits & Dividends
-
-Look up historical stock split factors and dividend payment information for tickers. Includes payment dates, record dates, declaration dates, and distribution frequency for dividends.
-
-### Company Analyst Ratings
-
-Access current and historical analyst buy/sell/hold ratings for stocks, including consensus data, price targets, and individual analyst recommendations with 15+ years of history. Available on Business plan and higher.
-
-### Ticker & Company Information
-
-Look up detailed company information for a ticker, including sector, industry, key executives, incorporation details, contact information, SIC codes, and the exchanges on which it trades. Search and list all supported tickers with filtering by name, symbol, or exchange.
-
-### Stock Market Indices
-
-List and retrieve data for 86+ global stock market indices/benchmarks, including current price, daily/weekly/monthly/yearly percentage changes. Available on Basic plan and higher.
-
-### Government Bonds
-
-Access 10-year government bond yield data for 53+ countries, including yield, daily price change, and weekly/monthly/yearly percentage changes. Available on Basic plan and higher.
-
-### ETF Holdings
-
-Retrieve complete ETF holdings data by ticker, including fund metadata, individual security holdings with balances, values, asset categories, and ISINs. Supports date range filtering. Available on Basic plan and higher.
-
-### SEC EDGAR Filings
-
-Access SEC EDGAR data including:
-
-- **CIK lookup:** Find CIK codes by company name or find company details by CIK code.
-- **Company submissions:** Retrieve full submission/filing history for a company (8-K, 10-K, 10-Q, Form 4, etc.), filterable by filing date, report date, or accession number.
-- **Company facts & concepts:** Get XBRL financial data (e.g., US-GAAP accounts payable) across all filings for a company.
-- **Frames:** Aggregate XBRL facts across all reporting entities for a given calendar period and concept.
-
-Available on Business plan only.
-
-### Reference Data
-
-Look up metadata for 2,700+ stock exchanges (name, MIC, country, status), supported currencies, and timezones.
-
-## Events
-
-The provider does not support events. Marketstack is a data query API and does not offer webhooks, event subscriptions, or any push-based notification mechanism.
+The official OpenAPI specification is the source for exact paths, query parameters, response nesting, rate limits, and catalog URLs. No authenticated provider requests were made during this refresh.

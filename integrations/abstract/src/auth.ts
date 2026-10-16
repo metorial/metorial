@@ -16,7 +16,10 @@ export let auth = SlateAuth.create()
       imageProcessingToken: z.string().optional(),
       avatarsToken: z.string().optional(),
       vatToken: z.string().optional(),
-      ibanToken: z.string().optional()
+      ibanToken: z.string().optional(),
+      emailReputationToken: z.string().optional(),
+      phoneIntelligenceToken: z.string().optional(),
+      ipIntelligenceToken: z.string().optional()
     })
   )
   .addCustomAuth({
@@ -40,7 +43,13 @@ export let auth = SlateAuth.create()
       imageProcessingToken: z.string().optional().describe('API key for Image Processing API'),
       avatarsToken: z.string().optional().describe('API key for User Avatars API'),
       vatToken: z.string().optional().describe('API key for VAT Validation API'),
-      ibanToken: z.string().optional().describe('API key for IBAN Validation API')
+      ibanToken: z.string().optional().describe('API key for IBAN Validation API'),
+      emailReputationToken: z.string().optional().describe('API key for Email Reputation API'),
+      phoneIntelligenceToken: z
+        .string()
+        .optional()
+        .describe('API key for Phone Intelligence API'),
+      ipIntelligenceToken: z.string().optional().describe('API key for IP Intelligence API')
     }),
 
     getOutput: async ctx => {
@@ -58,7 +67,10 @@ export let auth = SlateAuth.create()
           imageProcessingToken: ctx.input.imageProcessingToken,
           avatarsToken: ctx.input.avatarsToken,
           vatToken: ctx.input.vatToken,
-          ibanToken: ctx.input.ibanToken
+          ibanToken: ctx.input.ibanToken,
+          emailReputationToken: ctx.input.emailReputationToken,
+          phoneIntelligenceToken: ctx.input.phoneIntelligenceToken,
+          ipIntelligenceToken: ctx.input.ipIntelligenceToken
         }
       };
     }

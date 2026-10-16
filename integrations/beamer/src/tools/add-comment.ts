@@ -1,13 +1,21 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BeamerComment, Client } from '../lib/client';
 import { spec } from '../spec';
 
-let commentOutputSchema = z.object({
+export let commentOutputSchema = z.object({
   commentId: z.number().describe('Unique comment ID'),
   date: z.string().describe('Comment date (ISO-8601)'),
   text: z.string().describe('Comment text'),
-  postTitle: z.string().describe('Title of the post this comment belongs to'),
+  postTitle: z
+    .string()
+    .describe('Title of the post or feature request this comment belongs to'),
+  featureRequestTitle: z
+    .string()
+    .optional()
+    .describe('Title of the feature request, when applicable'),
+  visible: z.boolean().optional().describe('Feature request comment visibility'),
+  url: z.string().nullable().optional().describe('Comment URL in the dashboard'),
   userId: z.string().nullable().describe('User ID of the commenter'),
   userEmail: z.string().nullable().describe('Email of the commenter'),
   userFirstName: z.string().nullable().describe('First name of the commenter'),
@@ -47,7 +55,10 @@ export let addCommentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let comment: any;
+    if (ctx.input.resourceType === 'post' && ctx.input.visible !== undefined) {
+      throw createApiServiceError('visible is only supported for feature request comments.');
+    }
+    let comment: BeamerComment;
 
     if (ctx.input.resourceType === 'post') {
       comment = await client.createPostComment(ctx.input.resourceId, {
@@ -73,7 +84,10 @@ export let addCommentTool = SlateTool.create(spec, {
         commentId: comment.id,
         date: comment.date,
         text: comment.text,
-        postTitle: comment.postTitle,
+        postTitle: comment.featureRequestTitle ?? comment.postTitle,
+        featureRequestTitle: comment.featureRequestTitle,
+        visible: comment.visible,
+        url: comment.url,
         userId: comment.userId,
         userEmail: comment.userEmail,
         userFirstName: comment.userFirstName,

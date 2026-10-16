@@ -1,6 +1,18 @@
 # <img src="logo.png" height="20"> Kraken.io
 
-Optimize and compress images in JPG, PNG, WebP, GIF, SVG, AVIF, HEIC, and PDF formats. Perform lossy or lossless compression with custom quality settings. Resize images using multiple strategies (exact, portrait, landscape, auto, crop, square, fit) and generate responsive image sets. Convert images between formats (JPEG, PNG, GIF, WebP, AVIF). Preserve or strip image metadata (EXIF, XMP, IPTC). Auto-correct image orientation. Store optimized images to external cloud providers (S3, Azure, Google Cloud Storage, SoftLayer). Compress PDF files. Query account status for quota and plan details.
+Optimize images and PDFs from public URLs with lossy or lossless compression,
+custom quality, resizing, conversion, metadata preservation, and auto-orientation.
+Generate up to ten responsive image variants, including square thumbnails and
+custom crops. Store results in Amazon S3 or prepare completed files for download.
+Query the current account's plan, active status, and byte quotas.
+
+`optimize_image` and `generate_image_sets` wait for results by default. Supply a
+callback URL to receive a request ID immediately and have Kraken.io POST the
+results to your application. Files hosted by Kraken.io expire after one hour;
+download them promptly. If file delivery fails, completed optimization metadata
+and the provider's original URL remain available with an explicit warning.
+
+See [API coverage and provider documentation](docs/SPEC.md) for options and limits.
 
 ## License
 

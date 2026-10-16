@@ -3,12 +3,18 @@ import { spec } from './spec';
 import {
   archiveChannel,
   createChannel,
+  createOrSubscribeChannel,
   deleteMessage,
+  getChannel,
   getChannelTopics,
+  getMessage,
   getMessages,
+  getServerSettings,
   getUser,
   getUserPresence,
   listChannels,
+  listFiles,
+  listSubscriptions,
   listUsers,
   manageMessageFlags,
   manageReactions,
@@ -18,7 +24,8 @@ import {
   sendMessage,
   setUserStatus,
   updateChannel,
-  updateMessage
+  updateMessage,
+  uploadFile
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -31,6 +38,13 @@ export let provider = Slate.create({
     manageMessageFlags,
     listChannels,
     createChannel,
+    createOrSubscribeChannel,
+    getChannel,
+    getMessage,
+    getServerSettings,
+    listFiles,
+    listSubscriptions,
+    uploadFile,
     updateChannel,
     archiveChannel,
     getChannelTopics,

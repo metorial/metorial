@@ -29,6 +29,22 @@ export let listMessages = SlateTool.create(spec, {
         .describe('Only return messages after this ISO 8601 timestamp'),
       includeSpam: z.boolean().optional().describe('Include spam messages'),
       includeBlocked: z.boolean().optional().describe('Include blocked messages'),
+      includeUnauthenticated: z
+        .boolean()
+        .optional()
+        .describe('Include messages that failed sender authentication.'),
+      from: z
+        .array(z.string())
+        .optional()
+        .describe('Sender substrings; all values must match.'),
+      to: z
+        .array(z.string())
+        .optional()
+        .describe('Recipient substrings across To, CC, and BCC; all values must match.'),
+      subject: z
+        .array(z.string())
+        .optional()
+        .describe('Subject substrings; all values must match.'),
       includeTrash: z.boolean().optional().describe('Include trashed messages')
     })
   )
@@ -66,6 +82,10 @@ export let listMessages = SlateTool.create(spec, {
       after: ctx.input.after,
       includeSpam: ctx.input.includeSpam,
       includeBlocked: ctx.input.includeBlocked,
+      includeUnauthenticated: ctx.input.includeUnauthenticated,
+      from: ctx.input.from,
+      to: ctx.input.to,
+      subject: ctx.input.subject,
       includeTrash: ctx.input.includeTrash
     });
 

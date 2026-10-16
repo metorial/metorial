@@ -12,7 +12,8 @@ let attachmentSummarySchema = z.object({
   linkPath: z.string().optional().describe('URL path'),
   isPrivate: z.boolean().optional().describe('Whether the attachment is private'),
   isHidden: z.boolean().optional().describe('Whether the attachment is hidden'),
-  actions: z.number().optional().describe('Number of actions/entries')
+  actions: z.number().optional().describe('Number of actions/entries'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let listAttachments = SlateTool.create(spec, {
@@ -52,7 +53,8 @@ export let listAttachments = SlateTool.create(spec, {
       linkPath: a.link_path,
       isPrivate: a.is_private,
       isHidden: a.is_hidden,
-      actions: a.actions
+      actions: a.actions,
+      raw: a
     }));
 
     return {

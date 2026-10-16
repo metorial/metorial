@@ -2,7 +2,7 @@ None of those results are about "CrowTerminal." Let me search more specifically.
 
 I cannot responsibly create a specification for a provider that I cannot verify exists as a real, documented service. Here is what I can state:
 
-# Slates Specification for CrowTerminal
+# CrowTerminal API Specification
 
 ## Overview
 

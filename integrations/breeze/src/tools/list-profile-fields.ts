@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listProfileFields = SlateTool.create(spec, {
@@ -23,7 +23,7 @@ export let listProfileFields = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let fields = await client.listProfileFields();
-    let fieldsArray = Array.isArray(fields) ? fields : [];
+    let fieldsArray = requireList(fields, 'list-profile-fields');
 
     return {
       output: { profileFields: fieldsArray },

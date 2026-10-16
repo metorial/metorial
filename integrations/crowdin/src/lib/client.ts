@@ -1,18 +1,30 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { crowdinError, organizationDomain } from './errors';
 
 export class CrowdinClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  lastResponse: unknown;
+  readonly isEnterprise: boolean;
 
   constructor(opts: { token: string; organizationDomain?: string }) {
-    let baseURL = opts.organizationDomain
-      ? `https://${opts.organizationDomain}.api.crowdin.com/api/v2`
+    const domain = organizationDomain(opts.organizationDomain);
+    this.isEnterprise = !!domain;
+    let baseURL = domain
+      ? `https://${domain}.api.crowdin.com/api/v2`
       : 'https://api.crowdin.com/api/v2';
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: crowdinError,
+      timeout: 30000,
+      maxRedirects: 0,
       baseURL,
       headers: {
         Authorization: `Bearer ${opts.token}`
       }
+    });
+    this.axios.interceptors.response.use(response => {
+      this.lastResponse = response.data;
+      return response;
     });
   }
 
@@ -89,7 +101,7 @@ export class CrowdinClient {
     let response = await this.axios.post('/storages', content, {
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Crowdin-API-FileName': fileName
+        'Crowdin-API-FileName': encodeURIComponent(fileName)
       }
     });
     return response.data.data;
@@ -247,7 +259,7 @@ export class CrowdinClient {
     params?: { limit?: number; offset?: number }
   ) {
     let response = await this.axios.get(
-      `/projects/${projectId}/languages/${languageId}/files/progress`,
+      `/projects/${projectId}/languages/${encodeURIComponent(languageId)}/progress`,
       { params }
     );
     return response.data;
@@ -282,9 +294,17 @@ export class CrowdinClient {
       exportApprovedOnly?: boolean;
     }
   ) {
+    const payload =
+      this.isEnterprise && body?.exportApprovedOnly !== undefined
+        ? {
+            ...body,
+            exportApprovedOnly: undefined,
+            exportWithMinApprovalsCount: body.exportApprovedOnly ? 1 : 0
+          }
+        : body;
     let response = await this.axios.post(
       `/projects/${projectId}/translations/builds`,
-      body || {}
+      payload || {}
     );
     return response.data.data;
   }
@@ -354,6 +374,7 @@ export class CrowdinClient {
       fileIds: number[];
       method?: string;
       engineId?: number;
+      aiPromptId?: number;
       autoApproveOption?: string;
       duplicateTranslations?: boolean;
       translateUntranslatedOnly?: boolean;
@@ -366,7 +387,7 @@ export class CrowdinClient {
 
   async getPreTranslationStatus(projectId: number, preTranslationId: string) {
     let response = await this.axios.get(
-      `/projects/${projectId}/pre-translations/${preTranslationId}`
+      `/projects/${projectId}/pre-translations/${encodeURIComponent(preTranslationId)}`
     );
     return response.data.data;
   }
@@ -406,12 +427,16 @@ export class CrowdinClient {
   }
 
   async getTMExportStatus(tmId: number, exportId: string) {
-    let response = await this.axios.get(`/tms/${tmId}/exports/${exportId}`);
+    let response = await this.axios.get(
+      `/tms/${tmId}/exports/${encodeURIComponent(exportId)}`
+    );
     return response.data.data;
   }
 
   async downloadTMExport(tmId: number, exportId: string) {
-    let response = await this.axios.get(`/tms/${tmId}/exports/${exportId}/download`);
+    let response = await this.axios.get(
+      `/tms/${tmId}/exports/${encodeURIComponent(exportId)}/download`
+    );
     return response.data.data;
   }
 
@@ -467,6 +492,25 @@ export class CrowdinClient {
     await this.axios.delete(`/glossaries/${glossaryId}`);
   }
 
+  async exportGlossary(glossaryId: number, body: { format?: string }) {
+    const response = await this.axios.post(`/glossaries/${glossaryId}/exports`, body);
+    return response.data.data;
+  }
+
+  async getGlossaryExportStatus(glossaryId: number, exportId: string) {
+    const response = await this.axios.get(
+      `/glossaries/${glossaryId}/exports/${encodeURIComponent(exportId)}`
+    );
+    return response.data.data;
+  }
+
+  async downloadGlossaryExport(glossaryId: number, exportId: string) {
+    const response = await this.axios.get(
+      `/glossaries/${glossaryId}/exports/${encodeURIComponent(exportId)}/download`
+    );
+    return response.data.data;
+  }
+
   // --- Glossary Terms ---
 
   async listTerms(
@@ -491,6 +535,7 @@ export class CrowdinClient {
       partOfSpeech?: string;
       status?: string;
       translationOfTermId?: number;
+      conceptId?: number;
     }
   ) {
     let response = await this.axios.post(`/glossaries/${glossaryId}/terms`, body);

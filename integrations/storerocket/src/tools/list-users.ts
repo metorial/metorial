@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Lists all users associated with your StoreRocket account. Returns user roles and permissions, supporting team access audits. Supports pagination via limit and offset parameters.`,
+  description: `Retrieves users through the legacy StoreRocket users endpoint and retains the complete provider response. The endpoint and its limit/offset behavior are not described in the current public REST guide.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,7 +30,7 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      users: z.any().describe('List of users with their roles and permissions')
+      users: z.any().describe('Complete response from the legacy users endpoint')
     })
   )
   .handleInvocation(async ctx => {

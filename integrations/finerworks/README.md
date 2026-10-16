@@ -1,6 +1,8 @@
 # Finerworks
 
-Submit, manage, and track print-on-demand orders for fine art prints, canvas, greeting cards, posters, and other products. Upload and manage image files for printing. Browse product catalogs, media types, and pricing. Configure framing options with mat and glazing selections and preview frame packages. Manage virtual inventory SKUs linking products to fulfillment. Retrieve shipping options, validate recipient addresses, and update customer information.
+Submit, discover, manage and track print-on-demand orders for fine art prints, canvas, greeting cards and other products. Identify the connected account, browse reusable inventory SKUs and product catalogs, price products and shipping, validate addresses, manage image files, and generate downloadable frame previews. Uses the current FinerWorks v2 API.
+
+See [the integration specification](docs/SPEC.md) for tool coverage, test mode, payment requirements and safe order retry guidance.
 
 ## License
 

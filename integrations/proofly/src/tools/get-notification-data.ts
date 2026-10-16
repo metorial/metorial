@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prooflyString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getNotificationData = SlateTool.create(spec, {
@@ -14,7 +15,11 @@ export let getNotificationData = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      notificationId: z.string().describe('The ID of the notification to retrieve data for')
+      notificationId: z
+        .string()
+        .describe(
+          'Notification ID. Call get_campaign_notifications to discover notification IDs.'
+        )
     })
   )
   .output(
@@ -36,7 +41,13 @@ export let getNotificationData = SlateTool.create(spec, {
               .optional()
               .describe('URL of the page where the notification was shown'),
             city: z.string().optional().describe('Visitor city from geolocation'),
-            country: z.string().optional().describe('Visitor country from geolocation')
+            country: z.string().optional().describe('Visitor country from geolocation'),
+            countryCode: z.string().optional().describe('Visitor country code'),
+            timestamp: z.string().optional().describe('When the data entry was collected'),
+            data: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Original collected form or conversion data')
           })
         )
         .describe('Collected data entries for the notification')
@@ -44,21 +55,39 @@ export let getNotificationData = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.getNotificationData(ctx.input.notificationId);
-
-    let entries = Array.isArray(data) ? data : (data.data ?? data.entries ?? []);
+    let entries = await client.getNotificationData(ctx.input.notificationId);
 
     return {
       output: {
-        entries: entries.map((e: any) => ({
-          dataType: e.type ?? e.dataType ?? e.data_type,
-          submittedInput:
-            e.input ?? e.email ?? e.submittedInput ?? e.submitted_input ?? e.value,
-          visitorIp: e.ip ?? e.visitorIp ?? e.visitor_ip,
-          pageUrl: e.pageUrl ?? e.page_url ?? e.url,
-          city: e.city ?? e.geolocation?.city ?? e.geo?.city,
-          country: e.country ?? e.geolocation?.country ?? e.geo?.country
-        }))
+        entries: entries.map(e => {
+          let data = isApiErrorRecord(e.data) ? e.data : undefined;
+          let location = isApiErrorRecord(e.location) ? e.location : {};
+          let geolocation = isApiErrorRecord(e.geolocation) ? e.geolocation : {};
+          let geo = isApiErrorRecord(e.geo) ? e.geo : {};
+          return {
+            dataType: prooflyString(e.type, e.dataType, e.data_type),
+            submittedInput: prooflyString(
+              data?.input,
+              e.input,
+              e.email,
+              e.submittedInput,
+              e.submitted_input,
+              e.value
+            ),
+            visitorIp: prooflyString(e.ip, e.visitorIp, e.visitor_ip),
+            pageUrl: prooflyString(e.url, e.pageUrl, e.page_url),
+            city: prooflyString(location.city, e.city, geolocation.city, geo.city),
+            country: prooflyString(
+              location.country,
+              e.country,
+              geolocation.country,
+              geo.country
+            ),
+            countryCode: prooflyString(location.country_code),
+            timestamp: prooflyString(e.date),
+            data
+          };
+        })
       },
       message: `Retrieved **${entries.length}** data entries for notification \`${ctx.input.notificationId}\`.`
     };

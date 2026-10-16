@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getCategoriesTool = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let getCategoriesTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       categories: z.array(z.string()).describe('List of available event category names')
     })
   )
@@ -26,11 +28,15 @@ export let getCategoriesTool = SlateTool.create(spec, {
       ? data.categories
       : Array.isArray(data)
         ? data
-        : [];
-    let categories = rawCategories.map((c: any) => (typeof c === 'string' ? c : c.category));
+        : undefined;
+    if (!rawCategories)
+      throw createApiServiceError('Eventzilla returned an invalid categories response.');
+    let categories = rawCategories.map((c: any) =>
+      requireText(typeof c === 'string' ? c : c?.category, 'category name')
+    );
 
     return {
-      output: { categories },
+      output: { categories, raw: data },
       message: `Found **${categories.length}** event categories.`
     };
   })

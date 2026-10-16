@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireValue } from '../lib/client';
 import { buildClientConfig, flattenResourceList, flattenSingleResource } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -19,7 +19,9 @@ export let manageStock = SlateTool.create(spec, {
       productId: z
         .string()
         .optional()
-        .describe('Product ID (used for list filtering and create)'),
+        .describe(
+          'Product variation ID for list filtering and create. Use list_product_variations to discover IDs.'
+        ),
       locationId: z.string().optional().describe('Location ID for the stock item'),
       identifier: z
         .string()
@@ -46,7 +48,7 @@ export let manageStock = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let filters: Record<string, string> = {};
-      if (ctx.input.productId) filters.item_id = ctx.input.productId;
+      if (ctx.input.productId) filters.product_id = ctx.input.productId;
       if (ctx.input.locationId) filters.location_id = ctx.input.locationId;
 
       let response = await client.listStockItems({
@@ -65,8 +67,9 @@ export let manageStock = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      requireValue(ctx.input.productId, 'Product ID for create');
       let attributes: Record<string, any> = {};
-      if (ctx.input.productId) attributes.item_id = ctx.input.productId;
+      if (ctx.input.productId) attributes.product_id = ctx.input.productId;
       if (ctx.input.locationId) attributes.location_id = ctx.input.locationId;
       if (ctx.input.identifier) attributes.identifier = ctx.input.identifier;
 
@@ -79,12 +82,13 @@ export let manageStock = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.action === 'update' && ctx.input.stockItemId) {
+    {
+      let stockItemId = requireValue(ctx.input.stockItemId, 'Stock item ID for update');
       let attributes: Record<string, any> = {};
       if (ctx.input.identifier) attributes.identifier = ctx.input.identifier;
       if (ctx.input.locationId) attributes.location_id = ctx.input.locationId;
 
-      let response = await client.updateStockItem(ctx.input.stockItemId, attributes);
+      let response = await client.updateStockItem(stockItemId, attributes);
       let stockItem = flattenSingleResource(response);
 
       return {
@@ -92,10 +96,5 @@ export let manageStock = SlateTool.create(spec, {
         message: `Updated stock item **${stockItem?.identifier || ctx.input.stockItemId}**.`
       };
     }
-
-    return {
-      output: {},
-      message: 'No action performed. Provide a valid action and required parameters.'
-    };
   })
   .build();

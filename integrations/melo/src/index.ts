@@ -7,6 +7,8 @@ import {
   getPointsOfInterest,
   getPricePerMeterEvolution,
   getProperty,
+  getSavedSearch,
+  listCities,
   listSavedSearches,
   locationAutocomplete,
   searchProperties,
@@ -17,6 +19,8 @@ export let provider = Slate.create({
   tools: [
     searchProperties,
     getProperty,
+    getSavedSearch,
+    listCities,
     findSimilarProperties,
     createSavedSearch,
     updateSavedSearch,

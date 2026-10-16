@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateNumber, validatePeriod } from '../lib/client';
 import { buildClientConfig, flattenSingleResource } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -9,7 +9,7 @@ export let createOrder = SlateTool.create(spec, {
   key: 'create_order',
   description: `Create a new rental order in Booqable. Set the rental period, assign a customer, configure discounts and deposits. The order starts in "new" status and can be progressed through the workflow.`,
   instructions: [
-    'Dates must be in ISO 8601 format (e.g. "2024-01-15T10:00:00+00:00").',
+    'Rental dates are company-local wall times written with a Z suffix. For 10:00 at the company, send 10:00Z; do not convert to actual UTC.',
     'After creating the order, use Update Order to change its status (e.g. to "reserved").'
   ],
   tags: {
@@ -30,8 +30,15 @@ export let createOrder = SlateTool.create(spec, {
       depositValue: z.number().optional().describe('Deposit value'),
       tags: z.array(z.string()).optional().describe('Tags to assign to the order'),
       couponId: z.string().optional().describe('Coupon ID to apply'),
-      locationId: z.string().optional().describe('Pickup location ID'),
-      taxRegionId: z.string().optional().describe('Tax region ID')
+      locationId: z
+        .string()
+        .optional()
+        .describe('Pickup location ID. Use list_locations to discover IDs.'),
+      taxRegionId: z.string().optional().describe('Tax region ID'),
+      stopLocationId: z
+        .string()
+        .optional()
+        .describe('Return location ID. Use list_locations to discover IDs.')
     })
   )
   .output(
@@ -42,21 +49,44 @@ export let createOrder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(buildClientConfig(ctx));
 
+    validatePeriod(ctx.input.startsAt, ctx.input.stopsAt);
+    validateNumber(ctx.input.discountPercentage, 'Discount percentage', { min: 0, max: 100 });
+    validateNumber(ctx.input.discountValue, 'Discount value in cents', {
+      integer: true,
+      min: 0
+    });
+    validateNumber(ctx.input.depositValue, 'Deposit value', {
+      min: 0,
+      ...(ctx.input.depositType?.startsWith('percentage') ? { max: 100 } : {})
+    });
+    if (ctx.input.discountPercentage !== undefined && ctx.input.discountValue !== undefined) {
+      throw createApiServiceError(
+        'Provide either discountPercentage or discountValue, not both.'
+      );
+    }
     let attributes: Record<string, any> = {};
     if (ctx.input.startsAt) attributes.starts_at = ctx.input.startsAt;
     if (ctx.input.stopsAt) attributes.stops_at = ctx.input.stopsAt;
     if (ctx.input.customerId) attributes.customer_id = ctx.input.customerId;
     if (ctx.input.discountPercentage !== undefined)
-      attributes.discount_percentage = ctx.input.discountPercentage;
+      Object.assign(attributes, {
+        discount_type: 'percentage',
+        discount_value: ctx.input.discountPercentage
+      });
     if (ctx.input.discountValue !== undefined)
-      attributes.discount_value_in_cents = ctx.input.discountValue;
+      Object.assign(attributes, {
+        discount_type: 'fixed',
+        discount_value: ctx.input.discountValue
+      });
     if (ctx.input.depositType) attributes.deposit_type = ctx.input.depositType;
     if (ctx.input.depositValue !== undefined)
       attributes.deposit_value = ctx.input.depositValue;
-    if (ctx.input.tags) attributes.tags = ctx.input.tags;
+    if (ctx.input.tags) attributes.tag_list = ctx.input.tags;
     if (ctx.input.couponId) attributes.coupon_id = ctx.input.couponId;
-    if (ctx.input.locationId) attributes.location_id = ctx.input.locationId;
+    if (ctx.input.locationId) attributes.start_location_id = ctx.input.locationId;
     if (ctx.input.taxRegionId) attributes.tax_region_id = ctx.input.taxRegionId;
+
+    if (ctx.input.stopLocationId) attributes.stop_location_id = ctx.input.stopLocationId;
 
     let response = await client.createOrder(attributes);
     let order = flattenSingleResource(response);

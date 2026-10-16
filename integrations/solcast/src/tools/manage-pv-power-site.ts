@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,10 +18,10 @@ Supports the following operations:
 
 Site management operations do not consume API request quota.`,
   instructions: [
-    'Use "create" to set up a new site before fetching advanced PV power data.',
+    'Use "create" to set up a new site before fetching advanced PV power data. Provide name, latitude, longitude, capacity, capacityDc, trackingType, and installDate.',
     'Use "update" for partial changes (only modified fields need to be provided).',
     'Use "replace" to fully overwrite all site specifications.',
-    'The returned resourceId is needed for advanced PV power data requests.'
+    'The returned resource_id is needed for advanced PV power data requests.'
   ],
   tags: {
     destructive: true
@@ -35,7 +35,9 @@ Site management operations do not consume API request quota.`,
       resourceId: z
         .string()
         .optional()
-        .describe('Resource ID of the site (required for update, replace, delete)'),
+        .describe(
+          'Resource ID from list_pv_power_sites (required for update, replace, delete)'
+        ),
       name: z.string().optional().describe('Display name for the site'),
       latitude: z.number().min(-90).max(90).optional().describe('Latitude of the site'),
       longitude: z.number().min(-180).max(180).optional().describe('Longitude of the site'),
@@ -46,14 +48,17 @@ Site management operations do not consume API request quota.`,
         .min(-180)
         .max(180)
         .optional()
-        .describe('Panel azimuth angle (-180 to 180, north=0, east=90)'),
+        .describe('Panel azimuth angle (-180 to 180, north=0, east=-90)'),
       tilt: z.number().min(0).max(90).optional().describe('Panel tilt angle in degrees'),
       trackingType: z
         .enum(['fixed', 'horizontal_single_axis', 'vertical_single_axis', 'dual_axis'])
         .optional()
         .describe('Solar tracking type'),
       installDate: z.string().optional().describe('Installation date (ISO 8601 date)'),
-      gridExportLimit: z.number().optional().describe('Grid export limit in kW'),
+      gridExportLimit: z
+        .number()
+        .optional()
+        .describe('Grid export limit in kW; use -1 to remove a configured limit'),
       moduleType: z.string().optional().describe('PV module type'),
       groundCoverageRatio: z
         .number()
@@ -69,7 +74,7 @@ Site management operations do not consume API request quota.`,
       deratingInverterEfficiency: z
         .number()
         .optional()
-        .describe('Inverter efficiency derating factor'),
+        .describe('Peak inverter efficiency fraction (0.01 to 1)'),
       terrainSlope: z.number().optional().describe('Terrain slope in degrees'),
       terrainAzimuth: z.number().optional().describe('Terrain azimuth angle'),
       dustSoilingAverage: z
@@ -80,6 +85,47 @@ Site management operations do not consume API request quota.`,
         .boolean()
         .optional()
         .describe('Enable bifacial PV system modelling'),
+      deratingOtherSystem: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Non-temperature, non-age system loss fraction'),
+      trackerAxisAzimuth: z
+        .number()
+        .min(-180)
+        .max(180)
+        .optional()
+        .describe('Tracker axis azimuth in degrees; east is -90'),
+      trackerMaxRotationAngle: z
+        .number()
+        .min(0)
+        .max(90)
+        .optional()
+        .describe('Maximum tracker rotation from horizontal in degrees'),
+      trackerBackTracking: z.boolean().optional().describe('Enable tracker backtracking'),
+      trackerSmartTracking: z
+        .boolean()
+        .optional()
+        .describe('Move trackers horizontally during cloudy periods'),
+      siteGroundAlbedo: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Ground reflection fraction beneath the modules'),
+      bifacialityFactor: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Rear efficiency as a fraction of front efficiency'),
+      pvrowHeight: z.number().positive().optional().describe('PV row center height in metres'),
+      pvrowWidth: z
+        .number()
+        .positive()
+        .optional()
+        .describe('PV row cross-section width in metres'),
       siteTag: z.string().optional().describe('Custom tag for the site'),
       confirmOverwrite: z
         .string()
@@ -98,40 +144,58 @@ Site management operations do not consume API request quota.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let { operation, resourceId, ...siteData } = ctx.input;
+    if (
+      siteData.dustSoilingAverage &&
+      (siteData.dustSoilingAverage.length !== 12 ||
+        siteData.dustSoilingAverage.some(value => value < 0 || value > 1))
+    ) {
+      throw createApiServiceError(
+        'dustSoilingAverage must contain 12 monthly loss fractions between 0 and 1.'
+      );
+    }
+    if (siteData.groundCoverageRatio !== undefined && siteData.groundCoverageRatio < 0.01)
+      throw createApiServiceError('groundCoverageRatio must be between 0.01 and 1.');
+    if (
+      siteData.deratingInverterEfficiency !== undefined &&
+      (siteData.deratingInverterEfficiency < 0.01 || siteData.deratingInverterEfficiency > 1)
+    )
+      throw createApiServiceError(
+        'deratingInverterEfficiency must be a peak efficiency fraction between 0.01 and 1.'
+      );
+    if (
+      siteData.gridExportLimit !== undefined &&
+      siteData.gridExportLimit < 0 &&
+      siteData.gridExportLimit !== -1
+    )
+      throw createApiServiceError(
+        'gridExportLimit must be nonnegative in kW, or -1 to remove the configured limit.'
+      );
+    if (
+      siteData.installDate !== undefined &&
+      !Number.isFinite(Date.parse(siteData.installDate))
+    )
+      throw createApiServiceError('installDate must be an ISO 8601 date or datetime.');
 
     if (operation === 'create') {
       if (
         !siteData.name ||
         siteData.latitude === undefined ||
         siteData.longitude === undefined ||
-        siteData.capacity === undefined
+        siteData.capacity === undefined ||
+        siteData.capacityDc === undefined ||
+        !siteData.trackingType ||
+        !siteData.installDate
       ) {
-        throw new Error(
-          'name, latitude, longitude, and capacity are required for creating a PV Power Site.'
+        throw createApiServiceError(
+          'name, latitude, longitude, capacity, capacityDc, trackingType, and installDate are required for creating a PV Power Site.'
         );
       }
       let site = await client.createPvPowerSite({
+        ...siteData,
         name: siteData.name,
         latitude: siteData.latitude,
         longitude: siteData.longitude,
-        capacity: siteData.capacity,
-        capacityDc: siteData.capacityDc,
-        azimuth: siteData.azimuth,
-        tilt: siteData.tilt,
-        trackingType: siteData.trackingType,
-        installDate: siteData.installDate,
-        gridExportLimit: siteData.gridExportLimit,
-        moduleType: siteData.moduleType,
-        groundCoverageRatio: siteData.groundCoverageRatio,
-        deratingTempModule: siteData.deratingTempModule,
-        deratingAgeSystem: siteData.deratingAgeSystem,
-        deratingInverterEfficiency: siteData.deratingInverterEfficiency,
-        terrainSlope: siteData.terrainSlope,
-        terrainAzimuth: siteData.terrainAzimuth,
-        dustSoilingAverage: siteData.dustSoilingAverage,
-        bifacialSystemEnabled: siteData.bifacialSystemEnabled,
-        siteTag: siteData.siteTag,
-        confirmOverwrite: siteData.confirmOverwrite
+        capacity: siteData.capacity
       });
       return {
         output: { site },
@@ -140,33 +204,13 @@ Site management operations do not consume API request quota.`,
     }
 
     if (!resourceId) {
-      throw new Error('resourceId is required for update, replace, and delete operations.');
+      throw createApiServiceError(
+        'resourceId is required for update, replace, and delete operations.'
+      );
     }
 
     if (operation === 'update') {
-      let site = await client.updatePvPowerSite({
-        resourceId,
-        name: siteData.name,
-        latitude: siteData.latitude,
-        longitude: siteData.longitude,
-        capacity: siteData.capacity,
-        capacityDc: siteData.capacityDc,
-        azimuth: siteData.azimuth,
-        tilt: siteData.tilt,
-        trackingType: siteData.trackingType,
-        installDate: siteData.installDate,
-        gridExportLimit: siteData.gridExportLimit,
-        moduleType: siteData.moduleType,
-        groundCoverageRatio: siteData.groundCoverageRatio,
-        deratingTempModule: siteData.deratingTempModule,
-        deratingAgeSystem: siteData.deratingAgeSystem,
-        deratingInverterEfficiency: siteData.deratingInverterEfficiency,
-        terrainSlope: siteData.terrainSlope,
-        terrainAzimuth: siteData.terrainAzimuth,
-        dustSoilingAverage: siteData.dustSoilingAverage,
-        bifacialSystemEnabled: siteData.bifacialSystemEnabled,
-        siteTag: siteData.siteTag
-      });
+      let site = await client.updatePvPowerSite({ resourceId, ...siteData });
       return {
         output: { site },
         message: `Updated PV Power Site \`${resourceId}\`.`
@@ -178,35 +222,22 @@ Site management operations do not consume API request quota.`,
         !siteData.name ||
         siteData.latitude === undefined ||
         siteData.longitude === undefined ||
-        siteData.capacity === undefined
+        siteData.capacity === undefined ||
+        siteData.capacityDc === undefined ||
+        !siteData.trackingType ||
+        !siteData.installDate
       ) {
-        throw new Error(
-          'name, latitude, longitude, and capacity are required for replacing a PV Power Site.'
+        throw createApiServiceError(
+          'name, latitude, longitude, capacity, capacityDc, trackingType, and installDate are required for replacing a PV Power Site.'
         );
       }
       let site = await client.replacePvPowerSite({
         resourceId,
+        ...siteData,
         name: siteData.name,
         latitude: siteData.latitude,
         longitude: siteData.longitude,
-        capacity: siteData.capacity,
-        capacityDc: siteData.capacityDc,
-        azimuth: siteData.azimuth,
-        tilt: siteData.tilt,
-        trackingType: siteData.trackingType,
-        installDate: siteData.installDate,
-        gridExportLimit: siteData.gridExportLimit,
-        moduleType: siteData.moduleType,
-        groundCoverageRatio: siteData.groundCoverageRatio,
-        deratingTempModule: siteData.deratingTempModule,
-        deratingAgeSystem: siteData.deratingAgeSystem,
-        deratingInverterEfficiency: siteData.deratingInverterEfficiency,
-        terrainSlope: siteData.terrainSlope,
-        terrainAzimuth: siteData.terrainAzimuth,
-        dustSoilingAverage: siteData.dustSoilingAverage,
-        bifacialSystemEnabled: siteData.bifacialSystemEnabled,
-        siteTag: siteData.siteTag,
-        confirmOverwrite: siteData.confirmOverwrite
+        capacity: siteData.capacity
       });
       return {
         output: { site },

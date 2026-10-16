@@ -4,6 +4,7 @@ import {
   addNote,
   createSuggestion,
   deleteSuggestion,
+  getCurrentUser,
   getSuggestion,
   importExternalUsers,
   listCategories,
@@ -11,8 +12,10 @@ import {
   listFeatures,
   listForums,
   listLabels,
+  listNotes,
   listNpsRatings,
   listStatuses,
+  listStatusUpdates,
   listSuggestions,
   listSupporters,
   listUsers,
@@ -24,6 +27,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listNotes,
+    listStatusUpdates,
     listSuggestions,
     getSuggestion,
     createSuggestion,

@@ -1,72 +1,32 @@
-Let me get the actual API documentation.# Slates Specification for Browseai
+# Browse AI integration
 
-## Overview
+The integration uses the [Browse AI v2 REST API](https://docs.browse.ai/api/) at `https://api.browse.ai/v2`. Authenticate with an API key from the [dashboard API page](https://dashboard.browse.ai/api), sent as a Bearer token. No connection configuration or workspace ID is required.
 
-Browse AI is a no-code web scraping and monitoring platform that allows users to extract data from websites using configurable "robots." It provides a REST API to programmatically run extraction tasks, retrieve scraped data, set up monitoring schedules, perform bulk operations, and manage webhooks.
+## Workflows
 
-## Authentication
+- Discover robots with `list_robots`; inspect parameter types, labels, and defaults with `get_robot`.
+- Run a robot with `run_task`, optionally requesting video recording. Poll `get_task` or use `list_tasks` with status, date, bulk-run, sorting, pagination, and retry filters.
+- Read captured text, screenshots, and tables. `download_task_data` provides a JSON download and re-resolves temporary provider URLs when needed. Browse AI moves data larger than 100 KB to a temporary URL; original task fields remain available when returned by the provider.
+- Create and inspect bulk runs; use `list_bulk_runs` for discovery and `get_bulk_run` for a paginated task list. The v2 reference documents up to 50,000 tasks per bulk run; the official bulk guide recommends submitting batches of 1,000 input parameter sets.
+- List, get, create, update, pause/resume, and delete scheduled monitors. Use the recurring `schedule` expression, input overrides, and screenshot/text email notification settings. Legacy schedule details remain in returned provider data.
+- Update robot cookies for authenticated websites. Each cookie should include its name and value; domain, path, expiration, and browser cookie flags are supported by the provider.
+- List, create, and delete webhooks for task completion, successful tasks, failed tasks, captured-data changes, and table-export completion.
+- Check the task queue with `get_system_status` when diagnosing maintenance or delayed tasks.
 
-Browse AI uses API keys for authentication.
+Robot IDs are discovered with `list_robots`; monitor, task, webhook, and bulk-run IDs come from the corresponding list tools. For downloads, signed URL deadlines stay anchored to their signing timestamp. When no issuance-anchored expiration is available, a conservative one-minute metadata recheck policy applies; retrieving unchanged metadata does not extend the provider URL’s lifetime.
 
-To authenticate, include the API key as a Bearer token in the `Authorization` header of each request:
+Responses include provider data for fields not present in the summaries. Missing optional scalar values are omitted from summaries; nulls remain in provider data.
 
-```
-Authorization: Bearer YOUR_SECRET_API_KEY
-```
+## Boundaries
 
-To create an API key:
+The API-key API does not document a suitable current-user/profile endpoint. Its `/teams` operation explicitly requires an Auth0 access token for partner integrations and is not exposed by this API-key connection. The public v2 reference has no robot training, task cancellation, or export-creation operation. Table-export completion can be subscribed to through webhook management, but exports are not created through an invented endpoint.
 
-1. Log in to the Browse AI dashboard.
-2. Navigate to the **API** tab in the main navigation.
-3. Click **Create API key** and give it a descriptive name.
-4. Copy and securely store the key.
+Webhook subscription management does not register an event receiver. The current webhook documentation does not specify a cryptographic callback signature or signing secret, so this integration does not claim verified callback delivery.
 
-The API is available on all Browse AI plans at no additional cost. Multiple API keys can be created per account. The base URL for all API requests is `https://api.browse.ai/v2`.
+## References
 
-## Features
-
-### Robot Management
-
-Allows listing and retrieving details of configured web scraping robots. Each robot has a unique ID, name, and a set of input parameters (e.g., `originUrl`) that define what data it extracts. Robots expose their input parameters including name, type, and whether they are required.
-
-### Task Execution
-
-Runs a robot on-demand with custom input parameters. A task is created by providing the robot ID and the required input parameters (typically a URL to scrape). Tasks run asynchronously; you submit a task and then retrieve results once complete. Results include extracted text fields (`capturedTexts`) and optionally captured screenshots.
-
-### Data Retrieval
-
-Allows retrieving the results of individual tasks or listing all tasks for a given robot. Extracted data is returned as structured key-value pairs based on the fields configured when the robot was created.
-
-### Automated Monitoring
-
-Robots can be configured to run on a schedule to automatically monitor web pages for changes. When monitoring detects that captured data has changed, it can trigger notifications via webhooks.
-
-### Bulk Operations
-
-Supports large-scale data extraction by submitting bulk runs that can process many pages in a single command. Table exports can be generated when bulk operations complete.
-
-### Cookie Management
-
-Robot cookies can be updated via the API, which is useful for maintaining authenticated sessions on target websites that require login.
-
-### Webhook Management
-
-Webhooks can be created, configured, and managed programmatically per robot. Each webhook is associated with a specific event type and a destination URL.
-
-## Events
-
-Browse AI supports webhooks that send HTTP POST callbacks to a specified URL when events occur. Webhooks are configured per robot and per event type.
-
-### Task Completion
-
-- **`taskFinished`** — Fires when any task completes, regardless of success or failure. The payload includes task ID, status, captured data, screenshots, and metadata.
-- **`taskFinishedSuccessfully`** — Fires only when a task completes successfully. Useful for data processing pipelines that only need successful results.
-- **`taskFinishedWithError`** — Fires only when a task fails. Useful for error alerting and monitoring.
-
-### Data Change Detection
-
-- **`taskCapturedDataChanged`** — Fires when a monitoring run detects that previously captured data has changed. The payload includes the updated fields and a `changedFields` array indicating which specific fields changed.
-
-### Export Completion
-
-- **`tableExportFinishedSuccessfully`** — Fires when a table export finishes (currently in Beta). The payload includes the export format, download URL, and record count.
+- [Current API reference and embedded OpenAPI contract](https://docs.browse.ai/api/)
+- [Developer reference](https://developers.browse.ai/v2/reference)
+- [Bulk operations guide](https://help.browse.ai/en/articles/12683563-api-guide-bulk-operations-and-large-scale-data-extraction)
+- [Retrieving scraped data guide](https://help.browse.ai/en/articles/12683421-api-guide-retrieving-and-managing-scraped-data)
+- [Webhook setup guide](https://help.browse.ai/en/articles/12683642-webhooks-set-up-guide)

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PoofClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,17 +42,29 @@ export let sendPayout = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new PoofClient({ token: ctx.auth.token });
 
+    if (!Number.isFinite(ctx.input.amount) || ctx.input.amount <= 0) {
+      throw createApiServiceError('Payout amount must be greater than zero.');
+    }
+
     let result = await client.sendPayout({
       amount: ctx.input.amount,
       crypto: ctx.input.crypto,
       address: ctx.input.address
     });
 
+    let reportedAmount: unknown = result?.amount;
+    let amount =
+      typeof reportedAmount === 'number'
+        ? reportedAmount
+        : typeof reportedAmount === 'string' && reportedAmount.trim()
+          ? Number(reportedAmount)
+          : undefined;
+
     return {
       output: {
         transactionId: result?.transaction_id,
-        address: result?.address || ctx.input.address,
-        amount: result?.amount ?? ctx.input.amount,
+        address: result?.address,
+        amount: amount !== undefined && Number.isFinite(amount) ? amount : undefined,
         remainingBalance: result?.remaining_balance?.toString(),
         raw: result
       },

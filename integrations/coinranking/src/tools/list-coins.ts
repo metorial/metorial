@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { paginationSchema, rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let coinSummarySchema = z.object({
@@ -29,10 +30,28 @@ export let listCoins = SlateTool.create(spec, {
   .input(
     z.object({
       search: z.string().optional().describe('Filter coins by name or symbol'),
+      symbols: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by ticker symbols; symbols may identify multiple coins'),
+      uuids: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by coin UUIDs discovered with search or list_coins'),
+      contractAddresses: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by token contract addresses'),
+      blockchains: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by blockchain names such as ethereum'),
       tags: z
         .array(z.string())
         .optional()
-        .describe('Filter by tags (e.g. defi, stablecoin, nft)'),
+        .describe(
+          'Filter by tag slugs (e.g. defi, stablecoin, nft); call list_tags to discover tags'
+        ),
       tiers: z
         .array(z.enum(['1', '2', '3']))
         .optional()
@@ -54,11 +73,26 @@ export let listCoins = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Number of results (max 100 for free plan, default 50)'),
-      offset: z.number().optional().describe('Offset for pagination')
+      offset: z
+        .number()
+        .optional()
+        .describe('Offset for pagination; use cursor for later pages'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Cursor from pagination.nextCursor or pagination.previousCursor; omit offset when provided'
+        )
     })
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
+      pagination: paginationSchema
+        .optional()
+        .describe('Provider cursor pagination information'),
       coins: z.array(coinSummarySchema).describe('List of coins matching the filters'),
       totalCoins: z.number().describe('Total number of coins matching the filters')
     })
@@ -71,6 +105,10 @@ export let listCoins = SlateTool.create(spec, {
 
     let result = await client.listCoins({
       search: ctx.input.search,
+      symbols: ctx.input.symbols,
+      uuids: ctx.input.uuids,
+      contractAddresses: ctx.input.contractAddresses,
+      blockchains: ctx.input.blockchains,
       tags: ctx.input.tags,
       tiers: ctx.input.tiers,
       orderBy: ctx.input.orderBy,
@@ -78,30 +116,33 @@ export let listCoins = SlateTool.create(spec, {
       timePeriod: ctx.input.timePeriod,
       referenceCurrencyUuid: ctx.input.referenceCurrencyUuid,
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      cursor: ctx.input.cursor
     });
 
     let data = result.data;
-    let coins = (data.coins || []).map((c: any) => ({
+    let coins = data.coins.map(c => ({
       coinUuid: c.uuid,
       symbol: c.symbol,
       name: c.name,
-      iconUrl: c.iconUrl || null,
-      price: c.price || null,
-      marketCap: c.marketCap || null,
-      volume24h: c['24hVolume'] || null,
-      change: c.change || null,
+      iconUrl: c.iconUrl ?? null,
+      price: c.price ?? null,
+      marketCap: c.marketCap ?? null,
+      volume24h: c['24hVolume'] ?? null,
+      change: c.change ?? null,
       rank: c.rank ?? null,
-      btcPrice: c.btcPrice || null,
+      btcPrice: c.btcPrice ?? null,
       lowVolume: c.lowVolume ?? null
     }));
 
     return {
       output: {
+        rawData: result.data,
+        pagination: result.pagination,
         coins,
-        totalCoins: data.stats?.total ?? coins.length
+        totalCoins: data.stats.total
       },
-      message: `Found **${coins.length}** coin(s) (${data.stats?.total ?? coins.length} total).`
+      message: `Found **${coins.length}** coin(s) (${data.stats.total} total).`
     };
   })
   .build();

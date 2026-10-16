@@ -40,7 +40,8 @@ export let createDynamicImage = SlateTool.create(spec, {
             dynamicImageUrl: z.string().describe('Dynamic image URL for this format')
           })
         )
-        .describe('Available formats with their dynamic image URLs')
+        .describe('Available formats with their dynamic image URLs'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -64,7 +65,8 @@ export let createDynamicImage = SlateTool.create(spec, {
       output: {
         dynamicImageId: result.id,
         designId: result.design_id,
-        formats
+        formats,
+        raw: result
       },
       message: `Dynamic image created for design \`${result.design_id}\` with **${formats.length}** format(s). Use the dynamic image URLs to customize visuals via query parameters.`
     };

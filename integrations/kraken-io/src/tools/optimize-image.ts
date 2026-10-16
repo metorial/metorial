@@ -1,10 +1,18 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { downloadOptimizedFile } from '../lib/files';
+import {
+  additionalResizeFields,
+  s3StoreSchema,
+  validateAdditionalResize
+} from '../lib/schemas';
+import type { KrakenOptimizeResponse } from '../lib/types';
 import { spec } from '../spec';
 
 let resizeSchema = z
   .object({
+    ...additionalResizeFields,
     strategy: z
       .enum(['exact', 'portrait', 'landscape', 'auto', 'crop', 'square', 'fit', 'fill'])
       .describe(
@@ -46,21 +54,6 @@ let convertSchema = z
   })
   .optional()
   .describe('Convert image to a different format');
-
-let s3StoreSchema = z
-  .object({
-    accessKey: z.string().describe('Amazon S3 Access Key ID'),
-    secretKey: z.string().describe('Amazon S3 Secret Access Key'),
-    bucket: z.string().describe('S3 bucket name'),
-    region: z.string().optional().describe('S3 region (required if not us-east-1)'),
-    path: z.string().optional().describe('Destination path in the bucket'),
-    acl: z
-      .enum(['public_read', 'private'])
-      .optional()
-      .describe('Object ACL permissions. Defaults to public_read.')
-  })
-  .optional()
-  .describe('Store optimized image directly to Amazon S3');
 
 export let optimizeImageTool = SlateTool.create(spec, {
   name: 'Optimize Image',
@@ -142,10 +135,21 @@ The optimized image URL is available for **one hour** only.`,
         .string()
         .optional()
         .describe('Request ID returned when using callback URL mode'),
-      errorMessage: z.string().optional().describe('Error message if optimization failed')
+      errorMessage: z.string().optional().describe('Error message if optimization failed'),
+      fileDeliveryError: z
+        .string()
+        .optional()
+        .describe(
+          'Why the completed file could not be prepared for download; optimization still completed'
+        ),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete optimization or callback acknowledgment response')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.resize) validateAdditionalResize(ctx.input.resize);
     let client = new Client({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -155,6 +159,12 @@ The optimized image URL is available for **one hour** only.`,
     let resizeOptions = ctx.input.resize
       ? ({
           strategy: ctx.input.resize.strategy,
+          ...pickDefined({
+            size: ctx.input.resize.size,
+            x: ctx.input.resize.x,
+            y: ctx.input.resize.y,
+            scale: ctx.input.resize.scale
+          }),
           ...(ctx.input.resize.width !== undefined && { width: ctx.input.resize.width }),
           ...(ctx.input.resize.height !== undefined && { height: ctx.input.resize.height }),
           ...(ctx.input.resize.enhance !== undefined && { enhance: ctx.input.resize.enhance }),
@@ -197,44 +207,41 @@ The optimized image URL is available for **one hour** only.`,
       callbackUrl: ctx.input.callbackUrl
     });
 
-    if ('id' in result && result.id) {
+    if (typeof result.id === 'string' && result.id) {
       return {
         output: {
           success: true,
-          requestId: result.id
+          requestId: result.id,
+          raw: result
         },
         message: `Optimization request submitted. Results will be posted to the callback URL. Request ID: \`${result.id}\``
       };
     }
 
-    let optimizeResult = result as {
-      success: boolean;
-      file_name?: string;
-      original_size?: number;
-      kraked_size?: number;
-      saved_bytes?: number;
-      kraked_url?: string;
-      original_width?: number;
-      original_height?: number;
-      kraked_width?: number;
-      kraked_height?: number;
-      message?: string;
-    };
-
-    if (!optimizeResult.success) {
-      return {
-        output: {
-          success: false,
-          errorMessage: optimizeResult.message
-        },
-        message: `Optimization failed: ${optimizeResult.message}`
-      };
+    let optimizeResult = result as KrakenOptimizeResponse;
+    let fileDeliveryError: string | undefined;
+    try {
+      if (!optimizeResult.kraked_url) {
+        fileDeliveryError =
+          'Kraken.io did not provide a download URL for the completed optimization.';
+      } else {
+        await ctx.addAttachment({
+          type: 'content',
+          content: await downloadOptimizedFile(optimizeResult.kraked_url),
+          filename: optimizeResult.file_name
+        });
+      }
+    } catch {
+      fileDeliveryError =
+        'Optimization completed, but the optimized file could not be prepared for download. Use optimizedUrl to retrieve it directly; files hosted by Kraken.io are retained for one hour.';
     }
 
     let savedPercent =
-      optimizeResult.original_size && optimizeResult.saved_bytes
+      optimizeResult.original_size !== undefined &&
+      optimizeResult.original_size > 0 &&
+      optimizeResult.saved_bytes !== undefined
         ? ((optimizeResult.saved_bytes / optimizeResult.original_size) * 100).toFixed(1)
-        : '0';
+        : undefined;
 
     return {
       output: {
@@ -247,9 +254,11 @@ The optimized image URL is available for **one hour** only.`,
         originalWidth: optimizeResult.original_width,
         originalHeight: optimizeResult.original_height,
         optimizedWidth: optimizeResult.kraked_width,
-        optimizedHeight: optimizeResult.kraked_height
+        optimizedHeight: optimizeResult.kraked_height,
+        fileDeliveryError,
+        raw: result
       },
-      message: `Image optimized successfully. Saved **${savedPercent}%** (${optimizeResult.saved_bytes ?? 0} bytes). Original: ${optimizeResult.original_size} bytes, Optimized: ${optimizeResult.kraked_size} bytes.`
+      message: `Image optimized successfully.${fileDeliveryError ? ` ${fileDeliveryError}` : ' The optimized file was prepared for download.'}${optimizeResult.saved_bytes !== undefined ? ` Saved ${savedPercent !== undefined ? `**${savedPercent}%** ` : ''}(${optimizeResult.saved_bytes} bytes).` : ''}`
     };
   })
   .build();

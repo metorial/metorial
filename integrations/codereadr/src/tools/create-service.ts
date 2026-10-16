@@ -63,6 +63,18 @@ export let createService = SlateTool.create(spec, {
         .describe('Service deactivation end time (HH:mm:ss)'),
       uploadEmail: z.string().optional().describe('Email address for scan delivery'),
       uploadEmailFormat: z.string().optional().describe('Format of email delivery'),
+      postbackRealTimeScans: z
+        .string()
+        .optional()
+        .describe(
+          'Set to 1 or 0 for forwarding online scans from non-postback services. Requires postbackUrl.'
+        ),
+      postbackUploadedScans: z
+        .string()
+        .optional()
+        .describe(
+          'Set to 1 or 0 for forwarding uploaded scans from non-postback services. Requires postbackUrl.'
+        ),
       postbackReceiverOnly: z.string().optional().describe('Set to "1" for receiver-only mode')
     })
   )
@@ -87,6 +99,8 @@ export let createService = SlateTool.create(spec, {
       periodEndTime: ctx.input.periodEndTime,
       uploadEmail: ctx.input.uploadEmail,
       uploadEmailFormat: ctx.input.uploadEmailFormat,
+      postbackRealTimeScans: ctx.input.postbackRealTimeScans,
+      postbackUploadedScans: ctx.input.postbackUploadedScans,
       postbackReceiverOnly: ctx.input.postbackReceiverOnly
     });
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,6 +29,15 @@ export let changeThreadPriority = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (
+      !Number.isInteger(ctx.input.priority) ||
+      ctx.input.priority < 0 ||
+      ctx.input.priority > 3
+    ) {
+      throw createApiServiceError(
+        'Priority must be a whole number from 0 (urgent) to 3 (low)'
+      );
+    }
 
     let res = await client.changeThreadPriority(ctx.input.threadId, ctx.input.priority);
     let thread = res.thread;

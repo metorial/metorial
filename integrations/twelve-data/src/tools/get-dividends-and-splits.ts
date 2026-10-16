@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { invalidResponse, record, records, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getDividendsAndSplits = SlateTool.create(spec, {
@@ -21,13 +22,19 @@ Useful for tracking corporate actions and understanding historical capital event
       range: z
         .string()
         .optional()
-        .describe('Time range (e.g., "1month", "3months", "1year", "5years", "full")'),
+        .describe(
+          'Provider range: last, 1m, 3m, 6m, ytd, 1y, 2y, 5y, or full; next is supported for dividends only. Range takes precedence over dates.'
+        ),
       startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       endDate: z.string().optional().describe('End date (YYYY-MM-DD)')
     })
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
       dividends: z
         .array(z.record(z.string(), z.any()))
@@ -51,17 +58,26 @@ Useful for tracking corporate actions and understanding historical capital event
       endDate: ctx.input.endDate
     };
 
+    let raw: Record<string, any> = {};
+    let symbol: string | undefined;
     let dividends: any[] | undefined;
     let splits: any[] | undefined;
 
     if (ctx.input.dataType === 'dividends' || ctx.input.dataType === 'both') {
       let divResult = await client.getDividends(baseParams);
-      dividends = divResult.dividends || [];
+      raw.dividends = divResult;
+      symbol = requiredString(record(divResult.meta, 'meta').symbol, 'meta.symbol');
+      dividends = records(divResult.dividends, 'dividends');
     }
 
     if (ctx.input.dataType === 'splits' || ctx.input.dataType === 'both') {
       let splitResult = await client.getSplits(baseParams);
-      splits = splitResult.splits || [];
+      raw.splits = splitResult;
+      let splitSymbol = requiredString(record(splitResult.meta, 'meta').symbol, 'meta.symbol');
+      if (symbol !== undefined && symbol !== splitSymbol)
+        throw invalidResponse('corporate-action symbols disagree');
+      symbol = splitSymbol;
+      splits = records(splitResult.splits, 'splits');
     }
 
     let parts: string[] = [];
@@ -70,7 +86,8 @@ Useful for tracking corporate actions and understanding historical capital event
 
     return {
       output: {
-        symbol: ctx.input.symbol,
+        raw,
+        symbol: requiredString(symbol, 'meta.symbol'),
         dividends,
         splits
       },

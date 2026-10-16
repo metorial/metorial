@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorInput, cursorOutput, nextCursor, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let indicatorValueSchema = z.object({
@@ -23,6 +24,7 @@ Configurable by window size, timespan, series type, and date range.`,
 })
   .input(
     z.object({
+      cursor: cursorInput,
       ticker: z.string().describe('Ticker symbol (e.g., "AAPL")'),
       indicator: z
         .enum(['sma', 'ema', 'rsi', 'macd'])
@@ -54,10 +56,14 @@ Configurable by window size, timespan, series type, and date range.`,
   )
   .output(
     z.object({
+      nextCursor: cursorOutput,
       ticker: z.string().describe('Ticker symbol'),
       indicator: z.string().describe('Indicator type'),
-      values: z.array(indicatorValueSchema).describe('Array of computed indicator values'),
-      count: z.number().describe('Number of values returned')
+      values: z
+        .array(indicatorValueSchema)
+        .optional()
+        .describe('Array of computed indicator values'),
+      count: z.number().optional().describe('Number of values returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -69,42 +75,45 @@ Configurable by window size, timespan, series type, and date range.`,
       adjusted: ctx.input.adjusted,
       seriesType: ctx.input.seriesType,
       order: ctx.input.order,
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit,
       timestampGte: ctx.input.from,
       timestampLte: ctx.input.to
     };
 
     let data: any;
-    let values: Array<{
-      timestamp?: number;
-      value?: number;
-      macdValue?: number;
-      signal?: number;
-      histogram?: number;
-    }> = [];
+    let values:
+      | Array<{
+          timestamp?: number;
+          value?: number;
+          macdValue?: number;
+          signal?: number;
+          histogram?: number;
+        }>
+      | undefined;
 
     switch (ctx.input.indicator) {
       case 'sma':
         data = await client.getSMA({ ...commonParams, window: ctx.input.window });
-        values = (data.results?.values || []).map((v: any) => ({
-          timestamp: v.timestamp,
-          value: v.value
+        values = responseRows(data.results?.values, 'indicator values')?.map((v: any) => ({
+          timestamp: v.timestamp ?? undefined,
+          value: v.value ?? undefined
         }));
         break;
 
       case 'ema':
         data = await client.getEMA({ ...commonParams, window: ctx.input.window });
-        values = (data.results?.values || []).map((v: any) => ({
-          timestamp: v.timestamp,
-          value: v.value
+        values = responseRows(data.results?.values, 'indicator values')?.map((v: any) => ({
+          timestamp: v.timestamp ?? undefined,
+          value: v.value ?? undefined
         }));
         break;
 
       case 'rsi':
         data = await client.getRSI({ ...commonParams, window: ctx.input.window });
-        values = (data.results?.values || []).map((v: any) => ({
-          timestamp: v.timestamp,
-          value: v.value
+        values = responseRows(data.results?.values, 'indicator values')?.map((v: any) => ({
+          timestamp: v.timestamp ?? undefined,
+          value: v.value ?? undefined
         }));
         break;
 
@@ -115,11 +124,11 @@ Configurable by window size, timespan, series type, and date range.`,
           longWindow: ctx.input.longWindow,
           signalWindow: ctx.input.signalWindow
         });
-        values = (data.results?.values || []).map((v: any) => ({
-          timestamp: v.timestamp,
-          macdValue: v.value,
-          signal: v.signal,
-          histogram: v.histogram
+        values = responseRows(data.results?.values, 'indicator values')?.map((v: any) => ({
+          timestamp: v.timestamp ?? undefined,
+          macdValue: v.value ?? undefined,
+          signal: v.signal ?? undefined,
+          histogram: v.histogram ?? undefined
         }));
         break;
     }
@@ -128,10 +137,11 @@ Configurable by window size, timespan, series type, and date range.`,
       output: {
         ticker: ctx.input.ticker,
         indicator: ctx.input.indicator.toUpperCase(),
+        nextCursor: nextCursor(data),
         values,
-        count: values.length
+        count: values?.length ?? undefined
       },
-      message: `Computed **${ctx.input.indicator.toUpperCase()}** for **${ctx.input.ticker}** — ${values.length} data points returned.`
+      message: `Computed **${ctx.input.indicator.toUpperCase()}** for **${ctx.input.ticker}** — ${values?.length ?? 0} data points returned.`
     };
   })
   .build();

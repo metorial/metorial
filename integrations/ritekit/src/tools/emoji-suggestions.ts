@@ -26,11 +26,12 @@ Use "suggest" mode to get a list of relevant emojis, or "emojify" mode to get ba
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       emojis: z
         .array(
           z.object({
             emoji: z.string().describe('Emoji character'),
-            score: z.number().describe('Relevance score')
+            score: z.number().optional().describe('Relevance score, when returned by RiteKit')
           })
         )
         .optional()
@@ -50,6 +51,7 @@ Use "suggest" mode to get a list of relevant emojis, or "emojify" mode to get ba
 
       return {
         output: {
+          raw: { ...result },
           emojifiedText: result.text
         },
         message: `Auto-emojified text: "${result.text}"`
@@ -57,10 +59,12 @@ Use "suggest" mode to get a list of relevant emojis, or "emojify" mode to get ba
     }
 
     let result = await client.emojiSuggestions(ctx.input.text);
-    let emojis = result.emojis || [];
+    let emojis = (result.emojis || []).map(value =>
+      typeof value === 'string' ? { emoji: value } : value
+    );
 
     return {
-      output: { emojis },
+      output: { emojis, raw: { ...result } },
       message: `Found **${emojis.length}** emoji suggestions: ${emojis
         .slice(0, 10)
         .map(e => e.emoji)

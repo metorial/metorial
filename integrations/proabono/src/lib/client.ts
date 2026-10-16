@@ -1,12 +1,45 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
+
+type SubscriptionTarget = {
+  ReferenceSubscription?: string;
+  ReferenceCustomer?: string;
+  IdSubscription?: number;
+};
 
 export class ProAbonoClient {
   private axios;
 
   constructor(config: { token: string; apiEndpoint: string }) {
-    let baseURL = config.apiEndpoint.replace(/\/+$/, '');
+    let endpoint: URL;
+    try {
+      endpoint = new URL(config.apiEndpoint);
+    } catch {
+      throw createApiServiceError(
+        'Provide the HTTPS API endpoint shown in ProAbono under My Profile > Integration.'
+      );
+    }
+    if (
+      endpoint.protocol !== 'https:' ||
+      endpoint.username ||
+      endpoint.password ||
+      endpoint.search ||
+      endpoint.hash
+    ) {
+      throw createApiServiceError(
+        'The ProAbono API endpoint must be an HTTPS URL without credentials, query parameters, or fragments.'
+      );
+    }
+    if (!config.token)
+      throw createApiServiceError('Reconnect ProAbono with your Agent Key and API Key.');
+    let baseURL = endpoint.href.replace(/\/+$/, '').replace(/\/v1$/, '');
     this.axios = createAxios({
       baseURL: `${baseURL}/v1`,
+      validateStatus: () => true,
       headers: {
         Authorization: `Basic ${config.token}`,
         'Content-Type': 'application/json',
@@ -15,14 +48,64 @@ export class ProAbonoClient {
     });
   }
 
-  private async get(path: string, params?: Record<string, any>) {
-    let response = await this.axios.get(path, { params });
-    return response.data;
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>
+  ) {
+    try {
+      let response = await this.axios.request({ method, url: path, data, params });
+      if (response.status < 200 || response.status >= 300) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'ProAbono',
+            reason: 'proabono_api_error',
+            operation: `${method} ${path}`,
+            detailKeys: ['Target', 'Message', 'Code', 'Exception'],
+            extractUpstreamCode: (_error, upstream) => {
+              let body = Array.isArray(upstream?.data) ? upstream.data[0] : upstream?.data;
+              return isApiErrorRecord(body) && typeof body.Code === 'string'
+                ? body.Code
+                : undefined;
+            }
+          }
+        );
+      }
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'ProAbono',
+        reason: 'proabono_api_error',
+        operation: `${method} ${path}`,
+        detailKeys: ['Target', 'Message', 'Code', 'Exception']
+      });
+    }
   }
 
-  private async post(path: string, data?: Record<string, any>, params?: Record<string, any>) {
-    let response = await this.axios.post(path, data, { params });
-    return response.data;
+  private get(path: string, params?: Record<string, unknown>) {
+    return this.request('GET', path, undefined, params);
+  }
+
+  private post(path: string, data?: unknown, params?: Record<string, unknown>) {
+    return this.request('POST', path, data, params);
+  }
+
+  private async resolveSubscriptionId(target: SubscriptionTarget): Promise<number> {
+    if (target.IdSubscription !== undefined) return target.IdSubscription;
+    if (!target.ReferenceCustomer) {
+      throw createApiServiceError(
+        'Provide subscriptionId from manage_subscriptions list. The Live API does not support referenceSubscription lookups.'
+      );
+    }
+    let subscription = await this.getSubscription(target);
+    if (typeof subscription?.Id !== 'number') {
+      throw createApiServiceError(
+        'No active subscription was found for this customer. Use manage_subscriptions list and provide subscriptionId.'
+      );
+    }
+    return subscription.Id;
   }
 
   // ========== Customers ==========
@@ -126,7 +209,7 @@ export class ProAbonoClient {
   async updatePaymentSettings(
     referenceCustomer: string,
     data: {
-      IsAutoBilling?: boolean;
+      ModeBilling?: string;
       IsGreyListed?: boolean;
       NoteInvoice?: string;
       DateNextBilling?: string;
@@ -141,15 +224,19 @@ export class ProAbonoClient {
   // ========== Subscriptions ==========
 
   async createSubscription(data: Record<string, any>) {
-    return this.post('/Subscription', data);
+    let { EnsureBillable, TryStart, BillNow, ...body } = data;
+    return this.post('/Subscription', body, { EnsureBillable, TryStart, BillNow });
   }
 
-  async getSubscription(params: {
-    ReferenceSubscription?: string;
-    ReferenceCustomer?: string;
-    IdSubscription?: number;
-  }) {
-    return this.get('/Subscription', params);
+  async getSubscription(params: SubscriptionTarget) {
+    if (params.IdSubscription !== undefined)
+      return this.get(`/Subscription/${encodeURIComponent(params.IdSubscription)}`);
+    if (!params.ReferenceCustomer) {
+      throw createApiServiceError(
+        'Provide subscriptionId or referenceCustomer. Use manage_subscriptions list to discover subscription IDs.'
+      );
+    }
+    return this.get('/Subscription', { ReferenceCustomer: params.ReferenceCustomer });
   }
 
   async listSubscriptions(params?: {
@@ -162,41 +249,45 @@ export class ProAbonoClient {
     return this.get('/Subscriptions', params);
   }
 
-  async startSubscription(data: {
-    ReferenceSubscription?: string;
-    IdSubscription?: number;
-    ReferenceCustomer?: string;
-  }) {
-    return this.post('/Subscription/Start', data);
+  async startSubscription(
+    data: SubscriptionTarget & { EnsureBillable?: boolean; BillNow?: boolean }
+  ) {
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Subscription/${encodeURIComponent(id)}/Start`, undefined, {
+      EnsureBillable: data.EnsureBillable,
+      BillNow: data.BillNow
+    });
   }
 
-  async suspendSubscription(data: {
-    ReferenceSubscription?: string;
-    IdSubscription?: number;
-    ReferenceCustomer?: string;
-  }) {
-    return this.post('/Subscription/Suspension', data);
+  async suspendSubscription(data: SubscriptionTarget) {
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Subscription/${encodeURIComponent(id)}/Suspension`);
   }
 
-  async upgradeSubscription(data: Record<string, any>) {
-    return this.post('/Subscription/Upgrade', data);
+  async upgradeSubscription(data: SubscriptionTarget & Record<string, unknown>) {
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Subscription/${encodeURIComponent(id)}/Upgrade`, undefined, {
+      ReferenceOffer: data.ReferenceOffer,
+      BillNow: data.BillNow,
+      Immediate: data.Immediate,
+      IgnoreEngagement: data.IgnoreEngagement
+    });
   }
 
-  async terminateSubscription(data: {
-    ReferenceSubscription?: string;
-    IdSubscription?: number;
-    ReferenceCustomer?: string;
-    AtRenewal?: boolean;
-  }) {
-    return this.post('/Subscription/Termination', data);
+  async terminateSubscription(data: SubscriptionTarget & { AtRenewal?: boolean }) {
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Subscription/${encodeURIComponent(id)}/Termination`, undefined, {
+      Immediate: data.AtRenewal === undefined ? undefined : !data.AtRenewal
+    });
   }
 
-  async updateSubscriptionTermDate(data: {
-    ReferenceSubscription?: string;
-    IdSubscription?: number;
-    DateTerm?: string;
-  }) {
-    return this.post('/Subscription/TermDate', data);
+  async updateSubscriptionTermDate(data: SubscriptionTarget & { DateTerm?: string }) {
+    if (!data.DateTerm)
+      throw createApiServiceError('dateTerm is required for update_term_date.');
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Subscription/${encodeURIComponent(id)}/DateTerm`, {
+      DateTerm: data.DateTerm
+    });
   }
 
   // ========== Usages ==========
@@ -227,7 +318,8 @@ export class ProAbonoClient {
     DateStamp?: string;
     EnsureBillable?: boolean;
   }) {
-    return this.post('/Usage', data);
+    let { EnsureBillable, ...body } = data;
+    return this.post('/Usage', body, { EnsureBillable });
   }
 
   async batchUpdateUsages(
@@ -249,6 +341,7 @@ export class ProAbonoClient {
   async getOffer(params: {
     ReferenceOffer: string;
     ReferenceCustomer?: string;
+    ReferenceSegment?: string;
     Language?: string;
     Html?: boolean;
   }) {
@@ -263,21 +356,26 @@ export class ProAbonoClient {
     Html?: boolean;
     IgnoreFeatures?: boolean;
     UpgradeMode?: boolean;
+    IdSubscription?: number;
+    PrefixReferenceOffer?: string;
+    ReferencePricingTable?: string;
     Page?: number;
     SizePage?: number;
   }) {
-    return this.get('/Offers', params);
+    let { UpgradeMode, ...query } = params ?? {};
+    return this.get('/Offers', { ...query, Upgrade: UpgradeMode });
   }
 
   // ========== Invoices ==========
 
   async getInvoice(invoiceId: number) {
-    return this.get('/Invoice', { Id: invoiceId });
+    return this.get(`/Invoice/${encodeURIComponent(invoiceId)}`);
   }
 
   async listInvoices(params?: {
     ReferenceCustomer?: string;
     IdCustomer?: number;
+    IdSubscription?: number;
     Page?: number;
     SizePage?: number;
   }) {
@@ -285,7 +383,7 @@ export class ProAbonoClient {
   }
 
   async billCustomer(referenceCustomer: string) {
-    return this.post('/Bill', undefined, { ReferenceCustomer: referenceCustomer });
+    return this.post('/Billing/Customer', { ReferenceCustomer: referenceCustomer });
   }
 
   // ========== Balance Lines ==========
@@ -295,7 +393,8 @@ export class ProAbonoClient {
     Amount: number;
     Description?: string;
   }) {
-    return this.post('/BalanceLine', data);
+    let { Description, ...body } = data;
+    return this.post('/BalanceLine', { ...body, Label: Description });
   }
 
   async listBalanceLines(params?: {
@@ -309,28 +408,35 @@ export class ProAbonoClient {
   // ========== Quotes ==========
 
   async quoteSubscriptionCreation(data: Record<string, any>) {
-    return this.post('/Quote/Subscription', data);
+    let { EnsureBillable, TryStart, BillNow, ...body } = data;
+    return this.post('/Pricing/Subscription', body, { EnsureBillable, TryStart, BillNow });
   }
 
   async quoteSubscriptionUpgrade(data: Record<string, any>) {
-    return this.post('/Quote/SubscriptionUpgrade', data);
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Pricing/Subscription/${encodeURIComponent(id)}/Upgrade`, undefined, {
+      ReferenceOffer: data.ReferenceOffer,
+      BillNow: data.BillNow,
+      Immediate: data.Immediate,
+      IgnoreEngagement: data.IgnoreEngagement
+    });
   }
 
-  async quoteSubscriptionStart(data: {
-    ReferenceSubscription?: string;
-    IdSubscription?: number;
-  }) {
-    return this.post('/Quote/SubscriptionStart', data);
+  async quoteSubscriptionStart(data: SubscriptionTarget) {
+    let id = await this.resolveSubscriptionId(data);
+    return this.post(`/Pricing/Subscription/${encodeURIComponent(id)}/Start`);
   }
 
   async quoteUsageUpdate(data: {
     ReferenceFeature: string;
     ReferenceCustomer: string;
+    IdSubscription?: number;
     Increment?: number;
     QuantityCurrent?: number;
     IsEnabled?: boolean;
+    DateStamp?: string;
   }) {
-    return this.post('/Quote/Usage', data);
+    return this.post('/Pricing/Usage', data);
   }
 
   async quoteBalanceLine(data: {
@@ -338,20 +444,27 @@ export class ProAbonoClient {
     Amount: number;
     Description?: string;
   }) {
-    return this.post('/Quote/BalanceLine', data);
+    let { Description, ...body } = data;
+    return this.post('/Pricing/BalanceLine', { ...body, Label: Description });
   }
 
   // ========== Features ==========
 
   async listFeatures(params?: {
     ReferenceSegment?: string;
+    ReferenceCustomer?: string;
+    Language?: string;
+    IsVisible?: boolean;
     Page?: number;
     SizePage?: number;
   }) {
     return this.get('/Features', params);
   }
 
-  async getFeature(referenceFeature: string) {
-    return this.get('/Feature', { ReferenceFeature: referenceFeature });
+  async getFeature(
+    referenceFeature: string,
+    params?: { ReferenceSegment?: string; ReferenceCustomer?: string; Language?: string }
+  ) {
+    return this.get('/Feature', { ...params, ReferenceFeature: referenceFeature });
   }
 }

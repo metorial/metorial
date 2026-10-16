@@ -38,7 +38,8 @@ export let validateEmailTool = SlateTool.create(spec, {
         .string()
         .describe(
           'Domain status: ok, invalid, no-service, no-mail, mx-invalid, mx-bogon, or resolv-error'
-        )
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,6 +55,7 @@ export let validateEmailTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         valid: result.valid,
         email: result.email,
         domain: result.domain,

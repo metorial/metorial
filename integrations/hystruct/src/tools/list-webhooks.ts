@@ -19,6 +19,7 @@ export let listWebhooks = SlateTool.create(spec, {
         .array(
           z.object({
             webhookId: z.string().describe('Unique identifier of the webhook subscription.'),
+            id: z.string().optional().describe('Webhook identifier returned by Hystruct.'),
             createdAt: z.string().describe('Timestamp when the webhook was created.'),
             url: z.string().describe('The URL where webhook events are sent.'),
             events: z

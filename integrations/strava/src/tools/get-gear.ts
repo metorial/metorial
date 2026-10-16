@@ -20,8 +20,9 @@ export let getGear = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       gearId: z.string().describe('Gear identifier'),
-      name: z.string().describe('Gear name'),
+      name: z.string().optional().describe('Gear name'),
       brandName: z.string().nullable().optional().describe('Brand name'),
       modelName: z.string().nullable().optional().describe('Model name'),
       distance: z.number().describe('Total distance tracked in meters'),
@@ -37,6 +38,7 @@ export let getGear = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: gear,
         gearId: gear.id,
         name: gear.name,
         brandName: gear.brand_name,
@@ -46,7 +48,7 @@ export let getGear = SlateTool.create(spec, {
         description: gear.description,
         frameType: gear.frame_type
       },
-      message: `Retrieved gear **${gear.name}** (${gear.brand_name || 'Unknown brand'}) — ${(gear.distance / 1000).toFixed(0)} km tracked.`
+      message: `Retrieved gear ${gear.id}.`
     };
   })
   .build();

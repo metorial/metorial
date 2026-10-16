@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listFormEntries = SlateTool.create(spec, {
@@ -29,7 +29,7 @@ export let listFormEntries = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let entries = await client.listFormEntries(ctx.input.formId, ctx.input.details);
-    let entriesArray = Array.isArray(entries) ? entries : [];
+    let entriesArray = requireList(entries, 'list-form-entries');
 
     return {
       output: { entries: entriesArray },

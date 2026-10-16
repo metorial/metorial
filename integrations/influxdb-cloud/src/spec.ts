@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'influxdb-cloud',
   name: 'InfluxDB Cloud',
   description:
-    'Managed time-series database platform for storing, querying, and analyzing high-velocity time-series data.',
+    'InfluxDB Cloud TSM/v2 tools for writing and querying time-series data, discovering resources, and managing scheduled data processing.',
   metadata: {},
   config,
   auth

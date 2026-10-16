@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,19 +26,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.genderapi.io'
-      });
-
-      let response = await axios.get('/api/remaining', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let usage = await new Client({ token: ctx.output.token }).getUsage();
 
       return {
         profile: {
-          remainingCredits: response.data.remaining
+          remainingCredits: usage.remaining
         }
       };
     }

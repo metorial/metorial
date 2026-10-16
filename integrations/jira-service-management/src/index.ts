@@ -5,8 +5,11 @@ import {
   createCustomerRequestTool,
   createIssueTool,
   deleteIssueTool,
+  getCurrentUserTool,
+  getCustomerRequestTool,
   getIssueTool,
   getSlaInformationTool,
+  listCustomerRequestsTool,
   listProjectsTool,
   listRequestTypesTool,
   listServiceDesksTool,
@@ -22,6 +25,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
+    getCustomerRequestTool,
+    listCustomerRequestsTool,
     searchIssuesTool,
     getIssueTool,
     createIssueTool,

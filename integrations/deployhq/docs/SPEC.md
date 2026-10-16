@@ -1,4 +1,4 @@
-# Slates Specification for DeployHQ
+# DeployHQ Integration Specification
 
 ## Overview
 
@@ -27,7 +27,7 @@ curl -H "Content-type: application/json" \
      https://your-account.deployhq.com/projects
 ```
 
-API access is restricted by pricing plan as of September 2025. Not all plans include API access, and some accounts may have API access disabled.
+API access depends on account permissions and plan eligibility. DeployHQ documents `403 api_access_restricted` when the account plan does not include API access.
 
 ## Features
 

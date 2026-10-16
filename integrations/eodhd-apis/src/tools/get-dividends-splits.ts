@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let dividendSchema = z.object({
@@ -56,7 +56,7 @@ export let getDividendsSplits = SlateTool.create(spec, {
         from: ctx.input.from,
         to: ctx.input.to
       });
-      dividends = Array.isArray(divResult) ? divResult : [];
+      dividends = eodhdArray(divResult, 'get-dividends-splits');
     }
 
     if (dataType === 'splits' || dataType === 'both') {
@@ -64,7 +64,7 @@ export let getDividendsSplits = SlateTool.create(spec, {
         from: ctx.input.from,
         to: ctx.input.to
       });
-      splits = Array.isArray(splitResult) ? splitResult : [];
+      splits = eodhdArray(splitResult, 'get-dividends-splits');
     }
 
     let parts: string[] = [];

@@ -1,18 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 let clusterArticleSchema = z.object({
   articleId: z.number().describe('Unique ID of the news article'),
   title: z.string().describe('Headline of the article'),
-  text: z.string().describe('Full text content of the article'),
-  summary: z.string().describe('Short summary of the article'),
+  text: z.string().optional().describe('Full text content of the article'),
+  summary: z.string().optional().describe('Short summary of the article'),
   url: z.string().describe('URL to the original article'),
-  image: z.string().nullable().describe('URL of the main article image'),
-  publishDate: z.string().describe('ISO date when the article was published'),
-  authors: z.array(z.string()).describe('List of article authors'),
-  sentiment: z.number().nullable().describe('Sentiment score from -1 to +1')
+  image: z.string().nullable().optional().describe('URL of the main article image'),
+  publishDate: z
+    .string()
+    .optional()
+    .describe('Publication date and time reported by the provider'),
+  authors: z.array(z.string()).optional().describe('List of article authors'),
+  sentiment: z.number().nullable().optional().describe('Sentiment score from -1 to +1')
 });
 
 let newsClusterSchema = z.object({
@@ -48,14 +51,18 @@ export let topNewsTool = SlateTool.create(spec, {
         .min(1)
         .max(100)
         .optional()
-        .describe('Max articles per topic cluster (1–100)')
+        .describe('Max articles returned per topic cluster (1–100; applied after retrieval)')
     })
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       country: z.string().describe('Country code of the returned news'),
       language: z.string().describe('Language code of the returned news'),
-      clusters: z.array(newsClusterSchema).describe('News topic clusters ranked by importance')
+      clusters: z
+        .array(newsClusterSchema)
+        .describe('News topic clusters ranked by importance'),
+      raw: z.unknown().describe('Original provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
@@ -69,15 +76,15 @@ export let topNewsTool = SlateTool.create(spec, {
       maxNewsPerCluster: ctx.input.maxArticlesPerCluster
     });
 
-    let clusters = (result.top_news || []).map(cluster => ({
+    let clusters = result.top_news.map(cluster => ({
       articles: cluster.news.map(article => ({
         articleId: article.id,
         title: article.title,
-        text: article.text,
-        summary: article.summary,
+        text: article.text ?? undefined,
+        summary: article.summary ?? undefined,
         url: article.url,
         image: article.image,
-        publishDate: article.publish_date,
+        publishDate: article.publish_date ?? undefined,
         authors: article.authors,
         sentiment: article.sentiment
       }))
@@ -85,9 +92,11 @@ export let topNewsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         country: result.country,
         language: result.language,
-        clusters
+        clusters,
+        raw: result.raw
       },
       message: `Retrieved **${clusters.length}** top news clusters for **${result.country}** (${result.language}).`
     };

@@ -18,6 +18,7 @@ export let analyzeSentiment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       sentimentLabel: z
         .string()
         .describe('Sentiment label (e.g. "positive", "negative", "neutral")'),
@@ -37,12 +38,9 @@ export let analyzeSentiment = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.analyzeSentiment(ctx.input.text);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'Sentiment analysis failed');
-    }
-
     let data = result.data;
     let output = {
+      rawData: data,
       sentimentLabel: data.sentimentText,
       sentimentScore: data.sentiment,
       comparativeScore: data.comparative,
@@ -52,8 +50,10 @@ export let analyzeSentiment = SlateTool.create(spec, {
     };
 
     return {
-      output,
-      message: `Sentiment is **${data.sentimentText}** (score: ${data.sentiment}, comparative: ${data.comparative}).`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `Sentiment is **${data.sentimentText}** (score: ${data.sentiment}, comparative: ${data.comparative}).`
+      )
     };
   })
   .build();

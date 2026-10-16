@@ -54,7 +54,7 @@ type ApiOperationSpec = {
   notes?: string[];
 };
 
-let generatedAt = '2026-06-11';
+let generatedAt = '2026-10-15';
 
 let fabricRestBaseUrl = 'https://api.fabric.microsoft.com/v1';
 let oneLakeApiBaseUrl = 'https://api.onelake.fabric.microsoft.com';
@@ -62,15 +62,17 @@ let oneLakeDfsBaseUrl = 'https://onelake.dfs.fabric.microsoft.com';
 let oneLakeBlobBaseUrl = 'https://onelake.blob.fabric.microsoft.com';
 let oneLakeTableBaseUrl = 'https://onelake.table.fabric.microsoft.com';
 
-let genericItemScopes = [
-  'https://api.fabric.microsoft.com/Workspace.ReadWrite.All',
+let genericItemScopes = ['https://api.fabric.microsoft.com/Item.ReadWrite.All'];
+let workspaceReadScopes = [
+  'https://api.fabric.microsoft.com/Workspace.Read.All',
+  'https://api.fabric.microsoft.com/Workspace.ReadWrite.All'
+];
+let itemReadScopes = [
+  'https://api.fabric.microsoft.com/Item.Read.All',
   'https://api.fabric.microsoft.com/Item.ReadWrite.All'
 ];
 
-let executeScopes = [
-  'https://api.fabric.microsoft.com/Item.Execute.All',
-  ...genericItemScopes
-];
+let executeScopes = ['https://api.fabric.microsoft.com/Item.Execute.All'];
 
 let storageScopes = ['https://storage.azure.com/.default'];
 
@@ -125,7 +127,12 @@ let createItemRequestFields: Record<string, FieldSpec> = {
     description: 'Optional item description. Maximum length is 256 characters.'
   },
   folderId: folderIdField,
-  sensitivityLabelSettings: sensitivityLabelField
+  sensitivityLabelSettings: sensitivityLabelField,
+  options: {
+    type: 'object',
+    description:
+      'Item-type-specific definition options. Requires definition; see the item type Update Definition API.'
+  }
 };
 
 let dataFactoryCreateFields: Record<string, FieldSpec> = {
@@ -168,7 +175,7 @@ export let workloads: FabricDocsWorkload[] = [
     apiSpecUrl:
       'https://learn.microsoft.com/en-us/rest/api/fabric/datapipeline/items/create-data-pipeline',
     examplesUrl:
-      'https://learn.microsoft.com/en-us/rest/api/fabric/datapipeline/items/run-on-demand-item-job'
+      'https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/run-on-demand-item-job'
   },
   {
     key: 'dataflow',
@@ -247,6 +254,187 @@ export let workloads: FabricDocsWorkload[] = [
 ];
 
 let apiOperations: ApiOperationSpec[] = [
+  {
+    key: 'core_list_workspaces',
+    area: 'core',
+    title: 'List Fabric workspaces',
+    method: 'GET',
+    path: '/workspaces',
+    sourceUrl:
+      'https://learn.microsoft.com/en-us/rest/api/fabric/core/workspaces/list-workspaces',
+    scopes: [
+      'https://api.fabric.microsoft.com/Workspace.Read.All',
+      'https://api.fabric.microsoft.com/Workspace.ReadWrite.All'
+    ],
+    response: {
+      successStatus: [200],
+      body: 'Workspace collection.',
+      lro: false,
+      headers: []
+    },
+    examples: [
+      {
+        name: 'List Fabric workspaces',
+        method: 'GET',
+        path: '/workspaces'
+      }
+    ]
+  },
+  {
+    key: 'core_list_items',
+    area: 'core',
+    title: 'List Fabric items',
+    method: 'GET',
+    path: '/workspaces/{workspaceId}/items',
+    sourceUrl: 'https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-items',
+    scopes: [
+      'https://api.fabric.microsoft.com/Workspace.Read.All',
+      'https://api.fabric.microsoft.com/Workspace.ReadWrite.All'
+    ],
+    response: {
+      successStatus: [200],
+      body: 'Item collection.',
+      lro: false,
+      headers: []
+    },
+    examples: [
+      {
+        name: 'List Fabric items',
+        method: 'GET',
+        path: '/workspaces/{workspaceId}/items'
+      }
+    ]
+  },
+  {
+    key: 'core_get_item',
+    area: 'core',
+    title: 'Get Fabric item',
+    method: 'GET',
+    path: '/workspaces/{workspaceId}/items/{itemId}',
+    sourceUrl: 'https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item',
+    scopes: [
+      'https://api.fabric.microsoft.com/Item.Read.All',
+      'https://api.fabric.microsoft.com/Item.ReadWrite.All'
+    ],
+    response: {
+      successStatus: [200],
+      body: 'Complete item object.',
+      lro: false,
+      headers: []
+    },
+    examples: [
+      {
+        name: 'Get Fabric item',
+        method: 'GET',
+        path: '/workspaces/{workspaceId}/items/{itemId}'
+      }
+    ]
+  },
+  {
+    key: 'core_update_item',
+    area: 'core',
+    title: 'Update Fabric item',
+    method: 'PATCH',
+    path: '/workspaces/{workspaceId}/items/{itemId}',
+    sourceUrl: 'https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item',
+    scopes: ['https://api.fabric.microsoft.com/Item.ReadWrite.All'],
+    response: {
+      successStatus: [200],
+      body: 'Updated item object.',
+      lro: false,
+      headers: []
+    },
+    examples: [
+      {
+        name: 'Update Fabric item',
+        method: 'PATCH',
+        path: '/workspaces/{workspaceId}/items/{itemId}'
+      }
+    ],
+    requestFields: {
+      displayName: {
+        type: 'string',
+        description: 'New item display name.'
+      },
+      description: {
+        type: 'string',
+        description: 'New description; empty string clears it.'
+      }
+    }
+  },
+  {
+    key: 'core_get_operation_state',
+    area: 'core',
+    title: 'Get operation state',
+    method: 'GET',
+    path: '/operations/{operationId}',
+    sourceUrl:
+      'https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-state',
+    scopes: [],
+    response: {
+      successStatus: [200],
+      body: 'Full operation status and provider failure details.',
+      lro: true,
+      headers: ['Location', 'Retry-After', 'x-ms-operation-id']
+    },
+    examples: [
+      {
+        name: 'Get operation state',
+        method: 'GET',
+        path: '/operations/{operationId}'
+      }
+    ],
+    notes: ['Requires the same delegated scopes and permissions as the initiating operation.']
+  },
+  {
+    key: 'core_get_item_job',
+    area: 'core',
+    title: 'Get item job',
+    method: 'GET',
+    path: '/workspaces/{workspaceId}/items/{itemId}/jobs/instances/{jobInstanceId}',
+    sourceUrl:
+      'https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/get-item-job-instance',
+    scopes: [
+      'https://api.fabric.microsoft.com/Item.Read.All',
+      'https://api.fabric.microsoft.com/Item.ReadWrite.All'
+    ],
+    response: {
+      successStatus: [200],
+      body: 'Complete job status, timing and failure details.',
+      lro: false,
+      headers: []
+    },
+    examples: [
+      {
+        name: 'Get item job',
+        method: 'GET',
+        path: '/workspaces/{workspaceId}/items/{itemId}/jobs/instances/{jobInstanceId}'
+      }
+    ]
+  },
+  {
+    key: 'core_cancel_item_job',
+    area: 'core',
+    title: 'Cancel item job',
+    method: 'POST',
+    path: '/workspaces/{workspaceId}/items/{itemId}/jobs/instances/{jobInstanceId}/cancel',
+    sourceUrl:
+      'https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/cancel-item-job-instance',
+    scopes: ['https://api.fabric.microsoft.com/Item.Execute.All'],
+    response: {
+      successStatus: [202],
+      body: 'Cancellation accepted; poll job status for final state.',
+      lro: true,
+      headers: ['Location', 'Retry-After', 'x-ms-operation-id']
+    },
+    examples: [
+      {
+        name: 'Cancel item job',
+        method: 'POST',
+        path: '/workspaces/{workspaceId}/items/{itemId}/jobs/instances/{jobInstanceId}/cancel'
+      }
+    ]
+  },
   {
     key: 'core_create_item',
     upstreamMcpName: 'core_create-item',
@@ -331,7 +519,7 @@ let apiOperations: ApiOperationSpec[] = [
     path: '/workspaces/{workspaceId}/dataPipelines',
     sourceUrl:
       'https://learn.microsoft.com/en-us/rest/api/fabric/datapipeline/items/list-data-pipelines',
-    scopes: genericItemScopes,
+    scopes: workspaceReadScopes,
     queryParameters: folderListQueryParameters,
     response: {
       successStatus: [200],
@@ -402,7 +590,7 @@ let apiOperations: ApiOperationSpec[] = [
     path: '/workspaces/{workspaceId}/dataPipelines/{dataPipelineId}',
     sourceUrl:
       'https://learn.microsoft.com/en-us/rest/api/fabric/datapipeline/items/get-data-pipeline',
-    scopes: genericItemScopes,
+    scopes: itemReadScopes,
     response: { successStatus: [200], body: 'Data Pipeline item.' },
     examples: [
       {
@@ -458,7 +646,7 @@ let apiOperations: ApiOperationSpec[] = [
     path: '/workspaces/{workspaceId}/dataflows',
     sourceUrl:
       'https://learn.microsoft.com/en-us/rest/api/fabric/dataflow/items/list-dataflows',
-    scopes: genericItemScopes,
+    scopes: workspaceReadScopes,
     queryParameters: folderListQueryParameters,
     response: {
       successStatus: [200],
@@ -576,6 +764,9 @@ let apiOperations: ApiOperationSpec[] = [
     path: '/workspaces',
     sourceUrl: 'https://learn.microsoft.com/en-us/fabric/onelake/onelake-access-api',
     scopes: storageScopes,
+    notes: [
+      'Legacy OneLake route retained for saved environments. Use core_list_workspaces for documented Fabric REST discovery with the Fabric token.'
+    ],
     response: { successStatus: [200], body: 'Workspace collection.' },
     examples: [{ name: 'List workspaces', method: 'GET', path: '/workspaces' }]
   },
@@ -588,6 +779,9 @@ let apiOperations: ApiOperationSpec[] = [
     path: '/workspaces/{workspace}/items',
     sourceUrl: 'https://learn.microsoft.com/en-us/fabric/onelake/onelake-access-api',
     scopes: storageScopes,
+    notes: [
+      'Legacy OneLake route retained for saved environments. Use core_list_items for documented Fabric REST discovery with the Fabric token.'
+    ],
     response: { successStatus: [200], body: 'Item collection.' },
     examples: [
       {
@@ -723,8 +917,12 @@ let apiOperations: ApiOperationSpec[] = [
     area: 'onelake',
     title: 'OneLake Iceberg REST catalog operations',
     method: 'GET',
-    path: '/iceberg/v1/{workspace}/{item}/namespaces/{namespace}/tables',
-    sourceUrl: 'https://learn.microsoft.com/en-us/fabric/onelake/onelake-access-api',
+    path: '/iceberg/v1/{prefix}/namespaces/{namespace}/tables',
+    sourceUrl:
+      'https://learn.microsoft.com/en-us/fabric/onelake/table-apis/iceberg-table-apis-get-started',
+    notes: [
+      'Call onelake_get_table_config first and pass overrides.prefix as catalogPrefix when it differs from the workspace/item path.'
+    ],
     scopes: storageScopes,
     response: {
       successStatus: [200],
@@ -962,7 +1160,7 @@ export let bestPracticesResource = (topic?: string) =>
         'Use either creationPayload or definition in create item calls, never both.',
         'Pass folderId when the target folder is known instead of creating all items at workspace root.',
         'Pass friendly OneLake item identifiers with the item type suffix where the upstream API supports them, for example MyLakehouse.Lakehouse.',
-        'Do not inline large file or Arrow stream bodies in tool output; return them as attachments.'
+        'Prepare large files and Arrow stream results as downloadable files.'
       ],
       relevantOperations: apiOperations
         .filter(operation => operationMatchesArea(operation, topic))

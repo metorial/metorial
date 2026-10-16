@@ -109,21 +109,24 @@ export let createPass = SlateTool.create(spec, {
       templateId: ctx.input.templateId
     };
 
-    if (ctx.input.userProvidedId) body.userProvidedId = ctx.input.userProvidedId;
+    if (ctx.input.userProvidedId !== undefined) body.userProvidedId = ctx.input.userProvidedId;
     if (ctx.input.enforceUniqueUserProvidedId !== undefined)
       body.enforceUniqueUserProvidedId = ctx.input.enforceUniqueUserProvidedId;
-    if (ctx.input.barcodeValue) body.barcodeValue = ctx.input.barcodeValue;
-    if (ctx.input.expirationDate) body.expirationDate = ctx.input.expirationDate;
-    if (ctx.input.relevantDate) body.relevantDate = ctx.input.relevantDate;
+    if (ctx.input.barcodeValue !== undefined) body.barcodeValue = ctx.input.barcodeValue;
+    if (ctx.input.expirationDate !== undefined) body.expirationDate = ctx.input.expirationDate;
+    if (ctx.input.relevantDate !== undefined) body.relevantDate = ctx.input.relevantDate;
     if (ctx.input.storedValue !== undefined) body.storedValue = ctx.input.storedValue;
     if (ctx.input.emailRecipient) body.emailRecipient = ctx.input.emailRecipient;
     if (ctx.input.phoneRecipient) body.phoneRecipient = ctx.input.phoneRecipient;
     if (ctx.input.locations) body.locations = ctx.input.locations;
-    if (ctx.input.labelColor) body.labelColor = ctx.input.labelColor;
-    if (ctx.input.foregroundColor) body.foregroundColor = ctx.input.foregroundColor;
-    if (ctx.input.backgroundColor) body.backgroundColor = ctx.input.backgroundColor;
-    if (ctx.input.groupingIdentifier) body.groupingIdentifier = ctx.input.groupingIdentifier;
-    if (ctx.input.downloadPin) body.downloadPin = ctx.input.downloadPin;
+    if (ctx.input.labelColor !== undefined) body.labelColor = ctx.input.labelColor;
+    if (ctx.input.foregroundColor !== undefined)
+      body.foregroundColor = ctx.input.foregroundColor;
+    if (ctx.input.backgroundColor !== undefined)
+      body.backgroundColor = ctx.input.backgroundColor;
+    if (ctx.input.groupingIdentifier !== undefined)
+      body.groupingIdentifier = ctx.input.groupingIdentifier;
+    if (ctx.input.downloadPin !== undefined) body.downloadPin = ctx.input.downloadPin;
     if (ctx.input.bundleId) body.bundleId = ctx.input.bundleId;
 
     if (ctx.input.customFields) {
@@ -135,13 +138,21 @@ export let createPass = SlateTool.create(spec, {
     let result = await client.createPass(body, ctx.input.asyncProcessing);
     let data = result.data || result;
 
+    if (data.iPhoneUri) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: data.iPhoneUri,
+        mimeType: 'application/vnd.apple.pkpass'
+      });
+    }
+
     return {
       output: {
         passId: data.identifier,
-        downloadPage: data.downloadPage,
+        downloadPage: data.downloadPage ?? undefined,
         barcodeValue: data.barcodeValue || undefined,
-        iPhoneUri: data.iPhoneUri,
-        androidUri: data.androidUri
+        iPhoneUri: data.iPhoneUri ?? undefined,
+        androidUri: data.androidUri ?? undefined
       },
       message: `Created pass \`${data.identifier}\`${ctx.input.emailRecipient ? ` and sent to ${ctx.input.emailRecipient}` : ''}${ctx.input.phoneRecipient ? ` and sent via SMS to ${ctx.input.phoneRecipient}` : ''}.`
     };

@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let screenshotWebpage = SlateTool.create(spec, {
   name: 'Screenshot Webpage',
   key: 'screenshot_webpage',
-  description: `Capture a high-quality screenshot of any webpage. Returns the screenshot image data from a simple URL input.`,
+  description: `DEPRECATED — use \`capture_screenshot\` instead. Capture a high-quality screenshot of any webpage. Returns the screenshot image data from a simple URL input.`,
+  instructions: ['Use capture_screenshot to prepare a downloadable screenshot file.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SkyfireClient } from '../lib/client';
+import { type SellerService, SkyfireClient } from '../lib/client';
 import { spec } from '../spec';
 
 let sellerServiceOutputSchema = z.object({
@@ -12,7 +12,19 @@ let sellerServiceOutputSchema = z.object({
   price: z.string().describe('Price in USD'),
   priceModel: z.string().describe('Pricing model'),
   minimumTokenAmount: z.string().describe('Minimum token amount for buyers'),
-  acceptedTokens: z.array(z.string()).describe('Accepted token types'),
+  acceptedTokens: z
+    .array(z.string())
+    .optional()
+    .describe('Accepted token types when explicitly configured'),
+  openApiSpecUrl: z.string().optional().describe('Service OpenAPI specification URL'),
+  websiteUrl: z.string().optional().describe('Service website URL'),
+  mcpServerUrl: z.string().optional().describe('Service MCP server URL'),
+  fetchAgentProfileUrl: z.string().optional().describe('Fetch.ai agent profile URL'),
+  humanIdentityRequirement: z.unknown().optional().describe('Provider identity requirements'),
+  termsOfService: z.unknown().optional().describe('Provider terms of service'),
+  seller: z.unknown().optional().describe('Provider seller identity'),
+  maxTokenTTLSeconds: z.number().optional().describe('Maximum token lifetime in seconds'),
+  raw: z.unknown().optional().describe('Complete provider service record'),
   active: z.boolean().describe('Whether the service is currently active'),
   approved: z.boolean().describe('Whether the service has been approved by Skyfire'),
   createdAt: z.string().describe('ISO 8601 creation timestamp'),
@@ -26,7 +38,7 @@ export let manageSellerService = SlateTool.create(spec, {
   instructions: [
     'Use action "list" to see all your seller services.',
     'Use action "get" with sellerServiceId to retrieve a specific service.',
-    'Use action "create" to register a new service — provide name, description, type, and acceptedTokens at minimum.',
+    'Use action "create" to register a service. The provider requires name, description, tags, type, price, priceModel, minimumTokenAmount, humanIdentityRequirement, and the endpoint URL for the chosen type.',
     'Use action "update" with sellerServiceId and the fields to change.',
     'Use action "activate" or "deactivate" with sellerServiceId to toggle service visibility.',
     'Newly created services must be approved by Skyfire before they can be activated.'
@@ -51,26 +63,52 @@ export let manageSellerService = SlateTool.create(spec, {
       description: z.string().optional().describe('Service description (for create/update)'),
       tags: z.array(z.string()).optional().describe('Service tags (for create/update)'),
       type: z
-        .enum(['API', 'WEB_PAGE', 'MCP_SERVER_REMOTE'])
+        .enum(['API', 'WEB_PAGE', 'MCP_SERVER_REMOTE', 'MCP_SERVER_LOCAL', 'FETCH_AGENT'])
         .optional()
         .describe('Service type (for create)'),
       price: z.string().optional().describe('Price in USD (for create/update)'),
       priceModel: z
-        .enum(['PAY_PER_USE', 'SUBSCRIPTION'])
+        .enum(['PAY_PER_USE', 'SUBSCRIPTION', 'PAY_PER_MB', 'CUSTOM'])
         .optional()
-        .describe('Pricing model (for create/update)'),
+        .describe('Pricing model (for create)'),
       minimumTokenAmount: z
         .string()
         .optional()
         .describe('Minimum token amount buyers must authorize (for create/update)'),
       acceptedTokens: z
-        .array(z.enum(['kya', 'pay', 'kya+pay']))
+        .array(z.enum(['kya', 'pay', 'kya+pay', 'kya-pay']))
         .optional()
         .describe('Accepted token types (for create/update)'),
       openApiSpecUrl: z
         .string()
         .optional()
-        .describe('OpenAPI specification URL (for API type services, create/update)'),
+        .describe(
+          'OpenAPI specification URL (required by the provider for API service creation)'
+        ),
+      websiteUrl: z.string().optional().describe('Website URL for WEB_PAGE service creation'),
+      mcpServerUrl: z
+        .string()
+        .optional()
+        .describe('MCP server URL for remote or local MCP service creation'),
+      fetchAgentProfileUrl: z
+        .string()
+        .optional()
+        .describe('Fetch.ai profile URL for FETCH_AGENT service creation'),
+      humanIdentityRequirement: z
+        .object({
+          individual: z
+            .array(z.string())
+            .describe('Required individual identity fields; empty means none'),
+          organization: z
+            .array(z.string())
+            .describe('Required organization identity fields; empty means none')
+        })
+        .optional()
+        .describe('Identity requirements for service creation'),
+      maxTokenTTLSeconds: z
+        .number()
+        .optional()
+        .describe('Maximum token lifetime for creation, from 10 to 86400 seconds'),
       termsOfServiceUrl: z
         .string()
         .optional()
@@ -88,28 +126,15 @@ export let manageSellerService = SlateTool.create(spec, {
         .optional()
         .describe('List of seller services (for list/get/create actions)'),
       success: z.boolean().describe('Whether the operation succeeded'),
-      actionPerformed: z.string().describe('Description of what was done')
+      actionPerformed: z.string().describe('Description of what was done'),
+      raw: z.unknown().optional().describe('Complete provider response when returned')
     })
   )
   .handleInvocation(async ctx => {
     let client = new SkyfireClient({ token: ctx.auth.token });
     let { action, sellerServiceId } = ctx.input;
 
-    let mapService = (s: {
-      id: string;
-      name: string;
-      description: string;
-      tags: string[];
-      type: string;
-      price: string;
-      priceModel: string;
-      minimumTokenAmount: string;
-      acceptedTokens: string[];
-      active: boolean;
-      approved: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }) => ({
+    let mapService = (s: SellerService) => ({
       sellerServiceId: s.id,
       name: s.name,
       description: s.description,
@@ -119,6 +144,15 @@ export let manageSellerService = SlateTool.create(spec, {
       priceModel: s.priceModel,
       minimumTokenAmount: s.minimumTokenAmount,
       acceptedTokens: s.acceptedTokens,
+      openApiSpecUrl: s.openApiSpecUrl,
+      websiteUrl: s.websiteUrl,
+      mcpServerUrl: s.mcpServerUrl,
+      fetchAgentProfileUrl: s.fetchAgentProfileUrl,
+      humanIdentityRequirement: s.humanIdentityRequirement,
+      termsOfService: s.termsOfService,
+      seller: s.seller,
+      maxTokenTTLSeconds: s.maxTokenTTLSeconds,
+      raw: s,
       active: s.active,
       approved: s.approved,
       createdAt: s.createdAt,
@@ -126,11 +160,12 @@ export let manageSellerService = SlateTool.create(spec, {
     });
 
     if (action === 'list') {
-      let services = await client.getSellerServices();
-      let mapped = services.map(mapService);
+      let result = await client.getSellerServices();
+      let mapped = result.data.map(mapService);
       return {
         output: {
           services: mapped,
+          raw: result,
           success: true,
           actionPerformed: `Listed ${mapped.length} seller service(s).`
         },
@@ -139,11 +174,13 @@ export let manageSellerService = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!sellerServiceId) throw new Error('sellerServiceId is required for get action');
+      if (!sellerServiceId)
+        throw createApiServiceError('sellerServiceId is required for get action');
       let service = await client.getSellerService(sellerServiceId);
       return {
         output: {
           services: [mapService(service)],
+          raw: service,
           success: true,
           actionPerformed: `Retrieved service "${service.name}".`
         },
@@ -158,9 +195,17 @@ export let manageSellerService = SlateTool.create(spec, {
         !ctx.input.type ||
         !ctx.input.acceptedTokens
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'name, description, type, and acceptedTokens are required for create action'
         );
+      }
+      if (
+        ctx.input.maxTokenTTLSeconds !== undefined &&
+        (!Number.isFinite(ctx.input.maxTokenTTLSeconds) ||
+          ctx.input.maxTokenTTLSeconds < 10 ||
+          ctx.input.maxTokenTTLSeconds > 86400)
+      ) {
+        throw createApiServiceError('maxTokenTTLSeconds must be between 10 and 86400.');
       }
       let termsOfService = ctx.input.termsOfServiceUrl
         ? {
@@ -179,21 +224,28 @@ export let manageSellerService = SlateTool.create(spec, {
         minimumTokenAmount: ctx.input.minimumTokenAmount,
         acceptedTokens: ctx.input.acceptedTokens,
         openApiSpecUrl: ctx.input.openApiSpecUrl,
+        websiteUrl: ctx.input.websiteUrl,
+        mcpServerUrl: ctx.input.mcpServerUrl,
+        fetchAgentProfileUrl: ctx.input.fetchAgentProfileUrl,
+        humanIdentityRequirement: ctx.input.humanIdentityRequirement,
+        maxTokenTTLSeconds: ctx.input.maxTokenTTLSeconds,
         termsOfService
       });
 
       return {
         output: {
           services: [mapService(service)],
+          raw: service,
           success: true,
-          actionPerformed: `Created service "${service.name}" (pending approval).`
+          actionPerformed: `Created service "${service.name}".`
         },
-        message: `Created seller service **${service.name}**. It is pending approval by Skyfire.`
+        message: `Created seller service **${service.name}** (${service.approved ? 'approved' : 'pending approval'}).`
       };
     }
 
     if (action === 'update') {
-      if (!sellerServiceId) throw new Error('sellerServiceId is required for update action');
+      if (!sellerServiceId)
+        throw createApiServiceError('sellerServiceId is required for update action');
       let termsOfService = ctx.input.termsOfServiceUrl
         ? {
             url: ctx.input.termsOfServiceUrl,
@@ -221,7 +273,8 @@ export let manageSellerService = SlateTool.create(spec, {
     }
 
     if (action === 'activate') {
-      if (!sellerServiceId) throw new Error('sellerServiceId is required for activate action');
+      if (!sellerServiceId)
+        throw createApiServiceError('sellerServiceId is required for activate action');
       await client.activateSellerService(sellerServiceId);
       return {
         output: {
@@ -234,7 +287,7 @@ export let manageSellerService = SlateTool.create(spec, {
 
     if (action === 'deactivate') {
       if (!sellerServiceId)
-        throw new Error('sellerServiceId is required for deactivate action');
+        throw createApiServiceError('sellerServiceId is required for deactivate action');
       await client.deactivateSellerService(sellerServiceId);
       return {
         output: {
@@ -245,6 +298,6 @@ export let manageSellerService = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

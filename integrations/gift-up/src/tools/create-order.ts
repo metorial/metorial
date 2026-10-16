@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -77,7 +77,7 @@ let recipientSchema = z
         city: z.string().describe('City'),
         state: z.string().describe('State/province'),
         postalCode: z.string().describe('Postal/zip code'),
-        countryCode: z.string().describe('Country code')
+        countryCode: z.string().describe('3-letter ISO country code, for example USA')
       })
       .optional()
       .describe('Shipping address (required for postal fulfilment)'),
@@ -86,7 +86,9 @@ let recipientSchema = z
         shippingOptionId: z
           .string()
           .optional()
-          .describe('Reference an existing shipping option'),
+          .describe(
+            'Reference an existing shipping option. Call get_shipping_settings for IDs.'
+          ),
         name: z.string().optional().describe('Shipping option name'),
         price: z.number().optional().describe('Shipping price')
       })
@@ -179,6 +181,47 @@ export let createOrder = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    for (let [index, item] of ctx.input.items.entries()) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) {
+        throw createApiServiceError(
+          `items[${index}].quantity must be an integer from 1 to 1000.`
+        );
+      }
+      if (!item.itemId && (!item.name?.trim() || !item.backingType)) {
+        throw createApiServiceError(
+          `Provide itemId, or name and backingType for items[${index}]. Call list_items for item IDs.`
+        );
+      }
+    }
+    let recipient = ctx.input.recipient;
+    if (recipient?.fulfilmentMethod === 'Post') {
+      if (!recipient.shippingAddress || !recipient.shippingOption) {
+        throw createApiServiceError(
+          'Postal fulfilment requires shippingAddress and shippingOption. Call get_shipping_settings for shipping options.'
+        );
+      }
+      if (
+        !recipient.shippingOption.shippingOptionId &&
+        (recipient.shippingOption.name === undefined ||
+          recipient.shippingOption.price === undefined)
+      ) {
+        throw createApiServiceError(
+          'Provide shippingOptionId, or both name and price for a custom shipping option.'
+        );
+      }
+    }
+    if (
+      recipient &&
+      (recipient.fulfilmentMethod ?? 'Email') === 'Email' &&
+      !recipient.recipientEmail?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide recipientEmail for email fulfilment, or choose Post or None.'
+      );
+    }
+    if (ctx.input.metadata && Object.keys(ctx.input.metadata).length > 20) {
+      throw createApiServiceError('Order metadata supports no more than 20 keys.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       testMode: ctx.config.testMode

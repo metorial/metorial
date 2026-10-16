@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'baserow',
   name: 'Baserow',
   description:
-    'Open-source no-code database platform with spreadsheet-like interfaces and relational database capabilities. Manage workspaces, databases, tables, fields, rows, views, and webhooks via REST API.',
+    'Open-source no-code database platform with spreadsheet-like interfaces and relational database capabilities. Discover databases and tables, manage rows, fields, tables, and views, and upload files via the REST API.',
   metadata: {},
   config,
   auth

@@ -26,6 +26,7 @@ export let getSplitsAndDividends = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       splits: z
         .array(
           z.object({
@@ -50,11 +51,13 @@ export let getSplitsAndDividends = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { type, symbols, dateFrom, dateTo, sort, limit, offset } = ctx.input;
 
+    let raw: { splits?: unknown; dividends?: unknown } = {};
     let splits: { symbol: string; date: string; splitFactor: number }[] | undefined;
     let dividends: { symbol: string; date: string; dividend: number }[] | undefined;
 
     if (type === 'splits' || type === 'both') {
       let result = await client.getSplits({ symbols, dateFrom, dateTo, sort, limit, offset });
+      raw.splits = result.raw;
       splits = result.data.map(s => ({
         symbol: s.symbol,
         date: s.date,
@@ -71,6 +74,7 @@ export let getSplitsAndDividends = SlateTool.create(spec, {
         limit,
         offset
       });
+      raw.dividends = result.raw;
       dividends = result.data.map(d => ({
         symbol: d.symbol,
         date: d.date,
@@ -83,7 +87,7 @@ export let getSplitsAndDividends = SlateTool.create(spec, {
     if (dividends) parts.push(`${dividends.length} dividend(s)`);
 
     return {
-      output: { splits, dividends },
+      output: { splits, dividends, raw },
       message: `Retrieved ${parts.join(' and ')} for **${symbols}**.`
     };
   })

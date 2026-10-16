@@ -1,9 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let webhookSchema = z.object({
+  raw: z.unknown().optional().describe('Original webhook response returned by Doppler'),
+  name: z.string().optional().describe('Webhook name'),
   webhookSlug: z.string().optional().describe('Webhook unique slug identifier'),
   url: z.string().optional().describe('Webhook target URL'),
   enabled: z.boolean().optional().describe('Whether the webhook is enabled'),
@@ -31,7 +34,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug'),
+      project: projectInput,
       action: z
         .enum(['list', 'get', 'create', 'update', 'enable', 'disable', 'delete'])
         .describe('Action to perform'),
@@ -39,12 +42,19 @@ export let manageWebhooks = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Webhook slug (required for get, update, enable, disable, delete)'),
+      name: z.string().optional().describe('Webhook name (for create or update)'),
       url: z.string().optional().describe('Webhook target URL (required for create)'),
       secret: z.string().optional().describe('Signing secret for webhook verification'),
       enabledConfigs: z
         .array(z.string())
         .optional()
-        .describe('Config names that trigger this webhook'),
+        .describe(
+          'Config slugs to enable for this webhook (discover config slugs with manage_configs)'
+        ),
+      disableConfigs: z
+        .array(z.string())
+        .optional()
+        .describe('Config slugs to disable for this webhook (update only)'),
       customPayload: z
         .string()
         .optional()
@@ -70,10 +80,12 @@ export let manageWebhooks = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapWebhook = (w: any) => ({
+      raw: w,
+      name: w.name,
       webhookSlug: w.slug,
       url: w.url,
       enabled: w.enabled,
-      enabledConfigs: w.enabledConfigs || w.enabled_configs,
+      enabledConfigs: w.enabledConfigs ?? w.enabled_configs ?? w.enableConfigs,
       hasSecret: !!w.secret || w.hasSecret,
       hasPayload: !!w.payload || w.hasPayload
     });
@@ -88,7 +100,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.webhookSlug) throw new Error('webhookSlug is required for "get" action');
+      if (!ctx.input.webhookSlug)
+        throw createApiServiceError('webhookSlug is required for "get" action');
 
       let webhook = await client.getWebhook(ctx.input.project, ctx.input.webhookSlug);
 
@@ -99,14 +112,15 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.url) throw new Error('url is required for "create" action');
+      if (!ctx.input.url) throw createApiServiceError('url is required for "create" action');
 
       let webhook = await client.createWebhook(ctx.input.project, {
         url: ctx.input.url,
         secret: ctx.input.secret,
         enabledConfigs: ctx.input.enabledConfigs,
         payload: ctx.input.customPayload,
-        authentication: ctx.input.authentication
+        authentication: ctx.input.authentication,
+        name: ctx.input.name
       });
 
       return {
@@ -117,14 +131,16 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.webhookSlug)
-        throw new Error('webhookSlug is required for "update" action');
+        throw createApiServiceError('webhookSlug is required for "update" action');
 
       let webhook = await client.updateWebhook(ctx.input.project, ctx.input.webhookSlug, {
         url: ctx.input.url,
         secret: ctx.input.secret,
         enabledConfigs: ctx.input.enabledConfigs,
         payload: ctx.input.customPayload,
-        authentication: ctx.input.authentication
+        authentication: ctx.input.authentication,
+        name: ctx.input.name,
+        disableConfigs: ctx.input.disableConfigs
       });
 
       return {
@@ -135,7 +151,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'enable') {
       if (!ctx.input.webhookSlug)
-        throw new Error('webhookSlug is required for "enable" action');
+        throw createApiServiceError('webhookSlug is required for "enable" action');
 
       let webhook = await client.enableWebhook(ctx.input.project, ctx.input.webhookSlug);
 
@@ -147,7 +163,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'disable') {
       if (!ctx.input.webhookSlug)
-        throw new Error('webhookSlug is required for "disable" action');
+        throw createApiServiceError('webhookSlug is required for "disable" action');
 
       let webhook = await client.disableWebhook(ctx.input.project, ctx.input.webhookSlug);
 
@@ -159,7 +175,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.webhookSlug)
-        throw new Error('webhookSlug is required for "delete" action');
+        throw createApiServiceError('webhookSlug is required for "delete" action');
 
       await client.deleteWebhook(ctx.input.project, ctx.input.webhookSlug);
 
@@ -169,6 +185,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

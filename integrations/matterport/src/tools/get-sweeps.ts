@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fileDelivery } from '../lib/files';
 import { spec } from '../spec';
 
 let sweepLocationSchema = z.object({
@@ -71,23 +72,43 @@ export let getSweeps = SlateTool.create(spec, {
 
     let locations = await client.getSweeps(ctx.input.modelId, ctx.input.resolution);
 
-    let mappedLocations = (locations || []).map((loc: any) => ({
+    let mappedLocations = locations.map((loc: any) => ({
       locationId: loc.id,
-      position: loc.position || null,
-      floorId: loc.floor?.id || null,
-      roomId: loc.room?.id || null,
-      panoramas: (loc.panos || []).map((p: any) => ({
+      position: loc.position ?? null,
+      floorId: loc.floor?.id ?? null,
+      roomId: loc.room?.id ?? null,
+      panoramas: loc.panos.map((p: any) => ({
         panoramaId: p.id,
         skybox: p.skybox
           ? {
-              skyboxId: p.skybox.id || null,
-              status: p.skybox.status || null,
-              format: p.skybox.format || null,
-              faceUrls: p.skybox.children || null
+              skyboxId: p.skybox.id ?? null,
+              status: p.skybox.status ?? null,
+              format: p.skybox.format ?? null,
+              faceUrls: p.skybox.children ?? null
             }
           : null
       }))
     }));
+
+    for (let location of locations) {
+      for (let panorama of location.panos) {
+        if (panorama.skybox?.children == null) continue;
+        if (!Array.isArray(panorama.skybox.children))
+          throw createApiServiceError('Matterport returned an invalid panoramic image list.');
+        for (let [faceIndex, url] of panorama.skybox.children.entries()) {
+          await ctx.addAttachment(
+            fileDelivery(url, panorama.skybox.validUntil, {
+              kind: 'panorama',
+              modelId: ctx.input.modelId,
+              locationId: location.id,
+              panoramaId: panorama.id,
+              resolution: ctx.input.resolution,
+              faceIndex
+            })
+          );
+        }
+      }
+    }
 
     return {
       output: { locations: mappedLocations },

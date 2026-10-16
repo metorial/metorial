@@ -11,9 +11,12 @@ import {
   deleteService,
   deleteUser,
   generateBarcode,
+  generateBarcodeFile,
+  getApiLimits,
   listDatabases,
   listDevices,
   listQuestions,
+  listScanUploads,
   listServices,
   listUsers,
   manageDatabaseValues,
@@ -24,6 +27,7 @@ import {
   searchDatabaseValues,
   updateDatabase,
   updateDevice,
+  updateQuestion,
   updateService,
   updateUser
 } from './tools';
@@ -54,7 +58,11 @@ export let provider = Slate.create({
     manageQuestionAnswers,
     listDevices,
     updateDevice,
-    generateBarcode
+    generateBarcode,
+    generateBarcodeFile,
+    getApiLimits,
+    listScanUploads,
+    updateQuestion
   ],
   triggers: []
 });

@@ -1,6 +1,15 @@
-import { Slate, type SlateTool } from 'slates';
+import { Slate } from 'slates';
 import { spec } from './spec';
-import { captureScreenshot, extractContent, queryPage, scrapeHtml, unfurlUrl } from './tools';
+import {
+  captureScreenshot,
+  convertToMarkdown,
+  extractContent,
+  getFileUrl,
+  getOembed,
+  queryPage,
+  scrapeHtml,
+  unfurlUrl
+} from './tools';
 
 export let provider = Slate.create({
   spec,
@@ -9,7 +18,10 @@ export let provider = Slate.create({
     scrapeHtml,
     captureScreenshot,
     extractContent,
-    queryPage
-  ] as unknown as SlateTool<any, any, any, any>[],
+    queryPage,
+    convertToMarkdown,
+    getOembed,
+    getFileUrl
+  ],
   triggers: []
 });

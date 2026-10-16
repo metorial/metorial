@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Abyssale
 
-Programmatically generate visual content (images, videos, PDFs, GIFs, and HTML5 banners) from pre-designed templates. Retrieve and manage design templates, generate single images synchronously or multiple formats asynchronously, create dynamic image URLs for real-time personalization, export generated visuals as ZIP files, customize element properties (text, colors, images, shapes), manage fonts and projects, and leverage AI features for image generation, background removal, and content translation. Supports webhooks for tracking generation, export, and design approval events.
+Generate images, videos, GIFs, HTML5 banners, and print PDFs from Abyssale designs. Discover workspace templates, categories, projects, and fonts; inspect design layers and multipage content; customize generation settings; retrieve downloadable generated files; create dynamic image URLs; and start asynchronous ZIP exports. Search and optional pagination preserve the original all-results defaults. The connection verifies its API key against the workspace, and credit tools expose actual generation and AI balances. Completion callbacks can be supplied for asynchronous operations.
 
 ## License
 

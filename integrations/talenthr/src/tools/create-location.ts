@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createLocation = SlateTool.create(spec, {
   name: 'Create Location',
   key: 'create_location',
-  description: `Create a new work location in TalentHR. Locations represent physical offices or sites where employees work and can be assigned to employees.`,
+  description: `Create a new work location in TalentHR. Provide name, address, and isRemote; TalentHR requires all three. Locations can be assigned to employees.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,7 +14,15 @@ export let createLocation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name of the location to create')
+      name: z.string().describe('Name of the location to create'),
+      address: z
+        .string()
+        .optional()
+        .describe('Location address, required by TalentHR, up to 100 characters'),
+      isRemote: z
+        .boolean()
+        .optional()
+        .describe('Whether the location is remote, required by TalentHR')
     })
   )
   .output(
@@ -27,12 +35,16 @@ export let createLocation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.createLocation(ctx.input.name);
+    let response = await client.createLocation(
+      ctx.input.name,
+      ctx.input.address,
+      ctx.input.isRemote
+    );
 
     return {
       output: {
         locationId: response.data.id,
-        name: ctx.input.name,
+        name: response.data.name,
         rawResponse: response
       },
       message: `Successfully created location **${ctx.input.name}**.`

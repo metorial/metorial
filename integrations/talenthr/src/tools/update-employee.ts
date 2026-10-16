@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, providerId, validateDate, validateText } from '../lib/client';
 import { spec } from '../spec';
 
 let emergencyContactSchema = z
@@ -17,7 +17,7 @@ export let updateEmployee = SlateTool.create(spec, {
   name: 'Update Employee',
   key: 'update_employee',
   description: `Update an existing employee's profile data in TalentHR. Supports updating personal info, contact details, address, emergency contact, social media links, identification documents, and other profile fields.
-Only provide the fields you want to change; omitted fields remain unchanged.`,
+Only provide the fields you want to change. If firstName, lastName, or email is omitted, this tool first reads the employee profile and resubmits those existing required values. The update fails if that profile cannot supply them.`,
   instructions: [
     'Birth date must be formatted as YYYY-MM-DD and between 1930-01-01 and today.',
     'Personal email must be unique among personal emails in the system.',
@@ -105,7 +105,79 @@ Only provide the fields you want to change; omitted fields remain unchanged.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: Record<string, any> = {};
+    for (const [key, value] of Object.entries(ctx.input)) {
+      if (typeof value !== 'string' || key === 'employeeId') continue;
+      if (['shirtSize', 'tShirtSize', 'reportsToEmployeeId'].includes(key)) {
+        providerId(value, key);
+        continue;
+      }
+      if (
+        [
+          'birthDate',
+          'passportIssuedDate',
+          'passportExpiryDate',
+          'visaExpiryDate',
+          'driverLicenseIssuedDate',
+          'driverLicenseExpiryDate'
+        ].includes(key)
+      ) {
+        validateDate(value, key);
+        if (
+          key === 'birthDate' &&
+          (value < '1930-01-01' || value > new Date().toISOString().slice(0, 10))
+        )
+          throw createApiServiceError('birthDate must be between 1930-01-01 and today.');
+        if (key === 'passportIssuedDate' && value > new Date().toISOString().slice(0, 10))
+          throw createApiServiceError('passportIssuedDate cannot be in the future.');
+      } else if (key === 'allergies') {
+        if (value.length > 4000)
+          throw createApiServiceError('allergies must be at most 4000 characters.');
+      } else if (['passportNumber', 'visaNumber', 'driverLicenseNumber'].includes(key)) {
+        if (value.length > 64)
+          throw createApiServiceError(`${key} must be at most 64 characters.`);
+      } else if (
+        [
+          'firstName',
+          'lastName',
+          'email',
+          'ssn',
+          'personalEmail',
+          'workPhone',
+          'mobilePhone',
+          'phone',
+          'address',
+          'postalCode',
+          'city',
+          'employeeNumber',
+          'passportIssuingCountry',
+          'visaType',
+          'driverLicenseIssuingCountry',
+          'secondaryAddress',
+          'secondaryCity',
+          'secondaryPostalCode',
+          'secondaryCountry',
+          'twitterUrl',
+          'facebookUrl',
+          'instagramUrl',
+          'pinterestUrl',
+          'githubUrl',
+          'behanceUrl',
+          'skypeName'
+        ].includes(key) &&
+        value.length > 191
+      )
+        throw createApiServiceError(`${key} must be at most 191 characters.`);
+      if (['firstName', 'lastName', 'email'].includes(key)) validateText(value, key, 191);
+      if (
+        ['email', 'personalEmail'].includes(key) &&
+        value &&
+        !z.email().safeParse(value).success
+      )
+        throw createApiServiceError(`${key} must be a valid email address.`);
+      if (key.endsWith('Url') && value && !z.url().safeParse(value).success)
+        throw createApiServiceError(`${key} must be a valid URL.`);
+    }
+    let data: Record<string, unknown> = {};
 
     let fieldMap: Record<string, string> = {
       firstName: 'first_name',
@@ -156,18 +228,25 @@ Only provide the fields you want to change; omitted fields remain unchanged.`,
     };
 
     for (let [inputKey, apiKey] of Object.entries(fieldMap)) {
-      let value = (ctx.input as any)[inputKey];
+      let value = ctx.input[inputKey as keyof typeof ctx.input];
       if (value !== undefined) {
-        data[apiKey] = value;
+        data[apiKey] =
+          ['shirtSize', 'tShirtSize', 'reportsToEmployeeId'].includes(inputKey) &&
+          typeof value === 'string'
+            ? providerId(value, inputKey)
+            : value;
       }
     }
 
     if (ctx.input.emergencyContact) {
-      let ec: Record<string, any> = {};
+      let ec: Record<string, unknown> = {};
       if (ctx.input.emergencyContact.fullName !== undefined)
         ec.full_name = ctx.input.emergencyContact.fullName;
       if (ctx.input.emergencyContact.relationshipTypeId !== undefined)
-        ec.relationship_type_id = ctx.input.emergencyContact.relationshipTypeId;
+        ec.relationship_type_id = providerId(
+          ctx.input.emergencyContact.relationshipTypeId,
+          'emergencyContact.relationshipTypeId'
+        );
       if (ctx.input.emergencyContact.phone !== undefined)
         ec.phone = ctx.input.emergencyContact.phone;
       if (ctx.input.emergencyContact.address !== undefined)

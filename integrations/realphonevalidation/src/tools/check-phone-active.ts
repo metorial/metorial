@@ -31,6 +31,14 @@ export let checkPhoneActive = SlateTool.create(spec, {
   .output(
     z.object({
       activeStatus: z.string().describe('Phone active status: active or inactive'),
+      responseCode: z
+        .string()
+        .optional()
+        .describe('Provider active-status code: L, C, V, or N'),
+      phoneType: z
+        .string()
+        .optional()
+        .describe('Landline, Mobile, or VoIP for active numbers'),
       errorText: z
         .string()
         .optional()
@@ -40,14 +48,25 @@ export let checkPhoneActive = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.activeCheck(ctx.input.phone);
-    let errorText = normalizeErrorText(result.error_text);
+    let errorText = normalizeErrorText(result.RESPONSEMSG);
+    let activeStatus = result.RESPONSECODE === 'N' ? 'inactive' : 'active';
+    let phoneType =
+      result.RESPONSECODE === 'L'
+        ? 'Landline'
+        : result.RESPONSECODE === 'C'
+          ? 'Mobile'
+          : result.RESPONSECODE === 'V'
+            ? 'VoIP'
+            : undefined;
 
     return {
       output: {
-        activeStatus: result.status,
+        activeStatus,
+        responseCode: result.RESPONSECODE,
+        phoneType,
         errorText: errorText || undefined
       },
-      message: `Phone **${ctx.input.phone}** is **${result.status}**.`
+      message: `Phone **${ctx.input.phone}** is **${activeStatus}**${phoneType ? ` (${phoneType})` : ''}.`
     };
   })
   .build();

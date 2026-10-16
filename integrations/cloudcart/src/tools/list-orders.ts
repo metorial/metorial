@@ -32,6 +32,7 @@ export let listOrders = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       orders: z.array(
         z.object({
           orderId: z.string(),
@@ -69,26 +70,27 @@ export let listOrders = SlateTool.create(spec, {
 
     let orders = res.data.map(o => ({
       orderId: o.id,
-      customerEmail: o.attributes.customer_email,
-      customerFirstName: o.attributes.customer_first_name,
-      customerLastName: o.attributes.customer_last_name,
-      status: o.attributes.status,
-      statusFulfillment: o.attributes.status_fulfillment,
+      customerEmail: o.attributes.customer_email ?? undefined,
+      customerFirstName: o.attributes.customer_first_name ?? undefined,
+      customerLastName: o.attributes.customer_last_name ?? undefined,
+      status: o.attributes.status ?? undefined,
+      statusFulfillment: o.attributes.status_fulfillment ?? undefined,
       priceTotal: o.attributes.price_total,
-      currency: o.attributes.currency,
+      currency: o.attributes.currency ?? undefined,
       quantity: o.attributes.quantity,
-      dateAdded: o.attributes.date_added,
-      updatedAt: o.attributes.updated_at
+      dateAdded: o.attributes.date_added ?? undefined,
+      updatedAt: o.attributes.updated_at ?? undefined
     }));
 
     return {
       output: {
+        raw: res,
         orders,
-        totalCount: res.meta.total,
-        currentPage: res.meta['current-page'],
-        lastPage: res.meta['last-page']
+        totalCount: res.meta.page.total,
+        currentPage: res.meta.page['current-page'],
+        lastPage: res.meta.page['last-page']
       },
-      message: `Found **${res.meta.total}** orders (page ${res.meta['current-page']} of ${res.meta['last-page']}).`
+      message: `Found **${res.meta.page.total}** orders (page ${res.meta.page['current-page']} of ${res.meta.page['last-page']}).`
     };
   })
   .build();

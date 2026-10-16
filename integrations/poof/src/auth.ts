@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,14 @@ export let auth = SlateAuth.create()
       username: z
         .string()
         .optional()
-        .describe('Poof username (required for checkout operations)')
+        .describe(
+          'Poof username for reference; checkout requests require an explicit username'
+        )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Provide a Poof API key.');
+      }
       return {
         output: {
           token: ctx.input.token,

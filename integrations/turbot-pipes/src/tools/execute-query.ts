@@ -23,7 +23,9 @@ export let executeQuery = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -42,22 +44,19 @@ export let executeQuery = SlateTool.create(spec, {
         )
         .optional()
         .describe('Column metadata'),
-      rowCount: z.number().describe('Number of rows returned')
+      rowCount: z.number().describe('Number of rows returned'),
+      rawResult: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider query response, preserving column names and values')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['executeQuery']>>;
     if (ctx.input.ownerType === 'org') {
       result = await client.executeOrgQuery(
         ownerHandle,
@@ -76,7 +75,8 @@ export let executeQuery = SlateTool.create(spec, {
       output: {
         rows: result.items,
         columns: result.columns,
-        rowCount: result.items.length
+        rowCount: result.items.length,
+        rawResult: result.rawResult
       },
       message: `Query returned **${result.items.length}** row(s).`
     };

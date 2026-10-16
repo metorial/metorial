@@ -6,13 +6,20 @@ import { spec } from '../spec';
 export let getResourceStatistics = SlateTool.create(spec, {
   name: 'Get Resource Statistics',
   key: 'get_resource_statistics',
-  description: `Retrieve comprehensive statistics about data resources across the platform. Provides an overview of the data security posture including resource counts and classification metrics.`,
+  description: `Retrieve data-resource size, entity count, and measurement units for the connected Borneo organisation.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.')
+    })
+  )
   .output(
     z
       .object({
@@ -23,11 +30,12 @@ export let getResourceStatistics = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let result = await client.getResourceStatistics();
-    let data = result?.data ?? result;
+    let data = result;
 
     return {
       output: { statistics: data },

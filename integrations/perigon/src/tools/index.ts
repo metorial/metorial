@@ -1,3 +1,4 @@
+export * from './get-account-usage';
 export * from './search-articles';
 export * from './search-companies';
 export * from './search-journalists';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseProviderOutput, screenDetails } from '../lib/response';
 import { spec } from '../spec';
 
 let ipGeolocationSchema = z
@@ -23,6 +24,7 @@ let ipGeolocationSchema = z
     mobile_brand: z.string().optional(),
     elevation: z.number().optional(),
     usage_type: z.string().optional(),
+    usage_types: z.array(z.string()).optional(),
     is_proxy: z.boolean().optional(),
     is_in_blacklist: z.boolean().optional()
   })
@@ -92,6 +94,30 @@ let deviceSchema = z
   })
   .optional();
 
+let outputSchema = z.object({
+  raw: z
+    .record(z.string(), z.unknown())
+    .describe('Complete provider response, excluding credentials'),
+  fraudlabsproId: z.string().describe('Unique transaction ID assigned by FraudLabs Pro'),
+  fraudScore: z.number().describe('Fraud risk score from 0 (low risk) to 100 (high risk)'),
+  fraudStatus: z.string().describe('Recommended action: APPROVE, REJECT, or REVIEW'),
+  userOrderId: z.string().optional().describe('Your order ID if provided'),
+  triggeredRules: z
+    .array(z.any())
+    .optional()
+    .describe('List of fraud rules triggered by this transaction'),
+  ipGeolocation: ipGeolocationSchema.describe('IP geolocation and proxy detection details'),
+  billingAddress: billingAddressSchema.describe('Billing address validation results'),
+  shippingAddress: shippingAddressSchema.describe('Shipping address validation results'),
+  emailAddress: emailAddressSchema.describe('Email address validation results'),
+  phoneNumber: phoneNumberSchema.describe('Phone number validation results'),
+  username: usernameSchema.describe('Username risk assessment results'),
+  creditCard: creditCardSchema.describe('Credit card validation results'),
+  device: deviceSchema.describe('Device fingerprint validation results'),
+  apiVersion: z.string().optional().describe('Fraud analysis engine version'),
+  remainingCredits: z.number().optional().describe('Remaining API credits in your account')
+});
+
 export let screenOrder = SlateTool.create(spec, {
   name: 'Screen Order',
   key: 'screen_order',
@@ -125,6 +151,29 @@ export let screenOrder = SlateTool.create(spec, {
       shipState: z.string().optional().describe('Shipping state or province code'),
       shipCountry: z.string().optional().describe('Shipping country code (ISO 3166 alpha-2)'),
       shipZipCode: z.string().optional().describe('Shipping ZIP or postal code'),
+      shippingMethod: z
+        .enum(['standard_delivery', 'local_pickup'])
+        .optional()
+        .describe('Order shipping method'),
+      items: z
+        .array(
+          z.object({
+            sku: z.string().describe('Product SKU'),
+            quantity: z.number().describe('Positive whole-number quantity purchased'),
+            price: z.number().describe('Non-negative unit price'),
+            type: z
+              .string()
+              .optional()
+              .describe('Item type, such as physical, virtual, or downloadable'),
+            name: z.string().optional().describe('Product name'),
+            purchaseType: z
+              .string()
+              .optional()
+              .describe('Merchant-defined purchase category, such as subscription or renewal')
+          })
+        )
+        .optional()
+        .describe('Items purchased; the free Micro plan supports up to three items'),
       userPhone: z.string().optional().describe('Customer phone number'),
       email: z.string().optional().describe('Customer email address'),
       emailHash: z
@@ -169,29 +218,7 @@ export let screenOrder = SlateTool.create(spec, {
         .describe('FraudLabs Pro device validation checksum from the JavaScript agent')
     })
   )
-  .output(
-    z.object({
-      fraudlabsproId: z.string().describe('Unique transaction ID assigned by FraudLabs Pro'),
-      fraudScore: z.number().describe('Fraud risk score from 0 (low risk) to 100 (high risk)'),
-      fraudStatus: z.string().describe('Recommended action: APPROVE, REJECT, or REVIEW'),
-      userOrderId: z.string().optional().describe('Your order ID if provided'),
-      triggeredRules: z
-        .array(z.any())
-        .optional()
-        .describe('List of fraud rules triggered by this transaction'),
-      ipGeolocation: ipGeolocationSchema.describe(
-        'IP geolocation and proxy detection details'
-      ),
-      billingAddress: billingAddressSchema.describe('Billing address validation results'),
-      shippingAddress: shippingAddressSchema.describe('Shipping address validation results'),
-      emailAddress: emailAddressSchema.describe('Email address validation results'),
-      phoneNumber: phoneNumberSchema.describe('Phone number validation results'),
-      username: usernameSchema.describe('Username risk assessment results'),
-      creditCard: creditCardSchema.describe('Credit card validation results'),
-      device: deviceSchema.describe('Device fingerprint validation results'),
-      remainingCredits: z.number().optional().describe('Remaining API credits in your account')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -199,22 +226,28 @@ export let screenOrder = SlateTool.create(spec, {
 
     let result = await client.screenOrder(ctx.input);
 
-    let output = {
-      fraudlabsproId: result.fraudlabspro_id,
-      fraudScore: result.fraudlabspro_score,
-      fraudStatus: result.fraudlabspro_status,
-      userOrderId: result.user_order_id || undefined,
-      triggeredRules: result.fraudlabspro_rules || undefined,
-      ipGeolocation: result.ip_geolocation || undefined,
-      billingAddress: result.billing_address || undefined,
-      shippingAddress: result.shipping_address || undefined,
-      emailAddress: result.email_address || undefined,
-      phoneNumber: result.phone_number || undefined,
-      username: result.username || undefined,
-      creditCard: result.credit_card || undefined,
-      device: result.device || undefined,
-      remainingCredits: result.remaining_credits
-    };
+    let output = parseProviderOutput(
+      outputSchema,
+      {
+        raw: result,
+        fraudlabsproId: result.fraudlabspro_id,
+        fraudScore: result.fraudlabspro_score,
+        fraudStatus: result.fraudlabspro_status,
+        userOrderId: result.user_order_id ?? undefined,
+        triggeredRules: result.fraudlabspro_rules ?? undefined,
+        ipGeolocation: screenDetails(result, 'ip_geolocation'),
+        billingAddress: screenDetails(result, 'billing_address'),
+        shippingAddress: screenDetails(result, 'shipping_address'),
+        emailAddress: screenDetails(result, 'email_address'),
+        phoneNumber: screenDetails(result, 'phone_number'),
+        username: screenDetails(result, 'username'),
+        creditCard: screenDetails(result, 'credit_card'),
+        device: screenDetails(result, 'device'),
+        apiVersion: result.api_version,
+        remainingCredits: result.remaining_credits
+      },
+      'order result'
+    );
 
     let statusEmoji =
       output.fraudStatus === 'APPROVE' ? '✅' : output.fraudStatus === 'REJECT' ? '❌' : '⚠️';

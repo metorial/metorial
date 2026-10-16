@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlchemyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let callContract = SlateTool.create(spec, {
 Use this to read smart contract state, call view/pure functions, or estimate gas costs before sending a transaction.`,
   instructions: [
     'The data field should contain the ABI-encoded function call (function selector + encoded parameters).',
-    'For gas estimation, the to field can be omitted for contract deployment estimation.'
+    'The to field is required for both contract calls and gas estimation.'
   ],
   tags: {
     readOnly: true
@@ -56,8 +56,14 @@ Use this to read smart contract state, call view/pure functions, or estimate gas
         to: ctx.input.to,
         from: ctx.input.from,
         data: ctx.input.data,
-        value: ctx.input.value
+        value: ctx.input.value,
+        gas: ctx.input.gas
       });
+
+      if (BigInt(estimated) > BigInt(Number.MAX_SAFE_INTEGER))
+        throw createApiServiceError(
+          'Alchemy returned a gas estimate beyond the supported decimal range.'
+        );
 
       return {
         output: {

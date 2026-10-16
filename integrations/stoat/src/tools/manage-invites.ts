@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireArray } from '../lib/response';
 import { spec } from '../spec';
 
 export let createInvite = SlateTool.create(spec, {
   name: 'Create Invite',
   key: 'create_invite',
-  description: `Create an invite link for a Revolt channel. The invite allows others to join the server or group.`,
+  description: `Create an invite link for a Stoat channel. The invite allows others to join the server or group.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -33,7 +34,7 @@ export let createInvite = SlateTool.create(spec, {
     return {
       output: {
         inviteCode: result._id ?? result.code,
-        channelId: result.channel ?? ctx.input.channelId,
+        channelId: result.channel,
         serverId: result.server ?? undefined,
         creatorId: result.creator
       },
@@ -45,7 +46,7 @@ export let createInvite = SlateTool.create(spec, {
 export let fetchInvite = SlateTool.create(spec, {
   name: 'Fetch Invite',
   key: 'fetch_invite',
-  description: `Fetch details about a Revolt invite by its code. Returns information about the server and channel the invite leads to.`,
+  description: `Fetch details about a Stoat invite by its code. Returns information about the server and channel the invite leads to.`,
   tags: {
     readOnly: true
   }
@@ -72,7 +73,7 @@ export let fetchInvite = SlateTool.create(spec, {
 
     return {
       output: {
-        inviteCode: ctx.input.inviteCode,
+        inviteCode: result.code,
         serverName: result.server_name ?? undefined,
         serverId: result.server_id ?? undefined,
         channelName: result.channel_name ?? undefined,
@@ -87,7 +88,7 @@ export let fetchInvite = SlateTool.create(spec, {
 export let deleteInvite = SlateTool.create(spec, {
   name: 'Delete Invite',
   key: 'delete_invite',
-  description: `Delete a Revolt invite by its code. The invite will no longer be usable.`,
+  description: `Delete a Stoat invite by its code. The invite will no longer be usable.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -118,7 +119,7 @@ export let deleteInvite = SlateTool.create(spec, {
 export let fetchServerInvites = SlateTool.create(spec, {
   name: 'Fetch Server Invites',
   key: 'fetch_server_invites',
-  description: `List all active invites for a Revolt server.`,
+  description: `List all active invites for a Stoat server.`,
   tags: {
     readOnly: true
   }
@@ -145,7 +146,7 @@ export let fetchServerInvites = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let result = await client.fetchServerInvites(ctx.input.serverId);
-    let invitesArray = Array.isArray(result) ? result : [];
+    let invitesArray = requireArray(result, 'server invites');
 
     let invites = invitesArray.map((i: any) => ({
       inviteCode: i._id ?? i.code,

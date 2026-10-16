@@ -6,10 +6,14 @@ import { spec } from '../spec';
 export let getStockFinancials = SlateTool.create(spec, {
   name: 'Get Stock Financials',
   key: 'get_stock_financials',
-  description: `Retrieve financial data from SEC filings for a stock ticker, including balance sheets, income statements, and cash flow statements. Data is sourced from SEC EDGAR filings.`,
-  instructions: ['This endpoint uses the experimental vX API and may change.'],
+  description: `DEPRECATED — use \`get_financial_statements\` instead. Retrieve financial data from SEC filings for a stock ticker, including balance sheets, income statements, and cash flow statements. Data is sourced from SEC EDGAR filings.`,
+  instructions: [
+    'Use get_financial_statements for the current provider API. The legacy endpoint is retained only for compatibility.',
+    'This endpoint uses the experimental vX API and may change.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -76,7 +76,9 @@ export let getAirQualityHistory = SlateTool.create(spec, {
         ctx.input.to
       );
     } else {
-      throw new Error('Provide lat/lng coordinates or postalCode with countryCode.');
+      throw createApiServiceError(
+        'Provide lat/lng coordinates or postalCode with countryCode.'
+      );
     }
 
     let records = result.data || result.stations || [];

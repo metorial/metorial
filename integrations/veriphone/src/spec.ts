@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'veriphone',
   name: 'Veriphone',
   description:
-    'Phone number validation and carrier lookup service. Verify, format, and retrieve metadata for phone numbers worldwide.',
+    'Validate and format phone numbers, look up original and current carriers, check account credits, and verify CSV lists with downloadable results.',
   metadata: {},
   config,
   auth

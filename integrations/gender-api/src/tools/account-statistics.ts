@@ -18,7 +18,7 @@ export let accountStatistics = SlateTool.create(spec, {
         .boolean()
         .describe('Whether the account credit limit has been reached'),
       remainingCredits: z.number().describe('Number of credits still available'),
-      creditsUsed: z.number().describe('Credits consumed in the current billing period'),
+      creditsUsed: z.number().describe('Credits consumed by this statistics request'),
       lastMonthDate: z
         .string()
         .describe('Year-month of the last billing period (e.g. "2024-03")'),

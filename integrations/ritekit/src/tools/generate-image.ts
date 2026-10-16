@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RiteKitClient } from '../lib/client';
+import { deliverImageDownload } from '../lib/images';
 import { spec } from '../spec';
 
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generates a styled quote image from text with configurable fonts, colors, backgrounds, and animation effects. Can also animate an existing image with effects like glint.
-Use this to create social media graphics, quote cards, or animated GIFs from text or existing images.`,
+  description: `Creates a styled quote image from text with configurable fonts, colors, backgrounds, and branding. Use optional dimensions and font weights for social media graphics and quote cards. To animate an existing image, use Animate Image.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,6 +15,16 @@ Use this to create social media graphics, quote cards, or animated GIFs from tex
 })
   .input(
     z.object({
+      width: z.number().int().positive().optional().describe('Image width in pixels'),
+      height: z.number().int().positive().optional().describe('Image height in pixels'),
+      textFontWeight: z
+        .union([z.literal(400), z.literal(700)])
+        .optional()
+        .describe('Quote font weight: 400 normal, 700 bold'),
+      authorFontWeight: z
+        .union([z.literal(400), z.literal(700)])
+        .optional()
+        .describe('Author font weight: 400 normal, 700 bold'),
       quote: z.string().describe('Quote or text to render on the image'),
       author: z.string().describe('Author or source attribution text'),
       fontSize: z.number().optional().describe('Font size for the quote text'),
@@ -48,7 +58,9 @@ Use this to create social media graphics, quote cards, or animated GIFs from tex
       animation: z
         .enum(['none', 'rays', 'glint', 'circle'])
         .optional()
-        .describe('Animation effect to apply (creates an animated GIF)'),
+        .describe(
+          'Quote animation option; the current API documentation does not guarantee these effects'
+        ),
       showQuoteMark: z
         .boolean()
         .optional()
@@ -57,6 +69,11 @@ Use this to create social media graphics, quote cards, or animated GIFs from tex
   )
   .output(
     z.object({
+      downloadError: z
+        .string()
+        .optional()
+        .describe('Reason the downloadable copy could not be prepared'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       imageUrl: z.string().describe('URL of the generated image')
     })
   )
@@ -64,6 +81,10 @@ Use this to create social media graphics, quote cards, or animated GIFs from tex
     let client = new RiteKitClient({ token: ctx.auth.token });
 
     let result = await client.textToImage({
+      width: ctx.input.width,
+      height: ctx.input.height,
+      textFontWeight: ctx.input.textFontWeight,
+      authorFontWeight: ctx.input.authorFontWeight,
       quote: ctx.input.quote,
       author: ctx.input.author,
       fontSize: ctx.input.fontSize,
@@ -89,11 +110,17 @@ Use this to create social media graphics, quote cards, or animated GIFs from tex
         ctx.input.showQuoteMark !== undefined ? (ctx.input.showQuoteMark ? 1 : 0) : undefined
     });
 
+    let downloadError = await deliverImageDownload(result.url, content =>
+      ctx.addAttachment({ type: 'content', content })
+    );
+
     return {
       output: {
+        raw: { ...result },
+        downloadError,
         imageUrl: result.url
       },
-      message: `Generated ${ctx.input.animation && ctx.input.animation !== 'none' ? 'animated ' : ''}image: ${result.url}`
+      message: `${downloadError ? `${downloadError} ` : ''}Generated quote image: ${result.url}`
     };
   })
   .build();

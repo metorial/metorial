@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,9 @@ export let postQuestion = SlateTool.create(spec, {
     let q = result.items[0];
 
     if (!q) {
-      throw new Error('Failed to create question. Ensure you have write_access scope.');
+      throw createApiServiceError(
+        'Failed to create question. Ensure you have write_access scope.'
+      );
     }
 
     return {

@@ -50,6 +50,23 @@ export let createOrUpdateItem = SlateTool.create(spec, {
       categoryId: z.string().nullable().optional().describe('Category ID to assign'),
       trackStock: z.boolean().optional().describe('Enable stock tracking'),
       soldByWeight: z.boolean().optional().describe('Whether item is sold by weight'),
+      isComposite: z
+        .boolean()
+        .optional()
+        .describe('Whether the item consists of component variants'),
+      components: z
+        .array(
+          z.object({
+            variantId: z
+              .string()
+              .describe('Component variant ID. Call list_variants to find variant IDs.'),
+            quantity: z.number().describe('Quantity of this component in one composite item')
+          })
+        )
+        .optional()
+        .describe(
+          'Complete component list for a composite item; replaces the current list when provided'
+        ),
       useProduction: z
         .boolean()
         .optional()
@@ -185,6 +202,13 @@ export let createOrUpdateItem = SlateTool.create(spec, {
     if (input.categoryId !== undefined) body.category_id = input.categoryId;
     if (input.trackStock !== undefined) body.track_stock = input.trackStock;
     if (input.soldByWeight !== undefined) body.sold_by_weight = input.soldByWeight;
+    if (input.isComposite !== undefined) body.is_composite = input.isComposite;
+    if (input.components !== undefined) {
+      body.components = input.components.map(component => ({
+        variant_id: component.variantId,
+        quantity: component.quantity
+      }));
+    }
     if (input.useProduction !== undefined) body.use_production = input.useProduction;
     if (input.primarySupplierId !== undefined)
       body.primary_supplier_id = input.primarySupplierId;

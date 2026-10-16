@@ -5,7 +5,7 @@ let BASE_URL = 'https://resource-manager.api.cloud.yandex.net';
 export let listClouds = async (auth: AuthType, pageSize?: number, pageToken?: string) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = {};
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/resource-manager/v1/clouds', { params });
   return response.data;
@@ -25,7 +25,7 @@ export let listFolders = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { cloudId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/resource-manager/v1/folders', { params });
   return response.data;

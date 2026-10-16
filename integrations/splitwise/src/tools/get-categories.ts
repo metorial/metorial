@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseArray } from '../lib/errors';
 import { spec } from '../spec';
 
 let subcategorySchema = z.object({
@@ -34,10 +35,10 @@ export let getCategories = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let categories = await client.getCategories();
 
-    let mapped = (categories || []).map((cat: any) => ({
+    let mapped = categories.map((cat: any) => ({
       categoryId: cat.id,
       name: cat.name,
-      subcategories: (cat.subcategories || []).map((sub: any) => ({
+      subcategories: responseArray(cat.subcategories, 'subcategories').map((sub: any) => ({
         categoryId: sub.id,
         name: sub.name
       }))

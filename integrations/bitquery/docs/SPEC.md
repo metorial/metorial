@@ -1,4 +1,4 @@
-# Slates Specification for Bitquery
+# Bitquery Integration Specification
 
 ## Overview
 
@@ -103,3 +103,35 @@ Bitquery provides real-time blockchain data through Kafka streams as an alternat
 - Lower latency than WebSocket (sub-500ms for some chains).
 - Filtering is available but more limited compared to WebSocket's extensive filtering options.
 - Kafka endpoints are available at `rpk0.bitquery.io:9092`, `rpk1.bitquery.io:9092`, `rpk2.bitquery.io:9092`.
+
+
+## Integration Query Behavior
+
+The selected authentication method chooses the API version; there is no separate
+API-version configuration setting. The client-credentials connection obtains a
+token on callback and renews it using the same client-credentials grant before
+its documented expiry. Access tokens are not passed in redirect URLs.
+
+Eight read-only tools expose custom queries, DEX trades, transfers, balances,
+OHLC candles, decoded events, transactions, and holder rankings. Custom queries
+return the provider data unchanged. Convenience tools keep their existing numeric
+outputs and convert V2 decimal strings to numbers; use a custom query when exact
+decimal precision is required.
+
+Current EVM balances and holder rankings use `Balances` and `Holders` respectively.
+Holder rankings require a V2 connection. Solana convenience queries require V2.
+Solana balance results include only recently active token accounts, return the
+latest account per mint, and do not establish a wallet's complete portfolio.
+Solana holder rankings aggregate successful net movements by wallet owner and
+are complete only for tokens launched within the recent retention window
+(approximately eight hours). Use custom queries for other Solana history.
+
+Solana transactions have no single recipient; use token transfers to filter an
+incoming transfer by recipient. The transaction `value` is omitted for Solana
+rather than reporting transaction fees as transferred value. V2 EVM transactions
+include success status. V1 event-name filtering requires a V2 connection.
+
+Public documentation and supported network coverage can change. V1 APIs for
+Ethereum, BSC, and Polygon are deprecated in the provider's V1 documentation;
+use V2 for those networks. Legacy network enum values are preserved, but network
+availability depends on the selected provider API and account plan.

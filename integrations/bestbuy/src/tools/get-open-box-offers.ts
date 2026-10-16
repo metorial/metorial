@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BestBuyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,12 +31,32 @@ export let getOpenBoxOffers = SlateTool.create(spec, {
       categoryId: z
         .string()
         .optional()
-        .describe('Category ID to browse open box offers, e.g. "abcat0502000"')
+        .describe(
+          'Category ID from browse_categories to browse open box offers, e.g. "abcat0502000"'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Page number for category queries, starting at 1. Not supported for a single SKU or a SKU list'
+        ),
+      pageSize: z
+        .number()
+        .optional()
+        .describe(
+          'Category results per page, from 1 to 100. Not supported for a single SKU or a SKU list'
+        )
     })
   )
   .output(
     z.object({
       count: z.number().describe('Number of products with open box offers'),
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Complete provider response, including category pagination metadata when returned'
+        ),
       openBoxProducts: z
         .array(
           z.object({
@@ -65,39 +85,54 @@ export let getOpenBoxOffers = SlateTool.create(spec, {
     let client = new BestBuyClient({ token: ctx.auth.token });
     let { sku, skus, categoryId } = ctx.input;
 
-    let result: any;
+    let result: Awaited<ReturnType<BestBuyClient['getOpenBoxBySku']>>;
+
+    if (
+      (sku || (skus && skus.length > 0)) &&
+      (ctx.input.page !== undefined || ctx.input.pageSize !== undefined)
+    ) {
+      throw createApiServiceError('page and pageSize apply only to category queries.');
+    }
 
     if (sku) {
       result = await client.getOpenBoxBySku(sku);
     } else if (skus && skus.length > 0) {
       result = await client.getOpenBoxBySkus(skus);
     } else if (categoryId) {
-      result = await client.getOpenBoxByCategory(categoryId);
+      result = await client.getOpenBoxByCategory(categoryId, {
+        page: ctx.input.page,
+        pageSize: ctx.input.pageSize
+      });
     } else {
-      throw new Error('Provide either sku, skus, or categoryId to query open box offers.');
+      throw createApiServiceError(
+        'Provide either sku, skus, or categoryId to query open box offers.'
+      );
     }
 
-    let openBoxProducts = (result.results || []).map((item: any) => ({
-      sku: item.sku,
-      title: item.names?.title || '',
-      shortDescription: item.descriptions?.short || '',
-      newPrice: item.prices?.current || 0,
-      regularPrice: item.prices?.regular || 0,
-      imageUrl: item.images?.standard || '',
-      productUrl: item.links?.web || '',
-      offers: (item.offers || []).map((offer: any) => ({
-        condition: offer.condition || '',
-        currentPrice: offer.prices?.current || 0,
-        regularPrice: offer.prices?.regular || 0
+    let openBoxProducts = result.results.map(item => ({
+      sku: Number(item.sku),
+      title: item.names.title,
+      shortDescription: item.descriptions.short,
+      newPrice: item.prices.current,
+      regularPrice: item.prices.regular,
+      imageUrl: item.images.standard,
+      productUrl: item.links.web,
+      offers: item.offers.map(offer => ({
+        condition: offer.condition,
+        currentPrice: offer.prices.current,
+        regularPrice: offer.prices.regular
       }))
     }));
 
     return {
       output: {
         count: openBoxProducts.length,
+        rawResponse: result.rawResponse,
         openBoxProducts
       },
-      message: `Found **${openBoxProducts.length}** products with open box offers${sku ? ` for SKU ${sku}` : ''}${categoryId ? ` in category ${categoryId}` : ''}.`
+      message: client.redactMessage(
+        `Found **${openBoxProducts.length}** products with open box offers${sku ? ` for SKU ${sku}` : ''}${categoryId ? ` in category ${categoryId}` : ''}.`
+      )
     };
   })
   .build();

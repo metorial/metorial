@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { readItem } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getEventTool = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let getEventTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       eventId: z.number().describe('Unique event identifier'),
       title: z.string().describe('Event title'),
       description: z.string().optional().describe('Event description'),
@@ -55,13 +57,10 @@ export let getEventTool = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.getEvent(ctx.input.eventId);
-    let e = Array.isArray(data?.events)
-      ? data.events[0]
-      : Array.isArray(data)
-        ? data[0]
-        : data;
+    let e = readItem(data, 'events');
 
     let output = {
+      raw: data,
       eventId: e.id,
       title: e.title,
       description: e.description,

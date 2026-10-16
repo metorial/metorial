@@ -32,10 +32,13 @@ export let listPushes = SlateTool.create(spec, {
       pushes: z.array(
         z.object({
           pushIden: z.string().describe('Unique identifier of the push'),
-          type: z.string().describe('Type of push: note, link, or file'),
+          type: z.string().optional().describe('Type of push: note, link, or file'),
           active: z.boolean().describe('Whether the push is active (not deleted)'),
-          dismissed: z.boolean().describe('Whether the push has been dismissed'),
-          direction: z.string().describe('Push direction: self, outgoing, or incoming'),
+          dismissed: z.boolean().optional().describe('Whether the push has been dismissed'),
+          direction: z
+            .string()
+            .optional()
+            .describe('Push direction: self, outgoing, or incoming'),
           title: z.string().optional().describe('Title of the push'),
           body: z.string().optional().describe('Body text of the push'),
           url: z.string().optional().describe('URL (for link pushes)'),
@@ -47,7 +50,8 @@ export let listPushes = SlateTool.create(spec, {
           receiverEmail: z.string().optional().describe('Email of the receiver'),
           targetDeviceIden: z.string().optional().describe('Target device identifier'),
           created: z.string().describe('Creation Unix timestamp'),
-          modified: z.string().describe('Last modification Unix timestamp')
+          modified: z.string().describe('Last modification Unix timestamp'),
+          raw: z.unknown().optional().describe('Complete provider record')
         })
       ),
       cursor: z.string().optional().describe('Cursor for fetching the next page of results')
@@ -63,7 +67,7 @@ export let listPushes = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let pushes = result.pushes.map(p => ({
+    let pushes = (result.pushes ?? []).map(p => ({
       pushIden: p.iden,
       type: p.type,
       active: p.active,
@@ -80,7 +84,8 @@ export let listPushes = SlateTool.create(spec, {
       receiverEmail: p.receiver_email,
       targetDeviceIden: p.target_device_iden,
       created: String(p.created),
-      modified: String(p.modified)
+      modified: String(p.modified),
+      raw: p
     }));
 
     return {

@@ -62,7 +62,7 @@ export let searchInstitutions = SlateTool.create(spec, {
         .optional()
         .describe('Filter to institutions supporting account verification'),
       page: z.number().optional().describe('Page number'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -88,7 +88,7 @@ export let searchInstitutions = SlateTool.create(spec, {
     });
 
     let institutions = (result.institutions || []).map((i: any) => ({
-      code: i.code,
+      code: i.code ?? undefined,
       name: i.name,
       mediumLogoUrl: i.medium_logo_url,
       smallLogoUrl: i.small_logo_url,
@@ -145,7 +145,7 @@ export let readInstitution = SlateTool.create(spec, {
     ]);
 
     let mappedCreds = (credentials || []).map((c: any) => ({
-      guid: c.guid,
+      guid: c.guid ?? undefined,
       fieldName: c.field_name,
       fieldType: c.field_type,
       label: c.label,
@@ -155,7 +155,7 @@ export let readInstitution = SlateTool.create(spec, {
     return {
       output: {
         institution: {
-          code: institution.code,
+          code: institution.code ?? undefined,
           name: institution.name,
           mediumLogoUrl: institution.medium_logo_url,
           smallLogoUrl: institution.small_logo_url,

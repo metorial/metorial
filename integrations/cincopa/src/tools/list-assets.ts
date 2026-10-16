@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { getTotalCount, requireRecords } from '../lib/response';
 import { spec } from '../spec';
 
 export let listAssets = SlateTool.create(spec, {
@@ -22,6 +23,9 @@ export let listAssets = SlateTool.create(spec, {
         .enum(['video', 'image', 'audio', 'other'])
         .optional()
         .describe('Filter by asset type. If not specified, all types are returned.'),
+      assetId: z.string().optional().describe('Filter by an asset ID (rid)'),
+      tag: z.string().optional().describe('Filter by an asset tag'),
+      details: z.string().optional().describe('Comma-separated metadata fields to include'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z.number().optional().describe('Number of assets per page')
     })
@@ -39,18 +43,25 @@ export let listAssets = SlateTool.create(spec, {
       referenceId: ctx.input.referenceId,
       type: ctx.input.assetType,
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      rid: ctx.input.assetId,
+      tag: ctx.input.tag,
+      details: ctx.input.details
     });
 
-    let assets = data?.items || data?.assets || [];
-    let totalCount = data?.total_count ?? data?.count ?? assets.length;
+    let assets = requireRecords(data?.items ?? data?.assets, 'asset');
+    let totalCount = getTotalCount(
+      data?.items_data?.items_count,
+      data?.total_count,
+      data?.count
+    );
 
     return {
       output: {
         assets,
         totalCount
       },
-      message: `Found **${totalCount}** assets${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${ctx.input.assetType ? ` of type "${ctx.input.assetType}"` : ''}.`
+      message: `Found **${assets.length}** assets on this page${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${ctx.input.assetType ? ` of type "${ctx.input.assetType}"` : ''}.`
     };
   })
   .build();

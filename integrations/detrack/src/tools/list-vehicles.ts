@@ -1,17 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DetrackClient } from '../lib/client';
+import { DetrackClient, requireDetrackString } from '../lib/client';
 import { spec } from '../spec';
 
 export let listVehiclesTool = SlateTool.create(spec, {
   name: 'List Vehicles',
   key: 'list_vehicles',
-  description: `Retrieves all vehicles (drivers) registered in Detrack. Returns driver names, IDs, GPS location, speed, battery level, connection status, and distance traveled.`,
+  description: `Retrieves a page of vehicles (drivers) registered in Detrack. Returns driver names, IDs, GPS location, speed, battery level, connection status, and distance traveled.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z.number().optional().describe('Page number, starting at 1'),
+      limit: z.number().optional().describe('Number of vehicles per page')
+    })
+  )
   .output(
     z.object({
       vehicles: z
@@ -28,29 +33,47 @@ export let listVehiclesTool = SlateTool.create(spec, {
             connected: z.boolean().optional().describe('Whether the driver app is connected')
           })
         )
-        .describe('List of vehicles/drivers')
+        .describe('List of vehicles/drivers'),
+      page: z.number().optional().describe('Current page number'),
+      links: z.record(z.string(), z.unknown()).optional().describe('Provider pagination links')
     })
   )
   .handleInvocation(async ctx => {
     let client = new DetrackClient(ctx.auth.token);
 
-    let result = await client.listVehicles();
+    let result = await client.listVehicles(ctx.input);
 
-    let vehicles = (Array.isArray(result) ? result : []).map(v => ({
+    let vehicles = result.records.map(v => ({
       vehicleId: v.id ? String(v.id) : undefined,
       detrackId: v.detrack_id ? String(v.detrack_id) : undefined,
-      name: String(v.name ?? ''),
+      name: requireDetrackString(v, 'name'),
       lat: typeof v.lat === 'number' ? v.lat : undefined,
       lng: typeof v.lng === 'number' ? v.lng : undefined,
       speed: typeof v.speed === 'number' ? v.speed : undefined,
-      batteryLevel: typeof v.battery_level === 'number' ? v.battery_level : undefined,
+      batteryLevel:
+        typeof v.battery === 'number'
+          ? v.battery
+          : typeof v.battery_level === 'number'
+            ? v.battery_level
+            : undefined,
       distanceTraveled:
-        typeof v.distance_traveled === 'number' ? v.distance_traveled : undefined,
-      connected: typeof v.connected === 'boolean' ? v.connected : undefined
+        typeof v.distance === 'number'
+          ? v.distance
+          : typeof v.distance_traveled === 'number'
+            ? v.distance_traveled
+            : undefined,
+      connected:
+        v.connection === 'on' || v.connection === 'no-gps'
+          ? true
+          : v.connection === 'off'
+            ? false
+            : typeof v.connected === 'boolean'
+              ? v.connected
+              : undefined
     }));
 
     return {
-      output: { vehicles },
+      output: { vehicles, page: result.page, links: result.links },
       message: `Found **${vehicles.length}** vehicle(s)/driver(s).`
     };
   })

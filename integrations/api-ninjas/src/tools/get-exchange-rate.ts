@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getExchangeRate = SlateTool.create(spec, {
   name: 'Get Exchange Rate',
   key: 'get_exchange_rate',
-  description: `Look up the current exchange rate between two currencies. Provide a currency pair (e.g. **USD_EUR**, **GBP_AUD**) to get the live conversion rate.`,
+  description: `Look up the current exchange rate between two currencies. Provide a currency pair (e.g. **USD_EUR**, **GBP_AUD**) to get the latest available conversion rate. Free plans update once daily; premium plans provide real-time rates.`,
   tags: {
     readOnly: true
   }
@@ -19,6 +19,7 @@ export let getExchangeRate = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       currencyPair: z.string().describe('The queried currency pair (e.g. USD_EUR)'),
       rate: z.number().describe('Exchange rate value'),
       timestamp: z.number().describe('Unix timestamp when rate was captured')
@@ -31,11 +32,12 @@ export let getExchangeRate = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         currencyPair: pair,
-        rate: result.rate,
+        rate: result.exchange_rate,
         timestamp: result.timestamp
       },
-      message: `**1 ${ctx.input.fromCurrency}** = **${result.rate} ${ctx.input.toCurrency}**`
+      message: `**1 ${ctx.input.fromCurrency}** = **${result.exchange_rate} ${ctx.input.toCurrency}**`
     };
   })
   .build();

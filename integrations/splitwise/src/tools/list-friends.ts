@@ -44,7 +44,7 @@ export let listFriends = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let friends = await client.getFriends();
 
-    let mapped = (friends || []).map((f: any) => ({
+    let mapped = friends.map((f: any) => ({
       userId: f.id,
       firstName: f.first_name,
       lastName: f.last_name ?? null,

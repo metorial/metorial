@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,13 +12,25 @@ Provide as many identity fields as possible to maximize match accuracy. The targ
   instructions: [
     'The target must be a Lookup API target in "ready" status.',
     'Match rates are highest when providing multiple identity fields (name + address + email is ideal).',
-    'Use matchAlgorithm "tight" to require firstname match, or "loose" to match on address only.'
+    'Legacy matchAlgorithm is retained for compatibility; current matching follows the identifiers provided. Use identitySets for alternate identifiers.'
   ],
   tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
       targetId: z.string().describe('UUID of the Lookup API target'),
+      identitySets: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe(
+          'Alternate identifier sets for one person, using provider keys such as email and house_number_and_street.'
+        ),
+      emailHash: z
+        .string()
+        .optional()
+        .describe('Lowercase hex SHA-256 hash of the normalized email'),
+      latitude: z.number().optional().describe('Latitude for reverse geocoding'),
+      longitude: z.number().optional().describe('Longitude for reverse geocoding'),
       personFirstName: z.string().optional().describe('First name of the individual'),
       personLastName: z.string().optional().describe('Last name of the individual'),
       houseNumberAndStreet: z.string().optional().describe('Street address'),
@@ -31,7 +43,7 @@ Provide as many identity fields as possible to maximize match accuracy. The targ
         .enum(['loose', 'tight'])
         .optional()
         .describe(
-          'Match algorithm: "tight" requires firstname, "loose" ignores name and matches on address only'
+          'Legacy match preference forwarded for compatibility; current documentation recommends explicit identifiers and identitySets'
         ),
       searchRadius: z
         .number()
@@ -56,7 +68,19 @@ Provide as many identity fields as possible to maximize match accuracy. The targ
   .handleInvocation(async ctx => {
     let client = new FaradayClient({ token: ctx.auth.token });
 
+    if ((ctx.input.latitude === undefined) !== (ctx.input.longitude === undefined)) {
+      throw createApiServiceError(
+        'Provide both latitude and longitude for reverse geocoding.'
+      );
+    }
+    if (ctx.input.searchRadius !== undefined && ctx.input.searchRadius < 0) {
+      throw createApiServiceError('searchRadius must be zero or greater.');
+    }
     let identity: Record<string, any> = {};
+    if (ctx.input.identitySets !== undefined) identity.identity_sets = ctx.input.identitySets;
+    if (ctx.input.emailHash !== undefined) identity.email_hash = ctx.input.emailHash;
+    if (ctx.input.latitude !== undefined) identity.latitude = ctx.input.latitude;
+    if (ctx.input.longitude !== undefined) identity.longitude = ctx.input.longitude;
     if (ctx.input.personFirstName) identity.person_first_name = ctx.input.personFirstName;
     if (ctx.input.personLastName) identity.person_last_name = ctx.input.personLastName;
     if (ctx.input.houseNumberAndStreet)
@@ -66,7 +90,8 @@ Provide as many identity fields as possible to maximize match accuracy. The targ
     if (ctx.input.postcode) identity.postcode = ctx.input.postcode;
     if (ctx.input.email) identity.email = ctx.input.email;
     if (ctx.input.phone) identity.phone = ctx.input.phone;
-    if (ctx.input.matchAlgorithm) identity.match_algorithm = ctx.input.matchAlgorithm;
+    if (ctx.input.matchAlgorithm !== undefined)
+      identity.match_algorithm = ctx.input.matchAlgorithm;
     if (ctx.input.searchRadius !== undefined) identity.search_radius = ctx.input.searchRadius;
 
     let result = await client.lookupTarget(ctx.input.targetId, identity);
@@ -75,7 +100,12 @@ Provide as many identity fields as possible to maximize match accuracy. The targ
     let predictions: Record<string, any> = {};
 
     for (let [key, value] of Object.entries(result)) {
-      if (key.startsWith('fdy_')) {
+      if (
+        !Object.hasOwn(identity, key) &&
+        !['match_type', 'identity_provider', 'identity_set', 'cohabitants', 'error'].includes(
+          key
+        )
+      ) {
         predictions[key] = value;
       }
     }

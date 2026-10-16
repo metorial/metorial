@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let audioBibleSchema = z.object({
+export let audioBibleSchema = z.object({
   audioBibleId: z.string().describe('Unique identifier for the audio Bible version'),
   name: z.string().describe('Name of the audio Bible'),
+  copyright: z.string().optional().describe('Copyright information'),
+  info: z.string().optional().describe('Publisher information'),
   nameLocal: z.string().describe('Localized name'),
   description: z.string().describe('Description of the audio Bible'),
   descriptionLocal: z.string().describe('Localized description'),
@@ -41,6 +43,17 @@ export let listAudioBibles = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      abbreviation: z.string().optional().describe('Filter by Bible abbreviation'),
+      name: z.string().optional().describe('Search by Bible name'),
+      ids: z.string().optional().describe('Comma-separated audio Bible IDs'),
+      bibleId: z
+        .string()
+        .optional()
+        .describe('Filter by related text Bible ID from list_bibles'),
+      includeFullDetails: z
+        .boolean()
+        .optional()
+        .describe('Include copyright and publisher information'),
       language: z
         .string()
         .optional()
@@ -57,29 +70,36 @@ export let listAudioBibles = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listAudioBibles({
-      language: ctx.input.language
+      language: ctx.input.language,
+      abbreviation: ctx.input.abbreviation,
+      name: ctx.input.name,
+      ids: ctx.input.ids,
+      bibleId: ctx.input.bibleId,
+      includeFullDetails: ctx.input.includeFullDetails
     });
 
-    let audioBibles = (result.data || []).map(ab => ({
-      audioBibleId: ab.audioBibleId,
-      name: ab.name || '',
-      nameLocal: ab.nameLocal || '',
-      description: ab.description || '',
-      descriptionLocal: ab.descriptionLocal || '',
+    let audioBibles = result.data.map(ab => ({
+      audioBibleId: ab.id,
+      copyright: ab.copyright,
+      info: ab.info,
+      name: ab.name,
+      nameLocal: ab.nameLocal,
+      description: ab.description,
+      descriptionLocal: ab.descriptionLocal,
       language: {
-        languageId: ab.language?.id || '',
-        name: ab.language?.name || '',
-        nameLocal: ab.language?.nameLocal || '',
-        script: ab.language?.script || '',
-        scriptDirection: ab.language?.scriptDirection || ''
+        languageId: ab.language?.id,
+        name: ab.language?.name,
+        nameLocal: ab.language?.nameLocal,
+        script: ab.language?.script,
+        scriptDirection: ab.language?.scriptDirection
       },
-      countries: (ab.countries || []).map(c => ({
+      countries: ab.countries.map(c => ({
         countryId: c.id,
         name: c.name,
         nameLocal: c.nameLocal
       })),
-      type: ab.type || '',
-      updatedAt: ab.updatedAt || ''
+      type: ab.type,
+      updatedAt: ab.updatedAt
     }));
 
     return {

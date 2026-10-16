@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireArray, requireLookup } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSellerFeedback = SlateTool.create(spec, {
@@ -64,7 +64,10 @@ export let getSellerFeedback = SlateTool.create(spec, {
         .optional()
         .describe('Filter by overall rating.'),
       page: z.number().optional().describe('Page number to retrieve.'),
-      maxPage: z.number().optional().describe('Maximum page for auto-pagination.'),
+      maxPage: z
+        .number()
+        .optional()
+        .describe('Maximum page for auto-pagination, up to 5 for real-time requests.'),
       num: z
         .enum(['25', '50', '100', '200'])
         .optional()
@@ -87,6 +90,28 @@ export let getSellerFeedback = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
     let ebayDomain = ctx.input.ebayDomain || ctx.config.ebayDomain;
 
+    requireLookup(ctx.input);
+    if (ctx.input.searchTerm && ctx.input.feedbackType !== 'received_as_seller') {
+      throw createApiServiceError('searchTerm requires feedbackType received_as_seller.');
+    }
+    if (
+      ctx.input.timePeriod &&
+      !['received_as_buyer', 'received_as_seller'].includes(ctx.input.feedbackType ?? '')
+    ) {
+      throw createApiServiceError(
+        'timePeriod requires received_as_buyer or received_as_seller feedbackType.'
+      );
+    }
+    if (
+      ctx.input.overallRating &&
+      (ctx.input.feedbackType === 'left_for_others' ||
+        !ctx.input.timePeriod ||
+        ctx.input.timePeriod === 'all')
+    ) {
+      throw createApiServiceError(
+        'overallRating requires a one_month, six_months, or twelve_months timePeriod and cannot be used with left_for_others.'
+      );
+    }
     let result = await client.getSellerFeedback({
       ebayDomain,
       sellerName: ctx.input.sellerName,
@@ -100,8 +125,11 @@ export let getSellerFeedback = SlateTool.create(spec, {
       num: ctx.input.num ? Number(ctx.input.num) : undefined
     });
 
-    let feedbackEntries = result.seller_feedback || [];
-    let summary = result.seller_feedback_summary || {};
+    let feedbackEntries = requireArray(
+      result.seller_feedback_results ?? result.seller_feedback,
+      'seller_feedback_results'
+    );
+    let summary = result.seller_feedback_summary ?? result.seller_profile?.feedback_ratings;
     let pagination = result.pagination || {};
 
     return {

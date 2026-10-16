@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,12 +20,18 @@ export let compareTextSimilarity = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       similarity: z
         .number()
         .describe('Similarity score from 0 (completely different) to 1 (identical)')
     })
   )
   .handleInvocation(async ctx => {
+    if ([ctx.input.textA, ctx.input.textB].some(text => !text.trim() || text.length > 5000)) {
+      throw createApiServiceError(
+        'Provide two text passages, each between 1 and 5000 characters.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getTextSimilarity(ctx.input.textA, ctx.input.textB);
 
@@ -33,6 +39,7 @@ export let compareTextSimilarity = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         similarity: result.similarity
       },
       message: `Text similarity: **${percentage}%** (${result.similarity})`

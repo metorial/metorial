@@ -6,10 +6,14 @@ import { spec } from '../spec';
 export let getAnalystRatings = SlateTool.create(spec, {
   name: 'Get Analyst Ratings',
   key: 'get_analyst_ratings',
-  description: `Retrieve current and historical analyst buy/sell/hold ratings for stocks, including consensus data, price targets, and individual analyst recommendations. Supports up to 15+ years of history with date range filtering.`,
+  description: `DEPRECATED — use \`get_company_ratings\` instead. Retrieve current and historical analyst buy/sell/hold ratings for stocks, including consensus data, price targets, and individual analyst recommendations. Supports up to 15+ years of history with date range filtering.`,
+  instructions: [
+    'Use get_company_ratings for the current documented single-ticker company-ratings API. This tool retains its original multi-symbol request and response contract; no provider retirement is asserted.'
+  ],
   constraints: ['Available on Business plan and higher'],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

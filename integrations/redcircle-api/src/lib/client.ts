@@ -1,18 +1,40 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private apiKey: string;
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
     this.apiKey = config.token;
-    this.axios = createAxios({
-      baseURL: 'https://api.redcircleapi.com'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.redcircleapi.com',
+      timeout: 180_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'RedCircle',
+          reason: 'redcircle_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          nestedKeys: ['request_info', 'errors']
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.request_info?.success === false) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'RedCircle',
+            reason: 'redcircle_api_error',
+            nestedKeys: ['request_info', 'errors'],
+            fallbackMessage: 'The provider did not complete the request.'
+          }
+        );
+      }
+      return response;
     });
   }
 
   private withApiKey(params: Record<string, any> = {}): Record<string, any> {
-    return { api_key: this.apiKey, ...params };
+    return { ...params, api_key: this.apiKey };
   }
 
   // ──────────────────────────────────────────
@@ -103,7 +125,7 @@ export class Client {
   }
 
   async getCollection(collectionId: string): Promise<any> {
-    let response = await this.axios.get(`/collections/${collectionId}`, {
+    let response = await this.axios.get(`/collections/${encodeURIComponent(collectionId)}`, {
       params: this.withApiKey()
     });
     return response.data;
@@ -117,23 +139,69 @@ export class Client {
   }
 
   async updateCollection(collectionId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/collections/${collectionId}`, data, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.put(
+      `/collections/${encodeURIComponent(collectionId)}`,
+      data,
+      {
+        params: this.withApiKey()
+      }
+    );
     return response.data;
   }
 
   async deleteCollection(collectionId: string): Promise<any> {
-    let response = await this.axios.delete(`/collections/${collectionId}`, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.delete(
+      `/collections/${encodeURIComponent(collectionId)}`,
+      {
+        params: this.withApiKey()
+      }
+    );
     return response.data;
   }
 
   async startCollection(collectionId: string): Promise<any> {
-    let response = await this.axios.get(`/collections/${collectionId}/start`, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionId)}/start`,
+      {
+        params: this.withApiKey()
+      }
+    );
+    return response.data;
+  }
+
+  async listCollectionRequests(collectionId: string, page: number): Promise<any> {
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionId)}/requests/${page}`,
+      { params: this.withApiKey() }
+    );
+    return response.data;
+  }
+
+  async addCollectionRequests(
+    collectionId: string,
+    requests: Record<string, unknown>[]
+  ): Promise<any> {
+    return this.updateCollection(collectionId, { requests });
+  }
+
+  async updateCollectionRequest(
+    collectionId: string,
+    requestId: string,
+    parameters: Record<string, unknown>
+  ): Promise<any> {
+    let response = await this.axios.put(
+      `/collections/${encodeURIComponent(collectionId)}/${encodeURIComponent(requestId)}`,
+      parameters,
+      { params: this.withApiKey() }
+    );
+    return response.data;
+  }
+
+  async deleteCollectionRequest(collectionId: string, requestId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/collections/${encodeURIComponent(collectionId)}/${encodeURIComponent(requestId)}`,
+      { params: this.withApiKey() }
+    );
     return response.data;
   }
 
@@ -142,9 +210,12 @@ export class Client {
   // ──────────────────────────────────────────
 
   async listResultSets(collectionId: string): Promise<any> {
-    let response = await this.axios.get(`/collections/${collectionId}/results`, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionId)}/results`,
+      {
+        params: this.withApiKey()
+      }
+    );
     return response.data;
   }
 
@@ -154,7 +225,7 @@ export class Client {
     format: 'json' | 'jsonlines' | 'csv' = 'json',
     csvFields?: string
   ): Promise<any> {
-    let path = `/collections/${collectionId}/results/${resultSetId}`;
+    let path = `/collections/${encodeURIComponent(collectionId)}/results/${encodeURIComponent(resultSetId)}`;
     if (format === 'jsonlines') path += '/jsonlines';
     if (format === 'csv') path += '/csv';
 
@@ -171,7 +242,7 @@ export class Client {
 
   async resendWebhook(collectionId: string, resultSetId: string): Promise<any> {
     let response = await this.axios.get(
-      `/collections/${collectionId}/results/${resultSetId}/resendwebhook`,
+      `/collections/${encodeURIComponent(collectionId)}/results/${encodeURIComponent(resultSetId)}/resendwebhook`,
       {
         params: this.withApiKey()
       }
@@ -198,16 +269,23 @@ export class Client {
   }
 
   async updateDestination(destinationId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/destinations/${destinationId}`, data, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.put(
+      `/destinations/${encodeURIComponent(destinationId)}`,
+      data,
+      {
+        params: this.withApiKey()
+      }
+    );
     return response.data;
   }
 
   async deleteDestination(destinationId: string): Promise<any> {
-    let response = await this.axios.delete(`/destinations/${destinationId}`, {
-      params: this.withApiKey()
-    });
+    let response = await this.axios.delete(
+      `/destinations/${encodeURIComponent(destinationId)}`,
+      {
+        params: this.withApiKey()
+      }
+    );
     return response.data;
   }
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let upsertProduct = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let upsertProduct = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...importScopeFields,
       productId: z.string().describe('Unique identifier for the product.'),
       productName: z.string().describe('Name of the product.')
     })
@@ -25,11 +27,7 @@ export let upsertProduct = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let response = await client.upsertProduct({
       id: ctx.input.productId,

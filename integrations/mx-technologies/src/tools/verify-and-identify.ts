@@ -12,7 +12,7 @@ let memberStatusSchema = z.object({
 export let verifyMember = SlateTool.create(spec, {
   name: 'Verify Account',
   key: 'verify_account',
-  description: `Initiate instant account verification (IAV) for a member. Verifies account and routing numbers in under 5 seconds through direct connections. Use this for money movement and account funding use cases.`,
+  description: `Initiate instant account verification (IAV) for a member. Starts an asynchronous process to retrieve account and routing numbers; use Read Member Status to follow progress. Use this for money movement and account funding use cases.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -31,9 +31,9 @@ export let verifyMember = SlateTool.create(spec, {
 
     return {
       output: {
-        memberGuid: member.guid,
+        memberGuid: member.guid ?? undefined,
         connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated
+        isBeingAggregated: member.is_being_aggregated ?? undefined
       },
       message: `Verification initiated for member **${member.guid}**. Status: **${member.connection_status}**.`
     };
@@ -43,7 +43,7 @@ export let verifyMember = SlateTool.create(spec, {
 export let identifyMember = SlateTool.create(spec, {
   name: 'Identify Account Owner',
   key: 'identify_account_owner',
-  description: `Retrieve identity information about the account holder. Returns name, address, email, and phone number. Useful for identity verification (IDV) and Know Your Customer (KYC) processes.`,
+  description: `Start account owner identification for a member. After it completes, use List Account Owners to retrieve the name, address, email, and phone number. Useful for identity verification (IDV) and Know Your Customer (KYC) processes.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -62,9 +62,9 @@ export let identifyMember = SlateTool.create(spec, {
 
     return {
       output: {
-        memberGuid: member.guid,
+        memberGuid: member.guid ?? undefined,
         connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated
+        isBeingAggregated: member.is_being_aggregated ?? undefined
       },
       message: `Identification initiated for member **${member.guid}**. Status: **${member.connection_status}**.`
     };
@@ -82,11 +82,21 @@ export let listAccountOwners = SlateTool.create(spec, {
   .input(
     z.object({
       userGuid: z.string().describe('MX GUID of the user'),
-      memberGuid: z.string().describe('MX GUID of the member')
+      memberGuid: z.string().describe('MX GUID of the member'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      recordsPerPage: z.number().optional().describe('Records per page, from 10 to 1000')
     })
   )
   .output(
     z.object({
+      pagination: z
+        .object({
+          currentPage: z.number().optional(),
+          perPage: z.number().optional(),
+          totalEntries: z.number().optional(),
+          totalPages: z.number().optional()
+        })
+        .optional(),
       accountOwners: z.array(
         z.object({
           guid: z.string().optional(),
@@ -108,13 +118,17 @@ export let listAccountOwners = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MxClient({ token: ctx.auth.token, environment: ctx.config.environment });
-    let owners = await client.listAccountOwners(ctx.input.userGuid, ctx.input.memberGuid);
+    let result = await client.listAccountOwners(
+      ctx.input.userGuid,
+      ctx.input.memberGuid,
+      ctx.input
+    );
 
-    let mapped = (owners || []).map((o: any) => ({
-      guid: o.guid,
+    let mapped = result.accountOwners.map((o: any) => ({
+      guid: o.guid ?? undefined,
       accountGuid: o.account_guid,
       memberGuid: o.member_guid,
-      userGuid: o.user_guid,
+      userGuid: o.user_guid ?? undefined,
       firstName: o.first_name,
       lastName: o.last_name,
       email: o.email,
@@ -127,7 +141,17 @@ export let listAccountOwners = SlateTool.create(spec, {
     }));
 
     return {
-      output: { accountOwners: mapped },
+      output: {
+        accountOwners: mapped,
+        pagination: result.pagination
+          ? {
+              currentPage: result.pagination.current_page,
+              perPage: result.pagination.per_page,
+              totalEntries: result.pagination.total_entries,
+              totalPages: result.pagination.total_pages
+            }
+          : undefined
+      },
       message: `Found **${mapped.length}** account owner(s) for member ${ctx.input.memberGuid}.`
     };
   })
@@ -156,9 +180,9 @@ export let checkBalance = SlateTool.create(spec, {
 
     return {
       output: {
-        memberGuid: member.guid,
+        memberGuid: member.guid ?? undefined,
         connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated
+        isBeingAggregated: member.is_being_aggregated ?? undefined
       },
       message: `Balance check initiated for member **${member.guid}**. Status: **${member.connection_status}**.`
     };
@@ -187,9 +211,9 @@ export let extendHistory = SlateTool.create(spec, {
 
     return {
       output: {
-        memberGuid: member.guid,
+        memberGuid: member.guid ?? undefined,
         connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated
+        isBeingAggregated: member.is_being_aggregated ?? undefined
       },
       message: `Extended history request initiated for member **${member.guid}**. Status: **${member.connection_status}**.`
     };

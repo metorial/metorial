@@ -1,14 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray, weatherTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getHistoricalWeather = SlateTool.create(spec, {
   name: 'Get Historical Weather',
   key: 'get_historical_weather',
-  description: `Retrieve historical weather data for a specific location and date. Supports two modes: **timemachine** returns hourly data for a specific Unix timestamp, and **day summary** returns aggregated data for a specific calendar date. Covers 47+ years of data starting from January 1, 1979. Requires One Call API 3.0 subscription.`,
+  description: `Retrieve historical weather data for a specific location and date. Supports two modes: **timemachine** returns data for one specific Unix timestamp, and **day summary** returns aggregated data for a specific calendar date. Timestamp data starts on January 1, 1979; daily summaries start on January 2, 1979. Requires One Call API 3.0 subscription.`,
   instructions: [
-    'Use mode "timemachine" with a Unix timestamp to get hourly data for that moment',
+    'Use mode "timemachine" with a Unix timestamp to get weather for that moment',
     'Use mode "day_summary" with a date in YYYY-MM-DD format to get daily aggregated data'
   ],
   tags: {
@@ -31,7 +32,10 @@ export let getHistoricalWeather = SlateTool.create(spec, {
     z.object({
       latitude: z.number().describe('Latitude'),
       longitude: z.number().describe('Longitude'),
-      timezone: z.string().optional().describe('Timezone name'),
+      timezone: z
+        .string()
+        .optional()
+        .describe('Timezone name for timestamp data, or ±HH:MM offset for day summaries'),
       timezoneOffset: z.number().optional().describe('Shift in seconds from UTC'),
       hourlyData: z
         .array(
@@ -85,8 +89,8 @@ export let getHistoricalWeather = SlateTool.create(spec, {
     });
 
     if (ctx.input.mode === 'timemachine') {
-      if (!ctx.input.unixTimestamp) {
-        throw new Error('unixTimestamp is required for timemachine mode.');
+      if (ctx.input.unixTimestamp === undefined) {
+        throw createApiServiceError('unixTimestamp is required for timemachine mode.');
       }
       let data = await client.getOneCallTimemachine(
         ctx.input.latitude,
@@ -94,35 +98,35 @@ export let getHistoricalWeather = SlateTool.create(spec, {
         ctx.input.unixTimestamp
       );
 
-      let hourlyData = (data.data || []).map((h: any) => ({
-        timestamp: new Date(h.dt * 1000).toISOString(),
+      let hourlyData = weatherArray(data.data).map((h: any) => ({
+        timestamp: weatherTimestamp(h.dt),
         temperature: h.temp,
         feelsLike: h.feels_like,
-        pressure: h.pressure,
-        humidity: h.humidity,
-        dewPoint: h.dew_point,
-        cloudiness: h.clouds,
-        windSpeed: h.wind_speed,
-        windDirection: h.wind_deg,
-        visibility: h.visibility,
-        conditionGroup: h.weather?.[0]?.main,
-        conditionDescription: h.weather?.[0]?.description
+        pressure: h.pressure ?? undefined,
+        humidity: h.humidity ?? undefined,
+        dewPoint: h.dew_point ?? undefined,
+        cloudiness: h.clouds ?? undefined,
+        windSpeed: h.wind_speed ?? undefined,
+        windDirection: h.wind_deg ?? undefined,
+        visibility: h.visibility ?? undefined,
+        conditionGroup: h.weather?.[0]?.main ?? undefined,
+        conditionDescription: h.weather?.[0]?.description ?? undefined
       }));
 
       return {
         output: {
           latitude: data.lat,
           longitude: data.lon,
-          timezone: data.timezone,
-          timezoneOffset: data.timezone_offset,
+          timezone: data.timezone ?? undefined,
+          timezoneOffset: data.timezone_offset ?? undefined,
           hourlyData,
           daySummary: undefined
         },
         message: `Retrieved **${hourlyData.length}** historical hourly data points for (${ctx.input.latitude}, ${ctx.input.longitude}).`
       };
     } else {
-      if (!ctx.input.date) {
-        throw new Error('date is required for day_summary mode (YYYY-MM-DD).');
+      if (ctx.input.date === undefined) {
+        throw createApiServiceError('date is required for day_summary mode (YYYY-MM-DD).');
       }
       let data = await client.getOneCallDaySummary(
         ctx.input.latitude,
@@ -131,30 +135,30 @@ export let getHistoricalWeather = SlateTool.create(spec, {
       );
 
       let daySummary = {
-        date: data.date || ctx.input.date,
-        temperatureMin: data.temperature?.min,
-        temperatureMax: data.temperature?.max,
-        temperatureMorning: data.temperature?.morning,
-        temperatureAfternoon: data.temperature?.afternoon,
-        temperatureEvening: data.temperature?.evening,
-        temperatureNight: data.temperature?.night,
-        pressure: data.pressure?.afternoon,
-        humidity: data.humidity?.afternoon,
-        windSpeed: data.wind?.max?.speed,
-        precipitationTotal: data.precipitation?.total,
-        cloudCoverageAfternoon: data.cloud_cover?.afternoon
+        date: data.date,
+        temperatureMin: data.temperature?.min ?? undefined,
+        temperatureMax: data.temperature?.max ?? undefined,
+        temperatureMorning: data.temperature?.morning ?? undefined,
+        temperatureAfternoon: data.temperature?.afternoon ?? undefined,
+        temperatureEvening: data.temperature?.evening ?? undefined,
+        temperatureNight: data.temperature?.night ?? undefined,
+        pressure: data.pressure?.afternoon ?? undefined,
+        humidity: data.humidity?.afternoon ?? undefined,
+        windSpeed: data.wind?.max?.speed ?? undefined,
+        precipitationTotal: data.precipitation?.total ?? undefined,
+        cloudCoverageAfternoon: data.cloud_cover?.afternoon ?? undefined
       };
 
       return {
         output: {
           latitude: data.lat,
           longitude: data.lon,
-          timezone: data.tz,
+          timezone: data.tz ?? undefined,
           timezoneOffset: undefined,
           hourlyData: undefined,
           daySummary
         },
-        message: `Day summary for **${daySummary.date}**: ${daySummary.temperatureMin ?? 'N/A'}°–${daySummary.temperatureMax ?? 'N/A'}°, precipitation: ${daySummary.precipitationTotal ?? 0} mm.`
+        message: `Day summary for **${daySummary.date}**: ${daySummary.temperatureMin ?? 'N/A'}°–${daySummary.temperatureMax ?? 'N/A'}°, precipitation: ${daySummary.precipitationTotal ?? 'N/A'} mm.`
       };
     }
   })

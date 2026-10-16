@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'finmei',
   name: 'Finmei',
   description:
-    'Invoicing and expense management platform for freelancers and small businesses. Supports 180+ currencies, customizable templates, and flexible invoice sharing.',
+    'Manage business invoices, expense receipts, payments, customers, and products. Retrieve business details and prepare invoice PDFs and original receipts for download.',
   metadata: {},
   config,
   auth

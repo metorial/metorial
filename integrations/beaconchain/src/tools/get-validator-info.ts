@@ -16,7 +16,8 @@ let validatorSelectorSchema = z
       .optional()
       .describe(
         'Dashboard ID to select validators from. Use this instead of individual identifiers.'
-      )
+      ),
+    groupId: z.number().optional().describe('Optional group within dashboardId')
   })
   .describe('Specify validators by indices/pubkeys or by dashboard ID');
 
@@ -38,6 +39,20 @@ Optionally include APY/ROI data and balance at a specific epoch. Validators can 
   .input(
     z.object({
       validators: validatorSelectorSchema,
+      pageSize: z.number().optional().describe('Overview results per page (1-10)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Overview cursor from overview.paging.next_cursor'),
+      evaluationWindow: z
+        .enum(['24h', '7d', '30d', '90d', 'all_time'])
+        .optional()
+        .describe('APY/ROI evaluation window. Defaults to 24h.'),
+      balancePageSize: z.number().optional().describe('Balance results per page (1-10)'),
+      balanceCursor: z
+        .string()
+        .optional()
+        .describe('Balance cursor from balances.paging.next_cursor'),
       includeApyRoi: z
         .boolean()
         .optional()
@@ -46,7 +61,9 @@ Optionally include APY/ROI data and balance at a specific epoch. Validators can 
       balanceEpoch: z
         .number()
         .optional()
-        .describe('Specific epoch to retrieve balances for. If omitted, returns the latest.')
+        .describe(
+          'Specific epoch to retrieve balances for. If omitted, resolves the latest finalized epoch.'
+        )
     })
   )
   .output(
@@ -72,19 +89,26 @@ Optionally include APY/ROI data and balance at a specific epoch. Validators can 
 
     let selector = {
       validatorIdentifiers: ctx.input.validators.validatorIdentifiers,
-      dashboardId: ctx.input.validators.dashboardId
+      dashboardId: ctx.input.validators.dashboardId,
+      groupId: ctx.input.validators.groupId
     };
 
-    let overview = await client.getValidatorOverview(selector);
+    let overview = await client.getValidatorOverview(selector, {
+      pageSize: ctx.input.pageSize,
+      cursor: ctx.input.cursor
+    });
 
     let result: Record<string, any> = { overview };
 
     if (ctx.input.includeApyRoi) {
-      result.apyRoi = await client.getValidatorApyRoi(selector);
+      result.apyRoi = await client.getValidatorApyRoi(selector, ctx.input.evaluationWindow);
     }
 
     if (ctx.input.includeBalances) {
-      result.balances = await client.getValidatorBalances(selector, ctx.input.balanceEpoch);
+      result.balances = await client.getValidatorBalances(selector, ctx.input.balanceEpoch, {
+        pageSize: ctx.input.balancePageSize,
+        cursor: ctx.input.balanceCursor
+      });
     }
 
     let count = ctx.input.validators.validatorIdentifiers?.length ?? 'dashboard';

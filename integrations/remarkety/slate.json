@@ -1,6 +1,6 @@
 {
   "name": "@metorial/remarkety",
-  "description": "Manage eCommerce marketing automation for email and SMS campaigns. Create and update customer contacts, track orders and carts, sync product catalogs, manage newsletter subscriptions and unsubscriptions, send custom events to trigger automations, upload contacts in batch, and generate personalized coupons.",
+  "description": "Manage eCommerce email and SMS marketing data. Send customer, order, product, cart, and custom events, manage newsletter subscriptions, unsubscribe email and SMS contacts, and upload contact batches with per-contact outcomes.",
   "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "email-and-messaging"],
   "skills": [
     "create and update contacts",
@@ -10,8 +10,6 @@
     "manage newsletter subscriptions",
     "send custom events",
     "batch upload contacts",
-    "generate personalized coupons",
-    "monitor email engagement events",
-    "monitor SMS events"
+    "unsubscribe email and SMS contacts"
   ]
 }

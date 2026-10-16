@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
 
 let reviewSchema = z.object({
@@ -20,13 +21,26 @@ let reviewSchema = z.object({
     .describe('Review author information')
 });
 
+let outputSchema = z.object({
+  rawResult: z
+    .record(z.string(), z.unknown())
+    .describe('Complete response returned by Yelp, including original nullable fields'),
+  total: z
+    .number()
+    .describe(
+      'Total number of review excerpts returned by Yelp, not the business lifetime review count'
+    ),
+  possibleLanguages: z.array(z.string()).optional().describe('Languages found in reviews'),
+  reviews: z.array(reviewSchema).describe('List of review excerpts')
+});
+
 export let getReviews = SlateTool.create(spec, {
   name: 'Get Reviews',
   key: 'get_reviews',
-  description: `Retrieve review excerpts for a specific Yelp business. Returns review excerpts (approximately 160 characters each) along with the reviewer's name, rating, and profile URL. The API returns up to 3 review excerpts by default (up to 7 on higher-tier plans).`,
+  description: `Retrieve review excerpts for a specific Yelp business. Returns review excerpts (approximately 160 characters each) along with the reviewer's name, rating, and profile URL. Yelp documents up to three excerpts for this endpoint; access requires an Enhanced or Premium plan.`,
   constraints: [
     'Full review text is not available through this endpoint — only excerpts are returned.',
-    'Default limit is 3 review excerpts; higher-tier plans may return up to 7.'
+    'Requires an Enhanced or Premium plan with review endpoint access; available excerpts depend on the plan.'
   ],
   tags: {
     readOnly: true
@@ -41,13 +55,7 @@ export let getReviews = SlateTool.create(spec, {
       offset: z.number().optional().describe('Offset for pagination')
     })
   )
-  .output(
-    z.object({
-      total: z.number().describe('Total number of reviews for the business'),
-      possibleLanguages: z.array(z.string()).optional().describe('Languages found in reviews'),
-      reviews: z.array(reviewSchema).describe('List of review excerpts')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -58,29 +66,32 @@ export let getReviews = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let reviews = (result.reviews || []).map((r: any) => ({
-      reviewId: r.id,
-      url: r.url,
-      text: r.text,
-      rating: r.rating,
-      timeCreated: r.time_created,
-      user: r.user
-        ? {
-            userId: r.user.id,
-            profileUrl: r.user.profile_url,
-            imageUrl: r.user.image_url,
-            name: r.user.name
-          }
-        : undefined
-    }));
+    return mapYelpOutput(outputSchema, () => {
+      let reviews = result.reviews.map((r: any) => ({
+        reviewId: r.id,
+        url: r.url,
+        text: r.text,
+        rating: r.rating,
+        timeCreated: r.time_created,
+        user: r.user
+          ? {
+              userId: r.user.id,
+              profileUrl: r.user.profile_url,
+              imageUrl: r.user.image_url ?? undefined,
+              name: r.user.name
+            }
+          : undefined
+      }));
 
-    return {
-      output: {
-        total: result.total,
-        possibleLanguages: result.possible_languages,
-        reviews
-      },
-      message: `Retrieved **${reviews.length}** review excerpts out of **${result.total}** total reviews for this business.`
-    };
+      return {
+        output: {
+          rawResult: result,
+          total: result.total,
+          possibleLanguages: result.possible_languages,
+          reviews
+        },
+        message: `Retrieved **${reviews.length}** review excerpts. Yelp reported **${result.total}** excerpts returned.`
+      };
+    });
   })
   .build();

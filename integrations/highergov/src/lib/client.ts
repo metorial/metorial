@@ -1,6 +1,19 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+import { getDocumentRelatedKey } from './documents';
 
 let BASE_URL = 'https://www.highergov.com';
+
+let pageSchema = z.object({
+  results: z.array(z.record(z.string(), z.unknown())),
+  meta: z.object({
+    pagination: z.object({
+      page: z.number(),
+      pages: z.number(),
+      count: z.number()
+    })
+  })
+});
 
 export interface PaginatedResponse<T> {
   results: T[];
@@ -11,7 +24,7 @@ export interface PaginatedResponse<T> {
       count: number;
     };
   };
-  links: {
+  links?: {
     first: string | null;
     last: string | null;
     next: string | null;
@@ -23,19 +36,62 @@ export class Client {
   private axios;
 
   constructor(private token: string) {
-    this.axios = createAxios({
-      baseURL: BASE_URL
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'A HigherGov API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      timeout: 30_000,
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'HigherGov',
+          reason: 'highergov_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 
   private buildParams(params: Record<string, unknown>): Record<string, string> {
     let result: Record<string, string> = { api_key: this.token };
     for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && value !== '') {
-        result[key] = String(value);
+      if (value === undefined || value === null) continue;
+      if (typeof value === 'string' && !value.trim()) {
+        throw createApiServiceError(`${key} must not be blank when provided.`);
       }
+      if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+        throw createApiServiceError(`${key} must be a whole number.`);
+      }
+      if (key === 'page_number' && Number(value) < 1) {
+        throw createApiServiceError('pageNumber must be at least 1.');
+      }
+      if (key === 'page_size' && (Number(value) < 1 || Number(value) > 100)) {
+        throw createApiServiceError('pageSize must be between 1 and 100.');
+      }
+      if (key.endsWith('_date') && typeof value === 'string') {
+        let parsed = new Date(`${value}T00:00:00Z`);
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+          Number.isNaN(parsed.getTime()) ||
+          parsed.toISOString().slice(0, 10) !== value
+        ) {
+          throw createApiServiceError(`${key} must be a valid date in YYYY-MM-DD format.`);
+        }
+      }
+      result[key] = String(value);
     }
     return result;
+  }
+
+  private validatePage(data: unknown): PaginatedResponse<Record<string, unknown>> {
+    if (!pageSchema.safeParse(data).success) {
+      throw createApiServiceError(
+        'HigherGov returned an invalid paginated response. Try the request again.'
+      );
+    }
+    return data as PaginatedResponse<Record<string, unknown>>;
   }
 
   async getContracts(
@@ -48,6 +104,7 @@ export class Client {
       awardingAgencyKey?: number;
       fundingAgencyKey?: number;
       lastModifiedDate?: string;
+      capturedDate?: string;
       naicsCode?: string;
       pscCode?: string;
       searchId?: string;
@@ -68,6 +125,7 @@ export class Client {
         awarding_agency_key: params.awardingAgencyKey,
         funding_agency_key: params.fundingAgencyKey,
         last_modified_date: params.lastModifiedDate,
+        captured_date: params.capturedDate,
         naics_code: params.naicsCode,
         psc_code: params.pscCode,
         search_id: params.searchId,
@@ -78,11 +136,12 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getGrants(
     params: {
+      awardId?: string;
       awardeeKey?: number;
       awardeeKeyParent?: number;
       awardeeUei?: string;
@@ -99,6 +158,7 @@ export class Client {
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     let response = await this.axios.get('/api-external/grant/', {
       params: this.buildParams({
+        award_id: params.awardId,
         awardee_key: params.awardeeKey,
         awardee_key_parent: params.awardeeKeyParent,
         awardee_uei: params.awardeeUei,
@@ -113,7 +173,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getIdvAwards(
@@ -154,7 +214,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getSubcontracts(
@@ -185,7 +245,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getSubgrants(
@@ -216,7 +276,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getOpportunities(
@@ -249,7 +309,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getAwardees(
@@ -276,7 +336,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getAwardeeMentorProtege(
@@ -299,7 +359,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getAwardeePartnerships(
@@ -322,7 +382,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getPeople(
@@ -341,7 +401,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getDocuments(params: {
@@ -352,13 +412,13 @@ export class Client {
   }): Promise<PaginatedResponse<Record<string, unknown>>> {
     let response = await this.axios.get('/api-external/document/', {
       params: this.buildParams({
-        related_key: params.relatedKey,
+        related_key: getDocumentRelatedKey(params.relatedKey),
         ordering: params.ordering,
         page_number: params.pageNumber,
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getAgencies(
@@ -371,7 +431,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getVehicles(
@@ -390,7 +450,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getNaicsCodes(
@@ -409,7 +469,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getPscCodes(
@@ -422,7 +482,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getGrantPrograms(
@@ -441,7 +501,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getNsnData(
@@ -464,7 +524,7 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
   }
 
   async getSlContracts(
@@ -489,7 +549,28 @@ export class Client {
         page_size: params.pageSize
       })
     });
-    return response.data;
+    return this.validatePage(response.data);
+  }
+
+  async getPursuits(
+    params: {
+      referenceId?: number;
+      uniqueKey?: string;
+      searchId?: string;
+      pageNumber?: number;
+      pageSize?: number;
+    } = {}
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
+    let response = await this.axios.get('/api-external/pursuit/', {
+      params: this.buildParams({
+        reference_id: params.referenceId,
+        unique_key: params.uniqueKey,
+        search_id: params.searchId,
+        page_number: params.pageNumber,
+        page_size: params.pageSize
+      })
+    });
+    return this.validatePage(response.data);
   }
 
   // Zapier integration endpoints (use X-API-KEY header)

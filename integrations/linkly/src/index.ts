@@ -1,8 +1,10 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  bulkUpsertLinks,
   createLink,
   deleteLinks,
+  exportClickAnalytics,
   getClickAnalytics,
   getClickCounters,
   getLink,
@@ -15,7 +17,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    bulkUpsertLinks,
     createLink,
+    exportClickAnalytics,
     updateLink,
     getLink,
     listLinks,

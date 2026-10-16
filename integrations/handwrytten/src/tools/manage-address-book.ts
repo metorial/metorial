@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ let recipientSchema = z.object({
   city: z.string().optional().describe('City'),
   state: z.string().optional().describe('State/province'),
   zip: z.string().optional().describe('Postal/ZIP code'),
-  countryId: z.number().optional().describe('Country ID'),
+  countryId: z.number().optional().describe('Country ID from list_countries'),
   birthday: z.string().optional().describe('Birthday (YYYY-MM-DD)')
 });
 
@@ -55,7 +55,7 @@ export let manageAddressBook = SlateTool.create(spec, {
       city: z.string().optional().describe('City'),
       state: z.string().optional().describe('State/province'),
       zip: z.string().optional().describe('Postal/ZIP code'),
-      countryId: z.number().optional().describe('Country ID'),
+      countryId: z.number().optional().describe('Country ID from list_countries'),
       birthday: z.string().optional().describe('Birthday in YYYY-MM-DD format')
     })
   )
@@ -85,14 +85,14 @@ export let manageAddressBook = SlateTool.create(spec, {
       address2: r.address2 ?? undefined,
       city: r.city ?? undefined,
       state: r.state ?? undefined,
-      zip: r.zip ?? undefined,
+      zip: r.zip != null ? String(r.zip) : undefined,
       countryId: r.country_id != null ? Number(r.country_id) : undefined,
       birthday: r.birthday ?? undefined
     });
 
     if (action === 'list') {
       let result = await client.listRecipients();
-      let rawRecipients = result.recipients ?? result.data ?? [];
+      let rawRecipients = result.addresses ?? result.recipients ?? result.data ?? [];
       let recipients = rawRecipients.map(mapRecipient);
       return {
         output: { recipients, success: true },
@@ -102,7 +102,7 @@ export let manageAddressBook = SlateTool.create(spec, {
 
     if (action === 'search') {
       if (!ctx.input.searchQuery) {
-        throw new Error('searchQuery is required for search action');
+        throw createApiServiceError('searchQuery is required for search action');
       }
       let results = await client.searchRecipients(ctx.input.searchQuery);
       let recipients = results.map(mapRecipient);
@@ -113,8 +113,10 @@ export let manageAddressBook = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.address1 || !ctx.input.city || !ctx.input.state || !ctx.input.zip) {
-        throw new Error('address1, city, state, and zip are required to create a recipient');
+      if (!ctx.input.address1 || !ctx.input.city || !ctx.input.zip) {
+        throw createApiServiceError(
+          'address1, city, and zip are required to create a recipient'
+        );
       }
       let result = await client.addRecipient({
         firstName: ctx.input.firstName,
@@ -128,7 +130,17 @@ export let manageAddressBook = SlateTool.create(spec, {
         countryId: ctx.input.countryId,
         birthday: ctx.input.birthday
       });
-      let recipientId = String(result.id ?? result.recipient_id ?? '');
+      let returnedId = result.address_id ?? result.id ?? result.recipient_id;
+      if (
+        returnedId === undefined ||
+        returnedId === null ||
+        String(returnedId).trim() === ''
+      ) {
+        throw createApiServiceError(
+          'Handwrytten did not return a recipient address ID. Check the address book before retrying.'
+        );
+      }
+      let recipientId = String(returnedId);
       return {
         output: { recipientId, success: true },
         message: `Created recipient **${[ctx.input.firstName, ctx.input.lastName].filter(Boolean).join(' ') || 'contact'}** with ID \`${recipientId}\`.`
@@ -137,7 +149,23 @@ export let manageAddressBook = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.recipientId) {
-        throw new Error('recipientId is required for update action');
+        throw createApiServiceError('recipientId is required for update action');
+      }
+      if (
+        ![
+          ctx.input.firstName,
+          ctx.input.lastName,
+          ctx.input.businessName,
+          ctx.input.address1,
+          ctx.input.address2,
+          ctx.input.city,
+          ctx.input.state,
+          ctx.input.zip,
+          ctx.input.countryId,
+          ctx.input.birthday
+        ].some(value => value !== undefined)
+      ) {
+        throw createApiServiceError('Provide at least one recipient field to update.');
       }
       await client.updateRecipient(ctx.input.recipientId, {
         firstName: ctx.input.firstName,
@@ -159,7 +187,7 @@ export let manageAddressBook = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.recipientId) {
-        throw new Error('recipientId is required for delete action');
+        throw createApiServiceError('recipientId is required for delete action');
       }
       await client.deleteRecipient(ctx.input.recipientId);
       return {
@@ -168,6 +196,6 @@ export let manageAddressBook = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

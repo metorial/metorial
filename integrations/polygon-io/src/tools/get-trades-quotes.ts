@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorInput, cursorOutput, nextCursor, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let tradeSchema = z.object({
@@ -42,6 +43,7 @@ export let getTradesQuotes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorInput,
       ticker: z.string().describe('Stock ticker symbol (e.g., "AAPL")'),
       dataType: z.enum(['trades', 'quotes']).describe('Type of tick data to retrieve'),
       timestampFrom: z
@@ -66,9 +68,10 @@ export let getTradesQuotes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: cursorOutput,
       trades: z.array(tradeSchema).optional().describe('Array of trade records'),
       quotes: z.array(quoteSchema).optional().describe('Array of quote (NBBO) records'),
-      count: z.number().describe('Number of records returned')
+      count: z.number().optional().describe('Number of records returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -81,26 +84,28 @@ export let getTradesQuotes = SlateTool.create(spec, {
         timestampLte: ctx.input.timestampTo,
         order: ctx.input.order,
         sort: 'timestamp',
+        cursor: ctx.input.cursor,
         limit: ctx.input.limit
       });
 
-      let trades = (data.results || []).map((t: any) => ({
-        conditions: t.conditions,
-        price: t.price,
-        size: t.size,
-        exchange: t.exchange,
-        tradeId: t.id,
-        sipTimestamp: t.sip_timestamp,
-        participantTimestamp: t.participant_timestamp,
-        sequenceNumber: t.sequence_number
+      let trades = responseRows(data.results)?.map((t: any) => ({
+        conditions: t.conditions ?? undefined,
+        price: t.price ?? undefined,
+        size: t.size ?? undefined,
+        exchange: t.exchange ?? undefined,
+        tradeId: t.id ?? undefined,
+        sipTimestamp: t.sip_timestamp ?? undefined,
+        participantTimestamp: t.participant_timestamp ?? undefined,
+        sequenceNumber: t.sequence_number ?? undefined
       }));
 
       return {
         output: {
+          nextCursor: nextCursor(data),
           trades,
-          count: trades.length
+          count: trades?.length ?? undefined
         },
-        message: `Retrieved **${trades.length}** trade(s) for **${ctx.input.ticker}**.`
+        message: `Retrieved **${trades?.length ?? 0}** trade(s) for **${ctx.input.ticker}**.`
       };
     }
 
@@ -110,29 +115,31 @@ export let getTradesQuotes = SlateTool.create(spec, {
       timestampLte: ctx.input.timestampTo,
       order: ctx.input.order,
       sort: 'timestamp',
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let quotes = (data.results || []).map((q: any) => ({
-      bidPrice: q.bid_price,
-      bidSize: q.bid_size,
-      bidExchange: q.bid_exchange,
-      askPrice: q.ask_price,
-      askSize: q.ask_size,
-      askExchange: q.ask_exchange,
-      conditions: q.conditions,
-      sipTimestamp: q.sip_timestamp,
-      participantTimestamp: q.participant_timestamp,
-      sequenceNumber: q.sequence_number,
-      indicators: q.indicators
+    let quotes = responseRows(data.results)?.map((q: any) => ({
+      bidPrice: q.bid_price ?? undefined,
+      bidSize: q.bid_size ?? undefined,
+      bidExchange: q.bid_exchange ?? undefined,
+      askPrice: q.ask_price ?? undefined,
+      askSize: q.ask_size ?? undefined,
+      askExchange: q.ask_exchange ?? undefined,
+      conditions: q.conditions ?? undefined,
+      sipTimestamp: q.sip_timestamp ?? undefined,
+      participantTimestamp: q.participant_timestamp ?? undefined,
+      sequenceNumber: q.sequence_number ?? undefined,
+      indicators: q.indicators ?? undefined
     }));
 
     return {
       output: {
+        nextCursor: nextCursor(data),
         quotes,
-        count: quotes.length
+        count: quotes?.length ?? undefined
       },
-      message: `Retrieved **${quotes.length}** quote(s) for **${ctx.input.ticker}**.`
+      message: `Retrieved **${quotes?.length ?? 0}** quote(s) for **${ctx.input.ticker}**.`
     };
   })
   .build();

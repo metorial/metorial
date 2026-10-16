@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let isolateAudioTool = SlateTool.create(spec, {
   name: 'Isolate Audio',
   key: 'isolate_audio',
-  description: `Separate vocal tracks from background noise in an audio file. Accepts base64-encoded audio and returns the isolated vocals as base64-encoded audio.`,
+  description: `DEPRECATED — use \`isolate_audio_file\` instead. Separate vocal tracks from background noise in an audio file. Accepts base64-encoded audio and returns the isolated vocals as base64-encoded audio.`,
+  instructions: ['Use isolate_audio_file for downloadable audio with metadata output.'],
   tags: {
+    deprecated: true,
     readOnly: false
   }
 })

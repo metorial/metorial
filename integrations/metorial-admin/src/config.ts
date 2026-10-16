@@ -1,4 +1,4 @@
-import { SlateConfig } from '@slates/provider';
+import { SlateConfig } from 'slates';
 import { z } from 'zod';
 import { metorialValidationError } from './lib/errors';
 
@@ -45,23 +45,25 @@ export let resolveMetorialRuntimeConfig = (config?: unknown, auth?: { apiUrl?: s
     ...(auth?.apiUrl ? { apiUrl: auth.apiUrl } : {})
   });
 
-export let metorialConfigSchema = z.object({
-  apiUrl: z
-    .string()
-    .optional()
-    .default(DEFAULT_API_URL)
-    .describe(
-      'Metorial API base URL. Defaults to https://api.metorial.com. Trailing slashes are normalized.'
-    ),
-  apiVersion: z
-    .string()
-    .optional()
-    .default(DEFAULT_API_VERSION)
-    .describe('Metorial API version used for introspection and authenticated API calls.')
-});
+// Unknown stored fields retain the legacy apiUrl fallback for existing connections.
+export let metorialConfigSchema = z
+  .object({
+    apiVersion: z
+      .string()
+      .optional()
+      .default(DEFAULT_API_VERSION)
+      .describe('Metorial API version used for introspection and authenticated API calls.')
+  })
+  .passthrough();
 
 export let config = SlateConfig.create(metorialConfigSchema)
-  .getDefaultConfig(() => normalizeMetorialConfig({}))
+  .getDefaultConfig(() => ({ apiVersion: DEFAULT_API_VERSION }))
   .onConfigChanged(({ newConfig }) => ({
-    config: normalizeMetorialConfig(newConfig)
+    config: {
+      ...newConfig,
+      ...(typeof newConfig.apiUrl === 'string'
+        ? { apiUrl: normalizeApiUrl(newConfig.apiUrl) }
+        : {}),
+      apiVersion: normalizeMetorialConfig(newConfig).apiVersion
+    }
   }));

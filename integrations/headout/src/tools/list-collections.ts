@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutId, requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
 
 let collectionSchema = z
@@ -32,7 +33,7 @@ Collections are themed groupings (e.g., "Top Attractions", "Family-Friendly") th
       languageCode: z
         .string()
         .optional()
-        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL)'),
+        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL, PL)'),
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Number of results per page')
     })
@@ -41,6 +42,7 @@ Collections are themed groupings (e.g., "Top Attractions", "Family-Friendly") th
     z.object({
       collections: z.array(collectionSchema).describe('List of collections'),
       total: z.number().optional().describe('Total number of collections'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       nextOffset: z.number().optional().describe('Offset for the next page')
     })
   )
@@ -59,18 +61,20 @@ Collections are themed groupings (e.g., "Top Attractions", "Family-Friendly") th
     });
 
     let collections = (result.items ?? result.collections ?? []).map((c: any) => ({
-      collectionId: String(c.id ?? c.collectionId ?? ''),
-      name: c.name ?? '',
+      ...c,
+      collectionId: requireHeadoutId(c?.id ?? c?.collectionId, 'collection ID'),
+      name: requireHeadoutText(c.name, 'collection name'),
       cityCode: c.cityCode,
       canonicalUrl: c.canonicalUrl,
-      localeUrls: c.localeSpecificUrls
+      localeUrls: c.localeSpecificUrls ?? c.localeUrls ?? undefined
     }));
 
     return {
       output: {
         collections,
+        raw: result,
         total: result.total,
-        nextOffset: result.nextOffset
+        nextOffset: result.nextOffset ?? undefined
       },
       message: `Found ${result.total ?? collections.length} collections in **${ctx.input.cityCode}**. Showing ${collections.length} results.`
     };

@@ -14,6 +14,7 @@ export let getWorkspace = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional(),
       workspaceUuid: z.string(),
       name: z.string(),
       country: z.string(),
@@ -29,6 +30,7 @@ export let getWorkspace = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: workspace,
         workspaceUuid: workspace.uuid,
         name: workspace.name,
         country: workspace.country,

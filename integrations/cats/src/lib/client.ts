@@ -1,21 +1,94 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { collection, requiredId, validateNumber } from './response';
 
-let BASE_URL = 'https://api.catsone.com/v3';
+const BASE_URL = 'https://api.catsone.com/v3';
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        Authorization: `Token ${config.token}`,
-        'Content-Type': 'application/json'
+    if (!config.token.trim()) throw createApiServiceError('A CATS API key is required.');
+    let redact = (value: unknown): any => {
+      if (typeof value === 'string') {
+        return value
+          .split(config.token)
+          .join('[REDACTED]')
+          .replace(
+            /([?&](?:api[_-]?key|token|access_token|authorization)=)[^&#\s]*/gi,
+            '$1[REDACTED]'
+          )
+          .replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/gi, '$1[REDACTED]@');
       }
+      if (Array.isArray(value)) return value.map(redact);
+      if (isApiErrorRecord(value))
+        return Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, redact(item)])
+        );
+      return value;
+    };
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      authHeader: { value: `Token ${config.token}` },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CATS',
+          reason: 'cats_api_error',
+          extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure),
+          extractMessage: (failure, helpers) => {
+            let response = helpers.getResponseWithBody(failure);
+            return redact(
+              helpers.extractMessage({ response }, { fallbackMessage: 'Request failed' })
+            );
+          }
+        })
+    });
+    this.axios.interceptors.request.use(request => {
+      validateNumber(request.params?.page, 'page');
+      validateNumber(request.params?.per_page, 'perPage', 1, 100);
+      if (isApiErrorRecord(request.data)) {
+        for (let [key, value] of Object.entries(request.data)) {
+          if (key.endsWith('_id') && key !== 'external_id') validateNumber(value, key);
+        }
+        if (isApiErrorRecord(request.data.data_item))
+          validateNumber(request.data.data_item.id, 'regardingId');
+        if (Array.isArray(request.data.triggers)) {
+          for (let trigger of request.data.triggers) validateNumber(trigger?.id, 'trigger ID');
+        }
+        validateNumber(request.data.rating, 'rating', 0, 5);
+        validateNumber(request.data.priority, 'priority', 1, 5);
+        validateNumber(request.data.openings, 'openings', 0);
+        if (
+          request.method === 'put' &&
+          !Object.values(request.data).some(value => value !== undefined)
+        ) {
+          throw createApiServiceError('Provide at least one field to update.');
+        }
+      }
+      return request;
+    });
+    this.axios.interceptors.response.use(response => {
+      response.data = redact(response.data);
+      if (response.status === 201 && response.config.method === 'post') {
+        let location = getResponseHeaderValue(response.headers, 'location');
+        if (location) {
+          let path = location.split(/[?#]/, 1)[0] ?? '';
+          let id = path.replace(/\/$/, '').split('/').pop();
+          if (id && /^[1-9]\d*$/.test(id)) {
+            response.data = { ...(isApiErrorRecord(response.data) ? response.data : {}), id };
+          }
+        }
+      }
+      return response;
     });
   }
-
-  // ─── Candidates ────────────────────────────────────────────
 
   async listCandidates(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/candidates', {
@@ -25,7 +98,7 @@ export class Client {
   }
 
   async getCandidate(candidateId: string) {
-    let response = await this.axios.get(`/candidates/${candidateId}`);
+    let response = await this.axios.get(`/candidates/${requiredId(candidateId, 'resource')}`);
     return response.data;
   }
 
@@ -37,15 +110,33 @@ export class Client {
   }
 
   async updateCandidate(candidateId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/candidates/${candidateId}`, data);
+    let changes = pickDefined(data);
+    if (!Object.keys(changes).length)
+      throw createApiServiceError('Provide at least one field to update.');
+    let current = await this.getCandidate(candidateId);
+    requiredId(current?.id, 'candidate');
+    data = {
+      first_name: current.first_name,
+      last_name: current.last_name,
+      ...changes
+    };
+    if (typeof data.first_name !== 'string')
+      throw createApiServiceError('CATS candidate update requires a valid first_name.');
+    if (typeof data.last_name !== 'string')
+      throw createApiServiceError('CATS candidate update requires a valid last_name.');
+    let response = await this.axios.put(
+      `/candidates/${requiredId(candidateId, 'resource')}`,
+      data
+    );
     return response.data;
   }
 
   async deleteCandidate(candidateId: string) {
-    await this.axios.delete(`/candidates/${candidateId}`);
+    await this.axios.delete(`/candidates/${requiredId(candidateId, 'resource')}`);
   }
 
   async searchCandidates(query: string, params?: { page?: number; perPage?: number }) {
+    if (!query.trim()) return this.listCandidates(params);
     let response = await this.axios.get('/candidates/search', {
       params: { query, page: params?.page, per_page: params?.perPage }
     });
@@ -56,66 +147,37 @@ export class Client {
     filters: Record<string, any>,
     params?: { page?: number; perPage?: number }
   ) {
+    if (!isApiErrorRecord(filters) || Object.keys(filters).length === 0)
+      throw createApiServiceError('filters must be a nonempty JSON object.');
     let response = await this.axios.post('/candidates/search', filters, {
       params: { page: params?.page, per_page: params?.perPage }
     });
     return response.data;
   }
 
-  async getCandidateTags(candidateId: string) {
-    let response = await this.axios.get(`/candidates/${candidateId}/tags`);
-    return response.data;
-  }
-
-  async replaceCandidateTags(candidateId: string, tags: string[]) {
-    let response = await this.axios.post(`/candidates/${candidateId}/tags`, { tags });
-    return response.data;
-  }
-
-  async attachCandidateTags(candidateId: string, tags: string[]) {
-    let response = await this.axios.put(`/candidates/${candidateId}/tags`, { tags });
-    return response.data;
-  }
-
-  async getCandidateWorkHistory(candidateId: string) {
-    let response = await this.axios.get(`/candidates/${candidateId}/work_history`);
-    return response.data;
-  }
-
-  async createCandidateWorkHistory(candidateId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`/candidates/${candidateId}/work_history`, data);
-    return response.data;
-  }
-
-  async getCandidateCustomFields(candidateId: string) {
-    let response = await this.axios.get(`/candidates/${candidateId}/custom_fields`);
-    return response.data;
-  }
-
-  async updateCandidateCustomField(candidateId: string, fieldId: string, value: any) {
-    let response = await this.axios.put(
-      `/candidates/${candidateId}/custom_fields/${fieldId}`,
-      { value }
-    );
-    return response.data;
-  }
-
-  async getCandidateActivities(
-    candidateId: string,
-    params?: { page?: number; perPage?: number }
-  ) {
-    let response = await this.axios.get(`/candidates/${candidateId}/activities`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  async getRecordTags(resourceType: string, resourceId: string) {
+    let tags: Record<string, any>[] = [];
+    for (let page = 1; page <= 1000; page++) {
+      let data = (
+        await this.axios.get(`/${resourceType}/${requiredId(resourceId, 'resource')}/tags`, {
+          params: { page, per_page: 100 }
+        })
+      ).data;
+      let items = collection(data, 'tags');
+      tags.push(...items);
+      if (items.length < 100 || (typeof data.total === 'number' && tags.length >= data.total))
+        return tags;
+    }
+    throw createApiServiceError('Too many tag pages to retrieve.');
   }
 
   async createCandidateActivity(candidateId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`/candidates/${candidateId}/activities`, data);
+    let response = await this.axios.post(
+      `/candidates/${requiredId(candidateId, 'resource')}/activities`,
+      data
+    );
     return response.data;
   }
-
-  // ─── Jobs ──────────────────────────────────────────────────
 
   async listJobs(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/jobs', {
@@ -125,7 +187,7 @@ export class Client {
   }
 
   async getJob(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}`);
+    let response = await this.axios.get(`/jobs/${requiredId(jobId, 'resource')}`);
     return response.data;
   }
 
@@ -135,15 +197,37 @@ export class Client {
   }
 
   async updateJob(jobId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/jobs/${jobId}`, data);
+    if (!Object.keys(data).length)
+      throw createApiServiceError('Provide at least one field to update.');
+    let current = await this.getJob(jobId);
+    requiredId(current?.id, 'job');
+    data = {
+      ...data,
+      title: data.title ?? current.title,
+      company_id: data.company_id ?? current.company_id,
+      location: {
+        ...(isApiErrorRecord(current.location) ? current.location : {}),
+        ...pickDefined(data.location ?? {})
+      }
+    };
+    if (
+      typeof data.title !== 'string' ||
+      data.company_id === undefined ||
+      !Object.keys(data.location).length
+    )
+      throw createApiServiceError(
+        'CATS returned a job without the required title, company, or location.'
+      );
+    let response = await this.axios.put(`/jobs/${requiredId(jobId, 'resource')}`, data);
     return response.data;
   }
 
   async deleteJob(jobId: string) {
-    await this.axios.delete(`/jobs/${jobId}`);
+    await this.axios.delete(`/jobs/${requiredId(jobId, 'resource')}`);
   }
 
   async searchJobs(query: string, params?: { page?: number; perPage?: number }) {
+    if (!query.trim()) return this.listJobs(params);
     let response = await this.axios.get('/jobs/search', {
       params: { query, page: params?.page, per_page: params?.perPage }
     });
@@ -154,45 +238,25 @@ export class Client {
     filters: Record<string, any>,
     params?: { page?: number; perPage?: number }
   ) {
+    if (!isApiErrorRecord(filters) || Object.keys(filters).length === 0)
+      throw createApiServiceError('filters must be a nonempty JSON object.');
     let response = await this.axios.post('/jobs/search', filters, {
       params: { page: params?.page, per_page: params?.perPage }
     });
     return response.data;
   }
 
-  async getJobPipelines(jobId: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.axios.get(`/jobs/${jobId}/pipelines`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async getJobStatuses(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}/statuses`);
-    return response.data;
+  async getJobStatuses(params?: { page?: number; perPage?: number }) {
+    return (
+      await this.axios.get('/jobs/statuses', {
+        params: { page: params?.page, per_page: params?.perPage }
+      })
+    ).data;
   }
 
   async changeJobStatus(jobId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`/jobs/${jobId}/statuses`, data);
-    return response.data;
+    return (await this.axios.post(`/jobs/${requiredId(jobId, 'job')}/status`, data)).data;
   }
-
-  async getJobTags(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}/tags`);
-    return response.data;
-  }
-
-  async attachJobTags(jobId: string, tags: string[]) {
-    let response = await this.axios.put(`/jobs/${jobId}/tags`, { tags });
-    return response.data;
-  }
-
-  async getJobCustomFields(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}/custom_fields`);
-    return response.data;
-  }
-
-  // ─── Companies ─────────────────────────────────────────────
 
   async listCompanies(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/companies', {
@@ -202,7 +266,7 @@ export class Client {
   }
 
   async getCompany(companyId: string) {
-    let response = await this.axios.get(`/companies/${companyId}`);
+    let response = await this.axios.get(`/companies/${requiredId(companyId, 'resource')}`);
     return response.data;
   }
 
@@ -212,15 +276,34 @@ export class Client {
   }
 
   async updateCompany(companyId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/companies/${companyId}`, data);
+    let changes = pickDefined(data);
+    if (!Object.keys(changes).length)
+      throw createApiServiceError('Provide at least one field to update.');
+    let current = await this.getCompany(companyId);
+    requiredId(current?.id, 'company');
+    data = {
+      name: current.name,
+      owner_id: current.owner_id,
+      ...changes
+    };
+    if (typeof data.name !== 'string')
+      throw createApiServiceError('CATS company update requires a valid name.');
+    if (typeof data.owner_id !== 'number')
+      throw createApiServiceError('CATS company update requires a valid owner_id.');
+    validateNumber(data.owner_id, 'owner_id');
+    let response = await this.axios.put(
+      `/companies/${requiredId(companyId, 'resource')}`,
+      data
+    );
     return response.data;
   }
 
   async deleteCompany(companyId: string) {
-    await this.axios.delete(`/companies/${companyId}`);
+    await this.axios.delete(`/companies/${requiredId(companyId, 'resource')}`);
   }
 
   async searchCompanies(query: string, params?: { page?: number; perPage?: number }) {
+    if (!query.trim()) return this.listCompanies(params);
     let response = await this.axios.get('/companies/search', {
       params: { query, page: params?.page, per_page: params?.perPage }
     });
@@ -231,28 +314,13 @@ export class Client {
     filters: Record<string, any>,
     params?: { page?: number; perPage?: number }
   ) {
+    if (!isApiErrorRecord(filters) || Object.keys(filters).length === 0)
+      throw createApiServiceError('filters must be a nonempty JSON object.');
     let response = await this.axios.post('/companies/search', filters, {
       params: { page: params?.page, per_page: params?.perPage }
     });
     return response.data;
   }
-
-  async getCompanyDepartments(companyId: string) {
-    let response = await this.axios.get(`/companies/${companyId}/departments`);
-    return response.data;
-  }
-
-  async getCompanyTags(companyId: string) {
-    let response = await this.axios.get(`/companies/${companyId}/tags`);
-    return response.data;
-  }
-
-  async attachCompanyTags(companyId: string, tags: string[]) {
-    let response = await this.axios.put(`/companies/${companyId}/tags`, { tags });
-    return response.data;
-  }
-
-  // ─── Contacts ──────────────────────────────────────────────
 
   async listContacts(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/contacts', {
@@ -262,7 +330,7 @@ export class Client {
   }
 
   async getContact(contactId: string) {
-    let response = await this.axios.get(`/contacts/${contactId}`);
+    let response = await this.axios.get(`/contacts/${requiredId(contactId, 'resource')}`);
     return response.data;
   }
 
@@ -272,15 +340,41 @@ export class Client {
   }
 
   async updateContact(contactId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/contacts/${contactId}`, data);
+    let changes = pickDefined(data);
+    if (!Object.keys(changes).length)
+      throw createApiServiceError('Provide at least one field to update.');
+    let current = await this.getContact(contactId);
+    requiredId(current?.id, 'contact');
+    data = {
+      first_name: current.first_name,
+      last_name: current.last_name,
+      owner_id: current.owner_id,
+      company_id: current.company_id,
+      ...changes
+    };
+    if (typeof data.first_name !== 'string')
+      throw createApiServiceError('CATS contact update requires a valid first_name.');
+    if (typeof data.last_name !== 'string')
+      throw createApiServiceError('CATS contact update requires a valid last_name.');
+    if (typeof data.owner_id !== 'number')
+      throw createApiServiceError('CATS contact update requires a valid owner_id.');
+    validateNumber(data.owner_id, 'owner_id');
+    if (typeof data.company_id !== 'number')
+      throw createApiServiceError('CATS contact update requires a valid company_id.');
+    validateNumber(data.company_id, 'company_id');
+    let response = await this.axios.put(
+      `/contacts/${requiredId(contactId, 'resource')}`,
+      data
+    );
     return response.data;
   }
 
   async deleteContact(contactId: string) {
-    await this.axios.delete(`/contacts/${contactId}`);
+    await this.axios.delete(`/contacts/${requiredId(contactId, 'resource')}`);
   }
 
   async searchContacts(query: string, params?: { page?: number; perPage?: number }) {
+    if (!query.trim()) return this.listContacts(params);
     let response = await this.axios.get('/contacts/search', {
       params: { query, page: params?.page, per_page: params?.perPage }
     });
@@ -291,35 +385,21 @@ export class Client {
     filters: Record<string, any>,
     params?: { page?: number; perPage?: number }
   ) {
+    if (!isApiErrorRecord(filters) || Object.keys(filters).length === 0)
+      throw createApiServiceError('filters must be a nonempty JSON object.');
     let response = await this.axios.post('/contacts/search', filters, {
       params: { page: params?.page, per_page: params?.perPage }
     });
     return response.data;
   }
 
-  async getContactActivities(contactId: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.axios.get(`/contacts/${contactId}/activities`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
   async createContactActivity(contactId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`/contacts/${contactId}/activities`, data);
+    let response = await this.axios.post(
+      `/contacts/${requiredId(contactId, 'resource')}/activities`,
+      data
+    );
     return response.data;
   }
-
-  async getContactTags(contactId: string) {
-    let response = await this.axios.get(`/contacts/${contactId}/tags`);
-    return response.data;
-  }
-
-  async attachContactTags(contactId: string, tags: string[]) {
-    let response = await this.axios.put(`/contacts/${contactId}/tags`, { tags });
-    return response.data;
-  }
-
-  // ─── Pipelines ─────────────────────────────────────────────
 
   async listPipelines(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/pipelines', {
@@ -329,7 +409,7 @@ export class Client {
   }
 
   async getPipeline(pipelineId: string) {
-    let response = await this.axios.get(`/pipelines/${pipelineId}`);
+    let response = await this.axios.get(`/pipelines/${requiredId(pipelineId, 'resource')}`);
     return response.data;
   }
 
@@ -339,35 +419,24 @@ export class Client {
   }
 
   async updatePipeline(pipelineId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/pipelines/${pipelineId}`, data);
+    let response = await this.axios.put(
+      `/pipelines/${requiredId(pipelineId, 'resource')}`,
+      data
+    );
     return response.data;
   }
 
   async deletePipeline(pipelineId: string) {
-    await this.axios.delete(`/pipelines/${pipelineId}`);
+    await this.axios.delete(`/pipelines/${requiredId(pipelineId, 'resource')}`);
   }
 
   async changePipelineStatus(pipelineId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`/pipelines/${pipelineId}/status`, data);
+    let response = await this.axios.post(
+      `/pipelines/${requiredId(pipelineId, 'resource')}/status`,
+      data
+    );
     return response.data;
   }
-
-  async filterPipelines(
-    filters: Record<string, any>,
-    params?: { page?: number; perPage?: number }
-  ) {
-    let response = await this.axios.post('/pipelines/search', filters, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async getPipelineWorkflows(pipelineId: string) {
-    let response = await this.axios.get(`/pipelines/${pipelineId}/workflows`);
-    return response.data;
-  }
-
-  // ─── Activities ────────────────────────────────────────────
 
   async listActivities(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/activities', {
@@ -377,27 +446,9 @@ export class Client {
   }
 
   async getActivity(activityId: string) {
-    let response = await this.axios.get(`/activities/${activityId}`);
+    let response = await this.axios.get(`/activities/${requiredId(activityId, 'resource')}`);
     return response.data;
   }
-
-  async updateActivity(activityId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/activities/${activityId}`, data);
-    return response.data;
-  }
-
-  async deleteActivity(activityId: string) {
-    await this.axios.delete(`/activities/${activityId}`);
-  }
-
-  async searchActivities(query: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.axios.get('/activities/search', {
-      params: { query, page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  // ─── Tasks ─────────────────────────────────────────────────
 
   async listTasks(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/tasks', {
@@ -407,7 +458,7 @@ export class Client {
   }
 
   async getTask(taskId: string) {
-    let response = await this.axios.get(`/tasks/${taskId}`);
+    let response = await this.axios.get(`/tasks/${requiredId(taskId, 'resource')}`);
     return response.data;
   }
 
@@ -417,57 +468,13 @@ export class Client {
   }
 
   async updateTask(taskId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/tasks/${taskId}`, data);
+    let response = await this.axios.put(`/tasks/${requiredId(taskId, 'resource')}`, data);
     return response.data;
   }
 
   async deleteTask(taskId: string) {
-    await this.axios.delete(`/tasks/${taskId}`);
+    await this.axios.delete(`/tasks/${requiredId(taskId, 'resource')}`);
   }
-
-  // ─── Webhooks ──────────────────────────────────────────────
-
-  async listWebhooks(params?: { page?: number; perPage?: number }) {
-    let response = await this.axios.get('/webhooks', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async getWebhook(webhookId: string) {
-    let response = await this.axios.get(`/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async createWebhook(data: { url: string; event: string; secret?: string }) {
-    let response = await this.axios.post('/webhooks', data);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    await this.axios.delete(`/webhooks/${webhookId}`);
-  }
-
-  // ─── Events ────────────────────────────────────────────────
-
-  async listEvents(params?: {
-    startingAfterId?: string;
-    startingAfterTimestamp?: string;
-    page?: number;
-    perPage?: number;
-  }) {
-    let response = await this.axios.get('/events', {
-      params: {
-        starting_after_id: params?.startingAfterId,
-        starting_after_timestamp: params?.startingAfterTimestamp,
-        page: params?.page,
-        per_page: params?.perPage
-      }
-    });
-    return response.data;
-  }
-
-  // ─── Users ─────────────────────────────────────────────────
 
   async listUsers(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/users', {
@@ -476,13 +483,6 @@ export class Client {
     return response.data;
   }
 
-  async getUser(userId: string) {
-    let response = await this.axios.get(`/users/${userId}`);
-    return response.data;
-  }
-
-  // ─── Tags ──────────────────────────────────────────────────
-
   async listTags(params?: { page?: number; perPage?: number }) {
     let response = await this.axios.get('/tags', {
       params: { page: params?.page, per_page: params?.perPage }
@@ -490,40 +490,69 @@ export class Client {
     return response.data;
   }
 
-  // ─── Site ──────────────────────────────────────────────────
+  async listWorkflows(params?: { page?: number; perPage?: number }) {
+    return (
+      await this.axios.get('/pipelines/workflows', {
+        params: { page: params?.page, per_page: params?.perPage }
+      })
+    ).data;
+  }
+
+  async listWorkflowStatuses(
+    workflowId: string,
+    params?: { page?: number; perPage?: number }
+  ) {
+    return (
+      await this.axios.get(
+        `/pipelines/workflows/${requiredId(workflowId, 'workflow')}/statuses`,
+        { params: { page: params?.page, per_page: params?.perPage } }
+      )
+    ).data;
+  }
+
+  async getWorkflowStatus(workflowId: string, statusId: string) {
+    return (
+      await this.axios.get(
+        `/pipelines/workflows/${requiredId(workflowId, 'workflow')}/statuses/${requiredId(statusId, 'status')}`
+      )
+    ).data;
+  }
+
+  async replaceTags(resourceType: string, resourceId: string, tags: { id: number }[]) {
+    return (
+      await this.axios.post(`/${resourceType}/${requiredId(resourceId, 'resource')}/tags`, {
+        tags
+      })
+    ).data;
+  }
+
+  async attachTags(resourceType: string, resourceId: string, tags: { id: number }[]) {
+    return (
+      await this.axios.put(`/${resourceType}/${requiredId(resourceId, 'resource')}/tags`, {
+        tags
+      })
+    ).data;
+  }
+
+  async setPipelineStatus(pipelineId: string, statusId: number, fireTriggers?: boolean) {
+    validateNumber(statusId, 'statusId');
+    let body: Record<string, any> = { status_id: statusId };
+    if (fireTriggers !== undefined) {
+      let pipeline = await this.getPipeline(pipelineId);
+      let workflowId = requiredId(pipeline?.workflow_id, 'workflow');
+      let status = await this.getWorkflowStatus(workflowId, String(statusId));
+      if (!Array.isArray(status?.triggers))
+        throw createApiServiceError('CATS returned a status without its trigger list.');
+      body.triggers = status.triggers.map((trigger: any) => ({
+        id: Number(requiredId(trigger?.id, 'trigger')),
+        fire: fireTriggers
+      }));
+    }
+    return this.changePipelineStatus(pipelineId, body);
+  }
 
   async getSite() {
     let response = await this.axios.get('/site');
-    return response.data;
-  }
-
-  // ─── Lists ─────────────────────────────────────────────────
-
-  async getListItems(
-    resourceType: string,
-    listId: string,
-    params?: { page?: number; perPage?: number }
-  ) {
-    let response = await this.axios.get(`/${resourceType}/lists/${listId}/items`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async addToList(resourceType: string, listId: string, items: string[]) {
-    let response = await this.axios.post(`/${resourceType}/lists/${listId}/items`, { items });
-    return response.data;
-  }
-
-  async getLists(resourceType: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.axios.get(`/${resourceType}/lists`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async createList(resourceType: string, data: { name: string; notes?: string }) {
-    let response = await this.axios.post(`/${resourceType}/lists`, data);
     return response.data;
   }
 }

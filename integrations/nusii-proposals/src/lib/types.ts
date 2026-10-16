@@ -1,23 +1,25 @@
 export interface NusiiClient {
+  raw?: Record<string, unknown>;
   clientId: string;
   email: string;
   name: string;
-  surname: string;
+  surname?: string;
   fullName: string;
   currency: string;
-  business: string;
+  business?: string;
   locale: string;
   pdfPageSize: string;
-  web: string;
-  telephone: string;
-  address: string;
-  city: string;
-  postcode: string;
-  country: string;
-  state: string;
+  web?: string;
+  telephone?: string;
+  address?: string;
+  city?: string;
+  postcode?: string;
+  country?: string;
+  state?: string;
 }
 
 export interface NusiiProposal {
+  raw?: Record<string, unknown>;
   proposalId: string;
   title: string;
   accountId: number;
@@ -32,6 +34,7 @@ export interface NusiiProposal {
 }
 
 export interface NusiiSection {
+  raw?: Record<string, unknown>;
   sectionId: string;
   currency: string;
   accountId: number;
@@ -51,10 +54,11 @@ export interface NusiiSection {
   includeTotal: boolean;
   totalInCents: number;
   totalFormatted: string;
-  lineItemIds: string[];
+  lineItemIds?: string[];
 }
 
 export interface NusiiLineItem {
+  raw?: Record<string, unknown>;
   lineItemId: string;
   sectionId: number;
   name: string;
@@ -73,46 +77,53 @@ export interface NusiiLineItem {
 }
 
 export interface NusiiTemplate {
+  raw?: Record<string, unknown>;
   templateId: string;
   name: string;
-  accountId: number;
+  accountId?: number;
   createdAt: string;
   publicTemplate: boolean;
-  dummyTemplate: boolean;
+  dummyTemplate?: boolean;
 }
 
 export interface NusiiActivity {
+  raw?: Record<string, unknown>;
   activityId: string;
   activityType: string;
   ipAddress: string | null;
-  additionalFields: Record<string, any> | null;
+  additionalFields: Record<string, unknown> | null;
   proposalId: number | null;
   clientId: number | null;
 }
 
 export interface NusiiUser {
+  raw?: Record<string, unknown>;
   userId: string;
   email: string;
   name: string;
 }
 
 export interface NusiiTheme {
+  raw?: Record<string, unknown>;
   themeId: string;
   name: string;
 }
 
 export interface NusiiWebhookEndpoint {
+  raw?: Record<string, unknown>;
   webhookEndpointId: string;
   events: string[];
   targetUrl: string;
 }
 
 export interface NusiiAccount {
+  raw?: Record<string, unknown>;
   accountId: string;
   company: string;
   currency: string;
-  locale: string;
-  theme: string;
+  locale?: string;
+  theme?: string;
+  email?: string;
 }
 
 export interface PaginationMeta {
@@ -124,6 +135,7 @@ export interface PaginationMeta {
 }
 
 export interface PaginatedResult<T> {
+  raw?: Record<string, unknown>;
   items: T[];
   pagination: PaginationMeta;
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let redeemLicenseKey = SlateTool.create(spec, {
@@ -14,11 +15,14 @@ export let redeemLicenseKey = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      licenseKey: z.string().describe('The license key (UUID) to redeem')
+      licenseKey: z
+        .string()
+        .describe('The license key (generated UUID or uploaded custom code) to redeem')
     })
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       key: z.string().describe('The license key'),
       created: z.number().describe('Unix timestamp of creation'),
       redeemed: z.boolean().describe('Whether the key has been redeemed'),
@@ -34,12 +38,13 @@ export let redeemLicenseKey = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         key: result.key as string,
         created: result.created as number,
         redeemed: result.redeemed as boolean,
-        redeemedAt: (result.redeemed_at as number | null) ?? null,
+        redeemedAt: result.redeemed_at as number | null,
         refunded: result.refunded as boolean,
-        refundedAt: (result.refunded_at as number | null) ?? null
+        refundedAt: result.refunded_at as number | null
       },
       message: `License key \`${result.key}\` has been **redeemed** successfully.`
     };

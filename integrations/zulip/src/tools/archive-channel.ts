@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let archiveChannel = SlateTool.create(spec, {
   name: 'Archive Channel',
   key: 'archive_channel',
-  description: `Archive (deactivate) a Zulip channel. Archived channels are no longer visible and cannot receive new messages. Requires administrator permissions.`,
+  description: `Archive (deactivate) a Zulip channel. Archived channels are no longer visible and cannot receive new messages. Requires permission to administer the channel.`,
   tags: {
     destructive: true,
     readOnly: false

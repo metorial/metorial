@@ -9,9 +9,9 @@ export let upgradeAudiofile = SlateTool.create(spec, {
   description: `Upgrade an existing audiofile order with additional services or a faster transcription tier.
 
 **Available upgrade SKUs:**
-- \`UPGRD1\` — Budget to 7-Day
+- \`UPGRD1\` — Budget to 6-Day
 - \`UPGRD2\` — Budget to 1-Day
-- \`UPGRD3\` — 7-Day to 1-Day
+- \`UPGRD3\` — 6-Day to 1-Day
 - \`EDIT01\` — Extra Editing
 - \`DIFFQ2\` — Difficult Audio
 - \`TSTMP1\` — Timestamps`,
@@ -32,13 +32,14 @@ export let upgradeAudiofile = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      message: z.string().describe('Confirmation message from CastingWords')
+      message: z.string().describe('Confirmation message from CastingWords'),
+      raw: z.unknown().describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result = await client.upgradeAudiofile(
+    let { result, raw } = await client.upgradeAudiofile(
       ctx.input.audiofileId,
       ctx.input.skus,
       ctx.input.test
@@ -46,9 +47,10 @@ export let upgradeAudiofile = SlateTool.create(spec, {
 
     return {
       output: {
-        message: result.message ?? 'Upgrade applied successfully'
+        message: result.message,
+        raw
       },
-      message: `Upgraded audiofile **${ctx.input.audiofileId}** with SKUs: ${ctx.input.skus.join(', ')}.`
+      message: `Upgraded audiofile **${ctx.input.audiofileId}** with SKUs: ${client.sanitize(ctx.input.skus.join(', '))}.`
     };
   })
   .build();

@@ -1,64 +1,40 @@
-# Slates Specification for Kaggle
+# Kaggle Specification
 
-## Overview
-
-Kaggle is an online platform for data science and machine learning, owned by Google. It provides programmatic access to competitions, datasets, kernels (notebooks), and models. The API allows users to search, download, create, and manage these resources.
+Kaggle hosts competitions, datasets, notebooks, and machine learning models. This integration uses the documented REST API v1 compatibility surface at `https://www.kaggle.com/api/v1`.
 
 ## Authentication
 
-Kaggle uses **HTTP Basic Authentication** with a username and API key pair.
+Use HTTP Basic authentication with a Kaggle username and a legacy API key. At [Kaggle API settings](https://www.kaggle.com/settings/api), create credentials under **Legacy API Credentials**. The downloaded `kaggle.json` contains `username` and `key`. New personal API tokens and OAuth tokens use a separate authentication flow and do not belong in the legacy API key field.
 
-The Kaggle API requires authentication to access most of its functionality. Authentication is performed using API credentials consisting of a username and an API key.
+## Tools
 
-**Obtaining Credentials:**
+- `search_competitions`: filter competitions by keyword, category, group, sort order, and page.
+- `get_competition_details`: list competition files, optionally retrieve leaderboard entries and your submissions. File pagination tokens and submission pages can be provided explicitly.
+- `download_competition_data`: download a competition archive or one named file. Competition rules must already be accepted.
+- `search_datasets`: filter datasets by keyword, owner, group, file type, license, tags, size, and page.
+- `get_dataset_details`: retrieve metadata and a page of files for a dataset version, optionally retrieve processing status.
+- `download_dataset`: download a dataset ZIP archive or one named file, optionally selecting a version.
+- `create_dataset`: create a dataset or publish a new version from existing Kaggle upload tokens. New datasets require a title. Version creation requires owner, dataset slug, and version notes. `newDatasetSlug` names a new dataset; `datasetSlug` selects an existing dataset for version creation.
+- `search_kernels`: search notebooks by keyword, author, language, type, output type, data source, page, and page size.
+- `get_kernel_details`: retrieve notebook source and metadata, optionally retrieve output-file metadata and run status. Source and output retain the original provider records.
+- `push_kernel`: create or update and execute a notebook; attach dataset, competition, notebook, and model data sources. Execution is asynchronous.
+- `search_models`: list models with keyword, owner, sort order, page size, and continuation token.
+- `get_model_details`: retrieve a model and optionally one variation, using both framework and variation slug.
+- `download_model_version`: download a specific model variation version as a tar.gz archive.
+- `manage_model`: create, update, or delete a model. Creation requires a title; updates require at least one changed field.
+- `manage_model_variation`: create, update, or delete a variation, or create/delete versions. Creation requires an instance slug and license. Version creation requires existing upload tokens; version deletion requires a positive version number.
 
-After login, you can download your Kaggle API credentials at https://www.kaggle.com/settings by clicking on the "Generate New Token" button under the "API" section. This provides an API token string.
+Typed summaries omit null optional fields and retain original provider records in additive `raw` fields. Missing required search-result references or titles fail clearly. Failed upstream operations are surfaced as errors; requested detail operations do not silently return empty success results.
 
-There is also a legacy credential method: From your Kaggle account settings page, under "Legacy API Credentials", click on the "Create Legacy API Key" button to generate a `kaggle.json` file. This file contains a JSON object with `username` and `key` fields.
+Downloads use authenticated provider download endpoints. Metadata checks establish resource visibility but do not establish that a later download will succeed; permissions, accepted competition rules, file names, and selected versions are checked by Kaggle when downloading.
 
-**Using Credentials:**
+## Scope
 
-Credentials are sent via HTTP Basic Authentication, where the username is your Kaggle username and the password is your API key. The base URL is `https://www.kaggle.com/api/v1`. Credentials are Base64-encoded as `username:key` and sent in the `Authorization: Basic <encoded>` header.
+Upload initialization, prediction submission, notebook deletion, OAuth authorization, personal token auth, and local CLI configuration are not exposed. The legacy REST API does not document a suitable self/profile endpoint for this credential flow. No events or webhooks are exposed.
 
-Alternatively, you can populate `KAGGLE_USERNAME` and `KAGGLE_KEY` environment variables with values from `kaggle.json` to authenticate.
+## Official references
 
-**Note:** Some commands allow anonymous access, enabling users to download public datasets without the need for API credentials.
-
-## Features
-
-### Competitions
-
-List competitions, download competition data, and submit to a competition. You can search and filter competitions by category (e.g., featured, playground), group, and sort order. You can view competition leaderboards, list competition files, and check submission history.
-
-- Submissions are made by uploading a file along with a description message.
-- Competition data can be downloaded as individual files or as a full archive.
-
-### Datasets
-
-List, create, update, download, or delete datasets. You can search datasets by keyword, file type, license, size range, and tags. Users can create new datasets by initializing metadata and uploading files, then publish new versions with changelogs.
-
-- Datasets are referenced by `owner_slug/dataset_slug` format.
-- Downloads are typically delivered as ZIP archives.
-
-### Kernels (Notebooks)
-
-List, update and run, download code and output, or delete kernels (notebooks). You can search kernels by dataset, competition, language, kernel type (notebook or script), and output type. Users can push (create/update) kernels and pull their source code, retrieve execution output, and check run status.
-
-- Kernels can be associated with specific competitions or datasets.
-- Kernel execution is asynchronous; you push the code and then check its status.
-
-### Models
-
-List, create, update, download, or delete models and model variations. You can manage variations of your Kaggle Models and manage versions of your Kaggle Model Variations.
-
-- Models support multiple variations (e.g., different frameworks like TensorFlow, PyTorch).
-- Each variation can have multiple versions.
-- Models and their variations can be downloaded individually or as specific versions.
-
-### Configuration
-
-Users can view, set, and unset configuration values for the API client, such as default competition or path settings.
-
-## Events
-
-The provider does not support events. Kaggle does not offer webhooks or any purpose-built event subscription mechanism through its API.
+- [Kaggle API documentation](https://www.kaggle.com/docs/api)
+- [Official Kaggle CLI documentation](https://github.com/Kaggle/kaggle-cli/blob/main/docs/README.md)
+- [Official REST v1 route definitions](https://github.com/Kaggle/kaggle-cli/blob/1.6.3/kaggle/api/kaggle_api.py)
+- [Current official CLI operations](https://github.com/Kaggle/kaggle-cli/blob/main/src/kaggle/api/kaggle_api_extended.py)

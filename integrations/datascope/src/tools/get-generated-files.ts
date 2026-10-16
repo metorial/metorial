@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, expectArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getGeneratedFiles = SlateTool.create(spec, {
@@ -32,7 +32,13 @@ export let getGeneratedFiles = SlateTool.create(spec, {
       end: ctx.input.end
     });
 
-    let files = Array.isArray(results) ? results : [];
+    let files = expectArray(results, 'generated files');
+
+    for (let file of files) {
+      if (isApiErrorRecord(file) && typeof file.url === 'string') {
+        await ctx.addAttachment({ type: 'url', url: file.url });
+      }
+    }
 
     return {
       output: {

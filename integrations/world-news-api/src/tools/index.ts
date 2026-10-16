@@ -6,3 +6,4 @@ export * from './retrieve-article';
 export * from './search-news';
 export * from './search-news-sources';
 export * from './top-news';
+export * from './website-to-rss';

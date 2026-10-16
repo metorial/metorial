@@ -1,4 +1,7 @@
 export * from './cancel-cards';
+export * from './contacts';
+export * from './discovery';
+export * from './get-card';
 export * from './get-cards';
 export * from './get-contacts';
 export * from './get-user';

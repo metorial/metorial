@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,9 +15,15 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Your IP2Location.io API key')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token) {
+        throw createApiServiceError('Enter a nonempty IP2Location.io API key.', {
+          reason: 'invalid_api_key'
+        });
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     }

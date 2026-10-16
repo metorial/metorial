@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'poof',
   name: 'Poof',
   description:
-    'Payments infrastructure platform for accepting cryptocurrency payments, credit card payments, ACH bank transfers, and Cash App payments.',
+    'Create cryptocurrency and fiat payment requests, hosted checkouts, wallets, payouts, and transaction queries.',
   metadata: {},
   config,
   auth

@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface ScreenshotParams {
   url: string;
@@ -11,6 +16,7 @@ export interface ScreenshotParams {
   delay?: number;
   waitFor?: string;
   waitUntil?: 'dom_loaded' | 'page_loaded' | 'network_idle';
+  waitUntilTimeout?: number;
   element?: string;
   elementOverlap?: boolean;
   crop?: string;
@@ -50,12 +56,14 @@ export interface ScreenshotJsonResponse {
   url: string;
   extractedHtml?: string;
   extractedText?: string;
+  raw: Record<string, unknown>;
 }
 
 export interface QuotaResponse {
   limit: number;
   remaining: number;
   reset: number;
+  raw: Record<string, unknown>;
 }
 
 export class Client {
@@ -84,6 +92,8 @@ export class Client {
     if (params.delay !== undefined) query.delay = String(params.delay);
     if (params.waitFor !== undefined) query.wait_for = params.waitFor;
     if (params.waitUntil !== undefined) query.wait_until = params.waitUntil;
+    if (params.waitUntilTimeout !== undefined)
+      query.wait_until_timeout = String(params.waitUntilTimeout);
     if (params.element !== undefined) query.element = params.element;
     if (params.elementOverlap !== undefined)
       query.element_overlap = String(params.elementOverlap);
@@ -124,30 +134,72 @@ export class Client {
     return query;
   }
 
-  async captureScreenshot(params: ScreenshotParams): Promise<ScreenshotJsonResponse> {
-    let query = this.buildQueryParams(params);
-    query.response_type = 'json';
+  private async get(path: string, query: Record<string, string>): Promise<unknown> {
+    try {
+      let response = await this.axios.get(path, { params: query });
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'ApiFlash',
+        reason: 'apiflash_api_error',
+        operation: path === '/quota' ? 'quota lookup' : 'screenshot capture',
+        detailKeys: ['error_message', 'error_type', 'message', 'error'],
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+        extractUpstreamCode: (_input, response, helpers) =>
+          helpers.isRecord(response?.data) && typeof response.data.error_type === 'string'
+            ? response.data.error_type
+            : undefined
+      });
+    }
+  }
 
-    let response = await this.axios.get('', {
-      params: query
-    });
+  private readScreenshot(data: unknown): ScreenshotJsonResponse {
+    if (
+      !isApiErrorRecord(data) ||
+      typeof data.url !== 'string' ||
+      !data.url ||
+      (data.extracted_html !== undefined && typeof data.extracted_html !== 'string') ||
+      (data.extracted_text !== undefined && typeof data.extracted_text !== 'string')
+    ) {
+      throw createApiServiceError('ApiFlash returned an invalid screenshot response.', {
+        reason: 'invalid_response'
+      });
+    }
 
-    let data = response.data as Record<string, unknown>;
     return {
-      url: data.url as string,
-      extractedHtml: data.extracted_html as string | undefined,
-      extractedText: data.extracted_text as string | undefined
+      url: data.url,
+      extractedHtml: data.extracted_html,
+      extractedText: data.extracted_text,
+      raw: data
     };
   }
 
+  async captureScreenshot(params: ScreenshotParams): Promise<ScreenshotJsonResponse> {
+    let query = this.buildQueryParams(params);
+    query.response_type = 'json';
+    return this.readScreenshot(await this.get('', query));
+  }
+
   async getQuota(): Promise<QuotaResponse> {
-    let response = await this.axios.get('/quota', {
-      params: {
-        access_key: this.accessKey
-      }
+    let data = await this.get('/quota', {
+      access_key: this.accessKey
     });
 
-    return response.data as QuotaResponse;
+    if (
+      !isApiErrorRecord(data) ||
+      typeof data.limit !== 'number' ||
+      !Number.isFinite(data.limit) ||
+      typeof data.remaining !== 'number' ||
+      !Number.isFinite(data.remaining) ||
+      typeof data.reset !== 'number' ||
+      !Number.isFinite(data.reset)
+    ) {
+      throw createApiServiceError('ApiFlash returned an invalid quota response.', {
+        reason: 'invalid_response'
+      });
+    }
+
+    return { limit: data.limit, remaining: data.remaining, reset: data.reset, raw: data };
   }
 
   async extractContent(params: ScreenshotParams): Promise<ScreenshotJsonResponse> {
@@ -156,15 +208,6 @@ export class Client {
     query.extract_html = String(params.extractHtml ?? true);
     query.extract_text = String(params.extractText ?? true);
 
-    let response = await this.axios.get('', {
-      params: query
-    });
-
-    let data = response.data as Record<string, unknown>;
-    return {
-      url: data.url as string,
-      extractedHtml: data.extracted_html as string | undefined,
-      extractedText: data.extracted_text as string | undefined
-    };
+    return this.readScreenshot(await this.get('', query));
   }
 }

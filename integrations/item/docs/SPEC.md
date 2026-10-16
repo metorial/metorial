@@ -12,7 +12,7 @@ item provides API access to organization data stored as People, Companies, and c
 
 Each tool carries its own endpoint reference in its `docs` entry, so per-endpoint URLs are
 not duplicated here. This specification was last reconciled against the published OpenAPI
-document on 2026-07-31.
+document on 2026-10-15.
 
 The base URL is `https://app.useitem.io`.
 
@@ -20,7 +20,7 @@ The base URL is `https://app.useitem.io`.
 
 item uses API key authentication for all requests. Pass the key in the `x-api-key` header, and generate it from **Settings > System > API Key** in the item workspace. Keys are organization-scoped and documented as starting with `sk_live_`, though the integration accepts any non-empty value so an undocumented key format cannot lock a customer out.
 
-The API key is the only required credential for the endpoints documented here. There is no OAuth flow described in the official docs.
+The API key is the only required credential for the REST endpoints documented here. The separate [hosted item MCP service](https://docs.item.app/mcp-docs) uses OAuth and advertises additional assistant, list, note, and task tools; its guide does not publish REST routes or request/response contracts for those capabilities. This package targets the documented API-key REST API.
 
 The API exposes no current-user, profile, or account endpoint, so there is no identity tool. Credential validity is instead checked at connect time by calling the schema endpoint.
 
@@ -54,7 +54,7 @@ List shared views configured in the item UI and execute them to pull filtered, s
 
 ### Schema discovery
 
-Fetch all available object types and their field definitions, including custom objects, select options, relationship metadata, and field requirements. This is useful for discovering valid field names before creating or updating records.
+Fetch all available object types and their field definitions, including custom objects, select options, relationship metadata, percentage precision/value scale, and field requirements. This is useful for discovering valid field names before creating or updating records. Percentage metadata includes editable/display precision and the `percentage_units` value scale, where 43.5 means 43.5%. Optional metadata is omitted when absent, and documented null values are preserved.
 
 ### Organization users
 

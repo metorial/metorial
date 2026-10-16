@@ -1,0 +1,60 @@
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "imageUrl": {
+        "description": "URL of the image containing a VIN",
+        "type": "string"
+      },
+      "imageBase64": {
+        "description": "Base64-encoded image data",
+        "type": "string"
+      },
+      "cameraId": {
+        "description": "Unique camera identifier",
+        "type": "string"
+      },
+      "timestamp": {
+        "description": "ISO 8601 UTC timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "processingTime": {
+        "type": "number",
+        "description": "Processing time in milliseconds"
+      },
+      "filename": {
+        "type": "string",
+        "description": "Filename of the processed image"
+      },
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "vinCode": {
+              "type": "string",
+              "description": "Decoded VIN text"
+            },
+            "orientation": {
+              "description": "Text orientation (horizontal or vertical)",
+              "type": "string"
+            }
+          },
+          "required": ["vinCode"],
+          "additionalProperties": false
+        },
+        "description": "Detected VIN results"
+      }
+    },
+    "required": ["processingTime", "filename", "results"],
+    "additionalProperties": false
+  }
+}

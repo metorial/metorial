@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachJobFile } from '../lib/files';
+import { generationOutput } from '../lib/responses';
 import {
   authenticationSchema,
   cookieSchema,
@@ -16,7 +18,7 @@ export let generatePdfFromUrl = SlateTool.create(spec, {
 Optionally provide HTTP Basic Auth credentials or session cookies if the target URL requires authentication.
 The API call is asynchronous by default and returns a job ID.`,
   instructions: [
-    'Provide either a single url or a batch array of URLs, not both.',
+    'Provide a single url or a non-empty batch array. When both are supplied, the provider uses batch.',
     'Batch mode combines multiple URLs into one multi-page PDF document.'
   ],
   tags: {
@@ -44,23 +46,17 @@ The API call is asynchronous by default and returns a job ID.`,
   )
   .output(jobResponseSchema)
   .handleInvocation(async ctx => {
+    if (!ctx.input.url?.trim() && !ctx.input.batch?.length)
+      throw createApiServiceError('Provide a url or a non-empty batch of URLs.');
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.generatePdfFromUrl(ctx.input);
 
-    let sourceDesc = ctx.input.batch
-      ? `${ctx.input.batch.length} URLs (batch)`
-      : (ctx.input.url ?? 'provided URL');
-
+    let output = generationOutput(result);
+    await attachJobFile(ctx, result);
     return {
-      output: {
-        jobId: result.jobId ?? result.id ?? '',
-        status: result.status ?? 'pending',
-        assetUrl: result.assetUrl ?? result.url,
-        previewUrl: result.previewUrl,
-        timestamp: result.timestamp
-      },
-      message: `PDF generation from ${sourceDesc} started with job ID **${result.jobId ?? result.id}** (status: ${result.status ?? 'pending'}).`
+      output,
+      message: `Generation job **${output.jobId}** has status **${output.status}**. Use get_job to check progress, then retrieve_job_asset to download the result.`
     };
   })
   .build();

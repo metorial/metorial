@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let analogWrite = SlateTool.create(spec, {
@@ -15,12 +16,14 @@ export let analogWrite = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      deviceName,
       pin: z.string().describe('The pin number to write PWM value to (0–4)'),
       pwmValue: z.number().min(0).max(255).describe('The PWM value to write (0–255)')
     })
   )
   .output(
     z.object({
+      raw: rawResponse,
       success: z.string().describe('Whether the write was successful ("1" for success)'),
       resultValue: z.string().describe('Response value from the device')
     })
@@ -28,13 +31,14 @@ export let analogWrite = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
     let response = await client.analogWrite(ctx.input.pin, ctx.input.pwmValue);
 
     return {
       output: {
+        raw: response,
         success: response.success,
         resultValue: response.value
       },

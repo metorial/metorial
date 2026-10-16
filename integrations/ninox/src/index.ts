@@ -4,8 +4,10 @@ import {
   createRecords,
   deleteFile,
   deleteRecords,
+  downloadFile,
   executeQuery,
   executeScript,
+  getChanges,
   getDatabaseSchema,
   getRecord,
   getTableSchema,
@@ -14,7 +16,8 @@ import {
   listRecords,
   listTeams,
   listViews,
-  updateRecord
+  updateRecord,
+  upsertRecords
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -32,7 +35,10 @@ export let provider = Slate.create({
     executeScript,
     listFiles,
     deleteFile,
-    listViews
+    listViews,
+    downloadFile,
+    upsertRecords,
+    getChanges
   ],
   triggers: []
 });

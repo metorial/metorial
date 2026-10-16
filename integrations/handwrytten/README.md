@@ -1,6 +1,10 @@
 # Handwrytten
 
-Send physical handwritten notes and cards using robotic pens. Choose from handwriting styles and 100+ card/stationery designs, or create custom cards with uploaded images and logos. Manage an address book of recipients, create reusable message templates, include gift cards or physical inserts with orders, and schedule cards for future delivery. Support batch ordering via baskets for sending multiple cards at once. Track order status and retrieve proof images of completed letters.
+Send physical handwritten cards with real ink. Browse card designs and handwriting styles, manage recipient and sender addresses, include available gift cards or inserts, schedule cards, and submit baskets of personalized orders. Retrieve account information, discover supported countries and states, inspect order details, and cancel eligible paid orders before processing.
+
+Existing message-template and grouped order/basket history tools are retained for compatibility. Their legacy endpoints are absent from the current public API reference and have not been verified against a live account.
+
+API keys are available on the Handwrytten dashboard's Integrations page. See the [official API documentation](https://www.handwrytten.com/api/).
 
 ## License
 

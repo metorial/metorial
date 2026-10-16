@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationId, rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listGlossaries = SlateTool.create(spec, {
@@ -16,7 +17,9 @@ export let listGlossaries = SlateTool.create(spec, {
       organizationId: z
         .string()
         .optional()
-        .describe('Organization ID. Falls back to the value in config if not provided.')
+        .describe(
+          'Organization ID. Call list_organizations to discover IDs. Falls back to the saved setting.'
+        )
     })
   )
   .output(
@@ -37,31 +40,28 @@ export let listGlossaries = SlateTool.create(spec, {
               .optional()
               .describe('Whether this is the default glossary for the organization.'),
             createdAt: z.string().optional().describe('Creation timestamp.'),
-            updatedAt: z.string().optional().describe('Last update timestamp.')
+            updatedAt: z.string().optional().describe('Last update timestamp.'),
+            raw: rawSchema.optional().describe('Complete glossary metadata.')
           })
         )
         .describe('List of glossaries.')
     })
   )
   .handleInvocation(async ctx => {
-    let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) {
-      throw new Error(
-        'Organization ID is required. Provide it in the input or configure it globally.'
-      );
-    }
+    let orgId = organizationId(ctx.input.organizationId, ctx.config.organizationId);
 
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listGlossaries(orgId);
 
-    let glossaries = (result.results || result || []).map((g: any) => ({
-      glossaryId: g.id,
+    let glossaries = result.map(g => ({
+      glossaryId: String(g.id),
       name: g.name,
       sourceLanguage: g.source_language,
       targetLanguages: g.target_languages,
-      organizationDefault: g.organization_default,
-      createdAt: g.created_at,
-      updatedAt: g.updated_at
+      organizationDefault: g.organization_default ?? undefined,
+      createdAt: g.created_at ?? undefined,
+      updatedAt: g.updated_at ?? undefined,
+      raw: g
     }));
 
     return {

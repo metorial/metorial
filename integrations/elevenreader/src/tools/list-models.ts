@@ -14,6 +14,7 @@ export let listModelsTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       models: z
         .array(
           z.object({
@@ -58,26 +59,26 @@ export let listModelsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ElevenLabsClient(ctx.auth.token);
 
-    let models = await client.listModels();
+    let result = await client.listModels();
 
-    let mapped = models.map((m: any) => ({
+    let mapped = result.models.map(m => ({
       modelId: m.model_id,
       name: m.name,
-      description: m.description,
-      canDoTextToSpeech: m.can_do_text_to_speech,
-      canDoVoiceConversion: m.can_do_voice_conversion,
-      canBeFineTuned: m.can_be_finetuned,
-      canUseStyle: m.can_use_style,
-      canUseSpeakerBoost: m.can_use_speaker_boost,
-      tokenCostFactor: m.token_cost_factor,
-      languages: m.languages?.map((l: any) => ({
+      description: m.description ?? undefined,
+      canDoTextToSpeech: m.can_do_text_to_speech ?? undefined,
+      canDoVoiceConversion: m.can_do_voice_conversion ?? undefined,
+      canBeFineTuned: m.can_be_finetuned ?? undefined,
+      canUseStyle: m.can_use_style ?? undefined,
+      canUseSpeakerBoost: m.can_use_speaker_boost ?? undefined,
+      tokenCostFactor: m.token_cost_factor ?? undefined,
+      languages: m.languages?.map(l => ({
         languageId: l.language_id,
         name: l.name
       }))
     }));
 
     return {
-      output: { models: mapped },
+      output: { models: mapped, raw: result.raw },
       message: `Found ${mapped.length} available models.`
     };
   })

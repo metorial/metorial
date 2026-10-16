@@ -43,8 +43,8 @@ export let updateCompany = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.address) {
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -52,12 +52,13 @@ export let updateCompany = SlateTool.create(spec, {
         postal_code: ctx.input.address.postalCode
       };
     }
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
-    if (ctx.input.keyTechnologies) body.key_technologies = ctx.input.keyTechnologies;
+    if (ctx.input.keyTechnologies !== undefined)
+      body.key_technologies = ctx.input.keyTechnologies;
 
     await client.updateCompany(ctx.input.companyId, body);
 

@@ -10,7 +10,7 @@ export let listRegistries = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/container-registry/v1/registries', { params });
   return response.data;
@@ -49,7 +49,7 @@ export let listImages = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { registryId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/container-registry/v1/images', { params });
   return response.data;

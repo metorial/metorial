@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { flattenAds, mapSummary } from '../lib/response';
 import { spec } from '../spec';
 
 let metaSearchResultSchema = z
@@ -16,6 +17,23 @@ let metaSearchResultSchema = z
     pageLikeCount: z.number().optional()
   })
   .passthrough();
+
+let outputSchema = z.object({
+  query: z.string().optional(),
+  activeStatus: z.string().optional(),
+  adType: z.string().optional(),
+  continuationToken: z.string().nullable().optional(),
+  countryCode: z.string().optional(),
+  isResultComplete: z.boolean().optional(),
+  mediaTypes: z.string().optional(),
+  numberOfAds: z.number().optional(),
+  platform: z.array(z.string()).optional(),
+  results: z.array(metaSearchResultSchema).optional(),
+  rawResponse: z
+    .unknown()
+    .optional()
+    .describe('Complete provider response, including grouped results and null values')
+});
 
 export let searchMetaAds = SlateTool.create(spec, {
   name: 'Search Meta Ads',
@@ -37,20 +55,7 @@ export let searchMetaAds = SlateTool.create(spec, {
         .describe('ISO 3166-1 alpha-2 country code to limit results, e.g. "US"')
     })
   )
-  .output(
-    z.object({
-      query: z.string().optional(),
-      activeStatus: z.string().optional(),
-      adType: z.string().optional(),
-      continuationToken: z.string().nullable().optional(),
-      countryCode: z.string().optional(),
-      isResultComplete: z.boolean().optional(),
-      mediaTypes: z.string().optional(),
-      numberOfAds: z.number().optional(),
-      platform: z.array(z.string()).optional(),
-      results: z.array(metaSearchResultSchema).optional()
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
@@ -62,23 +67,29 @@ export let searchMetaAds = SlateTool.create(spec, {
       countryCode: ctx.input.countryCode
     });
 
-    let adCount = response?.number_of_ads ?? response?.numberOfAds ?? 0;
+    let adCount = response?.number_of_ads ?? response?.numberOfAds;
     let countryStr = ctx.input.countryCode ? ` in **${ctx.input.countryCode}**` : '';
 
     return {
-      output: {
+      output: mapSummary(outputSchema, {
         query: response?.query,
         activeStatus: response?.active_status ?? response?.activeStatus,
         adType: response?.ad_type ?? response?.adType,
-        continuationToken: response?.continuation_token ?? response?.continuationToken,
+        continuationToken:
+          response?.continuation_token !== undefined
+            ? response.continuation_token
+            : response?.continuationToken,
         countryCode: response?.country_code ?? response?.countryCode,
         isResultComplete: response?.is_result_complete ?? response?.isResultComplete,
         mediaTypes: response?.media_types ?? response?.mediaTypes,
-        numberOfAds: adCount,
+        numberOfAds: typeof adCount === 'number' ? adCount : undefined,
         platform: response?.platform,
-        results: response?.results
-      },
-      message: `Found **${adCount}** Meta ads matching keyword **"${ctx.input.keyword}"**${countryStr}.`
+        results: flattenAds(response?.results)?.map(ad =>
+          mapSummary(metaSearchResultSchema, ad)
+        ),
+        rawResponse: response
+      }),
+      message: `${typeof adCount === 'number' ? `Found **${adCount}**` : 'Retrieved'} Meta ads matching keyword **"${ctx.input.keyword}"**${countryStr}.`
     };
   })
   .build();

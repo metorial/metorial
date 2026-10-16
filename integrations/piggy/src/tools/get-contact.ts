@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
   name: 'Get Contact',
   key: 'get_contact',
-  description: `Retrieve a single contact by UUID or email address. Also returns the contact's credit balance, prepaid balance, tier, and identifiers in a single call.`,
+  description: `Retrieve a single contact by UUID or email address. Also returns the contact's credit balance, prepaid balance, and tier in a single call.`,
   tags: {
     readOnly: true
   }
@@ -19,6 +20,7 @@ export let getContact = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.any()).optional().describe('Original provider response'),
       contactUuid: z.string().describe('UUID of the contact'),
       email: z.string().optional().describe('Email address'),
       firstName: z.string().optional().describe('First name'),
@@ -34,7 +36,7 @@ export let getContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.contactUuid && !ctx.input.email) {
-      throw new Error('Either contactUuid or email must be provided');
+      throw createApiServiceError('Either contactUuid or email must be provided');
     }
 
     let contactData: any;
@@ -44,46 +46,28 @@ export let getContact = SlateTool.create(spec, {
       contactData = await client.findContactByEmail(ctx.input.email!);
     }
 
-    let contact = contactData.data || contactData;
-    let uuid = contact.uuid;
-
-    let creditBalance: number | undefined;
-    let prepaidBalanceInCents: number | undefined;
-    let tierName: string | undefined;
-
-    try {
-      let creditResult = await client.getContactCreditBalance(uuid);
-      creditBalance = creditResult.data?.balance ?? creditResult.balance;
-    } catch {
-      /* balance may not be available */
-    }
-
-    try {
-      let prepaidResult = await client.getContactPrepaidBalance(uuid);
-      prepaidBalanceInCents =
-        prepaidResult.data?.balance_in_cents ?? prepaidResult.balance_in_cents;
-    } catch {
-      /* prepaid may not be available */
-    }
-
-    try {
-      let tierResult = await client.getContactTier(uuid);
-      tierName = tierResult.data?.name ?? tierResult.name;
-    } catch {
-      /* tier may not be available */
-    }
+    let contact = contactData.data;
+    let uuid = requiredString(contact.uuid, 'contact UUID');
+    let creditBalance = contact.credit_balance?.balance ?? undefined;
+    let prepaidBalanceInCents = contact.prepaid_balance?.balance_in_cents ?? undefined;
+    let tierName = contact.tier?.name ?? undefined;
 
     return {
       output: {
+        raw: contact,
         contactUuid: uuid,
-        email: contact.email,
-        firstName: contact.first_name,
-        lastName: contact.last_name,
+        email: contact.email ?? undefined,
+        firstName: contact.current_values?.firstname ?? contact.first_name ?? undefined,
+        lastName: contact.current_values?.lastname ?? contact.last_name ?? undefined,
         creditBalance,
         prepaidBalanceInCents,
         tierName,
-        createdAt: contact.created_at,
-        attributes: contact.attributes || contact
+        createdAt: contact.created_at ?? contact.current_values?.created_at ?? undefined,
+        attributes: isApiErrorRecord(contact.current_values)
+          ? contact.current_values
+          : isApiErrorRecord(contact.attributes)
+            ? contact.attributes
+            : undefined
       },
       message: `Retrieved contact **${contact.email || uuid}**${creditBalance !== undefined ? ` with ${creditBalance} credits` : ''}.`
     };

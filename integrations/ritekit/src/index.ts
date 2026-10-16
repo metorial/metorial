@@ -1,9 +1,11 @@
 import { Slate } from 'slates';
+import { riteLy } from './categories';
 import { spec } from './spec';
 import {
   animateImage,
   autoHashtag,
   bannedInstagramHashtags,
+  checkEmail,
   companyInsights,
   emailInsights,
   emojiSuggestions,
@@ -27,6 +29,7 @@ export let provider = Slate.create({
     hashtagHistory,
     bannedInstagramHashtags,
     emailInsights,
+    checkEmail,
     companyInsights,
     emojiSuggestions,
     generateImage,
@@ -35,5 +38,6 @@ export let provider = Slate.create({
     shortenLink,
     listLinkCtas
   ],
+  toolCategories: [riteLy],
   triggers: []
 });

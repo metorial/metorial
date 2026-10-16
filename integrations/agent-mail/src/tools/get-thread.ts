@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getThread = SlateTool.create(spec, {
   name: 'Get Thread',
   key: 'get_thread',
-  description: `Retrieve a full email thread including all messages ordered by timestamp. Provides the complete conversation history with sender/recipient details, message content, and metadata.`,
+  description: `Retrieve a page of messages from an email thread. The first page contains the newest messages in ascending timestamp order; follow nextPageToken for older pages. messageCount is the total across the thread.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,11 +15,21 @@ export let getThread = SlateTool.create(spec, {
   .input(
     z.object({
       inboxId: z.string().describe('Inbox containing the thread'),
+      limit: z.number().optional().describe('Maximum messages in this page, up to 100.'),
+      pageToken: z
+        .string()
+        .optional()
+        .describe('Cursor from the previous response for the next, older page.'),
       threadId: z.string().describe('Unique identifier of the thread')
     })
   )
   .output(
     z.object({
+      count: z.number().optional().describe('Number of messages in this page'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Cursor for the next, older page of messages'),
       threadId: z.string().describe('Unique thread identifier'),
       inboxId: z.string().describe('Inbox the thread belongs to'),
       labels: z.array(z.string()).describe('Thread labels'),
@@ -48,10 +58,16 @@ export let getThread = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
-    let t = await client.getThread(ctx.input.inboxId, ctx.input.threadId);
+    let t = await client.getThread(ctx.input.inboxId, ctx.input.threadId, ctx.input);
 
+    if (!Array.isArray(t.messages))
+      throw createApiServiceError(
+        'AgentMail did not return the thread messages. Retry the request.'
+      );
     return {
       output: {
+        count: t.count,
+        nextPageToken: t.next_page_token,
         threadId: t.thread_id,
         inboxId: t.inbox_id,
         labels: t.labels,
@@ -60,7 +76,7 @@ export let getThread = SlateTool.create(spec, {
         recipients: t.recipients,
         subject: t.subject,
         messageCount: t.message_count,
-        messages: (t.messages || []).map(m => ({
+        messages: t.messages.map(m => ({
           messageId: m.message_id,
           timestamp: m.timestamp,
           from: m.from,
@@ -73,7 +89,7 @@ export let getThread = SlateTool.create(spec, {
           labels: m.labels
         }))
       },
-      message: `Retrieved thread "${t.subject || t.thread_id}" with **${t.message_count}** message(s).`
+      message: `Retrieved thread "${t.subject || t.thread_id}" with **${t.messages.length}** messages in this page (${t.message_count} total).`
     };
   })
   .build();

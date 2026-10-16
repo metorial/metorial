@@ -1,7 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
+  deploymentId: z.string().describe('ID of the created deployment'),
+  label: z.string().optional().describe('Deployment label'),
+  status: z.string().optional().describe('Deployment status')
+});
 
 export let createDeployment = SlateTool.create(spec, {
   name: 'Create Deployment',
@@ -29,20 +40,17 @@ export let createDeployment = SlateTool.create(spec, {
         .describe('Deployment importance level')
     })
   )
-  .output(
-    z.object({
-      deploymentId: z.string().describe('ID of the created deployment'),
-      label: z.string().optional().describe('Deployment label'),
-      status: z.string().optional().describe('Deployment status')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
-    let deployment: any;
+    if (Boolean(ctx.input.modelId) === Boolean(ctx.input.modelPackageId)) {
+      throw createApiServiceError('Provide exactly one of modelId or modelPackageId.');
+    }
+    let deployment: Record<string, any>;
 
     if (ctx.input.modelPackageId) {
       deployment = await client.createDeploymentFromModelPackage({
@@ -59,19 +67,21 @@ export let createDeployment = SlateTool.create(spec, {
         label: ctx.input.label,
         description: ctx.input.description,
         defaultPredictionServerId: ctx.input.defaultPredictionServerId,
+        predictionEnvironmentId: ctx.input.predictionEnvironmentId,
         importance: ctx.input.importance
       });
     } else {
-      throw new Error('Either modelId or modelPackageId must be provided');
+      throw createApiServiceError('Either modelId or modelPackageId must be provided');
     }
 
     return {
-      output: {
-        deploymentId: deployment.id || deployment.deploymentId,
+      output: parseOutput(outputSchema, {
+        raw: deployment,
+        deploymentId: deployment.id ?? deployment.deploymentId,
         label: deployment.label,
         status: deployment.status
-      },
-      message: `Deployment **${ctx.input.label}** created successfully. ID: **${deployment.id || deployment.deploymentId}**.`
+      }),
+      message: `Deployment **${ctx.input.label}** created successfully. ID: **${deployment.id ?? deployment.deploymentId}**.`
     };
   })
   .build();

@@ -1,5 +1,7 @@
+export { bulkUpsertLinks } from './bulk-upsert-links';
 export { createLink } from './create-link';
 export { deleteLinks } from './delete-links';
+export { exportClickAnalytics } from './export-click-analytics';
 export { getClickAnalytics } from './get-click-analytics';
 export { getClickCounters } from './get-click-counters';
 export { getLink } from './get-link';

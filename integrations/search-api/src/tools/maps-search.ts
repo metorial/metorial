@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let localResultSchema = z.object({
   position: z.number().optional().describe('Position in results'),
   title: z.string().optional().describe('Business name'),
   placeId: z.string().optional().describe('Google Place ID'),
+  dataId: z.string().optional().describe('Google Maps data identifier'),
+  localDataId: z.string().optional().describe('Google local listing identifier'),
   address: z.string().optional().describe('Full address'),
   phone: z.string().optional().describe('Phone number'),
   website: z.string().optional().describe('Website URL'),
@@ -50,6 +52,7 @@ export let mapsSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       localResults: z.array(localResultSchema).describe('Local business results'),
       currentPage: z.number().optional().describe('Current page number')
@@ -67,10 +70,12 @@ export let mapsSearch = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let localResults = (data.local_results || []).map((r: any) => ({
+    let localResults = resultArray(data.local_results, 'local_results').map((r: any) => ({
       position: r.position,
       title: r.title,
-      placeId: r.place_id || r.data_cid,
+      placeId: r.place_id,
+      dataId: r.data_id,
+      localDataId: r.ludocid ?? r.data_cid,
       address: r.address,
       phone: r.phone,
       website: r.website,
@@ -86,11 +91,12 @@ export let mapsSearch = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         localResults,
         currentPage: data.pagination?.current
       },
-      message: `Found ${localResults.length} local result${localResults.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${localResults.length} local result${localResults.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

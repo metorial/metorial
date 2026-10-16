@@ -32,9 +32,9 @@ export let deleteProject = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status || 'deleted'
+        status: result.status
       },
-      message: `Deleted project \`${ctx.input.projectPermalink}\`.`
+      message: `Requested deletion of project \`${ctx.input.projectPermalink}\`.`
     };
   })
   .build();

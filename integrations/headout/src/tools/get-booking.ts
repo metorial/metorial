@@ -1,57 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { bookingSchema, mapBooking } from '../lib/booking';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
-
-let bookingSchema = z
-  .object({
-    bookingId: z.string().describe('Headout booking identifier'),
-    partnerReferenceId: z.string().optional().describe('Partner reference ID'),
-    variantId: z.string().optional(),
-    inventoryId: z.string().optional(),
-    startDateTime: z.string().optional().describe('Experience start time'),
-    productName: z.string().optional(),
-    productId: z.string().optional(),
-    variantName: z.string().optional(),
-    customerCount: z.number().optional().describe('Number of customers'),
-    customers: z
-      .array(
-        z.object({
-          personType: z.string().optional(),
-          isPrimary: z.boolean().optional(),
-          inputFields: z
-            .array(
-              z.object({
-                fieldId: z.string().optional(),
-                name: z.string().optional(),
-                value: z.string().optional()
-              })
-            )
-            .optional()
-        })
-      )
-      .optional()
-      .describe('Customer details'),
-    priceAmount: z.number().optional(),
-    priceCurrencyCode: z.string().optional(),
-    status: z
-      .string()
-      .describe(
-        'Booking status (UNCAPTURED, PENDING, COMPLETED, CANCELLED, DIRTY, CAPTURE_TIMEDOUT)'
-      ),
-    voucherUrl: z.string().optional().describe('URL to the booking voucher'),
-    tickets: z
-      .array(
-        z.object({
-          publicId: z.string().optional(),
-          url: z.string().optional()
-        })
-      )
-      .optional()
-      .describe('Ticket PDF links'),
-    creationTimestamp: z.number().optional().describe('Creation time as epoch milliseconds')
-  })
-  .passthrough();
 
 export let getBooking = SlateTool.create(spec, {
   name: 'Get Booking',
@@ -81,6 +32,7 @@ Returns booking status, customer details, voucher URL, and ticket links.`,
         .array(bookingSchema)
         .describe('List of bookings (one item if querying by ID)'),
       total: z.number().optional().describe('Total number of bookings (only for listing)'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       nextOffset: z.number().optional().describe('Offset for the next page (only for listing)')
     })
   )
@@ -92,41 +44,22 @@ Returns booking status, customer details, voucher URL, and ticket links.`,
       currencyCode: ctx.config.currencyCode
     });
 
-    let mapBooking = (b: any) => ({
-      bookingId: String(b.bookingId ?? b.id ?? ''),
-      partnerReferenceId: b.partnerReferenceId,
-      variantId: b.variantId ? String(b.variantId) : undefined,
-      inventoryId: b.inventoryId ? String(b.inventoryId) : undefined,
-      startDateTime: b.startDateTime,
-      productName: b.product?.name,
-      productId: b.product?.id ? String(b.product.id) : undefined,
-      variantName: b.product?.variant?.name,
-      customerCount: b.customerDetails?.count ?? b.customersDetails?.count,
-      customers: (b.customerDetails?.customers ?? b.customersDetails?.customers)?.map(
-        (c: any) => ({
-          personType: c.personType,
-          isPrimary: c.isPrimary,
-          inputFields: c.inputFields?.map((f: any) => ({
-            fieldId: String(f.id ?? f.fieldId ?? ''),
-            name: f.name,
-            value: f.value
-          }))
-        })
-      ),
-      priceAmount: b.price?.amount,
-      priceCurrencyCode: b.price?.currencyCode,
-      status: b.status ?? 'UNKNOWN',
-      voucherUrl: b.voucherUrl,
-      tickets: b.tickets,
-      creationTimestamp: b.creationTimestamp
-    });
-
     if (ctx.input.bookingId) {
       let booking = await client.getBooking(ctx.input.bookingId);
       let mapped = mapBooking(booking);
+      for (let ticket of booking.tickets ?? []) {
+        if (ticket.type === 'PDF_URL' && ticket.url) {
+          await ctx.addAttachment({
+            type: 'url',
+            url: ticket.url,
+            mimeType: 'application/pdf'
+          });
+        }
+      }
       return {
         output: {
           bookings: [mapped],
+          raw: booking,
           total: 1
         },
         message: `Booking **${mapped.bookingId}** — status: **${mapped.status}**${mapped.productName ? `, product: "${mapped.productName}"` : ''}.`
@@ -143,8 +76,9 @@ Returns booking status, customer details, voucher URL, and ticket links.`,
     return {
       output: {
         bookings,
+        raw: result,
         total: result.total,
-        nextOffset: result.nextOffset
+        nextOffset: result.nextOffset ?? undefined
       },
       message: `Found ${result.total ?? bookings.length} bookings. Showing ${bookings.length} results.`
     };

@@ -1,73 +1,41 @@
-# Slates Specification for Solcast
+# Solcast
 
-## Overview
+Use an API key from the [Solcast Toolkit](https://toolkit.solcast.com.au/). Requests use Bearer authentication over HTTPS. Keys remain valid until revoked, and each account's product permissions govern which endpoints are available. No additional connection configuration is required.
 
-Solcast (a DNV company) provides global solar irradiance, weather, and PV power data via API. The Solcast API provides forecast, live and historical solar irradiance, PV power and weather data. The API provides 20+ weather parameters tailored to solar energy applications, from 2007 to 7 days ago. It serves the renewable energy industry for resource assessment, operational forecasting, and grid management.
+## Tools
 
-## Authentication
+| Tool | Behavior |
+| --- | --- |
+| `get_radiation_and_weather` | Forecast, live, or historical irradiance and weather at a latitude/longitude. Select desired output parameters and time resolution. |
+| `get_rooftop_pv_power` | Forecast, live, or historical rooftop generation for a system specified by location and capacity in kW. |
+| `get_advanced_pv_power` | Forecast, live, or historical power for a configured Advanced PV Power resource. |
+| `get_tmy_data` | Typical Meteorological Year weather, rooftop power, or advanced power data. |
+| `get_grid_aggregations` | Live or forecast data for a collection configured by Solcast; optionally select an aggregation within it. |
+| `get_horizon_angle` | Terrain elevation angles around a location, divided into a whole number of azimuth intervals. |
+| `list_pv_power_sites` | Discover sites and resource IDs, filter by name/ID, entitlement or creation date, or retrieve one site. |
+| `manage_pv_power_site` | Create, patch, replace, or delete site specifications. |
+| `submit_site_measurements` | Submit 1–1000 power and operating-condition records for an Advanced PV Power site. |
 
-The Solcast API allows for several methods of authentication using your provided API key. The API key is a user-specific key accessible from your account page in the Solcast API Toolkit. An API key will be a 32-character text string.
+Time-series results retain all provider fields within each data point. Site operations return the provider's complete site object. Site listing exposes the provider's total count, offset and query metadata. Optional `skip` and `take` select a page without changing the provider defaults when omitted. Increase `skip` by the returned page length until `offset + sites.length` reaches `totalCount`, or the page is empty. `skip` must be a nonnegative whole number and `take` a positive whole number. Measurement submission returns the complete provider response.
 
-The API key can be provided in three ways:
+## Dates, periods and orientation
 
-1. **Query string parameter**: Pass the API key as `api_key` in the URL query string. Example: `GET https://api.solcast.com.au/rooftop_sites/{site_id}/forecasts?api_key=YOUR_APIKEY`
+Historical requests need `start` and either `end` or `duration`, covering a positive interval of no more than 31 days. `hours` applies to live/forecast requests. Historical data begins in 2007 and ends seven days before the present; live estimates cover the recent period. Availability varies by product.
 
-2. **Bearer token**: Pass the key in the `Authorization` header with type `Bearer`. Example header: `Authorization: Bearer YOUR_APIKEY`
+Historical and TMY `timeZone` accepts UTC, longitudinal time, numeric UTC offsets from -13 to 13 in quarter-hour increments, and equivalent fixed offsets such as `+10:00`. Forecast and live `hours`, and horizon `azimuthIntervals`, must be positive whole numbers; their input types remain numbers.
 
-3. **Basic authentication**: For use with Basic authentication, the API key is passed only as the username with an empty password.
+Azimuth uses north = 0°, east = -90°, and west = +90°. Tilt is measured from horizontal, between 0° and 90°. Standard time series support PT5M, PT10M, PT15M, PT20M, PT30M and PT60M. TMY supports PT15M, PT20M, PT30M and PT60M. Current TMY probabilities are P50, P75, P90 and P95; the legacy P10 option remains visible for compatibility and produces a clear unsupported-value error. If supplied together, GHI and DNI weights must sum to one; supplying one weight fills its complement.
 
-Registration is free and access is instant. New users are granted a limited number of free any-location requests to each API endpoint, for testing and evaluation. To begin using the API commercially, a paid subscription is required.
+## Advanced PV sites and adjustments
 
-**Integration API**: The Solcast Integration API allows your application to make requests to the Solcast API on behalf of registered Solcast users. This requires an `integrator_id` and `integrator_api_key` provided by Solcast, plus a `user_api_key` for each user.
+Create and replace require name, latitude, longitude, AC/DC capacities, tracking type and installation date. `list_pv_power_sites` discovers the `resource_id` used by subsequent operations. Site inputs `capacity`, `capacityDc` and `gridExportLimit` use kW; returned provider site metadata uses MW. Set `gridExportLimit` to -1 to remove a configured limit. Monthly dust-soiling averages require exactly 12 loss fractions between zero and one. Optional tracker and bifacial configuration fields are available.
 
-## Features
+The API uses numeric operational overrides. `availabilityPercent` is a percentage, `constraintPowerMw` is an AC cap in MW, and `dustSoilingLoss`/`snowSoilingLoss` are loss fractions. These override the older boolean inputs. For compatibility, false availability requests 100%; false dust/snow inputs request zero loss, while true defers to provider defaults. The legacy `applyConstraint` flag is retained; use `constraintPowerMw` to set a request cap, or update the site's export limit to change its configured limit.
 
-### Radiation and Weather Data (Live, Forecast, Historical)
+`siteTag` and `confirmOverwrite` remain available as legacy inputs and are forwarded unchanged, but the current resource API does not document them. `showAll` requires administrator privileges.
 
-Retrieve solar irradiance and weather data for any global location. Solcast's solar forecast data projects irradiance and PV power from five minutes ahead to 14 days out, with 5- to 60-minute granularity anywhere on the planet. Available parameters include GHI, DNI, DHI, GTI, air temperature, wind speed and direction, relative humidity, surface pressure, precipitation rate, snow depth, PM2.5, PM10, cloud opacity, and more.
+Measurement power and limit fields use MW. Each record needs a timezone-bearing `periodEnd` and a positive ISO 8601 period duration. This tool targets Advanced PV resources; Premium PV measurements use a separate API.
 
-- Data is available in three temporal modes: **live** (estimated actuals), **forecast** (up to 14 days ahead), and **historical** (time series from 2007 to 7 days ago).
-- Key parameters: `latitude`, `longitude`, `output_parameters` (select specific data fields), `period` (time resolution: 5, 10, 15, 30, or 60 minutes), timezone configuration (UTC, longitudinal, or fixed offset).
-- Solcast provides probabilistic forecasting, including P10, P50 and P90, for day-ahead forecasts.
-- Terrain shading can be applied via a `terrain_shading` parameter.
-- Output formats: JSON and CSV.
+## API reference
 
-### Rooftop PV Power
-
-The Solcast Rooftop PV Model produces rooftop PV power output estimates, designed for modelling the production from rooftop PV systems (particularly fleets) with limited system specifications available.
-
-- Requires location (latitude/longitude), system capacity, tilt, and azimuth as inputs.
-- Available in live, forecast, and historical modes.
-- Supports submitting real power measurements to tune and improve site-specific forecasts.
-- Free hobbyist tier available for personal home PV systems (up to 2 tilt/azimuth combinations at one location).
-
-### Advanced PV Power
-
-The SDK provides 'Rooftop' and 'Advanced' PV power estimates. The advanced estimates use a more sophisticated PV model with comprehensive and flexible site configuration options.
-
-- Requires creating a **PV Power Site** with detailed specifications (capacity AC/DC, tracking type, module type, ground coverage ratio, derating factors, inverter efficiency, bifacial settings, dust soiling, etc.).
-- Sites can be listed, retrieved by ID, created, partially updated, fully replaced, and deleted.
-- Supports operational adjustments such as snow soiling override, dust soiling, constraints/curtailment, reduced availability, and inactive trackers.
-- Available in live, forecast, and historical modes.
-
-### Typical Meteorological Year (TMY)
-
-Retrieve synthetic TMY datasets for long-term resource assessment and energy yield modeling. TMY data is available for radiation and weather, as well as for advanced PV power.
-
-- TMY data is generated from 15+ years of satellite-derived historical data.
-- Available in multiple formats including PVsyst and SAM-compatible file formats.
-- Probabilistic TMY data is available.
-
-### Grid Aggregations
-
-Thousands of PV systems, combined according to your operating regions or grid assets. Retrieve live grid aggregation data for up to 7 days, and forecast grid aggregation data for up to 7 days.
-
-- Aggregations are custom-built by the Solcast team based on provided PV fleet metadata.
-- Estimates delivered in total power (MW) or performance units (such as % of total capacity), updated every 10 or 15 minutes.
-- Supports probabilistic outputs (P10/P50/P90).
-- Primarily used for grid management, load forecasting, VPP management, and energy trading.
-- Aggregation setup requires contacting Solcast directly; not self-service.
-
-## Events
-
-The provider does not support events. Solcast is a data retrieval API — it does not offer webhooks, event subscriptions, or any purpose-built push/polling notification mechanism.
+[Authentication](https://docs.solcast.com.au/docs/authentication), [irradiance/weather](https://docs.solcast.com.au/docs/section/irradiance-weather-data), [rooftop PV](https://docs.solcast.com.au/docs/section/rooftop-pv-power), [advanced PV and resources](https://docs.solcast.com.au/docs/section/advanced-pv-power), [grid aggregations](https://docs.solcast.com.au/docs/section/grid-aggregations), [geographic data](https://docs.solcast.com.au/docs/section/geographic), and [errors](https://docs.solcast.com.au/docs/errors).

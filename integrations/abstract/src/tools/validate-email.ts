@@ -23,6 +23,10 @@ export let validateEmail = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including unavailable values'),
       email: z.string().describe('The email address that was validated'),
       autocorrect: z
         .string()
@@ -66,6 +70,7 @@ export let validateEmail = SlateTool.create(spec, {
     });
 
     let output = {
+      rawResponse: result,
       email: result.email ?? ctx.input.email,
       autocorrect: result.autocorrect ?? undefined,
       deliverability: result.deliverability ?? undefined,

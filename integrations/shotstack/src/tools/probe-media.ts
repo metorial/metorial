@@ -31,7 +31,7 @@ export let probeMediaTool = SlateTool.create(spec, {
       output: {
         metadata: result.response
       },
-      message: `Media inspected successfully. Format: **${result.response?.metadata?.format?.format_long_name || 'unknown'}**`
+      message: 'Media inspected successfully.'
     };
   })
   .build();

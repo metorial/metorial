@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCoinPriceHistory = SlateTool.create(spec, {
@@ -21,13 +22,16 @@ export let getCoinPriceHistory = SlateTool.create(spec, {
         .optional()
         .describe('UUID of currency for price calculation'),
       timePeriod: z
-        .enum(['1h', '3h', '12h', '24h', '7d', '30d', '3m', '1y', '3y', '5y'])
+        .enum(['1h', '3h', '12h', '24h', '7d', '30d', '3m', '1y', '3y', '5y', 'all'])
         .optional()
         .describe('Time range for the price history. Defaults to 24h.')
     })
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       change: z.string().nullable().describe('Percentage change over the time period'),
       history: z
         .array(
@@ -52,17 +56,18 @@ export let getCoinPriceHistory = SlateTool.create(spec, {
     });
 
     let data = result.data;
-    let history = (data.history || []).map((h: any) => ({
-      price: h.price || null,
+    let history = data.history.map(h => ({
+      price: h.price ?? null,
       timestamp: h.timestamp
     }));
 
     return {
       output: {
-        change: data.change || null,
+        rawData: result.data,
+        change: data.change ?? null,
         history
       },
-      message: `Retrieved **${history.length}** price data points for period **${ctx.input.timePeriod || '24h'}**. Change: ${data.change || 'N/A'}%`
+      message: `Retrieved **${history.length}** price data points for period **${ctx.input.timePeriod || '24h'}**. Change: ${data.change ?? 'N/A'}%`
     };
   })
   .build();

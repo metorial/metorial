@@ -1,121 +1,33 @@
-Now let me look at the full API reference to understand all features:Now I have enough information to write the specification.
+# Piloterr integration
 
-# Slates Specification for Piloterr
+This integration covers selected [Piloterr API families](https://docs.piloterr.com/credits), using API key authentication and the current `https://api.piloterr.com/v2` API. Calls extract public website data and can consume credits even though they do not modify the target websites.
 
-## Overview
+## Authentication and account discovery
 
-Piloterr is a web scraping API platform that provides 50+ pre-built endpoints for extracting structured data from websites. It manages proxy rotation, browsers, anti-bots, and captchas, allowing developers to scrape any webpage with a single API request. It specializes in web scraping API with custom endpoints and rotating proxies, helping businesses extract unstructured data and automate workflows.
+Create a key in the [Piloterr dashboard](https://app.piloterr.com/), then connect with that API key. Requests send the key in the `x-api-key` header. There is no OAuth flow or required connection configuration.
 
-## Authentication
+Call `check_usage` to inspect actual account name and slug, key status, credit balances, subscription and pack information, and rate limits. The [Usage endpoint](https://docs.piloterr.com/usage) is free. The subscription object combines subscription quota and packs; it does not identify a subscription plan name unless the API separately returns one.
 
-Piloterr uses API key authentication. Piloterr uses API keys for authentication.
+## Available capabilities
 
-To obtain an API key:
+- Website crawling, JavaScript rendering, and approved-domain WebUnlocker access return HTML. These cost 1, 2, and 3 credits respectively. Technology detection and contact extraction cost 1 credit.
+- LinkedIn company, profile, job, post, job search, job suggestions, and job count calls cost 1 credit. Use `linkedin_job_suggestions` with `location=true` to find location IDs, and `linkedin_company` to find company IDs. Job search is page based, returning up to 25 listings per page.
+- Google web, news, images, and videos, plus Bing and Brave web search, cost 1 credit per call. Preserve returned pagination to decide whether another page is available. Google Images returns batches of 100. Google web's `num` parameter is deprecated and may not affect result counts.
+- Amazon search, product details, and seller offers cost 1 credit each. `amazon_product` with `includeOffers=true` makes a second paid call. Amazon search is page based, up to 60 items per page. Shopify product calls cost 1 credit; Walmart product calls cost 2 credits.
+- Company domain enrichment costs 1 credit. Crunchbase entity search, company profiles, and funding rounds cost 2 credits. Funding rounds return at most 15 results per call; refine filters rather than assuming the returned array is exhaustive.
+- Email verification and discovery cost 1 credit each. Email discovery needs a full name and a company domain or company name. WHOIS, malicious-domain, and DNSBL checks cost 1 credit each; `check_domain_reputation` with `checkType=both` makes two calls.
+- Instagram profile/post, GitHub profile, and Trustpilot company calls cost 1 credit each. GitHub's documentation currently marks its endpoint availability as degraded.
 
-1. Navigate to the [Piloterr Dashboard](https://piloterr.com/login) and create an account or log in.
-2. Click **API Keys**, then select **New**.
-3. Assign a name for the token, optionally add notes, and select **Save**.
+## Screenshots
 
-The API key must be included in every request as a custom header:
+Use `capture_screenshot` to request a downloadable PNG, JPEG, WebP, or PDF for 2 credits. It supports viewport size, full-page capture, selector capture, wait conditions, and page cleanup options. File metadata distinguishes a completed capture request from a failure to prepare its returned file. Review any delivery warning before requesting another paid capture.
 
-```
-x-api-key: <YOUR_API_KEY>
-```
+`screenshot_webpage` remains available for existing callers and is deprecated in favor of `capture_screenshot`. Its original input, output, and invocation behavior are preserved. The current [Screenshot documentation](https://docs.piloterr.com/website-screenshot) requires `url` and documents a direct file response; the replacement uses that API without cloud-storage credentials or returned storage URLs.
 
-Example request:
+## Response semantics and scope
 
-```
-curl -H "x-api-key: YOUR_API_KEY" https://piloterr.com/api/v2/company?query=gucci.com
-```
+Existing typed summaries remain available when the provider returns representable data. Complete original non-file responses are available in `raw`, including nulls, nested objects, and provider fields that do not fit older summary types. Missing optional counts, IDs, and scalar values are omitted; they are not manufactured as zeroes or empty strings.
 
-The API key is generated from the Piloterr Dashboard under the "API" tab and grants full access to all capabilities of the platform. There are no OAuth flows, scopes, or additional credentials required. Some endpoints are classified as "private" and require requesting access through a form on the Piloterr website before they can be used with your API key.
+The integration does not expose the entire provider catalog, arbitrary custom API paths, asynchronous jobs, or every retailer and niche scraping API. It has no registered triggers. Provider acceptance and downloadable delivery require verification in the connected deployment.
 
-## Features
-
-### Web Scraping / Website Crawling
-
-A high-performance scraping API designed to navigate and extract HTML from any site. Includes advanced parsing, TLS fingerprinting, rotating proxies, smart retries, and the ability to bypass anti-bot protections like Cloudflare, Akamai, PerimeterX, and DataDome.
-
-- Provide a URL and receive the rendered HTML content.
-- Web Unlocker is an advanced scraping mode that bypasses sophisticated anti-bot protections.
-
-### Website Technology Detection
-
-Retrieve website technology information including CMS, framework, analytics, CDN, hosting, and more.
-
-- Input a domain and receive a breakdown of the technology stack used by that website.
-
-### Company Data Enrichment
-
-Search among a database of 60 million companies and enrich data with daily-updated insights about businesses and their workforce.
-
-- Query by domain name to retrieve company information such as description, employee count, industry, and more.
-
-### LinkedIn Data Extraction
-
-Extract structured public data from LinkedIn, including:
-
-- Profile information from LinkedIn profiles for networking or research purposes.
-- Company information from LinkedIn company pages.
-- Job listing details including title, employment type, industry, seniority level, total applicants, company details, location, and job description.
-- LinkedIn post retrieval for content analysis.
-- Product information for LinkedIn-listed products and services.
-- Real-time job counts by industry, region, and role.
-- Job search based on keywords and location.
-- Some LinkedIn endpoints require requesting private access before use.
-
-### Search Engine Scraping
-
-Extract search results from multiple search engines:
-
-- Google Search and Google Search Autocomplete
-- Google Images
-- Bing Search
-- Brave search engine results.
-
-### E-Commerce Product Data
-
-Extract product and search data from various e-commerce platforms including Amazon, Best Buy, Walmart, Allegro, Auchan, Carrefour, Cdiscount, Chewy, Autodoc, ManoMano, and Shopify.
-
-- Retrieve product details, pricing, and search results from supported retailers.
-
-### Business Intelligence (Crunchbase)
-
-- Monitor funding history and financial milestones of companies with Crunchbase data.
-- Retrieve company information, people profiles, search results, and event data from Crunchbase.
-
-### Domain & Email Tools
-
-- Domain Whois API for extracting domain registration information.
-- Domain reputation and DNSBL checking.
-- Email validation and verification via SMTP verification.
-- Email finder for locating email addresses.
-
-### Real Estate Data
-
-- Extract data from SeLoger real estate ads.
-- Extract property data from Homestra.
-
-### Automotive Data
-
-- Access vehicle data from AutoScout24 for automotive insights.
-
-### Prediction Markets
-
-- Collect and structure public data from Polymarket, including markets, probabilities, trading volumes, liquidity, results, and historical data.
-
-### GitHub Data
-
-- Retrieve public user information from GitHub profiles.
-
-### Screenshot API
-
-- Capture high-quality images of any webpage with a simple API request.
-
-### Usage Monitoring
-
-- Check your current plan and remaining API credits via the usage endpoint.
-
-## Events
-
-The provider does not support webhooks. Piloterr is a request-response API platform focused on on-demand data extraction and does not offer any webhook, event subscription, or built-in polling mechanism.
+Official references: [Introduction](https://docs.piloterr.com/introduction), [Credits](https://docs.piloterr.com/credits), [Error handling](https://docs.piloterr.com/error-handling), [API keys](https://docs.piloterr.com/api-keys), [Complete API reference](https://docs.piloterr.com/llms-full.txt).

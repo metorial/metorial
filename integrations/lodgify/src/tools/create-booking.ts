@@ -135,6 +135,12 @@ export let createBooking = SlateTool.create(spec, {
       );
     }
 
+    if (ctx.input.total !== undefined && !ctx.input.currencyCode?.trim()) {
+      throw createApiServiceError(
+        'currencyCode is required when total is provided. Specify the booking currency, or omit total to let Lodgify calculate the quote.'
+      );
+    }
+
     let created = await client.createBooking(
       {
         property_id: ctx.input.propertyId,
@@ -167,9 +173,12 @@ export let createBooking = SlateTool.create(spec, {
     );
 
     // The endpoint answers with a bare integer id rather than a booking object.
-    let bookingId = Number.parseInt(String(created), 10);
+    let bookingId =
+      typeof created === 'number' || typeof created === 'string'
+        ? Number(created)
+        : Number.NaN;
 
-    if (!Number.isFinite(bookingId)) {
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
       throw createApiServiceError(
         'Lodgify did not return a booking ID for this request. Use the List Bookings tool to check whether the booking was created before retrying.'
       );

@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  getAttributes,
+  getCollection,
+  keywordRank,
+  nullableNumber,
+  requireRecord,
+  requireText
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let listKeywords = SlateTool.create(spec, {
@@ -8,7 +16,7 @@ export let listKeywords = SlateTool.create(spec, {
   key: 'list_keywords',
   description: `Retrieve tracked keywords for a project with their current rankings, search volume, SERP features, and trend data. Supports pagination and date filtering. Use this to get an overview of all keywords in a project and their performance.`,
   instructions: [
-    'Set perPage to 250 for faster bulk retrieval. Default is 20.',
+    'Set perPage to 250 for faster bulk retrieval. The provider default is 20.',
     'Use the date parameter (YYYY-MM-DD) to retrieve historical ranking data for a specific date.'
   ],
   tags: {
@@ -33,7 +41,12 @@ export let listKeywords = SlateTool.create(spec, {
           z.object({
             keywordId: z.string().nullable().describe('Unique keyword identifier'),
             keyword: z.string().nullable().describe('The tracked keyword text'),
-            currentRank: z.number().nullable().describe('Current Google ranking position'),
+            currentRank: z
+              .number()
+              .nullable()
+              .describe(
+                'Current numeric Google ranking position; null when unavailable or out of range. See rawResponse for the original state.'
+              ),
             bestRank: z.number().nullable().describe('Best ever ranking position'),
             url: z.string().nullable().describe('Tracked domain/URL'),
             rankingUrl: z
@@ -67,7 +80,13 @@ export let listKeywords = SlateTool.create(spec, {
         )
         .describe('Tracked keywords with ranking data'),
       totalCount: z.number().nullable().describe('Total number of keywords in the project'),
-      currentPage: z.number().nullable().describe('Current page number')
+      currentPage: z
+        .number()
+        .nullable()
+        .describe('Current page number reported by the provider'),
+      rawResponse: z
+        .any()
+        .describe('Original keyword response, including nonnumeric rank states')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,42 +98,53 @@ export let listKeywords = SlateTool.create(spec, {
       date: ctx.input.date
     });
 
-    let keywords = Array.isArray(data?.keywords)
-      ? data.keywords
-      : Array.isArray(data)
-        ? data
-        : [];
-
-    let mapped = keywords.map((kw: any) => ({
-      keywordId: kw.id ? String(kw.id) : null,
-      keyword: kw.kw ?? kw.keyword ?? null,
-      currentRank: kw.grank ?? kw.rank ?? null,
-      bestRank: kw.best ?? null,
-      url: kw.url ?? null,
-      rankingUrl: kw.rankingurl ?? null,
-      searchVolume: kw.ms ?? kw.search_volume ?? null,
-      cpc: kw.cpc ?? null,
-      competition: kw.competition ?? null,
-      device:
-        kw.se_type === 'sem'
-          ? 'mobile'
-          : kw.se_type === 'se'
-            ? 'desktop'
-            : (kw.se_type ?? null),
-      region: kw.region ?? null,
-      language: kw.language ?? null,
-      tags: kw.tags ?? null,
-      serpFeatures: kw.serp_features ?? null,
-      inLocalPack: kw.in_local_pack ?? null,
-      inFeatured: kw.in_featured ?? null,
-      trends: kw.trends ?? null
-    }));
+    let keywords = getCollection(data, 'keywords');
+    let mapped = keywords.map(keyword => {
+      let resource = requireRecord(keyword, 'keyword');
+      let kw = getAttributes(resource);
+      let device = kw.se_type ?? kw.type;
+      let tags =
+        kw.tags == null
+          ? null
+          : getCollection(kw.tags, 'tags').map(tag => {
+              if (typeof tag === 'string') return tag;
+              let name = requireRecord(tag, 'keyword tag').name;
+              requireText(name, 'Keyword tag name returned by Keyword.com');
+              return name as string;
+            });
+      return {
+        keywordId: resource.id == null ? null : String(resource.id),
+        keyword: kw.kw ?? kw.keyword ?? null,
+        currentRank: keywordRank(kw.grank ?? kw.rank),
+        bestRank: nullableNumber(kw.best, 'best rank'),
+        url: kw.url ?? null,
+        rankingUrl: kw.rankingurl ?? null,
+        searchVolume: nullableNumber(kw.ms ?? kw.search_volume, 'search volume'),
+        cpc: nullableNumber(kw.cpc, 'cost per click'),
+        competition: nullableNumber(kw.competition, 'competition'),
+        device: device === 'sem' ? 'mobile' : device === 'se' ? 'desktop' : (device ?? null),
+        region: kw.region ?? null,
+        language: kw.language ?? null,
+        tags,
+        serpFeatures: kw.serp_features ?? null,
+        inLocalPack: kw.in_local_pack ?? null,
+        inFeatured: kw.in_featured ?? null,
+        trends: kw.trends ?? null
+      };
+    });
 
     return {
       output: {
         keywords: mapped,
-        totalCount: data?.total ?? data?.keywords_count ?? mapped.length,
-        currentPage: data?.current_page ?? ctx.input.page ?? 1
+        totalCount: nullableNumber(
+          data?.meta?.pagination?.total ?? data?.total ?? data?.keywords_count,
+          'total keyword count'
+        ),
+        currentPage: nullableNumber(
+          data?.meta?.pagination?.current_page ?? data?.current_page,
+          'current page'
+        ),
+        rawResponse: data
       },
       message: `Retrieved **${mapped.length}** keyword(s) from project **${ctx.input.projectName}**.`
     };

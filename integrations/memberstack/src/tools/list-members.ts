@@ -9,7 +9,7 @@ export let listMembers = SlateTool.create(spec, {
   key: 'list_members',
   description: `List members in your Memberstack app with cursor-based pagination. Returns member details including email, custom fields, metadata, plan connections, and more. Use **after** and **limit** to paginate through large result sets.`,
   constraints: [
-    'Maximum limit is 200 members per request.',
+    'Memberstack caps each response at 100 members, including when a larger limit is supplied. Use the returned endCursor to fetch subsequent pages.',
     'Rate limited to 25 requests per second.'
   ],
   tags: {
@@ -29,11 +29,19 @@ export let listMembers = SlateTool.create(spec, {
         .min(1)
         .max(200)
         .optional()
-        .describe('Maximum number of members to return (1-200). Defaults to 50.'),
+        .describe(
+          'Requested page size (1-200). Memberstack caps values above 100 at 100. Defaults to 50.'
+        ),
       order: z
         .enum(['ASC', 'DESC'])
         .optional()
-        .describe('Sort order by creation date. Defaults to ASC.')
+        .describe('Sort order by creation date. Defaults to ASC.'),
+      includeJSON: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include member JSON data. Omitted by the provider by default for performance.'
+        )
     })
   )
   .output(
@@ -41,7 +49,11 @@ export let listMembers = SlateTool.create(spec, {
       totalCount: z.number().describe('Total number of members in the app'),
       endCursor: z.number().nullable().describe('Cursor for the next page of results'),
       hasMore: z.boolean().describe('Whether there are more members to fetch'),
-      members: z.array(memberSchema).describe('Array of member objects')
+      members: z.array(memberSchema).describe('Array of member objects'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response including pagination')
     })
   )
   .handleInvocation(async ctx => {
@@ -50,7 +62,8 @@ export let listMembers = SlateTool.create(spec, {
     let result = await client.listMembers({
       after: ctx.input.after,
       limit: ctx.input.limit,
-      order: ctx.input.order
+      order: ctx.input.order,
+      includeJSON: ctx.input.includeJSON
     });
 
     return {

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -18,6 +18,10 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.clientId.trim() || !ctx.input.apiKey.trim())
+        throw createApiServiceError('Provide a non-empty MX client ID and API key.');
+      if (ctx.input.clientId.includes(':'))
+        throw createApiServiceError('The MX client ID must not contain a colon.');
       let encoded = Buffer.from(`${ctx.input.clientId}:${ctx.input.apiKey}`).toString(
         'base64'
       );

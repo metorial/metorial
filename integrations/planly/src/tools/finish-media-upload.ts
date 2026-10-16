@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapMedia, mediaAdditionalFields, responseData } from '../lib/responses';
 import { spec } from '../spec';
 
 export let finishMediaUpload = SlateTool.create(spec, {
@@ -26,25 +27,16 @@ export let finishMediaUpload = SlateTool.create(spec, {
       thumbnailUri: z.string().optional().describe('URL to the media thumbnail'),
       duration: z.number().nullable().optional().describe('Video duration in seconds'),
       resolution: z.string().nullable().optional().describe('Media resolution'),
-      createdAt: z.string().optional().describe('Upload timestamp')
+      createdAt: z.string().optional().describe('Upload timestamp'),
+      ...mediaAdditionalFields
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.finishUpload(ctx.input.mediaId);
-    let media = result.data || result;
-
+    let media = mapMedia(responseData(result));
     return {
-      output: {
-        mediaId: media.id,
-        contentType: media.contentType,
-        contentLength: media.contentLength,
-        contentUri: media.contentUri,
-        thumbnailUri: media.thumbnailUri,
-        duration: media.duration,
-        resolution: media.resolution,
-        createdAt: media.createdAt
-      },
-      message: `Upload completed successfully. Media ID: ${media.id}.`
+      output: media,
+      message: `Upload completed successfully. Media ID: ${media.mediaId}.`
     };
   });

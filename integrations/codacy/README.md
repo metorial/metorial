@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Codacy
 
-Manage repositories, analyze code quality, and track security vulnerabilities across 49+ programming languages. Retrieve static analysis results including issues, complexity, duplication, and coverage metrics per commit, pull request, or file. Configure analysis tools, code patterns, and coding standards across organizations. Manage quality gates and gate policies to enforce code quality thresholds. Upload and retrieve code coverage data. Search security findings including SAST issues, secrets, dependency vulnerabilities, and IaC scanning results. Create DAST targets, trigger application security scans, and retrieve results. Search SBOM dependencies across repositories. Manage organization members, repository API tokens, and generate reporting exports.
+Review repository, commit, pull request, and file analysis; search code quality and security findings; inspect coverage and quality thresholds; configure analysis tools; and discover their code patterns. List organizations, members, coding standards, and enabled branches. Search SBOM dependencies, inspect security findings and their remediation details, ignore or restore findings, manage DAST targets and scans, and create or revoke repository API tokens.
+
+Connect with a Codacy account API token. For self-hosted Codacy, set the API base URL in the authentication settings. Select the Git provider and organization name in the connection configuration. `get_current_user` identifies the authenticated account, and `list_organizations` discovers available organizations.
 
 ## License
 

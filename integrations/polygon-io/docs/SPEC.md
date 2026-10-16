@@ -1,104 +1,39 @@
-# Slates Specification for Polygon.io
+# Polygon.io integration
 
-## Overview
-
-Polygon.io provides financial market data APIs, offering real-time, delayed and historical data across stocks, forex, and cryptocurrencies. It covers asset classes including Stocks, Crypto, Forex, Options, Indices, and Economy. It supports RESTful API for historical queries and WebSocket API for real-time streaming.
+Polygon.io is now Massive. This integration uses `https://api.massive.com`; existing Polygon API keys remain valid. It exposes read-only REST queries. Data access, history, and freshness depend on the subscription for each asset class.
 
 ## Authentication
 
-Polygon.io uses **API key** authentication. All API requests require authentication using your Polygon.io API key. All endpoints require authentication via API key.
+Use an API key from the Polygon.io or Massive dashboard. Requests send `Authorization: Bearer <API_KEY>`. Empty keys fail validation. This API does not document an account/profile identity endpoint, so no identity tool is exposed. There are no OAuth scopes or token-refresh operations.
 
-The API key can be provided in two ways:
+## Registered capabilities
 
-1. **Authorization Header (recommended):** Pass the API key as a Bearer token in the `Authorization` header:
+- Search tickers and retrieve company/ticker details, including historical point-in-time details.
+- Retrieve aggregate bars for stocks, options, forex, crypto, and indices. Aggregate limits count base aggregates used in calculation, so returned bars can be fewer than the limit.
+- Retrieve a stock's daily open/close or previous close and daily bars for the entire US stock market.
+- Retrieve stock trades and quotes, and interpret exchange and condition identifiers using `get_market_reference`. The same discovery tool lists supported ticker-type codes.
+- Retrieve snapshots for stocks, options, forex, crypto, and indices. Explicit ticker lists use one request per ticker; gainers/losers and unfiltered snapshots cover stocks. Freshness depends on the plan.
+- Calculate SMA, EMA, MACD, and RSI, and retrieve financial news with optional provider sentiment insights.
+- Retrieve legacy company financial statements and legacy dividends/splits without changing their field semantics. `get_adjusted_corporate_actions` uses the current `/stocks/v1/dividends` and `/stocks/v1/splits` datasets and preserves event classifications and historical adjustment factors.
+- Check market status and upcoming market holidays.
 
-   ```
-   Authorization: Bearer YOUR_API_KEY
-   ```
+Stocks, Options, Forex, Crypto, and Indices categories group the distinct subscribed market APIs. Aggregate, snapshot, and indicator tools are shared across categories and continue accepting ticker symbols from other asset classes. Reference discovery and market-status utilities are uncategorized.
 
-2. **Query Parameter:** Pass the API key as the `apiKey` query parameter:
-   ```
-   https://api.polygon.io/v3/reference/tickers?apiKey=YOUR_API_KEY
-   ```
+## Pagination and response fidelity
 
-In order to use Polygon APIs, you first need to create an account on Polygon.io. Go to polygon.io and create an account. Open your Dashboard and select API Keys to view your key.
+Paginated tools accept an optional opaque `cursor` and return `nextCursor` only when the provider supplies one. Keep filters unchanged between pages. Aggregate bars additionally return `nextFrom`; pass it as `from` with `nextCursor`, because the provider changes the date-range path for subsequent pages. Legacy dividend/split requests use independent dividend/split cursors.
 
-There are no OAuth flows or scopes. The API key is tied to your subscription plan, which determines what data and features you can access (e.g., real-time vs. delayed data, available asset classes).
+Optional mapped fields omit absent or null provider values and preserve zeros and false values. Optional results arrays and their derived counts remain absent when the provider omits them, rather than fabricating empty arrays. Financial reports additionally expose `rawReports`, preserving provider source metadata and explicit nulls. Current corporate actions, grouped bars, and reference records retain original field names and values. Legacy numeric timestamp schemas remain numeric.
 
-For WebSocket connections, the default endpoint is `wss://socket.polygon.io`. When a connection opens, it immediately sends an authentication message with the provided API key.
+## Boundaries
 
-## Features
+This integration does not implement streaming/WebSocket subscriptions, triggers, account administration, or file downloads. Its source-filings URLs are provider links; financial statement tools do not fetch or deliver filing files. Current paid Financials-and-Ratios expansion endpoints are distinct from the retained legacy financial-report contract and are not added here.
 
-### Stock Market Data
+## Official references
 
-Access real-time and historical data for US stocks from all exchanges. This includes trades, quotes (NBBO), daily open/close prices, previous close, and aggregate bars (OHLCV). Results can be adjusted for splits, and by default they are adjusted. Aggregates are available at configurable timespans (second, minute, hour, day, week, month, quarter, year).
-
-### Options Data
-
-Retrieve options contract data including trades, quotes, snapshots, and aggregate bars. Available data includes Options Contracts and Ticker Events. You can look up option contracts by underlying ticker, expiration date, strike price, and contract type (call/put).
-
-### Forex Data
-
-Access foreign exchange market data including real-time and historical currency pair quotes, trades, and aggregates. Supports major, minor, and exotic currency pairs.
-
-### Cryptocurrency Data
-
-The API provides real-time streaming access to market data including trades, quotes, aggregates, and specialized data streams like Level 2 order book data for cryptocurrencies.
-
-### Indices Data
-
-Polygon.io provides market data for over 10,000+ indices from multiple index families, including S&P, Nasdaq, Dow Jones, and more, offering real-time prices, historical data, and reference information. Polygon.io sources Indices data from CME Group, CBOE, and Nasdaq.
-
-### Technical Indicators
-
-Polygon supports Simple Moving Average (SMA), Exponential Moving Average (EMA), Moving Average Convergence/Divergence (MACD), and Relative Strength Index (RSI). The API uses underlying aggregates to construct technical indicators, with flexibility to specify date ranges, timespan of aggregates, split adjustment, and sort order. Configurable parameters include window size, series type (open, high, low, close), and timespan.
-
-### Snapshots
-
-Retrieve unified snapshots of market data for multiple asset classes including stocks, options, forex, and cryptocurrencies in a single request. This endpoint consolidates key metrics such as last trade, last quote, open, high, low, close, and volume. By aggregating data from various sources into one response, users can efficiently monitor and compare information spanning multiple markets.
-
-### Reference Data
-
-Access market metadata and reference information including:
-
-- **Tickers:** Query all ticker symbols which are supported by Polygon.io, currently including Stocks/Equities, Crypto, and Forex.
-- **Ticker Details:** Get detailed information about a ticker and the company behind it.
-- Stock Financials: 10K and 10Q financial reports for all US-based companies, sourced from the SEC Edgar database.
-- Stock Splits: Data for all splits through the Stock Splits v3 endpoint.
-- **Dividends:** Historical cash dividend data filterable by ticker, dates, frequency, and dividend type.
-- Market Status: The current trading status of the exchanges and overall financial markets, including whether exchanges are in pre-market, normal trading hours, or after-hours.
-- **Market Holidays, Exchanges, Conditions, and Ticker Types.**
-
-### Ticker News
-
-Access financial news articles related to specific tickers with sentiment analysis. Benzinga's detailed analyst ratings, corporate guidance, earnings reports, and structured financial news are available through the REST APIs.
-
-## Events
-
-Polygon.io provides real-time data streaming via **WebSocket connections**, not traditional webhook callbacks.
-
-### Stock Streams
-
-Data that can be streamed in real-time for both individual stock tickers and across the entire market includes: Aggregates (Per Minute), Aggregates (Per Second), Trades, and Quotes. Subscribe to specific ticker symbols or use wildcard (`*`) to receive data for all tickers.
-
-### Options Streams
-
-Real-time streaming of options trades, quotes, and per-minute/per-second aggregates. Subscribable per individual option contract symbol or across all contracts.
-
-### Forex Streams
-
-Real-time streaming of forex quotes and per-minute/per-second aggregates for currency pairs.
-
-### Crypto Streams
-
-Real-time streaming of cryptocurrency trades, quotes, aggregates, and Level 2 order book data.
-
-### Indices Streams
-
-Real-time streaming of index values and per-minute/per-second aggregates.
-
-**WebSocket Configuration:**
-
-- Polygon.io allows one simultaneous connection to one cluster at a time (clusters: stocks, options, forex, crypto), which means 4 total concurrent streams.
-- Alternative endpoints include `wss://delayed.polygon.io` for 15-minute delayed stock data and `wss://business.polygon.io` for Business tier features like Fair Market Value.
-- Available data tiers (real-time vs. delayed) depend on your subscription plan.
+- [REST authentication and market APIs](https://massive.com/docs/rest/quickstart)
+- [Polygon.io rebrand and API compatibility](https://massive.com/blog/polygon-is-now-massive)
+- [Stocks endpoint overview](https://massive.com/docs/rest/stocks/overview)
+- [Options endpoint overview](https://massive.com/docs/rest/options/overview)
+- [Current dividends](https://massive.com/docs/rest/stocks/corporate-actions/dividends) and [splits](https://massive.com/docs/rest/stocks/corporate-actions/splits)
+- [Legacy versus current financial-report shape](https://massive.com/knowledge-base/article/what-fields-can-i-expect-from-massives-financials-api)

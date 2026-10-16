@@ -46,11 +46,11 @@ export let getWatermarksTool = SlateTool.create(spec, {
     let watermarks = await client.getUserWatermarks(ctx.input.nickname);
 
     let mapped = watermarks.map((wm: any) => ({
-      name: wm.Name || undefined,
-      uri: wm.Uri || undefined,
-      dissolve: wm.Dissolve || undefined,
-      pinned: wm.Pinned || undefined,
-      thumbs: wm.Thumbs || undefined
+      name: wm.Name ?? undefined,
+      uri: wm.Uri ?? undefined,
+      dissolve: wm.Dissolve ?? undefined,
+      pinned: wm.Pinned ?? undefined,
+      thumbs: wm.Thumbs ?? undefined
     }));
 
     return {

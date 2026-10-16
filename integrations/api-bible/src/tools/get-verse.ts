@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scriptureContent } from '../lib/content';
 import { spec } from '../spec';
 
 let verseSummarySchema = z.object({
@@ -34,6 +35,16 @@ export let getVerse = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Specific verse ID to retrieve content (e.g., "GEN.1.1")'),
+      useOrgId: z
+        .boolean()
+        .optional()
+        .describe(
+          'Match the supplied verse or passage IDs against original versification IDs'
+        ),
+      parallels: z
+        .string()
+        .optional()
+        .describe('Comma-separated Bible IDs to return parallel scripture from'),
       contentType: z
         .enum(['html', 'json', 'text'])
         .optional()
@@ -53,6 +64,11 @@ export let getVerse = SlateTool.create(spec, {
       reference: z.string().optional().describe('Human-readable reference'),
       content: z.string().optional().describe('Verse scripture content'),
       copyright: z.string().optional().describe('Copyright information'),
+      fumsToken: z.string().optional().describe('Current FUMS token for scripture engagement'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original scripture response metadata'),
       fumsId: z.string().optional().describe('FUMS tracking token'),
       nextVerseId: z.string().optional().nullable().describe('ID of the next verse'),
       previousVerseId: z.string().optional().nullable().describe('ID of the previous verse')
@@ -64,6 +80,8 @@ export let getVerse = SlateTool.create(spec, {
     if (ctx.input.verseId) {
       let result = await client.getVerse(ctx.input.bibleId, ctx.input.verseId, {
         contentType: ctx.input.contentType,
+        parallels: ctx.input.parallels,
+        useOrgId: ctx.input.useOrgId,
         includeNotes: ctx.input.includeNotes,
         includeTitles: ctx.input.includeTitles,
         includeChapterNumbers: ctx.input.includeChapterNumbers,
@@ -73,14 +91,16 @@ export let getVerse = SlateTool.create(spec, {
       let v = result.data;
       return {
         output: {
-          verseId: v.verseId,
-          orgId: v.orgId || '',
-          reference: v.reference || '',
-          content: v.content || '',
-          copyright: v.copyright || '',
-          fumsId: result.meta?.fumsId || '',
-          nextVerseId: v.next?.verseId || null,
-          previousVerseId: v.previous?.verseId || null
+          verseId: v.id,
+          orgId: v.orgId,
+          reference: v.reference,
+          content: scriptureContent(v.content),
+          copyright: v.copyright,
+          fumsToken: result.meta?.fumsToken,
+          meta: result.meta,
+          fumsId: result.meta?.fumsId,
+          nextVerseId: v.next?.id ?? null,
+          previousVerseId: v.previous?.id ?? null
         },
         message: `Retrieved verse **${v.reference}**.`
       };
@@ -88,13 +108,13 @@ export let getVerse = SlateTool.create(spec, {
 
     if (ctx.input.chapterId) {
       let result = await client.getVerses(ctx.input.bibleId, ctx.input.chapterId);
-      let verses = (result.data || []).map(v => ({
-        verseId: v.verseId,
-        orgId: v.orgId || '',
+      let verses = result.data.map(v => ({
+        verseId: v.id,
+        orgId: v.orgId,
         bibleId: v.bibleId,
         bookId: v.bookId,
         chapterId: v.chapterId,
-        reference: v.reference || ''
+        reference: v.reference
       }));
 
       return {
@@ -105,7 +125,7 @@ export let getVerse = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(
+    throw createApiServiceError(
       'Either chapterId (to list verses) or verseId (to retrieve content) must be provided.'
     );
   })

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { providerRecords, providerString } from '../lib/response';
 import { spec } from '../spec';
 
 export let listLists = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let listLists = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       lists: z
         .array(
           z.object({
@@ -43,43 +45,28 @@ export let listLists = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
 
-    if (ctx.input.listId) {
-      let result = await client.getList(ctx.input.listId);
-      let list = result.data;
-      return {
-        output: {
-          lists: list
-            ? [
-                {
-                  listId: list._id,
-                  name: list.name,
-                  slug: list.slug,
-                  emoji: list.emoji,
-                  collectionId: list.collectionId,
-                  collectionName: list.collection?.name,
-                  duplicationAllowed: list.duplicationAllowed
-                }
-              ]
-            : []
-        },
-        message: list ? `Retrieved list: **${list.name}**.` : 'List not found.'
-      };
-    }
-
-    let result = await client.getLists();
-    let lists = (Array.isArray(result.data) ? result.data : []).map((list: any) => ({
-      listId: list._id,
-      name: list.name,
-      slug: list.slug,
-      emoji: list.emoji,
-      collectionId: list.collectionId,
-      collectionName: list.collection?.name,
-      duplicationAllowed: list.duplicationAllowed
+    let result = ctx.input.listId
+      ? await client.getList(ctx.input.listId)
+      : await client.getLists();
+    let data = ctx.input.listId
+      ? result.data === null
+        ? []
+        : providerRecords([result.data])
+      : providerRecords(result.data);
+    let lists = data.map(list => ({
+      listId: providerString(list._id, 'list ID'),
+      name: providerString(list.name, 'list name'),
+      slug: providerString(list.slug, 'list slug'),
+      emoji: typeof list.emoji === 'string' ? list.emoji : undefined,
+      collectionId: typeof list.collectionId === 'string' ? list.collectionId : undefined,
+      collectionName:
+        typeof list.collection?.name === 'string' ? list.collection.name : undefined,
+      duplicationAllowed:
+        typeof list.duplicationAllowed === 'boolean' ? list.duplicationAllowed : undefined
     }));
-
     return {
-      output: { lists },
-      message: `Found ${lists.length} list(s): ${lists.map((l: any) => l.name).join(', ')}.`
+      output: { lists, raw: result },
+      message: `Retrieved ${lists.length} list(s).`
     };
   })
   .build();

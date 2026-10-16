@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let createChannel = SlateTool.create(spec, {
   name: 'Create Channel',
   key: 'create_channel',
-  description: `Creates a new channel in your Heartbeat community. Channels can be of type thread, chat, or voice.`,
+  description: `DEPRECATED — use \`create_community_channel\` instead. Creates a new channel in your Heartbeat community. Channels can be of type thread, chat, or voice.`,
+  instructions: [
+    'Use create_community_channel instead. The documented operation requires a channel category; voice channels have their own endpoint.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

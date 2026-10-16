@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Gender API
 
-Predict the gender of a person based on their first name, full name, or email address. Returns gender classification (male, female, or unknown) with accuracy/probability scores and sample counts. Improve prediction accuracy by providing country code, IP address, or browser locale for localization. Predict the country of origin for a given first name with probability scores. Check account usage statistics including remaining request credits.
+Predict the gender of a person based on their first name, full name, or email address. Returns gender classification (male, female, or unknown) with accuracy/probability scores and sample counts. Improve prediction accuracy by providing country code, IP address, or browser locale for localization. Process up to 100 first names per batch, subject to account limits. Predict name origins with country probabilities, language, meaning, and ethnic group distributions when returned by the provider. Check account usage statistics including remaining request credits.
 
 ## License
 

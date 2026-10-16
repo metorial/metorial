@@ -1,18 +1,74 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://app.passcreator.com';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Passcreator API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: config.token },
+      timeout: 30_000,
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Passcreator',
+          reason: 'Passcreator API request failed',
+          detailKeys: ['description', 'message', 'error', 'detail'],
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.success === false) {
+        throw buildApiServiceError(
+          {
+            response: {
+              status: response.data.statusCode ?? response.status,
+              data: response.data
+            }
+          },
+          {
+            providerLabel: 'Passcreator',
+            reason: 'Passcreator API request failed',
+            detailKeys: ['description', 'message', 'error', 'detail'],
+            extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+          }
+        );
+      }
+      return response;
+    });
+  }
+
+  private passPagePath(value: string): string {
+    let url: URL;
+    try {
+      url = new URL(value, BASE_URL);
+    } catch {
+      throw createApiServiceError('nextPageUrl must be a valid Passcreator pagination URL.');
+    }
+    if (
+      url.origin !== BASE_URL ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      !(url.pathname === '/api/v3/pass' || url.pathname.startsWith('/api/pass/list/'))
+    ) {
+      throw createApiServiceError(
+        'Use the nextPageUrl returned by the Passcreator pass listing.'
+      );
+    }
+    return `${url.pathname}${url.search}`;
+  }
+
+  async listPassesPage(nextPageUrl: string): Promise<any> {
+    let response = await this.axios.get(this.passPagePath(nextPageUrl));
+    return response.data;
   }
 
   // ─── Pass Templates (V1) ───
@@ -23,9 +79,12 @@ export class Client {
   }
 
   async getTemplateFields(templateId: string): Promise<any[]> {
-    let response = await this.axios.get(`/api/pass-template/${templateId}`, {
-      params: { zapierStyle: 'true' }
-    });
+    let response = await this.axios.get(
+      `/api/pass-template/${encodeURIComponent(templateId)}`,
+      {
+        params: { zapierStyle: 'true' }
+      }
+    );
     return response.data;
   }
 
@@ -33,12 +92,15 @@ export class Client {
     templateId: string,
     body: { name: string; description?: string }
   ): Promise<any> {
-    let response = await this.axios.post(`/api/pass-template/copy/${templateId}`, body);
+    let response = await this.axios.post(
+      `/api/pass-template/copy/${encodeURIComponent(templateId)}`,
+      body
+    );
     return response.data;
   }
 
   async deleteTemplate(templateId: string): Promise<void> {
-    await this.axios.delete(`/api/pass-template/${templateId}`);
+    await this.axios.delete(`/api/pass-template/${encodeURIComponent(templateId)}`);
   }
 
   // ─── Pass Templates (V2) ───
@@ -49,22 +111,32 @@ export class Client {
   }
 
   async describeTemplate(templateId: string): Promise<any> {
-    let response = await this.axios.get(`/api/v2/pass-template/${templateId}/describe`);
+    let response = await this.axios.get(
+      `/api/v2/pass-template/${encodeURIComponent(templateId)}/describe`
+    );
     return response.data;
   }
 
   async updateTemplate(templateId: string, body: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/api/v2/pass-template/${templateId}`, body);
+    let response = await this.axios.post(
+      `/api/v2/pass-template/${encodeURIComponent(templateId)}`,
+      body
+    );
     return response.data;
   }
 
   async patchTemplate(templateId: string, body: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/api/v2/pass-template/${templateId}`, body);
+    let response = await this.axios.patch(
+      `/api/v2/pass-template/${encodeURIComponent(templateId)}`,
+      body
+    );
     return response.data;
   }
 
   async publishTemplate(templateId: string): Promise<any> {
-    let response = await this.axios.post(`/api/v2/pass-template/${templateId}/publish`);
+    let response = await this.axios.post(
+      `/api/v2/pass-template/${encodeURIComponent(templateId)}/publish`
+    );
     return response.data;
   }
 
@@ -75,19 +147,23 @@ export class Client {
     body: { pushNotificationText: string; publicationDate?: string }
   ): Promise<any> {
     let response = await this.axios.post(
-      `/api/pass-template/${templateId}/notification`,
+      `/api/pass-template/${encodeURIComponent(templateId)}/notification`,
       body
     );
     return response.data;
   }
 
   async listTemplateNotifications(templateId: string): Promise<any> {
-    let response = await this.axios.get(`/api/pass-template/${templateId}/notification`);
+    let response = await this.axios.get(
+      `/api/pass-template/${encodeURIComponent(templateId)}/notification`
+    );
     return response.data;
   }
 
   async deleteTemplateNotification(notificationId: string): Promise<void> {
-    await this.axios.delete(`/api/pass-template/notification/${notificationId}`);
+    await this.axios.delete(
+      `/api/pass-template/notification/${encodeURIComponent(notificationId)}`
+    );
   }
 
   // ─── Passes (V1) ───
@@ -109,7 +185,9 @@ export class Client {
       modifiedSince?: string;
     }
   ): Promise<any> {
-    let response = await this.axios.get(`/api/pass/list/${templateId}`, { params });
+    let response = await this.axios.get(`/api/pass/list/${encodeURIComponent(templateId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -117,34 +195,34 @@ export class Client {
     passId: string,
     params?: { includeFieldMapping?: boolean; appConfigurationId?: string }
   ): Promise<any> {
-    let response = await this.axios.get(`/api/pass/${passId}`, { params });
+    let response = await this.axios.get(`/api/pass/${encodeURIComponent(passId)}`, { params });
     return response.data;
   }
 
   async getPassUris(passId: string): Promise<any> {
-    let response = await this.axios.get(`/api/pass/geturis/${passId}`);
+    let response = await this.axios.get(`/api/pass/geturis/${encodeURIComponent(passId)}`);
     return response.data;
   }
 
   async searchPasses(templateId: string, searchString: string): Promise<any[]> {
     let response = await this.axios.get(
-      `/api/pass/search/${templateId}/${encodeURIComponent(searchString)}`
+      `/api/pass/search/${encodeURIComponent(templateId)}/${encodeURIComponent(searchString)}`
     );
     return response.data;
   }
 
   async updatePassV1(passId: string, body: Record<string, any>): Promise<void> {
-    await this.axios.post(`/api/pass/${passId}`, body, {
+    await this.axios.post(`/api/pass/${encodeURIComponent(passId)}`, body, {
       params: { zapierStyle: 'true' }
     });
   }
 
   async voidPass(passId: string, voided: boolean): Promise<void> {
-    await this.axios.put(`/api/pass/${passId}`, { voided });
+    await this.axios.put(`/api/pass/${encodeURIComponent(passId)}`, { voided });
   }
 
   async deletePassV1(passId: string): Promise<void> {
-    await this.axios.delete(`/api/pass/${passId}`);
+    await this.axios.delete(`/api/pass/${encodeURIComponent(passId)}`);
   }
 
   async enableDownload(passId: string, enableDownloadUntil?: string): Promise<void> {
@@ -152,7 +230,7 @@ export class Client {
     if (enableDownloadUntil) {
       body.enableDownloadUntil = enableDownloadUntil;
     }
-    await this.axios.post(`/api/pass/${passId}/enabledownload`, body);
+    await this.axios.post(`/api/pass/${encodeURIComponent(passId)}/enabledownload`, body);
   }
 
   // ─── Passes (V3) ───
@@ -170,7 +248,7 @@ export class Client {
 
   async updatePass(passId: string, body: Record<string, any>, async_?: boolean): Promise<any> {
     let response = await this.axios.post(
-      `/api/v3/pass/${passId}`,
+      `/api/v3/pass/${encodeURIComponent(passId)}`,
       { data: body },
       {
         params: async_ !== undefined ? { async: async_ } : undefined
@@ -181,7 +259,7 @@ export class Client {
 
   async patchPass(passId: string, body: Record<string, any>, async_?: boolean): Promise<any> {
     let response = await this.axios.patch(
-      `/api/v3/pass/${passId}`,
+      `/api/v3/pass/${encodeURIComponent(passId)}`,
       { data: body },
       {
         params: async_ !== undefined ? { async: async_ } : undefined
@@ -210,7 +288,7 @@ export class Client {
     nextPageUrl?: string;
   }): Promise<any> {
     if (params?.nextPageUrl) {
-      let response = await this.axios.get(params.nextPageUrl);
+      let response = await this.axios.get(this.passPagePath(params.nextPageUrl));
       return response.data;
     }
     let queryParams: Record<string, any> = {};
@@ -225,13 +303,13 @@ export class Client {
   }
 
   async deletePass(passId: string): Promise<any> {
-    let response = await this.axios.delete(`/api/v3/pass/${passId}`);
+    let response = await this.axios.delete(`/api/v3/pass/${encodeURIComponent(passId)}`);
     return response.data;
   }
 
   async movePass(passId: string, targetTemplateId: string): Promise<any> {
     let response = await this.axios.post(
-      `/api/v2/pass/${passId}/movetotemplate/${targetTemplateId}`
+      `/api/v2/pass/${encodeURIComponent(passId)}/movetotemplate/${encodeURIComponent(targetTemplateId)}`
     );
     return response.data;
   }
@@ -240,13 +318,13 @@ export class Client {
 
   async sendPassByEmail(passId: string, email: string): Promise<any> {
     let response = await this.axios.post(
-      `/api/pass/deliver/${passId}/email/${encodeURIComponent(email)}`
+      `/api/pass/deliver/${encodeURIComponent(passId)}/email/${encodeURIComponent(email)}`
     );
     return response.data;
   }
 
   async sendPushNotification(passId: string, text: string): Promise<void> {
-    await this.axios.post(`/api/pass/${passId}/sendpushnotification`, {
+    await this.axios.post(`/api/pass/${encodeURIComponent(passId)}/sendpushnotification`, {
       pushNotificationText: text
     });
   }
@@ -262,15 +340,18 @@ export class Client {
   // ─── Statistics ───
 
   async getPassStatistics(templateId: string, timeFrame: string, day: string): Promise<any> {
-    let response = await this.axios.get(`/api/pass/statistics/${templateId}`, {
-      params: { timeFrame, day }
-    });
+    let response = await this.axios.get(
+      `/api/pass/statistics/${encodeURIComponent(templateId)}`,
+      {
+        params: { timeFrame, day }
+      }
+    );
     return response.data;
   }
 
   async getActiveHistory(templateId: string, startingDay: string): Promise<any> {
     let response = await this.axios.get(
-      `/api/pass/statistics/${templateId}/activehistory/${startingDay}`
+      `/api/pass/statistics/${encodeURIComponent(templateId)}/activehistory/${encodeURIComponent(startingDay)}`
     );
     return response.data;
   }
@@ -283,24 +364,30 @@ export class Client {
   }
 
   async updateBundle(bundleId: string, passIds: string[]): Promise<any> {
-    let response = await this.axios.post(`/api/v2/pass-bundle/${bundleId}`, {
-      passes: passIds
-    });
+    let response = await this.axios.post(
+      `/api/v2/pass-bundle/${encodeURIComponent(bundleId)}`,
+      {
+        passes: passIds
+      }
+    );
     return response.data;
   }
 
   async getBundle(bundleId: string): Promise<any> {
-    let response = await this.axios.get(`/api/v2/pass-bundle/${bundleId}`);
+    let response = await this.axios.get(`/api/v2/pass-bundle/${encodeURIComponent(bundleId)}`);
     return response.data;
   }
 
   async voidBundle(bundleId: string, voided: boolean): Promise<any> {
-    let response = await this.axios.put(`/api/v2/pass-bundle/void/${bundleId}`, { voided });
+    let response = await this.axios.put(
+      `/api/v2/pass-bundle/void/${encodeURIComponent(bundleId)}`,
+      { voided }
+    );
     return response.data;
   }
 
   async deleteBundle(bundleId: string): Promise<void> {
-    await this.axios.delete(`/api/v2/pass-bundle/${bundleId}`);
+    await this.axios.delete(`/api/v2/pass-bundle/${encodeURIComponent(bundleId)}`);
   }
 
   // ─── App Configurations / Validation ───
@@ -311,7 +398,9 @@ export class Client {
   }
 
   async getAppConfiguration(configId: string): Promise<any> {
-    let response = await this.axios.get(`/api/appconfiguration/${configId}`);
+    let response = await this.axios.get(
+      `/api/appconfiguration/${encodeURIComponent(configId)}`
+    );
     return response.data;
   }
 
@@ -324,7 +413,9 @@ export class Client {
     configId: string,
     params?: { start?: number; pageSize?: number; createdSince?: string }
   ): Promise<any> {
-    let response = await this.axios.get(`/api/appscan/list/${configId}`, { params });
+    let response = await this.axios.get(`/api/appscan/list/${encodeURIComponent(configId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -365,7 +456,7 @@ export class Client {
   // ─── Process ───
 
   async getProcess(processId: string): Promise<any> {
-    let response = await this.axios.get(`/api/v3/process/${processId}`);
+    let response = await this.axios.get(`/api/v3/process/${encodeURIComponent(processId)}`);
     return response.data;
   }
 }

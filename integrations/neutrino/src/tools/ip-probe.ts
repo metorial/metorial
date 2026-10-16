@@ -42,7 +42,8 @@ export let ipProbeTool = SlateTool.create(spec, {
       asn: z.string().describe('Autonomous System Number'),
       asCidr: z.string().describe('CIDR range for the ASN'),
       asCountryCode: z.string().describe('Country code for the ASN'),
-      asDomains: z.array(z.string()).describe('Domains associated with the ASN')
+      asDomains: z.array(z.string()).describe('Domains associated with the ASN'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -57,23 +58,24 @@ export let ipProbeTool = SlateTool.create(spec, {
 
     return {
       output: {
-        valid: result.valid ?? false,
-        ip: result.ip ?? ctx.input.ip,
-        country: result.country ?? '',
-        countryCode: result.countryCode ?? '',
-        city: result.city ?? '',
-        region: result.region ?? '',
-        isVpn: result.isVpn ?? false,
-        isProxy: result.isProxy ?? false,
-        isHosting: result.isHosting ?? false,
-        isIsp: result.isIsp ?? false,
-        providerType: result.providerType ?? 'unknown',
-        providerDomain: result.providerDomain ?? '',
-        providerDescription: result.providerDescription ?? '',
-        asn: result.asn ?? '',
-        asCidr: result.asCidr ?? '',
-        asCountryCode: result.asCountryCode ?? '',
-        asDomains: result.asDomains ?? []
+        raw: result.raw,
+        valid: result.valid,
+        ip: result.ip,
+        country: result.country,
+        countryCode: result.countryCode,
+        city: result.city,
+        region: result.region,
+        isVpn: result.isVpn,
+        isProxy: result.isProxy,
+        isHosting: result.isHosting,
+        isIsp: result.isIsp,
+        providerType: result.providerType,
+        providerDomain: result.providerDomain,
+        providerDescription: result.providerDescription,
+        asn: result.asn,
+        asCidr: result.asCidr,
+        asCountryCode: result.asCountryCode,
+        asDomains: result.asDomains
       },
       message: `**${result.ip}**: ${result.providerType} provider${result.providerDomain ? ` (${result.providerDomain})` : ''} in ${result.city ? `${result.city}, ` : ''}${result.country}.${result.isVpn ? ' ⚠️ VPN detected.' : ''}${result.isProxy ? ' ⚠️ Proxy detected.' : ''}${result.isHosting ? ' Hosted in data center.' : ''}`
     };

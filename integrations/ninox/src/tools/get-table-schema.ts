@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type NinoxTable } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTableSchema = SlateTool.create(spec, {
@@ -13,8 +13,10 @@ export let getTableSchema = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
       tableId: z
         .string()
         .optional()
@@ -58,12 +60,9 @@ export let getTableSchema = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
-    let tables: any;
+    let tables: NinoxTable[];
     if (ctx.input.tableId) {
       let table = await client.getTable(
         ctx.input.teamId,
@@ -75,17 +74,21 @@ export let getTableSchema = SlateTool.create(spec, {
       tables = await client.listTables(ctx.input.teamId, ctx.input.databaseId);
     }
 
+    if (tables.some(table => !Array.isArray(table.fields))) {
+      throw createApiServiceError('Ninox returned a table schema without field definitions.');
+    }
+
     let output = {
-      tables: tables.map((t: any) => ({
+      tables: tables.map(t => ({
         tableId: t.id,
         name: t.name,
-        fields: (t.fields || []).map((f: any) => ({
+        fields: t.fields.map(f => ({
           fieldId: f.id,
           name: f.name,
           type: f.type,
           ...(f.choices
             ? {
-                choices: f.choices.map((c: any) => ({
+                choices: f.choices.map(c => ({
                   choiceId: c.id,
                   caption: c.caption
                 }))

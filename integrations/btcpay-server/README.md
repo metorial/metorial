@@ -1,6 +1,14 @@
-# <img src="logo.png" height="20"> Btcpay Server
+# <img src="logo.png" height="20"> BTCPay Server
 
-Accept and process cryptocurrency payments through a self-hosted, non-custodial payment processor. Create and manage invoices with configurable amounts, currencies, and expiration. Manage on-chain Bitcoin wallets including viewing balances, generating addresses, and creating transactions. Handle Lightning Network payments, create Lightning invoices, and check node balances. Create pull payments and manage payouts with approval workflows for both on-chain and Lightning. Set up payment requests for freelancers or bill pay. Configure and manage multiple stores, each with independent payment methods, wallets, and user access controls. Create Point of Sale and Crowdfunding apps. Issue full or partial refunds on invoices. Manage users, API keys, server settings, notifications, and reporting.
+Accept cryptocurrency payments through your own BTCPay Server instance. Create and retrieve invoices, update invoice metadata and status, prepare refunds, discover stores and payment methods, manage payment requests and pull payments, inspect on-chain wallets, and use a connected Lightning node. Payout operations include creation, approval with the actual payout revision, cancellation, and manual payment confirmation.
+
+Connect using your instance URL and an API key generated under **Account → Manage account → API keys**. Grant only the permissions needed for the operations you intend to use. Store permissions can be restricted to individual stores. `manage_stores` with `action: list` discovers accessible store IDs; `get_current_user` requires the separate `btcpay.user.canviewprofile` permission.
+
+Use `manage_payout_claims` for current payout operations. The older `manage_payouts` tool remains available for compatibility; its legacy approval request does not supply the revision required by current servers. `list` or `get` in the replacement returns the revision to pass to `approve`. Marking a payout as paid records an external payment; it does not send funds.
+
+Invoice and payment request outputs keep their numeric `amount` fields and expose the exact provider decimal as `amountExact`, plus the complete response in `raw`. Use exact decimal inputs for invoices and payout claims when precision matters. Wallet amounts use the cryptocurrency unit; Lightning invoice amounts and the local Lightning balance use millisatoshis. A Lightning payment may remain pending after the request returns; inspect its returned status or retrieve the payment again.
+
+See the [Greenfield API reference](https://docs.btcpayserver.org/API/Greenfield/v1/), [authentication guide](https://docs.btcpayserver.org/Developers/api/authentication/), and [integration notes](docs/SPEC.md).
 
 ## License
 

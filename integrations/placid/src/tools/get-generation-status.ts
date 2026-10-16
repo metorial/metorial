@@ -62,6 +62,15 @@ export let getGenerationStatus = SlateTool.create(spec, {
       }
     }
 
+    if (status === 'finished' && outputUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: outputUrl,
+        ...(ctx.input.generationType === 'pdf' ? { mimeType: 'application/pdf' } : {}),
+        ...(ctx.input.generationType === 'video' ? { mimeType: 'video/mp4' } : {})
+      });
+    }
+
     return {
       output: {
         generationId: ctx.input.generationId,

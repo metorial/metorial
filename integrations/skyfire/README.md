@@ -1,6 +1,12 @@
 # <img src="logo.png" height="20"> Skyfire
 
-Enable autonomous AI agent payments and identity verification through Skyfire's token-based protocol. Create PAY tokens to authorize payments to seller services, generate KYA (Know Your Agent) tokens for identity verification, and combine both in KYA+PAY tokens. Browse and search a marketplace of agent-consumable services, filter by tags and categories, and retrieve seller service IDs. Manage agent wallets including checking balances, funding via cards or ACH, and withdrawing earnings. Charge buyer tokens as a seller to collect payments. Register and manage seller services for discovery by buyer agents. Audit transactions by listing tokens with date and status filters, and reconcile authorized versus charged amounts.
+Create identity and payment tokens, inspect token validity and charge windows, and collect payments as a seller. Browse seller services with their endpoint URLs and identity requirements. Register, update, activate, or deactivate seller services, inspect the authenticated agent's wallet, configure source IPs, and retrieve paginated token charges for reconciliation.
+
+Use a Buyer Agent API key to create tokens and a Seller Agent API key to charge tokens or manage seller services. Keys are scoped to one agent. Organization admin keys are for organization administration and do not replace agent keys for these operations.
+
+Token creation accepts `kya`, `pay`, and `kya-pay`. The legacy `kya+pay` input remains supported and is sent as the provider's current `kya-pay` spelling. External seller URLs support only `kya` tokens and require an organization buyer key.
+
+For charges, omitting `chargeAmount` uses the configured price only for a `PAY_PER_USE` service. Other pricing models require an explicit amount. Charges may be partial and settle asynchronously. Do not automatically retry a payment whose outcome is uncertain.
 
 ## License
 

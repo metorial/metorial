@@ -19,6 +19,7 @@ export let getQrCode = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       qrCodeId: z.number().describe('Unique ID of the QR code'),
       name: z.string().describe('Name of the QR code'),
       qrType: z.number().describe('Type: 1=Static, 2=Dynamic'),
@@ -60,29 +61,46 @@ export let getQrCode = SlateTool.create(spec, {
 
     let campaign = qr.campaign
       ? {
-          campaignId: qr.campaign.id,
-          contentType: qr.campaign.content_type,
-          customUrl: qr.campaign.custom_url,
-          active: qr.campaign.campaign_active
+          campaignId: typeof qr.campaign.id === 'number' ? qr.campaign.id : undefined,
+          contentType:
+            typeof qr.campaign.content_type === 'number'
+              ? qr.campaign.content_type
+              : undefined,
+          customUrl:
+            typeof qr.campaign.custom_url === 'string' ? qr.campaign.custom_url : undefined,
+          active:
+            typeof qr.campaign.campaign_active === 'boolean'
+              ? qr.campaign.campaign_active
+              : undefined
         }
       : undefined;
 
     return {
       output: {
+        raw: qr,
         qrCodeId: qr.id,
         name: qr.name,
         qrType: qr.qr_type,
         organizationId: qr.organization,
-        url: qr.url,
+        url: typeof qr.url === 'string' ? qr.url : undefined,
         campaign,
-        attributes: qr.attributes,
-        fieldsData: qr.fields_data,
-        placeId: qr.place,
-        locationEnabled: qr.location_enabled,
-        createdAt: qr.created,
-        updatedAt: qr.updated
+        attributes:
+          qr.attributes && typeof qr.attributes === 'object' && !Array.isArray(qr.attributes)
+            ? qr.attributes
+            : undefined,
+        fieldsData:
+          qr.fields_data &&
+          typeof qr.fields_data === 'object' &&
+          !Array.isArray(qr.fields_data)
+            ? qr.fields_data
+            : undefined,
+        placeId: typeof qr.place === 'number' ? qr.place : undefined,
+        locationEnabled:
+          typeof qr.location_enabled === 'boolean' ? qr.location_enabled : undefined,
+        createdAt: typeof qr.created === 'string' ? qr.created : undefined,
+        updatedAt: typeof qr.updated === 'string' ? qr.updated : undefined
       },
-      message: `Retrieved QR code **"${qr.name}"** (ID: ${qr.id}, ${qr.qr_type === 1 ? 'Static' : 'Dynamic'}).`
+      message: `Retrieved QR code **"${qr.name}"** (ID: ${qr.id}).`
     };
   })
   .build();

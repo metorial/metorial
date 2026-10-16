@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateRows = SlateTool.create(spec, {
@@ -17,7 +17,11 @@ export let updateRows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table containing the rows'),
+      tableId: z
+        .number()
+        .describe(
+          'The ID of the table containing the rows. Discover with list_token_tables, or list_databases then list_tables for JWT connections.'
+        ),
       rowId: z
         .number()
         .optional()
@@ -53,12 +57,17 @@ export let updateRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
+    if (
+      ctx.input.rows !== undefined &&
+      (ctx.input.rowId !== undefined || ctx.input.fields !== undefined)
+    )
+      throw createApiServiceError(
+        'Provide rows for batch update, or rowId and fields for single update, not both.'
+      );
+    if (ctx.input.rows !== undefined && !ctx.input.rows.length)
+      throw createApiServiceError('rows must contain at least one row.');
     let updatedRows: any[];
 
     if (ctx.input.rows && ctx.input.rows.length > 0) {
@@ -67,7 +76,7 @@ export let updateRows = SlateTool.create(spec, {
         rows: ctx.input.rows as { id: number; [key: string]: any }[],
         userFieldNames: ctx.input.userFieldNames
       });
-    } else if (ctx.input.rowId && ctx.input.fields) {
+    } else if (ctx.input.rowId !== undefined && ctx.input.fields) {
       let updated = await client.updateRow({
         tableId: ctx.input.tableId,
         rowId: ctx.input.rowId,
@@ -76,7 +85,7 @@ export let updateRows = SlateTool.create(spec, {
       });
       updatedRows = [updated];
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide either `rowId` + `fields` for a single update, or `rows` for batch update.'
       );
     }

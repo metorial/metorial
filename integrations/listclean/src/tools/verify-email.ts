@@ -6,11 +6,10 @@ import { spec } from '../spec';
 export let verifyEmail = SlateTool.create(spec, {
   name: 'Verify Email',
   key: 'verify_email',
-  description: `Verify a single email address in real time. Checks syntax, DNS/MX records, SMTP responses, and risk signals to classify the email as **clean** (valid), **dirty** (invalid), or **unknown** (unverifiable).
-Each verification consumes one credit. Duplicate and unknown results are not charged.`,
+  description: `Verify a single email address in real time. Returns a provider status of clean, dirty, unknown, or error, together with the provider's explanation. Verification may consume account credits.`,
   instructions: [
     'Provide a complete email address to verify.',
-    'The status will be "clean" for valid emails, "dirty" for invalid, or "unknown" for unverifiable addresses.'
+    'The provider status is clean, dirty, unknown, or error. Read remarks for the reason.'
   ],
   tags: {
     readOnly: true,
@@ -25,7 +24,9 @@ Each verification consumes one credit. Duplicate and unknown results are not cha
   .output(
     z.object({
       email: z.string().describe('The verified email address'),
-      status: z.string().describe('Verification result: clean, dirty, or unknown'),
+      status: z
+        .string()
+        .describe('Provider verification result: clean, dirty, unknown, or error'),
       remarks: z
         .string()
         .describe(
@@ -43,11 +44,11 @@ Each verification consumes one credit. Duplicate and unknown results are not cha
 
     return {
       output: {
-        email: result.email || ctx.input.email,
+        email: result.email,
         status: result.status,
         remarks: result.remarks
       },
-      message: `Email **${result.email || ctx.input.email}** verification result: **${result.status}**. ${result.remarks}`
+      message: `Email **${result.email}** verification result: **${result.status}**. ${result.remarks}`
     };
   })
   .build();

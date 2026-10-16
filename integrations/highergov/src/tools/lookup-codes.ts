@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let lookupCodes = SlateTool.create(spec, {
@@ -28,7 +28,10 @@ export let lookupCodes = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Filter grant programs by agency key (grant_program only)'),
-      ordering: z.string().optional().describe('Sort order for results'),
+      ordering: z
+        .string()
+        .optional()
+        .describe('Sort order for NAICS results; omit for PSC and grant programs'),
       pageNumber: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z
         .number()
@@ -48,7 +51,14 @@ export let lookupCodes = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let input = ctx.input;
 
-    let response: any;
+    if (input.agencyKey !== undefined && input.codeType !== 'grant_program') {
+      throw createApiServiceError('agencyKey is supported only for grant_program lookups.');
+    }
+    if (input.ordering !== undefined && input.codeType !== 'naics') {
+      throw createApiServiceError('ordering is supported only for naics lookups.');
+    }
+
+    let response: PaginatedResponse<Record<string, unknown>>;
     if (input.codeType === 'naics') {
       response = await client.getNaicsCodes({
         naicsCode: input.code,

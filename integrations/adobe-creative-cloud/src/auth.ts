@@ -1,11 +1,24 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { adobeApiError } from './lib/client';
 
-let imsAxios = createAxios({
-  baseURL: 'https://ims-na1.adobelogin.com'
+let imsAxios = createAuthenticatedAxios({
+  baseURL: 'https://ims-na1.adobelogin.com',
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: adobeApiError
 });
 
 let scopes = [
+  {
+    title: 'Offline access',
+    description: 'Refresh access after the current session expires',
+    scope: 'offline_access'
+  },
   { title: 'OpenID', description: 'OpenID Connect authentication', scope: 'openid' },
   {
     title: 'Adobe ID',
@@ -92,12 +105,10 @@ function createAdobeCcOauth(opts: { name: string; key: string; requireOrgId: boo
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(data, { providerLabel: 'Adobe' });
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           clientId: ctx.clientId,
           orgId: opts.requireOrgId ? ctx.input.orgId : undefined
         }
@@ -106,7 +117,9 @@ function createAdobeCcOauth(opts: { name: string; key: string; requireOrgId: boo
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Adobe refresh token is available. Reconnect with offline access.'
+        );
       }
       let response = await imsAxios.post(
         '/ims/token/v3',
@@ -119,12 +132,14 @@ function createAdobeCcOauth(opts: { name: string; key: string; requireOrgId: boo
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'Adobe',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
+          ...tokens,
           clientId: ctx.output.clientId,
           orgId: ctx.output.orgId
         }
@@ -198,13 +213,34 @@ export let auth = SlateAuth.create()
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
       let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(data, { providerLabel: 'Adobe' });
       return {
         output: {
-          token: data.access_token,
-          expiresAt,
+          ...tokens,
           clientId: ctx.input.clientId,
           orgId: ctx.input.orgId
+        }
+      };
+    },
+
+    handleTokenRefresh: async (ctx: {
+      input: { clientId: string; clientSecret: string; scopes: string; orgId?: string };
+      output: { orgId?: string };
+    }) => {
+      let response = await imsAxios.post(
+        '/ims/token/v3',
+        new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: ctx.input.clientId,
+          client_secret: ctx.input.clientSecret,
+          scope: ctx.input.scopes
+        }).toString()
+      );
+      return {
+        output: {
+          ...normalizeOAuthTokenResponse(response.data, { providerLabel: 'Adobe' }),
+          clientId: ctx.input.clientId,
+          orgId: ctx.input.orgId ?? ctx.output.orgId
         }
       };
     }

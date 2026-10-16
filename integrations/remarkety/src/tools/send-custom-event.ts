@@ -9,7 +9,7 @@ export let sendCustomEventTool = SlateTool.create(spec, {
   description: `Send a custom event to Remarkety to trigger automations. Custom events support arbitrary properties (e.g., site searches, room bookings, loyalty milestones) that can be used to trigger automations. Note that custom events do not support advanced eCommerce analytics.`,
   instructions: [
     'Use built-in event types (customers/*, orders/*, products/*, carts/*, newsletter/*) for eCommerce data instead of custom events.',
-    'Custom event types should follow the format "category/action" (e.g., "search/performed", "booking/created").'
+    'Use an event name that matches the automation configured in Remarkety, such as "site-search".'
   ],
   tags: {
     destructive: false,

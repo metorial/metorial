@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, recordsFrom } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCalendarEventsTool = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
   description: `Retrieve financial calendar events including earnings, dividends, analyst ratings, IPOs, guidance, splits, mergers & acquisitions, conference calls, FDA announcements, offerings, and economic events. Supports filtering by ticker, date range, and importance level.`,
   instructions: [
     'Choose one eventType per request. Use tickers to filter by stock symbol, or leave blank for all.',
-    'For FDA events, use the tickers field (mapped to securities parameter internally).',
+    'For FDA events, use tickers to filter securities.',
     'Use the importance field (0-5) to filter by significance level where applicable.'
   ],
   tags: {
@@ -35,6 +35,10 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
         ])
         .describe('Type of calendar event to retrieve'),
       tickers: z.string().optional().describe('Comma-separated ticker symbols (max 50)'),
+      updatedSince: z
+        .number()
+        .optional()
+        .describe('Return records updated since this Unix timestamp in seconds'),
       date: z.string().optional().describe('Specific date to query (YYYY-MM-DD)'),
       dateFrom: z.string().optional().describe('Start date for range (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('End date for range (YYYY-MM-DD)'),
@@ -50,6 +54,7 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .describe('Array of calendar event records'),
       eventType: z.string().describe('Type of events returned'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of events returned')
     })
   )
@@ -60,7 +65,8 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
 
     let rawData: any;
 
-    let baseParams = { page, pageSize, tickers, date, dateFrom, dateTo, importance };
+    let updated = ctx.input.updatedSince;
+    let baseParams = { page, pageSize, tickers, date, dateFrom, dateTo, importance, updated };
 
     switch (eventType) {
       case 'earnings':
@@ -92,6 +98,7 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
           page,
           pageSize,
           securities: tickers,
+          updated,
           date,
           dateFrom,
           dateTo
@@ -108,25 +115,23 @@ export let getCalendarEventsTool = SlateTool.create(spec, {
           dateFrom,
           dateTo,
           importance,
-          country
+          country,
+          updated
         });
         break;
     }
 
-    // Calendar endpoints wrap data in a key matching the type
-    let events: any[] = [];
-    if (rawData) {
-      if (Array.isArray(rawData)) {
-        events = rawData;
-      } else if (typeof rawData === 'object') {
-        // Try common wrapper keys
-        let key = Object.keys(rawData).find(k => Array.isArray(rawData[k]));
-        events = key ? rawData[key] : [rawData];
-      }
-    }
+    let responseKey =
+      eventType === 'mergers_acquisitions'
+        ? 'ma'
+        : eventType === 'conference_calls'
+          ? 'conference-calls'
+          : eventType;
+    let events = recordsFrom(rawData, [responseKey]);
 
     return {
       output: {
+        raw: rawData,
         events,
         eventType,
         count: events.length

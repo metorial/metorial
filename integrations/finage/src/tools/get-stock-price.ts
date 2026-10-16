@@ -1,6 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import {
+  finageNumber,
+  finagePreviousClose,
+  finageRecord,
+  finageSymbol
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getStockPrice = SlateTool.create(spec, {
@@ -18,6 +24,7 @@ export let getStockPrice = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Stock ticker symbol'),
       ask: z.number().optional().describe('Latest ask price'),
       bid: z.number().optional().describe('Latest bid price'),
@@ -39,41 +46,30 @@ export let getStockPrice = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let symbol = ctx.input.symbol.toUpperCase();
-
-    let [quoteResult, prevCloseResult] = await Promise.allSettled([
+    let symbol = finageSymbol(ctx.input.symbol);
+    let [primaryData, previousData, tradeData] = await Promise.all([
       client.getStockLastQuote(symbol),
-      client.getStockPreviousClose(symbol)
+      client.getStockPreviousClose(symbol),
+      client.getStockLastTrade(symbol)
     ]);
-
-    let quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
-    let prevClose = prevCloseResult.status === 'fulfilled' ? prevCloseResult.value : null;
-
-    let prevCloseBar = prevClose?.results?.[0] ?? prevClose;
-
-    let output = {
+    let quote = finageRecord(primaryData);
+    let trade = finageRecord(tradeData);
+    let output = pickDefined({
       symbol,
-      ask: quote?.ask,
-      bid: quote?.bid,
-      askSize: quote?.asize,
-      bidSize: quote?.bsize,
-      lastTradePrice: quote?.ask && quote?.bid ? (quote.ask + quote.bid) / 2 : undefined,
-      timestamp: quote?.timestamp,
-      previousClose: prevCloseBar
-        ? {
-            open: prevCloseBar.o,
-            high: prevCloseBar.h,
-            low: prevCloseBar.l,
-            close: prevCloseBar.c,
-            volume: prevCloseBar.v
-          }
-        : undefined
-    };
-
-    let priceStr = output.bid ? `$${output.bid.toFixed(2)}` : 'N/A';
+      ask: finageNumber(quote.ask),
+      bid: finageNumber(quote.bid),
+      askSize: finageNumber(quote.asize),
+      bidSize: finageNumber(quote.bsize),
+      lastTradePrice: finageNumber(trade.price),
+      timestamp: finageNumber(quote.timestamp),
+      previousClose: finagePreviousClose(previousData),
+      raw: { quote: primaryData, previousClose: previousData, trade: tradeData }
+    });
+    if (output.ask === undefined && output.bid === undefined)
+      throw createApiServiceError('Finage returned no current pricing for this symbol.');
     return {
-      output,
-      message: `**${symbol}** current bid: ${priceStr}${output.previousClose?.close ? `, previous close: $${output.previousClose.close.toFixed(2)}` : ''}`
+      output: { ...output, symbol },
+      message: `Retrieved latest pricing and previous close for **${symbol}**.`
     };
   })
   .build();

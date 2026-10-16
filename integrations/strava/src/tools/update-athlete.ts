@@ -18,6 +18,7 @@ export let updateAthlete = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       athleteId: z.number().describe('Athlete identifier'),
       weight: z.number().nullable().optional().describe('Updated weight in kilograms')
     })
@@ -29,6 +30,7 @@ export let updateAthlete = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: updated,
         athleteId: updated.id,
         weight: updated.weight
       },

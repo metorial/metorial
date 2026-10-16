@@ -7,7 +7,9 @@ export let createGroup = SlateTool.create(spec, {
   name: 'Create Group',
   key: 'create_group',
   description: `Create a new credential group. Groups are organizational containers for credentials, typically representing a course, program, or event. Each group is linked to certificate and/or badge designs.`,
-  instructions: ['At least one of certificateDesignId or badgeDesignId is required.'],
+  instructions: [
+    'Provide designIds from list_designs, or use the legacy certificateDesignId/badgeDesignId fields. Do not combine the two request shapes.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -18,6 +20,12 @@ export let createGroup = SlateTool.create(spec, {
       name: z
         .string()
         .describe('Group name, used as the [group.name] attribute in credentials'),
+      designIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Ordered design IDs from list_designs. Replaces the complete design list; do not combine with legacy design fields.'
+        ),
       certificateDesignId: z
         .string()
         .optional()
@@ -33,8 +41,22 @@ export let createGroup = SlateTool.create(spec, {
     z.object({
       groupId: z.string().describe('ID of the created group'),
       name: z.string().describe('Name of the group'),
-      certificateDesignId: z.string().nullable().describe('Certificate design ID'),
-      badgeDesignId: z.string().nullable().describe('Badge design ID'),
+      designIds: z
+        .array(z.string())
+        .optional()
+        .describe('Ordered design IDs associated with this credential template'),
+      certificateDesignId: z
+        .string()
+        .nullable()
+        .describe(
+          'Legacy certificate design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+        ),
+      badgeDesignId: z
+        .string()
+        .nullable()
+        .describe(
+          'Legacy badge design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+        ),
       learningEventUrl: z.string().nullable().describe('Learning event URL'),
       createdAt: z.string().describe('Creation timestamp')
     })
@@ -44,6 +66,7 @@ export let createGroup = SlateTool.create(spec, {
 
     let group = await client.createGroup({
       name: ctx.input.name,
+      designIds: ctx.input.designIds,
       certificateDesignId: ctx.input.certificateDesignId,
       badgeDesignId: ctx.input.badgeDesignId,
       learningEventUrl: ctx.input.learningEventUrl
@@ -52,9 +75,10 @@ export let createGroup = SlateTool.create(spec, {
     return {
       output: {
         groupId: group.id,
+        designIds: group.designIds,
         name: group.name,
-        certificateDesignId: group.certificateDesignId,
-        badgeDesignId: group.badgeDesignId,
+        certificateDesignId: group.certificateDesignId ?? null,
+        badgeDesignId: group.badgeDesignId ?? null,
         learningEventUrl: group.learningEventUrl,
         createdAt: group.createdAt
       },

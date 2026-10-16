@@ -1,6 +1,6 @@
 {
   "name": "@metorial/fathom",
-  "description": "Retrieve AI-powered meeting recordings, transcripts, summaries, and action items from Zoom, Google Meet, and Microsoft Teams calls. List and filter meetings by date, type, recorder, or invitee. Access speaker-labeled timestamped transcripts, AI-generated summaries in Markdown, and extracted action items with assignees and completion status. Retrieve CRM-matched contacts, companies, and deals for meetings. Manage teams and team members. Create and delete webhooks to receive notifications when new meeting content is ready.",
+  "description": "Retrieve meeting recordings, speaker-labeled transcripts, AI summaries, action items, highlights, and CRM matches from Fathom. Filter meetings by date, recorder, team, company domain, or meeting type. Discover teams, team members, and meeting types.",
   "categories": [
     "apis-and-http-requests",
     "note-taking-and-knowledge-bases",
@@ -13,7 +13,8 @@
     "extract action items",
     "filter meetings by criteria",
     "retrieve CRM match data",
-    "manage webhook subscriptions",
-    "list team members"
+    "list team members",
+    "discover meeting types",
+    "retrieve meeting highlights"
   ]
 }

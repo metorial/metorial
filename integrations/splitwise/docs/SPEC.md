@@ -1,75 +1,27 @@
-Now let me fetch the full API documentation to get details on all endpoints and features, especially notifications and webhooks.Now I have comprehensive information about the Splitwise API. Let me compile the specification.
+# Splitwise integration specification
 
-# Slates Specification for Splitwise
+Splitwise API v3.0 provides users, shared expense records, groups, friends, comments, account activity, currencies, and categories. Official reference: https://dev.splitwise.com/ and the provider-maintained OpenAPI source at https://github.com/splitwise/api-docs.
 
-## Overview
+## Authentication and configuration
 
-Splitwise is a service for splitting bills and shared expenses among friends and groups. It tracks who owes whom and provides tools for managing shared expenses, settling debts, and organizing costs by groups (e.g., households, trips). The API (v3.0) allows programmatic access to manage users, groups, expenses, friends, comments, and notifications.
+OAuth 2.0 authorization-code connections use `/oauth/authorize` and `/oauth/token`. Personal API keys are bearer tokens generated on the application's details page. Both existing auth method keys and the saved `token` field are retained. The current official OAuth specification declares no scopes, refresh-token flow, or token expiry; this integration does not invent refresh or expiry state. Configuration is empty. No workspace or account identifier is required during connection setup.
 
-## Authentication
+## Capabilities
 
-Splitwise supports three authentication methods. All require registering an application at [https://secure.splitwise.com](https://secure.splitwise.com) to obtain a **consumer key** and **consumer secret**.
+- Users: current-user identity, user lookup, and profile updates.
+- Groups: list, get, create, delete, restore, add members, and remove members. Existing group-type choices remain supported, including legacy `apartment` and `house` values. Splitwise recommends `home` for new groups.
+- Expenses: list with documented group/friend/date/update filters and limit/offset pagination, get, create equal or custom splits, update including recurrence, delete, and restore. Amounts and shares remain decimal strings; no floating-point conversion is performed. Group ID `0` is preserved where Splitwise uses it for expenses outside a group. Updating shares replaces the full set of shares.
+- Friends: list, get details, add one friend, add multiple friends, and delete a friendship. Bulk creation uses the documented flattened `users__{index}__{property}` fields. Actual returned friend records determine the added-user output.
+- Comments: list, create, and delete. Deletion is confirmed using the returned comment's ID and deletion timestamp rather than an absent success field.
+- Account activity: `list_notifications` returns original notification objects, including nullable sources, provider HTML content, and future notification-type values. The optional limit preserves `0` as the provider maximum.
+- Reference data: supported currencies and hierarchical expense categories. Expense creation uses subcategory IDs.
 
-### OAuth 2.0
+## Errors and result handling
 
-The recommended approach for production integrations.
+Shared HTTP helpers preserve provider HTTP status and error bodies in service errors. HTTP-200 failures with nonempty errors or `success: false` are rejected. Boolean acknowledgement endpoints require `success: true`; expense creation and updates require an empty provider errors collection and a returned expense. Missing resource/list envelopes fail rather than becoming invented empty results.
 
-1. Redirect the user to the authorization URL: `https://www.splitwise.com/oauth/authorize` with your `client_id` and `redirect_uri`.
-2. After the user authorizes, Splitwise redirects back with a `code` query parameter.
-3. Exchange the code for an access token by POSTing to `https://www.splitwise.com/oauth/token` with `client_id`, `client_secret`, `grant_type=authorization_code`, `code`, and `redirect_uri`.
-4. The resulting access token dict (containing `access_token` and `token_type`) is used to authenticate subsequent requests.
+Existing tool keys, fields, scalar types, enum values, defaults, and requiredness remain unchanged. New capabilities are additive. Existing receipt URL output fields remain provider metadata; no file download or transfer is performed by the detail tool.
 
-### OAuth 1.0
+## Scope and verification
 
-A legacy authentication flow also supported by the API.
-
-1. Request a request token from `https://secure.splitwise.com/api/v3.0/get_request_token`.
-2. Redirect the user to `https://secure.splitwise.com/authorize?oauth_token={token}`.
-3. The user authenticates on Splitwise's site, and Splitwise sends your app an access token that provides access to the user's account data.
-4. Exchange the verifier for an access token at `https://secure.splitwise.com/api/v3.0/get_access_token`.
-5. The OAuth 1.0 token is valid forever, unless explicitly removed by the user or Splitwise.
-
-### API Key (Bearer Token)
-
-For testing purposes only — you can use the API key provided on your project's detail page in Splitwise to make requests on behalf of your own user. Pass it as a `Bearer` token in the `Authorization` header. This method is not suitable for accessing other users' data.
-
-**Base URL**: `https://secure.splitwise.com/api/v3.0/`
-
-**No scopes** are defined — authenticated users have full access to their own data and related resources.
-
-## Features
-
-### User Management
-
-Retrieve the current authenticated user's profile or another user's profile. Update the current user's details including first name, last name, email, password, locale, and default currency.
-
-### Group Management
-
-Create, retrieve, delete, and restore groups. Groups represent collections of users who share expenses (e.g., a household or a trip). Groups have a type (`home`, `trip`, `couple`, `other`), support simplified debts, and track member balances and debts. Users can be added to or removed from groups. Removing a user fails if they have a non-zero balance in the group. Deleting a group destroys all associated expenses.
-
-### Expense Management
-
-Create, retrieve, update, delete, and restore expenses. Expenses can be split equally among a group or split with custom paid/owed shares per user. Key parameters include cost, description, date, currency, category, and group assignment. Expenses support recurring intervals (weekly, fortnightly, monthly, yearly). Users in an expense can be identified by user ID or by email and name (allowing non-Splitwise users to be included). Expenses include repayment information and receipt images.
-
-- When splitting equally, the authenticated user is assumed to be the payer.
-- Expenses can be filtered by group, friend, date range, or update time.
-
-### Friend Management
-
-List, add, and remove friends. Friends include balance information showing what is owed between the current user and each friend, broken down by currency and by group. Multiple friends can be added at once. Friendships can only be deleted if there is no outstanding balance.
-
-### Comments
-
-Retrieve, create, and delete comments on expenses. Comments can be user-generated or system-generated (e.g., tracking changes to an expense).
-
-### Notifications
-
-Retrieve recent activity on the user's account. Notifications cover a wide range of events including expenses added/updated/deleted, comments added, group membership changes, friend changes, and debt simplifications. Notifications can be filtered by `updated_after` timestamp.
-
-### Reference Data
-
-Retrieve the list of supported currencies and expense categories. Categories are hierarchical with parent categories and subcategories. When creating expenses, a subcategory must be used.
-
-## Events
-
-The provider does not support events. Splitwise does not offer webhooks or purpose-built event subscription mechanisms. The notifications endpoint (`get_notifications`) is a pull-based API for retrieving recent account activity, not a push-based event system.
+Splitwise is one product and does not need separate product categories. The current official reference documents no webhook subscriptions; activity is retrieved through the notifications endpoint. Verification for this refresh is offline only. No expense, payment, account, group, friend, or comment operation was performed against Splitwise. Live acceptance, OAuth callbacks, and deployed behavior remain unverified.

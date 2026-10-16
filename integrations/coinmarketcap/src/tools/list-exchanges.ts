@@ -32,7 +32,10 @@ export let listExchanges = SlateTool.create(spec, {
     'Results are sorted by volume by default.',
     'Use "convert" to see volumes in a specific currency.'
   ],
-  constraints: ['Requires Standard plan or above for full access.'],
+  constraints: [
+    'Access depends on the API plan enabled for your key.',
+    'Supported ranking sorts are volume_24h, volume_24h_adjusted, and exchange_score.'
+  ],
   tags: {
     readOnly: true
   }
@@ -57,6 +60,7 @@ export let listExchanges = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       exchanges: z.array(exchangeListingSchema).describe('List of exchanges')
     })
   )
@@ -80,7 +84,22 @@ export let listExchanges = SlateTool.create(spec, {
       slug: listing.slug,
       numMarketPairs: listing.numMarketPairs,
       lastUpdated: listing.lastUpdated,
-      quote: listing.quote || {}
+      quote: Object.fromEntries(
+        Object.entries(listing.quote || {}).map(([currency, quote]) => [
+          currency,
+          {
+            volume24h: quote.volume24h ?? null,
+            volume24hAdjusted: quote.volume24hAdjusted ?? null,
+            volume7d: quote.volume7d ?? null,
+            volume30d: quote.volume30d ?? null,
+            percentChangeVolume24h: quote.percentChangeVolume24h ?? null,
+            percentChangeVolume7d: quote.percentChangeVolume7d ?? null,
+            percentChangeVolume30d: quote.percentChangeVolume30d ?? null,
+            effectiveLiquidity24h: quote.effectiveLiquidity24h ?? null,
+            lastUpdated: quote.lastUpdated ?? null
+          }
+        ])
+      )
     }));
 
     let count = exchanges.length;
@@ -90,7 +109,7 @@ export let listExchanges = SlateTool.create(spec, {
       : 'No exchanges found.';
 
     return {
-      output: { exchanges },
+      output: { exchanges, raw: client.rawResponse },
       message
     };
   })

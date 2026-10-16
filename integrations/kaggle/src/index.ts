@@ -2,6 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createDataset,
+  downloadCompetitionData,
+  downloadDataset,
+  downloadModelVersion,
   getCompetitionDetails,
   getDatasetDetails,
   getKernelDetails,
@@ -18,6 +21,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    downloadDataset,
+    downloadCompetitionData,
+    downloadModelVersion,
     searchCompetitions,
     getCompetitionDetails,
     searchDatasets,

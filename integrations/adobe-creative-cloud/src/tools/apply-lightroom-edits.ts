@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LightroomClient } from '../lib/lightroom';
 import { spec } from '../spec';
@@ -33,7 +33,7 @@ export let applyLightroomEdits = SlateTool.create(spec, {
   .output(
     z.object({
       jobId: z.string().optional().describe('Async job identifier'),
-      status: z.string().describe('Job status'),
+      status: z.string().optional().describe('Job status'),
       statusUrl: z.string().optional().describe('URL to poll for job status')
     })
   )
@@ -48,7 +48,7 @@ export let applyLightroomEdits = SlateTool.create(spec, {
 
     if (ctx.input.operation === 'applyPreset') {
       if (!ctx.input.presetXmp)
-        throw new Error('presetXmp is required for applyPreset operation');
+        throw createApiServiceError('presetXmp is required for applyPreset operation');
       result = await client.applyPreset(
         ctx.input.input,
         ctx.input.output,
@@ -61,10 +61,10 @@ export let applyLightroomEdits = SlateTool.create(spec, {
     return {
       output: {
         jobId: result.jobId || result._links?.self?.href?.split('/').pop(),
-        status: result.status || 'submitted',
+        status: result.status,
         statusUrl: result._links?.self?.href || result.links?.self?.href
       },
-      message: `Lightroom **${ctx.input.operation}** job submitted. Status: **${result.status || 'submitted'}**.`
+      message: `Lightroom **${ctx.input.operation}** job submitted.`
     };
   })
   .build();

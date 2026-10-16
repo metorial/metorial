@@ -2,13 +2,14 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DiscoveryClient } from '../lib/client';
 import { mapAttraction, mapPagination } from '../lib/mappers';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let attractionSchema = z.object({
   attractionId: z.string().describe('Unique Ticketmaster attraction ID'),
   name: z.string(),
   type: z.string(),
-  url: z.string(),
+  url: z.string().optional(),
   locale: z.string(),
   upcomingEvents: z.record(z.string(), z.any()).describe('Count of upcoming events by source'),
   externalLinks: z
@@ -36,6 +37,16 @@ let attractionSchema = z.object({
   aliases: z.array(z.string())
 });
 
+let outputSchema = z.object({
+  attractions: z.array(attractionSchema),
+  pagination: z.object({
+    totalElements: z.number(),
+    totalPages: z.number(),
+    currentPage: z.number(),
+    pageSize: z.number()
+  })
+});
+
 export let searchAttractionsTool = SlateTool.create(spec, {
   name: 'Search Attractions',
   key: 'search_attractions',
@@ -47,6 +58,18 @@ export let searchAttractionsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      classificationId: z
+        .string()
+        .optional()
+        .describe(
+          'Classification ID from browse_classifications or get_classification_details'
+        ),
+      typeId: z.string().optional().describe('Classification type ID'),
+      subTypeId: z.string().optional().describe('Classification sub-type ID'),
+      includeFamily: z
+        .string()
+        .optional()
+        .describe('Include family-friendly classifications: yes, no, or only'),
       keyword: z
         .string()
         .optional()
@@ -68,17 +91,7 @@ export let searchAttractionsTool = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number (0-indexed)')
     })
   )
-  .output(
-    z.object({
-      attractions: z.array(attractionSchema),
-      pagination: z.object({
-        totalElements: z.number(),
-        totalPages: z.number(),
-        currentPage: z.number(),
-        pageSize: z.number()
-      })
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -87,6 +100,10 @@ export let searchAttractionsTool = SlateTool.create(spec, {
     });
 
     let response = await client.searchAttractions({
+      classificationId: ctx.input.classificationId,
+      typeId: ctx.input.typeId,
+      subTypeId: ctx.input.subTypeId,
+      includeFamily: ctx.input.includeFamily,
       keyword: ctx.input.keyword,
       classificationName: ctx.input.classificationName,
       segmentId: ctx.input.segmentId,
@@ -104,8 +121,12 @@ export let searchAttractionsTool = SlateTool.create(spec, {
     let pagination = mapPagination(response?.page);
 
     return {
-      output: { attractions, pagination },
-      message: `Found **${pagination.totalElements}** attractions (showing page ${pagination.currentPage + 1} of ${pagination.totalPages}).`
+      output: parseTicketmasterOutput(
+        outputSchema,
+        { attractions, pagination },
+        'search-attractions'
+      ),
+      message: `Returned **${attractions.length}** attractions.`
     };
   })
   .build();

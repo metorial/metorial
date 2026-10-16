@@ -12,8 +12,11 @@ let baseFeeEstimateSchema = z.object({
 export let predictBaseFee = SlateTool.create(spec, {
   name: 'Predict Base Fee',
   key: 'predict_base_fee',
-  description: `Predicts the Ethereum base fee and blob base fee for the next 5 blocks at 99% and 70% confidence levels. Uses a quantile regression neural network model for predictions. Useful for setting optimal gas fees on Ethereum transactions.`,
+  description: `Predicts the Ethereum base fee and blob base fee for the next 5 blocks at the confidence levels returned by the provider. Uses a quantile regression neural network model for predictions. Useful for setting optimal gas fees on Ethereum transactions.`,
   constraints: ['Only available for Ethereum mainnet.'],
+  instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.'
+  ],
   tags: {
     readOnly: true
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -59,7 +59,7 @@ export let copyFile = SlateTool.create(spec, {
     }
 
     if (!ctx.input.targetStorage) {
-      throw new Error('targetStorage is required for remote copies');
+      throw createApiServiceError('targetStorage is required for remote copies');
     }
 
     let result = await client.remoteCopy(ctx.input.source, ctx.input.targetStorage, {

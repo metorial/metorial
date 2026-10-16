@@ -1,14 +1,106 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export let kaggleApiBase = 'https://www.kaggle.com/api/v1';
+
+let pathPart = (value: string) => {
+  if (!value.trim())
+    throw createApiServiceError('A non-empty Kaggle resource identifier is required.');
+  return encodeURIComponent(value);
+};
+
+let failureCode = (data: unknown): string | undefined => {
+  if (!isApiErrorRecord(data)) return undefined;
+  let nested = isApiErrorRecord(data.error) ? data.error : undefined;
+  let code = nested?.code ?? data.code ?? data.errorCode;
+  return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+};
 
 export class KaggleClient {
   private http;
 
   constructor(credentials: { token: string; username: string }) {
-    this.http = createAxios({
-      baseURL: 'https://www.kaggle.com/api/v1',
-      headers: {
-        Authorization: `Basic ${credentials.token}`
+    if (!credentials.token?.trim()) {
+      throw createApiServiceError('Kaggle credentials are required. Reconnect your account.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: kaggleApiBase,
+      timeout: 60_000,
+      authHeader: { value: `Basic ${credentials.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Kaggle',
+          reason: 'kaggle_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          nestedKeys: ['error', 'errors'],
+          detailKeys: [
+            'message',
+            'detail',
+            'error',
+            'errorMessage',
+            'error_description',
+            'code'
+          ],
+          extractUpstreamCode: (_error, response) => failureCode(response?.data)
+        })
+    });
+    this.http.interceptors.request.use(request => {
+      for (let key of ['page', 'pageSize', 'datasetVersionNumber']) {
+        let value = request.params?.[key];
+        if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {
+          throw createApiServiceError(`${key} must be a positive whole number.`);
+        }
       }
+      let min = request.params?.minSize;
+      let max = request.params?.maxSize;
+      if (
+        (min !== undefined && (!Number.isSafeInteger(min) || min < 0)) ||
+        (max !== undefined && (!Number.isSafeInteger(max) || max < 1)) ||
+        (min !== undefined && max !== undefined && min > max)
+      ) {
+        throw createApiServiceError(
+          'Dataset size bounds must be whole bytes with 0 <= minSize <= maxSize.'
+        );
+      }
+      return request;
+    });
+    this.http.interceptors.response.use(response => {
+      let data: unknown = response.data;
+      if (isApiErrorRecord(data)) {
+        let code = failureCode(data);
+        let hasError =
+          data.success === false ||
+          data.hasError === true ||
+          data.error === true ||
+          (typeof data.error === 'string' && data.error.trim().length > 0) ||
+          isApiErrorRecord(data.error) ||
+          (typeof data.errorMessage === 'string' && data.errorMessage.trim().length > 0) ||
+          (code !== undefined && Number(code) >= 400);
+        if (hasError) {
+          throw buildApiServiceError(
+            { response: { status: response.status, data } },
+            {
+              providerLabel: 'Kaggle',
+              reason: 'kaggle_api_error',
+              nestedKeys: ['error', 'errors'],
+              detailKeys: [
+                'message',
+                'detail',
+                'error',
+                'errorMessage',
+                'error_description',
+                'code'
+              ],
+              extractUpstreamCode: () => code
+            }
+          );
+        }
+      }
+      return response;
     });
   }
 
@@ -42,41 +134,15 @@ export class KaggleClient {
       pageSize?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/competitions/data/list/${competitionName}`, {
-      params: {
-        pageToken: params.pageToken,
-        pageSize: params.pageSize
-      }
-    });
-    return response.data;
-  }
-
-  async downloadCompetitionFile(competitionName: string, fileName: string) {
     let response = await this.http.get(
-      `/competitions/data/download/${competitionName}/${fileName}`,
+      `/competitions/data/list/${pathPart(competitionName)}`,
       {
-        responseType: 'arraybuffer'
+        params: {
+          pageToken: params.pageToken,
+          pageSize: params.pageSize
+        }
       }
     );
-    return response.data;
-  }
-
-  async downloadCompetitionFiles(competitionName: string) {
-    let response = await this.http.get(`/competitions/data/download-all/${competitionName}`, {
-      responseType: 'arraybuffer'
-    });
-    return response.data;
-  }
-
-  async submitToCompetition(
-    competitionName: string,
-    blobFileTokens: string,
-    submissionDescription: string
-  ) {
-    let response = await this.http.post(`/competitions/submissions/url/${competitionName}`, {
-      blobFileTokens,
-      submissionDescription
-    });
     return response.data;
   }
 
@@ -88,25 +154,23 @@ export class KaggleClient {
       pageSize?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/competitions/submissions/list/${competitionName}`, {
-      params: {
-        group: params.group,
-        page: params.page,
-        pageSize: params.pageSize
-      }
-    });
-    return response.data;
-  }
-
-  async getCompetitionLeaderboard(competitionName: string) {
     let response = await this.http.get(
-      `/competitions/${competitionName}/leaderboard/download`
+      `/competitions/submissions/list/${pathPart(competitionName)}`,
+      {
+        params: {
+          group: params.group,
+          page: params.page,
+          pageSize: params.pageSize
+        }
+      }
     );
     return response.data;
   }
 
   async viewCompetitionLeaderboard(competitionName: string) {
-    let response = await this.http.get(`/competitions/${competitionName}/leaderboard/view`);
+    let response = await this.http.get(
+      `/competitions/${pathPart(competitionName)}/leaderboard/view`
+    );
     return response.data;
   }
 
@@ -154,64 +218,30 @@ export class KaggleClient {
       pageSize?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/datasets/list/${ownerSlug}/${datasetSlug}`, {
-      params: {
-        datasetVersionNumber: params.datasetVersionNumber,
-        pageToken: params.pageToken,
-        pageSize: params.pageSize
-      }
-    });
-    return response.data;
-  }
-
-  async downloadDataset(
-    ownerSlug: string,
-    datasetSlug: string,
-    params: {
-      datasetVersionNumber?: number;
-    } = {}
-  ) {
-    let response = await this.http.get(`/datasets/download/${ownerSlug}/${datasetSlug}`, {
-      params: {
-        datasetVersionNumber: params.datasetVersionNumber
-      },
-      responseType: 'arraybuffer'
-    });
-    return response.data;
-  }
-
-  async downloadDatasetFile(
-    ownerSlug: string,
-    datasetSlug: string,
-    fileName: string,
-    params: {
-      datasetVersionNumber?: number;
-    } = {}
-  ) {
     let response = await this.http.get(
-      `/datasets/download/${ownerSlug}/${datasetSlug}/${fileName}`,
+      `/datasets/list/${pathPart(ownerSlug)}/${pathPart(datasetSlug)}`,
       {
         params: {
-          datasetVersionNumber: params.datasetVersionNumber
-        },
-        responseType: 'arraybuffer'
+          datasetVersionNumber: params.datasetVersionNumber,
+          pageToken: params.pageToken,
+          pageSize: params.pageSize
+        }
       }
     );
     return response.data;
   }
 
   async getDatasetMetadata(ownerSlug: string, datasetSlug: string) {
-    let response = await this.http.get(`/datasets/metadata/${ownerSlug}/${datasetSlug}`);
+    let response = await this.http.get(
+      `/datasets/metadata/${pathPart(ownerSlug)}/${pathPart(datasetSlug)}`
+    );
     return response.data;
   }
 
   async getDatasetStatus(ownerSlug: string, datasetSlug: string) {
-    let response = await this.http.get(`/datasets/status/${ownerSlug}/${datasetSlug}`);
-    return response.data;
-  }
-
-  async viewDataset(ownerSlug: string, datasetSlug: string) {
-    let response = await this.http.get(`/datasets/view/${ownerSlug}/${datasetSlug}`);
+    let response = await this.http.get(
+      `/datasets/status/${pathPart(ownerSlug)}/${pathPart(datasetSlug)}`
+    );
     return response.data;
   }
 
@@ -245,29 +275,8 @@ export class KaggleClient {
     }
   ) {
     let response = await this.http.post(
-      `/datasets/create/version/${ownerSlug}/${datasetSlug}`,
+      `/datasets/create/version/${pathPart(ownerSlug)}/${pathPart(datasetSlug)}`,
       body
-    );
-    return response.data;
-  }
-
-  async uploadDatasetFile(
-    fileName: string,
-    contentLength: number,
-    lastModifiedDateUtc: number
-  ) {
-    let response = await this.http.post(
-      `/datasets/upload/file/${encodeURIComponent(fileName)}`,
-      null,
-      {
-        params: {
-          contentLength,
-          lastModifiedDateUtc
-        },
-        headers: {
-          'Content-Type': 'application/octet-stream'
-        }
-      }
     );
     return response.data;
   }
@@ -310,7 +319,9 @@ export class KaggleClient {
   }
 
   async pullKernel(userName: string, kernelSlug: string) {
-    let response = await this.http.get(`/kernels/pull/${userName}/${kernelSlug}`);
+    pathPart(userName);
+    pathPart(kernelSlug);
+    let response = await this.http.get('/kernels/pull', { params: { userName, kernelSlug } });
     return response.data;
   }
 
@@ -328,6 +339,7 @@ export class KaggleClient {
     datasetDataSources?: string[];
     competitionDataSources?: string[];
     kernelDataSources?: string[];
+    modelDataSources?: string[];
     categoryIds?: string[];
   }) {
     let response = await this.http.post('/kernels/push', body);
@@ -335,12 +347,20 @@ export class KaggleClient {
   }
 
   async getKernelOutput(userName: string, kernelSlug: string) {
-    let response = await this.http.get(`/kernels/output/${userName}/${kernelSlug}`);
+    pathPart(userName);
+    pathPart(kernelSlug);
+    let response = await this.http.get('/kernels/output', {
+      params: { userName, kernelSlug }
+    });
     return response.data;
   }
 
   async getKernelStatus(userName: string, kernelSlug: string) {
-    let response = await this.http.get(`/kernels/status/${userName}/${kernelSlug}`);
+    pathPart(userName);
+    pathPart(kernelSlug);
+    let response = await this.http.get('/kernels/status', {
+      params: { userName, kernelSlug }
+    });
     return response.data;
   }
 
@@ -358,17 +378,19 @@ export class KaggleClient {
     let response = await this.http.get('/models/list', {
       params: {
         search: params.search,
-        sort_by: params.sortBy,
+        sortBy: params.sortBy,
         owner: params.owner,
-        page_size: params.pageSize,
-        page_token: params.pageToken
+        pageSize: params.pageSize,
+        pageToken: params.pageToken
       }
     });
     return response.data;
   }
 
   async getModel(ownerSlug: string, modelSlug: string) {
-    let response = await this.http.get(`/models/${ownerSlug}/${modelSlug}`);
+    let response = await this.http.get(
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/get`
+    );
     return response.data;
   }
 
@@ -382,7 +404,11 @@ export class KaggleClient {
     publishTime?: string;
     provenanceSourcesSummary?: string;
   }) {
-    let response = await this.http.post('/models/create/new', body);
+    let response = await this.http.post('/models/create/new', {
+      ...body,
+      provenanceSources: body.provenanceSourcesSummary,
+      provenanceSourcesSummary: undefined
+    });
     return response.data;
   }
 
@@ -398,12 +424,25 @@ export class KaggleClient {
       provenanceSourcesSummary?: string;
     }
   ) {
-    let response = await this.http.post(`/models/${ownerSlug}/${modelSlug}/update`, body);
+    let response = await this.http.post(
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/update`,
+      {
+        ...body,
+        provenanceSources: body.provenanceSourcesSummary,
+        provenanceSourcesSummary: undefined,
+        updateMask: Object.keys(body)
+          .filter(key => body[key as keyof typeof body] !== undefined)
+          .map(key => (key === 'provenanceSourcesSummary' ? 'provenanceSources' : key))
+          .join(',')
+      }
+    );
     return response.data;
   }
 
   async deleteModel(ownerSlug: string, modelSlug: string) {
-    let response = await this.http.post(`/models/${ownerSlug}/${modelSlug}/delete`);
+    let response = await this.http.post(
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/delete`
+    );
     return response.data;
   }
 
@@ -414,7 +453,7 @@ export class KaggleClient {
     variation: string
   ) {
     let response = await this.http.get(
-      `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}`
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/${pathPart(framework)}/${pathPart(variation)}/get`
     );
     return response.data;
   }
@@ -424,7 +463,7 @@ export class KaggleClient {
     modelSlug: string,
     body: {
       framework: string;
-      overview: string;
+      overview?: string;
       instanceSlug: string;
       licenseName?: string;
       fineTunable?: boolean;
@@ -434,8 +473,8 @@ export class KaggleClient {
     }
   ) {
     let response = await this.http.post(
-      `/models/${ownerSlug}/${modelSlug}/create/instance`,
-      body
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/create/instance`,
+      { ...body, externalUrl: undefined, externalBaseModelUrl: body.externalUrl }
     );
     return response.data;
   }
@@ -455,8 +494,16 @@ export class KaggleClient {
     }
   ) {
     let response = await this.http.post(
-      `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}/update`,
-      body
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/${pathPart(framework)}/${pathPart(variation)}/update`,
+      {
+        ...body,
+        externalUrl: undefined,
+        externalBaseModelUrl: body.externalUrl,
+        updateMask: Object.keys(body)
+          .filter(key => body[key as keyof typeof body] !== undefined)
+          .map(key => (key === 'externalUrl' ? 'externalBaseModelUrl' : key))
+          .join(',')
+      }
     );
     return response.data;
   }
@@ -468,7 +515,7 @@ export class KaggleClient {
     variation: string
   ) {
     let response = await this.http.post(
-      `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}/delete`
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/${pathPart(framework)}/${pathPart(variation)}/delete`
     );
     return response.data;
   }
@@ -484,26 +531,9 @@ export class KaggleClient {
     }
   ) {
     let response = await this.http.post(
-      `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}/create/version`,
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/${pathPart(framework)}/${pathPart(variation)}/create/version`,
       body
     );
-    return response.data;
-  }
-
-  async downloadModelInstance(
-    ownerSlug: string,
-    modelSlug: string,
-    framework: string,
-    variation: string,
-    versionNumber?: number
-  ) {
-    let path = `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}/download`;
-    if (versionNumber) {
-      path += `/${versionNumber}`;
-    }
-    let response = await this.http.get(path, {
-      responseType: 'arraybuffer'
-    });
     return response.data;
   }
 
@@ -515,7 +545,7 @@ export class KaggleClient {
     versionNumber: number
   ) {
     let response = await this.http.post(
-      `/models/${ownerSlug}/${modelSlug}/${framework}/${variation}/${versionNumber}/delete`
+      `/models/${pathPart(ownerSlug)}/${pathPart(modelSlug)}/${pathPart(framework)}/${pathPart(variation)}/${versionNumber}/delete`
     );
     return response.data;
   }

@@ -3,10 +3,13 @@ import { spec } from './spec';
 import {
   createTemplate,
   deleteImages,
+  downloadImage,
   generateImage,
   generateImageFromTemplate,
+  getUsage,
   listImages,
   listTemplates,
+  requestImageDeletion,
   updateTemplate
 } from './tools';
 
@@ -15,8 +18,11 @@ export let provider = Slate.create({
   tools: [
     generateImage,
     generateImageFromTemplate,
+    getUsage,
     listImages,
     deleteImages,
+    requestImageDeletion,
+    downloadImage,
     createTemplate,
     updateTemplate,
     listTemplates

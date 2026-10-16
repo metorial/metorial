@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GristClient } from '../lib/client';
+import { GristClient, getGristItems } from '../lib/client';
 import { spec } from '../spec';
 
 let columnSchema = z.object({
@@ -44,7 +44,7 @@ export let listColumns = SlateTool.create(spec, {
       ctx.input.tableId,
       ctx.input.includeHidden
     );
-    let columns = (result.columns || []).map((c: any) => ({
+    let columns = getGristItems(result, 'columns').map((c: any) => ({
       columnId: c.id,
       label: c.fields?.label,
       type: c.fields?.type,
@@ -143,7 +143,7 @@ export let modifyColumns = SlateTool.create(spec, {
         ctx.input.tableId,
         ctx.input.create.map(c => ({ id: c.columnId, fields: c.fields }))
       );
-      createdColumns = (result.columns || []).map((c: any) => c.id);
+      createdColumns = getGristItems(result, 'columns').map((c: any) => c.id);
     }
 
     if (ctx.input.update && ctx.input.update.length > 0) {

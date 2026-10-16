@@ -1,69 +1,40 @@
-Now let me get more details on the authentication and specific API features:The page didn't render fully. Let me fetch the API reference page for more details:The docs pages are JS-rendered and not fetching properly. I have enough information from the search results. Let me compile the specification.
+# Perigon
 
-# Slates Specification for Perigon
-
-## Overview
-
-Perigon is a news data API platform that provides structured, AI-enriched access to real-time and historical news articles from 200,000+ global sources. It offers endpoints for searching articles, story clusters, people, companies, journalists, media sources, and topics, with each article enriched with 25+ metadata points including sentiment, entities, categories, and summaries.
+Perigon provides structured news articles, related story clusters, entity profiles, media source data, topic discovery, Wikipedia search, and account usage information.
 
 ## Authentication
 
-Perigon uses API key authentication. You obtain an API key by creating an account with Perigon Business Solutions at [perigon.io](https://www.perigon.io/).
+Create an API key in the Perigon developer dashboard. Requests authenticate using `Authorization: Bearer <API_KEY>` against `https://api.perigon.io/v1`. Endpoint and enrichment availability depend on the account plan. No OAuth or connection configuration is required.
 
-The API key must be included with every request. It can be passed in one of two ways:
+## Tools
 
-- **Query parameter**: Append `apiKey=YOUR_API_KEY` to the request URL.
-  - Example: `https://api.perigon.io/v1/articles/all?apiKey=YOUR_API_KEY&source=cnn.com`
-- **Bearer token header**: Pass the key as an `Authorization: Bearer YOUR_API_KEY` header.
+| Tool | Provider endpoint | Purpose |
+| --- | --- | --- |
+| `search_articles` | `GET /articles/all` | Keyword search and article lookup; source, entity, location, date, label, and sentiment filters. Returns article IDs, available article body, matched journalist IDs, and enrichment. |
+| `search_stories` | `GET /stories/all` | Search story clusters and track updates, article counts, and mentioned entities. Pass `storyId` to article search as `clusterId`. |
+| `search_people` | `GET /people/all` | Search public figures by name, Wikidata identifier, or occupation. Includes available position dates. |
+| `search_companies` | `GET /companies/all` | Search companies by name, company ID, domain, stock symbol, industry, sector, or country. |
+| `search_journalists` | `GET /journalists/all`, `GET /journalists/{id}` | Discover journalists by name, publication, coverage topic, and activity; retrieve an individual profile by ID. An explicit journalist ID selects direct lookup. |
+| `search_sources` | `GET /sources/all` | Discover publishers by name, domain, group, topic, country, audience, publishing volume, and paywall status. |
+| `search_topics` | `GET /topics/all` | Find topic names by name, category, or subcategory for subsequent content filtering. |
+| `search_wikipedia` | `GET /wikipedia/all` | Search Wikipedia pages and revision dates. Returns page title, summary, available section text, and metadata. The language input accepts `enwiki`, or the shorthand `en`; the current reference supports English Wikipedia. |
+| `get_account_usage` | `GET /limits` | Identify the connected organization and inspect request usage, account limits, and reset dates without consuming the monthly request quota. |
 
-The base URL for the API is `https://api.perigon.io/v1/`.
+## Responses and pagination
 
-No OAuth or additional scopes are required. Access to specific endpoints and features depends on the subscription plan associated with the API key.
+Search tools retain their named result arrays and total-result counts. They also return the complete provider response as `raw`, including unavailable enrichment values and additional metadata. Optional enrichment is omitted from the named projection when absent or null; numeric zero, boolean false, and provider-supplied empty values remain unchanged. Source paywall status retains its nullable representation. Article label objects become label names. Wikipedia content combines the available raw section text in section order.
 
-## Features
+Pagination uses zero-based `page` and provider-controlled `size`; most endpoints default to 10 results and support up to 100 results per page. Account limits may vary. The provider normally caps pageable results at 10,000; use date ranges to retrieve larger histories. Totals may be capped by the provider rather than exact counts.
 
-### Article Search
+For compatibility, company and person searches retain the required name input and all existing source-group and sorting choices. The legacy story `date` sorting choice maps to creation time. The legacy story and source `language` inputs are forwarded unchanged for compatibility and have no documented filtering effect. Perigon documents language filtering only for articles; the current story and source parameter schemas omit it. The integration provides keyword search; it does not expose the separate semantic vector-search API.
 
-Search and retrieve individual news articles matching specific criteria. Supports keyword-based and semantic (contextual) search queries. Articles can be filtered by source, country, category, date range, location, sentiment, specific companies or people mentioned, and whether to include reprints. Each article response includes enriched metadata such as sentiment score, extracted entities, geographic tags, topic classification, and AI-generated summaries.
+## Provider references
 
-- **Key parameters**: query terms (with Boolean operators like AND/OR), source domain, country, category, date range, sort order, reprint exclusion.
-- Semantic search understands query context beyond keyword matching.
-
-### Story Clustering
-
-Retrieve groups of related articles covering the same event or topic, organized as story clusters. Each cluster includes aggregate data such as the number of articles, overall sentiment, and a story summary. Useful for identifying trending stories, measuring coverage scope, and understanding how events are reported across multiple sources.
-
-- **Key parameters**: same filtering options as article search.
-- Results are returned at the story level rather than the individual article level.
-
-### People Search
-
-Search and retrieve information about public figures, politicians, celebrities, and other newsworthy individuals referenced in articles. Returns biographical information including occupation, position, and descriptions.
-
-### Company Search
-
-Search and retrieve profiles of companies and businesses referenced in articles. Returns company details including CEO information, employee count, industry classification, and business descriptions.
-
-- **Key parameters**: company name, domain, industry.
-
-### Journalist / Author Search
-
-Search for journalists and reporters by name, publication, location, or coverage area. Returns journalist profiles with their associated sources, locations, and publishing activity. Perigon maintains a database of 230,000+ journalists and systematically maps articles to their authors.
-
-- Author matching is not available for every article.
-
-### Media Source Search
-
-Discover and retrieve information about the 160,000+ media sources indexed by Perigon. Sources can be searched by name, domain, location, or audience size. Returns details including monthly visits, top topics, and geographic focus.
-
-### Topic Discovery
-
-Search available news topics and categories supported by the Perigon API. Useful for discovering available categories and subjects to use as filters in article or story queries.
-
-### Wikipedia Search
-
-Search Wikipedia pages for information on any topic. Returns page summaries, content, categories, and metadata.
-
-## Events
-
-The provider does not support events. Perigon is a read-only data retrieval API with no webhook or event subscription mechanism.
+- [API overview](https://perigon.io/docs/api/intro)
+- [Authentication and errors](https://perigon.io/docs/api/authentication)
+- [Official TypeScript SDK request routes and parameters](https://github.com/goperigon/perigon-ts/blob/main/src/apis/V1Api.ts)
+- [Official TypeScript SDK response models](https://github.com/goperigon/perigon-ts/blob/main/src/models/index.ts)
+- [Wikipedia](https://perigon.io/docs/api/wikipedia)
+- [Account usage](https://perigon.io/docs/api/account-usage)
+- [Pagination](https://perigon.io/docs/api/pagination)
+- [Language filtering restriction](https://perigon.io/docs/api/languages)

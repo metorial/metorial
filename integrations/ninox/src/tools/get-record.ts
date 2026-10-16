@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecord = SlateTool.create(spec, {
@@ -13,9 +13,13 @@ export let getRecord = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table (e.g. "A", "B")'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
+      tableId: z
+        .string()
+        .describe('Table ID (e.g. "A", "B"). Use get_table_schema to discover tables.'),
       recordId: z.number().describe('Numeric ID of the record to retrieve'),
       choiceStyle: z
         .enum(['ids', 'names'])
@@ -35,10 +39,7 @@ export let getRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let record = await client.getRecord(
       ctx.input.teamId,
@@ -55,9 +56,9 @@ export let getRecord = SlateTool.create(spec, {
         recordId: record.id,
         sequence: record.sequence,
         createdAt: record.createdAt,
-        createdBy: record.createdBy,
+        createdBy: record.createdBy === undefined ? undefined : String(record.createdBy),
         modifiedAt: record.modifiedAt,
-        modifiedBy: record.modifiedBy,
+        modifiedBy: record.modifiedBy === undefined ? undefined : String(record.modifiedBy),
         fields: record.fields
       },
       message: `Retrieved record **#${record.id}** from table **${ctx.input.tableId}**.`

@@ -1,6 +1,8 @@
 export { cancelEmergency } from './cancel-emergency';
 export { checkAppLimits } from './check-app-limits';
 export { checkReceipt } from './check-receipt';
+export { getGroup } from './get-group';
+export { listGroups } from './list-groups';
 export { listSounds } from './list-sounds';
 export { manageGroup } from './manage-group';
 export { manageGroupMembers } from './manage-group-members';

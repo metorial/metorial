@@ -1,8 +1,16 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client, eventbriteApiError } from './lib/client';
 
-let api = createAxios({
-  baseURL: 'https://www.eventbriteapi.com/v3'
+let api = createAuthenticatedAxios({
+  baseURL: 'https://www.eventbriteapi.com/v3',
+  timeout: 30_000,
+  errorAdapter: eventbriteApiError
 });
 
 export let auth = SlateAuth.create()
@@ -59,24 +67,21 @@ export let auth = SlateAuth.create()
 
       return {
         output: {
-          token: response.data.access_token
+          token: normalizeOAuthTokenResponse(response.data, { providerLabel: 'Eventbrite' })
+            .token
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await api.get('/users/me/', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let user = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
           id: user.id,
-          email: user.emails?.[0]?.email,
+          email:
+            user.emails?.find((email: { primary?: boolean; email?: string }) => email.primary)
+              ?.email ?? user.emails?.[0]?.email,
           name: user.name
         }
       };
@@ -94,26 +99,24 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('An Eventbrite access token is required.');
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: any }) => {
-      let response = await api.get('/users/me/', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let user = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
           id: user.id,
-          email: user.emails?.[0]?.email,
+          email:
+            user.emails?.find((email: { primary?: boolean; email?: string }) => email.primary)
+              ?.email ?? user.emails?.[0]?.email,
           name: user.name
         }
       };

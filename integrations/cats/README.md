@@ -1,11 +1,11 @@
-# <img src="logo.png" height="20"> Cats
+# <img src="logo.png" height="20"> CATS
 
-Manage the full recruitment lifecycle with an applicant tracking system. Create, update, search, and delete candidate records with resume uploads and parsing. Manage job orders with workflows, statuses, and career portal publishing. Track companies and contacts as a recruiting CRM. Build and manage candidate pipelines through configurable hiring workflow stages. Log activities (calls, emails, meetings) and create tasks against candidates, contacts, or jobs. Organize records with tags, lists, and custom fields. Perform advanced filtered searches with boolean logic and geo-distance queries. Initiate and retrieve full data backups.
+Manage candidates, job orders, companies, contacts, hiring pipelines, activities, tasks, and tags in CATS. Search recruiting records with keyword queries or structured filters, discover workflows and statuses, and inspect the connected site.
+
+## API documentation
+
+[Official CATS API v3 documentation](https://docs.catsone.com/api/v3/).
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

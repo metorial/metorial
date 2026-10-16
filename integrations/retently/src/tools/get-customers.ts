@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -67,14 +67,28 @@ export let getCustomers = SlateTool.create(spec, {
     })
   )
   .output(
-    z.object({
-      subscribers: z.array(z.any()).optional().describe('List of customer records'),
-      page: z.number().optional().describe('Current page number'),
-      pages: z.number().optional().describe('Total number of pages'),
-      total: z.number().optional().describe('Total number of customers matching the query')
-    })
+    z
+      .object({
+        subscribers: z.array(z.any()).optional().describe('List of customer records'),
+        page: z.number().optional().describe('Current page number'),
+        pages: z.number().optional().describe('Total number of pages'),
+        total: z.number().optional().describe('Total number of customers matching the query')
+      })
+      .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('Page must be a positive whole number.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 1000)
+    ) {
+      throw createApiServiceError('Limit must be a whole number between 1 and 1,000.');
+    }
     let client = new Client(ctx.auth.token);
 
     if (ctx.input.customerId) {

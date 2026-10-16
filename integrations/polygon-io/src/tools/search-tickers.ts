@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  cursorInput,
+  cursorOutput,
+  nextCursor,
+  requiredTicker,
+  responseRows
+} from '../lib/response';
 import { spec } from '../spec';
 
 let tickerResultSchema = z.object({
@@ -25,6 +32,7 @@ export let searchTickers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorInput,
       search: z
         .string()
         .optional()
@@ -62,8 +70,9 @@ export let searchTickers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      tickers: z.array(tickerResultSchema).describe('Array of matching tickers'),
-      count: z.number().describe('Number of results returned')
+      nextCursor: cursorOutput,
+      tickers: z.array(tickerResultSchema).optional().describe('Array of matching tickers'),
+      count: z.number().optional().describe('Number of results returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,27 +87,29 @@ export let searchTickers = SlateTool.create(spec, {
       active: ctx.input.active,
       sort: ctx.input.sort,
       order: ctx.input.order,
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let tickers = (data.results || []).map((r: any) => ({
-      ticker: r.ticker,
-      name: r.name,
-      market: r.market,
-      locale: r.locale,
-      primaryExchange: r.primary_exchange,
-      type: r.type,
-      active: r.active,
-      currencyName: r.currency_name,
-      lastUpdatedUtc: r.last_updated_utc
+    let tickers = responseRows(data.results)?.map((r: any) => ({
+      ticker: requiredTicker(r.ticker),
+      name: r.name ?? undefined,
+      market: r.market ?? undefined,
+      locale: r.locale ?? undefined,
+      primaryExchange: r.primary_exchange ?? undefined,
+      type: r.type ?? undefined,
+      active: r.active ?? undefined,
+      currencyName: r.currency_name ?? undefined,
+      lastUpdatedUtc: r.last_updated_utc ?? undefined
     }));
 
     return {
       output: {
+        nextCursor: nextCursor(data),
         tickers,
-        count: tickers.length
+        count: tickers?.length ?? undefined
       },
-      message: `Found **${tickers.length}** ticker(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${ctx.input.market ? ` in ${ctx.input.market}` : ''}.`
+      message: `Found **${tickers?.length ?? 0}** ticker(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${ctx.input.market ? ` in ${ctx.input.market}` : ''}.`
     };
   })
   .build();

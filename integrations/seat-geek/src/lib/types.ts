@@ -45,8 +45,8 @@ export interface SeatGeekVenue {
   url: string;
   score: number;
   postal_code: string;
-  address: string;
-  extended_address: string;
+  address: string | null;
+  extended_address: string | null;
   city: string;
   state: string;
   country: string;
@@ -89,7 +89,7 @@ export interface SeatGeekGenre {
 
 export interface SeatGeekPerformerLink {
   provider: string;
-  id: string;
+  id?: string;
   url: string;
 }
 
@@ -98,8 +98,8 @@ export interface SeatGeekPerformer {
   name: string;
   short_name: string;
   url: string;
-  image: string;
-  images: SeatGeekPerformerImage;
+  image: string | null;
+  images: SeatGeekPerformerImage | null;
   score: number;
   slug: string;
   type: string;
@@ -151,12 +151,14 @@ export interface SeatGeekEvent {
 
 export interface SeatGeekRecommendation {
   event: SeatGeekEvent;
-  affinity: number;
+  affinity?: number;
+  score?: number;
 }
 
 export interface SeatGeekPerformerRecommendation {
   performer: SeatGeekPerformer;
-  affinity: number;
+  affinity?: number;
+  score?: number;
 }
 
 export interface SeatGeekListResponse<T> {
@@ -180,7 +182,6 @@ export interface SeatGeekVenuesResponse {
 }
 
 export interface SeatGeekTaxonomiesResponse {
-  meta: SeatGeekMeta;
   taxonomies: SeatGeekTaxonomy[];
 }
 

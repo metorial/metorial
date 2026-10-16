@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredNumber, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let transactionSchema = z
@@ -73,24 +74,25 @@ export let listLoyaltyTransactions = SlateTool.create(spec, {
       createdAtLt: ctx.input.createdBefore
     });
 
-    let transactions = (result.data || []).map((t: any) => ({
-      transactionUuid: t.uuid,
-      credits: t.credits,
-      type: t.type,
-      contactUuid: t.contact?.uuid,
-      contactEmail: t.contact?.email,
-      shopUuid: t.shop?.uuid,
-      unitValue: t.unit_value,
-      unitName: t.unit?.name,
-      createdAt: t.created_at,
-      ...t
-    }));
+    let transactions = result.data.map((t: any) =>
+      mapEntity(t, {
+        transactionUuid: requiredString(t.uuid, 'transactionUuid'),
+        credits: requiredNumber(t.credits, 'credits'),
+        type: requiredString(t.type, 'transaction type'),
+        contactUuid: t.contact?.uuid,
+        contactEmail: t.contact?.email,
+        shopUuid: t.shop?.uuid,
+        unitValue: t.unit_value,
+        unitName: t.unit?.name,
+        createdAt: t.created_at
+      })
+    );
 
     return {
       output: {
         transactions,
         totalCount: result.meta?.total,
-        currentPage: result.meta?.page,
+        currentPage: result.meta?.current_page ?? result.meta?.page,
         lastPage: result.meta?.last_page
       },
       message: `Retrieved **${transactions.length}** loyalty transaction(s)${result.meta?.total ? ` out of ${result.meta.total} total` : ''}.`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -66,6 +66,10 @@ export let updateCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including fields not shown in the summary'),
       customerId: z.number().describe('Altoviz customer ID'),
       number: z.string().nullable().optional(),
       companyName: z.string().nullable().optional(),
@@ -83,7 +87,7 @@ export let updateCustomer = SlateTool.create(spec, {
       resolvedId = customer.id;
     }
     if (!resolvedId) {
-      throw new Error('Either customerId or internalId must be provided');
+      throw createApiServiceError('Either customerId or internalId must be provided');
     }
 
     let { customerId: _, internalId: __, ...updateData } = ctx.input;
@@ -91,6 +95,7 @@ export let updateCustomer = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         customerId: result.id,
         number: result.number,
         companyName: result.companyName,

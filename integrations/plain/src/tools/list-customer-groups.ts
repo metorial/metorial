@@ -37,7 +37,7 @@ export let listCustomerGroups = SlateTool.create(spec, {
 
     let res = await client.getCustomerGroups(ctx.input.first, ctx.input.after);
 
-    let groups = (res.edges || []).map((edge: any) => ({
+    let groups = res.edges.map((edge: any) => ({
       groupId: edge.node.id,
       name: edge.node.name,
       key: edge.node.key,
@@ -47,8 +47,8 @@ export let listCustomerGroups = SlateTool.create(spec, {
     return {
       output: {
         groups,
-        hasNextPage: res.pageInfo?.hasNextPage ?? false,
-        endCursor: res.pageInfo?.endCursor ?? null
+        hasNextPage: res.pageInfo.hasNextPage,
+        endCursor: res.pageInfo.endCursor
       },
       message: `Found **${groups.length}** customer groups`
     };

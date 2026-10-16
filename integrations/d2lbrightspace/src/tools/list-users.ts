@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { responseItems } from '../lib/response';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      userName: z.string().optional().describe('Filter by username (partial match)'),
+      userName: z.string().optional().describe('Filter by exact username'),
       externalEmail: z.string().optional().describe('Filter by external email'),
       orgDefinedId: z.string().optional().describe('Filter by org-defined ID'),
       bookmark: z.string().optional().describe('Pagination bookmark from a previous request')
@@ -46,15 +47,15 @@ export let listUsers = SlateTool.create(spec, {
       bookmark: ctx.input.bookmark
     });
 
-    let items = result?.Items || (Array.isArray(result) ? result : []);
+    let items = responseItems(result);
     let users = items.map((u: any) => ({
       userId: String(u.UserId),
-      userName: u.UserName,
-      firstName: u.FirstName,
-      lastName: u.LastName,
-      externalEmail: u.ExternalEmail,
-      orgDefinedId: u.OrgDefinedId,
-      isActive: u.Activation?.IsActive
+      userName: u.UserName ?? undefined,
+      firstName: u.FirstName ?? undefined,
+      lastName: u.LastName ?? undefined,
+      externalEmail: u.ExternalEmail ?? undefined,
+      orgDefinedId: u.OrgDefinedId ?? undefined,
+      isActive: u.Activation?.IsActive ?? undefined
     }));
 
     return {

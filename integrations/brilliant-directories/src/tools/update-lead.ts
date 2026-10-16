@@ -29,6 +29,10 @@ Supports updating contact info, categories, and matching members.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       lead: z.any().describe('The updated lead record.')
     })
   )
@@ -60,6 +64,7 @@ Supports updating contact info, categories, and matching members.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         lead: result.message
       },
       message: `Updated lead **${ctx.input.leadId}**.`

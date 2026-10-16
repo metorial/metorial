@@ -7,11 +7,14 @@ import {
   generatePdfFromHtml,
   generatePdfFromTemplate,
   generatePdfFromUrl,
+  getAccount,
   getAccountStatus,
   getAsset,
+  getFileUrl,
   getJob,
   listAssets,
-  listJobs
+  listJobs,
+  retrieveJobAsset
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     listJobs,
     getAsset,
     listAssets,
-    getAccountStatus
+    getAccountStatus,
+    getAccount,
+    retrieveJobAsset,
+    getFileUrl
   ],
   triggers: []
 });

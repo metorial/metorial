@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listSubmissionsTool = SlateTool.create(spec, {
@@ -25,6 +25,7 @@ export let listSubmissionsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       submissions: z.array(
         z.object({
           submissionId: z.string().describe('Submission ID'),
@@ -49,10 +50,7 @@ export let listSubmissionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
     if (ctx.input.includeUser) include.push('user');
@@ -81,7 +79,7 @@ export let listSubmissionsTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { submissions },
+      output: { raw: raw, submissions },
       message: `Found **${submissions.length}** submission(s) for assignment ${ctx.input.assignmentId}.`
     };
   })

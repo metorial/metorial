@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Algodocs
+# <img src="logo.png" height="20"> AlgoDocs
 
-Extract structured data from PDFs, images, Word, and Excel documents using AI-powered OCR and custom extractors. Upload documents via local file, URL, or base64 encoding. Manage extractors and folders. Retrieve extracted fields and table data by document or extractor ID, with filtering by folder, date, and limit. Export extracted data in Excel, JSON, XML, or custom Excel templates. Supports over 200 languages.
+Connect your AlgoDocs account, discover extractors and folders, upload documents from URLs or base64 content, and retrieve extracted data. Download original documents or available Excel, JSON, XML, TXT, and CSV results.
+
+See [tool details](docs/SPEC.md) and the [official API reference](https://api.algodocs.com/).
 
 ## License
 

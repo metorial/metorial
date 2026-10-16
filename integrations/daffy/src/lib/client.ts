@@ -1,4 +1,19 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+let assertPositiveInteger = (value: number, field: string) => {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw createApiServiceError(`${field} must be a positive whole number.`);
+  }
+};
+
+let paginationParams = (page?: number) => {
+  if (page !== undefined) assertPositiveInteger(page, 'page');
+  return page === undefined ? undefined : { page };
+};
+
+let assertNonEmpty = (value: string, field: string) => {
+  if (!value.trim()) throw createApiServiceError(`${field} cannot be empty.`);
+};
 
 export interface PaginatedResponse<T> {
   items: T[];
@@ -51,42 +66,44 @@ export interface DaffyBalance {
 export interface DaffyNonProfit {
   ein: string;
   name: string;
-  website: string;
-  city: string;
-  state: string;
+  website: string | null;
+  city: string | null;
+  state: string | null;
   public_url: string;
   public_path: string;
-  logo: string;
-  latitude: number;
-  longitude: number;
-  cause: DaffyCause;
-  causes: DaffyCause[];
+  logo: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  cause: DaffyCause | null;
+  causes?: DaffyCause[];
 }
 
 export interface DaffyDonation {
   id: number;
-  amount: number;
+  amount?: number;
   status: string;
-  note: string;
-  visibility: string;
+  note: string | null;
+  visibility?: string | null;
+  scheduled_donation_id?: number | null;
+  user_id?: number;
   created_at: string;
-  mailed_at: string;
+  mailed_at: string | null;
   non_profit: {
     ein: string;
     name: string;
-    website: string;
-    city: string;
-    state: string;
-    logo: string;
+    website: string | null;
+    city: string | null;
+    state: string | null;
+    logo: string | null;
     public_path: string;
     public_url: string;
     cause_id: number;
   };
-  fund: {
+  fund?: {
     id: number;
     name: string;
   };
-  user: {
+  user?: {
     id: number;
     name: string;
     city: string;
@@ -102,17 +119,18 @@ export interface DaffyContribution {
   status: string;
   valuation: number;
   currency: string;
+  frequency?: string;
   created_at: string;
-  received_at: string;
-  completed_at: string;
+  received_at: string | null;
+  completed_at: string | null;
 }
 
 export interface DaffyGift {
   name: string;
   amount: number;
-  message: string;
+  message: string | null;
   code: string;
-  ein: string;
+  ein: string | null;
   seen: boolean;
   status: string;
   updated_at: string;
@@ -125,11 +143,15 @@ export class Client {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    assertNonEmpty(config.token, 'Daffy API key');
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://public.daffy.org/v1',
-      headers: {
-        'X-Api-Key': config.token
-      }
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Daffy',
+          reason: 'daffy_api_error'
+        })
     });
   }
 
@@ -141,6 +163,7 @@ export class Client {
   }
 
   async getUserByUsername(username: string): Promise<DaffyUser> {
+    assertNonEmpty(username, 'username');
     let response = await this.http.get(`/users/${encodeURIComponent(username)}`);
     return response.data;
   }
@@ -155,6 +178,7 @@ export class Client {
   // === Causes ===
 
   async getUserCauses(userId: number): Promise<DaffyCause[]> {
+    assertPositiveInteger(userId, 'userId');
     let response = await this.http.get(`/users/${userId}/causes`);
     return response.data;
   }
@@ -163,7 +187,7 @@ export class Client {
 
   async getContributions(page?: number): Promise<PaginatedResponse<DaffyContribution>> {
     let response = await this.http.get('/contributions', {
-      params: page ? { page } : undefined
+      params: paginationParams(page)
     });
     return response.data;
   }
@@ -172,7 +196,7 @@ export class Client {
 
   async getDonations(page?: number): Promise<PaginatedResponse<DaffyDonation>> {
     let response = await this.http.get('/donations', {
-      params: page ? { page } : undefined
+      params: paginationParams(page)
     });
     return response.data;
   }
@@ -181,13 +205,16 @@ export class Client {
     userId: number,
     page?: number
   ): Promise<PaginatedResponse<DaffyDonation>> {
+    assertPositiveInteger(userId, 'userId');
     let response = await this.http.get(`/users/${userId}/donations`, {
-      params: page ? { page } : undefined
+      params: paginationParams(page)
     });
     return response.data;
   }
 
   async getDonation(userId: number, donationId: number): Promise<DaffyDonation> {
+    assertPositiveInteger(userId, 'userId');
+    assertPositiveInteger(donationId, 'donationId');
     let response = await this.http.get(`/users/${userId}/donations/${donationId}`);
     return response.data;
   }
@@ -198,6 +225,10 @@ export class Client {
     note?: string;
     privateMemo?: string;
   }): Promise<DaffyDonation> {
+    if (!Number.isFinite(params.amount) || params.amount < 10) {
+      throw createApiServiceError('Donation amount must be at least $10 USD.');
+    }
+    assertNonEmpty(params.ein, 'ein');
     let response = await this.http.post('/donations', {
       amount: params.amount,
       ein: params.ein,
@@ -208,6 +239,7 @@ export class Client {
   }
 
   async cancelDonation(donationId: number): Promise<void> {
+    assertPositiveInteger(donationId, 'donationId');
     await this.http.delete(`/donations/${donationId}`);
   }
 
@@ -215,17 +247,22 @@ export class Client {
 
   async getGifts(page?: number): Promise<PaginatedResponse<DaffyGift>> {
     let response = await this.http.get('/gifts', {
-      params: page ? { page } : undefined
+      params: paginationParams(page)
     });
     return response.data;
   }
 
   async getGift(code: string): Promise<DaffyGift> {
+    assertNonEmpty(code, 'giftCode');
     let response = await this.http.get(`/gifts/${encodeURIComponent(code)}`);
     return response.data;
   }
 
   async createGift(params: { name: string; amount: number }): Promise<DaffyGift> {
+    assertNonEmpty(params.name, 'recipientName');
+    if (!Number.isSafeInteger(params.amount) || params.amount < 18) {
+      throw createApiServiceError('Gift amount must be at least $18 USD in whole dollars.');
+    }
     let response = await this.http.post('/gifts', {
       name: params.name,
       amount: params.amount
@@ -236,6 +273,7 @@ export class Client {
   // === Non-Profits ===
 
   async getNonProfit(ein: string): Promise<DaffyNonProfit> {
+    assertNonEmpty(ein, 'ein');
     let response = await this.http.get(`/non_profits/${encodeURIComponent(ein)}`);
     return response.data;
   }
@@ -246,9 +284,15 @@ export class Client {
     page?: number;
   }): Promise<PaginatedResponse<DaffyNonProfit>> {
     let queryParams: Record<string, string | number> = {};
-    if (params.query) queryParams.query = params.query;
-    if (params.causeId) queryParams.cause_id = params.causeId;
-    if (params.page) queryParams.page = params.page;
+    if (params.query !== undefined) queryParams.query = params.query;
+    if (params.causeId !== undefined) {
+      assertPositiveInteger(params.causeId, 'causeId');
+      queryParams.cause_id = params.causeId;
+    }
+    if (params.page !== undefined) {
+      assertPositiveInteger(params.page, 'page');
+      queryParams.page = params.page;
+    }
 
     let response = await this.http.get('/non_profits', { params: queryParams });
     return response.data;

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listDevices = SlateTool.create(spec, {
   name: 'List Devices',
   key: 'list_devices',
-  description: `Retrieve all devices registered to the Pushbullet account. Returns device details including nickname, manufacturer, model, and SMS capability. Useful for finding device identifiers to target pushes or send SMS messages.`,
+  description: `Retrieve a page of devices registered to the Pushbullet account. Returns device details including nickname, manufacturer, model, and SMS capability. Useful for finding device identifiers to target pushes or send SMS messages.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -18,7 +18,13 @@ export let listDevices = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(true)
-        .describe('Only return non-deleted devices')
+        .describe('Only return non-deleted devices'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      limit: z.number().optional().describe('Maximum results per page, from 1 to 500'),
+      modifiedAfter: z
+        .string()
+        .optional()
+        .describe('Only return records modified after this Unix timestamp in seconds')
     })
   )
   .output(
@@ -34,33 +40,42 @@ export let listDevices = SlateTool.create(spec, {
           hasSms: z.string().optional().describe('Whether the device supports SMS'),
           appVersion: z.number().optional().describe('App version number'),
           created: z.string().describe('Creation Unix timestamp'),
-          modified: z.string().describe('Last modification Unix timestamp')
+          modified: z.string().describe('Last modification Unix timestamp'),
+          raw: z.unknown().optional().describe('Complete provider record')
         })
-      )
+      ),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor for the next page, when more results are available')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listDevices({
-      active: ctx.input.activeOnly
+      active: ctx.input.activeOnly,
+      cursor: ctx.input.cursor,
+      limit: ctx.input.limit,
+      modifiedAfter: ctx.input.modifiedAfter
     });
 
-    let devices = result.devices.map(d => ({
+    let devices = (result.devices ?? []).map(d => ({
       deviceIden: d.iden,
       active: d.active,
       nickname: d.nickname,
       manufacturer: d.manufacturer,
       model: d.model,
       icon: d.icon,
-      hasSms: d.has_sms,
+      hasSms: d.has_sms === undefined ? undefined : String(d.has_sms),
       appVersion: d.app_version,
       created: String(d.created),
-      modified: String(d.modified)
+      modified: String(d.modified),
+      raw: d
     }));
 
     return {
-      output: { devices },
+      output: { devices, cursor: result.cursor },
       message: `Found **${devices.length}** device(s).`
     };
   })

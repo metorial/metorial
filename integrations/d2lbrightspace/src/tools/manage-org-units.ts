@@ -55,15 +55,16 @@ export let listOrgUnits = SlateTool.create(spec, {
       let items = result?.Items || (Array.isArray(result) ? result : []);
       let orgUnits = items.map((o: any) => ({
         orgUnitId: String(o.Identifier),
-        name: o.Name,
-        code: o.Code,
-        type: o.Type
-          ? {
-              typeId: String(o.Type.Id),
-              typeName: o.Type.Name
-            }
-          : undefined,
-        path: o.Path
+        name: o.Name ?? undefined,
+        code: o.Code ?? undefined,
+        type:
+          (o.Type ?? undefined)
+            ? {
+                typeId: String(o.Type.Id),
+                typeName: o.Type.Name ?? undefined
+              }
+            : undefined,
+        path: o.Path ?? undefined
       }));
 
       return {
@@ -86,15 +87,16 @@ export let listOrgUnits = SlateTool.create(spec, {
     let items = result?.Items || (Array.isArray(result) ? result : []);
     let orgUnits = items.map((o: any) => ({
       orgUnitId: String(o.Identifier),
-      name: o.Name,
-      code: o.Code,
-      type: o.Type
-        ? {
-            typeId: String(o.Type.Id),
-            typeName: o.Type.Name
-          }
-        : undefined,
-      path: o.Path
+      name: o.Name ?? undefined,
+      code: o.Code ?? undefined,
+      type:
+        (o.Type ?? undefined)
+          ? {
+              typeId: String(o.Type.Id),
+              typeName: o.Type.Name ?? undefined
+            }
+          : undefined,
+      path: o.Path ?? undefined
     }));
 
     return {
@@ -136,7 +138,7 @@ export let listRoles = SlateTool.create(spec, {
     let roles = items.map((r: any) => ({
       roleId: String(r.Identifier),
       name: r.DisplayName || r.Name,
-      code: r.Code
+      code: r.Code ?? undefined
     }));
 
     return {

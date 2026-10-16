@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { configInput, projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let secretEntrySchema = z.object({
@@ -32,8 +33,8 @@ Secrets are environment variables stored in a specific config within a project.`
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug or name'),
-      config: z.string().describe('Config name (e.g., "dev", "stg", "prd")'),
+      project: projectInput,
+      config: configInput,
       action: z
         .enum(['list', 'get', 'set', 'delete'])
         .describe('Action to perform on secrets'),
@@ -61,6 +62,11 @@ Secrets are environment variables stored in a specific config within a project.`
   )
   .output(
     z.object({
+      providerResponse: z
+        .unknown()
+        .optional()
+        .describe('Original secret data returned by Doppler'),
+
       secrets: z
         .record(z.string(), secretEntrySchema)
         .optional()
@@ -91,6 +97,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
       return {
         output: {
+          providerResponse: secrets,
           secrets,
           secretCount: count
         },
@@ -100,7 +107,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.secretName) {
-        throw new Error('secretName is required for "get" action');
+        throw createApiServiceError('secretName is required for "get" action');
       }
 
       let result = await client.getSecret(
@@ -111,6 +118,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
       return {
         output: {
+          providerResponse: result,
           secret: {
             name: result.name,
             raw: result.value?.raw,
@@ -124,7 +132,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
     if (ctx.input.action === 'set') {
       if (!ctx.input.secrets || Object.keys(ctx.input.secrets).length === 0) {
-        throw new Error('secrets object is required for "set" action');
+        throw createApiServiceError('secrets object is required for "set" action');
       }
 
       let updated = await client.setSecrets(
@@ -136,6 +144,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
       return {
         output: {
+          providerResponse: updated,
           secrets: updated,
           secretCount: count
         },
@@ -145,7 +154,7 @@ Secrets are environment variables stored in a specific config within a project.`
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.secretName) {
-        throw new Error('secretName is required for "delete" action');
+        throw createApiServiceError('secretName is required for "delete" action');
       }
 
       await client.deleteSecret(ctx.input.project, ctx.input.config, ctx.input.secretName);
@@ -158,6 +167,6 @@ Secrets are environment variables stored in a specific config within a project.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

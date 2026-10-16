@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareImageDownload } from '../lib/image-download';
 import { spec } from '../spec';
 
 export let getImage = SlateTool.create(spec, {
@@ -31,6 +32,11 @@ export let getImage = SlateTool.create(spec, {
 
     let image = await client.getImage(ctx.input.imageId);
 
+    let downloadMessage = await prepareImageDownload(
+      attachment => ctx.addAttachment(attachment),
+      image.imageUrl
+    );
+
     return {
       output: {
         imageId: image._id,
@@ -39,7 +45,7 @@ export let getImage = SlateTool.create(spec, {
         createdAt: image.createdAt,
         updatedAt: image.updatedAt
       },
-      message: `Retrieved image **${image._id}**. URL: ${image.imageUrl}`
+      message: `Retrieved image **${image._id}**. ${downloadMessage}`
     };
   })
   .build();

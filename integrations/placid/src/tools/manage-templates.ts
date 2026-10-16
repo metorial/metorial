@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlacidClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,9 @@ export let manageTemplates = SlateTool.create(spec, {
       title: z
         .string()
         .optional()
-        .describe('Template title (required for create; optional for update)'),
+        .describe(
+          'Template title (required for create unless duplicating; optional for update)'
+        ),
       width: z.number().optional().describe('Template width in pixels (for create)'),
       height: z.number().optional().describe('Template height in pixels (for create)'),
       tags: z
@@ -77,7 +79,14 @@ export let manageTemplates = SlateTool.create(spec, {
         .describe(
           'Sort order: "created_at-asc", "created_at-desc", "updated_at-asc", "updated_at-desc", "title-asc", "title-desc" (for list)'
         ),
-      page: z.number().optional().describe('Page number for pagination (for list)')
+      page: z.number().optional().describe('Legacy page number for pagination (for list)'),
+      tag: z.string().optional().describe('Filter by a tag or nested tag (for list)'),
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Use the nextPageUrl from a previous list response to continue pagination; takes precedence over filters'
+        )
     })
   )
   .output(
@@ -86,13 +95,22 @@ export let manageTemplates = SlateTool.create(spec, {
         .optional()
         .describe('Single template (for get, create, update)'),
       templates: z
-        .array(templateOutputSchema)
+        .array(
+          templateOutputSchema.extend({
+            customData: templateOutputSchema.shape.customData.optional()
+          })
+        )
         .optional()
         .describe('List of templates (for list)'),
       hasNextPage: z
         .boolean()
         .optional()
         .describe('Whether more pages are available (for list)'),
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, or null when there are no more pages'),
       deleted: z.boolean().optional().describe('Whether the template was deleted (for delete)')
     })
   )
@@ -121,13 +139,16 @@ export let manageTemplates = SlateTool.create(spec, {
           collectionId: ctx.input.collectionId,
           titleFilter: ctx.input.titleFilter,
           orderBy: ctx.input.orderBy,
-          page: ctx.input.page
+          page: ctx.input.page,
+          tag: ctx.input.tag,
+          nextPageUrl: ctx.input.nextPageUrl
         });
         let templates = result.data.map(mapTemplate);
         return {
           output: {
             templates,
-            hasNextPage: result.links.next !== null
+            hasNextPage: Boolean(result.links.next),
+            nextPageUrl: result.links.next
           },
           message: `Found **${templates.length}** template(s).${result.links.next ? ' More pages available.' : ''}`
         };
@@ -135,7 +156,7 @@ export let manageTemplates = SlateTool.create(spec, {
 
       case 'get': {
         if (!ctx.input.templateUuid)
-          throw new Error('templateUuid is required for "get" action');
+          throw createApiServiceError('templateUuid is required for "get" action');
         let template = await client.getTemplate(ctx.input.templateUuid);
         return {
           output: { template: mapTemplate(template) },
@@ -144,7 +165,11 @@ export let manageTemplates = SlateTool.create(spec, {
       }
 
       case 'create': {
-        if (!ctx.input.title) throw new Error('title is required for "create" action');
+        if (!ctx.input.title && !ctx.input.fromTemplate) {
+          throw createApiServiceError(
+            'title is required for create unless fromTemplate is provided.'
+          );
+        }
         let template = await client.createTemplate({
           title: ctx.input.title,
           width: ctx.input.width,
@@ -164,7 +189,7 @@ export let manageTemplates = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.templateUuid)
-          throw new Error('templateUuid is required for "update" action');
+          throw createApiServiceError('templateUuid is required for "update" action');
         let template = await client.updateTemplate(ctx.input.templateUuid, {
           title: ctx.input.title,
           tags: ctx.input.tags,
@@ -178,7 +203,7 @@ export let manageTemplates = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.templateUuid)
-          throw new Error('templateUuid is required for "delete" action');
+          throw createApiServiceError('templateUuid is required for "delete" action');
         await client.deleteTemplate(ctx.input.templateUuid);
         return {
           output: { deleted: true },

@@ -14,17 +14,26 @@ export let getGoal = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      goalSlug: z.string().describe('URL-friendly identifier of the goal')
+      goalSlug: z.string().describe('URL-friendly identifier of the goal'),
+      datapoints: z
+        .boolean()
+        .optional()
+        .describe('Include the goal datapoints in the response'),
+      emaciated: z.boolean().optional().describe('Omit the road matrices from the response')
     })
   )
   .output(goalSchema)
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
-    let raw = await client.getGoal(ctx.input.goalSlug);
+    let raw = await client.getGoal(ctx.input.goalSlug, {
+      datapoints: ctx.input.datapoints,
+      emaciated: ctx.input.emaciated
+    });
     let goal = mapGoal(raw);
 
     return {

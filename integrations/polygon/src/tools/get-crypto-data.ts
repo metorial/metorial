@@ -1,12 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  polygonTickerList
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getCryptoData = SlateTool.create(spec, {
   name: 'Get Crypto Snapshot',
   key: 'get_crypto_data',
-  description: `Retrieve current market snapshots for one or more cryptocurrency tickers. Returns current day bar, previous day bar, last trade, last quote, and daily price change. Crypto tickers use the \`X:\` prefix (e.g., \`X:BTCUSD\`).`,
+  description: `Retrieve current market snapshots for one or more cryptocurrency tickers. Returns current day bar, previous day bar, last trade and daily price change. Crypto tickers use the \`X:\` prefix (e.g., \`X:BTCUSD\`).`,
   instructions: [
     'Use the X: prefix for crypto tickers (e.g., X:BTCUSD, X:ETHUSD).',
     'Provide a comma-separated list for multiple tickers.'
@@ -27,6 +33,7 @@ export let getCryptoData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       snapshots: z
         .array(
           z.object({
@@ -74,6 +81,7 @@ export let getCryptoData = SlateTool.create(spec, {
     let client = new PolygonClient(ctx.auth.token);
 
     let tickerInput = ctx.input.tickers?.trim();
+    if (tickerInput) tickerInput = polygonTickerList(tickerInput).join(',');
 
     let mapBar = (bar: any) =>
       bar
@@ -112,7 +120,7 @@ export let getCryptoData = SlateTool.create(spec, {
         : [];
 
       return {
-        output: { snapshots },
+        output: polygonOutput({ snapshots }, response),
         message: `Retrieved snapshot for **${tickerInput}**.`
       };
     }
@@ -121,7 +129,7 @@ export let getCryptoData = SlateTool.create(spec, {
       tickers: tickerInput || undefined
     });
 
-    let snapshots = (response.tickers || []).map((t: any) => ({
+    let snapshots = polygonRecords(response.tickers, 'tickers').map((t: any) => ({
       ticker: t.ticker,
       todaysChange: t.todaysChange,
       todaysChangePercent: t.todaysChangePerc,
@@ -139,7 +147,7 @@ export let getCryptoData = SlateTool.create(spec, {
     }));
 
     return {
-      output: { snapshots },
+      output: polygonOutput({ snapshots }, response),
       message: `Retrieved **${snapshots.length}** crypto snapshots.`
     };
   })

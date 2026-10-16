@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConveyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -113,6 +113,10 @@ export let grantAuthorization = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
 
+    if (Boolean(ctx.input.requestId) === Boolean(ctx.input.email)) {
+      throw createApiServiceError('Provide exactly one of requestId or email.');
+    }
+
     await client.createAuthorization({
       requestId: ctx.input.requestId,
       email: ctx.input.email,
@@ -154,6 +158,12 @@ export let updateAuthorization = SlateTool.create(spec, {
   .output(authorizationSchema)
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
+
+    if (ctx.input.accessGroupIds === undefined && ctx.input.status === undefined) {
+      throw createApiServiceError(
+        'Provide accessGroupIds or status to update the authorization.'
+      );
+    }
 
     let a = await client.updateAuthorization(ctx.input.authorizationId, {
       accessGroupIds: ctx.input.accessGroupIds,

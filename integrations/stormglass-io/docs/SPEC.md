@@ -1,78 +1,43 @@
-# Slates Specification for Stormglass Io
+# Stormglass API integration
 
-## Overview
+The integration reads global weather, marine, biological, solar, astronomical, elevation, and tide data through the documented v2 API. It uses an API key in the `Authorization` header. Connection configuration is empty; no OAuth scopes, refresh tokens, tenant IDs, or account discovery are needed.
 
-Stormglass.io is a professional global weather API that provides developers, researchers, and organizations with high-quality land-based (terrestrial), ocean and coastal weather data. The API delivers parameters such as wind, wave, currents, temperature, tides, solar data and other environmental metrics. It aggregates data from multiple trusted providers such as ECMWF, NOAA, Metoffice UK, Met.no, DWD, FMI, and other national meteorological agencies.
+## Tools and endpoints
 
-## Authentication
+| Tool | Method and path | Behavior |
+| --- | --- | --- |
+| `get_weather` | GET `/weather/point` | Forecasts and a 14-day forecast look-back; source-dependent forecast horizon. |
+| `get_marine_data` | GET `/weather/point` | Marine parameters from the same weather endpoint. |
+| `get_historical_weather` | GET `/historical/point` | Historical archive from 2014; requires start or end; up to 240 hours with end inclusive. Most recent data normally lags by seven days. |
+| `get_bio_data` | GET `/bio/point` | Ocean biological and land soil parameter time series. Provider `data` maps to `hours`; legacy `hours` responses remain accepted. |
+| `get_solar_data` | GET `/solar/point` | UV and solar radiation time series. Provider `data` maps to `hours`; legacy `hours` responses remain accepted. |
+| `get_astronomy_data` | GET `/astronomy/point` | Daily sun/moon and twilight data. Preserves nested current/closest moon phases and exposes existing phase aliases. Null rise/set/twilight times are retained. |
+| `get_elevation` | GET `/elevation/point` | Elevation or bathymetry in meters relative to sea level, including genuine zero and negative values. A missing/non-numeric elevation is an invalid upstream response. |
+| `get_tide_data` | GET `/tide/sea-level/point`, `/tide/extremes/point` | Hourly relative tide heights, extremes, or both. Keeps metadata for both calls. |
+| `list_tide_stations` | GET `/tide/stations`, `/tide/stations/area` | All stations or stations within a top-right/bottom-left coordinate box. |
 
-Stormglass.io uses **API Key** authentication.
+Each tool preserves the complete original response in optional `raw`. Existing normalized output fields retain their original types and requiredness. No file-generating operations, account identity endpoint, webhooks, or pagination are documented for this API.
 
-Users sign up at stormglass.io/register and generate an API key from the user dashboard. This key is required for all API requests.
+## Coordinates, times, sources, and units
 
-The API key is passed in the `Authorization` header of each HTTP request:
+Latitude must be between -90 and 90; longitude between -180 and 180. Parameter lists must include at least one nonblank name; source selection is optional and passed as a comma-separated list. No fixed allowlist blocks new provider parameters or sources.
 
-```
-Authorization: your-api-key
-```
+Stormglass interprets all times as UTC and ignores an ISO timestamp's timezone component. UNIX timestamps use seconds; ISO date/hour prefixes are accepted. Start must not follow end. Historical data uses an inclusive final hour and supports a maximum 239-hour difference between start and end (240 hourly points). With one boundary omitted the provider computes it from the other. Astronomy supports up to ten days per request. Forecast availability varies by source; standard forecasts can reach ten days, while some AI sources can reach fifteen days.
 
-No OAuth, scopes, or additional credentials are required. There is a single API key per account.
+Temperatures are in Celsius; wind/current speeds in meters per second; wave heights in meters; wave periods in seconds; precipitation in mm/hour; pressure in hPa; cloud cover and humidity in percent; visibility in kilometers. Solar radiation flux is in W/m². Bio salinity is in per mille and soil moisture is volumetric content; concentration units depend on the parameter. Provider values and source labels are preserved without unit conversion.
 
-## Features
+Tide datums are MSL (default), MLLW, LAT, MLW, MHW, MHHW, and HAT. Tide levels represent astronomical tide relative to the selected datum, not actual water depth or storm-surge effects. The tide sea-level end is inclusive; the extremes end is exclusive. Metadata includes the selected station and its distance from the requested coordinate in kilometers. Combined queries make two requests and preserve each one's quota/usage metadata.
 
-### Weather Forecast and Historical Data
+## Errors and verification boundary
 
-Retrieve weather information for a specific latitude and longitude. Available parameters include air temperature, air pressure, humidity, wind speed/direction/gust, precipitation, cloud cover, solar radiance, and UV index.
+Blank API keys, invalid coordinates, empty parameter names, invalid bounding boxes, reversed recognized time ranges, and malformed provider response envelopes produce structured service errors. Upstream failures preserve provider messages and HTTP status through shared HTTP/error handling. No quota, coordinates, timestamps, station identity, or elevation values are synthesized.
 
-- Coordinates (latitude and longitude) are required. Specific weather parameters can be requested.
-- Users can specify individual data sources (e.g., "metno", "noaa", "sg") or combine multiple ones.
-- Supports both forecast data (up to 10 days ahead in hourly resolution) and historical data.
-- Start and end times can be specified to define the time range.
+This refresh was verified by package build, typecheck, scoped formatting/lint, and static schema comparison. No live provider requests, E2E suites, or evals were run.
 
-### Marine Data
+## Official sources
 
-Retrieve marine environment information for a specific latitude and longitude, including parameters such as waveHeight, swellHeight, and waterTemperature.
-
-- Additional marine parameters include wave direction, currents, secondary swell, wind wave, ice cover, sea depth, chlorophyll, salinity, pH, oxygen, and phytoplankton.
-- Same coordinate-based querying and source selection as weather data.
-
-### Tide Data
-
-The tide API mainly consists of two capabilities: sea-level data and extremes (high/low tide times).
-
-- **Sea Level**: Returns predicted sea levels at hourly intervals for a given coordinate.
-- **Extremes**: Returns tide levels as well as timestamps for high/low tide (extremes) globally.
-- The tide API contains thousands of stations located around the world, and automatically selects the station closest to the provided coordinates.
-- Start and end date range can be specified. Datum reference can be configured (defaults to Mean Sea Level).
-
-### Tide Station Listing
-
-Retrieve a list of all available tide stations globally, including metadata such as station name and location.
-
-### Astronomy Data
-
-The Astronomy data includes sunrise, sunset, moonrise, moonset, moon phase, closest moon phase, and moon fraction. First and last light for outdoor activities and navigation is also included, with times according to nautical, civil, and astronomical definitions.
-
-- Queried by coordinate and date range.
-
-### Solar Data
-
-The solar request is used to fetch solar-related data for a point. This includes solar radiation and UV index data useful for solar energy forecasting.
-
-- Queried by coordinate, with optional date range, parameters, and source selection.
-
-### Elevation Data
-
-Retrieve elevation data for a specific coordinate point.
-
-- Queried by latitude and longitude.
-
-### Data Source Selection
-
-Stormglass.io collects data from a wide range of oceanographic and meteorological institutions. All data sources are fully transparent — developers can access each provider individually or use Stormglass AI, an intelligent global grid that automatically selects the best-performing source.
-
-- Use the source `"sg"` to leverage Stormglass AI automatic source selection.
-
-## Events
-
-The provider does not support events. Stormglass.io is a data retrieval API and does not offer webhooks or event subscription mechanisms.
+- [Authentication](https://docs.stormglass.io/authentication.md)
+- [Weather](https://docs.stormglass.io/weather.md), [historical](https://docs.stormglass.io/historical.md), [sources](https://docs.stormglass.io/sources.md)
+- [Biological](https://docs.stormglass.io/bio.md), [solar](https://docs.stormglass.io/solar.md), [astronomy](https://docs.stormglass.io/astronomy.md)
+- [Tides and stations](https://docs.stormglass.io/tide.md), [elevation](https://docs.stormglass.io/elevation.md)
+- [UTC date/time semantics](https://docs.stormglass.io/misc.md), [error codes](https://docs.stormglass.io/errors.md)

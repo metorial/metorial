@@ -26,6 +26,7 @@ export let confirmCheckoutTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       checkoutId: z.number().describe('Checkout ID'),
       transactionRef: z.string().optional().describe('Transaction reference'),
       transactionTotal: z.number().optional().describe('Total amount'),
@@ -54,6 +55,7 @@ export let confirmCheckoutTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         checkoutId: data.checkout_id,
         transactionRef: data.transaction_ref,
         transactionTotal: data.transaction_total,

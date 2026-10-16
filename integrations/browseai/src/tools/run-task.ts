@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTask, rawSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let runTask = SlateTool.create(spec, {
@@ -14,32 +15,40 @@ export let runTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot to run'),
+      robotId: z
+        .string()
+        .describe('ID of the robot to run. Call list_robots to discover robot IDs.'),
       inputParameters: z
         .record(z.string(), z.any())
         .describe(
           'Key-value pairs of input parameters for the robot (e.g., { "originUrl": "https://example.com" })'
-        )
+        ),
+      recordVideo: z
+        .boolean()
+        .optional()
+        .describe('Try to record a video while running this task')
     })
   )
   .output(
     z.object({
       taskId: z.string().describe('ID of the created task'),
-      status: z.string().describe('Current status of the task (e.g., "running")'),
-      robotId: z.string().describe('ID of the robot that was run')
+      status: z.string().describe('Current status of the task (e.g., "in-progress")'),
+      robotId: z
+        .string()
+        .describe('ID of the robot that was run. Call list_robots to discover robot IDs.'),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.createTask(ctx.input.robotId, ctx.input.inputParameters);
-
+    let result = await new Client(ctx.auth).createTask(
+      ctx.input.robotId,
+      ctx.input.inputParameters,
+      ctx.input.recordVideo
+    );
+    let task = mapTask(result);
     return {
-      output: {
-        taskId: result.id,
-        status: result.status,
-        robotId: result.robotId ?? ctx.input.robotId
-      },
-      message: `Task \`${result.id}\` created with status **${result.status}**.`
+      output: { taskId: task.taskId, status: task.status, robotId: task.robotId, raw: result },
+      message: `Task \`${task.taskId}\` created with status **${task.status}**.`
     };
   })
   .build();

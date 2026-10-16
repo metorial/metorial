@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let invoiceItemSchema = z.object({
@@ -68,10 +68,7 @@ export let createInvoice = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let invoiceData: Record<string, any> = {
       contact: ctx.input.contactId,
@@ -84,14 +81,20 @@ export let createInvoice = SlateTool.create(spec, {
     if (ctx.input.projectId) invoiceData.project = ctx.input.projectId;
     if (ctx.input.currency) invoiceData.currency = ctx.input.currency;
     if (ctx.input.exchangeRate) invoiceData.exchange_rate = ctx.input.exchangeRate;
-    if (ctx.input.ecStatus) invoiceData.ec_status = ctx.input.ecStatus;
+    if (ctx.input.ecStatus)
+      invoiceData.ec_status =
+        ctx.input.ecStatus === 'UK'
+          ? 'UK/Non-EC'
+          : ctx.input.ecStatus === 'EC VAT Moss'
+            ? 'EC VAT MOSS'
+            : ctx.input.ecStatus;
     if (ctx.input.placeOfSupply) invoiceData.place_of_supply = ctx.input.placeOfSupply;
     if (ctx.input.comments) invoiceData.comments = ctx.input.comments;
 
     if (ctx.input.invoiceItems && ctx.input.invoiceItems.length > 0) {
       invoiceData.invoice_items = ctx.input.invoiceItems.map(item => {
         let mapped: Record<string, any> = {};
-        if (item.itemType) mapped.item_type = item.itemType;
+        if (item.itemType) mapped.item_type = item.itemType === 'No Unit' ? '' : item.itemType;
         if (item.quantity !== undefined) mapped.quantity = item.quantity;
         if (item.price) mapped.price = item.price;
         if (item.description) mapped.description = item.description;

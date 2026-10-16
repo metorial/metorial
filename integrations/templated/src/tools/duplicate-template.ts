@@ -27,6 +27,7 @@ export let duplicateTemplate = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       templateId: z.string().optional(),
       name: z.string().optional(),
       width: z.number().optional(),
@@ -50,6 +51,7 @@ export let duplicateTemplate = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         templateId: result.id,
         name: result.name,
         width: result.width,

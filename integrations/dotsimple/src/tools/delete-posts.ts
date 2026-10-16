@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deletePosts = SlateTool.create(spec, {
@@ -15,6 +16,7 @@ export let deletePosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       postUuids: z.array(z.string()).min(1).describe('Array of post UUIDs to delete')
     })
   )
@@ -27,7 +29,7 @@ export let deletePosts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.postUuids.length === 1) {

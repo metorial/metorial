@@ -24,25 +24,29 @@ Use this to find campaign IDs for sending surveys or filtering feedback.`,
     z.object({
       campaigns: z
         .array(
-          z.object({
-            campaignId: z.string().describe('Campaign ID'),
-            name: z.string().describe('Campaign name'),
-            isActive: z.boolean().describe('Whether the campaign is active'),
-            templateId: z.string().optional().describe('Assigned template ID'),
-            metric: z.string().describe('Survey metric type (NPS, CSAT, CES, STAR)'),
-            type: z.string().describe('Campaign type (transactional, recurring, etc.)'),
-            channel: z.string().describe('Delivery channel (email, link, inapp, intercom)')
-          })
+          z
+            .object({
+              campaignId: z.string().describe('Campaign ID'),
+              name: z.string().describe('Campaign name'),
+              isActive: z.boolean().describe('Whether the campaign is active'),
+              templateId: z.string().optional().describe('Assigned template ID'),
+              metric: z.string().describe('Survey metric type (NPS, CSAT, CES, STAR)'),
+              type: z.string().describe('Campaign type (transactional, recurring, etc.)'),
+              channel: z.string().describe('Delivery channel (email, link, inapp, intercom)')
+            })
+            .passthrough()
         )
         .describe('List of campaigns'),
       templates: z
         .array(
-          z.object({
-            templateId: z.string().describe('Template ID'),
-            name: z.string().describe('Template name'),
-            channel: z.string().optional().describe('Template channel'),
-            metric: z.string().optional().describe('Template metric type')
-          })
+          z
+            .object({
+              templateId: z.string().describe('Template ID'),
+              name: z.string().describe('Template name'),
+              channel: z.string().optional().describe('Template channel'),
+              metric: z.string().optional().describe('Template metric type')
+            })
+            .passthrough()
         )
         .optional()
         .describe('List of templates (if requested)')
@@ -53,6 +57,7 @@ Use this to find campaign IDs for sending surveys or filtering feedback.`,
 
     let campaignData = await client.getCampaigns();
     let campaigns = (campaignData.campaigns || []).map((c: any) => ({
+      ...c,
       campaignId: c.id,
       name: c.name,
       isActive: c.isActive,
@@ -66,6 +71,7 @@ Use this to find campaign IDs for sending surveys or filtering feedback.`,
     if (ctx.input.includeTemplates) {
       let templateData = await client.getTemplates();
       templates = (templateData.templates || []).map((t: any) => ({
+        ...t,
         templateId: t.id,
         name: t.name,
         channel: t.channel,

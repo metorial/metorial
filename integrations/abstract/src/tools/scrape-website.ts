@@ -29,6 +29,10 @@ export let scrapeWebsite = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Country code to proxy the request through (e.g. "US", "GB")'),
+      useProxy: z
+        .boolean()
+        .optional()
+        .describe('Use a different proxy IP address on each call'),
       premiumProxy: z
         .boolean()
         .optional()
@@ -48,7 +52,8 @@ export let scrapeWebsite = SlateTool.create(spec, {
       url: ctx.input.url,
       renderJs: ctx.input.renderJs,
       proxyCountry: ctx.input.proxyCountry,
-      premiumProxy: ctx.input.premiumProxy
+      premiumProxy: ctx.input.premiumProxy,
+      useProxy: ctx.input.useProxy
     });
 
     let content =

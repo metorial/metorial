@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords, type ProviderResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getPriceData = SlateTool.create(spec, {
@@ -10,7 +10,7 @@ export let getPriceData = SlateTool.create(spec, {
   instructions: [
     'For current prices, only tokenId or symbol is needed.',
     'For historical OHLCV, provide a date range. Data is limited to 29-day windows per request.',
-    'Historical pricing data starts from 2019-01-01 for most tokens.'
+    'Historical availability depends on the endpoint and token.'
   ],
   constraints: ['Date range for OHLCV data is limited to 29-day windows per request.'],
   tags: {
@@ -35,12 +35,16 @@ export let getPriceData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       priceData: z.array(z.record(z.string(), z.any())).describe('Array of price data records')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProviderResponse;
 
     if (ctx.input.dataType === 'current') {
       result = await client.getPrice({
@@ -67,10 +71,10 @@ export let getPriceData = SlateTool.create(spec, {
       });
     }
 
-    let priceData = result?.data ?? [];
+    let priceData = getRecords(result);
 
     return {
-      output: { priceData },
+      output: { priceData, raw: result },
       message: `Retrieved **${priceData.length}** ${ctx.input.dataType} price record(s).`
     };
   })

@@ -157,7 +157,7 @@ export let cartSchema = z.object({
   customer: customerSchema
     .partial()
     .optional()
-    .describe('Customer information (null if anonymous)'),
+    .describe('Customer information; omit for anonymous carts'),
   abandonedCheckoutUrl: z.string().optional().describe('Abandoned checkout recovery URL'),
   cartToken: z.string().optional().describe('Cart token identifier')
 });

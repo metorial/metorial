@@ -6,11 +6,12 @@ import { spec } from '../spec';
 export let uploadImage = SlateTool.create(spec, {
   name: 'Upload Image',
   key: 'upload_image',
-  description: `Upload an image to ImgBB and receive publicly accessible hosted URLs. Supports base64-encoded image data or a URL pointing to an image. Returns the hosted image URL, a viewer page URL, a display URL, a thumbnail URL, and a delete URL.`,
+  description: `Upload an image to ImgBB and receive a downloadable image and publicly accessible hosted URLs. Supports base64-encoded image data or a URL pointing to an image. Returns the hosted image URL, a viewer page URL, a display URL, a thumbnail URL, and a delete URL.`,
   constraints: [
     'Maximum file size is 32 MB.',
-    'Supported formats: JPG, PNG, BMP, GIF.',
-    'Expiration must be between 60 and 15,552,000 seconds (60 seconds to 180 days).'
+    'Expiration must be a whole number between 60 and 15,552,000 seconds (60 seconds to 180 days).',
+    'Images are publicly accessible. The delete URL allows manual removal; store it securely.',
+    'Images configured for automatic deletion become unavailable after their expiration.'
   ],
   tags: {
     destructive: false,
@@ -20,16 +21,13 @@ export let uploadImage = SlateTool.create(spec, {
   .input(
     z.object({
       image: z.string().describe('Base64-encoded image data or a URL pointing to an image'),
-      name: z
-        .string()
-        .optional()
-        .describe('Custom filename for the uploaded image (without extension)'),
+      name: z.string().optional().describe('Custom filename for the uploaded image'),
       expiration: z
         .number()
         .min(60)
         .max(15552000)
         .optional()
-        .describe('Auto-delete the image after this many seconds (60 to 15,552,000)')
+        .describe('Auto-delete the image after this many whole seconds (60 to 15,552,000)')
     })
   )
   .output(
@@ -63,6 +61,13 @@ export let uploadImage = SlateTool.create(spec, {
       expiration: ctx.input.expiration
     });
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      mimeType: result.image.mime,
+      filename: result.image.filename
+    });
+
     let output = {
       imageId: result.id,
       title: result.title,
@@ -80,8 +85,8 @@ export let uploadImage = SlateTool.create(spec, {
     };
 
     let expirationNote =
-      result.expiration > 0
-        ? ` The image will auto-expire in ${result.expiration} seconds.`
+      ctx.input.expiration !== undefined
+        ? ` Automatic deletion was requested after ${ctx.input.expiration} seconds.`
         : '';
 
     return {

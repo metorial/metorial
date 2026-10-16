@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'linkup',
   name: 'Linkup',
   description:
-    'Search the web using natural language queries and retrieve real-time content for AI grounding. Supports standard and deep search, structured data extraction, and webpage fetching.',
+    'Search and research the web with sourced answers or structured data, retrieve webpage and PDF content, and monitor credit balance.',
   metadata: {},
   config,
   auth

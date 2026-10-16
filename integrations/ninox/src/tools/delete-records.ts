@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteRecords = SlateTool.create(spec, {
@@ -13,9 +13,13 @@ export let deleteRecords = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table (e.g. "A", "B")'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
+      tableId: z
+        .string()
+        .describe('Table ID (e.g. "A", "B"). Use get_table_schema to discover tables.'),
       recordIds: z.array(z.number()).min(1).describe('Array of numeric record IDs to delete')
     })
   )
@@ -26,10 +30,7 @@ export let deleteRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     if (ctx.input.recordIds.length === 1) {
       await client.deleteRecord(

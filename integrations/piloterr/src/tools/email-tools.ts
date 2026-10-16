@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let verifyEmailOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  email: z.string().optional().describe('Verified email address'),
+  status: z.string().optional().describe('Verification status (e.g., valid, invalid, unknown)')
+});
 
 export let verifyEmail = SlateTool.create(spec, {
   name: 'Verify Email',
@@ -16,28 +23,30 @@ export let verifyEmail = SlateTool.create(spec, {
       email: z.string().describe('Email address to verify')
     })
   )
-  .output(
-    z.object({
-      email: z.string().optional().describe('Verified email address'),
-      status: z
-        .string()
-        .optional()
-        .describe('Verification status (e.g., valid, invalid, unknown)')
-    })
-  )
+  .output(verifyEmailOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.verifyEmail({ email: ctx.input.email });
 
     return {
-      output: {
+      output: normalizeOutput(verifyEmailOutputSchema, {
+        raw: result,
         email: result.email,
         status: result.status
-      },
+      }),
       message: `Email **${ctx.input.email}** verification status: **${result.status ?? 'unknown'}**.`
     };
   })
   .build();
+
+let findEmailOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  email: z.string().optional().describe('Found email address'),
+  status: z.string().optional().describe('Email verification status'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  companyDomain: z.string().optional()
+});
 
 export let findEmail = SlateTool.create(spec, {
   name: 'Find Email',
@@ -54,17 +63,14 @@ export let findEmail = SlateTool.create(spec, {
       companyName: z.string().optional().describe('Company name (e.g., "Google")')
     })
   )
-  .output(
-    z.object({
-      email: z.string().optional().describe('Found email address'),
-      status: z.string().optional().describe('Email verification status'),
-      firstName: z.string().optional(),
-      lastName: z.string().optional(),
-      companyDomain: z.string().optional()
-    })
-  )
+  .output(findEmailOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
+    if (!ctx.input.companyDomain && !ctx.input.companyName) {
+      throw createApiServiceError(
+        'Provide companyDomain or companyName to find a professional email.'
+      );
+    }
     let result = await client.findEmail({
       fullName: ctx.input.fullName,
       companyDomain: ctx.input.companyDomain,
@@ -72,13 +78,14 @@ export let findEmail = SlateTool.create(spec, {
     });
 
     return {
-      output: {
+      output: normalizeOutput(findEmailOutputSchema, {
+        raw: result,
         email: result.email,
         status: result.status,
         firstName: result.first_name,
         lastName: result.last_name,
         companyDomain: result.company_domain
-      },
+      }),
       message: result.email
         ? `Found email **${result.email}** for **${ctx.input.fullName}** (status: ${result.status ?? 'unknown'}).`
         : `No email found for **${ctx.input.fullName}**.`

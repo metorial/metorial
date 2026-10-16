@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   archiveTinyUrl,
+  countTinyUrls,
   createTinyUrl,
   deleteTinyUrl,
   getAnalytics,
@@ -15,6 +16,7 @@ export let provider = Slate.create({
     createTinyUrl,
     getTinyUrl,
     listTinyUrls,
+    countTinyUrls,
     updateTinyUrl,
     deleteTinyUrl,
     archiveTinyUrl,

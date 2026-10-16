@@ -6,6 +6,6 @@ export let config = SlateConfig.create(
     environment: z
       .enum(['production', 'sandbox'])
       .default('production')
-      .describe('API environment to use. Sandbox uses test data from 2018-12-22.')
+      .describe('API environment to use. Sandbox returns test data.')
   })
 );

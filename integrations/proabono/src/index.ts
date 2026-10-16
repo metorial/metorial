@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getFeatures,
   manageBalance,
   manageCustomerSettings,
   manageCustomers,
@@ -13,6 +14,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getFeatures,
     manageCustomers,
     manageSubscriptions,
     manageUsages,

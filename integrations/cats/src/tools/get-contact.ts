@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -30,6 +31,7 @@ export let getContact = SlateTool.create(spec, {
       emails: z.array(z.any()).optional().describe('Email addresses'),
       phones: z.array(z.any()).optional().describe('Phone numbers'),
       address: z.any().optional().describe('Address'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links')
     })
   )
@@ -39,18 +41,25 @@ export let getContact = SlateTool.create(spec, {
 
     return {
       output: {
-        contactId: (data.id ?? ctx.input.contactId).toString(),
-        firstName: data.first_name,
-        lastName: data.last_name,
-        title: data.title,
-        notes: data.notes,
-        isHot: data.is_hot,
-        countryCode: data.country_code,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        emails: data._embedded?.emails,
-        phones: data._embedded?.phones,
+        contactId: requiredId(data?.id, 'record'),
+        firstName: data.first_name ?? undefined,
+        lastName: data.last_name ?? undefined,
+        title: data.title ?? undefined,
+        notes: data.notes ?? undefined,
+        isHot: data.is_hot ?? undefined,
+        countryCode: data.country_code ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
+        emails:
+          data._embedded?.emails ??
+          (data.emails && typeof data.emails === 'object'
+            ? Object.entries(data.emails)
+                .filter(([, value]) => typeof value === 'string')
+                .map(([kind, email]) => ({ email, is_primary: kind === 'primary' }))
+            : undefined),
+        phones: data._embedded?.phones ?? undefined,
         address: data._embedded?.address ?? data.address,
+        raw: data,
         links: data._links
       },
       message: `Retrieved contact **${data.first_name ?? ''} ${data.last_name ?? ''}** (ID: ${ctx.input.contactId}).`

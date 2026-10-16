@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export interface SearchImagesParams {
   search?: string;
@@ -9,7 +14,8 @@ export interface SearchImagesParams {
 }
 
 export interface SearchImagesResponse {
-  filteredResults: number;
+  filteredResults?: number;
+  resultCountMetadata?: unknown;
   images: ImageResult[];
 }
 
@@ -40,7 +46,8 @@ export interface DownloadedImagesParams {
 }
 
 export interface DownloadedImagesResponse {
-  filteredResults: number;
+  filteredResults?: number;
+  resultCountMetadata?: unknown;
   images: DownloadedImage[];
 }
 
@@ -74,14 +81,14 @@ export interface UpdateGenerationParams {
 }
 
 export interface Generation {
-  generationId: string;
+  generationId?: string;
   name: string;
   prompt: string;
   status: number;
   statusLabel: string;
   params: GenerationParam[];
   processMode?: string;
-  images: ImageResult[];
+  images?: ImageResult[];
   nbImages?: number;
   tags?: string[];
   metaData?: Record<string, unknown>;
@@ -97,7 +104,8 @@ export interface ListGenerationsParams {
 }
 
 export interface ListGenerationsResponse {
-  filteredResults: number;
+  filteredResults?: number;
+  resultCountMetadata?: unknown;
   generations: Generation[];
 }
 
@@ -121,7 +129,39 @@ let statusLabels: Record<number, string> = {
   4: 'error'
 };
 
-let mapImage = (img: any): ImageResult => ({
+interface ApiImage {
+  id: string;
+  url: string;
+  urlFull: string;
+  validate?: boolean;
+  free?: boolean;
+  titles?: Record<string, string>;
+}
+
+interface ApiDownloadedImage {
+  id: string;
+  url: string;
+  urlFull: string;
+  urlUpscale?: string;
+  urlUpscaleUHD: string;
+  downloadedAt: string;
+}
+
+interface ApiGeneration {
+  id?: string;
+  name: string;
+  prompt: string;
+  status: number;
+  params: GenerationParam[];
+  processMode?: string;
+  images?: ApiImage[];
+  nbImages?: number;
+  tags?: string[];
+  metaData?: Record<string, unknown>;
+  createdAt?: string;
+}
+
+let mapImage = (img: ApiImage): ImageResult => ({
   imageId: img.id,
   url: img.url,
   urlFull: img.urlFull,
@@ -130,7 +170,7 @@ let mapImage = (img: any): ImageResult => ({
   titles: img.titles
 });
 
-let mapDownloadedImage = (img: any): DownloadedImage => ({
+let mapDownloadedImage = (img: ApiDownloadedImage): DownloadedImage => ({
   imageId: img.id,
   previewUrl: img.url,
   fullUrl: img.urlFull,
@@ -139,15 +179,15 @@ let mapDownloadedImage = (img: any): DownloadedImage => ({
   downloadedAt: img.downloadedAt
 });
 
-let mapGeneration = (gen: any): Generation => ({
+let mapGeneration = (gen: ApiGeneration): Generation => ({
   generationId: gen.id,
   name: gen.name,
   prompt: gen.prompt,
   status: gen.status,
   statusLabel: statusLabels[gen.status] ?? 'unknown',
-  params: gen.params ?? [],
+  params: gen.params,
   processMode: gen.processMode,
-  images: (gen.images ?? []).map(mapImage),
+  images: gen.images?.map(mapImage),
   nbImages: gen.nbImages,
   tags: gen.tags,
   metaData: gen.metaData,
@@ -155,66 +195,83 @@ let mapGeneration = (gen: any): Generation => ({
 });
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'An All-Images.ai API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.all-images.ai/v1',
-      headers: {
-        'api-key': token
-      }
+      timeout: 60000,
+      authHeader: { name: 'api-key', value: token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'All-Images.ai',
+          reason: 'all_images_ai_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 
+  private validatePrompt(params: { prompt?: string; additionalPrompt?: string }) {
+    if (params.prompt !== undefined && params.prompt.length > 4096) {
+      throw createApiServiceError('The image prompt must contain at most 4096 characters.');
+    }
+    if (params.additionalPrompt !== undefined && params.additionalPrompt.length > 1024) {
+      throw createApiServiceError(
+        'The additional prompt must contain at most 1024 characters.'
+      );
+    }
+  }
+
   async searchImages(params: SearchImagesParams): Promise<SearchImagesResponse> {
-    let response = await this.axios.post('/images/search', {
-      search: params.search,
-      filterFree: params.filterFree,
-      limit: params.limit,
-      offset: params.offset,
-      sort: params.sort
-    });
+    let response = await this.axios.post<{ filteredResults?: unknown; images: ApiImage[] }>(
+      '/images/search',
+      pickDefined(params)
+    );
 
     return {
-      filteredResults: response.data.filteredResults ?? 0,
-      images: (response.data.images ?? []).map(mapImage)
+      filteredResults:
+        typeof response.data.filteredResults === 'number'
+          ? response.data.filteredResults
+          : undefined,
+      resultCountMetadata: response.data.filteredResults,
+      images: response.data.images.map(mapImage)
     };
   }
 
   async buyImage(imageId: string): Promise<DownloadedImage> {
-    let response = await this.axios.post('/images/buy', { id: imageId });
+    let response = await this.axios.post<ApiDownloadedImage>('/images/buy', { id: imageId });
     return mapDownloadedImage(response.data);
   }
 
   async getDownloadedImages(
     params: DownloadedImagesParams
   ): Promise<DownloadedImagesResponse> {
-    let response = await this.axios.post('/images/downladed', {
-      limit: params.limit,
-      offset: params.offset,
-      sort: params.sort,
-      afterCreatedAt: params.afterCreatedAt,
-      beforeCreatedAt: params.beforeCreatedAt
-    });
+    let response = await this.axios.post<{
+      filteredResults?: unknown;
+      images: ApiDownloadedImage[];
+    }>('/images/downladed', pickDefined(params));
 
     return {
-      filteredResults: response.data.filteredResults ?? 0,
-      images: (response.data.images ?? []).map(mapDownloadedImage)
+      filteredResults:
+        typeof response.data.filteredResults === 'number'
+          ? response.data.filteredResults
+          : undefined,
+      resultCountMetadata: response.data.filteredResults,
+      images: response.data.images.map(mapDownloadedImage)
     };
   }
 
   async createGeneration(params: CreateGenerationParams): Promise<Generation> {
-    let response = await this.axios.post('/image-generations', {
-      name: params.name,
-      mode: params.mode,
-      prompt: params.prompt,
-      additionalPrompt: params.additionalPrompt,
-      optimizePrompt: params.optimizePrompt,
-      params: params.params,
-      processMode: params.processMode,
-      tags: params.tags,
-      metaData: params.metaData
-    });
+    this.validatePrompt(params);
+    let response = await this.axios.post<ApiGeneration>(
+      '/image-generations',
+      pickDefined(params)
+    );
 
     return mapGeneration(response.data);
   }
@@ -223,44 +280,41 @@ export class Client {
     generationId: string,
     params: UpdateGenerationParams
   ): Promise<Generation> {
-    let response = await this.axios.put(`/image-generations/${generationId}`, {
-      name: params.name,
-      mode: params.mode,
-      prompt: params.prompt,
-      additionalPrompt: params.additionalPrompt,
-      optimizePrompt: params.optimizePrompt,
-      params: params.params,
-      processMode: params.processMode,
-      tags: params.tags,
-      metaData: params.metaData
-    });
+    this.validatePrompt(params);
+    let response = await this.axios.put<ApiGeneration>(
+      `/image-generations/${encodeURIComponent(generationId)}`,
+      pickDefined(params)
+    );
 
     return mapGeneration(response.data);
   }
 
   async retryGeneration(generationId: string): Promise<void> {
-    await this.axios.post(`/image-generations/retry/${generationId}`);
+    await this.axios.post(`/image-generations/retry/${encodeURIComponent(generationId)}`);
   }
 
   async getGeneration(generationId: string): Promise<Generation> {
-    let response = await this.axios.get(`/image-generations/${generationId}`);
+    let response = await this.axios.get<ApiGeneration>(
+      `/image-generations/${encodeURIComponent(generationId)}`
+    );
     return mapGeneration(response.data);
   }
 
   async listGenerations(params: ListGenerationsParams): Promise<ListGenerationsResponse> {
-    let response = await this.axios.get('/image-generations', {
-      params: {
-        limit: params.limit,
-        offset: params.offset,
-        sort: params.sort,
-        name: params.name,
-        tag: params.tag
-      }
+    let response = await this.axios.get<{
+      filteredResults?: unknown;
+      prints: ApiGeneration[];
+    }>('/image-generations', {
+      params: pickDefined(params)
     });
 
     return {
-      filteredResults: response.data.filteredResults ?? 0,
-      generations: (response.data.prints ?? []).map(mapGeneration)
+      filteredResults:
+        typeof response.data.filteredResults === 'number'
+          ? response.data.filteredResults
+          : undefined,
+      resultCountMetadata: response.data.filteredResults,
+      generations: response.data.prints.map(mapGeneration)
     };
   }
 
@@ -271,13 +325,13 @@ export class Client {
   }
 
   async checkApiKey(): Promise<{ email: string; name?: string }> {
-    let response = await this.axios.get('/api-keys/check');
+    let response = await this.axios.get<{ email: string; name?: string }>('/api-keys/check');
     return response.data;
   }
 
   async getCredits(): Promise<CreditInfo[]> {
-    let response = await this.axios.get('/credit');
-    return (response.data.credits ?? []).map((c: any) => ({
+    let response = await this.axios.get<{ credits: CreditInfo[] }>('/credit');
+    return response.data.credits.map(c => ({
       type: c.type,
       credit: c.credit,
       creditTotal: c.creditTotal,
@@ -294,11 +348,11 @@ export class Client {
   }
 
   async unsubscribeWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/api-keys/webhook/unsubscribe/${webhookId}`);
+    await this.axios.delete(`/api-keys/webhook/unsubscribe/${encodeURIComponent(webhookId)}`);
   }
 
   async getWebhook(webhookId: string): Promise<any> {
-    let response = await this.axios.get(`/api-keys/webhook/${webhookId}`);
+    let response = await this.axios.get(`/api-keys/webhook/${encodeURIComponent(webhookId)}`);
     return response.data;
   }
 }

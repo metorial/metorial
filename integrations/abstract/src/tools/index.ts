@@ -3,6 +3,7 @@ export * from './enrich-company';
 export * from './exchange-rates';
 export * from './generate-avatar';
 export * from './geolocate-ip';
+export * from './intelligence';
 export * from './process-image';
 export * from './public-holidays';
 export * from './scrape-website';

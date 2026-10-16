@@ -6,12 +6,10 @@ import { spec } from '../spec';
 export let findLocations = SlateTool.create(spec, {
   name: 'Find Locations',
   key: 'find_locations',
-  description: `Queries store locations from your StoreRocket account. Returns location data including addresses, phone numbers, operating hours, and custom fields.
-Supports filtering by geographic proximity using latitude/longitude coordinates and radius, or by a search query such as a city name, zip code, or address.`,
+  description: `Retains the original StoreRocket /api/v2/locations call and its geographic, search, and pagination inputs for compatibility. This route is not documented in the current API reference. Use list_projects and list_project_locations for supported V2 location listing.`,
   instructions: [
-    'To search by proximity, provide lat and lng coordinates along with an optional radius.',
-    'To search by address or place name, use the query parameter.',
-    'Use limit and offset for paginating through large result sets.'
+    'The documented legacy V1 endpoint is /api/locations and uses a separate legacy token; this tool retains its original V2 route and is not a V1 client. Its availability and filtering remain unverified.',
+    'For the documented location-list workflow, call list_projects and pass a project ID to list_project_locations.'
   ],
   tags: {
     destructive: false,

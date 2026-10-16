@@ -31,7 +31,9 @@ export let getCampaignEvents = SlateTool.create(spec, {
     z.object({
       events: z
         .record(z.string(), z.unknown())
-        .describe('Campaign event data including delivery and response tracking details')
+        .describe(
+          'Campaign event data including delivery and response tracking details; array responses are preserved under data'
+        )
     })
   )
   .handleInvocation(async ctx => {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let cardSchema = z.object({
@@ -33,10 +33,7 @@ export let listCards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let result = await client.listCards({
       page: ctx.input.page,

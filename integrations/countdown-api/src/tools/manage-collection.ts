@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireInteger, requireRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCollection = SlateTool.create(spec, {
@@ -28,7 +28,9 @@ export let manageCollection = SlateTool.create(spec, {
       collectionId: z
         .string()
         .optional()
-        .describe('Collection ID. Required for update, start, stop, and delete actions.'),
+        .describe(
+          'Collection ID from list_collections. Required for update, start, stop, and delete actions.'
+        ),
       name: z.string().optional().describe('Collection name. Required for create.'),
       enabled: z
         .boolean()
@@ -62,7 +64,9 @@ export let manageCollection = SlateTool.create(spec, {
       destinationIds: z
         .array(z.string())
         .optional()
-        .describe('Cloud storage destination IDs for automatic upload of results.'),
+        .describe(
+          'Cloud storage destination IDs from list_destinations for automatic result upload.'
+        ),
       notificationEmail: z
         .string()
         .optional()
@@ -117,15 +121,46 @@ export let manageCollection = SlateTool.create(spec, {
     let { action, collectionId } = ctx.input;
 
     if (action !== 'create' && !collectionId) {
-      throw new Error(`collectionId is required for action "${action}".`);
+      throw createApiServiceError(`collectionId is required for action "${action}".`);
     }
 
+    for (let [field, values, min, max] of [
+      ['scheduleDaysOfMonth', ctx.input.scheduleDaysOfMonth, 1, 31],
+      ['scheduleDaysOfWeek', ctx.input.scheduleDaysOfWeek, 0, 6],
+      ['scheduleHours', ctx.input.scheduleHours, 0, 23]
+    ] as const) {
+      for (let value of values ?? []) requireInteger(value, field, min, max);
+    }
+    if (
+      ctx.input.scheduleType === 'minutes' &&
+      ctx.input.scheduleDaysOfMonth &&
+      ctx.input.scheduleDaysOfWeek
+    ) {
+      throw createApiServiceError(
+        'Minutes schedules can use scheduleDaysOfMonth or scheduleDaysOfWeek, not both.'
+      );
+    }
+    if (
+      ctx.input.scheduleMinutes &&
+      ![
+        'every_minute',
+        'every_5_minutes',
+        'every_10_minutes',
+        'every_15_minutes',
+        'every_20_minutes',
+        'every_25_minutes',
+        'every_30_minutes',
+        'every_hour'
+      ].includes(ctx.input.scheduleMinutes)
+    ) {
+      throw createApiServiceError('Provide a documented scheduleMinutes frequency.');
+    }
     let result: any;
 
     switch (action) {
       case 'create': {
         if (!ctx.input.name) {
-          throw new Error('name is required when creating a collection.');
+          throw createApiServiceError('name is required when creating a collection.');
         }
         result = await client.createCollection({
           name: ctx.input.name,
@@ -181,8 +216,11 @@ export let manageCollection = SlateTool.create(spec, {
       }
     }
 
-    let collection = result.collection;
-    let success = result.request_info?.success ?? true;
+    let collection =
+      action === 'create' || action === 'update'
+        ? requireRecord(result.collection, 'collection')
+        : result.collection;
+    let success = result.request_info.success;
 
     return {
       output: {

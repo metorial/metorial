@@ -1,9 +1,67 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  responseArray,
+  responseCollection,
+  responseNullableString,
+  responseNumber,
+  responsePagination,
+  responseRecord,
+  responseRequiredNumber,
+  responseString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let keywordDataSchema = z.object({
+  country: z.string().nullable().optional().describe('Marketplace country code'),
+  recommendedPromotions: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Estimated daily promotional units for improving keyword rank'),
+  relevancyScore: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Relevance to the queried ASINs or keyword'),
+  updatedAt: z.string().nullable().optional().describe('Keyword update timestamp'),
+  primaryAsin: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('First ASIN used as the comparison baseline'),
+  organicRank: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Organic rank of the primary ASIN; zero means unranked'),
+  sponsoredRank: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Sponsored rank of the primary ASIN'),
+  overallRank: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('First overall rank of the primary ASIN'),
+  organicRankingAsinsCount: z.number().nullable().optional(),
+  sponsoredRankingAsinsCount: z.number().nullable().optional(),
+  averageCompetitorOrganicRank: z.number().nullable().optional(),
+  averageCompetitorSponsoredRank: z.number().nullable().optional(),
+  relativeOrganicPosition: z.number().nullable().optional(),
+  relativeSponsoredPosition: z.number().nullable().optional(),
+  competitorOrganicRank: z
+    .array(z.object({ asin: z.string(), organic_rank: z.number() }))
+    .nullable()
+    .optional()
+    .describe('Native per-competitor organic ranks'),
+  competitorSponsoredRank: z
+    .array(z.object({ asin: z.string(), sponsored_rank: z.number() }))
+    .nullable()
+    .optional()
+    .describe('Native per-competitor sponsored ranks'),
   keywordId: z.string().describe('Unique identifier for the keyword'),
   keyword: z.string().describe('The keyword text'),
   monthlySearchVolumeExact: z
@@ -23,15 +81,15 @@ let keywordDataSchema = z.object({
   suggestedPpcBidBroad: z
     .number()
     .nullable()
-    .describe('Suggested PPC bid for broad match in dollars'),
+    .describe('Suggested PPC bid for broad match in marketplace currency'),
   suggestedPpcBidExact: z
     .number()
     .nullable()
-    .describe('Suggested PPC bid for exact match in dollars'),
+    .describe('Suggested PPC bid for exact match in marketplace currency'),
   sponsoredBrandAdBid: z
     .number()
     .nullable()
-    .describe('Suggested Sponsored Brand Ad bid in dollars'),
+    .describe('Suggested Sponsored Brand Ad bid in marketplace currency'),
   easeOfRankingScore: z.number().nullable().describe('Ease of ranking score (0-100)'),
   organicProductCount: z
     .number()
@@ -95,16 +153,30 @@ export let keywordsByAsinTool = SlateTool.create(spec, {
         .describe('Maximum organic product count filter'),
       sort: z
         .enum([
-          'monthly_search_volume_exact',
-          '-monthly_search_volume_exact',
-          'monthly_search_volume_broad',
-          '-monthly_search_volume_broad',
+          'name',
+          '-name',
+          'dominant_category',
+          '-dominant_category',
           'monthly_trend',
           '-monthly_trend',
           'quarterly_trend',
           '-quarterly_trend',
+          'monthly_search_volume_exact',
+          '-monthly_search_volume_exact',
+          'monthly_search_volume_broad',
+          '-monthly_search_volume_broad',
+          'recommended_promotions',
+          '-recommended_promotions',
+          'sp_brand_ad_bid',
+          '-sp_brand_ad_bid',
+          'ppc_bid_broad',
+          '-ppc_bid_broad',
+          'ppc_bid_exact',
+          '-ppc_bid_exact',
           'ease_of_ranking_score',
           '-ease_of_ranking_score',
+          'relevancy_score',
+          '-relevancy_score',
           'organic_product_count',
           '-organic_product_count'
         ])
@@ -121,6 +193,10 @@ export let keywordsByAsinTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response including native attributes and metadata'),
       keywords: z
         .array(keywordDataSchema)
         .describe('List of keywords associated with the queried ASINs'),
@@ -156,31 +232,115 @@ export let keywordsByAsinTool = SlateTool.create(spec, {
       }
     });
 
-    let keywords = (result.data || []).map((item: any) => ({
-      keywordId: item.id || '',
-      keyword: item.attributes?.name || '',
-      monthlySearchVolumeExact: item.attributes?.monthly_search_volume_exact ?? null,
-      monthlySearchVolumeBroad: item.attributes?.monthly_search_volume_broad ?? null,
-      monthlyTrend: item.attributes?.monthly_trend ?? null,
-      quarterlyTrend: item.attributes?.quarterly_trend ?? null,
-      dominantCategory: item.attributes?.dominant_category ?? null,
-      suggestedPpcBidBroad: item.attributes?.ppc_bid_broad ?? null,
-      suggestedPpcBidExact: item.attributes?.ppc_bid_exact ?? null,
-      sponsoredBrandAdBid: item.attributes?.sp_brand_ad_bid ?? null,
-      easeOfRankingScore: item.attributes?.ease_of_ranking_score ?? null,
-      organicProductCount: item.attributes?.organic_product_count ?? null,
-      sponsoredProductCount: item.attributes?.sponsored_product_count ?? null
+    let keywords = responseCollection(result).map(item => ({
+      keywordId: item.id,
+      primaryAsin: responseNullableString(item.attributes.primary_asin, 'primary_asin'),
+      organicRank: responseNumber(item.attributes.organic_rank, 'organic_rank'),
+      sponsoredRank: responseNumber(item.attributes.sponsored_rank, 'sponsored_rank'),
+      overallRank: responseNumber(item.attributes.overall_rank, 'overall_rank'),
+      organicRankingAsinsCount: responseNumber(
+        item.attributes.organic_ranking_asins_count,
+        'organic_ranking_asins_count'
+      ),
+      sponsoredRankingAsinsCount: responseNumber(
+        item.attributes.sponsored_ranking_asins_count,
+        'sponsored_ranking_asins_count'
+      ),
+      averageCompetitorOrganicRank: responseNumber(
+        item.attributes.avg_competitor_organic_rank,
+        'avg_competitor_organic_rank'
+      ),
+      averageCompetitorSponsoredRank: responseNumber(
+        item.attributes.avg_competitor_sponsored_rank,
+        'avg_competitor_sponsored_rank'
+      ),
+      relativeOrganicPosition: responseNumber(
+        item.attributes.relative_organic_position,
+        'relative_organic_position'
+      ),
+      relativeSponsoredPosition: responseNumber(
+        item.attributes.relative_sponsored_position,
+        'relative_sponsored_position'
+      ),
+      competitorOrganicRank:
+        item.attributes.competitor_organic_rank == null
+          ? null
+          : responseArray(
+              item.attributes.competitor_organic_rank,
+              'competitor organic ranks'
+            ).map(value => {
+              let competitor = responseRecord(value, 'competitor organic rank');
+              return {
+                asin: responseString(competitor.asin, 'competitor ASIN'),
+                organic_rank: responseRequiredNumber(
+                  competitor.organic_rank,
+                  'competitor organic rank'
+                )
+              };
+            }),
+      competitorSponsoredRank:
+        item.attributes.competitor_sponsored_rank == null
+          ? null
+          : responseArray(
+              item.attributes.competitor_sponsored_rank,
+              'competitor sponsored ranks'
+            ).map(value => {
+              let competitor = responseRecord(value, 'competitor sponsored rank');
+              return {
+                asin: responseString(competitor.asin, 'competitor ASIN'),
+                sponsored_rank: responseRequiredNumber(
+                  competitor.sponsored_rank,
+                  'competitor sponsored rank'
+                )
+              };
+            }),
+      keyword: responseString(item.attributes.name, 'keyword name'),
+      country: responseNullableString(item.attributes.country, 'keyword country'),
+      recommendedPromotions: responseNumber(
+        item.attributes.recommended_promotions,
+        'recommended promotions'
+      ),
+      relevancyScore: responseNumber(item.attributes.relevancy_score, 'relevancy score'),
+      updatedAt: responseNullableString(
+        item.attributes.updated_at,
+        'keyword update timestamp'
+      ),
+      monthlySearchVolumeExact: responseNumber(
+        item.attributes.monthly_search_volume_exact,
+        'monthly_search_volume_exact'
+      ),
+      monthlySearchVolumeBroad: responseNumber(
+        item.attributes.monthly_search_volume_broad,
+        'monthly_search_volume_broad'
+      ),
+      monthlyTrend: responseNumber(item.attributes.monthly_trend, 'monthly_trend'),
+      quarterlyTrend: responseNumber(item.attributes.quarterly_trend, 'quarterly_trend'),
+      dominantCategory: responseNullableString(
+        item.attributes.dominant_category,
+        'dominant category'
+      ),
+      suggestedPpcBidBroad: responseNumber(item.attributes.ppc_bid_broad, 'ppc_bid_broad'),
+      suggestedPpcBidExact: responseNumber(item.attributes.ppc_bid_exact, 'ppc_bid_exact'),
+      sponsoredBrandAdBid: responseNumber(item.attributes.sp_brand_ad_bid, 'sp_brand_ad_bid'),
+      easeOfRankingScore: responseNumber(
+        item.attributes.ease_of_ranking_score,
+        'ease_of_ranking_score'
+      ),
+      organicProductCount: responseNumber(
+        item.attributes.organic_product_count,
+        'organic_product_count'
+      ),
+      sponsoredProductCount: responseNumber(
+        item.attributes.sponsored_product_count,
+        'sponsored_product_count'
+      )
     }));
 
-    let totalItems = result.meta?.total_items ?? null;
-    let nextPageCursor: string | null = null;
-    if (result.links?.next) {
-      let nextUrl = new URL(result.links.next, 'https://developer.junglescout.com');
-      nextPageCursor = nextUrl.searchParams.get('page[cursor]');
-    }
+    let { totalItems, nextPageCursor } = responsePagination(result);
 
     return {
       output: {
+        raw: result,
         keywords,
         totalItems,
         nextPageCursor

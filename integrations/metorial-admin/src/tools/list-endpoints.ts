@@ -1,4 +1,4 @@
-import { SlateTool } from '@slates/provider';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
@@ -37,7 +37,13 @@ export let listEndpoints = SlateTool.create(spec, {
       includeSchemas: z
         .boolean()
         .optional()
-        .describe('Include full query and body schema metadata. Defaults to false.')
+        .describe('Include full query and body schema metadata. Defaults to false.'),
+      includeResponseSchema: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include the documented response schema metadata for each endpoint. Defaults to false.'
+        )
     })
   )
   .output(
@@ -56,7 +62,8 @@ export let listEndpoints = SlateTool.create(spec, {
       method: ctx.input.method,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
-      includeSchemas: ctx.input.includeSchemas
+      includeSchemas: ctx.input.includeSchemas,
+      includeResponseSchema: ctx.input.includeResponseSchema
     });
 
     return {

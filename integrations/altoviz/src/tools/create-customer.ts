@@ -20,7 +20,7 @@ export let createCustomer = SlateTool.create(spec, {
       companyName: z.string().optional().describe('Company name'),
       phone: z.string().optional().describe('Phone number'),
       cellPhone: z.string().optional().describe('Cell phone number'),
-      type: z.string().optional().describe('Customer type (e.g. Company, Individual)'),
+      type: z.string().optional().describe('Customer type: Business, Consumer, or Government'),
       title: z.string().optional().describe('Customer title'),
       internalId: z
         .string()
@@ -55,7 +55,7 @@ export let createCustomer = SlateTool.create(spec, {
         .object({
           discount: z
             .object({
-              type: z.string().optional().describe('Discount type (e.g. Percent, Amount)'),
+              type: z.string().optional().describe('Discount type: Percent or Fixed'),
               value: z.number().optional().describe('Discount value')
             })
             .optional(),
@@ -71,6 +71,10 @@ export let createCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including fields not shown in the summary'),
       customerId: z.number().describe('Altoviz customer ID'),
       number: z.string().nullable().optional().describe('Customer number'),
       companyName: z.string().nullable().optional(),
@@ -86,6 +90,7 @@ export let createCustomer = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         customerId: result.id,
         number: result.number,
         companyName: result.companyName,

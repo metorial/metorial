@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let downloadPodTool = SlateTool.create(spec, {
   name: 'Download Proof of Delivery',
   key: 'download_pod',
-  description: `Downloads the Proof of Delivery (POD) PDF or shipping label PDF for a completed job. Returns a download URL for the requested document.`,
+  description: `Prepares a downloadable Proof of Delivery (POD) PDF or shipping label PDF for a job. The download URL requires the connected Detrack API key.`,
   tags: {
     readOnly: true
   }
@@ -15,6 +15,10 @@ export let downloadPodTool = SlateTool.create(spec, {
     z.object({
       doNumber: z.string().describe('Delivery order number of the job'),
       date: z.string().describe('Job date in YYYY-MM-DD format'),
+      type: z
+        .enum(['Delivery', 'Collection'])
+        .optional()
+        .describe('Job type to disambiguate matching D.O. numbers'),
       documentType: z
         .enum(['pod', 'shipping_label'])
         .default('pod')
@@ -34,17 +38,24 @@ export let downloadPodTool = SlateTool.create(spec, {
 
     let result =
       ctx.input.documentType === 'shipping_label'
-        ? await client.downloadJobShippingLabel(ctx.input.doNumber, ctx.input.date)
-        : await client.downloadJobPod(ctx.input.doNumber, ctx.input.date);
+        ? client.downloadJobShippingLabel(ctx.input.doNumber, ctx.input.date, ctx.input.type)
+        : client.downloadJobPod(ctx.input.doNumber, ctx.input.date, ctx.input.type);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      mimeType: 'application/pdf',
+      headers: { 'X-API-KEY': ctx.auth.token }
+    });
 
     return {
       output: {
         doNumber: ctx.input.doNumber,
         date: ctx.input.date,
         documentType: ctx.input.documentType,
-        url: result.url ?? ''
+        url: result.url
       },
-      message: `Generated ${ctx.input.documentType === 'shipping_label' ? 'shipping label' : 'POD'} download link for job **${ctx.input.doNumber}**.`
+      message: `Prepared the ${ctx.input.documentType === 'shipping_label' ? 'shipping label' : 'POD'} PDF for job **${ctx.input.doNumber}**.`
     };
   })
   .build();

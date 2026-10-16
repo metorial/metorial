@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -14,12 +14,21 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Blocknative API key obtained from blocknative.com/request-api-key')
+        .describe(
+          'Existing Blocknative API key. The provider announced API shutdown after June 19, 2026.'
+        )
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Enter a non-empty Blocknative API key.', {
+          reason: 'blocknative_missing_api_key'
+        });
+      }
+
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

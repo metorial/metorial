@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
 import { spec } from '../spec';
@@ -63,11 +63,13 @@ export let manageApprovalTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
+    if (Boolean(ctx.input.approvalId) !== Boolean(ctx.input.decision)) {
+      throw createApiServiceError(
+        'Provide both approvalId and decision to answer an approval, or omit both to list approvals.'
+      );
+    }
     if (ctx.input.approvalId && ctx.input.decision) {
       let result = await client.answerApproval(
         ctx.input.issueIdOrKey,

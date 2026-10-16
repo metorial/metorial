@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let apiClient = createAxios({
-  baseURL: 'https://api.hotspotsystem.com/v2.0'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,16 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await apiClient.get('/me', {
-        headers: {
-          'sn-apikey': ctx.output.token
-        }
-      });
+      let response = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
-          id: String(response.data.userId ?? response.data.id ?? ''),
-          name: response.data.operator ?? response.data.name ?? ''
+          id: String(response.data.userId),
+          name: response.data.operator
         }
       };
     }

@@ -8,7 +8,7 @@ export let getStrommix = SlateTool.create(spec, {
   key: 'get_strommix',
   description: `Provides data on Germany's electricity generation mix across renewable and non-renewable sources. Includes breakdowns by source type (biomass, solar, wind onshore/offshore, nuclear, fossil fuels, etc.) for a given time period. Useful for analyzing energy production trends and renewable energy adoption.`,
   instructions: [
-    'Use predefined periods like "last_month" or "last_7_days", or specify custom date ranges with from/to parameters.',
+    'Use predefined periods like "lastmonth" or "last7days", or specify custom date ranges with from/to parameters.',
     'If no period is specified, the API returns the latest available data.'
   ],
   tags: {
@@ -20,7 +20,9 @@ export let getStrommix = SlateTool.create(spec, {
       period: z
         .string()
         .optional()
-        .describe('Predefined time period, e.g. "last_month", "last_7_days"'),
+        .describe(
+          'Predefined time period, yeartodate, thismonth, lastmonth, last30days, last7days, last90days, lastyear, or last365days; legacy last_month/last_7_days also accepted'
+        ),
       from: z
         .string()
         .optional()
@@ -33,6 +35,7 @@ export let getStrommix = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       mix: z
         .record(z.string(), z.any())
         .optional()
@@ -50,7 +53,10 @@ export let getStrommix = SlateTool.create(spec, {
 
     return {
       output: {
-        mix: result.mix,
+        raw: result,
+        mix: Array.isArray(result.mix)
+          ? Object.fromEntries(result.mix.map(entry => [entry.type, entry]))
+          : result.mix,
         total: result.total
       },
       message: `Retrieved Germany's electricity generation mix${ctx.input.period ? ` for period **${ctx.input.period}**` : ''}.`

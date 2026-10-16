@@ -1,13 +1,26 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://felt.com/api/v2'
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Felt API token is required. Reconnect with a workspace API token.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://felt.com/api/v2',
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Felt',
+          reason: 'felt_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['detail', 'title', 'message'],
+          nestedKeys: ['errors']
+        })
     });
-    this.axios.defaults.headers.common.Authorization = `Bearer ${config.token}`;
   }
 
   // ── Maps ──────────────────────────────────────────────────────────────
@@ -37,7 +50,7 @@ export class Client {
   }
 
   async getMap(mapId: string) {
-    let response = await this.axios.get(`/maps/${mapId}`);
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}`);
     return response.data;
   }
 
@@ -83,12 +96,12 @@ export class Client {
       body.viewer_permissions = vp;
     }
 
-    let response = await this.axios.post(`/maps/${mapId}/update`, body);
+    let response = await this.axios.post(`/maps/${encodeURIComponent(mapId)}/update`, body);
     return response.data;
   }
 
   async deleteMap(mapId: string) {
-    let response = await this.axios.delete(`/maps/${mapId}`);
+    let response = await this.axios.delete(`/maps/${encodeURIComponent(mapId)}`);
     return response.data;
   }
 
@@ -97,7 +110,7 @@ export class Client {
     if (params.projectId !== undefined) body.project_id = params.projectId;
     if (params.folderId !== undefined) body.folder_id = params.folderId;
 
-    let response = await this.axios.post(`/maps/${mapId}/move`, body);
+    let response = await this.axios.post(`/maps/${encodeURIComponent(mapId)}/move`, body);
     return response.data;
   }
 
@@ -116,19 +129,21 @@ export class Client {
       body.destination = dest;
     }
 
-    let response = await this.axios.post(`/maps/${mapId}/duplicate`, body);
+    let response = await this.axios.post(`/maps/${encodeURIComponent(mapId)}/duplicate`, body);
     return response.data;
   }
 
   // ── Layers ────────────────────────────────────────────────────────────
 
   async listLayers(mapId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/layers`);
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}/layers`);
     return response.data;
   }
 
   async getLayer(mapId: string, layerId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/layers/${layerId}`);
+    let response = await this.axios.get(
+      `/maps/${encodeURIComponent(mapId)}/layers/${encodeURIComponent(layerId)}`
+    );
     return response.data;
   }
 
@@ -154,31 +169,46 @@ export class Client {
       if (l.layerGroupId !== undefined) item.layer_group_id = l.layerGroupId;
       if (l.legendDisplay !== undefined) item.legend_display = l.legendDisplay;
       if (l.legendVisibility !== undefined) item.legend_visibility = l.legendVisibility;
-      if (l.ordering_key !== undefined) item.ordering_key = l.ordering_key;
+      if (l.ordering_key !== undefined) {
+        let orderingKey = Number(l.ordering_key);
+        if (!l.ordering_key.trim() || !Number.isSafeInteger(orderingKey)) {
+          throw createApiServiceError(
+            'orderingKey must contain a safe integer, for example "1".'
+          );
+        }
+        item.ordering_key = orderingKey;
+      }
       if (l.refreshPeriod !== undefined) item.refresh_period = l.refreshPeriod;
       if (l.subtitle !== undefined) item.subtitle = l.subtitle;
       if (l.metadata !== undefined) item.metadata = l.metadata;
       return item;
     });
 
-    let response = await this.axios.post(`/maps/${mapId}/layers`, body);
+    let response = await this.axios.post(`/maps/${encodeURIComponent(mapId)}/layers`, body);
     return response.data;
   }
 
   async deleteLayer(mapId: string, layerId: string) {
-    let response = await this.axios.delete(`/maps/${mapId}/layers/${layerId}`);
+    let response = await this.axios.delete(
+      `/maps/${encodeURIComponent(mapId)}/layers/${encodeURIComponent(layerId)}`
+    );
     return response.data;
   }
 
   async updateLayerStyle(mapId: string, layerId: string, style: Record<string, unknown>) {
-    let response = await this.axios.post(`/maps/${mapId}/layers/${layerId}/update_style`, {
-      style
-    });
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/layers/${encodeURIComponent(layerId)}/update_style`,
+      {
+        style
+      }
+    );
     return response.data;
   }
 
   async refreshLayer(mapId: string, layerId: string) {
-    let response = await this.axios.post(`/maps/${mapId}/layers/${layerId}/refresh`);
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/layers/${encodeURIComponent(layerId)}/refresh`
+    );
     return response.data;
   }
 
@@ -186,24 +216,28 @@ export class Client {
     let body: Record<string, unknown> = { import_url: params.importUrl };
     if (params.name !== undefined) body.name = params.name;
 
-    let response = await this.axios.post(`/maps/${mapId}/upload`, body);
+    let response = await this.axios.post(`/maps/${encodeURIComponent(mapId)}/upload`, body);
     return response.data;
   }
 
-  async getLayerExportLink(mapId: string, layerId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/layers/${layerId}/get_export_link`);
+  async getLayerExportLink(mapId: string, layerId: string): Promise<{ export_link: string }> {
+    let response = await this.axios.get(
+      `/maps/${encodeURIComponent(mapId)}/layers/${encodeURIComponent(layerId)}/get_export_link`
+    );
     return response.data;
   }
 
   // ── Layer Groups ──────────────────────────────────────────────────────
 
   async listLayerGroups(mapId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/layer_groups`);
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}/layer_groups`);
     return response.data;
   }
 
   async getLayerGroup(mapId: string, layerGroupId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/layer_groups/${layerGroupId}`);
+    let response = await this.axios.get(
+      `/maps/${encodeURIComponent(mapId)}/layer_groups/${encodeURIComponent(layerGroupId)}`
+    );
     return response.data;
   }
 
@@ -226,41 +260,53 @@ export class Client {
       return item;
     });
 
-    let response = await this.axios.post(`/maps/${mapId}/layer_groups`, body);
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/layer_groups`,
+      body
+    );
     return response.data;
   }
 
   async deleteLayerGroup(mapId: string, layerGroupId: string) {
-    let response = await this.axios.delete(`/maps/${mapId}/layer_groups/${layerGroupId}`);
+    let response = await this.axios.delete(
+      `/maps/${encodeURIComponent(mapId)}/layer_groups/${encodeURIComponent(layerGroupId)}`
+    );
     return response.data;
   }
 
   // ── Elements ──────────────────────────────────────────────────────────
 
   async listElements(mapId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/elements`);
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}/elements`);
     return response.data;
   }
 
   async createOrUpdateElements(mapId: string, featureCollection: Record<string, unknown>) {
-    let response = await this.axios.post(`/maps/${mapId}/elements`, featureCollection);
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/elements`,
+      featureCollection
+    );
     return response.data;
   }
 
   async deleteElement(mapId: string, elementId: string) {
-    let response = await this.axios.delete(`/maps/${mapId}/elements/${elementId}`);
+    let response = await this.axios.delete(
+      `/maps/${encodeURIComponent(mapId)}/elements/${encodeURIComponent(elementId)}`
+    );
     return response.data;
   }
 
   // ── Element Groups ────────────────────────────────────────────────────
 
   async listElementGroups(mapId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/element_groups`);
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}/element_groups`);
     return response.data;
   }
 
   async getElementGroup(mapId: string, groupId: string) {
-    let response = await this.axios.get(`/maps/${mapId}/element_groups/${groupId}`);
+    let response = await this.axios.get(
+      `/maps/${encodeURIComponent(mapId)}/element_groups/${encodeURIComponent(groupId)}`
+    );
     return response.data;
   }
 
@@ -273,26 +319,33 @@ export class Client {
       symbol?: string;
     }>
   ) {
-    let response = await this.axios.post(`/maps/${mapId}/element_groups`, groups);
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/element_groups`,
+      groups
+    );
     return response.data;
   }
 
   // ── Comments ──────────────────────────────────────────────────────────
 
   async exportComments(mapId: string, format: string = 'json') {
-    let response = await this.axios.get(`/maps/${mapId}/comments/export`, {
+    let response = await this.axios.get(`/maps/${encodeURIComponent(mapId)}/comments/export`, {
       params: { format }
     });
     return response.data;
   }
 
   async resolveComment(mapId: string, commentId: string) {
-    let response = await this.axios.post(`/maps/${mapId}/comments/${commentId}/resolve`);
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/comments/${encodeURIComponent(commentId)}/resolve`
+    );
     return response.data;
   }
 
   async deleteComment(mapId: string, commentId: string) {
-    let response = await this.axios.delete(`/maps/${mapId}/comments/${commentId}`);
+    let response = await this.axios.delete(
+      `/maps/${encodeURIComponent(mapId)}/comments/${encodeURIComponent(commentId)}`
+    );
     return response.data;
   }
 
@@ -306,9 +359,13 @@ export class Client {
   // ── Embed Tokens ──────────────────────────────────────────────────────
 
   async createEmbedToken(mapId: string, userEmail: string) {
-    let response = await this.axios.post(`/maps/${mapId}/embed_token`, null, {
-      params: { user_email: userEmail }
-    });
+    let response = await this.axios.post(
+      `/maps/${encodeURIComponent(mapId)}/embed_token`,
+      null,
+      {
+        params: { user_email: userEmail }
+      }
+    );
     return response.data;
   }
 
@@ -323,7 +380,7 @@ export class Client {
   }
 
   async getSource(sourceId: string) {
-    let response = await this.axios.get(`/sources/${sourceId}`);
+    let response = await this.axios.get(`/sources/${encodeURIComponent(sourceId)}`);
     return response.data;
   }
 
@@ -337,17 +394,20 @@ export class Client {
   }
 
   async updateSource(sourceId: string, params: Record<string, unknown>) {
-    let response = await this.axios.post(`/sources/${sourceId}/update`, params);
+    let response = await this.axios.post(
+      `/sources/${encodeURIComponent(sourceId)}/update`,
+      params
+    );
     return response.data;
   }
 
   async syncSource(sourceId: string) {
-    let response = await this.axios.post(`/sources/${sourceId}/sync`);
+    let response = await this.axios.post(`/sources/${encodeURIComponent(sourceId)}/sync`);
     return response.data;
   }
 
   async deleteSource(sourceId: string) {
-    let response = await this.axios.delete(`/sources/${sourceId}`);
+    let response = await this.axios.delete(`/sources/${encodeURIComponent(sourceId)}`);
     return response.data;
   }
 
@@ -362,7 +422,7 @@ export class Client {
   }
 
   async getProject(projectId: string) {
-    let response = await this.axios.get(`/projects/${projectId}`);
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 
@@ -396,12 +456,15 @@ export class Client {
     if (params.maxInheritedPermission !== undefined)
       body.max_inherited_permission = params.maxInheritedPermission;
 
-    let response = await this.axios.post(`/projects/${projectId}/update`, body);
+    let response = await this.axios.post(
+      `/projects/${encodeURIComponent(projectId)}/update`,
+      body
+    );
     return response.data;
   }
 
   async deleteProject(projectId: string) {
-    let response = await this.axios.delete(`/projects/${projectId}`);
+    let response = await this.axios.delete(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 

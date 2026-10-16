@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,7 @@ export let validatePhone = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       isValid: z.boolean().describe('Whether the phone number is valid'),
       isMobile: z.boolean().describe('Whether the number is a mobile number'),
       numberType: z
@@ -37,29 +38,31 @@ export let validatePhone = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.validatePhoneNumber(ctx.input.phoneNumber, ctx.input.country);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'Phone validation failed');
-    }
-
     let data = result.data;
+    let isValid = data.isValid ?? data.isvalid;
+    if (isValid === undefined)
+      throw createApiServiceError('APIVerve returned phone data without isValid.');
     let output = {
-      isValid: data.isvalid,
+      rawData: data,
+      isValid,
       isMobile: data.isMobile,
       numberType: data.type,
       country: data.detectedCountry,
       countryName: data.countryName,
       countryCallingCode: data.countrycode,
-      formattedInternational: data.formatted?.international ?? '',
-      formattedNational: data.formatted?.national ?? '',
-      formattedE164: data.formatted?.e164 ?? '',
-      formattedRfc: data.formatted?.rfc ?? ''
+      formattedInternational: data.formatted.international,
+      formattedNational: data.formatted.national,
+      formattedE164: data.formatted.e164,
+      formattedRfc: data.formatted.rfc
     };
 
-    let status = data.isvalid ? '**valid**' : '**invalid**';
+    let status = isValid ? '**valid**' : '**invalid**';
 
     return {
-      output,
-      message: `Phone number \`${ctx.input.phoneNumber}\` is ${status}. ${data.isvalid ? `Formatted: ${data.formatted?.international ?? ctx.input.phoneNumber}` : ''}`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `Phone number \`${ctx.input.phoneNumber}\` is ${status}. ${isValid ? `Formatted: ${data.formatted?.international ?? ctx.input.phoneNumber}` : ''}`
+      )
     };
   })
   .build();

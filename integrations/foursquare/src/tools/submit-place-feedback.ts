@@ -6,13 +6,15 @@ import { spec } from '../spec';
 export let submitPlaceFeedback = SlateTool.create(spec, {
   name: 'Submit Place Feedback',
   key: 'submit_place_feedback',
-  description: `Propose edits to place attributes or flag problematic places in the Foursquare database. Supports two modes: **propose an edit** to correct or update place details (name, address, phone, categories, etc.), or **flag a problem** to report issues like closures, duplicates, or incorrect locations.`,
+  description: `DEPRECATED — use \`suggest_place_changes\` instead. Propose edits to place attributes or flag problematic places in the Foursquare database. Supports two modes: **propose an edit** to correct or update place details (name, address, phone, categories, etc.), or **flag a problem** to report issues like closures, duplicates, or incorrect locations.`,
   instructions: [
+    'Use suggest_place_changes with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Set feedbackType to "edit" to propose changes to a place, or "flag" to report a problem.',
     'For edits: provide any fields you want to change. Only changed fields are needed.',
     'For flags: the problemType field is required. Use "duplicate" with duplicateFsqId if flagging a duplicate.'
   ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

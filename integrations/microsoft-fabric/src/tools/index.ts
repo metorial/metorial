@@ -1,4 +1,14 @@
-export { coreCreateItem } from './core';
+export {
+  coreCancelItemJob,
+  coreCreateItem,
+  coreDeleteItem,
+  coreGetItem,
+  coreGetItemJob,
+  coreGetOperationState,
+  coreListItems,
+  coreListWorkspaces,
+  coreUpdateItem
+} from './core';
 export {
   datafactoryCreateDataflow,
   datafactoryCreatePipeline,

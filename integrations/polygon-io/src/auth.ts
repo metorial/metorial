@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -12,9 +12,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string()
+      apiKey: z.string().describe('API key from the Polygon.io or Massive dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Enter a non-empty Polygon.io API key.');
       return {
         output: {
           token: ctx.input.apiKey

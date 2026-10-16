@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 export interface FinerworksClientConfig {
   webApiKey: string;
@@ -6,14 +6,72 @@ export interface FinerworksClientConfig {
   testMode?: boolean;
 }
 
+// These checks preserve the public number schemas while validating provider IDs.
+export function requireInteger(value: number, label: string, minimum = 1, maximum?: number) {
+  if (
+    !Number.isSafeInteger(value) ||
+    value < minimum ||
+    (maximum !== undefined && value > maximum)
+  ) {
+    throw createApiServiceError(
+      `${label} must be an integer between ${minimum} and ${maximum ?? Number.MAX_SAFE_INTEGER}.`
+    );
+  }
+}
+
+export function requiredNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw createApiServiceError(`FinerWorks returned an invalid or missing ${field}.`, {
+      reason: 'invalid_provider_response'
+    });
+  }
+  return value;
+}
+
+export function requiredString(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw createApiServiceError(`FinerWorks returned an invalid or missing ${field}.`, {
+      reason: 'invalid_provider_response'
+    });
+  }
+  return value;
+}
+
+export function requiredArray(value: unknown, field: string): any[] {
+  if (!Array.isArray(value)) {
+    throw createApiServiceError(`FinerWorks returned an invalid or missing ${field}.`, {
+      reason: 'invalid_provider_response'
+    });
+  }
+  return value;
+}
+
+export function assertSuccess(data: any) {
+  let status = data?.status ?? data;
+  if (typeof status?.success !== 'boolean') {
+    throw createApiServiceError('FinerWorks returned a response without a success status.', {
+      reason: 'invalid_provider_response'
+    });
+  }
+  if (!status.success) {
+    throw createApiServiceError(
+      `FinerWorks request failed: ${typeof status.message === 'string' && status.message ? status.message : 'The provider rejected the request.'}`,
+      {
+        reason: 'finerworks_api_error',
+        upstreamCode: status.status_code === undefined ? undefined : String(status.status_code)
+      }
+    );
+  }
+}
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
-  private testMode: boolean;
+  private config: FinerworksClientConfig;
 
   constructor(config: FinerworksClientConfig) {
-    this.testMode = config.testMode ?? false;
+    this.config = config;
     this.axios = createAxios({
-      baseURL: 'https://api.finerworks.com',
+      baseURL: 'https://v2.api.finerworks.com',
       headers: {
         'Content-Type': 'application/json',
         web_api_key: config.webApiKey,
@@ -22,132 +80,147 @@ export class Client {
     });
   }
 
-  // ── Credentials ──
-
-  async testCredentials(): Promise<any> {
-    let response = await this.axios.get('/v3/test_my_credentials');
-    return response.data;
-  }
-
-  // ── Orders ──
-
-  async submitOrders(orders: any[], validateOnly?: boolean): Promise<any> {
-    let payload: any = { orders };
-    if (validateOnly !== undefined) {
-      payload.validate_only = validateOnly;
-    }
-    if (this.testMode) {
-      for (let order of payload.orders) {
-        order.test_mode = true;
+  private async request(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    data?: unknown,
+    allowFailure = false
+  ): Promise<any> {
+    try {
+      let response = await this.axios.request({ method, url: `/v3/${path}`, data });
+      let result = response.data;
+      if (!allowFailure) assertSuccess(result);
+      else if (typeof result?.status?.success !== 'boolean') {
+        throw createApiServiceError(
+          'FinerWorks returned a response without a success status.',
+          { reason: 'invalid_provider_response' }
+        );
       }
+      return result;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'FinerWorks',
+        reason: 'finerworks_api_error',
+        operation: path.startsWith('submit_orders')
+          ? 'order submission (check list_orders before retrying an uncertain submission)'
+          : path.split('?')[0],
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+        detailKeys: ['message', 'Message', 'detail', 'error'],
+        nestedKeys: ['status', 'errors', 'ModelState', 'modelState'],
+        extractUpstreamCode: (_error, response) => {
+          let body = response?.data as
+            | { status?: { status_code?: unknown }; status_code?: unknown }
+            | undefined;
+          let code = body?.status?.status_code ?? body?.status_code;
+          return code === undefined ? undefined : String(code);
+        }
+      });
     }
-    let response = await this.axios.post('/v3/submit_orders', payload);
-    return response.data;
   }
 
-  async fetchOrderStatus(params: { orderPos?: string[]; orderIds?: number[] }): Promise<any> {
-    let response = await this.axios.post('/v3/fetch_order_status', {
-      order_pos: params.orderPos ?? null,
-      order_ids: params.orderIds ?? null
+  testCredentials() {
+    return this.request('get', 'test_my_credentials', {
+      credentials: { web_api_key: this.config.webApiKey, app_key: this.config.appKey }
     });
-    return response.data;
   }
 
-  async updateOrder(orderId: number, updateCommand: string): Promise<any> {
-    let response = await this.axios.put('/v3/update_order', {
+  submitOrders(orders: any[], validateOnly?: boolean, paymentToken?: string) {
+    return this.request(
+      'post',
+      'submit_orders_v2',
+      {
+        orders: orders.map(order => ({
+          ...order,
+          ...(this.config.testMode ? { test_mode: true } : {})
+        })),
+        validate_only: validateOnly,
+        payment_token: paymentToken
+      },
+      true
+    );
+  }
+
+  fetchOrderStatus(params: { orderPos?: string[]; orderIds?: number[] }) {
+    if (!params.orderPos?.length && !params.orderIds?.length) {
+      throw createApiServiceError(
+        'Provide at least one order ID or purchase order reference. Call list_orders to discover orders.'
+      );
+    }
+    params.orderIds?.forEach(id => requireInteger(id, 'Order ID'));
+    return this.request('post', 'fetch_order_status', {
+      order_pos: params.orderPos,
+      order_ids: params.orderIds
+    });
+  }
+
+  updateOrder(orderId: number, updateCommand: string) {
+    requireInteger(orderId, 'Order ID');
+    return this.request('put', 'update_order', {
       order_id: orderId,
       update_command: updateCommand
     });
-    return response.data;
   }
 
-  async submitNote(orderId: number, subject: string, message: string): Promise<any> {
-    let response = await this.axios.post('/v3/submit_note', {
-      order_id: orderId,
-      subject,
-      message
-    });
-    return response.data;
+  submitNote(orderId: number, subject: string, message: string) {
+    requireInteger(orderId, 'Order ID');
+    return this.request('post', 'submit_note', { order_id: orderId, subject, message });
   }
 
-  async updateCustomer(orderId: number, customerInfo: any): Promise<any> {
-    let response = await this.axios.put('/v3/update_customer', {
+  updateCustomer(orderId: number, customerInfo: any) {
+    requireInteger(orderId, 'Order ID');
+    return this.request('put', 'update_customer', {
       order_id: orderId,
       customer_info: customerInfo
     });
-    return response.data;
   }
 
-  // ── Order Status Definitions ──
-
-  async listOrderStatusDefinitions(): Promise<any> {
-    let response = await this.axios.get('/v3/list_order_status_definitions');
-    return response.data;
+  listOrderStatusDefinitions() {
+    return this.request('get', 'list_order_status_definitions');
   }
 
-  // ── Shipping ──
-
-  async listShippingOptions(order: any): Promise<any> {
-    let response = await this.axios.post('/v3/list_shipping_options', order);
-    return response.data;
-  }
-
-  async listShippingOptionsMultiple(orders: any[]): Promise<any> {
-    let response = await this.axios.post('/v3/list_shipping_options_multiple', orders);
-    return response.data;
-  }
-
-  // ── Address Validation ──
-
-  async validateRecipientAddress(recipient: any): Promise<any> {
-    let response = await this.axios.post('/v3/validate_recipient_address', {
-      recipient
+  async listShippingOptions(order: any) {
+    let result = await this.request('post', 'list_shipping_options_multiple', {
+      orders: [order]
     });
-    return response.data;
+    let orders = requiredArray(result.orders, 'orders');
+    let match = orders.find(item => item.order_po === order.order_po);
+    if (!match)
+      throw createApiServiceError(
+        'FinerWorks did not return shipping options for the requested purchase order reference.'
+      );
+    return { ...result, options: requiredArray(match.options, 'orders[].options') };
   }
 
-  // ── Product Catalog ──
+  validateRecipientAddress(recipient: any) {
+    return this.request('post', 'validate_recipient_address', { recipient }, true);
+  }
 
-  async listProductTypes(ids?: number[]): Promise<any> {
-    let response = await this.axios.post('/v3/list_product_types', {
-      ids: ids ?? null
+  listProductTypes(ids?: number[]) {
+    ids?.forEach(id => requireInteger(id, 'Product type ID'));
+    return this.request('post', 'list_product_types', { ids });
+  }
+  listMediaTypes(ids?: number[]) {
+    ids?.forEach(id => requireInteger(id, 'Media type ID'));
+    return this.request('post', 'list_media_types', { ids });
+  }
+  listStyleTypes(ids?: number[]) {
+    ids?.forEach(id => requireInteger(id, 'Style type ID'));
+    return this.request('post', 'list_style_types', { ids });
+  }
+
+  getPrices(items: { productQty: number; productSku: string }[]) {
+    return this.request('post', 'get_prices', {
+      products: items.map(item => ({
+        product_qty: item.productQty,
+        product_sku: item.productSku
+      }))
     });
-    return response.data;
+  }
+  getProductDetails(products: any[]) {
+    return this.request('post', 'get_product_details', { products });
   }
 
-  async listMediaTypes(ids?: number[]): Promise<any> {
-    let response = await this.axios.post('/v3/list_media_types', {
-      ids: ids ?? null
-    });
-    return response.data;
-  }
-
-  async listStyleTypes(ids?: number[]): Promise<any> {
-    let response = await this.axios.post('/v3/list_style_types', {
-      ids: ids ?? null
-    });
-    return response.data;
-  }
-
-  // ── Pricing ──
-
-  async getPrices(items: { productQty: number; productSku: string }[]): Promise<any> {
-    let payload = items.map(item => ({
-      product_qty: item.productQty,
-      product_sku: item.productSku
-    }));
-    let response = await this.axios.post('/v3/get_prices', payload);
-    return response.data;
-  }
-
-  async getProductDetails(items: any[]): Promise<any> {
-    let response = await this.axios.post('/v3/get_product_details', items);
-    return response.data;
-  }
-
-  // ── Images ──
-
-  async listImages(params: {
+  listImages(params: {
     searchFilter?: string;
     guidFilter?: string | null;
     pageNumber?: number;
@@ -158,145 +231,66 @@ export class Client {
     uploadDateTo?: string | null;
     listProducts?: boolean;
     active?: boolean | null;
-  }): Promise<any> {
-    let response = await this.axios.post('/v3/list_images', {
+  }) {
+    requireInteger(params.pageNumber ?? 1, 'Page number');
+    requireInteger(params.perPage ?? 25, 'Images per page', 1, 50);
+    return this.request('post', 'list_images', {
       library: { name: 'inventory' },
-      search_filter: params.searchFilter ?? '',
-      guid_filter: params.guidFilter ?? null,
-      page_number: params.pageNumber ?? 1,
-      per_page: params.perPage ?? 25,
-      sort_field: params.sortField ?? 'id',
-      sort_direction: params.sortDirection ?? 'DESC',
-      upload_date_from: params.uploadDateFrom ?? null,
-      upload_date_to: params.uploadDateTo ?? null,
-      list_products: params.listProducts ?? true,
-      active: params.active ?? null
+      search_filter: params.searchFilter,
+      guid_filter: params.guidFilter ? [params.guidFilter] : undefined,
+      page_number: params.pageNumber,
+      per_page: params.perPage,
+      sort_field: params.sortField,
+      sort_direction: params.sortDirection,
+      upload_date_from: params.uploadDateFrom,
+      upload_date_to: params.uploadDateTo,
+      list_products: params.listProducts,
+      active: params.active
     });
-    return response.data;
   }
-
-  async addImages(images: any[]): Promise<any> {
-    let response = await this.axios.post('/v3/add_images', {
-      images,
-      library: { name: 'inventory' }
-    });
-    return response.data;
+  addImages(images: any[]) {
+    return this.request('post', 'add_images', { images, library: { name: 'inventory' } });
   }
-
-  async updateImages(
-    images: { guid: string; title?: string; description?: string }[]
-  ): Promise<any> {
-    let response = await this.axios.put('/v3/update_images', {
-      images,
-      account_key: null
-    });
-    return response.data;
-  }
-
-  async deleteImages(guids: string[]): Promise<any> {
-    let response = await this.axios.delete('/v3/delete_images', {
-      data: {
-        guids,
-        library: null
-      }
-    });
-    return response.data;
-  }
-
-  // ── Framing ──
-
-  async listCollections(params?: {
-    collectionId?: number;
-    productCode?: string;
-  }): Promise<any> {
-    let response = await this.axios.post('/v3/list_collections', {
-      id: params?.collectionId ?? null,
-      product_code: params?.productCode ?? null
-    });
-    return response.data;
-  }
-
-  async listMats(matId?: number): Promise<any> {
-    let response = await this.axios.post('/v3/list_mats', {
-      id: matId ?? null
-    });
-    return response.data;
-  }
-
-  async listGlazing(glazingId?: number): Promise<any> {
-    let response = await this.axios.post('/v3/list_glazing', {
-      id: glazingId ?? null
-    });
-    return response.data;
-  }
-
-  async frameBuilder(params: {
-    productCode?: string | null;
-    config: {
-      frameId: number;
-      width: number;
-      height: number;
-      mats?: {
-        id: number;
-        windows: { width: number; height: number; windowX?: number; windowY?: number }[];
-      }[];
-      glazing?: { id: number };
-      units?: number;
-    };
-    render?: {
-      contentType?: number;
-      renderSize?: number;
-      squared?: boolean;
-      shadowInner?: boolean;
-      promptImage?: boolean;
-      frameImageToDisplayUrl?: string | null;
-    };
-  }): Promise<any> {
-    let response = await this.axios.post('/v3/frame_builder', {
-      product_code: params.productCode ?? null,
-      config: {
-        frame_id: params.config.frameId,
-        width: params.config.width,
-        height: params.config.height,
-        mats:
-          params.config.mats?.map(m => ({
-            id: m.id,
-            windows: m.windows.map(w => ({
-              width: w.width,
-              height: w.height,
-              window_x: w.windowX ?? 0,
-              window_y: w.windowY ?? 0,
-              mat_image_to_display_url: null
-            }))
-          })) ?? null,
-        glazing: params.config.glazing ?? null,
-        units: params.config.units ?? 0
-      },
-      render: {
-        content_type: params.render?.contentType ?? 0,
-        render_size: params.render?.renderSize ?? 500,
-        squared: params.render?.squared ?? false,
-        shadow_inner: params.render?.shadowInner ?? false,
-        prompt_image: params.render?.promptImage ?? false,
-        frame_image_to_display_url: params.render?.frameImageToDisplayUrl ?? null
-      }
-    });
-    return response.data;
-  }
-
-  // ── User Account ──
-
-  async getUser(accountKey?: string): Promise<any> {
-    let url = '/v3/get_user';
-    if (accountKey) {
-      url += `?account_key=${encodeURIComponent(accountKey)}`;
+  updateImages(images: { guid: string; title?: string; description?: string }[]) {
+    if (images.some(image => image.title === undefined && image.description === undefined)) {
+      throw createApiServiceError('Provide a title or description for every image to update.');
     }
-    let response = await this.axios.get(url);
-    return response.data;
+    return this.request('put', 'update_images', { images });
+  }
+  deleteImages(guids: string[]) {
+    return this.request('delete', 'delete_images', { guids, library: { name: 'inventory' } });
   }
 
-  async updateUser(userData: any): Promise<any> {
-    let response = await this.axios.put('/v3/update_user', userData);
-    return response.data;
+  listCollections(params?: { collectionId?: number; productCode?: string }) {
+    if (params?.collectionId !== undefined)
+      requireInteger(params.collectionId, 'Collection ID');
+    return this.request('post', 'list_collections', {
+      id: params?.collectionId,
+      product_code: params?.productCode
+    });
+  }
+  listMats(id?: number) {
+    if (id !== undefined) requireInteger(id, 'Mat ID');
+    return this.request('post', 'list_mats', { id });
+  }
+  listGlazing(id?: number) {
+    if (id !== undefined) requireInteger(id, 'Glazing ID');
+    return this.request('post', 'list_glazing', { id });
+  }
+
+  listOrders(params: Record<string, unknown>) {
+    return this.request('post', 'list_orders', params);
+  }
+  getOrder(orderGuid: string, orderEmail: string) {
+    return this.request(
+      'get',
+      `get_order?${new URLSearchParams({ order_guid: orderGuid, order_email: orderEmail })}`
+    );
+  }
+  listVirtualInventory(params: Record<string, unknown>) {
+    return this.request('post', 'list_virtual_inventory', params);
+  }
+  frameBuilder(productCode: string, render?: Record<string, unknown>) {
+    return this.request('post', 'frame_builder', { product_code: productCode, render });
   }
 }

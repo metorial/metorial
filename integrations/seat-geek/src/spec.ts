@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'seat-geek',
-  name: 'Seat Geek',
+  name: 'SeatGeek',
   description: undefined,
   metadata: {},
   config,

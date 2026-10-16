@@ -10,7 +10,8 @@ export let getAnalytics = SlateTool.create(spec, {
 Filter by a specific alias or tag, and optionally narrow results by date range. This is a **paid feature**.`,
   instructions: [
     'Use the "type" parameter to choose the analytics report. Each type returns different data.',
-    'For location analytics, provide a "region" value (e.g., a country code).',
+    'Provide a start datetime in "from" for every report. The end datetime defaults to now.',
+    'For location analytics, omit "region" for countries or provide an ISO country code for regional detail.',
     'For timeline analytics, specify an "interval" such as "day", "week", or "month".'
   ],
   tags: {
@@ -31,15 +32,28 @@ Filter by a specific alias or tag, and optionally narrow results by date range. 
           'hour_popularity'
         ])
         .describe('Type of analytics report to retrieve'),
-      alias: z.string().optional().describe('Filter analytics by a specific TinyURL alias'),
+      alias: z
+        .string()
+        .optional()
+        .describe(
+          'TinyURL to analyze, such as tinyurl.com/myalias. A bare alias uses tinyurl.com.'
+        ),
       tag: z.string().optional().describe('Filter analytics by a specific tag'),
-      from: z.string().optional().describe('ISO 8601 start datetime for the analytics period'),
+      from: z
+        .string()
+        .optional()
+        .describe('Required by TinyURL: ISO 8601 start datetime for the analytics period'),
       to: z.string().optional().describe('ISO 8601 end datetime for the analytics period'),
       interval: z
         .enum(['minute', 'hour', 'day', 'week', 'month'])
         .optional()
         .describe('Time interval for timeline analytics'),
-      region: z.string().optional().describe('Geographic region for location analytics')
+      region: z
+        .string()
+        .optional()
+        .describe(
+          'For location reports: ISO 3166-1 alpha-2 country code, or world for countries (default)'
+        )
     })
   )
   .output(
@@ -77,7 +91,7 @@ Filter by a specific alias or tag, and optionally narrow results by date range. 
         analytics = await client.getTopLanguages(baseParams);
         break;
       case 'location':
-        analytics = await client.getLocationAnalytics(ctx.input.region || '', baseParams);
+        analytics = await client.getLocationAnalytics(ctx.input.region || 'world', baseParams);
         break;
       case 'weekday_popularity':
         analytics = await client.getWeekdayPopularity(baseParams);

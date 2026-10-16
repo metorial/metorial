@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,6 +44,9 @@ export let listUsersTool = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
+    if (ctx.input.ids && ctx.input.ids.split(',').length > 50) {
+      throw createApiServiceError('Provide no more than 50 user IDs per request.');
+    }
     let users = await client.listUsers({
       search: ctx.input.search,
       ids: ctx.input.ids,

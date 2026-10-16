@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,15 +19,18 @@ export let auth = SlateAuth.create()
       region: z
         .string()
         .describe(
-          'Data hosting region from FaceUp admin: Settings > Data hosting region (e.g., "eu", "us")'
+          'Data hosting region from FaceUp admin: Settings > Organization settings (e.g., "eu-west-1", "us-east-1"). Copy the exact region value.'
         )
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim() || !ctx.input.region.trim()) {
+        throw createApiServiceError('Enter a FaceUp API key and data hosting region.');
+      }
       return {
         output: {
-          token: ctx.input.token,
-          region: ctx.input.region
+          token: ctx.input.token.trim(),
+          region: ctx.input.region.trim()
         }
       };
     }

@@ -40,6 +40,10 @@ Filter by genre, region, publisher region, language, and sort order. Use the "Ge
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       genreName: z.string().describe('Name of the genre being browsed.'),
       genreId: z.number().describe('Genre ID.'),
       parentId: z.number().describe('Parent genre ID.'),
@@ -66,11 +70,12 @@ Filter by genre, region, publisher region, language, and sort order. Use the "Ge
       publisherRegion: ctx.input.publisherRegion,
       language: ctx.input.language,
       sort: ctx.input.sort,
-      safeMode: ctx.input.safeMode ? 1 : undefined
+      safeMode: ctx.input.safeMode === undefined ? undefined : Number(ctx.input.safeMode)
     });
 
     return {
       output: {
+        raw: data,
         genreName: data.name,
         genreId: data.id,
         parentId: data.parent_id,

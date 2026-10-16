@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RiteKitClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ let hashtagSchema = z.object({
   images: z.number().describe('Percentage of tweets with images'),
   links: z.number().describe('Percentage of tweets with links'),
   mentions: z.number().describe('Percentage of tweets with mentions'),
-  color: z.number().describe('Color grade: 1=unused, 2=overused, 3=good, 4=great/trending')
+  color: z.number().describe('Color grade: 0=unused, 1=overused, 2=good, 3=great')
 });
 
 export let hashtagSuggestions = SlateTool.create(spec, {
@@ -44,6 +44,7 @@ Use this when you need hashtag ideas for social media content based on text topi
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       hashtags: z
         .array(hashtagSchema)
         .describe('List of suggested hashtags with engagement metrics')
@@ -63,23 +64,29 @@ Use this when you need hashtag ideas for social media content based on text topi
       color: number;
     }> = [];
 
+    let raw: Record<string, unknown>;
     if (ctx.input.imageUrl) {
       let result = await client.hashtagSuggestionsForImage(ctx.input.imageUrl);
       hashtags = result.data || [];
+      raw = { ...result };
     } else if (ctx.input.pageUrl) {
       let result = await client.hashtagsForUrl(ctx.input.pageUrl);
-      hashtags = result.data || [];
+      hashtags = result.hashtags ?? result.data ?? [];
+      raw = { ...result };
     } else if (ctx.input.text) {
       let result = await client.hashtagSuggestions(ctx.input.text);
       hashtags = result.data || [];
+      raw = { ...result };
     } else {
-      throw new Error('At least one of text, imageUrl, or pageUrl must be provided');
+      throw createApiServiceError(
+        'At least one of text, imageUrl, or pageUrl must be provided'
+      );
     }
 
     let source = ctx.input.imageUrl ? 'image' : ctx.input.pageUrl ? 'URL' : 'text';
 
     return {
-      output: { hashtags },
+      output: { hashtags, raw },
       message: `Found **${hashtags.length}** hashtag suggestions based on ${source}. Top suggestions: ${hashtags
         .slice(0, 5)
         .map(h => `#${h.tag}`)

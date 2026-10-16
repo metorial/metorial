@@ -27,6 +27,7 @@ export let searchTickers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -37,14 +38,14 @@ export let searchTickers = SlateTool.create(spec, {
         z.object({
           symbol: z.string(),
           name: z.string(),
-          country: z.string().nullable(),
+          country: z.string().nullable().optional(),
           hasIntraday: z.boolean(),
           hasEod: z.boolean(),
           exchange: z.object({
             name: z.string(),
             acronym: z.string(),
             mic: z.string(),
-            country: z.string(),
+            country: z.string().optional(),
             countryCode: z.string(),
             city: z.string()
           })
@@ -81,9 +82,10 @@ export let searchTickers = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         tickers
       },
-      message: `Found ${tickers.length} tickers${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Total available: ${result.pagination.total}.`
+      message: `Found ${tickers.length} tickers${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

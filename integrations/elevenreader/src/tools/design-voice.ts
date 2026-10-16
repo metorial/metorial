@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let designVoiceTool = SlateTool.create(spec, {
   name: 'Design Voice',
   key: 'design_voice',
-  description: `Create a new voice from a text description. Returns voice previews with audio samples and generated voice IDs that can be used for text-to-speech.`,
+  description: `DEPRECATED — use \`design_voice_previews\` instead. Create a new voice from a text description. Returns voice previews with audio samples and generated voice IDs that can be used for text-to-speech.`,
   instructions: [
+    'Use design_voice_previews for downloadable audio with metadata output.',
     'Provide a detailed description of the desired voice characteristics (age, gender, accent, tone, etc.).',
     'Optionally provide sample text (100-1000 chars) to preview the generated voice.'
   ],
   tags: {
+    deprecated: true,
     readOnly: false
   }
 })

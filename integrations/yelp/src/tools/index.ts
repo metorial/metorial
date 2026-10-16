@@ -1,5 +1,6 @@
 export * from './ai-chat';
 export * from './autocomplete';
+export * from './categories';
 export * from './get-business-details';
 export * from './get-reviews';
 export * from './match-business';

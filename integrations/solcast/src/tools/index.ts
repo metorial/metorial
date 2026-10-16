@@ -6,3 +6,4 @@ export * from './get-rooftop-pv-power';
 export * from './get-tmy-data';
 export * from './list-pv-power-sites';
 export * from './manage-pv-power-site';
+export * from './submit-site-measurements';

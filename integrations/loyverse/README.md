@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Loyverse
 
-Manage a cloud-based point-of-sale system for retail stores, cafes, and restaurants. Create, read, update, and delete items, categories, modifiers, and variants in the product catalog. Look up variants by SKU and track and update inventory stock levels across multiple store locations. Create sales receipts and process refunds. Manage customer records with lookup by ID or email. Create and configure discounts, tax rates, and suppliers. Read employee and shift data. Retrieve store locations, payment types, and merchant information.
+Manage a cloud-based point-of-sale system for retail stores, cafes, and restaurants. Manage items, categories, modifiers, and item variants in the product catalog, including composite items. Look up variants by SKU and track and update inventory stock levels across multiple store locations. Create sales receipts and process refunds. Manage customer records and loyalty balances with lookup by ID or email. Create and configure discounts, tax rates, and suppliers. Read employee and shift data. Retrieve store locations, POS devices, payment types, and merchant information. Filter catalog, employee, and store records by IDs or supported creation/update dates for synchronization.
 
 ## License
 

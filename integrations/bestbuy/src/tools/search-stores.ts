@@ -10,7 +10,8 @@ export let searchStores = SlateTool.create(spec, {
   instructions: [
     'Provide postalCode or lat/lng for location-based search. Distance defaults to 25 miles.',
     'Use query for attribute-based filtering, e.g. "storeType=Big Box Store" or "region=CA".',
-    'Combine location and attribute filters for precise results.'
+    'Combine location and attribute filters for precise results.',
+    'Use browse_catalog with resource=stores for cursor pagination through more than ten pages.'
   ],
   tags: {
     destructive: false,
@@ -26,6 +27,10 @@ export let searchStores = SlateTool.create(spec, {
       lat: z.number().optional().describe('Latitude for coordinate-based search'),
       lng: z.number().optional().describe('Longitude for coordinate-based search'),
       distance: z.number().optional().describe('Search radius in miles (default 25)'),
+      sort: z
+        .string()
+        .optional()
+        .describe('Sort order such as storeId.asc or distance.asc for a location search'),
       query: z
         .string()
         .optional()
@@ -63,6 +68,7 @@ export let searchStores = SlateTool.create(spec, {
       lat: ctx.input.lat,
       lng: ctx.input.lng,
       distance: ctx.input.distance,
+      sort: ctx.input.sort,
       query: ctx.input.query,
       show: ctx.input.show,
       page: ctx.input.page,
@@ -76,7 +82,9 @@ export let searchStores = SlateTool.create(spec, {
         totalPages: result.totalPages,
         stores: result.stores
       },
-      message: `Found **${result.total}** stores (page ${result.currentPage} of ${result.totalPages}, showing ${result.stores.length} results).`
+      message: client.redactMessage(
+        `Found **${result.total}** stores (page ${result.currentPage} of ${result.totalPages}, showing ${result.stores.length} results).`
+      )
     };
   })
   .build();

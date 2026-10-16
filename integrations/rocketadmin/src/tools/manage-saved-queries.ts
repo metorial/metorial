@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageSavedQueries = SlateTool.create(spec, {
@@ -13,19 +13,33 @@ export let manageSavedQueries = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      masterPassword: z
+        .string()
+        .optional()
+        .describe('Master password for an encrypted connection'),
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete', 'execute'])
         .describe('Action to perform'),
       connectionId: z
         .string()
         .optional()
-        .describe('Connection ID (required for list and create)'),
+        .describe('Connection ID for every action. Call list_connections to discover IDs.'),
       queryId: z
         .string()
         .optional()
         .describe('Query ID (required for get, update, delete, execute)'),
       title: z.string().optional().describe('Query title'),
-      queryText: z.string().optional().describe('SQL query text')
+      queryText: z.string().optional().describe('SQL query text'),
+      widgetType: z
+        .enum(['table', 'chart', 'counter', 'text'])
+        .optional()
+        .describe('Visualization type; required when creating a saved query'),
+      description: z.string().optional().describe('Saved query description'),
+      chartType: z.string().optional().describe('Chart type when using a chart visualization'),
+      widgetOptions: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Visualization options')
     })
   )
   .output(
@@ -43,15 +57,35 @@ export let manageSavedQueries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
-    let { action, connectionId, queryId, title, queryText } = ctx.input;
+    let {
+      action,
+      connectionId,
+      queryId,
+      title,
+      queryText,
+      widgetType,
+      description,
+      chartType,
+      widgetOptions
+    } = ctx.input;
+    if (!connectionId)
+      throw createApiServiceError(
+        'connectionId is required for saved-query actions. Call list_connections to discover IDs.'
+      );
+    let payload = {
+      ...(title !== undefined ? { name: title } : {}),
+      ...(queryText !== undefined ? { query_text: queryText } : {}),
+      ...(widgetType !== undefined ? { widget_type: widgetType } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(chartType !== undefined ? { chart_type: chartType } : {}),
+      ...(widgetOptions !== undefined ? { widget_options: widgetOptions } : {})
+    };
 
     if (action === 'list') {
-      if (!connectionId) throw new Error('connectionId is required for listing queries');
+      if (!connectionId)
+        throw createApiServiceError('connectionId is required for listing queries');
       let queries = await client.listSavedQueries(connectionId);
       return {
         output: { queries, success: true },
@@ -60,8 +94,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!queryId) throw new Error('queryId is required');
-      let query = await client.getSavedQuery(queryId);
+      if (!queryId) throw createApiServiceError('queryId is required');
+      let query = await client.getSavedQuery(connectionId, queryId);
       return {
         output: { query, success: true },
         message: `Retrieved saved query **${queryId}**.`
@@ -69,11 +103,13 @@ export let manageSavedQueries = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!connectionId) throw new Error('connectionId is required for creating a query');
-      let query = await client.createSavedQuery(connectionId, {
-        ...(title ? { title } : {}),
-        ...(queryText ? { query: queryText } : {})
-      });
+      if (!connectionId)
+        throw createApiServiceError('connectionId is required for creating a query');
+      if (!title || !queryText || !widgetType)
+        throw createApiServiceError(
+          'title, queryText, and widgetType are required for creating a saved query.'
+        );
+      let query = await client.createSavedQuery(connectionId, payload);
       return {
         output: { query, success: true },
         message: `Saved query created successfully.`
@@ -81,11 +117,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!queryId) throw new Error('queryId is required for updating');
-      let query = await client.updateSavedQuery(queryId, {
-        ...(title ? { title } : {}),
-        ...(queryText ? { query: queryText } : {})
-      });
+      if (!queryId) throw createApiServiceError('queryId is required for updating');
+      let query = await client.updateSavedQuery(connectionId, queryId, payload);
       return {
         output: { query, success: true },
         message: `Saved query **${queryId}** updated.`
@@ -93,8 +126,8 @@ export let manageSavedQueries = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!queryId) throw new Error('queryId is required for deleting');
-      await client.deleteSavedQuery(queryId);
+      if (!queryId) throw createApiServiceError('queryId is required for deleting');
+      await client.deleteSavedQuery(connectionId, queryId);
       return {
         output: { success: true },
         message: `Saved query **${queryId}** deleted.`
@@ -102,14 +135,14 @@ export let manageSavedQueries = SlateTool.create(spec, {
     }
 
     if (action === 'execute') {
-      if (!queryId) throw new Error('queryId is required for executing');
-      let queryResult = await client.executeSavedQuery(queryId);
+      if (!queryId) throw createApiServiceError('queryId is required for executing');
+      let queryResult = await client.executeSavedQuery(connectionId, queryId);
       return {
         output: { queryResult, success: true },
         message: `Query **${queryId}** executed successfully.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

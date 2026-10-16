@@ -18,6 +18,7 @@ export let getDubbingTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       dubbingId: z.string().describe('ID of the dubbing project'),
       name: z.string().optional().describe('Name of the dubbing project'),
       status: z
@@ -39,13 +40,14 @@ export let getDubbingTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         dubbingId: result.dubbing_id,
-        name: result.name,
+        name: result.name ?? undefined,
         status: result.status,
-        targetLanguages: result.target_languages,
-        sourceLanguage: result.source_language,
-        createdAt: result.created_at,
-        error: result.error
+        targetLanguages: result.target_languages ?? undefined,
+        sourceLanguage: result.source_language ?? undefined,
+        createdAt: result.created_at ?? undefined,
+        error: result.error ?? undefined
       },
       message: `Dubbing \`${result.dubbing_id}\` status: **${result.status}**.${result.error ? ` Error: ${result.error}` : ''}`
     };

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import { polygonOutput, polygonRecords, polygonResponseFields } from '../lib/response';
 import { spec } from '../spec';
 
 export let getMarketStatus = SlateTool.create(spec, {
@@ -21,6 +22,7 @@ export let getMarketStatus = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       afterHours: z
         .boolean()
         .optional()
@@ -69,6 +71,7 @@ export let getMarketStatus = SlateTool.create(spec, {
 
     let statusResponse = await client.getMarketStatus();
 
+    let rawHolidays: unknown;
     let output: any = {
       afterHours: statusResponse.afterHours,
       earlyHours: statusResponse.earlyHours,
@@ -91,7 +94,8 @@ export let getMarketStatus = SlateTool.create(spec, {
 
     if (ctx.input.includeHolidays) {
       let holidays = await client.getMarketHolidays();
-      output.holidays = (Array.isArray(holidays) ? holidays : []).map((h: any) => ({
+      rawHolidays = holidays;
+      output.holidays = polygonRecords(holidays, 'holidays').map((h: any) => ({
         exchange: h.exchange,
         name: h.name,
         date: h.date,
@@ -102,7 +106,12 @@ export let getMarketStatus = SlateTool.create(spec, {
     }
 
     return {
-      output,
+      output: polygonOutput(
+        output,
+        ctx.input.includeHolidays
+          ? { marketStatus: statusResponse, holidays: rawHolidays }
+          : statusResponse
+      ),
       message: `Market status: **${statusResponse.market || 'unknown'}**${statusResponse.afterHours ? ' (after hours)' : ''}${statusResponse.earlyHours ? ' (early hours)' : ''}.`
     };
   })

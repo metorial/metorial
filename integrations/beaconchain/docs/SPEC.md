@@ -1,82 +1,45 @@
-Now let me look at the V2 API docs in more detail to understand features and the notification/webhook system better.Now I have enough information to write the specification.
+# Beaconcha.in API specification
 
-# Slates Specification for beaconcha.in
+Beaconcha.in provides Ethereum explorer data, validator analytics, dashboard validator management, and machine monitoring history.
 
-## Overview
+## Connection
 
-Beaconcha.in is an open-source Ethereum blockchain explorer maintained by Bitfly that provides unified data across the consensus and execution layers. It is built for the Ethereum consensus layer and provides comprehensive querying tools to understand its inner workings. It offers APIs for querying validator performance, staking rewards, network state, and managing validator dashboards, as well as notifications via webhook for validator events.
+Provide an API key from https://beaconcha.in/user/api-key-management. V2 requests send `Authorization: Bearer <API_KEY>`. V1 execution queries additionally send the documented `apikey` header. The network setting accepts `mainnet` (default) or `hoodi`.
 
-## Authentication
+Ethereum V2 queries use `POST https://beaconcha.in/api/v2/ethereum/...` and include `chain` in the JSON body. Legacy V1 execution queries and dashboard management use the selected network host (`beaconcha.in` or `hoodi.beaconcha.in`). Account machine queries use the main service without an Ethereum chain field. OAuth is not used. The public API documents no account profile endpoint; connection validation queries chain state.
 
-API keys can be obtained in the user portal and must be included in requests either as a query string parameter or in the request header.
+## Tools
 
-V1 and V2 APIs use the same authentication method. A single API key is valid for all endpoints.
+| Tool | Behavior |
+| --- | --- |
+| `get_network_state` | Explorer state with optional queues, validator statuses, chain config, and performance. Network performance defaults to a 24h window. |
+| `get_epoch_info` | Explicit consensus epoch or latest/finalized epoch overview. |
+| `get_validator_info` | Validator overview, optional APY/ROI (24h by default), and balances. Overview and balance lists have independent cursors. |
+| `get_validator_rewards` | Per-validator rewards at one epoch or aggregate rewards. Aggregate defaults to all_time. |
+| `get_validator_performance` | Per-validator performance at one epoch or aggregate performance (24h by default). |
+| `get_validator_duties` | Upcoming duties, proposals, attestations, sync periods, deposits, withdrawals, or best maintenance window. |
+| `get_validator_queues` | Validator staking queue positions and estimated processing times, with pagination. |
+| `manage_dashboard_validators` | Add/move validators, bulk remove validators, or clear a group in an existing dashboard. Requires Orca. |
+| `get_slot_details` | Slot overview with optional duties, deposits, and withdrawals; included lists have independent cursors. |
+| `get_block_details` | Execution block overview and optional rewards. |
+| `get_sync_committee` | Period overview and optional paginated assigned validators. |
+| `get_execution_address` | Native and token balances with optional token pagination and gas recommendations. |
+| `get_gas_prices` | Gas recommendations without requiring an unrelated address lookup. |
+| `get_staking_entities` | Paginated entity/sub-entity comparisons over a fixed window (24h by default). Requires Scale or Enterprise. |
+| `list_machines` | Discover the authenticated account's known monitoring machine names. |
+| `get_machine_metrics` | Previously submitted system, validator-client, and beacon-node metrics over a timestamp range of at most 31 days. |
 
-**Bearer Token (Header):**
-Include the API key as a Bearer token in the `Authorization` header:
+Validator selectors accept exactly one of an identifier array or dashboard ID; dashboard selectors optionally include a group ID. Public input keys and existing output shapes remain stable. Numeric slot/block/period inputs are translated to the provider selector object internally. Per-epoch list and balance queries resolve an omitted epoch through the finalized epoch overview; an unavailable epoch fails explicitly rather than inventing data.
 
-```
-Authorization: Bearer <YOUR_API_KEY>
-```
+The current API specifies 1–10 results per page. Use `paging.next_cursor` from the corresponding response and preserve all query filters while continuing. Raw response data, null values, provider numeric strings, and metadata are preserved. Dashboard add responses identify the validators actually added; provider subscription limits can cause partial additions. Delete endpoints return no response body.
 
-**Query Parameter:**
-Alternatively, pass the API key as a query string parameter (e.g., `?apikey=<YOUR_API_KEY>`).
+## Official references
 
-API endpoints require an API key; a free API key can be obtained from the user portal at `https://beaconcha.in/user/api-key-management`.
-
-Free and paid users have access to both V1 and V2 APIs. Pro features are available for users on the Scale and Enterprise plans.
-
-**V2 API note:** All V2 API endpoints use the `POST` method with a JSON request body. The `chain` field (`"mainnet"` or `"hoodi"`) is required in every request.
-
-## Features
-
-### Ethereum Network State
-
-Query the current state of the Ethereum network, including the current epoch and total validator count. The `chain` parameter (`mainnet` or `hoodi`) is required for all V2 requests.
-
-### Validator Metrics & Rewards
-
-Access validator performance metrics and real-time staking rewards data. Retrieve detailed reward breakdowns per validator per epoch, including attestation rewards (head, source, target), sync committee rewards, block proposal rewards (execution layer and consensus layer), and penalties. Validators can be queried by index or public key. Attestation-based efficiency metrics are available, measuring correctness and inclusion delay of validator votes.
-
-### Validator Duties
-
-Query upcoming and historical validator duties including block proposals, attestations, and sync committee assignments.
-
-### Entities & Benchmarking
-
-Look up known staking entities (e.g., staking pools, operators) and compare their performance. Features include BeaconScore (performance scoring), an entities overview page, and entity-level dashboards for deep dives. BeaconScore and entity benchmarking are Pro-tier features.
-
-### Validator Dashboard Management
-
-Create validator dashboards and validator groups through the UI, then manage them via API by adding and assigning validators to groups. Supports Ethereum mainnet, Holesky testnet, and Gnosis network. Dashboards can be shared with others. Supports monitoring of up to 100,000 validators with custom validator groups.
-
-### Execution Layer Data
-
-Access execution layer data including real-time transaction tracking, wallet balances, token holdings, smart contract interaction analysis, and gas fee monitoring.
-
-### Consensus Layer Data (V1 Legacy)
-
-The V1 API provides access to consensus layer data such as blocks, epochs, slots, validators, attestations, deposits, and withdrawals. The V1 API remains available but no new features will be added.
-
-### Node Monitoring
-
-A free monitoring tool for solo stakers where the user specifies a monitoring endpoint on their beacon and validator nodes. Compatible with Lighthouse, Lodestar, Teku, and Nimbus consensus clients. Metrics are pushed to beaconcha.in and displayed in the mobile app.
-
-## Events
-
-Beaconcha.in supports notifications via email, push, or webhook.
-
-### Validator Event Webhooks
-
-Webhooks can be configured at `https://beaconcha.in/user/webhooks`. The number of available webhook endpoints depends on the subscription tier (ranging from 1 to 30). Webhook notifications can also be formatted for Discord.
-
-Alerts can be set up for downtime, missed duties, rewards, and more. Specific notification types include:
-
-- **Block Proposals:** Alerts when a validator is assigned or completes a block proposal.
-- **Attestation Missed:** Alerts when a validator misses an attestation.
-- **Sync Committee:** Alerts for sync committee assignments.
-- **Slashing:** Alerts when a validator is slashed.
-- **Validator Status Changes:** Alerts on lifecycle events such as activation, exit, and withdrawal processing.
-- **Machine Monitoring Alerts:** Custom machine alerts for CPU, RAM, and other system metrics (available on paid plans).
-
-Notification types are configured per validator or per validator group, and the same event types can be delivered across email, push, and webhook channels simultaneously.
+- [Getting started and authentication](https://docs.beaconcha.in/api/overview)
+- [Complete V2 OpenAPI](https://docs.beaconcha.in/v3/bundled.yaml)
+- [Pagination](https://docs.beaconcha.in/api/pagination)
+- [Error messages](https://docs.beaconcha.in/api/error-handling)
+- [Dashboard management](https://docs.beaconcha.in/api/dashboard)
+- [Machine monitoring](https://docs.beaconcha.in/api/machine-metrics-overview)
+- [V1 execution address balances](https://docs.beaconcha.in/api-reference/addresses/execution-address-balances)
+- [V1 gas recommendations](https://docs.beaconcha.in/api-reference/gas/current-gas-price-recommendations)

@@ -72,6 +72,7 @@ export let createPlan = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       planId: z.number().describe('Unique plan identifier'),
       paymentType: z.string().describe('Plan type'),
       name: z.string().describe('Plan name'),
@@ -95,6 +96,7 @@ export let createPlan = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: plan.raw,
         planId: plan.planId,
         paymentType: plan.paymentType,
         name: plan.name,

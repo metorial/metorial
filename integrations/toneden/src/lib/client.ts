@@ -1,15 +1,18 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class ToneDenClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://www.toneden.io/api/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ToneDen',
+          reason: 'toneden_api_error',
+          extractResponse: (cause, helpers) => helpers.getResponseWithBody(cause)
+        })
     });
   }
 
@@ -278,9 +281,10 @@ export class ToneDenClient {
   // ─── Offline Conversions ───────────────────────────────
 
   async uploadOfflineConversions(userId: number | string, conversions: Record<string, any>[]) {
-    let response = await this.axios.post(`/users/${userId}/advertising/offlineConversions`, {
+    let response = await this.axios.post(
+      `/users/${userId}/advertising/offlineConversions`,
       conversions
-    });
+    );
     return response.data;
   }
 }

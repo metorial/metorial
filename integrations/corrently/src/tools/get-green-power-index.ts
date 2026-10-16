@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,7 @@ export let getGreenPowerIndex = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       city: z.string().optional().describe('City name for the postal code'),
       zip: z.string().optional().describe('Postal code'),
       forecast: z
@@ -43,7 +44,7 @@ export let getGreenPowerIndex = SlateTool.create(spec, {
             energyPrice: z
               .number()
               .optional()
-              .describe('Local/regional energy price modification'),
+              .describe('Local electricity price in EUR per kWh'),
             solarIndex: z
               .number()
               .optional()
@@ -57,7 +58,7 @@ export let getGreenPowerIndex = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error(
+      throw createApiServiceError(
         'A German postal code (zip) is required. Provide it as input or configure a default in settings.'
       );
     }
@@ -71,16 +72,17 @@ export let getGreenPowerIndex = SlateTool.create(spec, {
       gsi: item.gsi,
       co2GreenEnergy: item.co2_g_oekostrom,
       co2Standard: item.co2_g_standard,
-      energyPrice: item.energyprice,
+      energyPrice: item.energyprice === undefined ? undefined : Number(item.energyprice),
       solarIndex: item.sci
     }));
 
     return {
       output: {
+        raw: result,
         city: result.location?.city,
         zip: result.location?.zip,
         forecast,
-        signature: result.signature
+        signature: result.signature ?? result.location?.signature
       },
       message: `Retrieved Green Power Index forecast for **${result.location?.city || zip}** with **${forecast.length}** hourly entries.`
     };

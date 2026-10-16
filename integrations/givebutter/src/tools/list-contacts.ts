@@ -19,6 +19,13 @@ let contactSummarySchema = z.object({
   updatedAt: z.string().nullable().describe('When the contact was last updated')
 });
 
+let listContactsOutputSchema = z.object({
+  contacts: z.array(contactSummarySchema).describe('List of contacts'),
+  totalCount: z.number().describe('Total number of contacts'),
+  currentPage: z.number().describe('Current page number'),
+  lastPage: z.number().describe('Last page number')
+});
+
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
   key: 'list_contacts',
@@ -30,49 +37,62 @@ export let listContacts = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      scope: z.string().optional().describe('Scope filter')
+      perPage: z.number().optional().describe('Items per page, from 1 to 100'),
+      scope: z
+        .string()
+        .optional()
+        .describe('Legacy scope filter passed through to Givebutter'),
+      email: z.string().optional().describe('Filter by contact email'),
+      firstName: z.string().optional().describe('Filter by first name'),
+      lastName: z.string().optional().describe('Filter by last name'),
+      tags: z.string().optional().describe('Provider tag filter'),
+      updatedAfter: z
+        .string()
+        .optional()
+        .describe('Return contacts updated after this ISO 8601 timestamp')
     })
   )
-  .output(
-    z.object({
-      contacts: z.array(contactSummarySchema).describe('List of contacts'),
-      totalCount: z.number().describe('Total number of contacts'),
-      currentPage: z.number().describe('Current page number'),
-      lastPage: z.number().describe('Last page number')
-    })
-  )
+  .output(listContactsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listContacts({
       page: ctx.input.page,
-      scope: ctx.input.scope
+      per_page: ctx.input.perPage,
+      scope: ctx.input.scope,
+      email: ctx.input.email,
+      firstName: ctx.input.firstName,
+      lastName: ctx.input.lastName,
+      tags: ctx.input.tags,
+      updatedAfter: ctx.input.updatedAfter
     });
 
     let contacts = result.data.map((c: any) => ({
       contactId: c.id,
-      firstName: c.first_name ?? null,
-      middleName: c.middle_name ?? null,
-      lastName: c.last_name ?? null,
-      company: c.company ?? null,
-      primaryEmail: c.primary_email ?? null,
-      primaryPhone: c.primary_phone ?? null,
-      totalContributions: c.stats?.total_contributions ?? null,
-      recurringContributions: c.stats?.recurring_contributions ?? null,
-      tags: c.tags ?? [],
-      archivedAt: c.archived_at ?? null,
-      createdAt: c.created_at ?? null,
-      updatedAt: c.updated_at ?? null
+      firstName: c.first_name,
+      middleName: c.middle_name,
+      lastName: c.last_name,
+      company: c.company,
+      primaryEmail: c.primary_email,
+      primaryPhone: c.primary_phone,
+      totalContributions: c.stats?.total_contributions,
+      recurringContributions: c.stats?.recurring_contributions,
+      tags: c.tags,
+      archivedAt: c.archived_at,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at
     }));
 
     return {
-      output: {
+      output: client.output(listContactsOutputSchema, {
         contacts,
         totalCount: result.meta.total,
         currentPage: result.meta.current_page,
         lastPage: result.meta.last_page
-      },
-      message: `Found **${result.meta.total}** contacts (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      }),
+      message: client.publicData(
+        `Found **${result.meta.total}** contacts (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      )
     };
   })
   .build();

@@ -15,6 +15,7 @@ export let getWorkplace = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original workplace metadata returned by Doppler'),
       workplaceId: z.string().describe('Workplace unique identifier'),
       name: z.string().describe('Workplace name'),
       billingEmail: z.string().optional().describe('Billing contact email'),
@@ -28,6 +29,7 @@ export let getWorkplace = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: workplace,
         workplaceId: workplace.id,
         name: workplace.name,
         billingEmail: workplace.billing_email,

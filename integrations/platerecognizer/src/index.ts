@@ -1,11 +1,15 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   blurImage,
+  blurImageFile,
   getUsage,
+  listLicenses,
   recognizeBoat,
   recognizeContainer,
   recognizePlate,
+  recognizeText,
   recognizeTrailer,
   recognizeUsdot,
   recognizeVin
@@ -15,12 +19,16 @@ export let provider = Slate.create({
   tools: [
     recognizePlate,
     blurImage,
+    blurImageFile,
     recognizeVin,
     recognizeTrailer,
     recognizeUsdot,
     recognizeContainer,
     recognizeBoat,
-    getUsage
+    getUsage,
+    recognizeText,
+    listLicenses
   ],
+  toolCategories,
   triggers: []
 });

@@ -48,8 +48,12 @@ Use this to quickly check how much native currency an address holds.`,
     ]);
 
     let balanceBigInt = BigInt(balance);
-    let ethValue = Number(balanceBigInt) / 1e18;
-    let balanceEth = ethValue.toFixed(18).replace(/0+$/, '').replace(/\.$/, '.0');
+    let whole = balanceBigInt / 10n ** 18n;
+    let fraction = (balanceBigInt % 10n ** 18n)
+      .toString()
+      .padStart(18, '0')
+      .replace(/0+$/, '');
+    let balanceEth = `${whole}.${fraction || '0'}`;
 
     return {
       output: {

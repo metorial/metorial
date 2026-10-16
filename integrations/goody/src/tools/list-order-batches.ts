@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let orderBatchSummarySchema = z.object({
@@ -35,10 +35,7 @@ export let listOrderBatches = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let result = await client.listOrderBatches({
       page: ctx.input.page,
@@ -53,7 +50,7 @@ export let listOrderBatches = SlateTool.create(spec, {
       sendMethod: b.send_method,
       isScheduledSend: b.is_scheduled_send,
       referenceId: b.reference_id,
-      workspaceName: b.workspace_name
+      workspaceName: b.workspace_name ?? null
     }));
 
     let totalCount = result.list_meta?.total_count || 0;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,9 +54,22 @@ export let getEvents = SlateTool.create(spec, {
         .optional()
         .describe('Token ID (used with chain and contractAddress to query by NFT)'),
       eventType: z
-        .enum(['sale', 'transfer', 'cancel', 'order', 'redemption'])
+        .enum([
+          'sale',
+          'transfer',
+          'cancel',
+          'order',
+          'redemption',
+          'mint',
+          'listing',
+          'offer',
+          'trait_offer',
+          'collection_offer'
+        ])
         .optional()
-        .describe('Filter by event type'),
+        .describe(
+          'Filter by event type. Legacy cancel, order, and redemption values are retained; current REST filters use sale, transfer, mint, listing, offer, trait_offer, and collection_offer.'
+        ),
       afterTimestamp: z
         .number()
         .optional()
@@ -76,6 +89,33 @@ export let getEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasNft =
+      ctx.input.contractAddress !== undefined || ctx.input.tokenIdentifier !== undefined;
+    if (hasNft && (!ctx.input.contractAddress || !ctx.input.tokenIdentifier)) {
+      throw createApiServiceError(
+        'NFT events require both contractAddress and tokenIdentifier.'
+      );
+    }
+    let targetCount = [
+      ctx.input.collectionSlug !== undefined,
+      ctx.input.accountAddress !== undefined,
+      hasNft
+    ].filter(Boolean).length;
+    if (targetCount !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one of collectionSlug, accountAddress, or contractAddress + tokenIdentifier.'
+      );
+    }
+    if (
+      ctx.input.afterTimestamp !== undefined &&
+      ctx.input.beforeTimestamp !== undefined &&
+      ctx.input.afterTimestamp > ctx.input.beforeTimestamp
+    ) {
+      throw createApiServiceError(
+        'afterTimestamp must be less than or equal to beforeTimestamp.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let chain = ctx.input.chain || ctx.config.chain || 'ethereum';
     let data: any;
@@ -99,19 +139,19 @@ export let getEvents = SlateTool.create(spec, {
     } else if (ctx.input.accountAddress) {
       data = await client.getEventsByAccount(ctx.input.accountAddress, params);
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide at least one of: collectionSlug, accountAddress, or contractAddress + tokenIdentifier.'
       );
     }
 
     let events = (data.asset_events ?? []).map((e: any) => ({
-      eventType: e.event_type ?? 'unknown',
-      eventTimestamp: e.event_timestamp ?? null,
+      eventType: e.event_type,
+      eventTimestamp: e.event_timestamp == null ? null : String(e.event_timestamp),
       orderHash: e.order_hash ?? null,
       chain: e.chain ?? null,
-      contractAddress: e.nft?.contract ?? null,
-      tokenIdentifier: e.nft?.identifier ?? null,
-      collectionSlug: e.collection_slug ?? e.nft?.collection ?? null,
+      contractAddress: e.nft?.contract ?? e.asset?.contract ?? null,
+      tokenIdentifier: e.nft?.identifier ?? e.asset?.identifier ?? null,
+      collectionSlug: e.collection_slug ?? e.nft?.collection ?? e.asset?.collection ?? null,
       quantity: e.quantity ?? null,
       maker: e.maker ?? null,
       taker: e.taker ?? null,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,16 @@ export let getAdjustedMetrics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.includeTeamMetrics &&
+      !ctx.input.includePassingMetrics &&
+      !ctx.input.includeRushingMetrics &&
+      !ctx.input.includeKickingMetrics
+    ) {
+      throw createApiServiceError('Select at least one result to retrieve.', {
+        reason: 'no_result_selected'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
     let results: any = {};
 

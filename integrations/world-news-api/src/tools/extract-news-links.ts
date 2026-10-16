@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let extractNewsLinksTool = SlateTool.create(spec, {
@@ -25,6 +25,7 @@ export let extractNewsLinksTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       links: z.array(z.string()).describe('List of discovered news article URLs')
     })
   )
@@ -39,9 +40,10 @@ export let extractNewsLinksTool = SlateTool.create(spec, {
 
     return {
       output: {
-        links: result.news_links || []
+        ...(result.quota ? { quota: result.quota } : {}),
+        links: result.news_links
       },
-      message: `Found **${(result.news_links || []).length}** news links from ${ctx.input.url}.`
+      message: `Found **${result.news_links.length}** news links from ${ctx.input.url}.`
     };
   })
   .build();

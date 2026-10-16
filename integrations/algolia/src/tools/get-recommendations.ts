@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -25,7 +25,11 @@ let recommendationRequestSchema = z.object({
     .min(0)
     .max(100)
     .optional()
-    .describe('Minimum score threshold for recommendations (0-100)'),
+    .describe('Minimum score threshold for recommendations (0-100). Defaults to 0.'),
+  fallbackParameters: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Search parameters used to fill missing recommendations for supported models.'),
   maxRecommendations: z
     .number()
     .optional()
@@ -76,18 +80,27 @@ export let getRecommendations = SlateTool.create(spec, {
     });
 
     let requests = ctx.input.requests.map(req => {
+      if (
+        ['related-products', 'bought-together', 'looking-similar'].includes(req.model) &&
+        !req.objectID
+      ) {
+        throw createApiServiceError(`objectID is required for the ${req.model} model.`);
+      }
+      if (req.model === 'trending-facets' && !req.facetName) {
+        throw createApiServiceError('facetName is required for the trending-facets model.');
+      }
       let payload: Record<string, any> = {
         indexName: req.indexName,
-        model: req.model
+        model: req.model,
+        threshold: req.threshold ?? 0
       };
 
       if (req.objectID !== undefined) {
         payload.objectID = req.objectID;
       }
 
-      if (req.threshold !== undefined) {
-        payload.threshold = req.threshold;
-      }
+      if (req.fallbackParameters !== undefined)
+        payload.fallbackParameters = req.fallbackParameters;
 
       if (req.maxRecommendations !== undefined) {
         payload.maxRecommendations = req.maxRecommendations;

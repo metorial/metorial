@@ -13,6 +13,10 @@ export let listTickets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       ticketUuid: z.string().optional().describe('Filter by a specific ticket UUID'),
       contactUuid: z.string().optional().describe('Filter by contact UUID')
     })
@@ -32,6 +36,8 @@ export let listTickets = SlateTool.create(spec, {
           closedOn: z.string().nullable()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -39,6 +45,7 @@ export let listTickets = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listTickets({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.ticketUuid,
       contact: ctx.input.contactUuid
     });
@@ -58,6 +65,8 @@ export let listTickets = SlateTool.create(spec, {
     return {
       output: {
         tickets,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${tickets.length}** ticket(s).`

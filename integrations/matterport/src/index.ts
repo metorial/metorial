@@ -5,9 +5,12 @@ import {
   deleteTag,
   getAssets,
   getDimensions,
+  getFileUrl,
   getModel,
+  getNoteComments,
   getNotes,
   getSweeps,
+  listFloors,
   listTags,
   purchaseAssetBundle,
   searchModels,
@@ -28,7 +31,10 @@ export let provider = Slate.create({
     purchaseAssetBundle,
     getSweeps,
     getDimensions,
-    getNotes
+    getNotes,
+    getFileUrl,
+    getNoteComments,
+    listFloors
   ],
   triggers: []
 });

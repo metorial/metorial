@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShortPixelClient } from '../lib/client';
+import { readNumber, readOptionalNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 export let checkApiStatus = SlateTool.create(spec, {
@@ -24,8 +25,14 @@ Returns monthly and one-time credit counts including how many calls have been ma
         .number()
         .describe('Number of paid API calls made from one-time credits'),
       oneTimeCallsQuota: z.number().describe('Total one-time API call quota'),
-      totalCallsMade: z.number().describe('Total numeric API calls made'),
-      totalCallsQuota: z.number().describe('Total numeric API calls quota')
+      totalCallsMade: z
+        .number()
+        .optional()
+        .describe('Total numeric API calls made, when supplied'),
+      totalCallsQuota: z
+        .number()
+        .optional()
+        .describe('Total numeric API calls quota, when supplied')
     })
   )
   .handleInvocation(async ctx => {
@@ -34,12 +41,12 @@ Returns monthly and one-time credit counts including how many calls have been ma
     let status = await client.getApiStatus();
 
     let output = {
-      monthlyCallsMade: status.APICallsMade ?? 0,
-      monthlyCallsQuota: status.APICallsQuota ?? 0,
-      oneTimeCallsMade: status.APICallsMadeOneTime ?? 0,
-      oneTimeCallsQuota: status.APICallsQuotaOneTime ?? 0,
-      totalCallsMade: status.APICallsMadeNumeric ?? 0,
-      totalCallsQuota: status.APICallsQuotaNumeric ?? 0
+      monthlyCallsMade: readNumber(status.APICallsMade, 'APICallsMade'),
+      monthlyCallsQuota: readNumber(status.APICallsQuota, 'APICallsQuota'),
+      oneTimeCallsMade: readNumber(status.APICallsMadeOneTime, 'APICallsMadeOneTime'),
+      oneTimeCallsQuota: readNumber(status.APICallsQuotaOneTime, 'APICallsQuotaOneTime'),
+      totalCallsMade: readOptionalNumber(status.APICallsMadeNumeric, 'APICallsMadeNumeric'),
+      totalCallsQuota: readOptionalNumber(status.APICallsQuotaNumeric, 'APICallsQuotaNumeric')
     };
 
     let remainingMonthly = output.monthlyCallsQuota - output.monthlyCallsMade;

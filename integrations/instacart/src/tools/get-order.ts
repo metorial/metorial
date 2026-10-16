@@ -21,7 +21,7 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
         .string()
         .optional()
         .describe(
-          'Specific order ID to retrieve. If omitted, returns all orders for the user.'
+          'Specific order ID to retrieve. Omit only for the deprecated list-all-orders API, which Instacart may remove.'
         )
     })
   )
@@ -30,6 +30,12 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
       orders: z
         .array(
           z.object({
+            raw: z
+              .unknown()
+              .optional()
+              .describe(
+                'Complete order data, including item quantities, prices, and metadata'
+              ),
             orderId: z.string().describe('Order ID'),
             status: z.string().describe('Current order status'),
             orderUrl: z.string().optional().describe('URL to view the order'),
@@ -73,10 +79,11 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
-    let orders: any;
+    let orders: Awaited<ReturnType<ConnectClient['getOrders']>>;
     if (ctx.input.orderId) {
       let order = await client.getOrder(ctx.input.userId, ctx.input.orderId);
       orders = [order];

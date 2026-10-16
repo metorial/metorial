@@ -29,7 +29,9 @@ export let listServerGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
@@ -46,12 +48,12 @@ export let listServerGroups = SlateTool.create(spec, {
 
     let groups = await client.listServerGroups(ctx.input.projectPermalink);
 
-    let mapped = (Array.isArray(groups) ? groups : []).map((g: any) => ({
+    let mapped = groups.map((g: any) => ({
       groupIdentifier: g.identifier,
       name: g.name,
       preferredBranch: g.preferred_branch,
-      lastRevision: g.last_revision ?? null,
-      servers: (g.servers || []).map((s: any) => ({
+      lastRevision: g.last_revision,
+      servers: g.servers?.map((s: any) => ({
         serverIdentifier: s.identifier,
         name: s.name,
         protocolType: s.protocol_type,

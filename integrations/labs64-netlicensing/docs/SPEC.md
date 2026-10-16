@@ -1,6 +1,4 @@
-Now let me fetch the notifications page to understand webhook support better:Now I have all the information needed. Let me compile the specification.
-
-# Slates Specification for Labs64 NetLicensing
+# Labs64 NetLicensing API Overview
 
 ## Overview
 
@@ -37,6 +35,12 @@ Each API key has an associated role that determines the level of access:
 | **Operation**          | Full CRUD for licensees and licenses, but cannot modify product configuration.                                      |
 | **Maintenance**        | Full product maintenance including products, modules, and license templates.                                        |
 | **Admin**              | Full access, equivalent to username/password authentication.                                                        |
+
+## Implemented API Surface
+
+The integration provides product, module, template, licensee, license, and bundle management; individual entity lookup; license validation and transfer; token creation, listing and revocation; transaction lookup/listing; and supported licensing model and license type discovery. Token deletion requires username and password authentication. API key access depends on the assigned provider role. Validation may create licensees or update licensing state and is not read-only.
+
+The sections below describe provider capabilities. Backup/restore, CSV reporting, transaction mutations, payment method configuration, and notifications are not implemented as tools or triggers.
 
 ## Features
 

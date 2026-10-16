@@ -1,6 +1,8 @@
 # Poof
 
-Process cryptocurrency and fiat payments, create checkout sessions, and manage transactions. Create blockchain wallets, generate deposit addresses, and check balances across 200+ tokens. Send cryptocurrency payouts to external addresses. Create invoices in multiple fiat currencies (USD, EUR, CNY) with cryptocurrency settlement (BTC, LTC, DOGE, ETH). Process ACH bank transfers and check transfer statuses. Fetch ERC-20 token prices, gas prices, and smart contract details. Manage products for checkout flows.
+Create hosted checkouts, cryptocurrency invoices, payment links, and deposit addresses. Create wallets, inspect balances, send payouts, query transactions, fetch products, and retrieve exchange rates, token prices, gas prices, and ERC-20 contract information.
+
+Authenticate with your Poof API key. Provide the merchant username explicitly when creating a checkout. Fiat invoices and charges use linked PayPal, Cash App, Skrill, or Coinbase accounts. When Poof returns a QR-code download URL, the payment tool also provides a downloadable QR code.
 
 ## License
 

@@ -1,6 +1,6 @@
 # Zulip
 
-Send, retrieve, edit, and delete messages in channels (streams) and direct messages. Manage channels, topics, and user subscriptions. Search and filter messages using narrow queries. Add emoji reactions, upload file attachments, and manage message flags (read, starred). Create and manage channels with public/private visibility, subscribe/unsubscribe users, and configure per-channel notification settings. Retrieve and manage users, user groups, presence status, and typing indicators. Configure organization settings including custom emoji, linkifiers, and custom profile fields. Send invitations, manage drafts and saved snippets, and schedule messages for future delivery.
+Send, search, retrieve, edit, and delete Zulip messages. Manage channel subscriptions, channel properties and topics, reactions, personal message flags, user groups, status, presence, and invitations. Read the connected account profile, server settings, and personal subscription preferences. Upload files for sharing in messages and list uploaded file metadata.
 
 ## License
 

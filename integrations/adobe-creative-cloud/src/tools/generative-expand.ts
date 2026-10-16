@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FireflyClient } from '../lib/firefly';
+import { FireflyClient, fireflyImages } from '../lib/firefly';
 import { spec } from '../spec';
 
 export let generativeExpand = SlateTool.create(spec, {
@@ -71,10 +71,10 @@ export let generativeExpand = SlateTool.create(spec, {
       placement
     });
 
-    let images = (result.outputs || result.images || []).map((img: any) => ({
-      imageUrl: img.image?.url || img.url,
-      seed: img.seed
-    }));
+    let images = fireflyImages(result);
+    for (let image of images) {
+      await ctx.addAttachment({ type: 'url', url: image.imageUrl });
+    }
 
     return {
       output: { images },

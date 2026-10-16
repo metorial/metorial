@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let userNameSchema = z
   .object({
-    given: z.string().optional().describe('First name'),
-    family: z.string().optional().describe('Last name'),
+    given: z.string().optional().describe('First name; required when creating a user'),
+    family: z.string().optional().describe('Last name; required when creating a user'),
     middle: z.string().optional().describe('Middle name'),
     title: z.string().optional().describe('Title (e.g., Mr., Dr.)'),
     suffix: z.string().optional().describe('Suffix (e.g., Jr., III)')
@@ -22,7 +22,10 @@ let userContactSchema = z
 
 let userOutputSchema = z.object({
   userId: z.string().describe('Internal user ID'),
-  userName: z.string().describe('Username (login name)'),
+  userName: z
+    .string()
+    .optional()
+    .describe('Username (login name), when visible to the caller'),
   externalId: z.string().optional().describe('External identifier'),
   givenName: z.string().optional().describe('First name'),
   familyName: z.string().optional().describe('Last name'),
@@ -49,15 +52,18 @@ let mapUser = (user: any) => ({
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new user account in Blackboard Learn. Requires a unique username. Optionally set name, email, roles, and availability.`,
+  description: `Create a new user account in Blackboard Learn. Requires a unique username, password, first name, and last name. Optionally set email, roles, and availability.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
       userName: z.string().describe('Unique username (login name)'),
-      password: z.string().optional().describe('User password'),
+      password: z.string().optional().describe('User password; required when creating a user'),
       externalId: z.string().optional().describe('External identifier for SIS integration'),
-      dataSourceId: z.string().optional().describe('Data source ID'),
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Data source ID. Call list_data_sources to discover IDs.'),
       available: z.enum(['Yes', 'No', 'Disabled']).optional().describe('User availability'),
       name: userNameSchema,
       contact: userContactSchema,
@@ -70,7 +76,7 @@ export let createUser = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let user = await client.createUser({
       userName: ctx.input.userName,
@@ -86,7 +92,7 @@ export let createUser = SlateTool.create(spec, {
 
     return {
       output: mapUser(user),
-      message: `Created user **${user.userName}**${user.name?.given ? ` (${user.name.given} ${user.name.family || ''})` : ''}.`
+      message: `Created user **${user.userName ?? user.id}**${user.name?.given ? ` (${user.name.given} ${user.name.family || ''})` : ''}.`
     };
   })
   .build();
@@ -121,7 +127,7 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let user = await client.getUser(ctx.input.userId);
 
     return {
@@ -131,7 +137,7 @@ export let getUser = SlateTool.create(spec, {
         systemRoleIds: user.systemRoleIds,
         address: user.address
       },
-      message: `Retrieved user **${user.userName}**${user.name?.given ? ` (${user.name.given} ${user.name.family || ''})` : ''}.`
+      message: `Retrieved user **${user.userName ?? user.id}**${user.name?.given ? ` (${user.name.given} ${user.name.family || ''})` : ''}.`
     };
   })
   .build();
@@ -150,7 +156,10 @@ export let updateUser = SlateTool.create(spec, {
       userName: z.string().optional().describe('New username'),
       password: z.string().optional().describe('New password'),
       externalId: z.string().optional().describe('External identifier'),
-      dataSourceId: z.string().optional().describe('Data source ID'),
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Data source ID. Call list_data_sources to discover IDs.'),
       available: z.enum(['Yes', 'No', 'Disabled']).optional().describe('User availability'),
       name: userNameSchema,
       contact: userContactSchema,
@@ -160,7 +169,7 @@ export let updateUser = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let { userId, available, ...rest } = ctx.input;
 
     let user = await client.updateUser(userId, {
@@ -170,7 +179,7 @@ export let updateUser = SlateTool.create(spec, {
 
     return {
       output: mapUser(user),
-      message: `Updated user **${user.userName}**.`
+      message: `Updated user **${user.userName ?? user.id}**.`
     };
   })
   .build();
@@ -194,7 +203,7 @@ export let deleteUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteUser(ctx.input.userId);
     return {
       output: { deleted: true },
@@ -212,12 +221,15 @@ export let listUsers = SlateTool.create(spec, {
   .input(
     z.object({
       offset: z.number().optional().describe('Number of items to skip'),
-      limit: z.number().optional().describe('Maximum results to return (max 200)'),
+      limit: z.number().optional().describe('Maximum results to return'),
       availability: z
         .enum(['Yes', 'No', 'Disabled'])
         .optional()
         .describe('Filter by availability'),
-      dataSourceId: z.string().optional().describe('Filter by data source ID'),
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Filter by data source ID. Call list_data_sources to discover IDs.'),
       sort: z.string().optional().describe('Sort field (e.g., "userName", "lastLogin")')
     })
   )
@@ -228,7 +240,7 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listUsers({
       offset: ctx.input.offset,
       limit: ctx.input.limit,

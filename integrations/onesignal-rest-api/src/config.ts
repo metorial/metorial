@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     appId: z
       .string()
+      .optional()
       .describe(
-        'Your OneSignal App ID (UUID v4). This is a public identifier used for all API requests.'
+        'Legacy default App ID. Prefer the appId tool input; list_apps discovers IDs with an Organization API Key.'
       )
   })
 );

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchSecFilings = SlateTool.create(spec, {
   name: 'Search SEC Filings',
   key: 'search_sec_filings',
-  description: `Search SEC EDGAR filings by company name or CIK code. First resolves a company name to its CIK code, then retrieves submission history. Supports filtering by form type (8-K, 10-K, 10-Q, Form 4, etc.) and date range. You can also provide a CIK code directly to skip the lookup step.`,
+  description: `Search SEC EDGAR filings by company name or CIK code. First resolves the first company-name match to its CIK code, then retrieves submission history. Provide an exact CIK when names are ambiguous. Supports filtering by form type (8-K, 10-K, 10-Q, Form 4, etc.) and date range. You can also provide a CIK code directly to skip the lookup step.`,
   constraints: ['Available on Business plan only'],
   tags: {
     readOnly: true
@@ -14,6 +14,9 @@ export let searchSecFilings = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accessionNumber: z.string().optional().describe('Filter by a filing accession number.'),
+      reportFrom: z.string().optional().describe('Start report date in YYYY-MM-DD format.'),
+      reportTo: z.string().optional().describe('End report date in YYYY-MM-DD format.'),
       companyName: z
         .string()
         .optional()
@@ -36,13 +39,14 @@ export let searchSecFilings = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       cik: z.string(),
       companyName: z.string().nullable(),
       pagination: z.object({
-        limit: z.number(),
-        offset: z.number(),
-        count: z.number(),
-        total: z.number()
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+        count: z.number().optional(),
+        total: z.number().optional()
       }),
       submissions: z.array(
         z.object({
@@ -61,38 +65,29 @@ export let searchSecFilings = SlateTool.create(spec, {
 
     let cik = ctx.input.cik;
     let companyName: string | null = null;
+    let lookupRaw: unknown;
 
     if (!cik && ctx.input.companyName) {
       let lookup = await client.getCikLookup({ query: ctx.input.companyName });
       if (lookup.data.length === 0) {
-        return {
-          output: {
-            cik: '',
-            companyName: ctx.input.companyName,
-            pagination: { limit: 0, offset: 0, count: 0, total: 0 },
-            submissions: []
-          },
-          message: `No SEC filings found for company "${ctx.input.companyName}". Try a different search term.`
-        };
+        throw createApiServiceError(
+          'No company matched companyName. Try another name or supply its SEC cik.'
+        );
       }
+      lookupRaw = lookup.raw;
       cik = lookup.data[0]!.cik;
       companyName = lookup.data[0]!.name;
     }
 
     if (!cik) {
-      return {
-        output: {
-          cik: '',
-          companyName: null,
-          pagination: { limit: 0, offset: 0, count: 0, total: 0 },
-          submissions: []
-        },
-        message: 'Either `companyName` or `cik` must be provided.'
-      };
+      throw createApiServiceError('Either companyName or cik must be provided.');
     }
 
     let result = await client.getSecSubmissions({
       cik,
+      accessionNumber: ctx.input.accessionNumber,
+      reportFrom: ctx.input.reportFrom,
+      reportTo: ctx.input.reportTo,
       formType: ctx.input.formType,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
@@ -112,11 +107,12 @@ export let searchSecFilings = SlateTool.create(spec, {
     return {
       output: {
         cik,
-        companyName,
+        companyName: result.companyName ?? companyName,
         pagination: result.pagination,
+        raw: { lookup: lookupRaw, submissions: result.raw },
         submissions
       },
-      message: `Retrieved ${submissions.length} SEC filings for CIK **${cik}**${companyName ? ` (${companyName})` : ''}${ctx.input.formType ? ` filtered by form type "${ctx.input.formType}"` : ''}. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${submissions.length} SEC filings for CIK **${cik}**${companyName ? ` (${companyName})` : ''}${ctx.input.formType ? ` filtered by form type "${ctx.input.formType}"` : ''}.`
     };
   })
   .build();

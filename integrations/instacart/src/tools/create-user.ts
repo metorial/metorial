@@ -20,6 +20,7 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
 })
   .input(
     z.object({
+      raw: z.unknown().optional().describe('Complete validated address and user response'),
       userId: z.string().describe('Unique user identifier (defined by you)'),
       firstName: z.string().describe('Customer first name (no special chars: /:<>$%?)'),
       lastName: z.string().optional().describe('Customer last name'),
@@ -37,13 +38,15 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete validated address and user response'),
       userId: z.string().describe('The Connect user ID')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
     let result = await client.createUserWithAddress(ctx.input);

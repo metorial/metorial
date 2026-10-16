@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 let couponSchema = z.object({
@@ -12,6 +13,12 @@ let couponSchema = z.object({
   isStorewide: z.boolean().describe('Whether the coupon applies to all products'),
   isLive: z.boolean().describe('Whether the coupon is active'),
   isArchived: z.boolean().describe('Whether the coupon is archived'),
+  limitOnePerEmail: z.boolean().optional().describe('Whether each email can redeem only once'),
+  validForDays: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Per-email eligibility window in days'),
   limit: z.number().nullable().describe('Maximum number of redemptions'),
   durationInMonths: z.number().nullable().describe('Subscription discount duration in months'),
   start: z.string().nullable().describe('Start date'),
@@ -28,7 +35,7 @@ let couponSchema = z.object({
 export let listCoupons = SlateTool.create(spec, {
   name: 'List Coupons',
   key: 'list_coupons',
-  description: `List all coupons in your Zylvie store. Optionally include archived coupons.`,
+  description: `List all coupons in your Zylvie store. Choose active coupons or archived coupons; the filter returns one group at a time.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -44,6 +51,7 @@ export let listCoupons = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       count: z.number().describe('Total number of coupons returned'),
       coupons: z.array(couponSchema).describe('List of coupons')
     })
@@ -53,31 +61,34 @@ export let listCoupons = SlateTool.create(spec, {
 
     let result = await client.listCoupons(ctx.input.includeArchived);
 
-    let coupons = (result.coupons || []).map((c: Record<string, unknown>) => ({
+    let coupons = result.coupons.map((c: Record<string, unknown>) => ({
       couponId: c.id as string,
-      created: String(c.created),
+      created: c.created as string,
       code: c.code as string,
       type: c.type as string,
       amount: c.amount as number,
       isStorewide: c.is_storewide as boolean,
       isLive: c.is_live as boolean,
-      isArchived: (c.is_archived as boolean) || false,
-      limit: (c.limit as number | null) ?? null,
-      durationInMonths: (c.duration_in_months as number | null) ?? null,
-      start: (c.start as string | null) ?? null,
-      end: (c.end as string | null) ?? null,
+      isArchived: c.is_archived as boolean,
+      limitOnePerEmail: c.limit_one_per_email as boolean | undefined,
+      validForDays: c.valid_for_days as number | null | undefined,
+      limit: c.limit as number | null,
+      durationInMonths: c.duration_in_months as number | null,
+      start: c.start as string | null,
+      end: c.end as string | null,
       redemptionCount: c.redemption_count as number,
-      products: (c.products as string[]) || [],
-      affiliateId: (c.affiliate as string | null) ?? null,
-      requiresSubscriptionProduct: (c.requires_subscription_product as string | null) ?? null
+      products: c.products as string[],
+      affiliateId: c.affiliate as string | null,
+      requiresSubscriptionProduct: c.requires_subscription_product as string | null
     }));
 
     return {
       output: {
+        raw: result,
         count: result.count,
         coupons
       },
-      message: `Found **${result.count}** coupon(s)${ctx.input.includeArchived ? ' (including archived)' : ''}.`
+      message: `Found **${result.count}** coupon(s)${ctx.input.includeArchived ? ' (archived)' : ''}.`
     };
   })
   .build();

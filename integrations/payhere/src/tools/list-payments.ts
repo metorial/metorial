@@ -23,8 +23,10 @@ export let listPayments = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       payments: z.array(
         z.object({
+          raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
           paymentId: z.number().describe('Payment identifier'),
           hashid: z.string().describe('Hash identifier'),
           reference: z.string().nullable().describe('Payment reference'),
@@ -42,6 +44,7 @@ export let listPayments = SlateTool.create(spec, {
         })
       ),
       meta: z.object({
+        raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
         currentPage: z.number(),
         nextPage: z.number().nullable(),
         prevPage: z.number().nullable(),

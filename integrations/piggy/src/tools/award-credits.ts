@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredNumber, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let awardCredits = SlateTool.create(spec, {
@@ -18,7 +19,7 @@ export let awardCredits = SlateTool.create(spec, {
       shopUuid: z
         .string()
         .optional()
-        .describe('UUID of the shop (uses config default if not provided)'),
+        .describe('Shop UUID from list_shops (uses config default if not provided)'),
       credits: z.number().optional().describe('Direct number of credits to award'),
       unitValue: z
         .number()
@@ -32,6 +33,7 @@ export let awardCredits = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.any()).optional().describe('Original provider response'),
       creditReceptionUuid: z.string().describe('UUID of the credit reception'),
       credits: z.number().describe('Number of credits awarded'),
       contactUuid: z.string().describe('UUID of the contact')
@@ -40,7 +42,8 @@ export let awardCredits = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let shopUuid = ctx.input.shopUuid || ctx.config.shopUuid;
-    if (!shopUuid) throw new Error('shopUuid is required either in input or config');
+    if (!shopUuid)
+      throw createApiServiceError('shopUuid is required either in input or config');
 
     let result = await client.createCreditReception({
       shopUuid,
@@ -50,12 +53,13 @@ export let awardCredits = SlateTool.create(spec, {
       unitName: ctx.input.unitName
     });
 
-    let reception = result.data || result;
+    let reception = result.data;
 
     return {
       output: {
-        creditReceptionUuid: reception.uuid,
-        credits: reception.credits,
+        raw: reception,
+        creditReceptionUuid: requiredString(reception.uuid, 'credit reception UUID'),
+        credits: requiredNumber(reception.credits, 'credits'),
         contactUuid: ctx.input.contactUuid
       },
       message: `Awarded **${reception.credits}** credits to contact ${ctx.input.contactUuid}.`

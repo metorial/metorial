@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { configInput, projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTrustedIps = SlateTool.create(spec, {
@@ -23,8 +24,8 @@ export let manageTrustedIps = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug'),
-      config: z.string().describe('Config name'),
+      project: projectInput,
+      config: configInput,
       action: z.enum(['list', 'add', 'delete']).describe('Action to perform'),
       ip: z
         .string()
@@ -50,7 +51,7 @@ export let manageTrustedIps = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.ip) throw new Error('ip is required for "add" action');
+      if (!ctx.input.ip) throw createApiServiceError('ip is required for "add" action');
 
       await client.addTrustedIp(ctx.input.project, ctx.input.config, ctx.input.ip);
 
@@ -61,7 +62,7 @@ export let manageTrustedIps = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.ip) throw new Error('ip is required for "delete" action');
+      if (!ctx.input.ip) throw createApiServiceError('ip is required for "delete" action');
 
       await client.deleteTrustedIp(ctx.input.project, ctx.input.config, ctx.input.ip);
 
@@ -71,6 +72,6 @@ export let manageTrustedIps = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

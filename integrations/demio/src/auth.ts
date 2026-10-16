@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { DemioClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,6 +18,10 @@ export let auth = SlateAuth.create()
       apiSecret: z.string().describe('Demio API Secret (found in Account Settings > API)')
     }),
     getOutput: async ctx => {
+      await new DemioClient({
+        token: ctx.input.apiKey,
+        apiSecret: ctx.input.apiSecret
+      }).ping();
       return {
         output: {
           token: ctx.input.apiKey,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TypefullyClient } from '../lib/client';
+import { enabledDraftPlatforms, providerId, TypefullyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let platformPostSchema = z.object({
@@ -14,6 +14,10 @@ let platformPostSchema = z.object({
 
 let platformConfigSchema = z.object({
   enabled: z.boolean().default(true).describe('Whether this platform is enabled'),
+  settings: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Platform-specific settings, such as X reply_to_url.'),
   posts: z
     .array(platformPostSchema)
     .min(1)
@@ -25,6 +29,7 @@ export let createDraft = SlateTool.create(spec, {
   key: 'create_draft',
   description: `Create a new draft post for one or more social media platforms (X, LinkedIn, Threads, Bluesky, Mastodon). Each platform can have its own tailored content and thread structure. Drafts can be saved, scheduled for a specific time, queued to the next available slot, or published immediately.`,
   instructions: [
+    'Publishing with publishAt now is asynchronous: poll get_draft until publishState is finished, then inspect status and published URLs.',
     'Set publishAt to "now" to publish immediately, "next-free-slot" to queue, or an ISO 8601 datetime to schedule.',
     'Omit publishAt to save as a draft without scheduling.',
     'Each platform has its own posts array — provide platform-specific content for best results.',
@@ -40,7 +45,9 @@ export let createDraft = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      socialSetId: z.string().describe('ID of the social set to create the draft in'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       platforms: z
         .object({
           x: platformConfigSchema.optional().describe('X (Twitter) platform content'),
@@ -56,7 +63,17 @@ export let createDraft = SlateTool.create(spec, {
         .describe(
           'When to publish: "now", "next-free-slot", or ISO 8601 datetime. Omit to save as draft.'
         ),
-      tags: z.array(z.string()).optional().describe('Tag names to assign to the draft'),
+      planAt: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Plan for an ISO datetime or next-free-slot without auto-publishing; null clears the date. Mutually exclusive with publishAt.'
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Tag slugs to assign to the draft; use manage_tags to discover them'),
       share: z.boolean().optional().describe('Whether to generate a Typefully share URL'),
       draftTitle: z.string().optional().describe('Internal title for organizing the draft')
     })
@@ -64,8 +81,17 @@ export let createDraft = SlateTool.create(spec, {
   .output(
     z.object({
       draftId: z.string().describe('ID of the created draft'),
-      socialSetId: z.string().describe('ID of the social set'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       status: z.string().describe('Draft status (draft, scheduled, published, publishing)'),
+      publishState: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Publishing progress; in_progress means accepted asynchronously. Poll get_draft until finished.'
+        ),
       createdAt: z.string().describe('When the draft was created'),
       scheduledDate: z.string().nullable().describe('Scheduled publication time, if set'),
       publishedAt: z
@@ -83,52 +109,57 @@ export let createDraft = SlateTool.create(spec, {
     let client = new TypefullyClient(ctx.auth.token);
 
     let platformsPayload: Record<string, unknown> = {};
-    let enabledPlatforms: string[] = [];
 
     for (let [platform, config] of Object.entries(ctx.input.platforms)) {
       if (config) {
         platformsPayload[platform] = {
           enabled: config.enabled,
+          ...(config.settings !== undefined ? { settings: config.settings } : {}),
           posts: config.posts.map(post => ({
             text: post.text,
             ...(post.mediaIds ? { media_ids: post.mediaIds } : {}),
             ...(post.quotePostUrl ? { quote_post_url: post.quotePostUrl } : {})
           }))
         };
-        if (config.enabled) {
-          enabledPlatforms.push(platform);
-        }
       }
     }
 
     let draft = await client.createDraft(ctx.input.socialSetId, {
       platforms: platformsPayload as any,
       publishAt: ctx.input.publishAt,
+      planAt: ctx.input.planAt,
       tags: ctx.input.tags,
       share: ctx.input.share,
       draftTitle: ctx.input.draftTitle
     });
 
+    let enabledPlatforms = enabledDraftPlatforms(draft);
+
     let output = {
-      draftId: draft.id,
-      socialSetId: draft.social_set_id,
+      draftId: providerId(draft.id),
+      socialSetId: providerId(draft.social_set_id),
       status: draft.status,
+      publishState: draft.publish_state,
       createdAt: draft.created_at,
       scheduledDate: draft.scheduled_date,
       publishedAt: draft.published_at,
       draftTitle: draft.draft_title,
-      tags: draft.tags ?? [],
+      tags: draft.tags,
       preview: draft.preview,
       shareUrl: draft.share_url,
       enabledPlatforms
     };
 
     let statusMsg =
-      draft.status === 'published'
-        ? 'published immediately'
-        : draft.status === 'scheduled'
-          ? `scheduled for ${draft.scheduled_date}`
-          : 'saved as draft';
+      draft.publish_state === 'in_progress'
+        ? 'accepted for asynchronous publishing; poll get_draft for completion'
+        : draft.status === 'planned'
+          ? `planned for ${draft.scheduled_date}; it will not auto-publish until confirmed`
+          : draft.status === 'published'
+            ? 'published immediately'
+            : draft.status === 'scheduled'
+              ? `scheduled for ${draft.scheduled_date}`
+              : 'saved as draft';
 
     return {
       output,

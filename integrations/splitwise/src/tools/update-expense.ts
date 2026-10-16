@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,10 @@ export let updateExpense = SlateTool.create(spec, {
       categoryId: z.number().optional().describe('Updated subcategory ID'),
       date: z.string().optional().describe('Updated date in ISO 8601 format'),
       details: z.string().optional().describe('Updated details/notes'),
+      repeatInterval: z
+        .enum(['never', 'weekly', 'fortnightly', 'monthly', 'yearly'])
+        .optional()
+        .describe('Updated recurrence interval; never stops recurrence'),
       shares: z
         .array(
           z.object({
@@ -56,6 +60,7 @@ export let updateExpense = SlateTool.create(spec, {
       category_id: ctx.input.categoryId,
       date: ctx.input.date,
       details: ctx.input.details,
+      repeat_interval: ctx.input.repeatInterval,
       users: ctx.input.shares?.map(s => ({
         user_id: s.userId,
         email: s.email,
@@ -67,6 +72,7 @@ export let updateExpense = SlateTool.create(spec, {
     });
 
     let updated = expenses[0];
+    if (!updated) throw createApiServiceError('Splitwise did not return an updated expense.');
 
     return {
       output: {

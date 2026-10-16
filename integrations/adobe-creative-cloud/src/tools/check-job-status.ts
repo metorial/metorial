@@ -1,5 +1,6 @@
-import { createAxios, SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
+import { createAdobeAxios, getAdobeJobUrl } from '../lib/client';
 import { spec } from '../spec';
 
 export let checkJobStatus = SlateTool.create(spec, {
@@ -23,6 +24,7 @@ export let checkJobStatus = SlateTool.create(spec, {
     z.object({
       status: z
         .string()
+        .optional()
         .describe('Current job status (e.g. pending, running, succeeded, failed)'),
       outputs: z
         .array(
@@ -34,33 +36,75 @@ export let checkJobStatus = SlateTool.create(spec, {
         )
         .optional()
         .describe('Output file locations'),
-      errors: z.any().optional().describe('Error details if the job failed')
+      errors: z.any().optional().describe('Error details if the job failed'),
+      raw: z
+        .any()
+        .optional()
+        .describe('Complete Adobe job response, including manifests and per-output metadata')
     })
   )
   .handleInvocation(async ctx => {
-    let http = createAxios({});
-    let response = await http.get(ctx.input.statusUrl, {
-      headers: {
-        Authorization: `Bearer ${ctx.auth.token}`,
-        'x-api-key': ctx.auth.clientId
-      }
-    });
+    let url = getAdobeJobUrl(ctx.input.statusUrl);
+    let http = createAdobeAxios(url.origin, ctx.auth);
+    let response = await http.get(`${url.pathname}${url.search}`, { maxRedirects: 0 });
 
     let data = response.data;
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('Adobe returned an invalid job status response.');
+    }
 
-    let outputs = (data.outputs || data.output || []).map((o: any) => ({
-      href: o.href || o._links?.self?.href,
-      storage: o.storage,
-      status: o.status
-    }));
+    let result = isApiErrorRecord(data.result) ? data.result : undefined;
+    let rawOutputs = data.outputs ?? data.output ?? result?.outputs;
+    let providerOutputs = Array.isArray(rawOutputs)
+      ? rawOutputs
+      : isApiErrorRecord(rawOutputs)
+        ? [rawOutputs]
+        : [];
+    let statuses = [
+      ...new Set(
+        providerOutputs
+          .map((output: any) => output.status)
+          .filter((status: unknown) => typeof status === 'string')
+      )
+    ];
+    let status =
+      data.status ?? data.jobStatus ?? (statuses.length === 1 ? statuses[0] : undefined);
+    let outputs = providerOutputs.flatMap((output: any) => {
+      let renditions = output._links?.renditions;
+      let files = Array.isArray(renditions) ? renditions : [output];
+      return files.map((file: any) => ({
+        href: file.href ?? file._links?.self?.href ?? file.destination?.url ?? file.url,
+        storage: file.storage,
+        status: output.status ?? status
+      }));
+    });
+    for (let output of providerOutputs) {
+      if (output.status !== 'succeeded' || !Array.isArray(output._links?.renditions)) continue;
+      for (let file of output._links.renditions) {
+        if (typeof file.href === 'string') {
+          await ctx.addAttachment({ type: 'url', url: file.href, mimeType: file.type });
+        }
+      }
+    }
+    let outputErrors = providerOutputs
+      .map((output: any) => output.errors ?? output.error)
+      .filter((error: unknown) => error !== undefined);
 
     return {
       output: {
-        status: data.status || data.jobStatus || 'unknown',
+        status: typeof status === 'string' ? status : undefined,
         outputs: outputs.length > 0 ? outputs : undefined,
-        errors: data.errors || data.error
+        errors:
+          data.errors ??
+          data.error ??
+          data.errorDetails ??
+          (outputErrors.length ? outputErrors : undefined),
+        raw: data
       },
-      message: `Job status: **${data.status || data.jobStatus || 'unknown'}**. ${outputs.length > 0 ? `${outputs.length} output(s) available.` : ''}`
+      message:
+        typeof status === 'string'
+          ? `Job status: **${status}**.`
+          : 'Retrieved job status details for each output.'
     };
   })
   .build();

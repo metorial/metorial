@@ -6,12 +6,16 @@ import { spec } from '../spec';
 export let generateSoundEffectTool = SlateTool.create(spec, {
   name: 'Generate Sound Effect',
   key: 'generate_sound_effect',
-  description: `Generate sound effects from text descriptions. Returns base64-encoded audio. Useful for creating cinematic sound effects for videos, voice-overs, or games.`,
+  description: `DEPRECATED — use \`generate_sound_effect_file\` instead. Generate sound effects from text descriptions. Returns base64-encoded audio. Useful for creating cinematic sound effects for videos, voice-overs, or games.`,
   constraints: [
     'Duration must be between 0.5 and 30 seconds.',
     'Looping is only available with the eleven_text_to_sound_v2 model.'
   ],
+  instructions: [
+    'Use generate_sound_effect_file for downloadable audio with metadata output.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: false
   }
 })

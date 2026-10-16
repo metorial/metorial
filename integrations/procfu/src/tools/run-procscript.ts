@@ -32,7 +32,7 @@ Can run synchronously (waits for result) or in the background (fire-and-forget).
   )
   .output(
     z.object({
-      result: z.any().describe('The script execution result (null if run in background)')
+      result: z.any().describe('The script result or background execution acknowledgment')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,7 +48,7 @@ Can run synchronously (waits for result) or in the background (fire-and-forget).
       output: { result },
       message: ctx.input.runInBackground
         ? `Launched ProcScript **${ctx.input.scriptName}** in the background.`
-        : `Executed ProcScript **${ctx.input.scriptName}** successfully.`
+        : `Received the result from ProcScript **${ctx.input.scriptName}**.`
     };
   })
   .build();

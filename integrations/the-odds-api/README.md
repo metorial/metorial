@@ -1,6 +1,14 @@
-# <img src="logo.png" height="20"> the Odds API
+# <img src="logo.png" height="20"> The Odds API
 
 Retrieve real-time and historical sports betting odds aggregated from 40+ bookmakers across 70+ sports and leagues. Fetch live and pre-match odds for markets including moneyline, spreads, totals, and futures. Access player props and alternate lines for individual events. Discover available sports, leagues, and market keys per bookmaker. Get live game scores and results with ~30-second update intervals. Look up historical odds snapshots (back to 2020) and iterate through timestamps. List participants (teams/players) for reference data. Filter odds by region (US, UK, AU, EU), odds format (decimal/American), specific bookmakers, event IDs, and time ranges.
+
+Historical event odds and market discovery are available through
+`get_historical_event_odds` and `get_historical_event_markets`. These complement
+sport-wide historical snapshots and require a paid provider plan. Event odds
+retain player descriptions, and optional request flags expose bookmaker links,
+source identifiers, bet limits and rotation numbers when available.
+
+[Provider API documentation](https://the-odds-api.com/liveapi/guides/v4/)
 
 ## License
 

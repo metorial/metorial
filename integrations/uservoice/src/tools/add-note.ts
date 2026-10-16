@@ -25,7 +25,8 @@ export let addNote = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let note = await client.createNote(ctx.input.suggestionId, ctx.input.body);
@@ -34,7 +35,7 @@ export let addNote = SlateTool.create(spec, {
       output: {
         noteId: note.id,
         body: note.body,
-        suggestionId: ctx.input.suggestionId,
+        suggestionId: note.links?.suggestion,
         createdAt: note.created_at
       },
       message: `Added internal note to suggestion ${ctx.input.suggestionId}.`

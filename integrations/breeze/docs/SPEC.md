@@ -1,125 +1,75 @@
-There are multiple products named "Breeze." The most prominent one for integration purposes appears to be **Breeze ChMS** (Church Management Software) and **Breeze PM** (Project Management). Let me clarify which "Breeze" is most likely intended. Given the context of a general integration platform, I'll note that "Breeze" most commonly refers to **Breeze ChMS** in the integration/API context. Let me get more details on the full API capabilities.Now I have comprehensive information about Breeze ChMS API. Let me also check if there are webhooks available.Now I have all the information needed. Breeze ChMS does not natively support webhooks — it provides an Account Log API that can be used as a polling mechanism to detect changes. Let me compile the specification.
+# Breeze integration specification
 
-# Slates Specification for Breeze
+Breeze ChMS manages church people, families, tags, events, attendance, giving,
+forms, and volunteers. This integration exposes 25 tools for those workflows.
 
-## Overview
+## Authentication and connection settings
 
-Breeze (Breeze ChMS) is a church management software platform that serves small and mid-sized churches by providing cloud-based church management software. It includes people, tags, events, check-in, contribution, pledges, forms, volunteers, families, and accounts.
+Use the account API key in the `Api-Key` header and configure the church's
+subdomain from its `https://<subdomain>.breezechms.com` address. API keys are
+account credentials; this integration does not implement OAuth. The existing
+optional `teamId` setting is retained for connections that already use it; the
+current public API reference does not document its header.
 
-## Authentication
+`get_account` retrieves the connected account identity. The authentication
+profile label is generic because the authentication callback has no account
+subdomain; retrieving the account requires the connection configuration.
 
-Breeze API supports HTTP Basic auth and token based authentication.
+## Tools
 
-**HTTP Basic Authentication:** You can use HTTP Basic authentication with your login credentials. Example: `curl -u username:password https://yoursubdomain.breezechms.com/api/projects.json`
+| Area | Tool keys |
+| --- | --- |
+| People and profile fields | `list_people`, `search_people`, `get_person`, `create_person`, `update_person`, `delete_person`, `list_profile_fields` |
+| Families | `manage_family` |
+| Tags and folders | `list_tags`, `manage_tag`, `assign_tag` |
+| Events and discovery | `list_events`, `get_event`, `create_event`, `delete_event` |
+| Attendance | `manage_attendance`, `list_attendance` |
+| Giving | `add_contribution` |
+| Forms | `list_forms`, `list_form_entries`, `remove_form_entry` |
+| Volunteers | `manage_volunteers`, `manage_volunteer_roles` |
+| Account | `get_account`, `query_account_log` |
 
-**API Token Authentication:** You can also authenticate by providing your API token in the request. The token has to be sent for each request your application makes to the Breeze API. The token can be passed as the username in HTTP Basic auth (with an empty password) or as a query parameter:
+`search_people` accepts Breeze's filter object, enabling custom profile field
+criteria and the provider's tag-filter syntax. `list_people` retains its existing
+convenience filters. Discover profile field IDs and option IDs with
+`list_profile_fields`.
 
-- `curl -u your_api_token: https://yoursubdomain.breezechms.com/api/people/`
-- `curl https://yoursubdomain.breezechms.com/api/people/?api_token=your_api_token`
+`create_person` and `update_person` accept a map of profile field IDs to values.
+They retrieve the field definitions and send Breeze's typed field-update array.
+Compound values can be objects with `response` and `details`; for example an email
+field can use `{"response":true,"details":{"address":"member@example.com"}}`.
+Checkbox values may be arrays, producing one field-update entry per selected value.
 
-Account Owners can obtain their API key by going to Manage Account > API Key.
+Event creation accepts Unix seconds as strings in `startsOn` and `endsOn`.
+Strings are passed through unchanged for compatibility; callers must supply the
+provider's supported timestamp format. The existing `previous` and `next`
+schedule options map to `before` and `after`. Event list/detail calls can include
+eligibility settings. Calendars and locations are available through the
+`includeCalendars` and `includeLocations` options on `list_events`.
 
-**Required Inputs:**
+Omitting `isArchived` on `list_forms` requests active forms. Set it to true for
+archived forms. Form field definitions are available through `list_forms.formId`.
 
-- **Subdomain**: Your Breeze account subdomain (e.g., `yourchurch` from `yourchurch.breezechms.com`). All API requests are made to `https://yoursubdomain.breezechms.com/api/`.
-- **API Key**: The secret API token from your Breeze account settings.
+Outputs retain provider records, including nested nulls and extra metadata.
+`get_account` includes both its established identity fields and an additional
+complete account summary. Provider failures and invalid responses raise errors;
+missing provider data is not substituted with success, empty IDs, or empty lists.
 
-**Multi-team support:** If the user is part of multiple teams/organizations then you must add the team ID to every call. You can append it to every call with `team_id` or add it to the HTTP header `HTTP_X_TEAM_ID`. You can get all the team IDs from the user endpoint.
+## Limits
 
-## Features
+The public reference notes that event responses may lag behind changes because
+of caching. Provider limits remain provider-controlled; no response counts,
+names, timestamps, or pagination defaults are invented. Numeric tool inputs keep
+their number schemas, with whole-number and documented limit checks at runtime.
+There are no file download/export tools or webhook triggers in this package.
+No live provider verification was performed for this refresh.
 
-### People Management
+## Official references
 
-Create, read, update, and delete person records in the church database. People can be listed with optional filtering by tags, status, and other custom profile fields. Individual person details include contact information, address, birthdate, gender, marital status, school, employer, and custom profile fields. Custom profile fields can be managed and queried to understand the schema of person records.
-
-- Supports filtering people by tags, status, and custom profile field values.
-- People can be retrieved with basic info (id and name only) or full details.
-- Custom profile fields support various types: text, multiple choice, dropdown, checkbox, date, textarea, birthdate, email, phone, address, and family role.
-
-### Family Management
-
-Link and unlink person records to form family units. Add people to existing families or remove them, and create or destroy family groupings.
-
-- A person can only belong to one family at a time; adding them to a new family removes them from their previous one.
-- Destroying a family does not delete the people — it only unlinks their associations.
-
-### Tags and Folders
-
-Organize people using tags grouped into hierarchical folders. Tags can be created, deleted, assigned to people, and unassigned from people. Tag folders provide organizational structure.
-
-- People can be filtered by tags using the People listing feature.
-- Folders support parent-child nesting.
-
-### Events and Calendars
-
-Manage church events and calendars. Events can be created, listed, retrieved, and deleted. Calendars (categories) can be listed, and events can be placed on specific calendars. Event locations can also be listed.
-
-- Events can be filtered by date range and calendar/category.
-- Events can be part of a series, with support for querying related instances.
-- External calendars (e.g., Google Calendar) are available via iCal feed URLs but not directly via the events API.
-- Event responses may be cached and lag up to 15 minutes behind the live site.
-
-### Attendance / Check-In
-
-Record and manage attendance for events. Check people in or out of event instances, remove attendance records, list attendance for a given event, and list people eligible for check-in.
-
-- Supports both check-in and check-out (recording departure timestamps).
-- Supports both person-based attendance and anonymous head counts.
-
-### Contributions / Giving
-
-Record financial contributions (donations/gifts) from third-party payment processors. Contributions can be added with details including date, amount, fund allocations (including split-fund gifts), payment method, batch grouping, and donor information.
-
-- Supports matching donors by a unique external ID so that subsequent gifts automatically link to the correct profile.
-- Fund names are auto-created if they don't already exist.
-- Contributions with the same group identifier are placed into the same batch.
-
-### Forms
-
-List forms, retrieve form fields and their structure, list form entries with responses, and remove form entries. Forms can be active or archived.
-
-- Form field definitions can be retrieved to understand the schema of responses.
-- Entry responses reference field IDs from the form field definitions.
-
-### Volunteers
-
-Manage volunteer scheduling for events. List, add, remove, and update volunteers for specific event instances. Manage volunteer roles including creating roles with quantity requirements and removing roles.
-
-- Volunteer roles are tied to event series — adding/removing a role on one instance affects all instances in the series.
-- Volunteers can be assigned one or more roles, and role assignments replace existing values.
-
-### Account
-
-Retrieve account summary information (name, subdomain, timezone, country) and query the account activity log. The activity log provides a record of actions performed across the system.
-
-- The account log supports filtering by action type, date range, and user.
-- Action types span across all major areas: people, events, contributions, tags, forms, volunteers, follow-ups, users, extensions, and account changes.
-
-## Events
-
-Breeze does not support webhooks or real-time event subscriptions. However, it provides a purpose-built **Account Log** polling mechanism that can be used to detect changes across the system.
-
-### Account Log (Polling)
-
-The Account Log API (`/api/account/list_log`) returns a historical record of actions performed in the Breeze account, which can be polled periodically to detect changes.
-
-Supported action categories include:
-
-- **People**: person created, updated, deleted, archived, merged, bulk updates, bulk imports, bulk deletes.
-- **Contributions**: contribution added, updated, deleted, bulk imports/deletes, envelope and payment method changes, batch updates, pledge imports.
-- **Events**: event created, updated, deleted, calendar changes, attendance imports/deletes.
-- **Tags**: tag created, updated, deleted, tag assigned/unassigned, folder changes.
-- **Forms**: form created, updated, deleted, form entry updates/deletes.
-- **Volunteers**: volunteer role created/deleted.
-- **Users**: user created, updated, deleted, role changes.
-- **Communications**: text sent.
-- **Follow-Ups**: follow-up option created, updated, deleted.
-- **Extensions**: extension installed, uninstalled, upgraded, downgraded.
-- **Account**: subscription payment method updated.
-
-Parameters:
-
-- `action` (required): The specific action type to query.
-- `start` / `end`: Date range filters.
-- `user_id`: Filter by the user who performed the action.
-- `details`: Include descriptive details about the logged action.
+- [API reference](https://app.breezechms.com/api)
+- [People and filters](https://app.breezechms.com/api#list_people)
+- [Profile updates](https://app.breezechms.com/api#update_person)
+- [Events](https://app.breezechms.com/api#list_events)
+- [Account identity](https://app.breezechms.com/api#account_summary)
+- [Payment integration example](https://app.breezechms.com/api#payment_integration)
+- [Provider PHP wrapper and API-key header](https://github.com/BreezeChMS/breeze-api-v1/blob/master/breeze.php)

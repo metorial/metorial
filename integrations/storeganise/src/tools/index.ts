@@ -4,6 +4,7 @@ export * from './get-invoice';
 export * from './get-settings';
 export * from './get-site';
 export * from './get-unit';
+export * from './get-unit-rental';
 export * from './get-user';
 export * from './list-invoices';
 export * from './list-sites';

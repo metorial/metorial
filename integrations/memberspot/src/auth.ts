@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -14,9 +14,12 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Your Memberspot API key. Found in Settings > Integrations > API Keys.')
+        .describe('Your Memberspot API key. Found in Settings > API keys (/settings/apikeys).')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Enter a Memberspot API key from Settings > API keys.');
+      }
       return {
         output: {
           token: ctx.input.apiKey

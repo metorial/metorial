@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapOrderDetails } from '../lib/client';
 import { spec } from '../spec';
 
 let orderShipmentSchema = z.object({
@@ -52,7 +52,7 @@ Supports cursor-based pagination (25 orders per page).`,
       cursor: z
         .string()
         .optional()
-        .describe('Pagination cursor for fetching the next page of results')
+        .describe('Pagination cursor or next/previous URL returned by list_orders')
     })
   )
   .output(
@@ -73,40 +73,17 @@ Supports cursor-based pagination (25 orders per page).`,
 
     let result = await client.getOrders(ctx.input.cursor);
 
-    let orders = (result.results || []).map((order: any) => ({
-      orderId: order.order_id,
+    let orders = result.results.map(order => ({
+      ...mapOrderDetails(order),
       paymentStatus: order.payment_status,
-      orderStatus: order.order_status,
-      employeeInfo: {
-        email: order.employee_info?.email || '',
-        name: order.employee_info?.name || '',
-        addressLine1: order.employee_info?.address_line_1 || '',
-        addressLine2: order.employee_info?.address_line_2 || undefined,
-        city: order.employee_info?.city || '',
-        state: order.employee_info?.state || '',
-        zip: order.employee_info?.zip || ''
-      },
-      companyInfo: {
-        email: order.company_info?.email || '',
-        name: order.company_info?.name || '',
-        addressLine1: order.company_info?.address_line_1 || '',
-        addressLine2: order.company_info?.address_line_2 || undefined,
-        city: order.company_info?.city || '',
-        state: order.company_info?.state || '',
-        zip: order.company_info?.zip || ''
-      },
-      shipments: {
-        deviceType: order.shipments?.device_type || '',
-        sendStatus: order.shipments?.send_status || '',
-        returnStatus: order.shipments?.return_status || ''
-      }
+      orderStatus: order.order_status
     }));
 
     return {
       output: {
         orders,
-        nextCursor: result.next || null,
-        previousCursor: result.previous || null
+        nextCursor: result.next,
+        previousCursor: result.previous
       },
       message: `Retrieved **${orders.length}** order(s).${result.next ? ' More pages available.' : ''}`
     };

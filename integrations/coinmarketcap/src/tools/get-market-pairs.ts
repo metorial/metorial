@@ -62,6 +62,7 @@ export let getMarketPairs = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       cryptocurrencyId: z.number().describe('CoinMarketCap cryptocurrency ID'),
       name: z.string().describe('Cryptocurrency name'),
       symbol: z.string().describe('Cryptocurrency symbol'),
@@ -97,11 +98,30 @@ export let getMarketPairs = SlateTool.create(spec, {
       category: pair.category,
       feeType: pair.feeType,
       marketUrl: pair.marketUrl,
-      quote: pair.quote || {}
+      quote: Object.fromEntries(
+        Object.entries(pair.quote || {}).map(([currency, quote]) => {
+          let liquidity = quote.effectiveLiquidity;
+          let numericLiquidity =
+            typeof liquidity === 'string' && liquidity.trim() ? Number(liquidity) : liquidity;
+          return [
+            currency,
+            {
+              price: quote.price ?? null,
+              volume24h: quote.volume24h ?? null,
+              lastUpdated: quote.lastUpdated ?? null,
+              effectiveLiquidity:
+                typeof numericLiquidity === 'number' && Number.isFinite(numericLiquidity)
+                  ? numericLiquidity
+                  : null
+            }
+          ];
+        })
+      )
     }));
 
     return {
       output: {
+        raw: client.rawResponse,
         cryptocurrencyId: data.id,
         name: data.name,
         symbol: data.symbol,

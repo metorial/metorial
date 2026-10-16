@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapWebhook, rawSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let listWebhooks = SlateTool.create(spec, {
@@ -13,7 +14,11 @@ export let listWebhooks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot to list webhooks for')
+      robotId: z
+        .string()
+        .describe(
+          'ID of the robot to list webhooks for. Call list_robots to discover robot IDs.'
+        )
     })
   )
   .output(
@@ -23,25 +28,23 @@ export let listWebhooks = SlateTool.create(spec, {
           z.object({
             webhookId: z.string().describe('ID of the webhook'),
             hookUrl: z.string().describe('Destination URL for the webhook'),
-            eventType: z.string().describe('Event type that triggers this webhook')
+            eventType: z.string().describe('Event type that triggers this webhook'),
+            createdAt: z
+              .number()
+              .optional()
+              .describe('Webhook creation timestamp in milliseconds'),
+            raw: rawSchema.optional()
           })
         )
         .describe('List of configured webhooks')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let webhooks = await client.listWebhooks(ctx.input.robotId);
-
-    let mapped = (Array.isArray(webhooks) ? webhooks : []).map((w: any) => ({
-      webhookId: w.id,
-      hookUrl: w.hookUrl,
-      eventType: w.eventType
-    }));
-
+    let webhooks = await new Client(ctx.auth).listWebhooks(ctx.input.robotId);
+    let mapped = webhooks.map(mapWebhook);
     return {
       output: { webhooks: mapped },
-      message: `Found **${mapped.length}** webhook(s) on robot \`${ctx.input.robotId}\`.`
+      message: `Retrieved **${mapped.length}** webhook(s).`
     };
   })
   .build();
@@ -53,7 +56,11 @@ export let createWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot to add the webhook to'),
+      robotId: z
+        .string()
+        .describe(
+          'ID of the robot to add the webhook to. Call list_robots to discover robot IDs.'
+        ),
       hookUrl: z.string().describe('Destination URL that will receive webhook POST requests'),
       eventType: z
         .enum([
@@ -70,24 +77,21 @@ export let createWebhook = SlateTool.create(spec, {
     z.object({
       webhookId: z.string().describe('ID of the created webhook'),
       hookUrl: z.string().describe('Destination URL'),
-      eventType: z.string().describe('Event type')
+      eventType: z.string().describe('Event type'),
+      createdAt: z.number().optional().describe('Webhook creation timestamp in milliseconds'),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.createWebhook(
+    let result = await new Client(ctx.auth).createWebhook(
       ctx.input.robotId,
       ctx.input.hookUrl,
       ctx.input.eventType
     );
-
+    let output = mapWebhook(result);
     return {
-      output: {
-        webhookId: result.id,
-        hookUrl: result.hookUrl ?? ctx.input.hookUrl,
-        eventType: result.eventType ?? ctx.input.eventType
-      },
-      message: `Webhook \`${result.id}\` created for **${ctx.input.eventType}** events on robot \`${ctx.input.robotId}\`.`
+      output,
+      message: `Created webhook \`${output.webhookId}\` for **${output.eventType}** events.`
     };
   })
   .build();
@@ -102,21 +106,26 @@ export let deleteWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot the webhook belongs to'),
+      robotId: z
+        .string()
+        .describe(
+          'ID of the robot the webhook belongs to. Call list_robots to discover robot IDs.'
+        ),
       webhookId: z.string().describe('ID of the webhook to delete')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the webhook was deleted successfully')
+      success: z.boolean().describe('Whether the webhook was deleted successfully'),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.deleteWebhook(ctx.input.robotId, ctx.input.webhookId);
+    let result = await client.deleteWebhook(ctx.input.robotId, ctx.input.webhookId);
 
     return {
-      output: { success: true },
+      output: { success: true, raw: result },
       message: `Webhook \`${ctx.input.webhookId}\` deleted from robot \`${ctx.input.robotId}\`.`
     };
   })

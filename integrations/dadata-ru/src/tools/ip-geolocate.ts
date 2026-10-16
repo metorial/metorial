@@ -19,11 +19,16 @@ Supports IPv4 and IPv6 addresses. Primarily covers Russian IP addresses.`,
   .input(
     z.object({
       ipAddress: z.string().describe('IPv4 or IPv6 address to geolocate'),
+      division: z
+        .enum(['ADMINISTRATIVE', 'MUNICIPAL'])
+        .optional()
+        .describe('Administrative or municipal address division'),
       language: z.enum(['ru', 'en']).optional().describe('Response language')
     })
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       found: z.boolean().describe('Whether a location was found for this IP'),
       value: z.string().nullable().describe('Formatted location string'),
       postalCode: z.string().nullable().describe('Postal code'),
@@ -46,13 +51,15 @@ Supports IPv4 and IPv6 addresses. Primarily covers Russian IP addresses.`,
 
     let data = await client.iplocateAddress({
       ip: ctx.input.ipAddress,
-      language: ctx.input.language || ctx.config.language
+      division: ctx.input.division,
+      language: ctx.input.language ?? ctx.config.language
     });
 
     let loc = data.location;
     if (!loc) {
       return {
         output: {
+          rawData: data,
           found: false,
           value: null,
           postalCode: null,
@@ -72,6 +79,7 @@ Supports IPv4 and IPv6 addresses. Primarily covers Russian IP addresses.`,
 
     return {
       output: {
+        rawData: data,
         found: true,
         value: loc.value ?? null,
         postalCode: loc.data?.postal_code ?? null,

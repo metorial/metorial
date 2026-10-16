@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let toggleEventSalesTool = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let toggleEventSalesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       eventStatus: z.string().describe('Updated event status (published/unpublished)')
     })
   )
@@ -29,9 +31,10 @@ export let toggleEventSalesTool = SlateTool.create(spec, {
 
     return {
       output: {
-        eventStatus: data.eventstatus ?? (ctx.input.publish ? 'published' : 'unpublished')
+        raw: data,
+        eventStatus: requireText(data.eventstatus, 'event sales status')
       },
-      message: `Event **${ctx.input.eventId}** is now **${ctx.input.publish ? 'published' : 'unpublished'}**.`
+      message: `Eventzilla returned sales status **${data.eventstatus}** for event ${ctx.input.eventId}.`
     };
   })
   .build();

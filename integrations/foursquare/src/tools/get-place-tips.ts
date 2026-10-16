@@ -15,8 +15,12 @@ let tipSchema = z.object({
 export let getPlaceTips = SlateTool.create(spec, {
   name: 'Get Place Tips',
   key: 'get_place_tips',
-  description: `Retrieve tips and reviews for a specific place. Tips are user-submitted text reviews that provide insight about the venue experience.`,
+  description: `DEPRECATED — use \`get_place_tips_current\` instead. Retrieve tips and reviews for a specific place. Tips are user-submitted text reviews that provide insight about the venue experience.`,
+  instructions: [
+    'Use get_place_tips_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

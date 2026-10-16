@@ -21,7 +21,12 @@ export let sendInvitations = SlateTool.create(spec, {
             email: z.string().describe('Email address of the recipient')
           })
         )
-        .describe('List of recipients to invite')
+        .describe('List of recipients to invite'),
+      template: z.enum(['advanced', 'basic']).optional().describe('Invitation template'),
+      role: z
+        .enum(['listener', 'presenter'])
+        .optional()
+        .describe('Invitation participant role')
     })
   )
   .output(
@@ -34,7 +39,8 @@ export let sendInvitations = SlateTool.create(spec, {
     let result = await client.sendInvitations(
       ctx.input.roomId,
       ctx.input.language,
-      ctx.input.attendees
+      ctx.input.attendees,
+      { template: ctx.input.template, role: ctx.input.role }
     );
 
     return {

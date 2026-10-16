@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,7 +64,7 @@ export let manageIndices = SlateTool.create(spec, {
     }
 
     if (!indexName) {
-      throw new Error('indexName is required for delete, copy, and move actions.');
+      throw createApiServiceError('indexName is required for delete, copy, and move actions.');
     }
 
     if (action === 'delete') {
@@ -77,7 +77,9 @@ export let manageIndices = SlateTool.create(spec, {
     }
 
     if (!destinationIndexName) {
-      throw new Error('destinationIndexName is required for copy and move actions.');
+      throw createApiServiceError(
+        'destinationIndexName is required for copy and move actions.'
+      );
     }
 
     if (action === 'copy') {

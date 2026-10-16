@@ -6,13 +6,13 @@ import { spec } from '../spec';
 export let captureScreenshot = SlateTool.create(spec, {
   name: 'Capture Screenshot',
   key: 'capture_screenshot',
-  description: `Capture a screenshot of any publicly accessible webpage and receive a URL to the resulting image.
+  description: `Capture a screenshot of any publicly accessible webpage and receive a downloadable image and its URL.
 Supports configuring viewport size, image format, full-page capture, element-specific capture, CSS/JS injection, custom headers/cookies, geolocation, and more.
 Use the **crop** parameter as \`"left,top,width,height"\` to capture a specific region. Use **element** with a CSS selector to capture a specific DOM element.
-Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
+Set **fresh** to \`true\` to bypass the cache and force a new capture. This does not invalidate an existing cached screenshot.`,
   instructions: [
     'The url must include the protocol (http:// or https://).',
-    'Use the headers parameter as semicolon-separated key:value pairs, e.g. "Authorization:Bearer xyz;X-Custom:value".',
+    'Use the headers parameter as semicolon-separated key=value pairs, e.g. "Authorization=Bearer xyz;X-Custom=value".',
     'Use the cookies parameter as semicolon-separated key=value pairs, e.g. "session_id=abc123;user=john".',
     'For geolocation, provide both latitude and longitude together.'
   ],
@@ -43,8 +43,18 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
         .max(100)
         .optional()
         .describe('Image quality for jpeg/webp (0-100). Defaults to 80'),
-      width: z.number().optional().describe('Viewport width in pixels. Defaults to 1920'),
-      height: z.number().optional().describe('Viewport height in pixels. Defaults to 1080'),
+      width: z
+        .number()
+        .optional()
+        .describe(
+          'Viewport width in pixels (0-16350); width × height must not exceed 33177600. Defaults to 1920'
+        ),
+      height: z
+        .number()
+        .optional()
+        .describe(
+          'Viewport height in pixels (0-16350); ignored for fullPage. Width × height must not exceed 33177600. Defaults to 1080'
+        ),
       fullPage: z
         .boolean()
         .optional()
@@ -62,11 +72,19 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
       waitFor: z
         .string()
         .optional()
-        .describe('CSS selector to wait for before capturing the screenshot'),
+        .describe('CSS selector to wait for before capture; fails if absent after 15 seconds'),
       waitUntil: z
         .enum(['dom_loaded', 'page_loaded', 'network_idle'])
         .optional()
         .describe('Page load event to wait for. Defaults to network_idle'),
+      waitUntilTimeout: z
+        .number()
+        .min(1)
+        .max(30)
+        .optional()
+        .describe(
+          'Maximum seconds to wait for waitUntil (1-30). Captures loaded content when this expires. Defaults to 30'
+        ),
       element: z
         .string()
         .optional()
@@ -80,7 +98,7 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
         .number()
         .optional()
         .describe(
-          'Resize the screenshot to this width in pixels while maintaining aspect ratio'
+          'Resize the screenshot to this width in pixels while maintaining aspect ratio; ignored for fullPage'
         ),
       scaleFactor: z
         .number()
@@ -98,7 +116,7 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
       headers: z
         .string()
         .optional()
-        .describe('Custom HTTP headers as semicolon-separated key:value pairs'),
+        .describe('Custom HTTP headers as semicolon-separated key=value pairs'),
       cookies: z
         .string()
         .optional()
@@ -114,7 +132,7 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
       proxy: z
         .string()
         .optional()
-        .describe('Proxy server address (e.g. http://user:pass@host:port)'),
+        .describe('Proxy server address as host:port or user:password@host:port'),
       latitude: z
         .number()
         .min(-90)
@@ -158,6 +176,14 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
         .boolean()
         .optional()
         .describe('Force a new screenshot, bypassing any cached version'),
+      extractHtml: z
+        .boolean()
+        .optional()
+        .describe('Also return the rendered HTML as a downloadable file'),
+      extractText: z
+        .boolean()
+        .optional()
+        .describe('Also return the rendered page text as a downloadable file'),
       s3Endpoint: z
         .string()
         .optional()
@@ -171,7 +197,10 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
   )
   .output(
     z.object({
-      screenshotUrl: z.string().describe('URL where the captured screenshot can be accessed')
+      screenshotUrl: z.string().describe('URL where the captured screenshot can be accessed'),
+      extractedHtmlUrl: z.string().optional().describe('URL of the extracted HTML file'),
+      extractedTextUrl: z.string().optional().describe('URL of the extracted text file'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -179,9 +208,32 @@ Set **fresh** to \`true\` to bypass the cache and force a new capture.`,
 
     let result = await client.captureScreenshot(ctx.input);
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      mimeType: `image/${ctx.input.format ?? 'jpeg'}`
+    });
+    if (result.extractedHtml) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.extractedHtml,
+        mimeType: 'text/html'
+      });
+    }
+    if (result.extractedText) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.extractedText,
+        mimeType: 'text/plain'
+      });
+    }
+
     return {
       output: {
-        screenshotUrl: result.url
+        screenshotUrl: result.url,
+        extractedHtmlUrl: result.extractedHtml,
+        extractedTextUrl: result.extractedText,
+        raw: result.raw
       },
       message: `Screenshot captured for **${ctx.input.url}**. [View screenshot](${result.url})`
     };

@@ -40,7 +40,7 @@ export let getCryptocurrencyQuotes = SlateTool.create(spec, {
   instructions: [
     'Provide at least one of: cryptocurrencyIds, symbols, or slugs.',
     'Multiple values can be comma-separated (e.g., symbols: "BTC,ETH,SOL").',
-    'When using symbols, the API defaults to the highest market cap match. Use cryptocurrencyIds for precision.'
+    'When using symbols, all matching assets may be returned. Use cryptocurrencyIds for precision.'
   ],
   tags: {
     readOnly: true
@@ -65,6 +65,7 @@ export let getCryptocurrencyQuotes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       cryptocurrencies: z
         .array(cryptocurrencyQuoteSchema)
         .describe('List of cryptocurrency quotes')
@@ -112,7 +113,7 @@ export let getCryptocurrencyQuotes = SlateTool.create(spec, {
         : `No quotes found for the specified cryptocurrencies.`;
 
     return {
-      output: { cryptocurrencies },
+      output: { cryptocurrencies, raw: client.rawResponse },
       message
     };
   })

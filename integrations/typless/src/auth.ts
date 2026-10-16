@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://developers.typless.com/api/'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,7 +16,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Typless API key found on the Settings page of the Typless dashboard')
+        .describe('Typless API key from Settings > API Keys in the Typless dashboard')
     }),
 
     getOutput: async ctx => {
@@ -31,13 +28,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await axios.get('/user-profile/', {
-        headers: {
-          Authorization: `Token ${ctx.output.token}`
-        }
-      });
-
-      let profile = response.data;
+      let profile = await new Client({ token: ctx.output.token }).getAuthenticationProfile();
 
       return {
         profile: {

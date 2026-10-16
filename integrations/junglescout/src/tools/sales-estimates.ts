@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  responseArray,
+  responseBoolean,
+  responseCollection,
+  responseNullableString,
+  responseNumber,
+  responseRecord,
+  responseString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let dailySalesDataSchema = z.object({
@@ -35,6 +44,25 @@ export let salesEstimatesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response including native attributes and metadata'),
+      parentAsin: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Parent ASIN returned for a variant product'),
+      isVariant: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe('Whether the queried ASIN is a variant'),
+      isStandalone: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe('Whether the queried ASIN is standalone'),
       asin: z.string().describe('The queried ASIN'),
       isParent: z.boolean().nullable().describe('Whether this ASIN is a parent product'),
       variants: z
@@ -57,39 +85,44 @@ export let salesEstimatesTool = SlateTool.create(spec, {
       endDate: ctx.input.endDate
     });
 
-    let dailySales: Array<{
-      date: string;
-      estimatedUnitsSold: number | null;
-      lastKnownPrice: number | null;
-    }> = [];
-    let isParent: boolean | null = null;
-    let variants: string[] | null = null;
-
-    let items = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
-    for (let item of items) {
-      isParent = item.attributes?.is_parent ?? null;
-      variants = item.attributes?.variants ?? null;
-
-      let estimates = item.attributes?.data || [];
-      for (let entry of estimates) {
-        dailySales.push({
-          date: entry.date || '',
-          estimatedUnitsSold: entry.estimated_units_sold ?? null,
-          lastKnownPrice: entry.last_known_price ?? null
-        });
-      }
-    }
-
-    let totalSales = dailySales.reduce((sum, d) => sum + (d.estimatedUnitsSold || 0), 0);
+    let items = responseCollection(result);
+    let dailySales = items.flatMap(item =>
+      responseArray(item.attributes.data, 'daily sales data').map(value => {
+        let entry = responseRecord(value, 'daily sales point');
+        return {
+          date: responseString(entry.date, 'sales date'),
+          estimatedUnitsSold: responseNumber(
+            entry.estimated_units_sold,
+            'estimated units sold'
+          ),
+          lastKnownPrice: responseNumber(entry.last_known_price, 'last known price')
+        };
+      })
+    );
+    let attributes = items[0]?.attributes;
+    let isParent = responseBoolean(attributes?.is_parent, 'is_parent');
+    let variants =
+      attributes?.variants == null
+        ? null
+        : responseArray(attributes.variants, 'variants').map(value =>
+            responseString(value, 'variant ASIN')
+          );
+    let parentAsin = responseNullableString(attributes?.parent_asin, 'parent ASIN');
+    let isVariant = responseBoolean(attributes?.is_variant, 'is_variant');
+    let isStandalone = responseBoolean(attributes?.is_standalone, 'is_standalone');
 
     return {
       output: {
+        raw: result,
         asin: ctx.input.asin,
+        parentAsin,
+        isVariant,
+        isStandalone,
         isParent,
         variants,
         dailySales
       },
-      message: `Retrieved **${dailySales.length}** daily data points for ASIN ${ctx.input.asin} from ${ctx.input.startDate} to ${ctx.input.endDate}. Estimated total units sold: **${totalSales}**.`
+      message: `Retrieved **${dailySales.length}** daily data points for ASIN ${ctx.input.asin} from ${ctx.input.startDate} to ${ctx.input.endDate}.`
     };
   })
   .build();

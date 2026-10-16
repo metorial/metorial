@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getEventName } from '../lib/events';
+import { validateEventTimes, validateIntegerFields } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateEvent = SlateTool.create(spec, {
@@ -40,35 +42,40 @@ export let updateEvent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateIntegerFields(ctx.input, ['capacity']);
+    validateEventTimes(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let eventUpdate: any = {};
-    if (ctx.input.name) eventUpdate.name = { html: ctx.input.name };
-    if (ctx.input.description) eventUpdate.description = { html: ctx.input.description };
+    if (ctx.input.name !== undefined) eventUpdate.name = { html: ctx.input.name };
+    if (ctx.input.description !== undefined)
+      eventUpdate.description = { html: ctx.input.description };
     if (ctx.input.startUtc && ctx.input.startTimezone) {
       eventUpdate.start = { timezone: ctx.input.startTimezone, utc: ctx.input.startUtc };
     }
     if (ctx.input.endUtc && ctx.input.endTimezone) {
       eventUpdate.end = { timezone: ctx.input.endTimezone, utc: ctx.input.endUtc };
     }
-    if (ctx.input.currency) eventUpdate.currency = ctx.input.currency;
+    if (ctx.input.currency !== undefined) eventUpdate.currency = ctx.input.currency;
     if (ctx.input.onlineEvent !== undefined) eventUpdate.online_event = ctx.input.onlineEvent;
     if (ctx.input.listed !== undefined) eventUpdate.listed = ctx.input.listed;
     if (ctx.input.shareable !== undefined) eventUpdate.shareable = ctx.input.shareable;
     if (ctx.input.capacity !== undefined) eventUpdate.capacity = ctx.input.capacity;
-    if (ctx.input.venueId) eventUpdate.venue_id = ctx.input.venueId;
-    if (ctx.input.organizerId) eventUpdate.organizer_id = ctx.input.organizerId;
-    if (ctx.input.categoryId) eventUpdate.category_id = ctx.input.categoryId;
-    if (ctx.input.formatId) eventUpdate.format_id = ctx.input.formatId;
+    if (ctx.input.venueId !== undefined) eventUpdate.venue_id = ctx.input.venueId;
+    if (ctx.input.organizerId !== undefined) eventUpdate.organizer_id = ctx.input.organizerId;
+    if (ctx.input.categoryId !== undefined) eventUpdate.category_id = ctx.input.categoryId;
+    if (ctx.input.formatId !== undefined) eventUpdate.format_id = ctx.input.formatId;
 
+    if (Object.keys(eventUpdate).length === 0)
+      throw createApiServiceError('Provide at least one field to update.');
     let event = await client.updateEvent(ctx.input.eventId, eventUpdate);
 
     return {
       output: {
         eventId: event.id,
-        name: event.name?.html || event.name?.text || '',
-        status: event.status,
-        url: event.url
+        name: getEventName(event.name),
+        status: event.status ?? undefined,
+        url: event.url ?? undefined
       },
       message: `Updated event **${event.name?.html || event.name?.text || event.id}**.`
     };

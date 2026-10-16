@@ -1,6 +1,10 @@
-# <img src="logo.jpeg" height="20"> Bigml
+# <img src="logo.jpeg" height="20"> BigML
 
-Build, manage, and deploy machine learning models via BigML's cloud platform. Create data sources from files, URLs, or external databases. Process datasets with transformations, sampling, filtering, and aggregation. Train supervised models (decision trees, ensembles, deepnets, logistic/linear regressions, time series) and unsupervised models (clusters, anomaly detectors, topic models, associations, PCA). Generate single or batch predictions including classifications, regressions, forecasts, anomaly scores, and centroids. Evaluate model performance with accuracy and precision metrics. Automate model selection with OptiML. Combine heterogeneous models using fusions. Script and automate ML workflows with WhizzML. Export models for local use. Manage organizations, projects, and external database connectors.
+Import data from remote URLs or inline CSV/JSON, prepare datasets, train supervised and unsupervised models, and generate predictions, forecasts, centroid assignments, and anomaly scores. Create batch predictions and download their CSV results. Evaluate models, run OptiML searches, execute WhizzML workflows, organize projects, and discover or manage resources with filters and pagination.
+
+Connect with a BigML username and API key. Optional organization and project credentials scope requests to resources you can access. Project IDs can be discovered with `list_resources` using the `project` resource type. Account task and subscription information is available through `get_account_status`.
+
+Creation is generally asynchronous. Use `get_resource` until the resource's status code is `5` before using its results. The legacy development-mode setting is retained for saved connections; BigML retired the separate development environment, so requests use the production API.
 
 ## License
 

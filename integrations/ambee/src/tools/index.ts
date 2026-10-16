@@ -16,3 +16,5 @@ export { getWeatherForecast } from './get-weather-forecast';
 export { getWeatherHistory } from './get-weather-history';
 export { getWildfire } from './get-wildfire';
 export { getWildfireRisk } from './get-wildfire-risk';
+export { queryDisasters } from './query-disasters';
+export { queryEnvironment } from './query-environment';

@@ -44,7 +44,9 @@ The amount of detail returned depends on the package tier configured in the inte
       response: z.string().describe('Response status from the API (e.g., "OK" for success).'),
       isProxy: z
         .string()
-        .describe('Whether the IP is a proxy: "YES", "NO", or "-" if not applicable.'),
+        .describe(
+          'Provider proxy status: "YES", "NO", "DCH" for a hosting/data-center address on some packages, or "-" if not applicable.'
+        ),
       proxyType: z
         .string()
         .optional()
@@ -76,7 +78,8 @@ The amount of detail returned depends on the package tier configured in the inte
       vpnProvider: z
         .string()
         .optional()
-        .describe('Name of the VPN provider, if identified (PX11 only).')
+        .describe('Name of the VPN provider, if identified (PX11 only).'),
+      creditsConsumed: z.number().optional().describe('Credits consumed by this lookup.')
     })
   )
   .handleInvocation(async ctx => {
@@ -91,25 +94,33 @@ The amount of detail returned depends on the package tier configured in the inte
     });
 
     let output = {
-      response: result.response || '',
-      isProxy: result.isProxy || '',
-      proxyType: result.proxyType || undefined,
-      countryCode: result.countryCode || undefined,
-      countryName: result.countryName || undefined,
-      regionName: result.regionName || undefined,
-      cityName: result.cityName || undefined,
-      isp: result.isp || undefined,
-      domain: result.domain || undefined,
-      usageType: result.usageType || undefined,
-      asn: result.asn || undefined,
-      asName: result.as || undefined,
-      lastSeen: result.lastSeen || undefined,
-      threat: result.threat || undefined,
-      vpnProvider: result.provider || undefined
+      response: result.response,
+      isProxy: result.isProxy,
+      proxyType: result.proxyType,
+      countryCode: result.countryCode,
+      countryName: result.countryName,
+      regionName: result.regionName,
+      cityName: result.cityName,
+      isp: result.isp,
+      domain: result.domain,
+      usageType: result.usageType,
+      asn: result.asn,
+      asName: result.as,
+      lastSeen: result.lastSeen,
+      threat: result.threat,
+      vpnProvider: result.provider,
+      creditsConsumed: result.creditsConsumed
     };
 
     let ipLabel = ctx.input.ipAddress || 'server IP';
-    let proxyStatus = result.isProxy === 'YES' ? 'a proxy' : 'not a proxy';
+    let proxyStatus =
+      result.isProxy === 'YES'
+        ? 'a proxy'
+        : result.isProxy === 'NO'
+          ? 'not a proxy'
+          : result.isProxy === 'DCH'
+            ? 'a hosting, data-center, or CDN address'
+            : `reported with proxy status **${result.isProxy}**`;
     let proxyDetail =
       result.proxyType && result.proxyType !== '-' ? ` (type: **${result.proxyType}**)` : '';
     let locationParts = [result.cityName, result.regionName, result.countryName].filter(

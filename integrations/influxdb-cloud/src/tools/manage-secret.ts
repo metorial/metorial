@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { influxError, requireArray } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listSecrets = SlateTool.create(spec, {
@@ -8,13 +9,17 @@ export let listSecrets = SlateTool.create(spec, {
   key: 'list_secrets',
   description: `List all secret keys stored for the organization. Only the keys are returned, not the values.
 Secrets are stored securely using Vault and can be referenced in Flux scripts.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ orgId: orgIdInput }))
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       secretKeys: z.array(z.string()).describe('List of secret key names')
     })
   )
@@ -22,9 +27,12 @@ Secrets are stored securely using Vault and can be referenced in Flux scripts.`,
     let client = createClient(ctx);
     let result = await client.listSecretKeys();
 
+    let secretKeys = requireArray(result, 'secrets');
+    if (secretKeys.some(key => typeof key !== 'string'))
+      throw influxError('InfluxDB returned invalid secret key names.');
     return {
-      output: { secretKeys: result.secrets || [] },
-      message: `Found **${(result.secrets || []).length}** secret key(s).`
+      output: { secretKeys, raw: result },
+      message: `Found **${secretKeys.length}** secret key(s).`
     };
   })
   .build();
@@ -34,12 +42,16 @@ export let upsertSecrets = SlateTool.create(spec, {
   key: 'upsert_secrets',
   description: `Add or update one or more secrets for the organization. Provide key-value pairs where each key is the secret name and each value is the secret content.
 Secrets can be referenced in Flux scripts using \`secrets.get()\`.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       secrets: z
         .record(z.string(), z.string())
         .describe('Key-value pairs of secret names and their values')
@@ -67,12 +79,16 @@ export let deleteSecrets = SlateTool.create(spec, {
   name: 'Delete Secrets',
   key: 'delete_secrets',
   description: `Delete one or more secrets from the organization by their keys.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       secretKeys: z.array(z.string()).describe('List of secret key names to delete')
     })
   )

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateComponents } from '../lib/components';
 import { spec } from '../spec';
 
 let componentSchema = z.object({
@@ -54,6 +55,10 @@ export let createTimelineEvent = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    validateComponents(ctx.input.components);
+    if (Boolean(ctx.input.threadId) === Boolean(ctx.input.customerId)) {
+      throw createApiServiceError('Provide exactly one of customerId or threadId');
+    }
 
     if (ctx.input.threadId) {
       let input: any = {
@@ -98,7 +103,7 @@ export let createTimelineEvent = SlateTool.create(spec, {
         message: `Customer event created: **${ev.title}**`
       };
     } else {
-      throw new Error('Provide either customerId or threadId');
+      throw createApiServiceError('Provide either customerId or threadId');
     }
   })
   .build();

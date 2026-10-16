@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
+import { nextPageOutput, pageInput } from '../lib/schemas';
+import { presenceAction } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getPresenceHistory = SlateTool.create(spec, {
@@ -8,7 +10,7 @@ export let getPresenceHistory = SlateTool.create(spec, {
   key: 'get_presence_history',
   description: `Retrieve historical presence events from an Ably channel. Returns a log of all presence actions (enter, leave, update) that occurred within the specified time range.`,
   instructions: [
-    'Requires API Key authentication with "presence" and "history" capabilities on the target channel.',
+    'Requires API Key authentication with the "history" capability on the target channel.',
     'Times are specified as milliseconds since Unix epoch.'
   ],
   constraints: ['Maximum 1000 events per request.'],
@@ -18,6 +20,7 @@ export let getPresenceHistory = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: pageInput,
       channelId: z.string().describe('Channel name to retrieve presence history from'),
       start: z
         .string()
@@ -41,9 +44,14 @@ export let getPresenceHistory = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: nextPageOutput,
       events: z
         .array(
           z.object({
+            raw: z
+              .any()
+              .optional()
+              .describe('Complete provider record, including metadata and encoded values'),
             clientId: z.string().optional().describe('Client ID of the member'),
             connectionId: z.string().optional().describe('Connection ID'),
             memberData: z.any().optional().describe('Member status payload at time of event'),
@@ -61,25 +69,30 @@ export let getPresenceHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
-    let events = await client.getPresenceHistory(ctx.input.channelId, {
-      start: ctx.input.start,
-      end: ctx.input.end,
-      limit: ctx.input.limit,
-      direction: ctx.input.direction
-    });
+    let page = await client.getPresenceHistory(
+      ctx.input.channelId,
+      {
+        start: ctx.input.start,
+        end: ctx.input.end,
+        limit: ctx.input.limit,
+        direction: ctx.input.direction
+      },
+      ctx.input.page
+    );
 
-    let mapped = (events || []).map((e: any) => ({
+    let mapped = page.items.map((e: any) => ({
+      raw: e,
       clientId: e.clientId,
       connectionId: e.connectionId,
       memberData: e.data,
-      action: e.action,
+      action: presenceAction(e.action),
       timestamp: e.timestamp
     }));
 
     return {
-      output: { events: mapped },
+      output: { events: mapped, nextPageUrl: page.nextPageUrl },
       message: `Retrieved **${mapped.length}** presence event(s) from channel **${ctx.input.channelId}**.`
     };
   })

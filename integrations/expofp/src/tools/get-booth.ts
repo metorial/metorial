@@ -42,11 +42,11 @@ export let getBooth = SlateTool.create(spec, {
     return {
       output: {
         name: booth.name,
-        adminNotes: booth.adminNotes ?? '',
-        isOnHold: booth.isOnHold ?? false,
-        isSpecialSection: booth.isSpecialSection ?? false,
-        metadata: booth.metadata ?? {},
-        exhibitors: (booth.exhibitors ?? []).map(e => ({
+        adminNotes: booth.adminNotes,
+        isOnHold: booth.isOnHold,
+        isSpecialSection: booth.isSpecialSection,
+        metadata: booth.metadata,
+        exhibitors: booth.exhibitors.map(e => ({
           exhibitorId: e.id,
           name: e.name
         }))

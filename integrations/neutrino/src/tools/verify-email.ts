@@ -38,7 +38,8 @@ export let verifyEmailTool = SlateTool.create(spec, {
       isPersonal: z.boolean().describe('Whether this appears to be a personal email address'),
       isCatchAll: z.boolean().describe('Whether the domain uses a catch-all policy'),
       smtpStatus: z.string().describe('SMTP verification status code'),
-      smtpResponse: z.string().describe('Raw SMTP server response')
+      smtpResponse: z.string().describe('Raw SMTP server response'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,17 +55,18 @@ export let verifyEmailTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         valid: result.valid,
         verified: result.verified,
         email: result.email,
         domain: result.domain,
-        provider: result.provider ?? '',
+        provider: result.provider,
         isFreemail: result.isFreemail,
         isDisposable: result.isDisposable,
         isPersonal: result.isPersonal,
         isCatchAll: result.isCatchAll,
-        smtpStatus: result.smtpStatus ?? '',
-        smtpResponse: result.smtpResponse ?? ''
+        smtpStatus: result.smtpStatus,
+        smtpResponse: result.smtpResponse
       },
       message: result.verified
         ? `**${result.email}** is verified — the mailbox exists and can receive mail.${result.isCatchAll ? ' Note: domain uses catch-all policy.' : ''}`

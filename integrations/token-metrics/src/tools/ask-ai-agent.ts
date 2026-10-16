@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,10 @@ export let askAiAgent = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       answer: z.string().describe('The AI agent response')
     })
   )
@@ -37,10 +41,16 @@ export let askAiAgent = SlateTool.create(spec, {
     messages.push({ user: ctx.input.question });
 
     let result = await client.askAiAgent(messages);
-    let answer = result?.answer ?? result?.data?.answer ?? '';
+    let answer =
+      result.answer ?? (isApiErrorRecord(result.data) ? result.data.answer : undefined);
+    if (typeof answer !== 'string') {
+      throw createApiServiceError('Token Metrics returned no answer text.', {
+        reason: 'invalid_provider_response'
+      });
+    }
 
     return {
-      output: { answer },
+      output: { answer, raw: result },
       message: `AI Agent responded to: "${ctx.input.question}"`
     };
   })

@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listCoins = SlateTool.create(spec, {
   name: 'List Coins',
   key: 'list_coins',
-  description: `Retrieve the complete list of cryptocurrencies tracked by CoinMarketCal. Useful for discovering which coins have events and for getting correct coin names to use when searching events.`,
+  description: `DEPRECATED — use \`search_coins\` instead. Retrieve the complete list of cryptocurrencies tracked by CoinMarketCal. Useful for discovering which coins have events and for getting correct coin names to use when searching events.`,
+  instructions: [
+    'API V1 was retired on July 14, 2026. Use search_coins with a V2 API key and follow its cursor to retrieve further pages.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

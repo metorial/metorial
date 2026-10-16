@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,9 +7,9 @@ export let manageWebhook = SlateTool.create(spec, {
   name: 'Manage Webhook',
   key: 'manage_webhook',
   description: `Create, update, or delete webhooks for receiving email and domain events. Webhooks can be scoped to specific pods or inboxes.
-Available event types: \`message.received\`, \`message.sent\`, \`message.delivered\`, \`message.bounced\`, \`message.complained\`, \`message.rejected\`, \`domain.verified\`.`,
+Common event types: \`message.received\`, \`message.sent\`, \`message.delivered\`, \`message.bounced\`, \`message.complained\`, \`message.rejected\`, \`domain.verified\`.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -17,7 +17,10 @@ Available event types: \`message.received\`, \`message.sent\`, \`message.deliver
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('Operation to perform'),
       webhookId: z.string().optional().describe('Webhook ID (required for update and delete)'),
-      url: z.string().optional().describe('Webhook endpoint URL (required for create)'),
+      url: z
+        .string()
+        .optional()
+        .describe('Webhook endpoint URL (required for create; cannot be changed on update)'),
       eventTypes: z.array(z.string()).optional().describe('Event types to subscribe to'),
       podIds: z.array(z.string()).optional().describe('Scope to specific pod IDs (max 10)'),
       inboxIds: z
@@ -41,12 +44,16 @@ Available event types: \`message.received\`, \`message.sent\`, \`message.deliver
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.podIds?.length ?? 0) > 10 || (ctx.input.inboxIds?.length ?? 0) > 10)
+      throw createApiServiceError(
+        'Use at most 10 pod IDs and at most 10 inbox IDs per webhook.'
+      );
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.url) throw new Error('url is required for create action');
+      if (!ctx.input.url) throw createApiServiceError('url is required for create action');
       if (!ctx.input.eventTypes?.length)
-        throw new Error('eventTypes is required for create action');
+        throw createApiServiceError('eventTypes is required for create action');
 
       let webhook = await client.createWebhook(
         ctx.input.url,
@@ -63,12 +70,13 @@ Available event types: \`message.received\`, \`message.sent\`, \`message.deliver
           secret: webhook.secret,
           enabled: webhook.enabled
         },
-        message: `Created webhook for events: ${webhook.event_types.join(', ')}.`
+        message: `Created webhook for events: ${ctx.input.eventTypes.join(', ')}.`
       };
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required for update action');
+      if (!ctx.input.webhookId)
+        throw createApiServiceError('webhookId is required for update action');
 
       let webhook = await client.updateWebhook(ctx.input.webhookId, {
         url: ctx.input.url,
@@ -90,7 +98,8 @@ Available event types: \`message.received\`, \`message.sent\`, \`message.deliver
     }
 
     // delete
-    if (!ctx.input.webhookId) throw new Error('webhookId is required for delete action');
+    if (!ctx.input.webhookId)
+      throw createApiServiceError('webhookId is required for delete action');
     await client.deleteWebhook(ctx.input.webhookId);
 
     return {

@@ -34,10 +34,10 @@ let extractionResultSchema = z
 export let getExtractionResult = SlateTool.create(spec, {
   name: 'Get Extraction Result',
   key: 'get_extraction_result',
-  description: `Poll for the result of an asynchronous document extraction. Returns the current processing status and extracted data when available. The status can be one of: PROCESSING, SUCCESS, FAILURE, or EXPIRED (48 hours after completion). Use this after submitting a document for async extraction.`,
+  description: `Poll the legacy receive-result endpoint for an asynchronous document extraction. For submissions from extract_document_async, use get_extraction_data instead. Returns the current processing status and extracted data when available. The status can be one of: PROCESSING, SUCCESS, FAILURE, or EXPIRED (48 hours after completion). Use this after submitting a document for async extraction.`,
   instructions: [
     'Results expire 48 hours after processing completes',
-    'If status is not SUCCESS, poll again after a short delay'
+    'For legacy PROCESSING status, poll again after a short delay; do not repeatedly poll a failed or expired extraction'
   ],
   tags: {
     readOnly: true

@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let createMember = SlateTool.create(spec, {
   name: 'Create Member',
   key: 'create_member',
-  description: `Creates a new user in your Heartbeat community. Optionally assign groups, set a profile picture, bio, social links, and trigger an introduction thread.`,
+  description: `DEPRECATED — use \`provision_member\` instead. Creates a new user in your Heartbeat community. Optionally assign groups, set a profile picture, bio, social links, and trigger an introduction thread.`,
+  instructions: [
+    'Use provision_member instead. The documented create operation uses a full name and one role ID and does not guarantee a returned member profile.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

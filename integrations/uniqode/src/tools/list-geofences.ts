@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listGeofences = SlateTool.create(spec, {
   name: 'List Geofences',
   key: 'list_geofences',
-  description: `List and search geofences in your Beaconstac account. Returns geofence details including geographic coordinates, radius, associated campaigns, and places.`,
+  description: `List and search geofences in your Uniqode account. Returns geofence details including geographic coordinates, radius, associated campaigns, and places.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +14,10 @@ export let listGeofences = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: z
+        .string()
+        .optional()
+        .describe('Organization ID from list_organizations; overrides the configured default'),
       search: z.string().optional().describe('Search by geofence name'),
       ordering: z.string().optional().describe('Sort field. Prefix with "-" for descending.'),
       limit: z.number().optional().describe('Maximum number of results'),
@@ -22,6 +26,7 @@ export let listGeofences = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of geofences'),
       geofences: z
         .array(
@@ -49,7 +54,7 @@ export let listGeofences = SlateTool.create(spec, {
     let result = await client.listGeofences({
       search: ctx.input.search,
       ordering: ctx.input.ordering,
-      organization: ctx.config.organizationId,
+      organization: ctx.input.organizationId ?? ctx.config.organizationId,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -60,14 +65,16 @@ export let listGeofences = SlateTool.create(spec, {
       latitude: g.latitude,
       longitude: g.longitude,
       radius: g.radius,
-      placeId: g.place,
-      campaignContentType: g.campaign?.content_type,
-      createdAt: g.created,
-      updatedAt: g.updated
+      placeId: typeof g.place === 'number' ? g.place : undefined,
+      campaignContentType:
+        typeof g.campaign?.content_type === 'number' ? g.campaign?.content_type : undefined,
+      createdAt: typeof g.created === 'string' ? g.created : undefined,
+      updatedAt: typeof g.updated === 'string' ? g.updated : undefined
     }));
 
     return {
       output: {
+        raw: result,
         totalCount: result.count,
         geofences
       },

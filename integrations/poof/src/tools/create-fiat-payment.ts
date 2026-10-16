@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PoofClient } from '../lib/client';
+import { getPoofPaymentUrl, PoofClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createFiatPayment = SlateTool.create(spec, {
@@ -51,6 +51,13 @@ export let createFiatPayment = SlateTool.create(spec, {
       ctx.input.type === 'invoice'
         ? await client.createFiatInvoice(params)
         : await client.createFiatCharge(params);
+
+    if (typeof result?.qr_code === 'string' && /^https?:\/\//i.test(result.qr_code)) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: getPoofPaymentUrl(result, ['qr_code'])
+      });
+    }
 
     return {
       output: {

@@ -4,6 +4,11 @@ import { ConnectClient } from '../lib/connect-client';
 import { spec } from '../spec';
 
 let cartItemSchema = z.object({
+  item: z
+    .object({ upc: z.string().optional(), rrc: z.string().optional() })
+    .optional()
+    .describe('Current item code; specify exactly one UPC or retailer reference code'),
+  weight: z.number().optional().describe('Weight in the product catalog unit'),
   lineNum: z.string().describe('Line number identifier for the item'),
   count: z.number().describe('Quantity of the item'),
   productCodes: z
@@ -36,11 +41,25 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
     z.object({
       userId: z.string().describe('Connect user ID'),
       fulfillmentType: z.enum(['delivery', 'pickup']).describe('Type of fulfillment'),
+      address: z
+        .object({
+          addressLine1: z.string(),
+          addressLine2: z.string().optional(),
+          addressType: z.string().optional(),
+          postalCode: z.string(),
+          city: z.string().optional()
+        })
+        .optional()
+        .describe('Delivery address required by the delivery API'),
       locationCode: z.string().describe('Store location code from the Find Stores tool'),
       items: z
         .array(cartItemSchema)
         .optional()
         .describe('Cart items to check availability against'),
+      desiredWindows: z
+        .array(z.object({ startsAt: z.string(), endsAt: z.string() }))
+        .optional()
+        .describe('Requested ISO 8601 windows; delivery only'),
       withEtaOptions: z.boolean().optional().describe('Whether to include ETA time slots'),
       withPriorityEtaOptions: z
         .boolean()
@@ -50,20 +69,30 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including warnings and address flags'),
       serviceOptions: z
         .array(
           z.object({
+            raw: z.unknown().optional().describe('Complete service option data'),
             serviceOptionId: z.string().describe('Unique ID for this service option'),
             serviceOptionReference: z
               .string()
+              .optional()
               .describe('Reference identifier for reserving this slot'),
             date: z.string().describe('Date for this time slot'),
             window: z
               .object({
-                startAt: z.string().describe('Window start time (ISO 8601)'),
-                endAt: z.string().describe('Window end time (ISO 8601)'),
+                immediateHour: z
+                  .number()
+                  .optional()
+                  .describe('Hours from order creation for immediate time slots'),
+                startAt: z.string().optional().describe('Window start time (ISO 8601)'),
+                endAt: z.string().optional().describe('Window end time (ISO 8601)'),
                 type: z.string().describe('Type of window'),
-                asap: z.boolean().describe('Whether this is an ASAP option')
+                asap: z.boolean().optional().describe('Whether this is an ASAP option')
               })
               .describe('Time window details'),
             available: z.boolean().describe('Whether this time slot is currently available')
@@ -75,14 +104,15 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
-    let serviceOptions = await client.listCartServiceOptions(ctx.input);
+    let { serviceOptions, raw } = await client.listCartServiceOptions(ctx.input);
 
     let availableCount = serviceOptions.filter(o => o.available).length;
     return {
-      output: { serviceOptions },
+      output: { serviceOptions, raw },
       message: `Found **${serviceOptions.length}** service option(s) for user **${ctx.input.userId}** at store **${ctx.input.locationCode}** (${availableCount} available).`
     };
   })

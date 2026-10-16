@@ -19,6 +19,7 @@ export let getPayment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       paymentId: z.number().describe('Payment identifier'),
       hashid: z.string(),
       reference: z.string().nullable().describe('Payment reference'),

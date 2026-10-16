@@ -1,57 +1,39 @@
-# Slates Specification for TinyURL
+# TinyURL API specification
 
-## Overview
+## Sources
 
-TinyURL is a URL shortening service that allows users to create short aliases for long URLs. It was launched in January 2002 by Kevin Gilbertson and is one of the oldest URL shortening services still in operation. The modern API is built on the OpenAPI standard and provides link shortening, management, analytics, and branded domain support.
+- [Official OpenAPI 2.4.2](https://tinyurl.com/openapi/v2.json), as linked by the [developer documentation](https://tinyurl.com/app/dev).
+- [Token permissions](https://tinyurl.com/blog/what-permission-tinyurl-api-tokens/).
+- [List behavior and response example](https://tinyurl.com/blog/how-get-list-tinyurls-api/).
+- [Archive behavior](https://tinyurl.com/blog/how-archive-using-tinyurl-api/).
 
-## Authentication
+Reviewed 2026-10-15. Base URL: `https://api.tinyurl.com`.
 
-TinyURL uses **API Token (Bearer Token)** authentication.
+## Authentication and configuration
 
-To use the TinyURL API, developers must first obtain an API key by signing up for an account on the TinyURL developer portal at https://tinyurl.com/app/dev.
+Use a Bearer API token created in [API settings](https://tinyurl.com/app/settings/api). Select permissions for the operations needed. There is no OAuth flow or connection configuration. The published API does not expose a current-user or account endpoint.
 
-Tokens are created by entering a token name and selecting specific permissions for the use case. You can create an API token that can be used to create, update, change, and delete TinyURLs by checking the relevant permission checkboxes.
+## Tools
 
-The API token is passed as a Bearer token in the `Authorization` header:
+| Tool | Behavior |
+| --- | --- |
+| `create_tinyurl` | Shorten a destination, optionally using a custom alias, domain, tags, description, or expiration. |
+| `get_tinyurl` | Read link details and analytics settings. |
+| `list_tinyurls` | List available or archived links; filter by creation dates or `alias:`/`tag:` search. Fetch details per result to retain destination and hit outputs. |
+| `count_tinyurls` | Count links using the same filters without fetching individual details. |
+| `update_tinyurl` | Change destination, metadata, analytics collection, or optional public analytics sharing; then retrieve complete details. |
+| `delete_tinyurl` | Permanently delete a link. |
+| `archive_tinyurl` | Toggle archive state and retrieve complete details. |
+| `get_analytics` | Retrieve the existing seven report types. A start datetime is required; omitted end time means now. Location reports default to countries (`world`). |
 
-```
-Authorization: Bearer <YOUR_API_TOKEN>
-```
+Updates use the returned domain and alias after a rename. Mutations are sequential and are not transactional; a later failure may leave an earlier change applied. A failed final detail read surfaces an error that warns the change may already have been applied.
 
-The base URL for the API is `https://api.tinyurl.com`.
+Analytics filters accept a full TinyURL without its scheme. A bare alias is interpreted on `tinyurl.com`. Report data is returned without flattening its provider-specific structure.
 
-TinyURL allows users to create permission-specific API tokens. For example, there can be a token that can only be used to create TinyURLs, or one that can only be used to delete TinyURLs. It is possible to create a token with multiple or even all permissions.
+## Availability and limits
 
-Available token permissions for **free** users:
+Tags, descriptions, expiration, changing destinations, and analytics are subject to subscription and token permissions. Listing is documented as available with any valid account token; the public count operation documents authentication but no additional permission or plan restriction. Account-specific availability was not verified.
 
-- Create TinyURL, Update TinyURL (update alias), and Archive TinyURL.
+The published list/count API has no pagination parameters. List hydration increases requests with the number of matching links; use filters or `count_tinyurls` for large accounts. The list schema in OpenAPI describes a single alias, while the official help response shows an array; the implementation follows that response example.
 
-Additional permissions for **paid** users:
-
-- Change URL (change destination URL), Manage TinyURL Expiration, and Use Bulk Requests (enables processing multiple links in one request, combined with other permissions like create or delete).
-
-## Features
-
-### URL Shortening
-
-Create shortened URLs from long URLs. When creating a link, you can specify the target URL, domain (defaults to `tinyurl.com`), a custom alias, tags, an expiration date, and a description. Note that description, tags, and expiration (`expires_at`) only work with paid subscriptions; free accounts must leave these fields blank.
-
-### Link Management
-
-Retrieve, update, and delete shortened URLs. You can archive or unarchive TinyURLs on your account. You can fetch a list of all TinyURLs on your account using any valid token. Paid users can change the destination URL of an existing TinyURL.
-
-### Link Analytics
-
-View detailed analytics for shortened links, including total and unique clicks, likely human traffic, geographic distribution, referrers, devices, browsers, and popular days and times. Analytics are available on paid plans. Users can also tag and group shortened links together to get a more holistic view of marketing campaigns.
-
-### Branded Domains
-
-Manage branded domains by purchasing a domain through TinyURL or connecting an existing domain or subdomain. This allows creating custom short links that reflect your brand. This is a paid feature.
-
-### Bulk Operations
-
-Bulk requests enable processing multiple links in one API call, but the token must have additional permissions for the type of operation (e.g., create or delete). Available on paid plans only.
-
-## Events
-
-The provider does not support events. TinyURL does not offer webhooks or event subscription mechanisms through its API.
+Public API documentation includes bulk processing and raw logs, but this integration does not expose those operations. Branded domains can be used in link tools; buying, configuring, or discovering domains is not in the published API. No webhook subscription API is documented.

@@ -25,6 +25,15 @@ export let listTests = SlateTool.create(spec, {
   .output(
     z.object({
       tests: z.array(z.record(z.string(), z.any())).describe('Array of test objects'),
+      next: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page, empty when no next page exists'),
+      previous: z.string().optional().describe('Provider URL for the previous page'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response including pagination'),
       total: z.number().describe('Total number of tests available'),
       offset: z.number().describe('Current pagination offset')
     })
@@ -40,6 +49,9 @@ export let listTests = SlateTool.create(spec, {
     return {
       output: {
         tests: result.data,
+        next: result.next,
+        previous: result.previous,
+        raw: result.raw,
         total: result.total,
         offset: result.offset
       },

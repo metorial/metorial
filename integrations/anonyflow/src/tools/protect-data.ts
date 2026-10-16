@@ -6,10 +6,11 @@ import { spec } from '../spec';
 export let protectData = SlateTool.create(spec, {
   name: 'Protect Data',
   key: 'protect_data',
-  description: `Encrypt and anonymize specific fields within a data object using AnonyFlow's encryption service. Specify which fields to protect using the **keys** parameter — only those fields will be encrypted while the rest remain untouched. Useful for protecting PII such as names, emails, phone numbers, and addresses before storing or sharing data.`,
+  description: `Encrypt fields within a data object using AnonyFlow. Select field names with keys, or use an empty keys array to protect the entire object. Returns the full API response and the processed object in values.`,
   instructions: [
     'Provide the full data object and specify which field names should be anonymized via the keys parameter.',
-    'Only the fields listed in keys will be encrypted; all other fields remain unchanged.'
+    'A non-empty keys array selects fields; an empty keys array protects the entire object.',
+    'Pass output.values to unprotect_data as protectedFields. The legacy protectedFields output contains the full API response, with the processed object under value.'
   ],
   tags: {
     destructive: false,
@@ -26,7 +27,7 @@ export let protectData = SlateTool.create(spec, {
       keys: z
         .array(z.string())
         .describe(
-          'Array of field names within the data object that should be encrypted/anonymized.'
+          'Field names to encrypt. An empty array protects every field in the data object.'
         )
     })
   )
@@ -35,8 +36,9 @@ export let protectData = SlateTool.create(spec, {
       protectedFields: z
         .record(z.string(), z.unknown())
         .describe(
-          'The data object with specified fields encrypted. Unspecified fields remain unchanged.'
-        )
+          'Full AnonyFlow API response, including status and the encrypted object under value.'
+        ),
+      values: z.record(z.string(), z.unknown()).describe('The encrypted data object.')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,9 +48,12 @@ export let protectData = SlateTool.create(spec, {
 
     return {
       output: {
-        protectedFields: result as Record<string, unknown>
+        protectedFields: result,
+        values: result.value
       },
-      message: `Successfully protected ${ctx.input.keys.length} field(s): **${ctx.input.keys.join(', ')}**`
+      message: ctx.input.keys.length
+        ? `Received the protected data for ${ctx.input.keys.length} selected field(s).`
+        : 'Received the protected data for the entire object.'
     };
   })
   .build();

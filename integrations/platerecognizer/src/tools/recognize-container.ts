@@ -8,7 +8,9 @@ export let recognizeContainer = SlateTool.create(spec, {
   key: 'recognize_container',
   description: `Read shipping container identification codes from images. Extracts owner code, serial/registration number, and check digit from standard ISO 6346 container markings.
 Handles blurry, dark, angled, and shadowy images.`,
-  instructions: ['Provide either an imageUrl or imageBase64, not both.'],
+  instructions: [
+    'Use imageBase64 for the documented binary image upload. For documented URL recognition, use recognize_text with type="shipping_container". The legacy imageUrl field is forwarded to the provider as before, with priority over imageBase64.'
+  ],
   constraints: ['Maximum image size is 3 MB.'],
   tags: {
     destructive: false,
@@ -21,14 +23,45 @@ Handles blurry, dark, angled, and shadowy images.`,
         .string()
         .optional()
         .describe('URL of the image containing a shipping container'),
-      imageBase64: z.string().optional().describe('Base64-encoded image data'),
+      imageBase64: z
+        .string()
+        .optional()
+        .describe('Base64-encoded image data; a base64 data URI also preserves its MIME type'),
+      imageMimeType: z
+        .string()
+        .optional()
+        .describe(
+          'MIME type of the uploaded image, when known; overrides a data URI MIME type'
+        ),
+      imageFilename: z
+        .string()
+        .optional()
+        .describe('Original filename of the uploaded image, when known'),
       cameraId: z.string().optional().describe('Unique camera identifier'),
-      timestamp: z.string().optional().describe('ISO 8601 UTC timestamp')
+      timestamp: z.string().optional().describe('ISO 8601 UTC timestamp'),
+      minDetectionScore: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Minimum text-region detection confidence'),
+      minOcrScore: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Minimum recognized-text confidence')
     })
   )
   .output(
     z.object({
-      results: z.array(z.any()).describe('Container identification results from the API')
+      results: z.array(z.any()).describe('Container identification results from the API'),
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response including image dimensions and processing metadata'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -38,14 +71,19 @@ Handles blurry, dark, angled, and shadowy images.`,
       imageUrl: ctx.input.imageUrl,
       imageBase64: ctx.input.imageBase64,
       cameraId: ctx.input.cameraId,
-      timestamp: ctx.input.timestamp
+      timestamp: ctx.input.timestamp,
+      minDetectionScore: ctx.input.minDetectionScore,
+      minOcrScore: ctx.input.minOcrScore,
+      imageMimeType: ctx.input.imageMimeType,
+      imageFilename: ctx.input.imageFilename
     });
 
     let results = Array.isArray(result) ? result : result.results || [result];
 
     return {
       output: {
-        results
+        results,
+        raw: result
       },
       message:
         results.length > 0

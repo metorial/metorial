@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireValue, validateNumber } from '../lib/client';
 import { buildClientConfig, flattenSingleResource } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -10,8 +10,8 @@ export let createPayment = SlateTool.create(spec, {
   description: `Create a payment charge, authorization, or refund. Charges process direct payments, authorizations hold funds for later capture, and refunds return funds from previous charges.`,
   instructions: [
     'For charges: provide orderId and amountInCents at minimum.',
-    'For refunds: provide orderId and amountInCents for the refund amount.',
-    'For authorizations: provide orderId and amountInCents for the hold amount.'
+    'For connected refunds, provide paymentChargeId. Refunds do not accept mode or paymentMethodId.',
+    'Use get_payment to check the actual payment status after creation; creation alone does not prove funds were collected.'
   ],
   tags: {
     destructive: false
@@ -27,9 +27,30 @@ export let createPayment = SlateTool.create(spec, {
       mode: z
         .enum(['manual', 'off_session', 'request', 'terminal', 'capture'])
         .optional()
-        .describe('Payment mode (for charges)'),
-      paymentMethodId: z.string().optional().describe('Saved payment method ID'),
-      provider: z.enum(['stripe', 'app', 'none']).optional().describe('Payment provider')
+        .describe(
+          'Charge mode; authorizations support off_session, request, or terminal. Omit for refunds.'
+        ),
+      paymentMethodId: z
+        .string()
+        .optional()
+        .describe(
+          'Saved payment method ID. Call list_payment_methods to discover IDs. Not accepted for refunds.'
+        ),
+      provider: z.enum(['stripe', 'app', 'none']).optional().describe('Payment provider'),
+      paymentChargeId: z
+        .string()
+        .optional()
+        .describe(
+          'Original successful charge ID for a connected refund. Use list_payments to discover IDs.'
+        ),
+      paymentAuthorizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Existing authorization ID required for capture charges. Use list_payments to discover IDs.'
+        ),
+      depositInCents: z.number().optional().describe('Separate deposit amount in whole cents'),
+      description: z.string().optional().describe('Payment description or refund explanation')
     })
   )
   .output(
@@ -40,6 +61,48 @@ export let createPayment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(buildClientConfig(ctx));
 
+    validateNumber(ctx.input.amountInCents, 'Amount in cents', { integer: true, min: 0 });
+    validateNumber(ctx.input.depositInCents, 'Deposit in cents', { integer: true, min: 0 });
+    if (ctx.input.amountInCents + (ctx.input.depositInCents ?? 0) <= 0)
+      throw createApiServiceError('The total payment amount must be greater than zero.');
+    if (
+      ctx.input.paymentType === 'refund' &&
+      (ctx.input.mode !== undefined ||
+        ctx.input.paymentMethodId !== undefined ||
+        ctx.input.paymentAuthorizationId !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Refunds do not accept mode, paymentMethodId, or paymentAuthorizationId. Use paymentChargeId for a connected refund.'
+      );
+    }
+    if (ctx.input.paymentType !== 'refund' && ctx.input.paymentChargeId !== undefined)
+      throw createApiServiceError('paymentChargeId is only used for refunds.');
+    if (ctx.input.paymentType !== 'charge' && ctx.input.paymentAuthorizationId !== undefined)
+      throw createApiServiceError('paymentAuthorizationId is only used for capture charges.');
+    if (
+      ctx.input.paymentType === 'authorization' &&
+      (ctx.input.mode === 'manual' || ctx.input.mode === 'capture')
+    )
+      throw createApiServiceError(
+        'Authorizations require off_session, request, or terminal mode.'
+      );
+    if (ctx.input.mode === 'off_session')
+      requireValue(ctx.input.paymentMethodId, 'Saved payment method ID for off_session');
+    if (ctx.input.mode === 'capture')
+      requireValue(ctx.input.paymentAuthorizationId, 'Payment authorization ID for capture');
+    if (ctx.input.paymentAuthorizationId !== undefined && ctx.input.mode !== 'capture')
+      throw createApiServiceError(
+        'Set mode to capture when supplying paymentAuthorizationId.'
+      );
+    if (ctx.input.mode === 'manual' && ctx.input.provider && ctx.input.provider !== 'none')
+      throw createApiServiceError('Manual charges use provider none.');
+    if (
+      ctx.input.paymentType === 'refund' &&
+      ctx.input.provider &&
+      ctx.input.provider !== 'none'
+    )
+      requireValue(ctx.input.paymentChargeId, 'Original charge ID for a provider refund');
+
     let attributes: Record<string, any> = {
       order_id: ctx.input.orderId,
       amount_in_cents: ctx.input.amountInCents
@@ -48,6 +111,14 @@ export let createPayment = SlateTool.create(spec, {
     if (ctx.input.mode) attributes.mode = ctx.input.mode;
     if (ctx.input.paymentMethodId) attributes.payment_method_id = ctx.input.paymentMethodId;
     if (ctx.input.provider) attributes.provider = ctx.input.provider;
+
+    if (ctx.input.paymentChargeId !== undefined)
+      attributes.payment_charge_id = ctx.input.paymentChargeId;
+    if (ctx.input.paymentAuthorizationId !== undefined)
+      attributes.payment_authorization_id = ctx.input.paymentAuthorizationId;
+    if (ctx.input.depositInCents !== undefined)
+      attributes.deposit_in_cents = ctx.input.depositInCents;
+    if (ctx.input.description !== undefined) attributes.description = ctx.input.description;
 
     let response: any;
     if (ctx.input.paymentType === 'charge') {

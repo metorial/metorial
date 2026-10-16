@@ -48,9 +48,9 @@ export let manageMessageFlags = SlateTool.create(spec, {
 
     return {
       output: {
-        messagesUpdated: result.messages?.length ?? ctx.input.messageIds.length
+        messagesUpdated: result.messages.length
       },
-      message: `Flag "${ctx.input.flag}" ${ctx.input.action === 'add' ? 'added to' : 'removed from'} ${ctx.input.messageIds.length} message(s)`
+      message: `Flag "${ctx.input.flag}" ${ctx.input.action === 'add' ? 'added to' : 'removed from'} ${result.messages.length} message(s)`
     };
   })
   .build();

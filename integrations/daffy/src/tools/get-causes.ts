@@ -13,7 +13,7 @@ export let getCauses = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      userId: z.number().describe('User ID to retrieve causes for')
+      userId: z.number().describe('User ID from get_user_profile to retrieve causes for')
     })
   )
   .output(

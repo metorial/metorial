@@ -13,6 +13,14 @@ export let getTrivia = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(30)
+        .optional()
+        .describe('Number of questions; premium only'),
+      safe: z.boolean().optional().describe('Restrict to safe trivia; premium only'),
       category: z
         .enum([
           'artliterature',
@@ -36,6 +44,7 @@ export let getTrivia = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       questions: z
         .array(
           z.object({
@@ -49,7 +58,9 @@ export let getTrivia = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let params: Record<string, string | number> = {};
+    let params: Record<string, string | number | boolean> = {};
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.safe !== undefined) params.safe = ctx.input.safe;
     if (ctx.input.category) params.category = ctx.input.category;
 
     let result = await client.getTrivia(params);
@@ -57,8 +68,9 @@ export let getTrivia = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         questions: questions.map((q: any) => ({
-          category: q.category,
+          category: q.category ?? undefined,
           question: q.question,
           answer: q.answer
         }))

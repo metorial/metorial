@@ -1,9 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let personaSetSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   personaSetId: z.string().describe('Unique identifier of the persona set'),
   name: z.string().describe('Human-readable name of the persona set'),
   status: z
@@ -33,11 +37,12 @@ export let listPersonaSets = SlateTool.create(spec, {
     let personaSets = await client.listPersonaSets();
 
     let mapped = personaSets.map((p: any) => ({
+      raw: p,
       personaSetId: p.id,
       name: p.name,
       status: p.status,
       cohortId: p.cohort_id,
-      personaCount: p.persona_count,
+      personaCount: p.number_of_clusters,
       createdAt: p.created_at,
       updatedAt: p.updated_at
     }));
@@ -74,16 +79,17 @@ export let getPersonaSet = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: p,
         personaSetId: p.id,
         name: p.name,
         status: p.status,
         cohortId: p.cohort_id,
-        personaCount: p.persona_count,
+        personaCount: p.number_of_clusters,
         personas: p.personas,
         createdAt: p.created_at,
         updatedAt: p.updated_at
       },
-      message: `Persona set **${p.name}** is **${p.status}** with ${p.persona_count ?? 'unknown'} personas.`
+      message: `Persona set **${p.name}** is **${p.status}** with ${p.number_of_clusters ?? 'unknown'} personas.`
     };
   })
   .build();
@@ -109,17 +115,23 @@ export let createPersonaSet = SlateTool.create(spec, {
       name: ctx.input.name,
       cohort_id: ctx.input.cohortId
     };
-    if (ctx.input.personaCount !== undefined) body.persona_count = ctx.input.personaCount;
+    if (ctx.input.personaCount !== undefined) {
+      if (!Number.isInteger(ctx.input.personaCount)) {
+        throw createApiServiceError('personaCount must be an integer number of clusters.');
+      }
+      body.number_of_clusters = ctx.input.personaCount;
+    }
 
     let p = await client.createPersonaSet(body);
 
     return {
       output: {
+        raw: p,
         personaSetId: p.id,
         name: p.name,
         status: p.status,
         cohortId: p.cohort_id,
-        personaCount: p.persona_count,
+        personaCount: p.number_of_clusters,
         createdAt: p.created_at,
         updatedAt: p.updated_at
       },

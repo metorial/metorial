@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,9 @@ export let manageTask = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update_retention') {
       if (!ctx.input.retentionMode) {
-        throw new Error('retentionMode is required when action is "update_retention"');
+        throw createApiServiceError(
+          'retentionMode is required when action is "update_retention"'
+        );
       }
 
       let result = await client.updateTaskRetention(ctx.input.taskId, ctx.input.retentionMode);
@@ -80,7 +82,7 @@ export let manageTask = SlateTool.create(spec, {
         dateDeleted: result.dateDeleted,
         message: result.message
       },
-      message: `Task **${ctx.input.taskId}** files have been permanently deleted.`
+      message: `Task **${ctx.input.taskId}**: ${result.message}`
     };
   })
   .build();

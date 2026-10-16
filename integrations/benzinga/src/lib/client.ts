@@ -1,49 +1,118 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Benzinga',
+    reason: 'benzinga_api_error',
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    detailKeys: ['text', 'message', 'detail', 'value', 'code'],
+    nestedKeys: ['errors', 'error']
+  });
+
+export let validateInteger = (
+  value: number | undefined,
+  field: string,
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER
+) => {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < min || value > max)) {
+    throw createApiServiceError(`${field} must be a whole number between ${min} and ${max}.`);
+  }
+};
+
+export let validateSymbols = (value: string | undefined, field: string, max?: number) => {
+  if (value === undefined) return;
+  let values = value.split(',');
+  if (values.some(item => !item.trim()) || (max !== undefined && values.length > max)) {
+    throw createApiServiceError(
+      `${field} must contain non-empty comma-separated identifiers${max === undefined ? '' : ` (maximum ${max})`}.`
+    );
+  }
+};
+
+export let numericValue = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  let number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+};
+
+export let stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+
+export let recordsFrom = (
+  data: unknown,
+  keys: string[] = ['data'],
+  singleton = false
+): Record<string, any>[] => {
+  if (Array.isArray(data)) return data;
+  if (isApiErrorRecord(data)) {
+    for (let key of keys) {
+      if (Array.isArray(data[key])) return data[key];
+    }
+    if (singleton) return [data];
+  }
+  if (data === undefined || data === null || data === '') return [];
+  throw createApiServiceError('Benzinga returned an unexpected response format.', {
+    reason: 'benzinga_invalid_response'
+  });
+};
+
+type CalendarParams = {
+  page?: number;
+  pageSize?: number;
+  tickers?: string;
+  date?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  updated?: number;
+  importance?: number;
+  country?: string;
+  securities?: string;
+};
+
+type FundamentalParams = {
+  symbols: string;
+  asOf?: string;
+  period?: string;
+  reportType?: string;
+};
 
 export class BenzingaClient {
-  private token: string;
-  private axiosV2;
-  private axiosV2_1;
-  private axiosV1;
-  private axiosMovers;
-  private axiosGov;
-  private axiosSec;
+  private axios = createAxios({
+    baseURL: 'https://api.benzinga.com',
+    headers: { accept: 'application/json' },
+    timeout: 30000
+  });
 
-  constructor(config: { token: string }) {
-    this.token = config.token;
-
-    this.axiosV2 = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v2',
-      headers: { accept: 'application/json' }
-    });
-
-    this.axiosV2_1 = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v2.1',
-      headers: { accept: 'application/json' }
-    });
-
-    this.axiosV1 = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v1',
-      headers: { accept: 'application/json' }
-    });
-
-    this.axiosMovers = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v1/market',
-      headers: { accept: 'application/json' }
-    });
-
-    this.axiosGov = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v1/gov/usa/congress',
-      headers: { accept: 'application/json' }
-    });
-
-    this.axiosSec = createAxios({
-      baseURL: 'https://api.benzinga.com/api/v1',
-      headers: { accept: 'application/json' }
-    });
+  constructor(private config: { token: string }) {
+    if (!config.token.trim()) throw createApiServiceError('A Benzinga API key is required.');
   }
 
-  // ---- News ----
+  private async get(
+    path: string,
+    params: Record<string, unknown> = {},
+    headers?: Record<string, string>
+  ) {
+    try {
+      let response = await this.axios.get(path, {
+        params: { ...pickDefined(params), token: this.config.token },
+        headers
+      });
+      if (isApiErrorRecord(response.data) && response.data.ok === false) {
+        throw apiError({ response: { status: response.status, data: response.data } });
+      }
+      return response.data;
+    } catch (error) {
+      throw apiError(error);
+    }
+  }
 
   async getNews(params: {
     page?: number;
@@ -60,30 +129,25 @@ export class BenzingaClient {
     topics?: string;
     authors?: string;
     contentTypes?: string;
+    region?: string;
   }) {
-    let res = await this.axiosV2.get('/news', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pageSize: params.pageSize,
-        displayOutput: params.displayOutput,
-        date: params.date,
-        dateFrom: params.dateFrom,
-        dateTo: params.dateTo,
-        updatedSince: params.updatedSince,
-        publishedSince: params.publishedSince,
-        sort: params.sort,
-        tickers: params.tickers,
-        channels: params.channels,
-        topics: params.topics,
-        authors: params.authors,
-        content_types: params.contentTypes
-      }
-    });
-    return res.data;
+    validateInteger(params.page, 'page', 0, 100000);
+    validateInteger(params.pageSize, 'pageSize', 1, 100);
+    validateInteger(params.updatedSince, 'updatedSince');
+    validateInteger(params.publishedSince, 'publishedSince');
+    validateSymbols(params.tickers, 'tickers', 50);
+    let { contentTypes, ...rest } = params;
+    return this.get('/api/v2/news', { ...rest, content_types: contentTypes });
   }
 
-  // ---- WIIMs (Why Is It Moving) ----
+  async getNewsArticle(articleId: number, displayOutput?: 'full' | 'abstract' | 'headline') {
+    validateInteger(articleId, 'articleId', 1);
+    return this.get(`/api/v2/news/${articleId}`, { displayOutput });
+  }
+
+  async getNewsChannels() {
+    return this.get('/api/v2.1/news/channels', {}, { Key: this.config.token });
+  }
 
   async getWiims(params: {
     searchKeys?: string;
@@ -92,299 +156,84 @@ export class BenzingaClient {
     page?: number;
     pageSize?: number;
   }) {
-    let res = await this.axiosV2.get('/wiims', {
-      params: {
-        token: this.token,
-        search_keys: params.searchKeys,
-        search_keys_type: params.searchKeys ? 'symbol' : undefined,
-        updated_since: params.updatedSince,
-        country: params.country,
-        page: params.page,
-        pagesize: params.pageSize
-      }
+    return this.getNews({
+      tickers: params.searchKeys,
+      channels: 'WIIM',
+      displayOutput: 'full',
+      region: params.country,
+      updatedSince: params.updatedSince,
+      page: params.page,
+      pageSize: params.pageSize
     });
-    return res.data;
   }
 
-  // ---- Calendar Endpoints ----
-
-  async getCalendarRatings(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/ratings', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance
-      }
+  private async getCalendar(type: string, params: CalendarParams) {
+    validateInteger(params.page, 'page', 0, 100000);
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    validateInteger(params.importance, 'importance', 0, 5);
+    validateInteger(params.updated, 'updated');
+    validateSymbols(params.tickers, 'tickers', 50);
+    validateSymbols(params.securities, 'tickers', 50);
+    return this.get(`/api/v2.1/calendar/${type}`, {
+      page: params.page,
+      pagesize: params.pageSize,
+      'parameters[tickers]':
+        type === 'economics' || type === 'fda' ? undefined : params.tickers,
+      'parameters[securities]': type === 'fda' ? params.securities : undefined,
+      'parameters[date]': type === 'ipos' ? undefined : params.date,
+      ipo_date: type === 'ipos' ? params.date : undefined,
+      'parameters[date_from]': params.dateFrom,
+      'parameters[date_to]': params.dateTo,
+      'parameters[updated]': params.updated,
+      'parameters[importance]': [
+        'ratings',
+        'earnings',
+        'dividends',
+        'economics',
+        'guidance',
+        'splits',
+        'ma',
+        'offerings'
+      ].includes(type)
+        ? params.importance
+        : undefined,
+      country: type === 'economics' ? params.country : undefined
     });
-    return res.data;
   }
 
-  async getCalendarEarnings(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-  }) {
-    let res = await this.axiosV2_1.get('/calendar/earnings', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance
-      }
-    });
-    return res.data;
+  getCalendarRatings(params: CalendarParams) {
+    return this.getCalendar('ratings', params);
   }
-
-  async getCalendarDividends(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/dividends', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance
-      }
-    });
-    return res.data;
+  getCalendarEarnings(params: CalendarParams) {
+    return this.getCalendar('earnings', params);
   }
-
-  async getCalendarEconomics(params: {
-    page?: number;
-    pageSize?: number;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-    country?: string;
-  }) {
-    let res = await this.axiosV2.get('/calendar/economics', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance,
-        'parameters[country]': params.country
-      }
-    });
-    return res.data;
+  getCalendarDividends(params: CalendarParams) {
+    return this.getCalendar('dividends', params);
   }
-
-  async getCalendarIPOs(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/ipos', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
-    });
-    return res.data;
+  getCalendarEconomics(params: CalendarParams) {
+    return this.getCalendar('economics', params);
   }
-
-  async getCalendarGuidance(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/guidance', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance
-      }
-    });
-    return res.data;
+  getCalendarIPOs(params: CalendarParams) {
+    return this.getCalendar('ipos', params);
   }
-
-  async getCalendarSplits(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-    importance?: number;
-  }) {
-    let res = await this.axiosV2_1.get('/calendar/splits', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated,
-        'parameters[importance]': params.importance
-      }
-    });
-    return res.data;
+  getCalendarGuidance(params: CalendarParams) {
+    return this.getCalendar('guidance', params);
   }
-
-  async getCalendarMA(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/ma', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
-    });
-    return res.data;
+  getCalendarSplits(params: CalendarParams) {
+    return this.getCalendar('splits', params);
   }
-
-  async getCalendarOfferings(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/offerings', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
-    });
-    return res.data;
+  getCalendarMA(params: CalendarParams) {
+    return this.getCalendar('ma', params);
   }
-
-  async getCalendarFDA(params: {
-    page?: number;
-    pageSize?: number;
-    securities?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/fda', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[securities]': params.securities,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
-    });
-    return res.data;
+  getCalendarOfferings(params: CalendarParams) {
+    return this.getCalendar('offerings', params);
   }
-
-  async getCalendarConferenceCalls(params: {
-    page?: number;
-    pageSize?: number;
-    tickers?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    date?: string;
-    updated?: number;
-  }) {
-    let res = await this.axiosV2.get('/calendar/conference-calls', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
-    });
-    return res.data;
+  getCalendarFDA(params: CalendarParams) {
+    return this.getCalendar('fda', params);
   }
-
-  // ---- Market Movers ----
+  getCalendarConferenceCalls(params: CalendarParams) {
+    return this.getCalendar('conference-calls', params);
+  }
 
   async getMovers(params: {
     maxResults?: number;
@@ -392,21 +241,11 @@ export class BenzingaClient {
     to?: string;
     session?: 'REGULAR' | 'PRE_MARKET' | 'AFTER_MARKET';
     screenerQuery?: string;
+    moversQuery?: string;
   }) {
-    let res = await this.axiosMovers.get('/movers', {
-      params: {
-        token: this.token,
-        maxResults: params.maxResults,
-        from: params.from,
-        to: params.to,
-        session: params.session,
-        screenerQuery: params.screenerQuery
-      }
-    });
-    return res.data;
+    validateInteger(params.maxResults, 'maxResults', 1);
+    return this.get('/api/v1/market/movers', params);
   }
-
-  // ---- Signals (Options Activity) ----
 
   async getOptionActivity(params: {
     page?: number;
@@ -417,129 +256,84 @@ export class BenzingaClient {
     date?: string;
     updated?: number;
   }) {
-    let res = await this.axiosV1.get('/signal/option_activity', {
-      params: {
-        token: this.token,
-        page: params.page,
-        pagesize: params.pageSize,
-        'parameters[tickers]': params.tickers,
-        'parameters[date_from]': params.dateFrom,
-        'parameters[date_to]': params.dateTo,
-        'parameters[date]': params.date,
-        'parameters[updated]': params.updated
-      }
+    validateInteger(params.page, 'page', 0, 100000);
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    validateInteger(params.updated, 'updated');
+    validateSymbols(params.tickers, 'tickers', 50);
+    return this.get('/api/v1/signal/option_activity', {
+      page: params.page,
+      pageSize: params.pageSize,
+      'parameters[tickers]': params.tickers,
+      'parameters[date_from]': params.dateFrom,
+      'parameters[date_to]': params.dateTo,
+      'parameters[date]': params.date,
+      'parameters[updated]': params.updated
     });
-    return res.data;
   }
 
-  // ---- Delayed Quotes ----
-
-  async getDelayedQuotes(params: { symbols?: string; isin?: string; cik?: string }) {
-    let res = await this.axiosV2.get('/quoteDelayed', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        isin: params.isin,
-        cik: params.cik
-      }
-    });
-    return res.data;
+  async getDelayedQuotes(params: { symbols: string; isin?: string; cik?: string }) {
+    validateSymbols(params.symbols, 'symbols');
+    return this.get('/api/v2/quoteDelayed', params);
   }
-
-  // ---- Historical Bars ----
 
   async getBars(params: {
     symbols: string;
     from?: string;
     to?: string;
     interval?: '1D' | '1H' | '5M' | '15M' | '30M' | '1W' | '1MONTH';
+    session?: 'ANY' | 'REGULAR' | 'PRE_MARKET' | 'AFTER_MARKET';
   }) {
-    let res = await this.axiosV2.get('/bars', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        from: params.from,
-        to: params.to,
-        interval: params.interval
-      }
+    validateSymbols(params.symbols, 'symbols');
+    if (!params.from?.trim())
+      throw createApiServiceError(
+        'Provide from for historical bars, such as a YYYY-MM-DD date or 1DAY.'
+      );
+    let intervals = {
+      '1D': '1d',
+      '1H': '1h',
+      '5M': '5m',
+      '15M': '15m',
+      '30M': '30m',
+      '1W': '1w',
+      '1MONTH': '1M'
+    };
+    return this.get('/api/v2/bars', {
+      ...params,
+      interval: params.interval ? intervals[params.interval] : undefined
     });
-    return res.data;
   }
 
-  // ---- Company Fundamentals ----
-
-  async getFundamentals(params: { symbols: string; asOf?: string }) {
-    let res = await this.axiosV2_1.get('/fundamentals', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        asOf: params.asOf
-      }
-    });
-    return res.data;
+  private getFundamental(path: string, params: FundamentalParams) {
+    validateSymbols(params.symbols, 'symbols');
+    return this.get(`/api/v2.1/fundamentals${path}`, params);
   }
-
-  async getCompanyProfile(params: { symbols: string; asOf?: string }) {
-    let res = await this.axiosV2_1.get('/fundamentals/companyProfile', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        asOf: params.asOf
-      }
-    });
-    return res.data;
+  getFundamentals(params: FundamentalParams) {
+    return this.getFundamental('', params);
   }
-
-  async getFinancials(params: {
-    symbols: string;
-    asOf?: string;
-    period?: string;
-    reportType?: string;
-  }) {
-    let res = await this.axiosV2_1.get('/fundamentals/financials', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        asOf: params.asOf,
-        period: params.period,
-        reportType: params.reportType
-      }
-    });
-    return res.data;
+  getCompanyProfile(params: FundamentalParams) {
+    return this.getFundamental('/companyProfile', params);
   }
-
-  async getValuationRatios(params: { symbols: string; asOf?: string }) {
-    let res = await this.axiosV2_1.get('/fundamentals/valuationRatios', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        asOf: params.asOf
-      }
-    });
-    return res.data;
+  getFinancials(params: FundamentalParams) {
+    return this.getFundamental('/financials', params);
   }
-
-  // ---- Corporate Logos ----
+  getValuationRatios(params: FundamentalParams) {
+    return this.getFundamental('/valuationRatios', params);
+  }
 
   async searchLogos(params: {
     searchKeys: string;
     searchKeysType?: 'symbol' | 'cik' | 'cusip' | 'isin';
     fields?: string;
   }) {
-    let res = await this.axiosV2.get('/logos/search', {
-      params: {
-        token: this.token,
-        search_keys: params.searchKeys,
-        search_keys_type: params.searchKeysType || 'symbol',
-        fields:
-          params.fields ||
-          'logo_light,logo_dark,logo_vector_light,logo_vector_dark,mark_light,mark_dark'
-      }
+    validateSymbols(params.searchKeys, 'searchKeys', 100);
+    return this.get('/api/v2/logos/search', {
+      search_keys: params.searchKeys,
+      search_keys_type: params.searchKeysType ?? 'symbol',
+      fields:
+        params.fields ??
+        'logo_light,logo_dark,logo_vector_light,logo_vector_dark,mark_light,mark_dark,colors'
     });
-    return res.data;
   }
-
-  // ---- Government Trades ----
 
   async getGovernmentTrades(params: {
     chamber?: 'House' | 'Senate';
@@ -551,51 +345,48 @@ export class BenzingaClient {
     pageSize?: number;
     updatedSince?: number;
   }) {
-    let res = await this.axiosGov.get('/trades', {
-      params: {
-        token: this.token,
-        chamber: params.chamber,
-        date: params.date,
-        date_from: params.dateFrom,
-        date_to: params.dateTo,
-        search_keys: params.searchKeys,
-        page: params.page,
-        pagesize: params.pageSize,
-        updated_since: params.updatedSince
-      }
+    validateInteger(params.page, 'page', 0, 100000);
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    validateInteger(params.updatedSince, 'updatedSince');
+    validateSymbols(params.searchKeys, 'tickers');
+    return this.get('/api/v1/gov/usa/congress/trades', {
+      chamber: params.chamber,
+      date: params.date,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      search_keys: params.searchKeys,
+      search_keys_type: params.searchKeys ? 'ticker' : undefined,
+      page: params.page,
+      pagesize: params.pageSize,
+      updated_since: params.updatedSince
     });
-    return res.data;
   }
-
-  // ---- SEC Filings / Insider Transactions ----
 
   async getInsiderTransactions(params: {
     date?: string;
     dateFrom?: string;
     dateTo?: string;
     searchKeys?: string;
-    searchKeysType?: 'symbol' | 'accession_number' | 'id';
+    searchKeysType?: 'symbol' | 'accession_number' | 'id' | 'cik';
     page?: number;
     pageSize?: number;
     updatedSince?: number;
   }) {
-    let res = await this.axiosSec.get('/insider_transactions/filings', {
-      params: {
-        token: this.token,
-        date: params.date,
-        date_from: params.dateFrom,
-        date_to: params.dateTo,
-        search_keys: params.searchKeys,
-        search_keys_type: params.searchKeysType || 'symbol',
-        page: params.page,
-        pagesize: params.pageSize,
-        updated_since: params.updatedSince
-      }
+    validateInteger(params.page, 'page', 0, 100000);
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    validateInteger(params.updatedSince, 'updatedSince');
+    validateSymbols(params.searchKeys, 'tickers');
+    return this.get('/api/v1/sec/insider_transactions/filings', {
+      date: params.date,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      search_keys: params.searchKeys,
+      search_keys_type: params.searchKeysType ?? 'symbol',
+      page: params.page,
+      pagesize: params.pageSize,
+      updated_since: params.updatedSince
     });
-    return res.data;
   }
-
-  // ---- Short Interest ----
 
   async getShortInterest(params: {
     symbols: string;
@@ -603,17 +394,59 @@ export class BenzingaClient {
     to?: string;
     page?: number;
     pageSize?: number;
+    finraReport?: boolean;
   }) {
-    let res = await this.axiosV1.get('/shortinterest', {
-      params: {
-        token: this.token,
-        symbols: params.symbols,
-        from: params.from,
-        to: params.to,
-        page: params.page,
-        pageSize: params.pageSize
-      }
+    validateSymbols(params.symbols, 'symbols');
+    validateInteger(params.page, 'page');
+    validateInteger(params.pageSize, 'pageSize', 1);
+    return this.get('/api/v1/shortinterest', params);
+  }
+
+  async getConsensusRatings(params: {
+    ticker: string;
+    dateFrom?: string;
+    dateTo?: string;
+    simplify?: boolean;
+    aggregateType?: 'number' | 'percentage';
+    pageSize?: number;
+  }) {
+    validateSymbols(params.ticker, 'ticker', 1);
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    return this.get('/api/v1/consensus-ratings', {
+      'parameters[tickers]': params.ticker,
+      'parameters[date_from]': params.dateFrom,
+      'parameters[date_to]': params.dateTo,
+      simplify: params.simplify,
+      aggregate_type: params.aggregateType,
+      pagesize: params.pageSize
     });
-    return res.data;
+  }
+
+  async getTrendingTickers(params: {
+    timeframe?: '10m' | '1h' | '1d';
+    source: 'all' | 'clickstream' | 'logo';
+    tickers?: string;
+    page?: number;
+    pageSize?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    timeFrom?: string;
+    timeTo?: string;
+  }) {
+    validateSymbols(params.tickers, 'tickers');
+    validateInteger(params.page, 'page');
+    validateInteger(params.pageSize, 'pageSize', 1, 1000);
+    return this.get('/api/v1/trending-tickers/list', {
+      timeframe: params.timeframe,
+      interval: params.timeframe,
+      source: params.source,
+      tickers: params.tickers,
+      page: params.page,
+      pagesize: params.pageSize,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+      time_from: params.timeFrom,
+      time_to: params.timeTo
+    });
   }
 }

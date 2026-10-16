@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageCampaigns = SlateTool.create(spec, {
     'Use action "delete" to permanently remove a campaign.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -73,7 +73,8 @@ export let manageCampaigns = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.campaignId) throw new Error('campaignId is required for get action');
+      if (!ctx.input.campaignId)
+        throw createApiServiceError('campaignId is required for get action');
       let campaign = await client.getCampaign(ctx.input.campaignId);
       return {
         output: { campaign },
@@ -82,7 +83,8 @@ export let manageCampaigns = SlateTool.create(spec, {
     }
 
     if (action === 'stats') {
-      if (!ctx.input.campaignId) throw new Error('campaignId is required for stats action');
+      if (!ctx.input.campaignId)
+        throw createApiServiceError('campaignId is required for stats action');
       let campaignStats = await client.getCampaignStats(ctx.input.campaignId);
       return {
         output: { campaignStats },
@@ -92,7 +94,7 @@ export let manageCampaigns = SlateTool.create(spec, {
 
     if (action === 'update_status') {
       if (!ctx.input.campaignId)
-        throw new Error('campaignId is required for update_status action');
+        throw createApiServiceError('campaignId is required for update_status action');
       let result = await client.updateCampaignStatus(
         ctx.input.campaignId,
         ctx.input.statusUpdate || {}
@@ -104,7 +106,8 @@ export let manageCampaigns = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.campaignId) throw new Error('campaignId is required for delete action');
+      if (!ctx.input.campaignId)
+        throw createApiServiceError('campaignId is required for delete action');
       let result = await client.deleteCampaign(ctx.input.campaignId);
       return {
         output: { result },
@@ -112,6 +115,6 @@ export let manageCampaigns = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

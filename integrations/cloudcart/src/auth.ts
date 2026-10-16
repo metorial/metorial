@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,8 @@ export let auth = SlateAuth.create()
         .describe('CloudCart API key from Settings > API keys in the store admin panel')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Enter a non-empty CloudCart API key.');
       return {
         output: {
           token: ctx.input.apiKey

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutId, requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
 
 let pricingPersonSchema = z
@@ -52,7 +53,7 @@ export let getInventory = SlateTool.create(spec, {
 Use this before creating a booking to find available time slots and accurate prices.`,
   instructions: [
     'Get the variantId from the "Get Product Details" tool.',
-    'By default returns inventory for the next 30 days. Use startDateTime/endDateTime to customize the range (max ~90 days out).',
+    'The start defaults to the current time. The end is unbounded when omitted; specify a range and paginate to limit results.',
     'Date format is ISO 8601 local time: YYYY-MM-DDThh:mm:ss.',
     'Inventory is volatile — refresh frequently before booking to avoid stale data.'
   ],
@@ -71,7 +72,7 @@ Use this before creating a booking to find available time slots and accurate pri
       endDateTime: z
         .string()
         .optional()
-        .describe('End of date range (YYYY-MM-DDThh:mm:ss). Defaults to 30 days from start.'),
+        .describe('End of date range (YYYY-MM-DDThh:mm:ss). Unbounded when omitted.'),
       currencyCode: z.string().optional().describe('Override currency for pricing (ISO 4217)'),
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Number of inventory slots per page')
@@ -81,6 +82,7 @@ Use this before creating a booking to find available time slots and accurate pri
     z.object({
       inventoryItems: z.array(inventoryItemSchema).describe('Available inventory slots'),
       total: z.number().optional().describe('Total number of inventory slots'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       nextOffset: z.number().optional().describe('Offset for the next page')
     })
   )
@@ -101,12 +103,25 @@ Use this before creating a booking to find available time slots and accurate pri
     });
 
     let inventoryItems = (result.items ?? []).map((item: any) => ({
-      inventoryId: String(item.id ?? item.inventoryId ?? ''),
+      ...item,
+      inventoryId: requireHeadoutId(item?.id ?? item?.inventoryId, 'inventory ID'),
       startDateTime: item.startDateTime,
       endDateTime: item.endDateTime,
       availability: item.availability,
-      remaining: item.remaining,
+      remaining: item.remaining ?? undefined,
       pricing: item.pricing
+        ? {
+            ...item.pricing,
+            persons: item.pricing.persons?.map((person: any) => ({
+              ...person,
+              type: requireHeadoutText(person?.type, 'person type'),
+              name: requireHeadoutText(person.name, 'person type name'),
+              ageFrom: person.ageFrom ?? undefined,
+              ageTo: person.ageTo ?? undefined
+            })),
+            groups: item.pricing.groups ?? undefined
+          }
+        : undefined
     }));
 
     let availableCount = inventoryItems.filter((i: any) => i.availability !== 'CLOSED').length;
@@ -114,8 +129,9 @@ Use this before creating a booking to find available time slots and accurate pri
     return {
       output: {
         inventoryItems,
+        raw: result,
         total: result.total,
-        nextOffset: result.nextOffset
+        nextOffset: result.nextOffset ?? undefined
       },
       message: `Found ${result.total ?? inventoryItems.length} inventory slots for variant **${ctx.input.variantId}**. ${availableCount} slot${availableCount !== 1 ? 's are' : ' is'} available.`
     };

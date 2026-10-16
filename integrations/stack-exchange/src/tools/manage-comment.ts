@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageComment = SlateTool.create(spec, {
@@ -43,17 +44,17 @@ export let manageComment = SlateTool.create(spec, {
     let { action, postId, commentId, body } = ctx.input;
 
     if (action === 'add') {
-      if (!postId) throw new Error('postId is required to add a comment.');
-      if (!body) throw new Error('body is required to add a comment.');
+      if (!postId) throw createApiServiceError('postId is required to add a comment.');
+      if (!body) throw createApiServiceError('body is required to add a comment.');
       let result = await client.addComment(postId, body);
       let comment = result.items[0];
+      if (!comment)
+        throw createApiServiceError('Stack Exchange did not return the saved comment.');
       return {
         output: {
-          commentId: comment?.comment_id,
-          body: comment?.body,
-          creationDate: comment?.creation_date
-            ? new Date(comment.creation_date * 1000).toISOString()
-            : undefined,
+          commentId: comment.comment_id,
+          body: comment.body,
+          creationDate: optionalProviderDate(comment.creation_date),
           success: true
         },
         message: `Comment added to post **#${postId}**.`
@@ -61,17 +62,17 @@ export let manageComment = SlateTool.create(spec, {
     }
 
     if (action === 'edit') {
-      if (!commentId) throw new Error('commentId is required to edit a comment.');
-      if (!body) throw new Error('body is required to edit a comment.');
+      if (!commentId) throw createApiServiceError('commentId is required to edit a comment.');
+      if (!body) throw createApiServiceError('body is required to edit a comment.');
       let result = await client.editComment(commentId, body);
       let comment = result.items[0];
+      if (!comment)
+        throw createApiServiceError('Stack Exchange did not return the saved comment.');
       return {
         output: {
-          commentId: comment?.comment_id,
-          body: comment?.body,
-          creationDate: comment?.creation_date
-            ? new Date(comment.creation_date * 1000).toISOString()
-            : undefined,
+          commentId: comment.comment_id,
+          body: comment.body,
+          creationDate: optionalProviderDate(comment.creation_date),
           success: true
         },
         message: `Comment **#${commentId}** edited.`
@@ -79,7 +80,8 @@ export let manageComment = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!commentId) throw new Error('commentId is required to delete a comment.');
+      if (!commentId)
+        throw createApiServiceError('commentId is required to delete a comment.');
       await client.deleteComment(commentId);
       return {
         output: { success: true },
@@ -87,6 +89,6 @@ export let manageComment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

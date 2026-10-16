@@ -1,6 +1,6 @@
 {
   "name": "@metorial/seat-geek",
-  "description": "Search and discover live events (sports, concerts, theater) across the United States and Canada. Look up detailed event information including dates, venues, performers, ticket price statistics, and popularity scores. Filter events by performer, venue, location, date range, taxonomy, and ticket pricing. Search for performers with details like images, genres, and external links. Look up venues by city, state, or geolocation. Retrieve event and performer recommendations based on similarity seeds. Browse hierarchical event category taxonomies. Note: does not support purchasing or booking tickets — users must be directed to SeatGeek URLs for transactions.",
+  "description": "Search and discover live events (sports, concerts, theater) across the United States and Canada. Look up detailed event information including dates, venues, performers, ticket price statistics, and popularity scores. Filter events by performer, venue, location, date range, taxonomy, and ticket pricing. Search for performers with details like images, genres, and external links. Look up venues by city, state, or geolocation. Retrieve event and performer recommendations based on similarity seeds. Browse hierarchical event category taxonomies. Note: does not support purchasing or booking tickets \u2014 users must be directed to SeatGeek URLs for transactions.",
   "categories": ["e-commerce-and-retail", "web-search"],
   "skills": [
     "search live events",
@@ -12,6 +12,9 @@
     "browse event taxonomies",
     "filter by date range",
     "retrieve ticket price stats",
-    "geolocation-based event search"
+    "geolocation-based event search",
+    "look up venue details",
+    "browse music genres",
+    "filter events with available tickets"
   ]
 }

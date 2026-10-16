@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -63,27 +64,32 @@ export let createContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.ownerId === undefined || ctx.input.companyId === undefined)
+      throw createApiServiceError(
+        'CATS requires ownerId and companyId. Discover them with list_users and search_companies.'
+      );
+
     let body: Record<string, any> = {
       first_name: ctx.input.firstName,
       last_name: ctx.input.lastName
     };
 
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.companyId) body.company_id = ctx.input.companyId;
-    if (ctx.input.emails) {
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.companyId !== undefined) body.company_id = ctx.input.companyId;
+    if (ctx.input.emails !== undefined) {
       body.emails = ctx.input.emails.map(e => ({
         email: e.email,
         is_primary: e.isPrimary ?? false
       }));
     }
-    if (ctx.input.phones) {
+    if (ctx.input.phones !== undefined) {
       body.phones = ctx.input.phones.map(p => ({
         number: p.number,
         extension: p.extension,
-        type: p.type
+        type: p.type === 'cell' ? 'mobile' : p.type
       }));
     }
-    if (ctx.input.address) {
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -91,15 +97,14 @@ export let createContact = SlateTool.create(spec, {
         postal_code: ctx.input.address.postalCode
       };
     }
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
-    if (ctx.input.reportsTo) body.reports_to = ctx.input.reportsTo;
+    if (ctx.input.reportsTo !== undefined) body.reports_to_id = ctx.input.reportsTo;
 
     let result = await client.createContact(body);
-    let contactId =
-      result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let contactId = requiredId(result?.id, 'created record');
 
     return {
       output: {

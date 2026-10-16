@@ -1,0 +1,1276 @@
+{
+  "replacements": {
+    "list_users": "list_records",
+    "list_clients": "list_records",
+    "get_client": "get_record",
+    "create_client": "manage_client_record",
+    "update_client": "manage_client_record",
+    "list_projects": "list_records",
+    "get_project": "get_record",
+    "create_project": "manage_project_record",
+    "update_project": "manage_project_record",
+    "list_services": "list_records",
+    "create_service": "manage_service_record",
+    "update_service": "manage_service_record",
+    "search_time_entries": "list_records",
+    "get_time_entry": "get_record",
+    "create_time_entry": "manage_time_entry_record",
+    "update_time_entry": "manage_time_entry_record",
+    "delete_time_entry": "manage_time_entry_record"
+  },
+  "actions": [
+    {
+      "key": "list_users",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "number",
+                  "description": "Unique identifier of the user"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the user"
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the user"
+                }
+              },
+              "required": ["userId", "name", "email"],
+              "additionalProperties": false
+            },
+            "description": "List of users in the workspace"
+          }
+        },
+        "required": ["users"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "list_clients",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "clientId": {
+                  "type": "number",
+                  "description": "Unique identifier of the client"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the client"
+                },
+                "info": {
+                  "description": "Description or additional information",
+                  "type": "string"
+                },
+                "color": {
+                  "description": "Color code for the client",
+                  "type": "string"
+                },
+                "acronym": {
+                  "description": "Short acronym for the client",
+                  "type": "string"
+                },
+                "active": {
+                  "description": "Whether the client is active",
+                  "type": "boolean"
+                },
+                "billable": {
+                  "description": "Whether the client is billable",
+                  "type": "boolean"
+                },
+                "externalId": {
+                  "description": "External ID for syncing with other systems",
+                  "type": "string"
+                }
+              },
+              "required": ["clientId", "name"],
+              "additionalProperties": false
+            },
+            "description": "List of clients"
+          }
+        },
+        "required": ["clients"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "get_client",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "number",
+            "description": "ID of the client to retrieve"
+          }
+        },
+        "required": ["clientId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "number",
+            "description": "Unique identifier of the client"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the client"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the client",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the client",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the client is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the client is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["clientId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "create_client",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the client"
+          },
+          "info": {
+            "description": "Description or additional information about the client",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the client (e.g., hex color)",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the client",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the client is active (defaults to true)",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the client is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "number",
+            "description": "Unique identifier of the client"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the client"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the client",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the client",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the client is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the client is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["clientId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "update_client",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "number",
+            "description": "ID of the client to update"
+          },
+          "name": {
+            "description": "New name for the client",
+            "type": "string"
+          },
+          "info": {
+            "description": "New description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "New color code for the client",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "New acronym for the client",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the client is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the client is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["clientId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "number",
+            "description": "Unique identifier of the client"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the client"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the client",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the client",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the client is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the client is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["clientId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "list_projects",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "number",
+                  "description": "Unique identifier of the project"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the project"
+                },
+                "info": {
+                  "description": "Description or additional information",
+                  "type": "string"
+                },
+                "color": {
+                  "description": "Color code for the project",
+                  "type": "string"
+                },
+                "acronym": {
+                  "description": "Short acronym for the project",
+                  "type": "string"
+                },
+                "active": {
+                  "description": "Whether the project is active",
+                  "type": "boolean"
+                },
+                "billable": {
+                  "description": "Whether the project is billable",
+                  "type": "boolean"
+                },
+                "clientId": {
+                  "description": "ID of the associated client",
+                  "type": "number"
+                },
+                "externalId": {
+                  "description": "External ID for syncing with other systems",
+                  "type": "string"
+                }
+              },
+              "required": ["projectId", "name"],
+              "additionalProperties": false
+            },
+            "description": "List of projects"
+          }
+        },
+        "required": ["projects"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "get_project",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "ID of the project to retrieve"
+          }
+        },
+        "required": ["projectId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "Unique identifier of the project"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the project"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the project",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the project",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the project is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the project is billable",
+            "type": "boolean"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "create_project",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the project"
+          },
+          "info": {
+            "description": "Description or additional information about the project",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the project (e.g., hex color)",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the project",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the project is active (defaults to true)",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the project is billable",
+            "type": "boolean"
+          },
+          "clientId": {
+            "description": "ID of the client to associate this project with",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "Unique identifier of the project"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the project"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the project",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the project",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the project is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the project is billable",
+            "type": "boolean"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "update_project",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "ID of the project to update"
+          },
+          "name": {
+            "description": "New name for the project",
+            "type": "string"
+          },
+          "info": {
+            "description": "New description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "New color code for the project",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "New acronym for the project",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the project is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the project is billable",
+            "type": "boolean"
+          },
+          "clientId": {
+            "description": "ID of the client to associate this project with",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["projectId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "number",
+            "description": "Unique identifier of the project"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the project"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the project",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the project",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the project is active",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the project is billable",
+            "type": "boolean"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "list_services",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": "number",
+                  "description": "Unique identifier of the service"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the service"
+                },
+                "info": {
+                  "description": "Description or additional information",
+                  "type": "string"
+                },
+                "color": {
+                  "description": "Color code for the service",
+                  "type": "string"
+                },
+                "acronym": {
+                  "description": "Short acronym for the service",
+                  "type": "string"
+                },
+                "active": {
+                  "description": "Whether the service is active",
+                  "type": "boolean"
+                },
+                "externalId": {
+                  "description": "External ID for syncing with other systems",
+                  "type": "string"
+                }
+              },
+              "required": ["serviceId", "name"],
+              "additionalProperties": false
+            },
+            "description": "List of services"
+          }
+        },
+        "required": ["services"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "create_service",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the service"
+          },
+          "info": {
+            "description": "Description or additional information about the service",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the service (e.g., hex color)",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the service",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the service is active (defaults to true)",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "Unique identifier of the service"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the service"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the service",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the service",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the service is active",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["serviceId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "update_service",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "ID of the service to update"
+          },
+          "name": {
+            "description": "New name for the service",
+            "type": "string"
+          },
+          "info": {
+            "description": "New description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "New color code for the service",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "New acronym for the service",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the service is active",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["serviceId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number",
+            "description": "Unique identifier of the service"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the service"
+          },
+          "info": {
+            "description": "Description or additional information",
+            "type": "string"
+          },
+          "color": {
+            "description": "Color code for the service",
+            "type": "string"
+          },
+          "acronym": {
+            "description": "Short acronym for the service",
+            "type": "string"
+          },
+          "active": {
+            "description": "Whether the service is active",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["serviceId", "name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "search_time_entries",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "after": {
+            "description": "Return entries after this date/time (ISO 8601 format)",
+            "type": "string"
+          },
+          "before": {
+            "description": "Return entries before this date/time (ISO 8601 format)",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "Filter by client ID",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "Filter by project ID",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "Filter by service ID",
+            "type": "number"
+          },
+          "externalId": {
+            "description": "Filter by external ID",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timeEntryId": {
+                  "type": "number",
+                  "description": "Unique identifier of the time entry"
+                },
+                "start": {
+                  "type": "string",
+                  "description": "Start time of the entry (ISO 8601 format)"
+                },
+                "end": {
+                  "type": "string",
+                  "description": "End time of the entry (ISO 8601 format)"
+                },
+                "description": {
+                  "description": "Description of the work performed",
+                  "type": "string"
+                },
+                "clientId": {
+                  "description": "ID of the associated client",
+                  "type": "number"
+                },
+                "projectId": {
+                  "description": "ID of the associated project",
+                  "type": "number"
+                },
+                "serviceId": {
+                  "description": "ID of the associated service",
+                  "type": "number"
+                },
+                "userId": {
+                  "description": "ID of the user who created the entry",
+                  "type": "number"
+                },
+                "paid": {
+                  "description": "Whether the time entry has been paid",
+                  "type": "boolean"
+                },
+                "billable": {
+                  "description": "Whether the time entry is billable",
+                  "type": "boolean"
+                },
+                "externalId": {
+                  "description": "External ID for syncing with other systems",
+                  "type": "string"
+                }
+              },
+              "required": ["timeEntryId", "start", "end"],
+              "additionalProperties": false
+            },
+            "description": "List of matching time entries"
+          }
+        },
+        "required": ["timeEntries"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "get_time_entry",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "ID of the time entry to retrieve"
+          }
+        },
+        "required": ["timeEntryId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "Unique identifier of the time entry"
+          },
+          "start": {
+            "type": "string",
+            "description": "Start time of the entry (ISO 8601 format)"
+          },
+          "end": {
+            "type": "string",
+            "description": "End time of the entry (ISO 8601 format)"
+          },
+          "description": {
+            "description": "Description of the work performed",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "ID of the associated project",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "ID of the associated service",
+            "type": "number"
+          },
+          "userId": {
+            "description": "ID of the user who created the entry",
+            "type": "number"
+          },
+          "paid": {
+            "description": "Whether the time entry has been paid",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the time entry is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["timeEntryId", "start", "end"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "create_time_entry",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "Start time (ISO 8601 format, e.g., \"2024-01-15T09:00:00Z\")"
+          },
+          "end": {
+            "type": "string",
+            "description": "End time (ISO 8601 format, e.g., \"2024-01-15T17:00:00Z\")"
+          },
+          "description": {
+            "description": "Description of the work performed",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "ID of the client to associate with",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "ID of the project to associate with",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "ID of the service/activity type",
+            "type": "number"
+          },
+          "userId": {
+            "description": "ID of the user (defaults to authenticated user)",
+            "type": "number"
+          },
+          "paid": {
+            "description": "Whether the time entry has been paid",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the time entry is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["start", "end"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "Unique identifier of the time entry"
+          },
+          "start": {
+            "type": "string",
+            "description": "Start time of the entry (ISO 8601 format)"
+          },
+          "end": {
+            "type": "string",
+            "description": "End time of the entry (ISO 8601 format)"
+          },
+          "description": {
+            "description": "Description of the work performed",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "ID of the associated project",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "ID of the associated service",
+            "type": "number"
+          },
+          "userId": {
+            "description": "ID of the user who created the entry",
+            "type": "number"
+          },
+          "paid": {
+            "description": "Whether the time entry has been paid",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the time entry is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["timeEntryId", "start", "end"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "update_time_entry",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "ID of the time entry to update"
+          },
+          "start": {
+            "description": "New start time (ISO 8601 format)",
+            "type": "string"
+          },
+          "end": {
+            "description": "New end time (ISO 8601 format)",
+            "type": "string"
+          },
+          "description": {
+            "description": "New description of the work performed",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "ID of the client to associate with",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "ID of the project to associate with",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "ID of the service/activity type",
+            "type": "number"
+          },
+          "userId": {
+            "description": "ID of the user",
+            "type": "number"
+          },
+          "paid": {
+            "description": "Whether the time entry has been paid",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the time entry is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["timeEntryId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "Unique identifier of the time entry"
+          },
+          "start": {
+            "type": "string",
+            "description": "Start time of the entry (ISO 8601 format)"
+          },
+          "end": {
+            "type": "string",
+            "description": "End time of the entry (ISO 8601 format)"
+          },
+          "description": {
+            "description": "Description of the work performed",
+            "type": "string"
+          },
+          "clientId": {
+            "description": "ID of the associated client",
+            "type": "number"
+          },
+          "projectId": {
+            "description": "ID of the associated project",
+            "type": "number"
+          },
+          "serviceId": {
+            "description": "ID of the associated service",
+            "type": "number"
+          },
+          "userId": {
+            "description": "ID of the user who created the entry",
+            "type": "number"
+          },
+          "paid": {
+            "description": "Whether the time entry has been paid",
+            "type": "boolean"
+          },
+          "billable": {
+            "description": "Whether the time entry is billable",
+            "type": "boolean"
+          },
+          "externalId": {
+            "description": "External ID for syncing with other systems",
+            "type": "string"
+          }
+        },
+        "required": ["timeEntryId", "start", "end"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "key": "delete_time_entry",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "number",
+            "description": "ID of the time entry to delete"
+          }
+        },
+        "required": ["timeEntryId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the deletion was successful"
+          },
+          "timeEntryId": {
+            "type": "number",
+            "description": "ID of the deleted time entry"
+          }
+        },
+        "required": ["deleted", "timeEntryId"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "clientSourceSha256": "ce5d477daf3f58ff5c1ea055fe338af242b7dc0cfe9a4da0abd7a31cbff5b421",
+  "handlers": {
+    "manage-project.ts": [
+      "d237cb7bdc3600a2b042cd7ddefd086244094638800881e6a8689d3a05623746",
+      "9c3364bd42a38e012059285639752e4b1a5bb89d2fc4ef163ede4561a40a842c",
+      "aa87d4b2a957289545f1c255c2cca9ccdc5d8cf2e5712419aa727f065ec1ea5e",
+      "9b4454da43289a633cb5866ac3dc0b38de6a5526148b6885df89b5d16c31846f"
+    ],
+    "list-users.ts": ["e06de8bd2e3dd8975569010a691788acc1c2f1983cb4fbb09424a4135d3fa907"],
+    "manage-time-entry.ts": [
+      "3236670116c258ffe6bd6e73f9cd3666da7191ccbf15554b9e11e6ab13951bc2",
+      "ace9caef10bb8099a1d03454956aa4098a3475ebfdda36f4420dc182edc33f42",
+      "c792f3f551142aff47d0805824835f630f49f3fa1784aa360bfd046acced99a8",
+      "7845cf1138023f70dc47b41f6acb64d29818fce14e9c9d1807720c94a56dc642",
+      "dfe548fca9d273c3ee12b5f544894ea79b0a810ac1fc222fce3da15d757e9c5c"
+    ],
+    "manage-service.ts": [
+      "df4f84a3f3273180324ed5ce214e813194bb9ea4c0e8ecd8f61653f6c3416b2a",
+      "52cd84e09345dbcc2ba295dc3c736f4462949c2dac8fbdd5d843254dd0276a66",
+      "427c2aef3802d3ccfb3f436043152cbe6cfd243eaa66843b3a09a7c411719d97"
+    ],
+    "manage-client.ts": [
+      "c335dc272f87786f72756a78281b6ee4e3dc52432257c70ecb0fc4134c17dffd",
+      "802722ef20252fe71ebd315e963ba1d34947259c0fd3a81d300d7b40ce165316",
+      "6ef0dac699ff2c3931c826de70e4d827ea529e8cdd69e620a9eaeccc1a94bba9",
+      "5ea1d25df7a69adaeaffcd1427a1087455c10656a79a6bbcf943a8d904b4196c"
+    ]
+  }
+}

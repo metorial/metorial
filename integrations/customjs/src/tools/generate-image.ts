@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExecutionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -69,18 +69,31 @@ export let generateImage = SlateTool.create(spec, {
     let client = new ExecutionClient({ token: ctx.auth.token });
 
     if (ctx.input.mode === 'html_to_png') {
-      if (!ctx.input.html) throw new Error('html is required for html_to_png mode.');
+      if (!ctx.input.html)
+        throw createApiServiceError('html is required for html_to_png mode.');
       let imageBase64 = await client.htmlToPng({ html: ctx.input.html });
+      await ctx.addAttachment({
+        type: 'content',
+        content: Buffer.from(imageBase64, 'base64'),
+        filename: 'image.png',
+        mimeType: 'image/png'
+      });
       return {
         output: { imageBase64 },
         message: `PNG image generated from HTML content.`
       };
     } else {
-      if (!ctx.input.url) throw new Error('url is required for screenshot mode.');
+      if (!ctx.input.url) throw createApiServiceError('url is required for screenshot mode.');
       let imageBase64 = await client.screenshot({
         url: ctx.input.url,
         commands: ctx.input.commands,
         box: ctx.input.cropBox
+      });
+      await ctx.addAttachment({
+        type: 'content',
+        content: Buffer.from(imageBase64, 'base64'),
+        filename: 'image.png',
+        mimeType: 'image/png'
       });
       return {
         output: { imageBase64 },

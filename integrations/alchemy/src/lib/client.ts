@@ -1,152 +1,218 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
+import {
+  blockSchema,
+  hexData,
+  logsSchema,
+  nftSchema,
+  ownedNftsSchema,
+  ownersSchema,
+  parseResponse,
+  pricesSchema,
+  quantity,
+  receiptSchema,
+  tokenBalancesSchema,
+  tokenMetadataSchema,
+  transactionSchema,
+  transfersSchema
+} from './responses';
 
 export class AlchemyClient {
   private api: ReturnType<typeof createAxios>;
-  private notifyApi: ReturnType<typeof createAxios>;
-  private network: string;
+  private nftApi: ReturnType<typeof createAxios>;
+  private pricesApi: ReturnType<typeof createAxios>;
   private token: string;
 
   constructor(config: { token: string; network: string }) {
+    if (!config.token.trim()) throw createApiServiceError('An Alchemy API key is required.');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(config.network)) {
+      throw createApiServiceError('Use an Alchemy network identifier such as eth-mainnet.');
+    }
     this.token = config.token;
-    this.network = config.network;
-
+    let host = `https://${config.network}.g.alchemy.com`;
+    let headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
     this.api = createAxios({
-      baseURL: `https://${config.network}.g.alchemy.com/v2/${config.token}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      baseURL: `${host}/v2/${encodeURIComponent(config.token)}`,
+      headers
     });
-
-    this.notifyApi = createAxios({
-      baseURL: 'https://dashboard.alchemy.com/api',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Alchemy-Token': config.token
-      }
+    this.nftApi = createAxios({
+      baseURL: `${host}/nft/v3/${encodeURIComponent(config.token)}`,
+      headers,
+      paramsSerializer: { indexes: null }
+    });
+    this.pricesApi = createAxios({
+      baseURL: 'https://api.g.alchemy.com/prices/v1',
+      headers: { ...headers, Authorization: `Bearer ${config.token}` }
     });
   }
 
-  // -- JSON-RPC Helper --
-
-  private async jsonRpc<T>(method: string, params: any[] = []): Promise<T> {
-    let response = await this.api.post('', {
-      jsonrpc: '2.0',
-      id: 1,
-      method,
-      params
-    });
-    if (response.data.error) {
-      throw new Error(
-        `JSON-RPC error: ${response.data.error.message || JSON.stringify(response.data.error)}`
+  private redact(value: unknown): unknown {
+    if (typeof value === 'string') {
+      return value
+        .replaceAll(this.token, '[redacted]')
+        .replaceAll(encodeURIComponent(this.token), '[redacted]')
+        .replace(
+          /([?&](?:api[-_]?key|access[-_]?token|token|secret|authorization)=)[^&#\s]*/gi,
+          '$1[redacted]'
+        )
+        .replace(/\bBearer\s+[^\s"'<>]+/gi, 'Bearer [redacted]');
+    }
+    if (Array.isArray(value)) return value.map(item => this.redact(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          /^(?:api[-_]?key|access[-_]?token|authorization|secret|password)$/i.test(key)
+            ? '[redacted]'
+            : this.redact(item)
+        ])
       );
     }
-    return response.data.result as T;
+    return value;
   }
 
-  // -- Node API (JSON-RPC) --
-
-  async getBalance(address: string, blockTag: string = 'latest'): Promise<string> {
-    return this.jsonRpc<string>('eth_getBalance', [address, blockTag]);
+  private async request<T>(
+    operation: string,
+    schema: z.ZodType<T>,
+    run: () => Promise<{ data: unknown }>
+  ): Promise<T> {
+    try {
+      let response = await run();
+      return parseResponse(schema, this.redact(response.data), operation);
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Alchemy',
+        reason: 'alchemy_request_failed',
+        operation,
+        extractResponse: (input, helpers) => {
+          let response = helpers.getResponseWithBody(input);
+          return response ? { ...response, data: this.redact(response.data) } : undefined;
+        },
+        extractMessage: (input, helpers) => {
+          let response = helpers.getResponseWithBody(input);
+          return String(
+            this.redact(
+              helpers.extractMessage(
+                response
+                  ? { response: { ...response, data: this.redact(response.data) } }
+                  : input
+              )
+            )
+          );
+        },
+        parent: {}
+      });
+    }
   }
 
-  async getBlockNumber(): Promise<string> {
-    return this.jsonRpc<string>('eth_blockNumber');
+  private async jsonRpc<T>(
+    method: string,
+    params: unknown[],
+    schema: z.ZodType<T>
+  ): Promise<T> {
+    let envelope = await this.request(
+      method,
+      z
+        .object({ result: z.unknown().optional(), error: z.unknown().optional() })
+        .passthrough(),
+      () => this.api.post('', { jsonrpc: '2.0', id: 1, method, params })
+    );
+    if (envelope.error !== undefined && envelope.error !== null) {
+      throw buildApiServiceError(
+        { response: { data: envelope.error } },
+        {
+          providerLabel: 'Alchemy',
+          reason: 'alchemy_rpc_failed',
+          operation: method,
+          parent: {}
+        }
+      );
+    }
+    return parseResponse(schema, envelope.result, method);
   }
 
-  async getBlockByNumber(
-    blockNumber: string,
-    fullTransactions: boolean = false
-  ): Promise<any> {
-    return this.jsonRpc<any>('eth_getBlockByNumber', [blockNumber, fullTransactions]);
+  getBalance(address: string, blockTag = 'latest') {
+    return this.jsonRpc('eth_getBalance', [address, blockTag], quantity);
   }
-
-  async getBlockByHash(blockHash: string, fullTransactions: boolean = false): Promise<any> {
-    return this.jsonRpc<any>('eth_getBlockByHash', [blockHash, fullTransactions]);
+  getBlockNumber() {
+    return this.jsonRpc('eth_blockNumber', [], quantity);
   }
-
-  async getTransactionByHash(txHash: string): Promise<any> {
-    return this.jsonRpc<any>('eth_getTransactionByHash', [txHash]);
+  getChainId() {
+    return this.jsonRpc('eth_chainId', [], quantity);
   }
-
-  async getTransactionReceipt(txHash: string): Promise<any> {
-    return this.jsonRpc<any>('eth_getTransactionReceipt', [txHash]);
+  getClientVersion() {
+    return this.jsonRpc('web3_clientVersion', [], z.string());
   }
-
-  async call(
+  getBlockByNumber(blockNumber: string, fullTransactions = false) {
+    return this.jsonRpc('eth_getBlockByNumber', [blockNumber, fullTransactions], blockSchema);
+  }
+  getBlockByHash(blockHash: string, fullTransactions = false) {
+    return this.jsonRpc('eth_getBlockByHash', [blockHash, fullTransactions], blockSchema);
+  }
+  getTransactionByHash(hash: string) {
+    return this.jsonRpc('eth_getTransactionByHash', [hash], transactionSchema);
+  }
+  getTransactionReceipt(hash: string) {
+    return this.jsonRpc('eth_getTransactionReceipt', [hash], receiptSchema);
+  }
+  call(
     transaction: { to: string; data?: string; from?: string; value?: string; gas?: string },
-    blockTag: string = 'latest'
-  ): Promise<string> {
-    return this.jsonRpc<string>('eth_call', [transaction, blockTag]);
+    blockTag = 'latest'
+  ) {
+    return this.jsonRpc('eth_call', [transaction, blockTag], hexData);
   }
-
-  async estimateGas(transaction: {
+  estimateGas(transaction: {
     to?: string;
     from?: string;
     data?: string;
     value?: string;
-  }): Promise<string> {
-    return this.jsonRpc<string>('eth_estimateGas', [transaction]);
+    gas?: string;
+  }) {
+    return this.jsonRpc('eth_estimateGas', [transaction], quantity);
   }
-
-  async sendRawTransaction(signedTx: string): Promise<string> {
-    return this.jsonRpc<string>('eth_sendRawTransaction', [signedTx]);
+  sendRawTransaction(signedTx: string) {
+    return this.jsonRpc(
+      'eth_sendRawTransaction',
+      [signedTx],
+      z.string().regex(/^0x[0-9a-f]{64}$/i)
+    );
   }
-
-  async getTransactionCount(address: string, blockTag: string = 'latest'): Promise<string> {
-    return this.jsonRpc<string>('eth_getTransactionCount', [address, blockTag]);
+  getTransactionCount(address: string, blockTag = 'latest') {
+    return this.jsonRpc('eth_getTransactionCount', [address, blockTag], quantity);
   }
-
-  async getGasPrice(): Promise<string> {
-    return this.jsonRpc<string>('eth_gasPrice');
+  getGasPrice() {
+    return this.jsonRpc('eth_gasPrice', [], quantity);
   }
-
-  async getLogs(filter: {
+  getLogs(filter: {
     fromBlock?: string;
     toBlock?: string;
     address?: string | string[];
     topics?: (string | string[] | null)[];
-  }): Promise<any[]> {
-    return this.jsonRpc<any[]>('eth_getLogs', [filter]);
+  }) {
+    return this.jsonRpc('eth_getLogs', [filter], logsSchema);
   }
-
-  // -- Token API (Alchemy enhanced JSON-RPC) --
-
-  async getTokenBalances(
-    address: string,
-    tokenAddresses?: string[],
-    pageKey?: string
-  ): Promise<any> {
-    let params: any[] = [address];
-    if (tokenAddresses && tokenAddresses.length > 0) {
-      params.push(tokenAddresses);
-    } else {
-      params.push('erc20');
-    }
-    if (pageKey) {
-      params.push({ pageKey });
-    }
-    return this.jsonRpc<any>('alchemy_getTokenBalances', params);
+  getTokenBalances(address: string, tokenAddresses?: string[], pageKey?: string) {
+    return this.jsonRpc(
+      'alchemy_getTokenBalances',
+      [
+        address,
+        tokenAddresses?.length ? tokenAddresses : 'erc20',
+        ...(pageKey ? [{ pageKey }] : [])
+      ],
+      tokenBalancesSchema
+    );
   }
-
-  async getTokenMetadata(contractAddress: string): Promise<any> {
-    return this.jsonRpc<any>('alchemy_getTokenMetadata', [contractAddress]);
+  getTokenMetadata(contractAddress: string) {
+    return this.jsonRpc('alchemy_getTokenMetadata', [contractAddress], tokenMetadataSchema);
   }
-
-  async getTokenAllowance(
-    contractAddress: string,
-    owner: string,
-    spender: string
-  ): Promise<string> {
-    return this.jsonRpc<string>('alchemy_getTokenAllowance', [
-      { contract: contractAddress, owner, spender }
-    ]);
+  getTokenAllowance(contract: string, owner: string, spender: string) {
+    return this.jsonRpc(
+      'alchemy_getTokenAllowance',
+      [{ contract, owner, spender }],
+      z.string().regex(/^\d+$/)
+    );
   }
-
-  // -- Transfers API --
-
-  async getAssetTransfers(params: {
+  getAssetTransfers(params: {
     fromBlock?: string;
     toBlock?: string;
     fromAddress?: string;
@@ -158,138 +224,65 @@ export class AlchemyClient {
     pageKey?: string;
     withMetadata?: boolean;
     excludeZeroValue?: boolean;
-  }): Promise<any> {
-    return this.jsonRpc<any>('alchemy_getAssetTransfers', [params]);
+  }) {
+    return this.jsonRpc('alchemy_getAssetTransfers', [params], transfersSchema);
   }
-
-  // -- NFT API v3 (REST) --
-
-  private getNftApiBaseUrl(): string {
-    return `https://${this.network}.g.alchemy.com/nft/v3/${this.token}`;
-  }
-
-  async getNFTsForOwner(params: {
+  getNFTsForOwner(params: {
     owner: string;
     contractAddresses?: string[];
     pageKey?: string;
     pageSize?: number;
     withMetadata?: boolean;
     excludeFilters?: string[];
-    includeFilters?: string[];
     orderBy?: string;
-  }): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let queryParams: any = { owner: params.owner, withMetadata: params.withMetadata ?? true };
-    if (params.contractAddresses)
-      queryParams['contractAddresses[]'] = params.contractAddresses;
-    if (params.pageKey) queryParams.pageKey = params.pageKey;
-    if (params.pageSize) queryParams.pageSize = params.pageSize;
-    if (params.excludeFilters) queryParams['excludeFilters[]'] = params.excludeFilters;
-    if (params.includeFilters) queryParams['includeFilters[]'] = params.includeFilters;
-    if (params.orderBy) queryParams.orderBy = params.orderBy;
-    let response = await nftApi.get('/getNFTsForOwner', { params: queryParams });
-    return response.data;
+  }) {
+    let { contractAddresses, excludeFilters, ...rest } = params;
+    return this.request('getNFTsForOwner', ownedNftsSchema, () =>
+      this.nftApi.get('/getNFTsForOwner', {
+        params: {
+          ...rest,
+          withMetadata: params.withMetadata ?? true,
+          'contractAddresses[]': contractAddresses,
+          'excludeFilters[]': excludeFilters
+        }
+      })
+    );
   }
-
-  async getNFTMetadata(
-    contractAddress: string,
-    tokenId: string,
-    tokenType?: string
-  ): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let queryParams: any = { contractAddress, tokenId };
-    if (tokenType) queryParams.tokenType = tokenType;
-    let response = await nftApi.get('/getNFTMetadata', { params: queryParams });
-    return response.data;
+  getNFTMetadata(contractAddress: string, tokenId: string) {
+    return this.request('getNFTMetadata', nftSchema, () =>
+      this.nftApi.get('/getNFTMetadata', { params: { contractAddress, tokenId } })
+    );
   }
-
-  async getOwnersForNFT(
-    contractAddress: string,
-    tokenId: string,
-    pageKey?: string
-  ): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let queryParams: any = { contractAddress, tokenId };
-    if (pageKey) queryParams.pageKey = pageKey;
-    let response = await nftApi.get('/getOwnersForNFT', { params: queryParams });
-    return response.data;
+  getOwnersForNFT(contractAddress: string, tokenId: string, pageKey?: string) {
+    return this.request('getOwnersForNFT', ownersSchema, () =>
+      this.nftApi.get('/getOwnersForNFT', { params: { contractAddress, tokenId, pageKey } })
+    );
   }
-
-  async getOwnersForContract(
+  getOwnersForContract(
     contractAddress: string,
     withTokenBalances?: boolean,
     pageKey?: string
-  ): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let queryParams: any = { contractAddress };
-    if (withTokenBalances !== undefined) queryParams.withTokenBalances = withTokenBalances;
-    if (pageKey) queryParams.pageKey = pageKey;
-    let response = await nftApi.get('/getOwnersForContract', { params: queryParams });
-    return response.data;
+  ) {
+    return this.request('getOwnersForContract', ownersSchema, () =>
+      this.nftApi.get('/getOwnersForContract', {
+        params: { contractAddress, withTokenBalances, pageKey }
+      })
+    );
+  }
+  async isSpamContract(contractAddress: string) {
+    let result = await this.request(
+      'isSpamContract',
+      z.union([z.boolean(), z.object({ isSpamContract: z.boolean() }).passthrough()]),
+      () => this.nftApi.get('/isSpamContract', { params: { contractAddress } })
+    );
+    return typeof result === 'boolean' ? result : result.isSpamContract;
   }
 
-  async getContractMetadata(contractAddress: string): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let response = await nftApi.get('/getContractMetadata', { params: { contractAddress } });
-    return response.data;
+  getTokenPrices(params: { addresses: { network: string; address: string }[] }) {
+    return this.request('token prices', pricesSchema, () =>
+      this.pricesApi.post('/tokens/by-address', params)
+    );
   }
-
-  async getNFTSales(params: {
-    contractAddress?: string;
-    tokenId?: string;
-    fromBlock?: number;
-    toBlock?: number | string;
-    order?: string;
-    marketplace?: string;
-    buyerAddress?: string;
-    sellerAddress?: string;
-    pageKey?: string;
-    limit?: number;
-  }): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let response = await nftApi.get('/getNFTSales', { params });
-    return response.data;
-  }
-
-  async isSpamContract(contractAddress: string): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let response = await nftApi.get('/isSpamContract', { params: { contractAddress } });
-    return response.data;
-  }
-
-  async getNFTsForContract(
-    contractAddress: string,
-    params?: {
-      startToken?: string;
-      limit?: number;
-      withMetadata?: boolean;
-    }
-  ): Promise<any> {
-    let nftApi = createAxios({ baseURL: this.getNftApiBaseUrl() });
-    let queryParams: any = { contractAddress, ...params };
-    let response = await nftApi.get('/getNFTsForContract', { params: queryParams });
-    return response.data;
-  }
-
-  // -- Prices API --
-
-  async getTokenPrices(params: {
-    addresses: { network: string; address: string }[];
-  }): Promise<any> {
-    let pricesApi = createAxios({
-      baseURL: 'https://api.g.alchemy.com/prices/v1',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.token}`
-      }
-    });
-    let response = await pricesApi.post('/tokens/by-address', {
-      addresses: params.addresses
-    });
-    return response.data;
-  }
-
-  // -- Transaction Simulation --
 
   async simulateExecution(params: {
     from: string;
@@ -297,67 +290,22 @@ export class AlchemyClient {
     value?: string;
     data?: string;
   }): Promise<any> {
-    return this.jsonRpc<any>('alchemy_simulateExecution', [params]);
+    return this.jsonRpc(
+      'alchemy_simulateExecution',
+      [params],
+      z.record(z.string(), z.unknown())
+    );
   }
-
   async simulateAssetChanges(params: {
     from: string;
     to: string;
     value?: string;
     data?: string;
   }): Promise<any> {
-    return this.jsonRpc<any>('alchemy_simulateAssetChanges', [params]);
-  }
-
-  // -- Notify API (Webhooks) --
-
-  async createWebhook(params: {
-    webhookType: string;
-    webhookUrl: string;
-    network?: string;
-    addresses?: string[];
-    nftFilters?: { contractAddress: string; tokenId?: string }[];
-    graphqlQuery?: string;
-  }): Promise<any> {
-    let body: any = {
-      webhook_type: params.webhookType,
-      webhook_url: params.webhookUrl
-    };
-    if (params.network) body.network = params.network;
-    if (params.addresses) body.addresses = params.addresses;
-    if (params.nftFilters)
-      body.nft_filters = params.nftFilters.map(f => ({
-        contract_address: f.contractAddress,
-        token_id: f.tokenId
-      }));
-    if (params.graphqlQuery) body.graphql_query = params.graphqlQuery;
-
-    let response = await this.notifyApi.post('/create-webhook', body);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string): Promise<any> {
-    let response = await this.notifyApi.delete('/delete-webhook', {
-      data: { webhook_id: webhookId }
-    });
-    return response.data;
-  }
-
-  async updateWebhookAddresses(params: {
-    webhookId: string;
-    addressesToAdd?: string[];
-    addressesToRemove?: string[];
-  }): Promise<any> {
-    let response = await this.notifyApi.patch('/update-webhook-addresses', {
-      webhook_id: params.webhookId,
-      addresses_to_add: params.addressesToAdd || [],
-      addresses_to_remove: params.addressesToRemove || []
-    });
-    return response.data;
-  }
-
-  async getWebhooks(): Promise<any> {
-    let response = await this.notifyApi.get('/team-webhooks');
-    return response.data;
+    return this.jsonRpc(
+      'alchemy_simulateAssetChanges',
+      [params],
+      z.record(z.string(), z.unknown())
+    );
   }
 }

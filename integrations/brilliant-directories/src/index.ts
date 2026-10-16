@@ -23,6 +23,8 @@ import {
   getPost,
   getReview,
   getWidget,
+  getWritableFields,
+  listRecords,
   matchLead,
   searchCategories,
   searchMembers,
@@ -37,11 +39,15 @@ import {
   updatePost,
   updateReview,
   updateWidget,
-  verifyMemberLogin
+  verifyMemberLogin,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
+    listRecords,
+    getWritableFields,
     getMember,
     createMember,
     updateMember,

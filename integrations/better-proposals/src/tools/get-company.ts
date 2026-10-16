@@ -30,7 +30,7 @@ export let getCompany = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         company: result.data
       },
       message: `Retrieved company **${ctx.input.companyId}**.`

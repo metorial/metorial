@@ -18,6 +18,7 @@ export let getOrder = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       orderId: z.string(),
       customerId: z.string().optional(),
       customerFirstName: z.string().optional(),
@@ -39,6 +40,7 @@ export let getOrder = SlateTool.create(spec, {
       abandoned: z.any().optional(),
       usn: z.string().optional(),
       desiredDeliveryDate: z.string().optional(),
+      desiredDeliveryWindow: z.record(z.string(), z.unknown()).optional(),
       noteCustomer: z.string().optional(),
       noteAdministrator: z.string().optional(),
       dateAdded: z.string().optional(),
@@ -51,34 +53,45 @@ export let getOrder = SlateTool.create(spec, {
 
     let res = await client.getOrder(ctx.input.orderId);
     let o = res.data;
+    let deliveryDate = o.attributes.desired_delivery_date;
 
     return {
       output: {
+        raw: res,
         orderId: o.id,
-        customerId: o.attributes.customer_id,
-        customerFirstName: o.attributes.customer_first_name,
-        customerLastName: o.attributes.customer_last_name,
-        customerEmail: o.attributes.customer_email,
-        customerIp: o.attributes.customer_ip,
+        customerId:
+          o.attributes.customer_id == null ? undefined : String(o.attributes.customer_id),
+        customerFirstName: o.attributes.customer_first_name ?? undefined,
+        customerLastName: o.attributes.customer_last_name ?? undefined,
+        customerEmail: o.attributes.customer_email ?? undefined,
+        customerIp:
+          o.attributes.customer_ip == null ? undefined : String(o.attributes.customer_ip),
         priceProductsSubtotal: o.attributes.price_products_subtotal,
         priceSubtotal: o.attributes.price_subtotal,
         priceTotal: o.attributes.price_total,
         quantity: o.attributes.quantity,
         weight: o.attributes.weight,
-        status: o.attributes.status,
-        statusFulfillment: o.attributes.status_fulfillment,
-        currency: o.attributes.currency,
+        status: o.attributes.status ?? undefined,
+        statusFulfillment: o.attributes.status_fulfillment ?? undefined,
+        currency: o.attributes.currency ?? undefined,
         vatIncluded: o.attributes.vat_included,
         emailSent: o.attributes.email_sent,
-        invoiceNumber: o.attributes.invoice_number,
-        invoiceDate: o.attributes.invoice_date,
+        invoiceNumber:
+          o.attributes.invoice_number == null
+            ? undefined
+            : String(o.attributes.invoice_number),
+        invoiceDate: o.attributes.invoice_date ?? undefined,
         abandoned: o.attributes.abandoned,
-        usn: o.attributes.usn,
-        desiredDeliveryDate: o.attributes.desired_delivery_date,
-        noteCustomer: o.attributes.note_customer,
-        noteAdministrator: o.attributes.note_administrator,
-        dateAdded: o.attributes.date_added,
-        updatedAt: o.attributes.updated_at,
+        usn: o.attributes.usn ?? undefined,
+        desiredDeliveryDate: typeof deliveryDate === 'string' ? deliveryDate : undefined,
+        desiredDeliveryWindow:
+          deliveryDate && typeof deliveryDate === 'object' && !Array.isArray(deliveryDate)
+            ? deliveryDate
+            : undefined,
+        noteCustomer: o.attributes.note_customer ?? undefined,
+        noteAdministrator: o.attributes.note_administrator ?? undefined,
+        dateAdded: o.attributes.date_added ?? undefined,
+        updatedAt: o.attributes.updated_at ?? undefined,
         relationships: o.relationships
       },
       message: `Retrieved order **#${o.id}** — status: **${o.attributes.status}**, total: **${o.attributes.price_total} ${o.attributes.currency || ''}**.`

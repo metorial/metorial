@@ -66,7 +66,7 @@ export let listThreads = SlateTool.create(spec, {
       ctx.input.after
     );
 
-    let threads = (res.edges || []).map((edge: any) => ({
+    let threads = res.edges.map((edge: any) => ({
       threadId: edge.node.id,
       title: edge.node.title,
       status: edge.node.status,
@@ -78,8 +78,8 @@ export let listThreads = SlateTool.create(spec, {
     return {
       output: {
         threads,
-        hasNextPage: res.pageInfo?.hasNextPage ?? false,
-        endCursor: res.pageInfo?.endCursor ?? null
+        hasNextPage: res.pageInfo.hasNextPage,
+        endCursor: res.pageInfo.endCursor
       },
       message: `Returned **${threads.length}** threads`
     };

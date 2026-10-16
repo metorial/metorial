@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { type ActionButton, Client } from '../lib/client';
+import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let actionButtonSchema = z.object({
@@ -33,11 +33,13 @@ export let publishMessage = SlateTool.create(spec, {
     'Priority levels: 1 (min) = silent, 2 (low) = no sound, 3 (default) = standard, 4 (high) = prominent, 5 (max/urgent) = very prominent with pop-over.',
     'Tags can include emoji shortcodes (e.g., "warning", "white_check_mark") which are auto-converted to emojis on supported clients.',
     'Delay supports durations (e.g., "30m", "2h"), Unix timestamps, or natural language (e.g., "tomorrow, 10am"). Minimum 10 seconds, maximum 3 days.',
-    'Up to 3 action buttons can be added per notification.'
+    'Up to 3 action buttons can be added per notification.',
+    'Reuse sequenceId to update the same notification. Without one, retain the first returned messageId for update_notification.',
+    'Scheduled delivery requires caching; cacheDisabled cannot be combined with delay.'
   ],
   constraints: [
     'Maximum 3 action buttons per notification.',
-    'Scheduled delivery delay must be between 10 seconds and 3 days.',
+    'Scheduled delivery defaults to a minimum of 10 seconds and maximum of 3 days; self-hosted servers can configure the limit.',
     'Phone calls require a verified phone number and ntfy Pro.'
   ],
   tags: {
@@ -84,7 +86,22 @@ export let publishMessage = SlateTool.create(spec, {
         .describe(
           'Schedule delivery for later (e.g., "30m", "2h", "tomorrow, 10am", or Unix timestamp)'
         ),
-      email: z.string().optional().describe('Email address to forward the notification to'),
+      timezone: z
+        .string()
+        .optional()
+        .describe(
+          'IANA timezone for natural-language delay values, such as America/New_York; defaults to the server timezone'
+        ),
+      sequenceId: z
+        .string()
+        .optional()
+        .describe('Optional stable sequence identifier for later updates, clears, or deletes'),
+      email: z
+        .string()
+        .optional()
+        .describe(
+          'Email address to forward the notification to, or "yes" for the primary verified address'
+        ),
       call: z
         .string()
         .optional()
@@ -103,6 +120,10 @@ export let publishMessage = SlateTool.create(spec, {
   .output(
     z.object({
       messageId: z.string().describe('Unique ID of the published message'),
+      sequenceId: z
+        .string()
+        .optional()
+        .describe('Sequence identifier, when returned by the server'),
       time: z.number().describe('Unix timestamp when the message was published'),
       topic: z.string().describe('Topic the message was published to'),
       title: z.string().optional().describe('Notification title'),
@@ -132,9 +153,11 @@ export let publishMessage = SlateTool.create(spec, {
       attachUrl: ctx.input.attachUrl,
       filename: ctx.input.filename,
       delay: ctx.input.delay,
+      timezone: ctx.input.timezone,
+      sequenceId: ctx.input.sequenceId,
       email: ctx.input.email,
       call: ctx.input.call,
-      actions: ctx.input.actions as ActionButton[] | undefined,
+      actions: ctx.input.actions,
       cacheDisabled: ctx.input.cacheDisabled,
       firebaseDisabled: ctx.input.firebaseDisabled
     });
@@ -147,6 +170,7 @@ export let publishMessage = SlateTool.create(spec, {
     return {
       output: {
         messageId: result.messageId,
+        sequenceId: result.sequenceId,
         time: result.time,
         topic: result.topic,
         title: result.title,

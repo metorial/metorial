@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTag = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let createTag = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       name: z.string().describe('Name of the tag'),
       hexColor: z.string().describe('Hex color code for the tag (e.g. "#38bdf8")')
     })
@@ -29,7 +31,7 @@ export let createTag = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.createTag({

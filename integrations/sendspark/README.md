@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Sendspark
 
-Create, manage, and personalize AI-generated dynamic video campaigns for sales outreach and marketing. Add prospects individually or in bulk to automatically generate personalized videos with viewer-specific details like names, companies, and website screenshots. Retrieve campaign details, look up prospect video status and share URLs, and track video engagement through webhooks for events like video viewed, played, watched percentage, liked, and CTA clicked.
+Create, manage, and personalize AI-generated dynamic video campaigns for sales outreach and marketing. Add prospects individually or in bulk to automatically generate personalized videos with viewer-specific details like names, companies, and website screenshots. Discover connected workspaces, retrieve campaign details, look up prospect video status and share URLs, configure outbound prospect webhooks, and read or download existing video transcripts. Adjust campaign fallback settings and retrieve supported personalization languages.
 
 ## License
 

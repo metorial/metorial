@@ -8,16 +8,19 @@ import {
   exportRecord,
   getFileUrl,
   getRecord,
+  getSheetSchema,
   listActionButtons,
   listRecords,
   lockRecord,
-  updateRecord
+  updateRecord,
+  uploadFile
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     listRecords,
     getRecord,
+    getSheetSchema,
     createRecord,
     updateRecord,
     deleteRecord,
@@ -26,7 +29,8 @@ export let provider = Slate.create({
     executeActionButton,
     listActionButtons,
     exportRecord,
-    getFileUrl
+    getFileUrl,
+    uploadFile
   ],
   triggers: []
 });

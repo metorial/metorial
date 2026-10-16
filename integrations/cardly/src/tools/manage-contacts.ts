@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CardlyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contactOutputSchema = z.object({
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete contact record returned by Cardly'),
   contactId: z.string().describe('Unique contact ID'),
   externalId: z.string().optional().describe('External/CRM ID'),
   firstName: z.string().describe('First name'),
-  lastName: z.string().describe('Last name'),
+  lastName: z.string().optional().describe('Last name, when supplied to Cardly'),
   email: z.string().optional().describe('Email address'),
   company: z.string().optional().describe('Company name'),
   address: z.string().describe('Street address'),
@@ -17,15 +21,16 @@ let contactOutputSchema = z.object({
   country: z.string().describe('2-character ISO country code'),
   postcode: z.string().optional().describe('Postal/ZIP code'),
   customFields: z.record(z.string(), z.unknown()).optional().describe('Custom field values'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
+  createdAt: z.string().optional().describe('Creation timestamp, when returned by Cardly'),
+  updatedAt: z.string().optional().describe('Last update timestamp, when returned by Cardly')
 });
 
 let mapContact = (c: Record<string, unknown>) => ({
+  raw: c.raw as Record<string, unknown> | undefined,
   contactId: c.id as string,
   externalId: c.externalId as string | undefined,
   firstName: c.firstName as string,
-  lastName: c.lastName as string,
+  lastName: c.lastName as string | undefined,
   email: c.email as string | undefined,
   company: c.company as string | undefined,
   address: c.address as string,
@@ -35,9 +40,12 @@ let mapContact = (c: Record<string, unknown>) => ({
   country: c.country as string,
   postcode: c.postcode as string | undefined,
   customFields: c.customFields as Record<string, unknown> | undefined,
-  createdAt: c.createdAt as string,
-  updatedAt: c.updatedAt as string
+  createdAt: c.createdAt as string | undefined,
+  updatedAt: c.updatedAt as string | undefined
 });
+
+let contactName = (contact: { firstName: string; lastName?: string }) =>
+  [contact.firstName, contact.lastName].filter(Boolean).join(' ');
 
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
@@ -96,7 +104,12 @@ export let findContact = SlateTool.create(spec, {
     z.object({
       listId: z.string().describe('UUID of the contact list to search'),
       email: z.string().optional().describe('Email address to search for'),
-      externalId: z.string().optional().describe('External/CRM ID to search for')
+      externalId: z
+        .string()
+        .optional()
+        .describe(
+          'External/CRM ID to search for; takes precedence when email is also supplied'
+        )
     })
   )
   .output(contactOutputSchema)
@@ -110,7 +123,7 @@ export let findContact = SlateTool.create(spec, {
 
     return {
       output: mapContact(contact as unknown as Record<string, unknown>),
-      message: `Found contact **${contact.firstName} ${contact.lastName}** (${contact.id}).`
+      message: `Found contact **${contactName(contact)}** (${contact.id}).`
     };
   })
   .build();
@@ -141,7 +154,7 @@ export let createContact = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Custom field values keyed by field slug')
+        .describe('Custom field values keyed by field code from list_contact_lists')
     })
   )
   .output(contactOutputSchema)
@@ -153,7 +166,7 @@ export let createContact = SlateTool.create(spec, {
 
     return {
       output: mapContact(contact as unknown as Record<string, unknown>),
-      message: `Contact **${contact.firstName} ${contact.lastName}** created with ID **${contact.id}**.`
+      message: `Contact **${contactName(contact)}** created with ID **${contact.id}**.`
     };
   })
   .build();
@@ -193,11 +206,14 @@ export let editContact = SlateTool.create(spec, {
     let client = new CardlyClient({ token: ctx.auth.token });
 
     let { listId, contactId, ...updateData } = ctx.input;
+    if (!Object.values(updateData).some(value => value !== undefined)) {
+      throw createApiServiceError('Provide at least one contact field to update.');
+    }
     let contact = await client.editContact(listId, contactId, updateData);
 
     return {
       output: mapContact(contact as unknown as Record<string, unknown>),
-      message: `Contact **${contact.firstName} ${contact.lastName}** (${contact.id}) updated successfully.`
+      message: `Contact **${contactName(contact)}** (${contact.id}) updated successfully.`
     };
   })
   .build();
@@ -234,7 +250,7 @@ export let syncContact = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Custom field values keyed by field slug')
+        .describe('Custom field values keyed by field code from list_contact_lists')
     })
   )
   .output(contactOutputSchema)
@@ -246,7 +262,7 @@ export let syncContact = SlateTool.create(spec, {
 
     return {
       output: mapContact(contact as unknown as Record<string, unknown>),
-      message: `Contact **${contact.firstName} ${contact.lastName}** synced successfully (${contact.id}).`
+      message: `Contact **${contactName(contact)}** synced successfully (${contact.id}).`
     };
   })
   .build();
@@ -294,6 +310,30 @@ export let deleteContact = SlateTool.create(spec, {
     return {
       output: { deleted: true },
       message: `Contact deleted from list **${ctx.input.listId}** successfully.`
+    };
+  })
+  .build();
+
+export let getContact = SlateTool.create(spec, {
+  name: 'Get Contact',
+  key: 'get_contact',
+  description:
+    'Retrieve a contact by its ID within a contact list. Use list_contact_lists and list_contacts to discover IDs.',
+  tags: { destructive: false, readOnly: true }
+})
+  .input(
+    z.object({
+      listId: z.string().describe('Contact list ID from list_contact_lists'),
+      contactId: z.string().describe('Contact ID from list_contacts')
+    })
+  )
+  .output(contactOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = new CardlyClient({ token: ctx.auth.token });
+    let contact = await client.getContact(ctx.input.listId, ctx.input.contactId);
+    return {
+      output: mapContact(contact as unknown as Record<string, unknown>),
+      message: `Retrieved contact **${contact.id}**.`
     };
   })
   .build();

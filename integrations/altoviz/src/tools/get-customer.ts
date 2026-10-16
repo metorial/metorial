@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,6 +32,7 @@ export let getCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       customerId: z.number().describe('Altoviz customer ID'),
       number: z.string().nullable().optional(),
       companyName: z.string().nullable().optional(),
@@ -80,15 +81,21 @@ export let getCustomer = SlateTool.create(spec, {
     } else if (ctx.input.email) {
       let results = await client.getCustomerByEmail(ctx.input.email);
       if (!results || results.length === 0) {
-        throw new Error(`No customer found with email: ${ctx.input.email}`);
+        throw createApiServiceError(`No customer found with email: ${ctx.input.email}`);
+      }
+      if (results.length > 1) {
+        throw createApiServiceError(
+          'More than one customer matches this email. Use list_customers to select an exact customerId.'
+        );
       }
       customer = results[0];
     } else {
-      throw new Error('One of customerId, internalId, or email must be provided');
+      throw createApiServiceError('One of customerId, internalId, or email must be provided');
     }
 
     return {
       output: {
+        raw: customer,
         customerId: customer.id,
         number: customer.number,
         companyName: customer.companyName,

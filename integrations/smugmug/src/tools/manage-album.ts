@@ -85,15 +85,15 @@ export let createAlbumTool = SlateTool.create(spec, {
 
     return {
       output: {
-        albumKey: album?.AlbumKey || '',
-        albumUri: album?.Uri || '',
-        name: album?.Name || ctx.input.name,
-        urlName: album?.UrlName || undefined,
-        webUri: album?.WebUri || undefined,
-        privacy: album?.Privacy || undefined,
+        albumKey: album?.AlbumKey,
+        albumUri: album?.Uri,
+        name: album?.Name,
+        urlName: album?.UrlName ?? undefined,
+        webUri: album?.WebUri ?? undefined,
+        privacy: album?.Privacy ?? undefined,
         nodeId
       },
-      message: `Created album **${album?.Name || ctx.input.name}**`
+      message: `Created album **${album?.Name}**`
     };
   })
   .build();
@@ -166,13 +166,13 @@ export let updateAlbumTool = SlateTool.create(spec, {
 
     return {
       output: {
-        albumKey: album?.AlbumKey || ctx.input.albumKey,
-        name: album?.Name || '',
-        webUri: album?.WebUri || undefined,
-        privacy: album?.Privacy || undefined,
-        lastUpdated: album?.LastUpdated || undefined
+        albumKey: album?.AlbumKey,
+        name: album?.Name,
+        webUri: album?.WebUri ?? undefined,
+        privacy: album?.Privacy ?? undefined,
+        lastUpdated: album?.LastUpdated ?? undefined
       },
-      message: `Updated album **${album?.Name || ctx.input.albumKey}**`
+      message: `Updated album **${album?.Name}**`
     };
   })
   .build();
@@ -292,33 +292,33 @@ export let getAlbumTool = SlateTool.create(spec, {
         count: ctx.input.imageCount
       });
       images = result.items.map((img: any) => ({
-        imageKey: img.ImageKey || '',
-        title: img.Title || undefined,
-        caption: img.Caption || undefined,
-        fileName: img.FileName || undefined,
-        webUri: img.WebUri || undefined,
-        thumbnailUrl: img.ThumbnailUrl || undefined,
-        dateUploaded: img.Date || undefined
+        imageKey: img.ImageKey,
+        title: img.Title ?? undefined,
+        caption: img.Caption ?? undefined,
+        fileName: img.FileName ?? undefined,
+        webUri: img.WebUri ?? undefined,
+        thumbnailUrl: img.ThumbnailUrl ?? undefined,
+        dateUploaded: img.Date ?? undefined
       }));
       totalImages = result.pages.total;
     }
 
     return {
       output: {
-        albumKey: album?.AlbumKey || ctx.input.albumKey,
-        name: album?.Name || '',
-        description: album?.Description || undefined,
-        webUri: album?.WebUri || undefined,
-        privacy: album?.Privacy || undefined,
-        urlName: album?.UrlName || undefined,
-        imageCount: album?.ImageCount || undefined,
-        lastUpdated: album?.LastUpdated || undefined,
-        imagesLastUpdated: album?.ImagesLastUpdated || undefined,
+        albumKey: album?.AlbumKey,
+        name: album?.Name,
+        description: album?.Description ?? undefined,
+        webUri: album?.WebUri ?? undefined,
+        privacy: album?.Privacy ?? undefined,
+        urlName: album?.UrlName ?? undefined,
+        imageCount: album?.ImageCount ?? undefined,
+        lastUpdated: album?.LastUpdated ?? undefined,
+        imagesLastUpdated: album?.ImagesLastUpdated ?? undefined,
         nodeId,
         images,
         totalImages
       },
-      message: `Retrieved album **${album?.Name || ctx.input.albumKey}**${images ? ` with ${images.length} images` : ''}`
+      message: `Retrieved album **${album?.Name}**${images ? ` with ${images.length} images` : ''}`
     };
   })
   .build();

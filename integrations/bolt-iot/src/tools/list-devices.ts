@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDevices = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listDevices = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: rawResponse,
       success: z.string().describe('Whether the request was successful ("1" for success)'),
       devices: z.array(z.any()).describe('List of devices associated with the account')
     })
@@ -26,14 +28,28 @@ export let listDevices = SlateTool.create(spec, {
 
     let response = await client.getDevices();
 
+    let devices: unknown[];
+    try {
+      devices = Array.isArray(response)
+        ? response
+        : response.value
+          ? JSON.parse(response.value)
+          : [response];
+    } catch (error) {
+      throw createApiServiceError(
+        'Bolt IoT returned a device list that could not be decoded.',
+        {
+          reason: 'invalid_response',
+          parent: error
+        }
+      );
+    }
+
     return {
       output: {
+        raw: response,
         success: response.success ?? '1',
-        devices: Array.isArray(response)
-          ? response
-          : response.value
-            ? JSON.parse(response.value)
-            : [response]
+        devices
       },
       message: `Retrieved device list from Bolt Cloud.`
     };

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MonitoringClient } from '../lib/client';
+import { minerstatHistoryEntries } from '../lib/response';
 import { spec } from '../spec';
 
 export let getMiningStatisticsTool = SlateTool.create(spec, {
@@ -29,6 +30,7 @@ export let getMiningStatisticsTool = SlateTool.create(spec, {
     z.object({
       scope: z.string().describe('The scope that was queried'),
       groupName: z.string().optional().describe('Group name if group scope was used'),
+      response: z.any().optional().describe('Original API response'),
       entries: z.array(z.record(z.string(), z.any())).describe('Statistics entries')
     })
   )
@@ -44,7 +46,7 @@ export let getMiningStatisticsTool = SlateTool.create(spec, {
     switch (ctx.input.scope) {
       case 'group':
         if (!ctx.input.groupName) {
-          throw new Error('groupName is required when scope is "group"');
+          throw createApiServiceError('groupName is required when scope is "group"');
         }
         result = await client.getGroupStatistics(ctx.input.groupName, params);
         break;
@@ -56,11 +58,7 @@ export let getMiningStatisticsTool = SlateTool.create(spec, {
         break;
     }
 
-    let entries = Array.isArray(result)
-      ? result
-      : typeof result === 'object'
-        ? Object.values(result)
-        : [];
+    let entries = minerstatHistoryEntries(result);
 
     let scopeLabel =
       ctx.input.scope === 'group' ? `group **${ctx.input.groupName}**` : ctx.input.scope;
@@ -69,7 +67,8 @@ export let getMiningStatisticsTool = SlateTool.create(spec, {
       output: {
         scope: ctx.input.scope,
         groupName: ctx.input.groupName,
-        entries: entries as any[]
+        entries,
+        response: result
       },
       message: `Retrieved **${entries.length}** statistics entries for ${scopeLabel}.`
     };

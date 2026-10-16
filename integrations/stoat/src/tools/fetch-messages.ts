@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireArray, requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -17,7 +18,7 @@ let messageSchema = z.object({
 export let fetchMessages = SlateTool.create(spec, {
   name: 'Fetch Messages',
   key: 'fetch_messages',
-  description: `Fetch messages from a Revolt channel. Supports pagination with before/after cursors, sorting, and fetching a specific message by ID. Use this to read channel history or retrieve specific messages.`,
+  description: `Fetch messages from a Stoat channel. Supports pagination with before/after cursors, sorting, and fetching a specific message by ID. Use this to read channel history or retrieve specific messages.`,
   instructions: [
     'Use `before` and `after` parameters to paginate through messages.',
     'Set `includeUsers` to true to get user objects alongside messages.'
@@ -46,16 +47,30 @@ export let fetchMessages = SlateTool.create(spec, {
         .enum(['Latest', 'Oldest', 'Relevance'])
         .optional()
         .describe('Sort order for messages'),
-      nearby: z.string().optional().describe('Fetch messages around this message ID'),
+      nearby: z
+        .string()
+        .optional()
+        .describe('Fetch messages around this ID; ignores before, after and sort'),
       includeUsers: z.boolean().optional().describe('Include user objects in the response')
     })
   )
   .output(
     z.object({
-      messages: z.array(messageSchema).describe('List of messages')
+      messages: z.array(messageSchema).describe('List of messages'),
+      users: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('User objects returned when includeUsers is true'),
+      members: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Server member objects returned when available')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) {
+      throw createApiServiceError('Message limit must be a whole number.');
+    }
     let client = createClient(ctx);
 
     if (ctx.input.messageId) {
@@ -85,7 +100,10 @@ export let fetchMessages = SlateTool.create(spec, {
       include_users: ctx.input.includeUsers
     });
 
-    let messagesArray = Array.isArray(result) ? result : (result.messages ?? []);
+    let messagesArray = requireArray(
+      Array.isArray(result) ? result : requireRecord(result, 'messages').messages,
+      'messages'
+    );
 
     let messages = messagesArray.map((msg: any) => ({
       messageId: msg._id,
@@ -99,7 +117,11 @@ export let fetchMessages = SlateTool.create(spec, {
     }));
 
     return {
-      output: { messages },
+      output: {
+        messages,
+        users: !Array.isArray(result) ? (result.users ?? undefined) : undefined,
+        members: !Array.isArray(result) ? (result.members ?? undefined) : undefined
+      },
       message: `Fetched ${messages.length} message(s) from channel \`${ctx.input.channelId}\``
     };
   })

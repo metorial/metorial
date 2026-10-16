@@ -8,10 +8,7 @@ export let createMember = SlateTool.create(spec, {
   key: 'create_member',
   description: `Create a new member (user) in the directory. Requires an email, password, and subscription (membership plan) ID at minimum.
 Additional profile fields can be provided. The membership plan settings are respected unless overriding data is sent.`,
-  instructions: [
-    'The password must be at least 6 characters long.',
-    'The subscriptionId must reference an existing Membership Plan ID.'
-  ],
+  instructions: ['The subscriptionId must reference an existing Membership Plan ID.'],
   tags: {
     destructive: false
   }
@@ -19,7 +16,7 @@ Additional profile fields can be provided. The membership plan settings are resp
   .input(
     z.object({
       email: z.string().describe('Email address for the new member.'),
-      password: z.string().describe('Password for the new member (minimum 6 characters).'),
+      password: z.string().describe('Password for the new member.'),
       subscriptionId: z.string().describe('The Membership Plan ID to assign to the member.'),
       firstName: z.string().optional().describe('First name of the member.'),
       lastName: z.string().optional().describe('Last name of the member.'),
@@ -44,6 +41,10 @@ Additional profile fields can be provided. The membership plan settings are resp
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       member: z.any().describe('The newly created member record.')
     })
   )
@@ -61,15 +62,16 @@ Additional profile fields can be provided. The membership plan settings are resp
 
     if (ctx.input.firstName) data.first_name = ctx.input.firstName;
     if (ctx.input.lastName) data.last_name = ctx.input.lastName;
-    if (ctx.input.phone) data.phone = ctx.input.phone;
+    if (ctx.input.phone) data.phone_number = ctx.input.phone;
     if (ctx.input.company) data.company = ctx.input.company;
     if (ctx.input.website) data.website = ctx.input.website;
-    if (ctx.input.address) data.address = ctx.input.address;
+    if (ctx.input.address) data.address1 = ctx.input.address;
     if (ctx.input.city) data.city = ctx.input.city;
-    if (ctx.input.state) data.state = ctx.input.state;
-    if (ctx.input.zip) data.zip = ctx.input.zip;
-    if (ctx.input.country) data.country = ctx.input.country;
-    if (ctx.input.sendWelcomeEmail) data.send_welcome_email = '1';
+    if (ctx.input.state) data.state_code = ctx.input.state;
+    if (ctx.input.zip) data.zip_code = ctx.input.zip;
+    if (ctx.input.country) data.country_code = ctx.input.country;
+    if (ctx.input.sendWelcomeEmail !== undefined)
+      data.send_email_notifications = ctx.input.sendWelcomeEmail ? '1' : '0';
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
         data[key] = value;
@@ -81,6 +83,7 @@ Additional profile fields can be provided. The membership plan settings are resp
     return {
       output: {
         status: result.status,
+        raw: result,
         member: result.message
       },
       message: `Created new member with email **${ctx.input.email}**.`

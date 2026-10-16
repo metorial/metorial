@@ -61,15 +61,15 @@ export let getSessions = SlateTool.create(spec, {
       output: {
         sessions: sessions.map(s => ({
           sessionId: s.id,
-          externalId: s.externalId ?? '',
-          name: s.name ?? '',
-          description: s.description ?? '',
-          dates: s.dates ?? [],
-          logo: s.logo ?? '',
-          boothId: s.boothId ?? 0,
-          boothName: s.boothName ?? '',
-          speakerIds: s.speakerIds ?? [],
-          trackIds: s.trackIds ?? []
+          externalId: s.externalId,
+          name: s.name,
+          description: s.description,
+          dates: s.dates,
+          logo: s.logo,
+          boothId: s.boothId,
+          boothName: s.boothName,
+          speakerIds: s.speakerIds,
+          trackIds: s.trackIds
         }))
       },
       message: `Found **${sessions.length}** session(s) for event ${ctx.input.eventId}.`

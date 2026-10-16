@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let deleteCheck = SlateTool.create(spec, {
@@ -18,7 +19,8 @@ export let deleteCheck = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the check was successfully deleted')
+      deleted: z.boolean().describe('Whether the check was successfully deleted'),
+      raw: rawSchema.optional().describe('Complete original deletion response')
     })
   )
   .handleInvocation(async ctx => {
@@ -27,7 +29,9 @@ export let deleteCheck = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Deleted check \`${ctx.input.checkToken}\`.`
+      message: result.deleted
+        ? `Deleted check \`${ctx.input.checkToken}\`.`
+        : 'Updown.io did not confirm check deletion.'
     };
   })
   .build();

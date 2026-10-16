@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,11 @@ let customerSchema = z.object({
   referenceAffiliation: z.string().optional().describe('Affiliate identifier'),
   dateAffiliation: z.string().optional().describe('Affiliation date'),
   metadata: z.record(z.string(), z.string()).optional().describe('Custom key/value metadata'),
-  links: z.array(linkSchema).optional().describe('Encrypted hosted page links')
+  links: z.array(linkSchema).optional().describe('Encrypted hosted page links'),
+  rawResponse: z
+    .any()
+    .optional()
+    .describe('Unmodified customer resource, including original metadata value types')
 });
 
 export let manageCustomers = SlateTool.create(spec, {
@@ -31,7 +35,7 @@ export let manageCustomers = SlateTool.create(spec, {
   key: 'manage_customers',
   description: `Create, retrieve, update, list, suspend, or anonymize customers in ProAbono.
 Customers are identified by a **ReferenceCustomer** that maps to your application's user identifier.
-Supports managing metadata, billing address, and payment settings.
+Supports customer metadata; use manage_customer_settings for billing address and payment settings.
 Creating or retrieving a customer returns encrypted links for the hosted customer portal.`,
   instructions: [
     'Use "create" to add a new customer; ProAbono uses the same endpoint for create and update, so providing an existing ReferenceCustomer will update that customer.',
@@ -118,7 +122,7 @@ Creating or retrieving a customer returns encrypted links for the hosted custome
 
     if (action === 'get') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for get action');
+        throw createApiServiceError('referenceCustomer is required for get action');
       let result = await client.getCustomer(
         ctx.input.referenceCustomer,
         ctx.input.referenceOffer
@@ -132,7 +136,7 @@ Creating or retrieving a customer returns encrypted links for the hosted custome
 
     if (action === 'update') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for update action');
+        throw createApiServiceError('referenceCustomer is required for update action');
       let result = await client.updateCustomer({
         ReferenceCustomer: ctx.input.referenceCustomer,
         Email: ctx.input.email,
@@ -163,17 +167,17 @@ Creating or retrieving a customer returns encrypted links for the hosted custome
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${customers.length}** customers (total: ${result?.TotalItems || 0})`
+        message: `Found **${customers.length}** customers on this page`
       };
     }
 
     if (action === 'suspend') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for suspend action');
-      await client.suspendCustomer(ctx.input.referenceCustomer);
+        throw createApiServiceError('referenceCustomer is required for suspend action');
+      let result = await client.suspendCustomer(ctx.input.referenceCustomer);
       return {
         output: {
-          customer: { referenceCustomer: ctx.input.referenceCustomer, status: 'Suspended' }
+          customer: mapCustomer(result)
         },
         message: `Suspended customer **${ctx.input.referenceCustomer}**`
       };
@@ -181,17 +185,17 @@ Creating or retrieving a customer returns encrypted links for the hosted custome
 
     if (action === 'anonymize') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for anonymize action');
-      await client.anonymizeCustomer(ctx.input.referenceCustomer);
+        throw createApiServiceError('referenceCustomer is required for anonymize action');
+      let result = await client.anonymizeCustomer(ctx.input.referenceCustomer);
       return {
-        output: { customer: { referenceCustomer: ctx.input.referenceCustomer } },
+        output: { customer: mapCustomer(result) },
         message: `Anonymized customer **${ctx.input.referenceCustomer}** (personal data cleared)`
       };
     }
 
     if (action === 'revoke_links') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for revoke_links action');
+        throw createApiServiceError('referenceCustomer is required for revoke_links action');
       let result = await client.revokeCustomerLinks(ctx.input.referenceCustomer);
       let customer = mapCustomer(result);
       return {
@@ -200,7 +204,7 @@ Creating or retrieving a customer returns encrypted links for the hosted custome
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -215,6 +219,12 @@ let mapCustomer = (raw: any) => ({
   status: raw?.Status,
   referenceAffiliation: raw?.ReferenceAffiliation,
   dateAffiliation: raw?.DateAffiliation,
-  metadata: raw?.Metadata,
-  links: raw?.Links
+  metadata:
+    raw?.Metadata === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(raw.Metadata).map(([key, value]) => [key, String(value)])
+        ),
+  links: raw?.Links,
+  rawResponse: raw
 });

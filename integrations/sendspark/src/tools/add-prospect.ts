@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let webhookEventEnum = z.enum([
@@ -27,6 +28,7 @@ export let addProspect = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       campaignId: z
         .string()
         .describe('ID of the dynamic video campaign to add the prospect to'),
@@ -38,6 +40,25 @@ export let addProspect = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('URL for website screenshot personalization in the video background'),
+      screenshotUrl: z
+        .string()
+        .optional()
+        .describe('Direct screenshot URL for the background'),
+      customField: z.string().optional().describe('Custom personalization value'),
+      fields: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Additional personalization fields'),
+      fallbackToEmailDomainForBackground: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use the email domain as the background when a background URL is unavailable'
+        ),
+      callbackId: z
+        .string()
+        .optional()
+        .describe('Callback identifier for this processing request'),
       forceCreation: z
         .boolean()
         .optional()
@@ -58,6 +79,7 @@ export let addProspect = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       prospects: z.array(
         z.object({
           prospectId: z.string().optional(),
@@ -78,11 +100,7 @@ export let addProspect = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
     let result = await client.addProspect(ctx.input.campaignId, {
       processAndAuthorizeCharge: true,
@@ -98,10 +116,15 @@ export let addProspect = SlateTool.create(spec, {
         contactEmail: ctx.input.contactEmail,
         company: ctx.input.company,
         jobTitle: ctx.input.jobTitle,
-        backgroundUrl: ctx.input.backgroundUrl
+        backgroundUrl: ctx.input.backgroundUrl,
+        screenshotUrl: ctx.input.screenshotUrl,
+        customField: ctx.input.customField,
+        fields: ctx.input.fields,
+        webhookUrl: ctx.input.webhookUrl,
+        webhookEvents: ctx.input.webhookEvents
       },
-      webhookUrl: ctx.input.webhookUrl,
-      webhookEvents: ctx.input.webhookEvents
+      fallbackToEmailDomainForBackground: ctx.input.fallbackToEmailDomainForBackground,
+      callbackId: ctx.input.callbackId
     });
 
     let prospectList = result.prospectList || [];
@@ -122,8 +145,8 @@ export let addProspect = SlateTool.create(spec, {
     }));
 
     return {
-      output: { prospects },
-      message: `Added prospect **${ctx.input.contactName}** (${ctx.input.contactEmail}) to campaign. Status: ${prospects[0]?.status || 'pending'}.`
+      output: { prospects, raw: result },
+      message: `Sendspark accepted the prospect request for **${ctx.input.contactName}** (${ctx.input.contactEmail}).${prospects[0]?.status !== undefined ? ` Status: ${prospects[0].status}.` : ''}`
     };
   })
   .build();

@@ -1,112 +1,39 @@
-# Slates Specification for DataRobot
+# DataRobot integration
 
-## Overview
+Connect using an API key from **API keys and tools** and your DataRobot instance URL. The URL must use HTTPS; `/api/v2` is optional. Existing saved instance URLs remain supported, while an instance URL provided with new credentials takes precedence. If neither is present, the integration uses `https://app.datarobot.com`.
 
-DataRobot is an enterprise AI/ML platform that automates the end-to-end process of building, deploying, and managing predictive models. The REST API provides a programmatic alternative to the web interface for creating and managing DataRobot projects, building predictive models, and deploying them into production environments. It also supports deploying custom models written in any open-source language or library for real-time or batch predictions.
+The 30 tools cover these workflows:
 
-## Authentication
+| Area | Tools and behavior |
+| --- | --- |
+| Identity | `get_current_user` reads the connected user from `/account/info/`. |
+| Projects | `list_projects`, `get_project`, `create_project`, and `manage_project` discover, create, rename, and delete projects. Project creation accepts exactly one dataset URL or AI Catalog dataset ID. |
+| Modeling | `start_autopilot`, `list_models`, and `get_model` expose training configuration, leaderboard metrics, and computed feature impact. `list_blueprints` and `list_feature_lists` discover modeling resources. `request_feature_impact` starts computation before retrieving scores with `get_model`. |
+| Datasets | `list_datasets`, `get_dataset`, `manage_dataset`, and `download_dataset` manage catalog datasets and download original persisted CSV data. A supplied name is applied after URL ingestion. |
+| Registry | `list_model_packages`, `get_model_package`, and `register_model` discover and register deployment-ready model versions. Registration uses the current `fromLeaderboard` API. |
+| Deployments | `list_deployments`, `get_deployment`, `create_deployment`, and `manage_deployment` create, update, replace, and delete deployments. A learning-model deployment first registers the model, then deploys its package. `list_prediction_servers` and `list_prediction_environments` discover infrastructure IDs. |
+| Predictions | `make_predictions` sends structured rows to the **serverless** prediction endpoint. `create_batch_prediction_job` scores an AI Catalog dataset to local-file output; `get_batch_prediction_job` polls status and `download_batch_predictions` downloads the completed CSV. Dedicated-server real-time predictions require a separate endpoint and authentication flow. |
+| Monitoring | `get_deployment_monitoring` retrieves requested service statistics, accuracy, feature drift, and target drift. Provider failures are reported instead of appearing as empty monitoring data. |
+| Model files | `download_model_artifact` downloads training artifacts or persistent logs for blueprints containing custom tasks. |
 
-DataRobot uses **API key-based authentication** as the primary method for API access.
+Creation waits for documented asynchronous status locations when supplied. A timed-out job may still complete; check the resource before repeating a create operation. A registered model package can require further build time before deployment. Model replacement reasons are `ACCURACY`, `DATA_DRIFT`, `ERRORS`, `SCHEDULED_REFRESH`, `SCORING_SPEED`, `DEPRECATION`, and `OTHER`; omission selects `OTHER`.
 
-### API Key (Bearer Token)
+List tools expose their existing offset/limit controls. Returned total counts come from provider totals. Existing numeric input schemas remain compatible; values required to be integers are validated at runtime. The legacy model-list route is retained because it supplies the complete existing leaderboard fields and ordering contract.
 
-API keys are the preferred method for authenticating web requests to the DataRobot APIs; they replace the legacy API token method. When interacting with the DataRobot API, authentication is performed using a bearer token contained in the HTTP Authorization header.
+Downloads are delivered as downloadable files with metadata. Credentials and credential-bearing URL parameters are removed from public provider records. Existing nullable response fields retain their null values; provider nulls or numeric labels that cannot fit older optional scalar fields remain available in `raw`.
 
-To authenticate, include the API key in the request header:
+No triggers are registered. Custom model authoring, external-source credential administration, compliance-document generation, advanced time-series setup, and notification subscriptions are outside the registered tool surface.
 
-```
-Authorization: Bearer <API_KEY>
-```
+Official references, checked 2026-10-15:
 
-**Obtaining an API key:**
-From the DataRobot UI, click the user icon in the top right corner and select "API keys and tools." Click "Create new key," name the new key, and click "Create."
-
-**API Endpoint:**
-The base URL depends on your DataRobot instance. Common endpoints include `https://app.datarobot.com`, `https://app.eu.datarobot.com`, and `https://app.jp.datarobot.com`, or a custom URL for self-managed installations (e.g., `https://my-company.datarobot.com`).
-
-The REST API base path is typically: `https://app.datarobot.com/api/v2`
-
-**Required parameters for authentication:**
-
-- **API Key**: Generated from the DataRobot UI under API keys and tools.
-- **Endpoint URL**: The DataRobot instance URL (varies by region or self-managed installation).
-
-## Features
-
-### Project Management
-
-The API provides a programmatic alternative to the web interface for creating and managing DataRobot projects. Users can create projects by uploading datasets, configure project settings, set target variables, and manage the overall modeling workflow.
-
-### Automated Machine Learning (AutoML / Autopilot)
-
-Autopilot automatically selects the best predictive models for a specified target feature and runs them at increasing sample sizes, resulting in a selection of best-suited models and identification of a recommended model. Users can configure the Autopilot mode (e.g., Quick, Full), specify target features, and set advanced options like partitioning and feature engineering.
-
-### Model Training and Evaluation
-
-Users can train individual models, perform advanced tuning of hyperparameters, compute feature impact scores, generate lift charts, ROC curves, confusion matrices, and partial dependence plots. The API provides access to model insights including prediction explanations and feature importance rankings.
-
-### Data Registry (AI Catalog)
-
-The API provides endpoints for managing data, including the Data Registry, datasets, feature lists, and blueprints. Users can upload, list, share, version, and delete datasets. Datasets can be categorized for training, prediction, batch predictions, or custom model testing.
-
-### Model Registry
-
-The Model Registry organizes all models used in DataRobot as registered models containing deployment-ready model packages. You can register DataRobot, custom, and external model packages. From the Model Registry, you can generate model compliance documentation from model packages and deploy, share, or archive models.
-
-### Model Deployment
-
-Users can deploy models to production environments through the API. Models written in any open-source language or library can be deployed and exposed as a production-quality REST API to support real-time or batch predictions. Deployments can be managed, shared, replaced with new models, and deleted.
-
-### Predictions
-
-- **Real-time Predictions**: The Prediction API allows making predictions on a model deployment by specifying the deployment ID. Supports both structured and unstructured model types.
-- **Batch Predictions**: The Batch Prediction API provides flexible options for intake and output when scoring large datasets. Supports reading from and writing to S3 and databases.
-- **Prediction Explanations**: Prediction Explanations identify why a given model makes a certain prediction, using the same endpoint as bare predictions with the `maxExplanations` parameter.
-
-### Deployment Monitoring (MLOps)
-
-After deploying a model, users can access advanced model management features such as data drift, accuracy, and service health statistics. This includes monitoring for target drift, data drift, and service health across all deployments.
-
-### Custom Models
-
-Custom inference models allow users to bring pre-trained models into DataRobot. Users can create custom models in the Custom Model Workshop, then prepare, test, register, and deploy them to a centralized deployment hub for monitoring and management. DataRobot supports custom models built in Python, R, and Java.
-
-### Time Series Modeling
-
-The API supports time series projects with specialized features including datetime partitioning, forecast windows, known-in-advance features, multi-series projects, and calendar integration for events and holidays.
-
-### Credentials Management
-
-Users can store and manage credentials for connecting to external data sources (databases, cloud storage). Supported credential types include basic authentication, OAuth, API tokens, S3, GCP, Azure, Snowflake, and Databricks credentials.
-
-### Compliance Documentation
-
-Users can programmatically generate compliance documentation from models, providing evidence that model components work as intended and are appropriate for their business purpose.
-
-## Events
-
-DataRobot supports webhooks that allow users in an organization to subscribe to certain DataRobot events. When a notification event is triggered, an HTTP POST payload is sent to the webhook's configured URL.
-
-Secret tokens can be used to verify that notification requests are authentic and coming from DataRobot. Users create a secret key known only to DataRobot and the client-side, and add it to the notification channel configuration.
-
-### Project Events
-
-Events related to modeling project lifecycle:
-
-- Project created, deleted, shared
-- Autopilot completed
-
-### Dataset Events
-
-Events related to dataset management in the AI Catalog:
-
-- Dataset created, deleted, shared
-
-### Deployment Events
-
-Events related to model deployment lifecycle and health monitoring:
-
-- Deployment created, deleted, shared, model replaced
-- Service health status changes (green to yellow, red)
-- Data drift status changes (green to yellow, red)
-- Accuracy health status changes (green to yellow, red)
+- [Authentication and API keys](https://docs.datarobot.com/en/docs/platform/acct-settings/api-key-mgmt.html)
+- [Projects and Autopilot](https://docs.datarobot.com/en/docs/api/reference/public-api/projects.html)
+- [DataRobot models](https://docs.datarobot.com/en/docs/api/reference/public-api/datarobot_models.html)
+- [Data registry](https://docs.datarobot.com/en/docs/api/reference/public-api/data_registry.html)
+- [Model registry](https://docs.datarobot.com/en/docs/api/reference/public-api/model_management.html)
+- [Deployment management](https://docs.datarobot.com/en/docs/api/reference/public-api/deployment_management.html)
+- [Model replacement](https://docs.datarobot.com/en/docs/api/reference/public-api/deployment_model_replacement.html)
+- [Serverless Prediction API](https://docs.datarobot.com/en/docs/api/reference/predapi/pred-ref-serverless/index.html)
+- [Batch predictions](https://docs.datarobot.com/en/docs/api/reference/public-api/batch_predictions.html)
+- [Service health](https://docs.datarobot.com/en/docs/api/reference/public-api/observability_service_health.html), [accuracy](https://docs.datarobot.com/en/docs/api/reference/public-api/observability_accuracy.html), and [drift](https://docs.datarobot.com/en/docs/api/reference/public-api/observability_drift.html)
+- [Official Python SDK 3.20.0 distribution](https://pypi.org/project/datarobot/3.20.0/) for prediction server, feature-list/blueprint, and registration request/response behavior where the current REST pages are incomplete

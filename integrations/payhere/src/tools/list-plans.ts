@@ -23,8 +23,10 @@ export let listPlans = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       plans: z.array(
         z.object({
+          raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
           planId: z.number().describe('Unique plan identifier'),
           paymentType: z.string().describe('Either "recurring" or "one_off"'),
           name: z.string().describe('Display name of the plan'),
@@ -58,6 +60,7 @@ export let listPlans = SlateTool.create(spec, {
         })
       ),
       meta: z.object({
+        raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
         currentPage: z.number(),
         nextPage: z.number().nullable(),
         prevPage: z.number().nullable(),

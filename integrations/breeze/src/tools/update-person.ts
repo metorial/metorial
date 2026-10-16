@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, serializeProfileFields } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let updatePerson = SlateTool.create(spec, {
@@ -9,7 +9,8 @@ export let updatePerson = SlateTool.create(spec, {
   description: `Update an existing person's profile fields. Accepts a map of profile field IDs to new values. Use **List Profile Fields** to discover available field IDs and types.`,
   instructions: [
     'Use the List Profile Fields tool to discover available field IDs before updating.',
-    'Only fields included in the update will be changed; other fields remain untouched.'
+    'Only fields included in the update will be changed; other fields remain untouched.',
+    'For compound fields such as email, phone, or address, provide an object containing response and details in the Breeze field format.'
   ]
 })
   .input(
@@ -30,7 +31,7 @@ export let updatePerson = SlateTool.create(spec, {
 
     let person = await client.updatePerson(
       ctx.input.personId,
-      JSON.stringify(ctx.input.fields)
+      await serializeProfileFields(client, ctx.input.fields)
     );
 
     return {

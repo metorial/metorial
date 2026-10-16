@@ -12,6 +12,8 @@
     "access market price analytics",
     "autocomplete location names",
     "filter by property criteria",
-    "get points of interest"
+    "get points of interest",
+    "discover city and department identifiers",
+    "retrieve saved search settings"
   ]
 }

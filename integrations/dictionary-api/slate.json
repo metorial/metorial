@@ -1,6 +1,6 @@
 {
   "name": "@metorial/dictionary-api",
-  "description": "Look up word definitions, phonetics, pronunciations, synonyms, antonyms, and example sentences. Retrieve detailed linguistic information for words across multiple languages, including parts of speech, IPA transcriptions, and audio pronunciation URLs. Supports querying in any available language by language code.",
+  "description": "Look up definitions, parts of speech, phonetic transcriptions, pronunciation recordings, synonyms, antonyms, example sentences, and available word origins through the Free Dictionary API. No account or API key is required. English uses language code en; other language codes depend on provider availability.",
   "categories": ["education-and-learning", "language-translation"],
   "skills": [
     "look up word definitions",
@@ -8,7 +8,7 @@
     "get audio pronunciations",
     "find synonyms and antonyms",
     "retrieve example sentences",
-    "query multiple languages",
+    "retrieve word origins",
     "get parts of speech"
   ]
 }

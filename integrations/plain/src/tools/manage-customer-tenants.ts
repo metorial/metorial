@@ -18,11 +18,11 @@ export let manageCustomerTenants = SlateTool.create(spec, {
       addTenantIds: z
         .array(z.string())
         .optional()
-        .describe('Tenant IDs to add the customer to'),
+        .describe('Tenant IDs from list_tenants to add the customer to'),
       removeTenantIds: z
         .array(z.string())
         .optional()
-        .describe('Tenant IDs to remove the customer from')
+        .describe('Tenant IDs from list_tenants to remove the customer from')
     })
   )
   .output(
@@ -39,7 +39,7 @@ export let manageCustomerTenants = SlateTool.create(spec, {
 
     if (ctx.input.addTenantIds && ctx.input.addTenantIds.length > 0) {
       await client.addCustomerToTenants({
-        customerId: ctx.input.customerId,
+        customerIdentifier: { customerId: ctx.input.customerId },
         tenantIdentifiers: ctx.input.addTenantIds.map(id => ({ tenantId: id }))
       });
       added = ctx.input.addTenantIds.length;
@@ -47,7 +47,7 @@ export let manageCustomerTenants = SlateTool.create(spec, {
 
     if (ctx.input.removeTenantIds && ctx.input.removeTenantIds.length > 0) {
       await client.removeCustomerFromTenants({
-        customerId: ctx.input.customerId,
+        customerIdentifier: { customerId: ctx.input.customerId },
         tenantIdentifiers: ctx.input.removeTenantIds.map(id => ({ tenantId: id }))
       });
       removed = ctx.input.removeTenantIds.length;

@@ -28,6 +28,7 @@ export let listCategories = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       categories: z.array(
         z.object({
           categoryId: z.string(),
@@ -54,22 +55,23 @@ export let listCategories = SlateTool.create(spec, {
 
     let categories = res.data.map(c => ({
       categoryId: c.id,
-      name: c.attributes.name,
+      name: c.attributes.name ?? undefined,
       parentId: c.attributes.parent_id,
-      description: c.attributes.description,
-      urlHandle: c.attributes.url_handle,
+      description: c.attributes.description ?? undefined,
+      urlHandle: c.attributes.url_handle ?? undefined,
       order: c.attributes.order,
-      dateModified: c.attributes.date_modified
+      dateModified: c.attributes.date_modified ?? undefined
     }));
 
     return {
       output: {
+        raw: res,
         categories,
-        totalCount: res.meta.total,
-        currentPage: res.meta['current-page'],
-        lastPage: res.meta['last-page']
+        totalCount: res.meta.page.total,
+        currentPage: res.meta.page['current-page'],
+        lastPage: res.meta.page['last-page']
       },
-      message: `Found **${res.meta.total}** categories (page ${res.meta['current-page']} of ${res.meta['last-page']}).`
+      message: `Found **${res.meta.page.total}** categories (page ${res.meta.page['current-page']} of ${res.meta.page['last-page']}).`
     };
   })
   .build();

@@ -1,8 +1,10 @@
 export * from './create-records';
 export * from './delete-file';
 export * from './delete-records';
+export * from './download-file';
 export * from './execute-query';
 export * from './execute-script';
+export * from './get-changes';
 export * from './get-database-schema';
 export * from './get-record';
 export * from './get-table-schema';
@@ -12,3 +14,4 @@ export * from './list-records';
 export * from './list-teams';
 export * from './list-views';
 export * from './update-record';
+export * from './upsert-records';

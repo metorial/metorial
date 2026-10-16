@@ -1,8 +1,36 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let apiAxios = createAxios({
   baseURL: 'https://app.retently.com/api/v2'
 });
+
+apiAxios.interceptors.response.use(
+  response => {
+    let data = response.data;
+    if (isApiErrorRecord(data) && (data.success === false || Number(data.code) >= 400)) {
+      throw buildApiServiceError(
+        { response: { status: Number(data.code) || 400, data } },
+        {
+          providerLabel: 'Retently',
+          reason: 'retently_api_error'
+        }
+      );
+    }
+    return response;
+  },
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, {
+        providerLabel: 'Retently',
+        reason: 'retently_api_error'
+      })
+    )
+);
 
 export interface CustomerProperty {
   label: string;
@@ -17,6 +45,8 @@ export interface CustomerInput {
   company?: string;
   tags?: string[];
   properties?: CustomerProperty[];
+  unset_properties?: string[];
+  unset_tags?: string[];
 }
 
 export interface AttributeFilter {
@@ -37,7 +67,10 @@ export interface DateRangeParams {
 }
 
 export class Client {
-  constructor(private token: string) {}
+  constructor(private token: string) {
+    if (typeof token !== 'string' || !token.trim())
+      throw createApiServiceError('A Retently API key or access token is required.');
+  }
 
   private get headers() {
     return {
@@ -64,7 +97,7 @@ export class Client {
   }
 
   async getCustomer(customerId: string) {
-    let response = await apiAxios.get(`/customers/${customerId}`, {
+    let response = await apiAxios.get(`/customers/${encodeURIComponent(customerId)}`, {
       headers: this.headers
     });
     return response.data.data;
@@ -120,7 +153,7 @@ export class Client {
     let response = await apiAxios.post('/survey', body, {
       headers: this.headers
     });
-    return response.data.data;
+    return response.data.data ?? response.data;
   }
 
   // ─── Feedback ───
@@ -143,7 +176,7 @@ export class Client {
   }
 
   async getFeedbackById(feedbackId: string) {
-    let response = await apiAxios.get(`/feedback/${feedbackId}`, {
+    let response = await apiAxios.get(`/feedback/${encodeURIComponent(feedbackId)}`, {
       headers: this.headers
     });
     return response.data.data;
@@ -198,7 +231,7 @@ export class Client {
     let response = await apiAxios.get('/campaigns', {
       headers: this.headers
     });
-    return response.data.data;
+    return response.data.data ?? response.data;
   }
 
   // ─── Templates ───
@@ -207,7 +240,7 @@ export class Client {
     let response = await apiAxios.get('/templates', {
       headers: this.headers
     });
-    return response.data.data;
+    return response.data.data ?? response.data;
   }
 
   // ─── Companies ───
@@ -230,7 +263,9 @@ export class Client {
   // ─── Reports ───
 
   async getReports(params?: DateRangeParams & { campaignId?: string }) {
-    let path = params?.campaignId ? `/reports/${params.campaignId}` : '/reports/';
+    let path = params?.campaignId
+      ? `/reports/${encodeURIComponent(params.campaignId)}`
+      : '/reports/';
     let queryParams: Record<string, string> = {};
     if (params?.startDate) queryParams.startDate = params.startDate;
     if (params?.endDate) queryParams.endDate = params.endDate;
@@ -264,7 +299,7 @@ export class Client {
     if (params?.startDate) queryParams.startDate = params.startDate;
     if (params?.endDate) queryParams.endDate = params.endDate;
 
-    let response = await apiAxios.get(`/trends/${groupId}`, {
+    let response = await apiAxios.get(`/trends/${encodeURIComponent(groupId)}`, {
       headers: this.headers,
       params: queryParams
     });
@@ -315,9 +350,12 @@ export class Client {
   }
 
   async removeSuppressedEmail(suppressionId: string) {
-    let response = await apiAxios.delete(`/suppressions/emails/${suppressionId}`, {
-      headers: this.headers
-    });
+    let response = await apiAxios.delete(
+      `/suppressions/emails/${encodeURIComponent(suppressionId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -340,15 +378,56 @@ export class Client {
   }
 
   async removeSuppressedDomain(suppressionId: string) {
-    let response = await apiAxios.delete(`/suppressions/domains/${suppressionId}`, {
+    let response = await apiAxios.delete(
+      `/suppressions/domains/${encodeURIComponent(suppressionId)}`,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async getAccountStatus() {
+    let response = await apiAxios.get('/ping', { headers: this.headers });
+    return response.data.data;
+  }
+
+  async getTemplate(templateId: string) {
+    let response = await apiAxios.get(`/templates/${encodeURIComponent(templateId)}`, {
       headers: this.headers
     });
+    return response.data.data;
+  }
+
+  async resubscribeCustomers(emails: string[]) {
+    let response = await apiAxios.post(
+      '/customers/resubscribe',
+      {
+        subscribers: emails.map(email => ({ email }))
+      },
+      { headers: this.headers }
+    );
+    return response.data;
+  }
+
+  async importFeedback(body: Record<string, unknown>, idempotencyKey?: string) {
+    let response = await apiAxios.post('/import', body, {
+      headers: {
+        ...this.headers,
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+      }
+    });
+    return response.data;
+  }
+
+  async syncAttributes(body: { customers?: string[]; emails?: string[]; scope?: string }) {
+    let response = await apiAxios.post('/sync-attributes', body, { headers: this.headers });
     return response.data;
   }
 
   // ─── Helpers ───
 
-  private buildQueryParams(params?: Record<string, any>): Record<string, string> {
+  private buildQueryParams(params?: object): Record<string, string> {
     if (!params) return {};
     let queryParams: Record<string, string> = {};
     for (let [key, value] of Object.entries(params)) {
@@ -357,7 +436,7 @@ export class Client {
         for (let i = 0; i < value.length; i++) {
           let attr = value[i] as AttributeFilter;
           queryParams[`attributes[${i}][name]`] = attr.name;
-          queryParams[`attributes[${i}][operator]`] = attr.operator;
+          queryParams[`attributes[${i}][op]`] = attr.operator;
           if (attr.value !== undefined) {
             queryParams[`attributes[${i}][value]`] = String(attr.value);
           }

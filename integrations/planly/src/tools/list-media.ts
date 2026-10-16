@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  mapMedia,
+  mediaAdditionalFields,
+  pageMetadata,
+  paginationFor,
+  responseData,
+  responseItems,
+  teamIdSchema
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let mediaItemSchema = z.object({
@@ -11,13 +20,14 @@ let mediaItemSchema = z.object({
   thumbnailUri: z.string().optional().describe('URL to the thumbnail'),
   duration: z.number().nullable().optional().describe('Video duration in seconds'),
   resolution: z.string().nullable().optional().describe('Media resolution'),
-  createdAt: z.string().optional().describe('Upload timestamp')
+  createdAt: z.string().optional().describe('Upload timestamp'),
+  ...mediaAdditionalFields
 });
 
 export let listMedia = SlateTool.create(spec, {
   name: 'List Media',
   key: 'list_media',
-  description: `List media files in a team's media library with pagination and sorting. Returns file details including URLs, dimensions, and metadata. Use the returned mediaId values when attaching media to scheduled posts.`,
+  description: `List media files in a team's media library with pagination and sorting. Returns file details including URLs, dimensions, and metadata. Use the returned mediaId values when attaching media to scheduled posts. Call list_teams to discover the team ID.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -25,7 +35,7 @@ export let listMedia = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
+      teamId: teamIdSchema,
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       pageSize: z.number().optional().describe('Number of results per page (default 50)'),
       orderByField: z
@@ -44,38 +54,11 @@ export let listMedia = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-
-    let pagination: any = {};
-    if (ctx.input.cursor) pagination.cursor = ctx.input.cursor;
-    if (ctx.input.pageSize) pagination.pageSize = ctx.input.pageSize;
-    if (ctx.input.orderByField && ctx.input.orderByDirection) {
-      pagination.orderBy = [ctx.input.orderByField, ctx.input.orderByDirection];
-    }
-
-    let result = await client.listMedia(
-      ctx.input.teamId,
-      Object.keys(pagination).length > 0 ? pagination : undefined
-    );
-
-    let data = result.data || result;
-    let items = Array.isArray(data) ? data : data.items || data.media || [];
-    let media = items.map((m: any) => ({
-      mediaId: m.id,
-      contentType: m.contentType,
-      contentLength: m.contentLength,
-      contentUri: m.contentUri,
-      thumbnailUri: m.thumbnailUri,
-      duration: m.duration,
-      resolution: m.resolution,
-      createdAt: m.createdAt
-    }));
-
+    let result = await client.listMedia(ctx.input.teamId, paginationFor(ctx.input));
+    let data = responseData(result);
+    let media = responseItems(data, ['items', 'media']).map(mapMedia);
     return {
-      output: {
-        media,
-        nextCursor: data.next || null,
-        totalCount: data.totalNumberOfRows
-      },
+      output: { media, ...pageMetadata(data) },
       message: `Retrieved ${media.length} media file(s).`
     };
   });

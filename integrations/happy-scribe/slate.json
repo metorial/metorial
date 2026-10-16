@@ -1,6 +1,6 @@
 {
   "name": "@metorial/happy-scribe",
-  "description": "Transcribe, subtitle, and translate audio and video files using AI-powered or human professional services. Upload media files, create transcription and subtitling orders in 120+ languages, translate transcriptions into 70+ target languages, and export results in multiple formats (TXT, DOCX, PDF, SRT, VTT, STL, XML, JSON, and more). Manage transcriptions with folders, tags, glossaries, and style guides. Configure webhooks for order status notifications.",
+  "description": "Transcribe, subtitle and translate audio and video. Discover organizations, create and confirm orders, track processing and failures, manage transcription names, folders and public sharing, read meeting summaries, and export documents, subtitles, spreadsheets, editing-project files and source media. Download supported files from the documented media host.",
   "categories": [
     "document-processing",
     "language-translation",
@@ -15,6 +15,10 @@
     "manage glossaries",
     "apply style guides",
     "organize with tags and folders",
-    "configure order webhooks"
+    "configure order webhooks",
+    "discover organizations",
+    "update transcription sharing",
+    "read meeting summaries",
+    "download transcription media"
   ]
 }

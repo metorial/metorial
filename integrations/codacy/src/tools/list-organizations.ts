@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listOrganizations = SlateTool.create(spec, {
@@ -28,6 +28,10 @@ export let listOrganizations = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       organizations: z
         .array(
           z.object({
@@ -56,13 +60,17 @@ export let listOrganizations = SlateTool.create(spec, {
     });
 
     let organizations = (response.data ?? []).map((org: any) => ({
-      organizationName: org.name ?? org.remoteOrganizationName ?? '',
-      provider: org.provider ?? '',
+      organizationName: requireCodacyString(
+        org.name ?? org.remoteOrganizationName,
+        'organization.name'
+      ),
+      provider: requireCodacyString(org.provider, 'organization.provider'),
       joinStatus: org.joinStatus ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         organizations,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

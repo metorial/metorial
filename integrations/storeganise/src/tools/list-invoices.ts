@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,6 +14,7 @@ export let listInvoicesTool = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().optional().describe('Filter invoices by user/tenant ID'),
+      ids: z.string().optional().describe('Comma-separated invoice IDs to fetch (up to 50)'),
       state: z
         .string()
         .optional()
@@ -37,7 +38,11 @@ export let listInvoicesTool = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
+    if (ctx.input.ids && ctx.input.ids.split(',').length > 50) {
+      throw createApiServiceError('Provide no more than 50 invoice IDs per request.');
+    }
     let invoices = await client.listInvoices({
+      ids: ctx.input.ids,
       userId: ctx.input.userId,
       state: ctx.input.state,
       updatedAfter: ctx.input.updatedAfter,

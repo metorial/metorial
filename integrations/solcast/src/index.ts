@@ -8,7 +8,8 @@ import {
   getRooftopPvPower,
   getTmyData,
   listPvPowerSites,
-  managePvPowerSite
+  managePvPowerSite,
+  submitSiteMeasurements
 } from './tools';
 
 export let provider = Slate.create({
@@ -21,7 +22,8 @@ export let provider = Slate.create({
     getGridAggregations,
     managePvPowerSite,
     listPvPowerSites,
-    getHorizonAngle
+    getHorizonAngle,
+    submitSiteMeasurements
   ],
   triggers: []
 });

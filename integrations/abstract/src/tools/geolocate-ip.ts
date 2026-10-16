@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AbstractClient } from '../lib/client';
 import { spec } from '../spec';
@@ -28,6 +28,10 @@ export let geolocateIp = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including unavailable values'),
       ipAddress: z.string().optional().describe('The queried IP address'),
       city: z.string().optional().describe('City name'),
       region: z.string().optional().describe('State or province name'),
@@ -97,28 +101,30 @@ export let geolocateIp = SlateTool.create(spec, {
       fields: ctx.input.fields
     });
 
+    let location = result.location ?? result;
     let output = {
+      rawResponse: isApiErrorRecord(result) ? result : undefined,
       ipAddress: result.ip_address ?? undefined,
-      city: result.city ?? undefined,
-      region: result.region ?? undefined,
-      regionIsoCode: result.region_iso_code ?? undefined,
-      postalCode: result.postal_code ?? undefined,
-      country: result.country ?? undefined,
-      countryCode: result.country_code ?? undefined,
-      isCountryEu: result.is_country_eu ?? undefined,
-      continent: result.continent ?? undefined,
-      continentCode: result.continent_code ?? undefined,
-      longitude: result.longitude != null ? Number(result.longitude) : undefined,
-      latitude: result.latitude != null ? Number(result.latitude) : undefined,
+      city: location.city ?? undefined,
+      region: location.region ?? undefined,
+      regionIsoCode: location.region_iso_code ?? undefined,
+      postalCode: location.postal_code ?? undefined,
+      country: location.country ?? undefined,
+      countryCode: location.country_code ?? undefined,
+      isCountryEu: location.is_country_eu ?? location.country_is_eu ?? undefined,
+      continent: location.continent ?? undefined,
+      continentCode: location.continent_code ?? undefined,
+      longitude: location.longitude != null ? Number(location.longitude) : undefined,
+      latitude: location.latitude != null ? Number(location.latitude) : undefined,
       timezone: result.timezone
         ? {
             name: result.timezone.name ?? undefined,
             abbreviation: result.timezone.abbreviation ?? undefined,
             utcOffset:
-              result.timezone.gmt_offset != null
-                ? String(result.timezone.gmt_offset)
+              (result.timezone.utc_offset ?? result.timezone.gmt_offset) != null
+                ? String(result.timezone.utc_offset ?? result.timezone.gmt_offset)
                 : undefined,
-            localTime: result.timezone.current_time ?? undefined,
+            localTime: result.timezone.local_time ?? result.timezone.current_time ?? undefined,
             isDst: result.timezone.is_dst ?? undefined
           }
         : undefined,
@@ -129,7 +135,7 @@ export let geolocateIp = SlateTool.create(spec, {
             isTor: result.security.is_tor ?? undefined,
             isRelay: result.security.is_relay ?? undefined,
             isHosting: result.security.is_hosting ?? undefined,
-            isAbuser: result.security.is_abuser ?? undefined
+            isAbuser: result.security.is_abuser ?? result.security.is_abuse ?? undefined
           }
         : undefined,
       flag: result.flag
@@ -141,26 +147,27 @@ export let geolocateIp = SlateTool.create(spec, {
         : undefined,
       currency: result.currency
         ? {
-            currencyName: result.currency.currency_name ?? undefined,
-            currencyCode: result.currency.currency_code ?? undefined
+            currencyName: result.currency.name ?? result.currency.currency_name ?? undefined,
+            currencyCode: result.currency.code ?? result.currency.currency_code ?? undefined
           }
         : undefined,
       connectionAsn:
-        result.connection?.autonomous_system_number != null
-          ? Number(result.connection.autonomous_system_number)
+        (result.asn?.asn ?? result.connection?.autonomous_system_number) != null
+          ? Number(result.asn?.asn ?? result.connection?.autonomous_system_number)
           : undefined,
-      connectionIsp: result.connection?.isp_name ?? undefined,
+      connectionIsp: result.asn?.name ?? result.connection?.isp_name ?? undefined,
       companyName: result.company?.name ?? undefined,
       companyDomain: result.company?.domain ?? undefined,
       companyType: result.company?.type ?? undefined
     };
 
     let locationParts = [output.city, output.region, output.country].filter(Boolean);
-    let location = locationParts.length > 0 ? locationParts.join(', ') : 'unknown location';
+    let locationLabel =
+      locationParts.length > 0 ? locationParts.join(', ') : 'unknown location';
 
     return {
       output,
-      message: `IP **${output.ipAddress ?? 'unknown'}** is located in **${location}**${output.connectionIsp ? ` (ISP: ${output.connectionIsp})` : ''}.`
+      message: `IP **${output.ipAddress ?? 'unknown'}** is located in **${locationLabel}**${output.connectionIsp ? ` (ISP: ${output.connectionIsp})` : ''}.`
     };
   })
   .build();

@@ -5,8 +5,11 @@ import {
   createTask,
   deleteProject,
   getProject,
+  getProjectDetails,
   getTask,
+  getWorkspaceIdentity,
   listCustomers,
+  listProjectGroups,
   listProjects,
   listTasks,
   listUsers,
@@ -18,6 +21,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getWorkspaceIdentity,
+    listProjectGroups,
+    getProjectDetails,
     listUsers,
     listCustomers,
     listProjects,

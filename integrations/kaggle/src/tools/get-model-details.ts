@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleRecord, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let modelInstanceSchema = z
@@ -62,24 +63,29 @@ export let getModelDetails = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.framework !== undefined) !== (ctx.input.variationSlug !== undefined))
+      throw createApiServiceError(
+        'Provide both framework and variationSlug to retrieve a model variation.'
+      );
     let client = new KaggleClient(ctx.auth);
     let model = await client.getModel(ctx.input.ownerSlug, ctx.input.modelSlug);
 
     let variationDetail: any;
     if (ctx.input.framework && ctx.input.variationSlug) {
-      variationDetail = await client
-        .getModelInstance(
+      variationDetail = kaggleRecord(
+        await client.getModelInstance(
           ctx.input.ownerSlug,
           ctx.input.modelSlug,
           ctx.input.framework,
           ctx.input.variationSlug
-        )
-        .catch(() => null);
+        ),
+        'model variation'
+      );
     }
 
     return {
       output: {
-        ...(model ?? {}),
+        ...kaggleSummary(model, 'model'),
         variationDetail: variationDetail ?? undefined
       },
       message: `Retrieved model **${ctx.input.ownerSlug}/${ctx.input.modelSlug}**${variationDetail ? ` with variation ${ctx.input.framework}/${ctx.input.variationSlug}` : ''}.`

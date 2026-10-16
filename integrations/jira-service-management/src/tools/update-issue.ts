@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
 import { spec } from '../spec';
@@ -55,10 +55,7 @@ export let updateIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let fields: any = {};
     let hasFieldUpdates = false;
@@ -73,7 +70,12 @@ export let updateIssueTool = SlateTool.create(spec, {
         type: 'doc',
         version: 1,
         content: [
-          { type: 'paragraph', content: [{ type: 'text', text: ctx.input.description }] }
+          {
+            type: 'paragraph',
+            content: ctx.input.description
+              ? [{ type: 'text', text: ctx.input.description }]
+              : []
+          }
         ]
       };
       hasFieldUpdates = true;
@@ -101,56 +103,47 @@ export let updateIssueTool = SlateTool.create(spec, {
       }
     }
 
+    let transitionId: string | undefined;
+    let transitionedTo: string | undefined;
+    if (ctx.input.transitionId || ctx.input.transitionName) {
+      let transitions = await client.getTransitions(ctx.input.issueIdOrKey);
+      let match = ctx.input.transitionId
+        ? transitions.find((t: any) => t.id === ctx.input.transitionId)
+        : transitions.find(
+            (t: any) => t.name.toLowerCase() === ctx.input.transitionName!.toLowerCase()
+          );
+      if (!match) {
+        throw createApiServiceError(
+          `Transition "${ctx.input.transitionId ?? ctx.input.transitionName}" not found. Available transitions: ${transitions.map((t: any) => t.name).join(', ')}`
+        );
+      }
+      transitionId = match.id;
+      transitionedTo = match.to?.name;
+    }
     if (ctx.input.assigneeAccountId !== undefined) {
       await client.assignIssue(ctx.input.issueIdOrKey, ctx.input.assigneeAccountId);
     }
-
     if (hasFieldUpdates) {
       await client.updateIssue(ctx.input.issueIdOrKey, { fields });
     }
-
     let transitioned = false;
-    let transitionedTo: string | undefined;
-
-    if (ctx.input.transitionId || ctx.input.transitionName) {
-      let transitionId = ctx.input.transitionId;
-
-      if (!transitionId && ctx.input.transitionName) {
-        let transitions = await client.getTransitions(ctx.input.issueIdOrKey);
-        let match = transitions.find(
-          (t: any) => t.name.toLowerCase() === ctx.input.transitionName!.toLowerCase()
-        );
-        if (!match) {
-          let available = transitions.map((t: any) => t.name).join(', ');
-          throw new Error(
-            `Transition "${ctx.input.transitionName}" not found. Available transitions: ${available}`
-          );
-        }
-        transitionId = match.id;
-        transitionedTo = match.to?.name || match.name;
-      }
-
-      if (transitionId) {
-        await client.transitionIssue(
-          ctx.input.issueIdOrKey,
-          transitionId,
-          undefined,
-          ctx.input.transitionComment
-        );
-        transitioned = true;
-
-        if (!transitionedTo) {
-          let transitions = await client.getTransitions(ctx.input.issueIdOrKey);
-          let match = transitions.find((t: any) => t.id === transitionId);
-          transitionedTo = match?.to?.name;
-        }
-      }
+    if (transitionId) {
+      await client.transitionIssue(
+        ctx.input.issueIdOrKey,
+        transitionId,
+        undefined,
+        ctx.input.transitionComment
+      );
+      transitioned = true;
     }
 
     let actions: string[] = [];
     if (hasFieldUpdates) actions.push('updated fields');
     if (ctx.input.assigneeAccountId !== undefined) actions.push('updated assignee');
-    if (transitioned) actions.push(`transitioned to "${transitionedTo}"`);
+    if (transitioned)
+      actions.push(
+        transitionedTo ? `transitioned to "${transitionedTo}"` : 'transitioned the issue'
+      );
 
     return {
       output: {

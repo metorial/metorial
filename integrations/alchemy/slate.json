@@ -1,18 +1,15 @@
 {
   "name": "@metorial/alchemy",
-  "description": "Interact with 80+ blockchain networks including Ethereum, Polygon, Solana, and Bitcoin via JSON-RPC node APIs. Query token balances, metadata, and allowances. Fetch historical transfers and transactions for any address. Retrieve real-time and historical token prices. Look up NFT ownership, metadata, sales history, and spam classification. Simulate transactions to preview gas costs and state changes. Manage smart wallets with account abstraction, gas sponsorship, and social login. Configure webhooks for real-time notifications on address activity, NFT transfers, and custom on-chain events using GraphQL filters.",
+  "description": "Query EVM blockchain balances, blocks, transactions, logs, and smart contracts through Alchemy. Read ERC-20 metadata and spending allowances, search historical transfers, inspect NFT holdings and ownership, and look up current token prices. Broadcast signed transactions. Legacy transaction simulation remains registered for compatibility after its provider retirement.",
   "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
   "skills": [
-    "query blockchain state and blocks",
+    "query EVM blockchain state and blocks",
     "fetch token balances and metadata",
-    "retrieve transfer history",
-    "look up NFT ownership and metadata",
-    "get real-time token prices",
-    "simulate transactions",
-    "manage smart wallets",
-    "sponsor gas fees",
-    "configure on-chain webhooks",
-    "monitor address activity"
+    "read token spending allowances",
+    "retrieve historical asset transfers",
+    "look up NFT holdings and ownership",
+    "get current token prices",
+    "broadcast signed transactions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/alchemy.svg"
 }

@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'codereadr',
-  name: 'Codereadr',
+  name: 'CodeREADr',
   description:
     'Cloud-based barcode scanning and data collection platform for smartphones and tablets.',
   metadata: {},

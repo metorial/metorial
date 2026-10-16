@@ -1,96 +1,37 @@
-# Slates Specification for Cloudlayer
+# Cloudlayer Integration
 
-## Overview
+## API and authentication
 
-Cloudlayer (cloudlayer.io) is a service for automating document generation processes using PDF Generation and Image Generation services. Using its API, you can generate rich documents such as PDFs or images from HTML or a URL. It offers an extensive library of templates and supports custom templates using Nunjucks templating syntax.
+The API root is `https://api.cloudlayer.io/v2`. Every API request uses the connection's API key in `X-API-Key`. The existing auth output remains `{ token: string }`; configuration is empty. There is no OAuth refresh flow.
 
-## Authentication
+Official references: [API overview](https://cloudlayer.io/docs/api-overview/), [account](https://cloudlayer.io/docs/account/), [jobs](https://cloudlayer.io/docs/jobs/), [assets](https://cloudlayer.io/docs/assets/), and [storage](https://cloudlayer.io/docs/storage/).
 
-Cloudlayer authenticates API requests using account API keys. If you don't include your key when making an API request or use an incorrect one, a 401 Unauthorized response gets returned.
+## Generation
 
-To obtain your API Key, you will need to log into your account. Go to the API Management tab, and by default, a single API Key gets generated for you. Up to 5 API Keys are allowed at any given time.
+The six generation workflows use `POST /html/pdf`, `/url/pdf`, `/template/pdf`, `/html/image`, `/url/image`, and `/template/image`. HTML and custom templates are base64 strings. `templateData` is sent as the provider's `data` object. The public PDF `batch: string[]` input is translated to the documented `{ batch: { urls: string[] } }` request body. A batch takes precedence over `url` when both are supplied. Legacy `waitForSelector.timeout` maps to documented `options.timeout`; explicit `options.timeout` wins. Legacy preview `imageType` maps to documented `type`; explicit `type` wins. All legacy fields remain accepted.
 
-The API Key needs to be added to the header of each request. The name of the header is `X-API-Key` and the value will be the key which begins with `cl-`.
+The six tools accept an optional `async` boolean. The provider defaults it to true and returns a job ID and actual state. Setting false waits for completion but v2 still returns JSON. No completion state, ID, date, or bytes are synthesized when missing. A response missing its required job ID or state raises an actionable error.
 
-Example:
+PDF generation supports paper dimensions, margins, page ranges, backgrounds, CSS page size, headers/footers, and previews. Image generation supports PNG, JPG, WebP, JPEG, and SVG; optional quality applies to JPG/JPEG/WebP. Viewports can emulate mobile, touch, and landscape behavior.
 
-```
-X-API-Key: cl-your-api-key-here
-```
+Endpoint references: [HTML to PDF](https://cloudlayer.io/docs/html-to-pdf/), [URL to PDF](https://cloudlayer.io/docs/url-to-pdf/), [template to PDF](https://cloudlayer.io/docs/template-to-pdf/), [HTML to image](https://cloudlayer.io/docs/html-to-image/), [URL to image](https://cloudlayer.io/docs/url-to-image/), [template to image](https://cloudlayer.io/docs/template-to-image/).
 
-The base URL for the API is `https://api.cloudlayer.io/v2/`.
+## Jobs, files, and account
 
-## Features
+- `get_job` and `list_jobs` retain actual job IDs and states. Documented `processTime` and `apiCreditCost` populate the existing processing-time and credits fields. Epoch-millisecond creation times become ISO strings in existing timestamp fields.
+- `get_asset` returns existing file metadata and prepares the file for download. `list_assets` discovers file IDs and URLs. Existing URL fields remain compatible.
+- `retrieve_job_asset` reads the actual job, searches stored assets by their provider `jobId`, and downloads the matching file after success. Its output contains metadata, state, search count, and an optional continuation cursor; it contains no file bytes or download URL. Searches are bounded to three pages by default, ten maximum, with repeated-cursor detection.
+- `get_account` identifies the account by `uid` and reports subscription, billing model, usage, storage, and credit fields when supplied.
+- `get_account_status` retains its legacy `/getStatus` request. Its existing fields are preserved; the absence of that route from current docs does not establish that it is invalid.
 
-### PDF Generation from HTML
+Job/asset endpoint pages document `limit` and `startAfterId`, whereas the overview says the lists have no pagination queries. Inputs follow the endpoint pages while preserving legacy `offset`. Responses are not assumed to be exhaustive, and cursor support requires provider verification.
 
-Convert HTML content into PDF documents. The HTML to PDF endpoint allows you to convert HTML to PDF files. The HTML can include Javascript, CSS, Imported Fonts, Embedded images, External images, or other external resources. The HTML must be provided as a base64-encoded string.
+Optional scalar nulls are omitted from typed summary fields. Additive provider details retain actual nulls and objects; API keys and request credentials are removed from those details.
 
-- Configurable paper format (A4, Letter, etc.), dimensions, margins, and orientation (portrait/landscape).
-- Support for custom headers and footers.
-- Options for page ranges, background graphics printing, and CSS @page declarations.
+## Download lifetime
 
-### PDF Generation from URL
+The provider documents asset URLs as pre-authenticated, so downloads do not need the API key. Their expiry depends on storage configuration; no universal provider TTL is claimed. A runtime policy rereads metadata through the authenticated asset endpoint after at most 15 minutes. Recognized S3 Signature V4 URLs use the documented `X-Amz-Date` plus `X-Amz-Expires` deadline to cap that recheck with a 10-second safety margin. Links at or inside that margin are rejected both initially and after metadata retrieval, even when the returned URL changes. Unknown URL timing retains the runtime recheck policy. Metadata retrieval does not promise a new signature or URL. Job-linked URL renewal checks the job and, if necessary, a bounded asset search. Missing or retained-away files fail explicitly. The policy does not extend provider retention or guarantee a URL lasts fifteen minutes.
 
-The PDF Generation service can take any publicly accessible URL and capture it to generate a PDF document from its source. This feature is particularly useful for converting dashboards or web pages into PDF documents. The service supports session cookies and basic authentication if your URL requires authentication.
+## Scope
 
-- Supports batch processing: an array of URLs can be converted to PDF and combined into a single PDF file.
-- Same paper format, margin, header/footer, and orientation options as HTML-to-PDF.
-
-### Image Generation from HTML
-
-Take any HTML and convert it into an image. It can include JavaScript, CSS, custom font imports, image imports, etc. As long as it works in Chrome, the service will render it.
-
-- Configurable viewport width and height, device scale factor (DPR).
-- Output formats include PNG, JPG, and WebP.
-- Support for transparent backgrounds (for formats that support transparency).
-
-### Image Generation from URL
-
-Any URL accessible on the public web can be captured and turned into an image. This is useful for converting dashboards into image documents to send out to customers or management.
-
-- Same viewport and output format options as HTML-to-image.
-- Supports authentication via cookies or basic auth on the target URL.
-
-### Template-Based Generation (PDF and Image)
-
-Two template types are available: predefined templates from the gallery, and custom templates.
-
-- **Predefined templates**: Browse pre-defined templates in the PDF or Image template gallery. Pass in the `templateId` and your data, and the service handles the rest.
-- **Custom templates**: Create your own templates using the Nunjucks syntax and pass in your data. Templates are provided as base64-encoded strings.
-- Extended Nunjucks functions offer multicultural support for currencies, dates, and number formatting.
-- Templates that support auto-calculations can be toggled via the `__auto_calculate` field in the data.
-
-### Asset Storage and CDN
-
-Generated assets are stored in your account's cloud storage by default. These assets are cached in the CDN and available for public access using a Public CDN URL. There are no bandwidth or additional costs associated with using assets via the CDN URL.
-
-- User Storage lets users bring their own storage. Any S3-compatible storage can be used, and all assets will be processed and uploaded to your storage.
-- Storage can be explicitly disabled to receive the asset directly in the response.
-
-### Preview Generation
-
-The service can generate an image preview (thumbnail) of the image or first page of the PDF document. Storage must be enabled.
-
-- Configurable width, height, image type (e.g., WebP), quality (0–100), and aspect ratio options.
-
-### Job Management
-
-Jobs API allows listing your jobs and viewing jobs by ID using the API.
-
-- V1 API calls are synchronous by default. V2 API calls are asynchronous by default.
-
-### Account Status
-
-The API provides a status endpoint (`/v2/getStatus`) to check your account's remaining credits and rate limit information without consuming API credits.
-
-## Events
-
-Cloudlayer supports webhooks for job completion notifications.
-
-### Job Status Webhooks
-
-A webhook is an external URL endpoint that can be sent data when a job's status has changed to success or error. Webhooks are especially useful when using async calls — you can send many async calls and then have your external service receive the webhook calls. All webhook calls follow the exact same format of the job response.
-
-- Every API request can include a `webhook` parameter with the URL where the completed response will be sent upon completion. This URL must be an HTTPS endpoint and publicly accessible via the internet.
-- Webhooks fire when a job reaches either a `success` or `error` status.
+There are 13 public workflows. Cloudlayer is one document-generation product, so separate product categories are unnecessary. Existing per-request webhook URL inputs remain supported. No trigger registration, storage-administration workflows, live API testing, or tool-use evaluations are part of this change.

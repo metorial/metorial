@@ -19,6 +19,10 @@ export let validateIban = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including unavailable values'),
       iban: z.string().optional().describe('The validated IBAN'),
       isValid: z.boolean().optional().describe('Whether the IBAN is valid'),
       countryCode: z.string().optional().describe('Country code from the IBAN'),
@@ -38,6 +42,7 @@ export let validateIban = SlateTool.create(spec, {
     let result = await client.validateIban({ ibanNumber: ctx.input.ibanNumber });
 
     let output = {
+      rawResponse: result,
       iban: result.iban ?? ctx.input.ibanNumber,
       isValid: result.is_valid ?? undefined,
       countryCode: result.country?.code ?? result.country_code ?? undefined,
@@ -53,7 +58,7 @@ export let validateIban = SlateTool.create(spec, {
 
     return {
       output,
-      message: `IBAN **${output.iban}** is **${output.isValid ? 'valid' : 'invalid'}**${output.bankName ? ` — ${output.bankName}` : ''}${output.countryName ? `, ${output.countryName}` : ''}.`
+      message: `IBAN **${output.iban}** is **${output.isValid === true ? 'valid' : output.isValid === false ? 'invalid' : 'unknown'}**${output.bankName ? ` — ${output.bankName}` : ''}${output.countryName ? `, ${output.countryName}` : ''}.`
     };
   })
   .build();

@@ -1,6 +1,8 @@
-# Coin Market Cap
+# CoinMarketCap
 
-Retrieve real-time and historical cryptocurrency market data for thousands of cryptocurrencies and exchanges. Look up current prices, market capitalization, trading volume, circulating supply, and percentage changes. Access historical OHLCV data going back to 2013. Convert amounts between cryptocurrencies and 93+ fiat currencies using live exchange rates. Retrieve cryptocurrency metadata including logos, descriptions, and social links. List market pairs across exchanges, query global market metrics like Bitcoin dominance, and access decentralized exchange (DEX) trading data. Map cryptocurrency IDs, symbols, and slugs. This is a read-only data API — it does not support trading or purchasing.
+Retrieve cryptocurrency listings, latest quotes, metadata, trading pairs, exchange listings and metadata, global market metrics, and supported fiat currencies. Discover stable cryptocurrency and exchange IDs, convert amounts using current or plan-supported historical rates, and monitor the connected API key's plan limits and usage.
+
+Authenticate with a CoinMarketCap Pro API key. Endpoint access, conversion currencies, historical conversion range, and rate limits depend on the key's API plan. Choose the production or sandbox environment when connecting.
 
 ## License
 

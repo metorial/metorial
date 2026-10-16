@@ -1,6 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
+import type { z as Zod } from 'zod';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { assertQrReferenceSafe, prepareQrDownload } from '../lib/files';
+import type { qrParametersSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateQrCode = SlateTool.create(spec, {
@@ -47,29 +50,45 @@ export let generateQrCode = SlateTool.create(spec, {
       contentType: z.string().describe('Type of data encoded'),
       size: z.number().describe('Image dimensions in pixels'),
       margin: z.number().describe('Border width in pixels'),
-      expiresAt: z.number().describe('Unix timestamp when the download URL expires')
+      expiresAt: z
+        .number()
+        .describe('Unix timestamp in milliseconds when the download URL expires')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.size !== undefined &&
+      (!Number.isInteger(ctx.input.size) || ctx.input.size < 50 || ctx.input.size > 2048)
+    ) {
+      throw createApiServiceError(
+        'QR code size must be a whole number from 50 to 2048 pixels.'
+      );
+    }
+    if (
+      ctx.input.margin !== undefined &&
+      (!Number.isInteger(ctx.input.margin) || ctx.input.margin < 0 || ctx.input.margin > 100)
+    ) {
+      throw createApiServiceError(
+        'QR code margin must be a whole number from 0 to 100 pixels.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
-    let params: Record<string, any> = {
+    let params: Zod.infer<typeof qrParametersSchema> = {
       value: ctx.input.content
     };
     if (ctx.input.contentType) params.type = ctx.input.contentType;
     if (ctx.input.imageFormat) params.format = ctx.input.imageFormat;
-    if (ctx.input.size) params.size = ctx.input.size;
+    if (ctx.input.size !== undefined) params.size = ctx.input.size;
     if (ctx.input.margin != null) params.margin = ctx.input.margin;
     if (ctx.input.foregroundColor) params.color = ctx.input.foregroundColor;
     if (ctx.input.backgroundColor) params.backgroundColor = ctx.input.backgroundColor;
 
-    let result = await client.generateQrCode(params as any);
-
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'QR code generation failed');
-    }
+    assertQrReferenceSafe(params, ctx.auth.token);
+    let result = await client.generateQrCode(params);
 
     let data = result.data;
+    await ctx.addAttachment(prepareQrDownload(data, params));
     let output = {
       qrCodeId: data.id,
       downloadUrl: data.downloadURL,
@@ -81,8 +100,10 @@ export let generateQrCode = SlateTool.create(spec, {
     };
 
     return {
-      output,
-      message: `QR code generated successfully. [Download ${data.format.toUpperCase()} image](${data.downloadURL}).`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `QR code generated as a downloadable ${data.format.toUpperCase()} image.`
+      )
     };
   })
   .build();

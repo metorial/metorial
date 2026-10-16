@@ -14,6 +14,7 @@ export let checkCreditBalance = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      balance: z.number().describe('Current balance returned by Linkup'),
       remainingCredits: z
         .number()
         .describe('The number of credits remaining on your Linkup account')

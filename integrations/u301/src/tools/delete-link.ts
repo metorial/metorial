@@ -32,7 +32,9 @@ export let deleteLink = SlateTool.create(spec, {
       output: {
         success: result.success
       },
-      message: `Link **${ctx.input.shortenedLink}** has been deleted.`
+      message: result.success
+        ? `Link **${ctx.input.shortenedLink}** has been deleted.`
+        : `U301 did not confirm deletion of **${ctx.input.shortenedLink}**.`
     };
   })
   .build();

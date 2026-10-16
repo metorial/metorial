@@ -26,7 +26,7 @@ export let getVariable = SlateTool.create(spec, {
         .union([z.boolean(), z.string(), z.number()])
         .nullable()
         .describe('Current value of the variable'),
-      createdAt: z.string().describe('When the variable was created'),
+      createdAt: z.string().optional().describe('When the variable was created'),
       updatedAt: z.string().describe('When the variable was last updated')
     })
   )
@@ -36,7 +36,7 @@ export let getVariable = SlateTool.create(spec, {
     let variableId: string;
     let name: string;
     let value: boolean | string | number | null;
-    let createdAt: string;
+    let createdAt: string | undefined;
     let updatedAt: string;
 
     if (ctx.input.variableType === 'boolean') {

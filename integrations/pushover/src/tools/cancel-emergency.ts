@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PushoverClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,8 +35,8 @@ export let cancelEmergency = SlateTool.create(spec, {
       userKey: ctx.auth.userKey
     });
 
-    if (!ctx.input.receiptId && !ctx.input.tag) {
-      throw new Error('Either receiptId or tag must be provided');
+    if (Boolean(ctx.input.receiptId) === Boolean(ctx.input.tag)) {
+      throw createApiServiceError('Provide exactly one of receiptId or tag.');
     }
 
     let result: { status: number; request: string };

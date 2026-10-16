@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProcFuClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let getPodioAppInfo = SlateTool.create(spec, {
   key: 'get_podio_app_info',
   description: `Retrieve information about Podio apps. Can fetch:
 - A single app's full payload by app ID.
-- All apps in a workspace by space ID.
+- All apps in a workspace by space ID. Call list_podio_organizations to discover workspace IDs.
 - Category field values for a specific app field.
 - Recent activity (recently modified item IDs) for an app.`,
   tags: {
@@ -30,11 +30,19 @@ export let getPodioAppInfo = SlateTool.create(spec, {
       spaceId: z
         .string()
         .optional()
-        .describe('The Podio Space/Workspace ID (required for list_apps)'),
+        .describe(
+          'The Podio Workspace ID (required for list_apps). Call list_podio_organizations to discover workspace IDs.'
+        ),
       fieldId: z
         .string()
         .optional()
-        .describe('The field ID (required for get_field_categories)')
+        .describe('The field ID (required for get_field_categories)'),
+      sinceDate: z
+        .string()
+        .optional()
+        .describe(
+          'For recent_activity, stop at this date in YYYY-MM-DD or YYYY-MM-DD hh:mm:ss format.'
+        )
     })
   )
   .output(
@@ -55,7 +63,7 @@ export let getPodioAppInfo = SlateTool.create(spec, {
     let client = new ProcFuClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'get_app') {
-      if (!ctx.input.appId) throw new Error('appId is required for get_app');
+      if (!ctx.input.appId) throw createApiServiceError('appId is required for get_app');
       let app = await client.getAppRaw(ctx.input.appId);
       return {
         output: { app },
@@ -64,7 +72,7 @@ export let getPodioAppInfo = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list_apps') {
-      if (!ctx.input.spaceId) throw new Error('spaceId is required for list_apps');
+      if (!ctx.input.spaceId) throw createApiServiceError('spaceId is required for list_apps');
       let apps = await client.getSpaceApps(ctx.input.spaceId);
       let count = Array.isArray(apps) ? apps.length : 0;
       return {
@@ -75,7 +83,7 @@ export let getPodioAppInfo = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get_field_categories') {
       if (!ctx.input.appId || !ctx.input.fieldId)
-        throw new Error('appId and fieldId are required for get_field_categories');
+        throw createApiServiceError('appId and fieldId are required for get_field_categories');
       let categories = await client.getAppFieldCategories(ctx.input.appId, ctx.input.fieldId);
       return {
         output: { categories },
@@ -84,14 +92,16 @@ export let getPodioAppInfo = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'recent_activity') {
-      if (!ctx.input.appId) throw new Error('appId is required for recent_activity');
-      let recentItemIds = await client.getRecentActivity(ctx.input.appId);
+      if (!ctx.input.appId) {
+        throw createApiServiceError('appId is required for recent_activity');
+      }
+      let recentItemIds = await client.getRecentActivity(ctx.input.appId, ctx.input.sinceDate);
       return {
         output: { recentItemIds },
         message: `Retrieved recent activity for app **${ctx.input.appId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

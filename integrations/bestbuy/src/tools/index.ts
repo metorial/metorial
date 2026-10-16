@@ -1,3 +1,4 @@
+export { browseCatalog } from './browse-catalog';
 export { browseCategories } from './browse-categories';
 export { checkAvailability } from './check-availability';
 export { getOpenBoxOffers } from './get-open-box-offers';

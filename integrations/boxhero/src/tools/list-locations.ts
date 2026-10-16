@@ -8,8 +8,8 @@ export let listLocations = SlateTool.create(spec, {
   key: 'list_locations',
   description: `Retrieve all inventory locations (warehouses, stores, stockrooms) from BoxHero. Use location IDs when filtering items or creating transactions.`,
   constraints: [
-    'Only available for teams on the Business Plan (Business Mode).',
-    'Calling this in Basic Mode will result in an error.'
+    'Requires a team in Location mode (mode = 2).',
+    'Calling this in Basic or Unit mode returns an error.'
   ],
   tags: {
     destructive: false,
@@ -23,10 +23,13 @@ export let listLocations = SlateTool.create(spec, {
         .array(
           z.object({
             locationId: z.number().describe('Unique location ID'),
-            name: z.string().describe('Location name')
+            name: z.string().describe('Location name'),
+            quantity: z.number().optional().describe('Total on-hand stock across all items'),
+            memo: z.string().optional().describe('Location memo')
           })
         )
-        .describe('List of inventory locations')
+        .describe('List of inventory locations'),
+      raw: z.unknown().optional().describe('Original response returned by BoxHero')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,11 +39,13 @@ export let listLocations = SlateTool.create(spec, {
 
     let locations = response.items.map(loc => ({
       locationId: loc.id,
-      name: loc.name
+      name: loc.name,
+      quantity: loc.quantity,
+      memo: loc.memo
     }));
 
     return {
-      output: { locations },
+      output: { locations, raw: response },
       message: `Retrieved ${locations.length} location(s).`
     };
   })

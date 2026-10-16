@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import { finageNumber, finageRecord, finageSymbol } from '../lib/response';
 import { spec } from '../spec';
 
 export let convertCurrency = SlateTool.create(spec, {
@@ -24,6 +25,7 @@ export let convertCurrency = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       from: z.string().describe('Source currency code'),
       to: z.string().describe('Target currency code'),
       originalAmount: z.number().describe('Original amount'),
@@ -34,30 +36,32 @@ export let convertCurrency = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let { from, to, amount, assetType } = ctx.input;
-
-    let data: any;
-    if (assetType === 'crypto') {
-      data = await client.convertCrypto(from.toUpperCase(), to.toUpperCase(), amount);
-    } else {
-      data = await client.convertCurrency(from.toUpperCase(), to.toUpperCase(), amount);
-    }
-
-    let convertedAmount = data.value ?? data.convertedAmount ?? data.amount;
-    let rate = data.rate ?? (convertedAmount && amount ? convertedAmount / amount : undefined);
-
-    let output = {
-      from: from.toUpperCase(),
-      to: to.toUpperCase(),
-      originalAmount: amount,
-      convertedAmount,
-      rate,
-      timestamp: data.timestamp
-    };
-
+    let { amount, assetType } = ctx.input;
+    let from = finageSymbol(ctx.input.from);
+    let to = finageSymbol(ctx.input.to);
+    let data =
+      assetType === 'crypto'
+        ? await client.convertCrypto(from, to, amount)
+        : await client.convertCurrency(from, to, amount);
+    let response = finageRecord(data);
+    let convertedAmount = finageNumber(response.value ?? response.convertedAmount);
+    if (convertedAmount === undefined)
+      throw createApiServiceError('Finage returned no converted amount.');
+    let rate =
+      finageNumber(response.rate) ?? (amount !== 0 ? convertedAmount / amount : undefined);
     return {
-      output,
-      message: `**${amount} ${from.toUpperCase()}** = **${convertedAmount ?? 'N/A'} ${to.toUpperCase()}**${rate ? ` (rate: ${rate})` : ''}`
+      output: {
+        from,
+        to,
+        originalAmount: amount,
+        ...pickDefined({
+          convertedAmount,
+          rate,
+          timestamp: finageNumber(response.timestamp),
+          raw: data
+        })
+      },
+      message: `**${amount} ${from}** = **${convertedAmount} ${to}**`
     };
   })
   .build();

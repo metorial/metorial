@@ -26,6 +26,7 @@ export let manageGlobals = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       globalKey: z.string().describe('Key of the global'),
       name: z.string().describe('Display name'),
       value: z.string().describe('Value'),
@@ -34,7 +35,7 @@ export let manageGlobals = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    let global: any;
+    let global: Awaited<ReturnType<Client['createGlobal']>>;
 
     if (ctx.input.action === 'create') {
       global = await client.createGlobal({ name: ctx.input.name, value: ctx.input.value });
@@ -47,6 +48,7 @@ export let manageGlobals = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: global,
         globalKey: global.key,
         name: global.name,
         value: global.value,

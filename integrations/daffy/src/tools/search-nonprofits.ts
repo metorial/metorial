@@ -18,8 +18,8 @@ let nonProfitSchema = z.object({
   state: z.string().nullable().describe('State'),
   publicUrl: z.string().describe('Daffy public profile URL'),
   logo: z.string().nullable().describe('Organization logo URL'),
-  latitude: z.number().nullable().describe('Geographic latitude'),
-  longitude: z.number().nullable().describe('Geographic longitude'),
+  latitude: z.number().nullable().optional().describe('Geographic latitude, when included'),
+  longitude: z.number().nullable().optional().describe('Geographic longitude, when included'),
   primaryCause: causeSchema.nullable().describe('Primary cause category'),
   causes: z.array(causeSchema).describe('All associated causes')
 });
@@ -29,7 +29,7 @@ export let searchNonprofits = SlateTool.create(spec, {
   key: 'search_nonprofits',
   description: `Search Daffy's database of 1.7M+ U.S. nonprofits by name/keyword and/or cause category. Use this to find charities, verify nonprofit details, or browse organizations by cause.`,
   instructions: [
-    'Provide at least a query or causeId to search. Both can be combined for more specific results.'
+    'Search by query, causeId, or both. Use get_causes with a user ID from get_user_profile to discover causes that a user supports.'
   ],
   tags: {
     readOnly: true
@@ -38,7 +38,7 @@ export let searchNonprofits = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().optional().describe('Search text to match against nonprofit names'),
-      causeId: z.number().optional().describe('Filter by cause ID'),
+      causeId: z.number().optional().describe('Filter by cause ID from get_causes'),
       page: z
         .number()
         .optional()

@@ -14,7 +14,10 @@ export let listCredentialInteractions = SlateTool.create(spec, {
   .input(
     z.object({
       credentialId: z.string().describe('ID of the credential to list interactions for'),
-      limit: z.number().optional().describe('Number of interactions per page (default: 20)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of interactions per page (whole number 1–100; default: 20)'),
       cursor: z.string().optional().describe('Pagination cursor for fetching the next page')
     })
   )
@@ -24,9 +27,11 @@ export let listCredentialInteractions = SlateTool.create(spec, {
         .array(
           z.object({
             interactionId: z.string().describe('ID of the interaction'),
-            name: z.string().describe('Name of the interaction'),
-            type: z.string().describe('Type of interaction'),
-            createdAt: z.string().describe('Interaction timestamp')
+            name: z.string().describe('Interaction event type (compatibility alias)'),
+            type: z.string().describe('Interaction event type'),
+            createdAt: z.string().describe('Interaction timestamp'),
+            triggeredBy: z.string().optional().describe('Actor who triggered the interaction'),
+            credentialId: z.string().optional().describe('ID of the credential')
           })
         )
         .describe('List of credential interactions'),
@@ -44,18 +49,20 @@ export let listCredentialInteractions = SlateTool.create(spec, {
 
     let interactions = result.data.map(i => ({
       interactionId: i.id,
-      name: i.name,
-      type: i.type,
-      createdAt: i.createdAt
+      triggeredBy: i.triggeredBy,
+      credentialId: i.credentialId,
+      name: i.eventType,
+      type: i.eventType,
+      createdAt: i.triggeredAt
     }));
 
     return {
       output: {
         interactions,
-        nextCursor: result.pagination.next,
-        prevCursor: result.pagination.prev
+        nextCursor: result.pagination?.next ?? null,
+        prevCursor: result.pagination?.prev ?? null
       },
-      message: `Retrieved **${interactions.length}** interaction(s) for credential \`${ctx.input.credentialId}\`.${result.pagination.next ? ' More results available.' : ''}`
+      message: `Retrieved **${interactions.length}** interaction(s) for credential \`${ctx.input.credentialId}\`.${result.pagination?.next ? ' More results available.' : ''}`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let insiderTransactionSchema = z.object({
@@ -21,6 +21,9 @@ let insiderTransactionSchema = z.object({
     .optional()
     .nullable()
     .describe('A=Acquired, D=Disposed'),
+  link: z.string().optional().describe('Link to the SEC filing returned by the provider'),
+  reportDate: z.string().optional().describe('Date the transaction was reported'),
+  exchange: z.string().optional().describe('Exchange code'),
   postTransactionAmount: z
     .number()
     .optional()
@@ -64,7 +67,7 @@ export let getInsiderTransactions = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let transactionsArray = Array.isArray(transactions) ? transactions : [];
+    let transactionsArray = eodhdArray(transactions, 'get-insider-transactions');
 
     return {
       output: {

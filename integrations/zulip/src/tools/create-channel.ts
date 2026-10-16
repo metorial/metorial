@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let createChannel = SlateTool.create(spec, {
   name: 'Create Channel',
   key: 'create_channel',
-  description: `Create a new Zulip channel (stream). The authenticated user will be automatically subscribed. Can create public or private channels.`,
+  description: `DEPRECATED — use \`create_or_subscribe_channel\` instead. Create a new Zulip channel (stream). The authenticated user will be automatically subscribed. Can create public or private channels.`,
+  instructions: [
+    'Use create_or_subscribe_channel for subscription results that distinguish newly subscribed from already subscribed without claiming the channel was newly created.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

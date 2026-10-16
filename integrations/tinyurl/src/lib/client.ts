@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 export interface CreateTinyUrlParams {
   url: string;
@@ -55,7 +61,13 @@ export interface AnalyticsStatusParams {
   enabled: boolean;
 }
 
-export interface TinyUrlData {
+export interface AnalyticsSharingParams {
+  domain: string;
+  alias: string;
+  public: boolean;
+}
+
+export interface TinyUrlAliasData {
   domain: string;
   alias: string;
   deleted: boolean;
@@ -66,198 +78,290 @@ export interface TinyUrlData {
     public: boolean;
   };
   tiny_url: string;
-  url: string;
   created_at: string;
   expires_at: string | null;
-  description: string | null;
+  description?: string | null;
+}
+
+export interface TinyUrlData extends TinyUrlAliasData {
+  url: string;
   hits: number;
 }
 
-export interface ApiResponse<T> {
+interface ApiResponse<T> {
   code: number;
   errors: string[];
   data: T;
 }
 
+let toTinyUrlError = (error: unknown, operation: string) =>
+  buildApiServiceError(error, {
+    providerLabel: 'TinyURL',
+    reason: 'tinyurl_api_error',
+    operation,
+    extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+    extractUpstreamCode: (_value, response, helpers) =>
+      helpers.isRecord(response?.data) && typeof response.data.code === 'number'
+        ? String(response.data.code)
+        : undefined
+  });
+
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.tinyurl.com',
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${params.token}` },
+      headers: { Accept: 'application/json' }
     });
   }
 
-  async createTinyUrl(params: CreateTinyUrlParams): Promise<TinyUrlData> {
-    let body: Record<string, unknown> = { url: params.url };
-    if (params.domain) body.domain = params.domain;
-    if (params.alias) body.alias = params.alias;
-    if (params.tags && params.tags.length > 0) body.tags = params.tags;
-    if (params.expiresAt) body.expires_at = params.expiresAt;
-    if (params.description) body.description = params.description;
+  private async request<T>(
+    operation: string,
+    method: 'get' | 'post' | 'patch' | 'delete',
+    path: string,
+    data?: Record<string, unknown>,
+    params?: Record<string, unknown>
+  ): Promise<T> {
+    let response = await requestAxiosData<ApiResponse<T>>(
+      operation,
+      () => this.axios.request({ method, url: path, data, params }),
+      toTinyUrlError
+    );
 
-    let response = await this.axios.post<ApiResponse<TinyUrlData>>('/create', body);
-    return response.data.data;
+    if (response?.code !== 0 || response.errors?.length) {
+      throw toTinyUrlError({ response: { data: response } }, operation);
+    }
+    if (response.data === undefined || response.data === null) {
+      throw createApiServiceError(`TinyURL returned no data for ${operation}.`, {
+        reason: 'tinyurl_invalid_response'
+      });
+    }
+    return response.data;
   }
 
-  async getTinyUrl(domain: string, alias: string): Promise<TinyUrlData> {
-    let response = await this.axios.get<ApiResponse<TinyUrlData>>(
+  createTinyUrl(params: CreateTinyUrlParams) {
+    return this.request<TinyUrlAliasData & { url: string }>(
+      'create TinyURL',
+      'post',
+      '/create',
+      pickDefined({
+        url: params.url,
+        domain: params.domain,
+        alias: params.alias,
+        tags: params.tags,
+        expires_at: params.expiresAt,
+        description: params.description
+      })
+    );
+  }
+
+  getTinyUrl(domain: string, alias: string, operation = 'retrieve TinyURL') {
+    return this.request<TinyUrlData>(
+      operation,
+      'get',
       `/alias/${encodeURIComponent(domain)}/${encodeURIComponent(alias)}`
     );
-    return response.data.data;
   }
 
-  async deleteTinyUrl(domain: string, alias: string): Promise<TinyUrlData> {
-    let response = await this.axios.delete<ApiResponse<TinyUrlData>>(
+  deleteTinyUrl(domain: string, alias: string) {
+    return this.request<TinyUrlAliasData & { url: string }>(
+      'delete TinyURL',
+      'delete',
       `/alias/${encodeURIComponent(domain)}/${encodeURIComponent(alias)}`
     );
-    return response.data.data;
   }
 
-  async updateTinyUrl(params: UpdateTinyUrlParams): Promise<TinyUrlData> {
-    let body: Record<string, unknown> = {
-      domain: params.domain,
-      alias: params.alias
-    };
-    if (params.newDomain !== undefined) body.new_domain = params.newDomain;
-    if (params.newAlias !== undefined) body.new_alias = params.newAlias;
-    if (params.newStats !== undefined) body.new_stats = params.newStats;
-    if (params.newTags !== undefined) body.new_tags = params.newTags;
-    if (params.newExpiresAt !== undefined) body.new_expires_at = params.newExpiresAt;
-    if (params.newDescription !== undefined) body.new_description = params.newDescription;
-
-    let response = await this.axios.patch<ApiResponse<TinyUrlData>>('/update', body);
-    return response.data.data;
+  updateTinyUrl(params: UpdateTinyUrlParams) {
+    return this.request<TinyUrlAliasData>(
+      'update TinyURL metadata',
+      'patch',
+      '/update',
+      pickDefined({
+        domain: params.domain,
+        alias: params.alias,
+        new_domain: params.newDomain,
+        new_alias: params.newAlias,
+        new_stats: params.newStats,
+        new_tags: params.newTags,
+        new_expires_at: params.newExpiresAt,
+        new_description: params.newDescription
+      })
+    );
   }
 
-  async changeUrl(params: ChangeUrlParams): Promise<TinyUrlData> {
-    let response = await this.axios.patch<ApiResponse<TinyUrlData>>('/change', {
+  changeUrl(params: ChangeUrlParams) {
+    return this.request<{ url: string }>('change destination URL', 'patch', '/change', {
       domain: params.domain,
       alias: params.alias,
       url: params.url
     });
-    return response.data.data;
   }
 
-  async archiveTinyUrl(domain: string, alias: string): Promise<TinyUrlData> {
-    let response = await this.axios.patch<ApiResponse<TinyUrlData>>('/archive', {
+  archiveTinyUrl(domain: string, alias: string) {
+    return this.request<TinyUrlAliasData>('toggle archive status', 'patch', '/archive', {
       domain,
       alias
     });
-    return response.data.data;
   }
 
   async listTinyUrls(params: ListUrlsParams): Promise<TinyUrlData[]> {
-    let queryParams: Record<string, string> = {};
-    if (params.from) queryParams.from = params.from;
-    if (params.to) queryParams.to = params.to;
-    if (params.search) queryParams.search = params.search;
+    let aliases = await this.request<TinyUrlAliasData[]>(
+      'list TinyURLs',
+      'get',
+      `/urls/${params.type}`,
+      undefined,
+      pickDefined({ from: params.from, to: params.to, search: params.search })
+    );
+    if (!Array.isArray(aliases)) {
+      throw createApiServiceError('TinyURL returned an invalid link list.', {
+        reason: 'tinyurl_invalid_response'
+      });
+    }
 
-    let response = await this.axios.get<ApiResponse<TinyUrlData[]>>(`/urls/${params.type}`, {
-      params: queryParams
-    });
-    return response.data.data;
+    let links: TinyUrlData[] = [];
+    for (let alias of aliases) {
+      // The list endpoint omits destination URLs and hit counts.
+      let detail = await this.getTinyUrl(alias.domain, alias.alias);
+      links.push({ ...alias, ...detail });
+    }
+    return links;
   }
 
   async countTinyUrls(params: ListUrlsParams): Promise<number> {
-    let queryParams: Record<string, string> = {};
-    if (params.from) queryParams.from = params.from;
-    if (params.to) queryParams.to = params.to;
-    if (params.search) queryParams.search = params.search;
-
-    let response = await this.axios.get<ApiResponse<{ count: number }>>(
+    let data = await this.request<{ count: number }>(
+      'count TinyURLs',
+      'get',
       `/urls/${params.type}/count`,
+      undefined,
+      pickDefined({ from: params.from, to: params.to, search: params.search })
+    );
+    if (!Number.isInteger(data.count) || data.count < 0) {
+      throw createApiServiceError('TinyURL returned an invalid link count.', {
+        reason: 'tinyurl_invalid_response'
+      });
+    }
+    return data.count;
+  }
+
+  setAnalyticsStatus(params: AnalyticsStatusParams) {
+    return this.request<TinyUrlAliasData>(
+      'set analytics collection',
+      'patch',
+      '/analytics/status',
       {
-        params: queryParams
+        domain: params.domain,
+        alias: params.alias,
+        enabled: params.enabled
       }
     );
-    return response.data.data.count;
   }
 
-  async setAnalyticsStatus(params: AnalyticsStatusParams): Promise<TinyUrlData> {
-    let response = await this.axios.patch<ApiResponse<TinyUrlData>>('/analytics/status', {
-      domain: params.domain,
-      alias: params.alias,
-      enabled: params.enabled
-    });
-    return response.data.data;
-  }
-
-  async getGeneralAnalytics(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/general', {
-      params: this.buildAnalyticsQuery(params)
-    });
-    return response.data.data;
-  }
-
-  async getTimelineAnalytics(params: TimelineAnalyticsParams): Promise<unknown> {
-    let queryParams = this.buildAnalyticsQuery(params);
-    if (params.interval) queryParams.interval = params.interval;
-
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/timeline', {
-      params: queryParams
-    });
-    return response.data.data;
-  }
-
-  async getTopSources(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/sources/top', {
-      params: this.buildAnalyticsQuery(params)
-    });
-    return response.data.data;
-  }
-
-  async getTopLanguages(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/languages/top', {
-      params: this.buildAnalyticsQuery(params)
-    });
-    return response.data.data;
-  }
-
-  async getLocationAnalytics(region: string, params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>(
-      `/analytics/location/${encodeURIComponent(region)}`,
+  setAnalyticsSharing(params: AnalyticsSharingParams) {
+    return this.request<TinyUrlAliasData>(
+      'set analytics sharing',
+      'patch',
+      '/analytics/sharing',
       {
-        params: this.buildAnalyticsQuery(params)
+        domain: params.domain,
+        alias: params.alias,
+        public: params.public
       }
     );
-    return response.data.data;
   }
 
-  async getWeekdayPopularity(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>(
+  getGeneralAnalytics(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve general analytics',
+      'get',
+      '/analytics/general',
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
+  }
+
+  getTimelineAnalytics(params: TimelineAnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve timeline analytics',
+      'get',
+      '/analytics/timeline',
+      undefined,
+      { ...this.buildAnalyticsQuery(params), ...pickDefined({ interval: params.interval }) }
+    );
+  }
+
+  getTopSources(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve traffic sources',
+      'get',
+      '/analytics/sources/top',
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
+  }
+
+  getTopLanguages(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve languages',
+      'get',
+      '/analytics/languages/top',
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
+  }
+
+  getLocationAnalytics(region: string, params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve location analytics',
+      'get',
+      `/analytics/location/${encodeURIComponent(region || 'world')}`,
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
+  }
+
+  getWeekdayPopularity(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve weekday popularity',
+      'get',
       '/analytics/popularity/weekday',
-      {
-        params: this.buildAnalyticsQuery(params)
-      }
+      undefined,
+      this.buildAnalyticsQuery(params)
     );
-    return response.data.data;
   }
 
-  async getHourPopularity(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/popularity/hour', {
-      params: this.buildAnalyticsQuery(params)
-    });
-    return response.data.data;
+  getHourPopularity(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve hourly popularity',
+      'get',
+      '/analytics/popularity/hour',
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
   }
 
-  async getRawAnalytics(params: AnalyticsParams): Promise<unknown> {
-    let response = await this.axios.get<ApiResponse<unknown>>('/analytics/raw/json', {
-      params: this.buildAnalyticsQuery(params)
-    });
-    return response.data.data;
+  getRawAnalytics(params: AnalyticsParams) {
+    return this.request<unknown>(
+      'retrieve raw analytics logs',
+      'get',
+      '/analytics/raw/json',
+      undefined,
+      this.buildAnalyticsQuery(params)
+    );
   }
 
-  private buildAnalyticsQuery(params: AnalyticsParams): Record<string, string> {
-    let query: Record<string, string> = {};
-    if (params.from) query.from = params.from;
-    if (params.to) query.to = params.to;
-    if (params.alias) query.alias = params.alias;
-    if (params.tag) query.tag = params.tag;
-    return query;
+  private buildAnalyticsQuery(params: AnalyticsParams) {
+    if (!params.from?.trim()) {
+      throw createApiServiceError(
+        'Provide a start datetime in "from" for the analytics report.',
+        {
+          reason: 'tinyurl_analytics_start_required'
+        }
+      );
+    }
+    let alias = params.alias?.replace(/^https?:\/\//i, '');
+    if (alias && !alias.includes('/')) alias = `tinyurl.com/${alias}`;
+    return pickDefined({ from: params.from, to: params.to, alias, tag: params.tag });
   }
 }

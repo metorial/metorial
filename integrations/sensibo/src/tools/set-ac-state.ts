@@ -1,7 +1,24 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SensiboClient } from '../lib/client';
+import { checked, deviceIdSchema, record, SensiboClient } from '../lib/client';
+import { stateResult, validateAcState } from '../lib/state';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  deviceId: z.string().describe('The device that was updated'),
+  acState: z
+    .object({
+      on: z.boolean().optional(),
+      mode: z.string().optional(),
+      targetTemperature: z.number().optional(),
+      temperatureUnit: z.string().optional(),
+      fanLevel: z.string().optional(),
+      swing: z.string().optional(),
+      horizontalSwing: z.string().optional(),
+      light: z.string().optional()
+    })
+    .describe('The resulting AC state after the update')
+});
 
 export let setAcStateTool = SlateTool.create(spec, {
   name: 'Set AC State',
@@ -17,7 +34,7 @@ export let setAcStateTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deviceId: z.string().describe('The unique ID of the Sensibo device'),
+      deviceId: deviceIdSchema,
       on: z.boolean().optional().describe('Turn AC on (true) or off (false)'),
       mode: z
         .enum(['cool', 'heat', 'fan', 'dry', 'auto'])
@@ -31,68 +48,68 @@ export let setAcStateTool = SlateTool.create(spec, {
       light: z.string().optional().describe('Light setting (e.g. on, off)')
     })
   )
-  .output(
-    z.object({
-      deviceId: z.string().describe('The device that was updated'),
-      acState: z
-        .object({
-          on: z.boolean().optional(),
-          mode: z.string().optional(),
-          targetTemperature: z.number().optional(),
-          temperatureUnit: z.string().optional(),
-          fanLevel: z.string().optional(),
-          swing: z.string().optional(),
-          horizontalSwing: z.string().optional(),
-          light: z.string().optional()
-        })
-        .describe('The resulting AC state after the update')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new SensiboClient(ctx.auth.token);
-    let { deviceId, ...stateProps } = ctx.input;
+    let result = await (async () => {
+      let { deviceId, ...stateProps } = ctx.input;
 
-    let propertyKeys = Object.keys(stateProps).filter(
-      k => stateProps[k as keyof typeof stateProps] !== undefined
-    );
+      let propertyKeys = Object.keys(stateProps).filter(
+        k => stateProps[k as keyof typeof stateProps] !== undefined
+      );
 
-    let result: any;
+      if (!propertyKeys.length)
+        throw createApiServiceError('Provide at least one AC state property.');
+      let device = await client.getDevice(deviceId);
+      validateAcState(stateProps, device);
+      let result: unknown;
 
-    if (propertyKeys.length === 1) {
-      let property = propertyKeys[0]!;
-      let value = stateProps[property as keyof typeof stateProps];
-      result = await client.setAcStateProperty(deviceId, property, value);
-    } else {
-      let acState: Record<string, any> = {};
-      for (let key of propertyKeys) {
-        acState[key] = stateProps[key as keyof typeof stateProps];
+      if (propertyKeys.length === 1) {
+        let property = propertyKeys[0]!;
+        let value = stateProps[property as keyof typeof stateProps];
+        result = await client.setAcStateProperty(
+          deviceId,
+          property,
+          value,
+          record(device.acState, 'current AC state')
+        );
+      } else {
+        let acState: Record<string, any> = {};
+        for (let key of propertyKeys) {
+          acState[key] = stateProps[key as keyof typeof stateProps];
+        }
+        result = await client.setAcState(deviceId, acState);
       }
-      result = await client.setAcState(deviceId, acState);
-    }
 
-    let acState = result?.acState || result;
+      let acState = stateResult(result);
 
-    let output = {
-      deviceId,
-      acState: {
-        on: acState?.on,
-        mode: acState?.mode,
-        targetTemperature: acState?.targetTemperature,
-        temperatureUnit: acState?.temperatureUnit,
-        fanLevel: acState?.fanLevel,
-        swing: acState?.swing,
-        horizontalSwing: acState?.horizontalSwing,
-        light: acState?.light
-      }
-    };
+      let output = {
+        deviceId,
+        acState: {
+          on: acState?.on,
+          mode: acState?.mode,
+          targetTemperature: acState?.targetTemperature,
+          temperatureUnit: acState?.temperatureUnit,
+          fanLevel: acState?.fanLevel,
+          swing: acState?.swing,
+          horizontalSwing: acState?.horizontalSwing,
+          light: acState?.light
+        }
+      };
 
-    let changes = propertyKeys
-      .map(k => `${k}=${stateProps[k as keyof typeof stateProps]}`)
-      .join(', ');
+      let changes = propertyKeys
+        .map(k => `${k}=${stateProps[k as keyof typeof stateProps]}`)
+        .join(', ');
 
+      return {
+        output,
+        message: `Updated AC state on device **${deviceId}**: ${changes}.`
+      };
+    })();
     return {
-      output,
-      message: `Updated AC state on device **${deviceId}**: ${changes}.`
+      ...result,
+      output: checked(outputSchema, client.sanitize(result.output), 'tool output'),
+      message: client.sanitize(result.message)
     };
   })
   .build();

@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let matchPlace = SlateTool.create(spec, {
   name: 'Match Place',
   key: 'match_place',
-  description: `Match a place name and location to a Foursquare POI record. Useful for enriching in-house datasets with Foursquare data by matching against known place names and addresses or coordinates.`,
+  description: `DEPRECATED — use \`match_place_current\` instead. Match a place name and location to a Foursquare POI record. Useful for enriching in-house datasets with Foursquare data by matching against known place names and addresses or coordinates.`,
   instructions: [
+    'Use match_place_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Provide the place name and either an address (with city/state/country) or lat/long coordinates.',
     'More location detail improves match accuracy.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

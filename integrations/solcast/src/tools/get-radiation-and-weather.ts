@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getDataPoints } from '../lib/client';
 import { spec } from '../spec';
 
 let outputParameterEnum = z
@@ -27,7 +27,30 @@ let outputParameterEnum = z
     'cloud_opacity',
     'pm2.5',
     'pm10',
-    'albedo_daily'
+    'albedo_daily',
+    'albedo',
+    'azimuth',
+    'clearsky_gti',
+    'cloud_opacity10',
+    'cloud_opacity90',
+    'dhi10',
+    'dhi90',
+    'dni10',
+    'dni90',
+    'ghi10',
+    'ghi90',
+    'gti10',
+    'gti90',
+    'precipitable_water',
+    'snow_soiling_rooftop',
+    'snow_soiling_ground',
+    'zenith',
+    'snowfall_rate',
+    'wind_gust',
+    'cape',
+    'weather_type',
+    'min_air_temp',
+    'max_air_temp'
   ])
   .describe('Output parameter to include');
 
@@ -80,7 +103,7 @@ Returns time-series data including GHI, DNI, DHI, GTI, air temperature, wind spe
         .optional()
         .describe('Specific output parameters to include in the response'),
       period: z
-        .enum(['PT5M', 'PT10M', 'PT15M', 'PT30M', 'PT60M'])
+        .enum(['PT5M', 'PT10M', 'PT15M', 'PT20M', 'PT30M', 'PT60M'])
         .optional()
         .describe('Time resolution for the data'),
       hours: z.number().optional().describe('Number of hours of data to return'),
@@ -95,7 +118,7 @@ Returns time-series data including GHI, DNI, DHI, GTI, air temperature, wind spe
         .min(-180)
         .max(180)
         .optional()
-        .describe('Azimuth angle of the surface (-180 to 180, north=0, east=90)'),
+        .describe('Azimuth angle of the surface (-180 to 180, north=0, east=-90)'),
       arrayType: z
         .enum(['fixed', 'horizontal_single_axis'])
         .optional()
@@ -116,7 +139,7 @@ Returns time-series data including GHI, DNI, DHI, GTI, air temperature, wind spe
         .string()
         .optional()
         .describe(
-          'Time zone for historic response timestamps (e.g. UTC, or a fixed offset like +10:00)'
+          'Time zone for historic response timestamps (e.g. UTC, longitudinal, 10, or +10:00)'
         )
     })
   )
@@ -164,7 +187,7 @@ Returns time-series data including GHI, DNI, DHI, GTI, air temperature, wind spe
       result = await client.getLiveRadiationAndWeather(baseParams);
     } else {
       if (!start) {
-        throw new Error('The "start" parameter is required for historic mode.');
+        throw createApiServiceError('The "start" parameter is required for historic mode.');
       }
       result = await client.getHistoricRadiationAndWeather({
         ...baseParams,
@@ -176,7 +199,7 @@ Returns time-series data including GHI, DNI, DHI, GTI, air temperature, wind spe
     }
 
     let dataKey = mode === 'forecast' ? 'forecasts' : 'estimated_actuals';
-    let dataPoints = result[dataKey] ?? result.estimated_actuals ?? result.forecasts ?? [];
+    let dataPoints = getDataPoints(result, dataKey);
 
     return {
       output: {

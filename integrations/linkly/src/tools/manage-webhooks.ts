@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageWebhooks = SlateTool.create(spec, {
   name: 'Manage Webhooks',
   key: 'manage_webhooks',
-  description: `Manages webhook subscriptions for click notifications. Supports listing, creating, and deleting webhooks at both the link level and workspace level. Link-level webhooks fire only for that specific link; workspace-level webhooks fire for all links.`,
+  description: `Manages webhook subscriptions for click and link lifecycle notifications. Supports listing, creating, and deleting webhooks at both the link level and workspace level. Link-level webhooks receive click, link.updated, and link.deleted events for that link. Workspace-level webhooks also receive link.created events for every link in the workspace.`,
   instructions: [
     'Set action to "list", "create", or "delete".',
     'Set scope to "link" for link-level webhooks or "workspace" for workspace-level webhooks.',
@@ -64,10 +64,25 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     let { action, scope, linkId, webhookUrl, webhookId } = ctx.input;
 
+    if (
+      scope === 'link' &&
+      (linkId === undefined || !Number.isSafeInteger(linkId) || linkId <= 0)
+    ) {
+      throw createApiServiceError(
+        'A positive integer linkId is required when scope is "link".'
+      );
+    }
+    if (action === 'create' && webhookUrl) {
+      let parsed = z.url().safeParse(webhookUrl);
+      if (!parsed.success || !/^https?:\/\//i.test(webhookUrl)) {
+        throw createApiServiceError('webhookUrl must be an absolute HTTP or HTTPS endpoint.');
+      }
+    }
+
     if (action === 'list') {
       let result: any;
       if (scope === 'link') {
-        if (!linkId) throw new Error('linkId is required when scope is "link"');
+        if (!linkId) throw createApiServiceError('linkId is required when scope is "link"');
         result = await client.listLinkWebhooks(linkId);
       } else {
         result = await client.listWorkspaceWebhooks();
@@ -85,11 +100,12 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!webhookUrl) throw new Error('webhookUrl is required for "create" action');
+      if (!webhookUrl)
+        throw createApiServiceError('webhookUrl is required for "create" action');
 
       let result: any;
       if (scope === 'link') {
-        if (!linkId) throw new Error('linkId is required when scope is "link"');
+        if (!linkId) throw createApiServiceError('linkId is required when scope is "link"');
         result = await client.createLinkWebhook(linkId, webhookUrl);
       } else {
         result = await client.createWorkspaceWebhook(webhookUrl);
@@ -104,10 +120,10 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!webhookId) throw new Error('webhookId is required for "delete" action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for "delete" action');
 
       if (scope === 'link') {
-        if (!linkId) throw new Error('linkId is required when scope is "link"');
+        if (!linkId) throw createApiServiceError('linkId is required when scope is "link"');
         await client.deleteLinkWebhook(linkId, webhookId);
       } else {
         await client.deleteWorkspaceWebhook(webhookId);
@@ -119,6 +135,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -23,6 +23,7 @@ export let getProduct = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       productId: z.string(),
       name: z.string().optional(),
       description: z.string().optional(),
@@ -53,7 +54,7 @@ export let getProduct = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.config.domain });
 
     let includes: string[] = [];
-    if (ctx.input.includeVariants) includes.push('variant');
+    if (ctx.input.includeVariants) includes.push('variants');
     if (ctx.input.includeCategory) includes.push('category');
 
     let res = await client.getProduct(
@@ -64,15 +65,16 @@ export let getProduct = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         productId: p.id,
-        name: p.attributes.name,
-        description: p.attributes.description,
-        urlHandle: p.attributes.url_handle,
-        seoTitle: p.attributes.seo_title,
-        seoDescription: p.attributes.seo_description,
+        name: p.attributes.name ?? undefined,
+        description: p.attributes.description ?? undefined,
+        urlHandle: p.attributes.url_handle ?? undefined,
+        seoTitle: p.attributes.seo_title ?? undefined,
+        seoDescription: p.attributes.seo_description ?? undefined,
         priceFrom: p.attributes.price_from,
         priceTo: p.attributes.price_to,
-        priceType: p.attributes.price_type,
+        priceType: p.attributes.price_type ?? undefined,
         active: p.attributes.active,
         draft: p.attributes.draft,
         digital: p.attributes.digital,
@@ -83,9 +85,9 @@ export let getProduct = SlateTool.create(spec, {
         tracking: p.attributes.tracking,
         threshold: p.attributes.threshold,
         views: p.attributes.views,
-        dateAdded: p.attributes.date_added,
-        dateModified: p.attributes.date_modified,
-        publishDate: p.attributes.publish_date,
+        dateAdded: p.attributes.date_added ?? undefined,
+        dateModified: p.attributes.date_modified ?? undefined,
+        publishDate: p.attributes.publish_date ?? undefined,
         relationships: p.relationships,
         included: res.included
       },

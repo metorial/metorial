@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let sendWhatsAppMessage = SlateTool.create(spec, {
@@ -10,9 +11,9 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
 - **Template message**: Send a pre-approved WhatsApp template with variable substitution.
 - **Direct message**: Send a free-form text, image, video, document, audio, or location message (requires an active 24-hour session with the recipient).`,
   instructions: [
-    'For template messages, provide templateName and language. Use getWhatsAppTemplates to find available templates.',
+    'For template messages, provide templateName and language. Use list_whatsapp_resources to find available templates.',
     'For direct messages, set messageType to the desired type (text, image, video, document, audio, location) and provide the corresponding content.',
-    'The phoneId can be found using the List WhatsApp Accounts tool.'
+    'Discover phoneId with list_whatsapp_resources using resourceType accounts.'
   ],
   tags: {
     destructive: false,
@@ -21,10 +22,15 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      reportUrl: z.string().optional().describe('URL to receive provider delivery reports'),
       to: z
         .string()
         .describe('Recipient phone number in international format (e.g., "13023895111")'),
-      phoneId: z.string().describe('WhatsApp phone ID from your connected WABA account'),
+      phoneId: z
+        .string()
+        .describe(
+          'WhatsApp phone ID. Discover it with list_whatsapp_resources using resourceType accounts.'
+        ),
       mode: z
         .enum(['template', 'direct'])
         .describe(
@@ -75,7 +81,12 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the message was sent successfully'),
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
+      messageId: z.string().optional().describe('Message ID when returned by Zixflow'),
+      campaignId: z.string().optional().describe('Campaign ID when returned by Zixflow'),
+      success: z
+        .boolean()
+        .describe('Whether Zixflow acknowledged successful message submission'),
       responseMessage: z.string().describe('Response message from the API')
     })
   )
@@ -83,8 +94,13 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
     let client = new ZixflowClient({ token: ctx.auth.token });
     let result: any;
 
+    requireInput(ctx.input.to, 'to');
+    requireInput(ctx.input.phoneId, 'phoneId');
     if (ctx.input.mode === 'template') {
+      requireInput(ctx.input.templateName, 'templateName');
+      requireInput(ctx.input.language, 'language');
       result = await client.sendWhatsAppTemplate({
+        reportUrl: ctx.input.reportUrl,
         to: ctx.input.to,
         phoneId: ctx.input.phoneId,
         templateName: ctx.input.templateName!,
@@ -93,7 +109,14 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
         linkWithRecord: ctx.input.linkWithRecord
       });
     } else {
-      let messageType = ctx.input.messageType!;
+      let messageType = requireInput(ctx.input.messageType, 'messageType');
+      if (messageType === 'text') requireInput(ctx.input.text?.body, 'text.body');
+      else if (messageType === 'location' && !ctx.input.location)
+        throw createApiServiceError('location is required for a location message.', {
+          reason: 'zixflow_invalid_input'
+        });
+      else if (['image', 'video', 'document', 'audio'].includes(messageType))
+        requireInput(ctx.input.mediaUrl, 'mediaUrl');
       let content: Record<string, any> = {};
 
       if (messageType === 'text' && ctx.input.text) {
@@ -103,14 +126,20 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
         };
       } else if (['image', 'video', 'document', 'audio'].includes(messageType)) {
         content[messageType] = { link: ctx.input.mediaUrl };
-        if (ctx.input.caption) content[messageType].caption = ctx.input.caption;
+        if (ctx.input.caption && messageType !== 'audio')
+          content[messageType].caption = ctx.input.caption;
         if (ctx.input.filename && messageType === 'document')
           content[messageType].filename = ctx.input.filename;
       } else if (messageType === 'location' && ctx.input.location) {
-        content.location = ctx.input.location;
+        content.location = {
+          ...ctx.input.location,
+          latitude: String(ctx.input.location.latitude),
+          longitude: String(ctx.input.location.longitude)
+        };
       }
 
       result = await client.sendWhatsAppDirectMessage({
+        reportUrl: ctx.input.reportUrl,
         to: ctx.input.to,
         phoneId: ctx.input.phoneId,
         type: messageType,
@@ -121,12 +150,12 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
 
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response'
+        ...operationOutput(result),
+        messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
+        campaignId: typeof result.campaignId === 'string' ? result.campaignId : undefined
       },
-      message: result.status
-        ? `WhatsApp ${ctx.input.mode} message sent to ${ctx.input.to}.`
-        : `Failed to send WhatsApp message: ${result.message}`
+      message:
+        'Zixflow accepted the message request; use a delivery report to check recipient delivery.'
     };
   })
   .build();

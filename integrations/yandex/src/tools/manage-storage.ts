@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as storage from '../lib/storage';
 import { spec } from '../spec';
@@ -63,7 +63,7 @@ export let manageBucket = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         let folderId = ctx.input.folderId || ctx.config.folderId;
-        if (!folderId) throw new Error('folderId is required for bucket creation');
+        if (!folderId) throw createApiServiceError('folderId is required for bucket creation');
         result = await storage.createBucket(ctx.auth, {
           folderId,
           name: ctx.input.bucketName,
@@ -101,6 +101,9 @@ export let manageBucket = SlateTool.create(spec, {
           ctx.input.anonymousAccessList !== undefined
         ) {
           updateFields.push('anonymousAccessFlags');
+        }
+        if (updateFields.length === 0) {
+          throw createApiServiceError('Provide at least one bucket setting to update.');
         }
         result = await storage.updateBucket(ctx.auth, ctx.input.bucketName, {
           defaultStorageClass: ctx.input.defaultStorageClass,

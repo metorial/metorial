@@ -33,7 +33,7 @@ export let listImages = SlateTool.create(spec, {
 
     let images = await client.listImages();
 
-    let mapped = (Array.isArray(images) ? images : []).map((image: any) => ({
+    let mapped = images.map(image => ({
       imageId: image._id,
       templateId: image.template,
       imageUrl: image.imageUrl,

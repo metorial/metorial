@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type NinoxView } from '../lib/client';
 import { spec } from '../spec';
 
 export let listViews = SlateTool.create(spec, {
@@ -13,8 +13,10 @@ export let listViews = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
       tableId: z
         .string()
         .optional()
@@ -43,12 +45,9 @@ export let listViews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
-    let views: any;
+    let views: NinoxView[];
     if (ctx.input.tableId) {
       views = await client.listTableViews(
         ctx.input.teamId,
@@ -61,7 +60,7 @@ export let listViews = SlateTool.create(spec, {
 
     return {
       output: {
-        views: views.map((v: any) => ({
+        views: views.map(v => ({
           viewId: v.id,
           caption: v.caption,
           type: v.type,

@@ -17,8 +17,12 @@ import {
   deleteSecrets,
   deleteTask,
   deleteTelegraf,
+  getBucket,
+  getCurrentUser,
+  getDashboard,
   getOrganizationMembers,
   getTask,
+  getTaskRunLogs,
   getTaskRuns,
   getTelegraf,
   listAuthorizations,
@@ -47,6 +51,10 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getBucket,
+    getCurrentUser,
+    getDashboard,
+    getTaskRunLogs,
     writeData,
     queryData,
     deleteData,

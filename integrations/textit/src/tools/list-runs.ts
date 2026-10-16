@@ -14,6 +14,11 @@ export let listRuns = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      runUuid: z.string().optional().describe('Filter by UUID.'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       flowUuid: z.string().optional().describe('Filter by flow UUID'),
       contactUuid: z.string().optional().describe('Filter by contact UUID'),
       responded: z.boolean().optional().describe('Filter by whether the contact responded'),
@@ -53,6 +58,8 @@ export let listRuns = SlateTool.create(spec, {
           exitType: z.string().nullable()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -60,6 +67,8 @@ export let listRuns = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listRuns({
+      cursor: ctx.input.cursor,
+      uuid: ctx.input.runUuid,
       flow: ctx.input.flowUuid,
       contact: ctx.input.contactUuid,
       responded: ctx.input.responded,
@@ -95,6 +104,8 @@ export let listRuns = SlateTool.create(spec, {
     return {
       output: {
         runs,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${runs.length}** run(s)${result.next ? ' (more results available)' : ''}.`

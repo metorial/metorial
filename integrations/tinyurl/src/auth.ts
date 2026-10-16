@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'API Token',
     key: 'api_token',
     inputSchema: z.object({
-      token: z.string().describe('TinyURL API token from https://tinyurl.com/app/dev')
+      token: z.string().describe('TinyURL API token from https://tinyurl.com/app/settings/api')
     }),
     getOutput: async ctx => {
       return {

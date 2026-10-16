@@ -9,7 +9,8 @@ export let checkAvailability = SlateTool.create(spec, {
   description: `Check near real-time in-store availability of a product at Best Buy stores. Query by SKU with either a postal code or specific store ID. Returns stores carrying the product with stock status, distance, and pickup time estimates.`,
   instructions: [
     'Provide either postalCode or storeId to locate stores.',
-    'When using postalCode, stores within a 25-mile radius are returned.'
+    'When using postalCode, stores within a 250-mile radius are returned, ordered by proximity.',
+    'Use search_stores to discover store IDs. Only stores with the product in stock are returned.'
   ],
   tags: {
     destructive: false,
@@ -26,12 +27,16 @@ export let checkAvailability = SlateTool.create(spec, {
       storeId: z
         .string()
         .optional()
-        .describe('Specific Best Buy store ID to check availability at')
+        .describe('Specific Best Buy store ID from search_stores to check availability at')
     })
   )
   .output(
     z.object({
       total: z.number().describe('Total number of stores with availability information'),
+      ispuEligible: z
+        .boolean()
+        .optional()
+        .describe('Whether the product is eligible for in-store pickup'),
       stores: z
         .array(z.record(z.string(), z.unknown()))
         .describe(
@@ -48,13 +53,16 @@ export let checkAvailability = SlateTool.create(spec, {
       storeId: ctx.input.storeId
     });
 
-    let storeCount = result.products?.length || 0;
+    let storeCount = result.stores.length;
     return {
       output: {
-        total: result.total,
-        stores: result.products || []
+        total: storeCount,
+        stores: result.stores,
+        ispuEligible: result.ispuEligible
       },
-      message: `Found availability information at **${storeCount}** stores for SKU ${ctx.input.sku}.`
+      message: client.redactMessage(
+        `Found availability information at **${storeCount}** stores for SKU ${ctx.input.sku}.`
+      )
     };
   })
   .build();

@@ -4,6 +4,7 @@ export * from './delete-schedules';
 export * from './finish-media-upload';
 export * from './generate-ai-content';
 export * from './get-ai-credits';
+export * from './get-team';
 export * from './import-media';
 export * from './list-channels';
 export * from './list-media';

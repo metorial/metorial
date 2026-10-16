@@ -11,5 +11,6 @@ export * from './manage-extras';
 export * from './manage-sessions';
 export * from './manage-speakers';
 export * from './manage-tracks';
+export * from './offline-plan';
 export * from './update-booth';
 export * from './update-exhibitor';

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchNewsSourcesTool = SlateTool.create(spec, {
@@ -22,6 +22,7 @@ export let searchNewsSourcesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       totalAvailable: z.number().describe('Total number of matching sources'),
       sources: z
         .array(
@@ -39,7 +40,7 @@ export let searchNewsSourcesTool = SlateTool.create(spec, {
 
     let result = await client.searchNewsSources(ctx.input.name);
 
-    let sources = (result.sources || []).map(source => ({
+    let sources = result.sources.map(source => ({
       sourceName: source.name,
       sourceUrl: source.url,
       language: source.language
@@ -47,10 +48,11 @@ export let searchNewsSourcesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         totalAvailable: result.available,
         sources
       },
-      message: `Found **${result.available}** news source(s) matching "${ctx.input.name}". Returned ${sources.length} results.`
+      message: `Found **${result.available}** news source(s). Returned ${sources.length} results.`
     };
   })
   .build();

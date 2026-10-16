@@ -12,7 +12,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Skyfire API key generated from the Skyfire Dashboard')
+      apiKey: z
+        .string()
+        .describe(
+          'Agent API key from the Skyfire Dashboard. Use a Buyer key for token creation and a Seller key for charging or service management.'
+        )
     }),
     getOutput: async ctx => {
       return {

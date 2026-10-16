@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .default('EUR')
       .describe(
-        'Default base currency for exchange rates (e.g., EUR, USD). Changing the base currency requires a paid Fixer plan.'
+        'Default base currency for exchange rates (e.g., EUR, USD). Permitted base currencies depend on the subscription for the selected API host.'
       )
   })
 );

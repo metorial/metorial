@@ -1,103 +1,165 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined
+} from 'slates';
+
+export type ApiRecord = Record<string, any>;
+export interface Banner extends ApiRecord {
+  id: string;
+  version?: number;
+  sharing_id?: string;
+  file: { type: string; url: string; cdn_url?: string; filename?: string };
+  format?: { id?: string; width: number; height: number; unit?: string };
+  template?: { id: string; name: string };
+}
+export interface Paging {
+  page?: number;
+  perPage?: number;
+}
+
+export let validateInteger = (
+  value: number | undefined,
+  name: string,
+  min: number,
+  max?: number
+) => {
+  if (
+    value !== undefined &&
+    (!Number.isInteger(value) || value < min || (max !== undefined && value > max))
+  ) {
+    throw createApiServiceError(
+      `${name} must be an integer from ${min}${max === undefined ? ' upwards' : ` to ${max}`}.`
+    );
+  }
+};
+
+export let validateName = (name: string) => {
+  if (name.length < 2 || name.length > 100) {
+    throw createApiServiceError('Name must contain 2 to 100 characters.');
+  }
+};
 
 export class AbyssaleClient {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.abyssale.com',
-      headers: {
-        'x-api-key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'x-api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Abyssale',
+          reason: 'abyssale_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          detailKeys: ['message', 'path', 'code'],
+          nestedKeys: ['errors'],
+          extractUpstreamCode: (_input, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.id === 'string'
+              ? response.data.id
+              : undefined
+        })
     });
   }
 
-  // ── Designs ──
-
-  async listDesigns(params?: { categoryId?: string; type?: string }) {
-    let queryParams: Record<string, string> = {};
-    if (params?.categoryId) queryParams.category_id = params.categoryId;
-    if (params?.type) queryParams.type = params.type;
-
-    let response = await this.axios.get('/designs', { params: queryParams });
-    return response.data as Array<{
-      id: string;
-      name: string;
-      type: string;
-      created_at: number;
-      updated_at: number;
-      preview_url: string;
-      category_name: string | null;
-    }>;
-  }
-
-  async getDesignFormatDetails(designId: string, formatSpecifier: string) {
-    let response = await this.axios.get(`/designs/${designId}/formats/${formatSpecifier}`);
-    return response.data as {
-      id: string;
-      uid: string;
-      width: number;
-      height: number;
-      unit: string;
-      preview_url: string;
-      dynamic_image_url: string;
-      design: Record<string, any>;
-      elements: Record<string, any>[];
-      variables: Record<string, any>;
+  private async list<T>(path: string, params: ApiRecord = {}) {
+    validateInteger(params.page, 'page', 1);
+    // The provider caps values above 100; retain that documented behavior.
+    validateInteger(params.per_page, 'perPage', 1);
+    let response = await this.axios.get<T[]>(path, { params: pickDefined(params) });
+    let header = getResponseHeaderValue(response.headers, 'x-total-count');
+    let totalCount = header === undefined ? undefined : Number(header);
+    return {
+      items: response.data,
+      totalCount: Number.isFinite(totalCount) ? totalCount : undefined
     };
   }
 
-  // ── Synchronous Generation ──
+  async getWorkspace() {
+    return (await this.axios.post<{ company?: string; version?: string }>('/auth')).data;
+  }
+
+  async getCredits() {
+    return (await this.axios.get<ApiRecord>('/credits')).data;
+  }
+
+  async listDesigns(params: ApiRecord = {}) {
+    return this.list<ApiRecord>('/designs', {
+      category_id: params.categoryId || undefined,
+      project_id: params.projectId,
+      type: params.type,
+      query: params.query,
+      name: params.name,
+      project: params.project,
+      orientation: params.orientation,
+      size: params.sizes?.join(','),
+      format: params.formatNames?.join(','),
+      updated_since: params.updatedSince,
+      created_since: params.createdSince,
+      sort: params.sort,
+      order: params.order,
+      page: params.page,
+      per_page: params.perPage
+    });
+  }
+
+  async getDesign(designId: string, advanced?: boolean) {
+    return (
+      await this.axios.get<ApiRecord>(`/designs/${encodeURIComponent(designId)}`, {
+        params: advanced ? { i: 'advanced' } : undefined
+      })
+    ).data;
+  }
+
+  async getDesignFormatDetails(designId: string, formatSpecifier: string) {
+    return (
+      await this.axios.get<ApiRecord>(
+        `/designs/${encodeURIComponent(designId)}/formats/${encodeURIComponent(formatSpecifier)}`
+      )
+    ).data;
+  }
+
+  async getBanner(bannerId: string) {
+    return (await this.axios.get<Banner>(`/banners/${encodeURIComponent(bannerId)}`)).data;
+  }
 
   async generateSingleImage(
     designId: string,
     params: {
       templateFormatName: string;
-      elements?: Record<string, any>;
+      elements?: ApiRecord;
       imageFileType?: string;
+      fileCompressionLevel?: number;
+      originalVisualId?: string;
     }
   ) {
-    let body: Record<string, any> = {
-      template_format_name: params.templateFormatName
-    };
-    if (params.elements) body.elements = params.elements;
-    if (params.imageFileType) body.image_file_type = params.imageFileType;
-
-    let response = await this.axios.post(`/banner-builder/${designId}/generate`, body);
-    return response.data as {
-      id: string;
-      version: number;
-      sharing_id: string;
-      file: {
-        type: string;
-        url: string;
-        cdn_url: string;
-        filename: string;
-      };
-      format: {
-        id: string;
-        width: number;
-        height: number;
-      };
-      template: {
-        id: string;
-        name: string;
-        created_at: number;
-        updated_at: number;
-      };
-    };
+    validateInteger(params.fileCompressionLevel, 'fileCompressionLevel', 1, 100);
+    return (
+      await this.axios.post<Banner>(
+        `/banner-builder/${encodeURIComponent(designId)}/generate`,
+        pickDefined({
+          template_format_name: params.templateFormatName,
+          elements: params.elements,
+          image_file_type: params.imageFileType,
+          file_compression_level: params.fileCompressionLevel,
+          original_visual_id: params.originalVisualId
+        })
+      )
+    ).data;
   }
-
-  // ── Asynchronous Generation ──
 
   async generateMultiFormat(
     designId: string,
     params: {
       callbackUrl?: string;
       templateFormatNames?: string[];
-      elements?: Record<string, any>;
+      elements?: ApiRecord;
       imageFileType?: string;
+      fileCompressionLevel?: number;
+      originalVisualId?: string;
+      pages?: ApiRecord;
       html5?: {
         clickTag?: string;
         pageTitle?: string;
@@ -105,184 +167,207 @@ export class AbyssaleClient {
         repeat?: number;
         includeBackupImage?: boolean;
       };
+      gif?: { maxFps?: number; repeat?: number };
+      video?: { fps?: number };
+      print?: { colorProfile?: string; displayCropMarks?: boolean };
     }
   ) {
-    let body: Record<string, any> = {};
-    if (params.callbackUrl) body.callback_url = params.callbackUrl;
-    if (params.templateFormatNames) body.template_format_names = params.templateFormatNames;
-    if (params.elements) body.elements = params.elements;
-    if (params.imageFileType) body.image_file_type = params.imageFileType;
-    if (params.html5) {
-      body.html5 = {
-        ...(params.html5.clickTag !== undefined && { click_tag: params.html5.clickTag }),
-        ...(params.html5.pageTitle !== undefined && { page_title: params.html5.pageTitle }),
-        ...(params.html5.adNetwork !== undefined && { ad_network: params.html5.adNetwork }),
-        ...(params.html5.repeat !== undefined && { repeat: params.html5.repeat }),
-        ...(params.html5.includeBackupImage !== undefined && {
-          include_backup_image: params.html5.includeBackupImage
-        })
-      };
+    validateInteger(params.fileCompressionLevel, 'fileCompressionLevel', 1, 100);
+    validateInteger(params.html5?.repeat, 'html5.repeat', -1, 100);
+    validateInteger(params.gif?.repeat, 'gif.repeat', -1, 100);
+    validateInteger(params.gif?.maxFps, 'gif.maxFps', 2, 9);
+    validateInteger(params.video?.fps, 'video.fps', 2, 30);
+    if (params.originalVisualId && (params.templateFormatNames?.length ?? 0) > 1) {
+      throw createApiServiceError('Versioned regeneration requires exactly one format.');
     }
+    return (
+      await this.axios.post<{ generation_request_id: string }>(
+        `/async/banner-builder/${encodeURIComponent(designId)}/generate`,
+        pickDefined({
+          callback_url: params.callbackUrl || undefined,
+          template_format_names: params.templateFormatNames,
+          elements: params.elements,
+          image_file_type: params.imageFileType,
+          file_compression_level: params.fileCompressionLevel,
+          original_visual_id: params.originalVisualId,
+          pages: params.pages,
+          html5:
+            params.html5 &&
+            pickDefined({
+              click_tag: params.html5.clickTag,
+              page_title: params.html5.pageTitle,
+              ad_network: params.html5.adNetwork,
+              repeat: params.html5.repeat,
+              include_backup_image: params.html5.includeBackupImage
+            }),
+          gif:
+            params.gif &&
+            pickDefined({ max_fps: params.gif.maxFps, repeat: params.gif.repeat }),
+          video: params.video && pickDefined({ fps: params.video.fps }),
+          print:
+            params.print &&
+            pickDefined({
+              color_profile: params.print.colorProfile,
+              display_crop_marks: params.print.displayCropMarks
+            })
+        })
+      )
+    ).data;
+  }
 
-    let response = await this.axios.post(`/async/banner-builder/${designId}/generate`, body);
-    return response.data as {
-      generation_request_id: string;
-    };
+  async generateMultipagePdf(
+    designId: string,
+    params: {
+      pages: ApiRecord;
+      callbackUrl?: string;
+      print?: { colorProfile?: string; displayCropMarks?: boolean };
+    }
+  ) {
+    return (
+      await this.axios.post<{ generation_request_id: string }>(
+        `/async/banner-builder/${encodeURIComponent(designId)}/generate-multipage-pdf`,
+        pickDefined({
+          pages: params.pages,
+          callback_url: params.callbackUrl,
+          print:
+            params.print &&
+            pickDefined({
+              color_profile: params.print.colorProfile,
+              display_crop_marks: params.print.displayCropMarks
+            })
+        })
+      )
+    ).data;
   }
 
   async getGenerationRequestStatus(generationRequestId: string) {
-    let response = await this.axios.get(`/generation-request/${generationRequestId}`);
-    return response.data as {
-      is_finalized: boolean;
-      id: string;
-      banners: Array<{
+    return (
+      await this.axios.get<{
         id: string;
-        file: {
-          type: string;
-          url: string;
-          cdn_url: string;
-          filename: string;
-        };
-        format: {
-          id: string;
-          width: number;
-          height: number;
-        };
-        template: {
-          id: string;
-          name: string;
-          created_at: number;
-          updated_at: number;
-        };
-      }>;
-      errors: Array<{
-        template_format_name: string;
-        reason: string;
-      }>;
-    };
+        is_finalized: boolean;
+        banners: Banner[];
+        errors?: { template_format_name?: string; reason?: string }[];
+      }>(`/generation-request/${encodeURIComponent(generationRequestId)}`)
+    ).data;
   }
-
-  // ── Dynamic Images ──
 
   async createDynamicImage(
     designId: string,
-    params?: {
-      enableRateLimit?: boolean;
-      enableProductionMode?: boolean;
-    }
+    params?: { enableRateLimit?: boolean; enableProductionMode?: boolean }
   ) {
-    let body: Record<string, any> = {};
-    if (params?.enableRateLimit !== undefined) body.enable_rate_limit = params.enableRateLimit;
-    if (params?.enableProductionMode !== undefined)
-      body.enable_production_mode = params.enableProductionMode;
-
-    let response = await this.axios.post(`/designs/${designId}/dynamic-image-url`, body);
-    return response.data as {
-      id: string;
-      design_id: string;
-      formats: Array<{
+    return (
+      await this.axios.post<{
         id: string;
-        uid: string;
-        width: number;
-        unit: string;
-        height: number;
-        dynamic_image_url: string;
-      }>;
-    };
+        design_id: string;
+        formats: {
+          id: string;
+          uid: string;
+          width: number;
+          height: number;
+          unit: string;
+          dynamic_image_url: string;
+        }[];
+      }>(
+        `/designs/${encodeURIComponent(designId)}/dynamic-image-url`,
+        pickDefined({
+          enable_rate_limit: params?.enableRateLimit,
+          enable_production_mode: params?.enableProductionMode
+        })
+      )
+    ).data;
   }
-
-  // ── Export ──
 
   async exportBanners(params: { bannerIds: string[]; callbackUrl: string }) {
-    let response = await this.axios.post('/async/banners/export', {
-      ids: params.bannerIds,
-      callback_url: params.callbackUrl
-    });
-    return response.data as {
-      export_id: string;
-    };
+    if (params.bannerIds.length === 0)
+      throw createApiServiceError('Provide at least one banner ID to export.');
+    return (
+      await this.axios.post<{ export_id: string }>('/async/banners/export', {
+        ids: params.bannerIds,
+        callback_url: params.callbackUrl
+      })
+    ).data;
   }
 
-  // ── Projects ──
-
-  async listProjects() {
-    let response = await this.axios.get('/projects');
-    return response.data as Array<{
-      id: string;
-      name: string;
-      created_at_ts: number;
-    }>;
+  async listProjects(params: { name?: string } & Paging = {}) {
+    return this.list<ApiRecord>('/projects', {
+      name: params.name,
+      page: params.page,
+      per_page: params.perPage
+    });
   }
 
   async createProject(name: string) {
-    let response = await this.axios.post('/projects', { name });
-    return response.data as {
-      id: string;
-      name: string;
-      created_at_ts: number;
-    };
+    validateName(name);
+    return (
+      await this.axios.post<{ id: string; name: string; created_at_ts: number }>('/projects', {
+        name
+      })
+    ).data;
   }
 
-  // ── Fonts ──
-
-  async listFonts() {
-    let response = await this.axios.get('/fonts');
-    return response.data as Array<{
-      id: string;
-      name: string;
-      available_weights: Array<string | number>;
-      type: string;
-    }>;
+  async listFonts(params: ApiRecord = {}) {
+    if (
+      params.weight !== undefined &&
+      ![100, 200, 300, 400, 500, 600, 700, 800, 900].includes(params.weight)
+    ) {
+      throw createApiServiceError(
+        'weight must be a font weight from 100 to 900 in increments of 100.'
+      );
+    }
+    return this.list<ApiRecord>(
+      '/fonts',
+      pickDefined({
+        type: params.type,
+        name: params.name,
+        category: params.category,
+        weight: params.weight,
+        style: params.style,
+        page: params.page,
+        per_page: params.perPage
+      })
+    );
   }
 
-  // ── Workspace Templates ──
+  async listWorkspaceTemplates(params: { categoryId?: string; designType?: string }) {
+    return (
+      await this.axios.get<ApiRecord[]>('/workspace-templates', {
+        params: pickDefined({ category_id: params.categoryId, type: params.designType })
+      })
+    ).data;
+  }
+
+  async listWorkspaceTemplateCategories() {
+    return (await this.axios.get<ApiRecord[]>('/workspace-template-categories')).data;
+  }
 
   async duplicateWorkspaceTemplate(
     companyTemplateId: string,
-    params: {
-      projectId: string;
-      name?: string;
-    }
+    params: { projectId: string; name?: string }
   ) {
-    let body: Record<string, any> = {
-      project_id: params.projectId
-    };
-    if (params.name) body.name = params.name;
-
-    let response = await this.axios.post(
-      `/workspace-templates/${companyTemplateId}/use`,
-      body
-    );
-    return response.data as {
-      duplication_request_id: string;
-    };
+    if (params.name) validateName(params.name);
+    return (
+      await this.axios.post<{ duplication_request_id: string }>(
+        `/workspace-templates/${encodeURIComponent(companyTemplateId)}/use`,
+        pickDefined({ project_id: params.projectId, name: params.name || undefined })
+      )
+    ).data;
   }
 
   async getDuplicationRequestStatus(duplicateRequestId: string) {
-    let response = await this.axios.get(`/design-duplication-requests/${duplicateRequestId}`);
-    return response.data as {
-      request_id: string;
-      status: string;
-      created_at_ts: number;
-      completed_at_ts: number | null;
-      errored_at_ts: number | null;
-      target_project: {
-        id: string;
-        name: string;
+    return (
+      await this.axios.get<{
+        request_id: string;
+        status: string;
         created_at_ts: number;
-      };
-      designs: Array<{
-        original_design_id: string;
-        target_design_id: string;
-        target_design_name: string;
-      }>;
-    };
-  }
-
-  // ── Health Check ──
-
-  async checkReady() {
-    let response = await this.axios.get('/ready');
-    return response.data;
+        completed_at_ts?: number | null;
+        errored_at_ts?: number | null;
+        target_project: { id: string; name: string; created_at_ts: number };
+        designs: {
+          original_design_id: string;
+          target_design_id: string;
+          target_design_name: string;
+        }[];
+      }>(`/design-duplication-requests/${encodeURIComponent(duplicateRequestId)}`)
+    ).data;
   }
 }

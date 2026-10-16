@@ -13,7 +13,8 @@ let profileOutputSchema = z.object({
   about: z.string().optional().describe('Bio/about text'),
   city: z.string().optional().describe('City'),
   country: z.string().optional().describe('Country'),
-  accountCount: z.number().optional().describe('Number of connected accounts')
+  accountCount: z.number().optional().describe('Number of connected accounts'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let getProfile = SlateTool.create(spec, {
@@ -55,7 +56,8 @@ export let getProfile = SlateTool.create(spec, {
           about: user.about,
           city: user.city,
           country: user.country,
-          accountCount: user.account_count
+          accountCount: user.account_count,
+          raw: user
         }
       },
       message: `Retrieved profile for **${user.display_name || user.username}** (ID: ${user.id}).`

@@ -1,4 +1,7 @@
 export * from './get-message-report';
+export { getRcsTemplateVariables } from './get-rcs-template-variables';
+export { listAttributeOptions } from './list-attribute-options';
+export { listAttributes } from './list-attributes';
 export * from './list-collections';
 export * from './list-lists';
 export * from './list-whatsapp-resources';

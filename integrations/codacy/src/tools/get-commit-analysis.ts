@@ -40,6 +40,10 @@ export let getCommitAnalysis = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       commit: z
         .object({
           sha: z.string().optional().describe('Commit SHA.'),
@@ -84,21 +88,29 @@ export let getCommitAnalysis = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: response,
           commit: {
             sha: data.commit?.sha ?? data.sha ?? ctx.input.commitSha,
             message: data.commit?.message ?? data.message ?? undefined,
             authorName: data.commit?.authorName ?? data.authorName ?? undefined,
             authorEmail: data.commit?.authorEmail ?? data.authorEmail ?? undefined,
-            timestamp: data.commit?.timestamp ?? data.timestamp ?? undefined,
+            timestamp:
+              data.commit?.commitTimestamp ??
+              data.commit?.timestamp ??
+              data.timestamp ??
+              undefined,
             grade: data.grade ?? undefined,
             gradeLetter: data.gradeLetter ?? undefined,
             totalIssues: data.totalIssues ?? undefined,
-            newIssues: data.newIssues ?? undefined,
-            fixedIssues: data.fixedIssues ?? undefined,
-            coverage: data.coverage ?? undefined
+            newIssues: data.quality?.newIssues ?? data.newIssues ?? undefined,
+            fixedIssues: data.quality?.fixedIssues ?? data.fixedIssues ?? undefined,
+            coverage:
+              (typeof data.coverage === 'number'
+                ? data.coverage
+                : data.coverage?.totalCoveragePercentage) ?? undefined
           }
         },
-        message: `Commit **${ctx.input.commitSha.substring(0, 7)}**: Grade **${data.gradeLetter ?? 'N/A'}**, ${data.totalIssues ?? 0} total issues.`
+        message: `Commit **${ctx.input.commitSha.substring(0, 7)}**: Grade **${data.gradeLetter ?? 'N/A'}**, ${data.totalIssues ?? 'unknown'} total issues.`
       };
     }
 
@@ -109,16 +121,18 @@ export let getCommitAnalysis = SlateTool.create(spec, {
     });
 
     let commits = (response.data ?? []).map((item: any) => ({
-      sha: item.commit?.sha ?? item.sha ?? '',
+      sha: item.commit?.sha ?? item.sha ?? undefined,
       message: item.commit?.message ?? item.message ?? undefined,
       authorName: item.commit?.authorName ?? item.authorName ?? undefined,
-      timestamp: item.commit?.timestamp ?? item.timestamp ?? undefined,
+      timestamp:
+        item.commit?.commitTimestamp ?? item.commit?.timestamp ?? item.timestamp ?? undefined,
       gradeLetter: item.gradeLetter ?? undefined,
       totalIssues: item.totalIssues ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         commits,
         cursor: response.pagination?.cursor
       },

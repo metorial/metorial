@@ -1,3 +1,4 @@
+import { createApiServiceError } from 'slates';
 import { type AdobeAuthConfig, createAdobeAxios } from './client';
 
 let USERMANAGEMENT_BASE_URL = 'https://usermanagement.adobe.io';
@@ -7,28 +8,44 @@ export class UserManagementClient {
 
   constructor(auth: AdobeAuthConfig) {
     this.http = createAdobeAxios(USERMANAGEMENT_BASE_URL, auth);
+    this.http.interceptors.response.use(response => {
+      if (typeof response.data?.result === 'string' && response.data.result !== 'success') {
+        throw createApiServiceError(
+          `Adobe user management failed: ${response.data.result}. ${
+            Array.isArray(response.data.errors)
+              ? response.data.errors
+                  .map((error: { message?: string }) => error.message)
+                  .filter(Boolean)
+                  .join('; ')
+              : (response.data.message ?? '')
+          }`,
+          { reason: 'adobe_user_action_failed' }
+        );
+      }
+      return response;
+    });
   }
 
   async listUsers(orgId: string, page?: number) {
-    let response = await this.http.get(`/v2/usermanagement/users/${orgId}/${page || 0}`);
+    let response = await this.http.get(`/v2/usermanagement/users/${orgId}/${page ?? 0}`);
     return response.data;
   }
 
   async getUser(orgId: string, email: string) {
     let response = await this.http.get(
-      `/v2/usermanagement/organizations/${orgId}/users/${email}`
+      `/v2/usermanagement/organizations/${orgId}/users/${encodeURIComponent(email)}`
     );
     return response.data;
   }
 
   async listGroups(orgId: string, page?: number) {
-    let response = await this.http.get(`/v2/usermanagement/groups/${orgId}/${page || 0}`);
+    let response = await this.http.get(`/v2/usermanagement/groups/${orgId}/${page ?? 0}`);
     return response.data;
   }
 
   async getGroupMembers(orgId: string, groupName: string, page?: number) {
     let response = await this.http.get(
-      `/v2/usermanagement/users/${orgId}/${page || 0}/${encodeURIComponent(groupName)}`
+      `/v2/usermanagement/users/${orgId}/${page ?? 0}/${encodeURIComponent(groupName)}`
     );
     return response.data;
   }
@@ -44,7 +61,21 @@ export class UserManagementClient {
     }>
   ) {
     let response = await this.http.post(`/v2/usermanagement/action/${orgId}`, actions);
-    return response.data;
+    let result = response.data;
+    if (result.result !== 'success') {
+      throw createApiServiceError(
+        `Adobe user management did not complete all actions: ${result.result ?? 'missing result'}. ${
+          Array.isArray(result.errors)
+            ? result.errors
+                .map((error: { message?: string }) => error.message)
+                .filter(Boolean)
+                .join('; ')
+            : (result.message ?? '')
+        }`,
+        { reason: 'adobe_user_action_failed' }
+      );
+    }
+    return result;
   }
 
   async createUser(

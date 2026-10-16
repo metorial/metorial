@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -87,6 +87,12 @@ export let createBookingQuote = SlateTool.create(spec, {
     }
 
     let quoteId = Number(created) || Number(quote?.id);
+
+    if (!Number.isInteger(quoteId) || quoteId <= 0) {
+      throw createApiServiceError(
+        `Lodgify accepted the quote request for booking #${ctx.input.bookingId} but did not return a valid quote ID. Use get_quote with this booking ID to inspect its current quote before creating another one.`
+      );
+    }
 
     return {
       output: {

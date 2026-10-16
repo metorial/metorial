@@ -25,6 +25,10 @@ export let getGenresAndRegions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       genres: z
         .array(
           z.object({
@@ -50,12 +54,18 @@ export let getGenresAndRegions = SlateTool.create(spec, {
 
     let include = ctx.input.include || 'all';
 
+    let raw: Record<string, unknown> = {};
     let genres: { genreId: number; name: string; parentId: number }[] | undefined;
     let languages: string[] | undefined;
     let regions: Record<string, string> | undefined;
 
     if (include === 'all' || include === 'genres') {
-      let data = await client.getGenres(ctx.input.topLevelGenresOnly ? 1 : undefined);
+      let data = await client.getGenres(
+        ctx.input.topLevelGenresOnly === undefined
+          ? undefined
+          : Number(ctx.input.topLevelGenresOnly)
+      );
+      raw.genres = data;
       genres = data.genres.map(g => ({
         genreId: g.id,
         name: g.name,
@@ -65,11 +75,13 @@ export let getGenresAndRegions = SlateTool.create(spec, {
 
     if (include === 'all' || include === 'languages') {
       let data = await client.getLanguages();
+      raw.languages = data;
       languages = data.languages;
     }
 
     if (include === 'all' || include === 'regions') {
       let data = await client.getRegions();
+      raw.regions = data;
       regions = data.regions;
     }
 
@@ -80,6 +92,7 @@ export let getGenresAndRegions = SlateTool.create(spec, {
 
     return {
       output: {
+        raw,
         genres,
         languages,
         regions

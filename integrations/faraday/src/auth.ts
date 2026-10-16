@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { FaradayClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -22,15 +23,8 @@ export let auth = SlateAuth.create()
       }
     }),
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.faraday.ai/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await client.get('/accounts/current');
-      let account = response.data;
+      let client = new FaradayClient({ token: ctx.output.token });
+      let account = await client.getCurrentAccount();
 
       return {
         profile: {

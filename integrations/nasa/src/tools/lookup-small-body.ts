@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 export let lookupSmallBody = SlateTool.create(spec, {
@@ -26,6 +26,17 @@ export let lookupSmallBody = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
+      physicalParameters: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe(
+          'Complete physical parameter records with provider names, values, units and references'
+        ),
+      discovery: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Discovery circumstances and citations'),
       object: z
         .record(z.string(), z.any())
         .optional()
@@ -38,6 +49,14 @@ export let lookupSmallBody = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      [ctx.input.designation, ctx.input.spkId, ctx.input.searchName].filter(
+        value => value !== undefined
+      ).length !== 1
+    ) {
+      throw createApiServiceError('Provide exactly one of designation, spkId, or searchName.');
+    }
+    validateInteger(ctx.input.spkId, 'SPK-ID', 1);
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.getSsdSmallBody({
@@ -46,17 +65,25 @@ export let lookupSmallBody = SlateTool.create(spec, {
       searchName: ctx.input.searchName
     });
 
-    let objectInfo = result.object || {};
-    let orbit = result.orbit || {};
-    let physical = result.phys_par || {};
+    let objectInfo = result.object;
+    let orbit = result.orbit;
+    let physicalParameters = result.phys_par;
+    let physical = Array.isArray(physicalParameters)
+      ? Object.fromEntries(
+          physicalParameters.map((parameter: any) => [parameter.name, parameter])
+        )
+      : physicalParameters;
 
     return {
       output: {
+        raw: result,
+        physicalParameters,
+        discovery: result.discovery,
         object: objectInfo,
         orbit,
         physical
       },
-      message: `Found small body: **${objectInfo.fullname || objectInfo.des || ctx.input.searchName || 'Unknown'}**.`
+      message: `Found small body: **${objectInfo?.fullname || objectInfo?.des || ctx.input.searchName || 'Unknown'}**.`
     };
   })
   .build();

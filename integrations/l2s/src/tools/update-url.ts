@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { L2sClient } from '../lib/client';
+import { L2sClient, type UpdateUrlParams } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateUrl = SlateTool.create(spec, {
@@ -34,7 +34,7 @@ export let updateUrl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new L2sClient({ token: ctx.auth.token });
 
-    let updateParams: Record<string, any> = {};
+    let updateParams: UpdateUrlParams = {};
     if (ctx.input.url !== undefined) updateParams.url = ctx.input.url;
     if (ctx.input.tags !== undefined) updateParams.tags = ctx.input.tags;
     if (ctx.input.utmSource !== undefined) updateParams.utmSource = ctx.input.utmSource;
@@ -48,7 +48,7 @@ export let updateUrl = SlateTool.create(spec, {
     return {
       output: {
         ok: result.ok,
-        message: result.response?.message ?? 'URL updated',
+        message: result.response.message,
         urlData: result.response?.data
       },
       message: `Updated shortened URL **${ctx.input.urlId}**.`

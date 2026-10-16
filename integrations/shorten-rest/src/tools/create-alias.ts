@@ -42,11 +42,11 @@ export let createAlias = SlateTool.create(spec, {
   description: `Creates a new shortened URL (alias) that redirects to one or more destination URLs. Supports vanity aliases, geo/OS-based redirect targeting, custom meta tags for social sharing, and tracking pixel snippets. Use the \`@rnd\` macro in the alias name to combine custom text with random characters (e.g., "promo/@rnd").`,
   instructions: [
     'At least one destination with a URL is required. The first destination without country/OS targeting serves as the default.',
-    'If aliasName is omitted, a random 7-character alias is generated automatically.',
+    'If aliasName is omitted or empty, a random 7-character alias is generated automatically.',
     'Use the @rnd macro in aliasName to mix custom text with random characters (e.g., "sale/@rnd").'
   ],
   constraints: [
-    'Alias must be at least 1 character if specified.',
+    'Supply alias paths without a leading slash and domain names without a URL scheme or path.',
     'Destination URLs have a maximum length of 8192 characters.',
     'Each alias is unique within its domain. If an alias is taken on a shared domain like short.fyi, use a custom domain.'
   ],

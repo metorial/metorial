@@ -25,6 +25,10 @@ export let deleteMember = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       confirmation: z.string().describe('Confirmation message from the API.')
     })
   )
@@ -39,6 +43,7 @@ export let deleteMember = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         confirmation:
           typeof result.message === 'string' ? result.message : JSON.stringify(result.message)
       },

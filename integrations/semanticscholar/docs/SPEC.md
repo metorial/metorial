@@ -1,71 +1,34 @@
-Let me get more details on the API endpoints and features.Now let me check for webhook/event support and get details on the API key header format.I now have enough information to write the specification.
+# Semantic Scholar
 
-# Slates Specification for Semantic Scholar
+The integration exposes read-only Academic Graph, Recommendations, and Datasets APIs. Its contracts follow the provider’s [Academic Graph](https://api.semanticscholar.org/api-docs/graph), [Recommendations](https://api.semanticscholar.org/api-docs/recommendations), and [Datasets](https://api.semanticscholar.org/api-docs/datasets) documentation.
 
-## Overview
+## Authentication and setup
 
-Semantic Scholar is a free, AI-powered academic search engine developed by the Allen Institute for AI (AI2) that indexes over 200 million scientific papers across all disciplines. The API allows users to find and explore scientific publication data about authors, papers, citations, venues, and more. It provides structured JSON data including metadata, abstracts, citation networks, TLDR summaries, and SPECTER2 embeddings.
+Public access remains available without credentials. The optional `api_key` method accepts `apiKey` and stores it as `token`; API requests send it in the case-sensitive `x-api-key` header. There are no setup fields, OAuth scopes, refresh tokens, account identity endpoint, or webhook subscriptions in the documented APIs.
 
-## Authentication
+## Academic Graph
 
-Most Semantic Scholar endpoints are available to the public without authentication. Certain endpoints require authentication via an API key, and authenticated users have access to higher rate limits.
+- `search_papers`: relevance-ranked keyword search with paper metadata selection and publication, venue, citation, discipline, and public-PDF filters. At most 100 papers per page and 1,000 results overall.
+- `search_papers_bulk`: filtered Boolean search with sorting and continuation tokens. Up to 1,000 papers per page and 10,000,000 overall; nested citation/reference metadata is unavailable.
+- `match_paper`: closest title match, including the provider’s score. No match is a provider error.
+- `get_paper`: a single paper or a batch of up to 500 IDs. Null batch entries remain null. Supports the provider’s external identifier prefixes and requested metadata fields. Request `embedding.specter_v2` for SPECTER version 2.
+- `get_citations`: incoming citations or outgoing references, with pagination and requested contextual fields.
+- `search_authors`, `get_author`, `get_author_papers`, and `get_paper_authors`: researcher discovery, single/batch profiles, and paginated publications or paper authors. Author batch lookup accepts up to 1,000 IDs.
+- `autocomplete_papers`: provider suggestions for a partial query; the provider truncates the query after 100 characters.
+- `search_snippets`: ranked excerpts from titles, abstracts, and body text with original paper, retrieval, and license metadata. Supports documented filters and at most 1,000 results.
 
-**API Key Authentication:**
+Existing numeric schema fields remain numbers; integer limits are checked at runtime. Malformed responses fail explicitly rather than inventing totals or empty result arrays. Missing metadata remains missing, and provider records retain additional fields.
 
-- Request a free API key through the Semantic Scholar website at `https://www.semanticscholar.org/product/api#api-key-form`.
-- You will receive your private API key via email.
-- The API key is passed via the `x-api-key` request header, e.g., `headers = {"x-api-key": "your-api-key"}`.
-- Some endpoints (such as the Datasets diffs endpoint) require the use of a Semantic Scholar API key.
+## Recommendations
 
-No OAuth or other authentication methods are supported. The API uses only API key-based authentication.
+`recommend_papers` uses one positive paper for single-paper recommendations or a list of positive and optional negative examples. The `recent` and `all-cs` pools apply only to the single-paper mode without negatives. Up to 500 recommendations are supported.
 
-## Features
+## Datasets and downloadable files
 
-### Paper Search
+`get_datasets` lists releases, reads release contents, or returns one dataset’s metadata and complete original file URL list. The provider’s actual release identifier is `release_id`; the legacy `releaseId` output field remains available if supplied by the provider.
 
-Search for academic papers using keyword queries. Two search modes are available: paper relevance search and paper bulk search. The relevance search can return more detailed information about each paper's authors, references, and citations, while the bulk search supports sorting and special syntax in the query parameter.
+File preparation is optional and limited to one selected shard. Pass `releaseId`, `datasetName`, and a `downloadFileUrl` from a previous result. If `latest` is selected, preparation resolves it to an immutable dated release before retrieving that release’s dataset links. Preparation requires HTTPS on the dataset host shown by official documentation, `ai2-s2ag.s3.amazonaws.com`, and a known future signed expiry. The file URL keeps its signature; the API key is never forwarded to S3.
 
-- Filter results by year, publication date range, publication type, fields of study, venue, minimum citation count, and open access PDF availability.
-- Use the `fields` parameter to specify which paper metadata to return (e.g., title, abstract, authors, citation count, references, TLDR, embeddings, open access PDF URL).
+Renewal reads the same dated release and dataset, finds the same exact S3 object path regardless of list order, and fails if it is missing or ambiguous. Expiry comes from the S3 `Expires` or `X-Amz-Date`/`X-Amz-Expires` fields, with a local 60-second renewal safety margin. No provider lifetime is assumed. Metadata discovery does not prepare any files. Large-shard transfer, storage limits, later signed-link availability, and completed delivery remain outside what preparation establishes.
 
-### Paper Details
-
-Retrieve detailed metadata for individual papers or batches of papers. Papers can be looked up by various identifier types: Semantic Scholar Paper ID (S2PaperId), CorpusId, DOI, ArXiv ID, MAG, ACL, PMID, PMCID, or URL.
-
-- Available fields include title, abstract, authors, year, venue, citation count, reference count, influential citation count, TLDR summary, publication venue details, external IDs, open access PDF links, and SPECTER2 embeddings.
-
-### Citation and Reference Graph
-
-Explore the citation network surrounding a paper. Retrieve the list of papers that cite a given paper (citations) and the list of papers referenced by a given paper (references).
-
-- Useful for analyzing a paper's sources or investigating connections between academic works. Note that references are outgoing (papers cited by the specified paper) while citations are incoming (papers that cite the specified paper).
-- Each citation/reference includes context and metadata about the citing/cited paper.
-
-### Author Lookup
-
-Retrieve information about researchers, including their publication history. Look up individual authors by their Semantic Scholar Author ID, or fetch details for multiple authors in batch.
-
-- Available fields include name, affiliations, homepage, paper count, citation count, h-index, and list of papers.
-- Retrieve the full list of papers by a specific author.
-
-### Paper Autocomplete
-
-Get autocomplete suggestions for a paper query. Useful for building search interfaces with type-ahead functionality.
-
-### Paper Recommendations
-
-Get recommended papers for a single positive example, with an option to choose which pool of papers to recommend from: "recent" or "all-cs".
-
-- Get recommended papers for lists of positive and negative examples, where negative paper IDs indicate papers the returned results should not be related to.
-
-### Dataset Downloads
-
-For heavy-duty users, the Datasets API provides download links for the entire Semantic Scholar Academic Graph (S2AG) or the Open Research Corpus (S2ORC), enabling offline, large-scale research.
-
-- List available dataset releases and retrieve download links for specific datasets within a release.
-- Retrieve incremental diffs between releases, containing only the changes from one release to the next sequential release. This allows maintaining a local copy of the dataset without re-downloading everything.
-- Dataset diffs endpoints require an API key.
-
-## Events
-
-The provider does not support events. Semantic Scholar does not offer webhooks, event subscriptions, or purpose-built polling mechanisms through its API.
+Incremental dataset diffs are documented upstream but are not currently exposed. No data files are downloaded during metadata or preparation calls.

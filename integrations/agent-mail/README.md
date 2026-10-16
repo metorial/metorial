@@ -1,6 +1,10 @@
 # Agent Mail
 
-Create and manage email inboxes for AI agents to send, receive, and reply to emails programmatically. Organize conversations with threads, labels, and drafts. Search emails semantically across inboxes. Extract structured data from unstructured emails and auto-categorize messages with custom prompts. Manage custom domains, contact/mailing lists, and multi-tenant pods. Subscribe to webhook and WebSocket events for message delivery, bounces, complaints, and domain verification. Supports IMAP and SMTP access alongside the REST API.
+Create and manage email inboxes, send and reply to emails, search message bodies and conversations, and organize mail with labels and drafts. Download email attachments or the original MIME email, manage custom domains and allow/block lists, and discover or manage email webhooks and multi-tenant pods.
+
+Connect with an API key from the [AgentMail Console](https://console.agentmail.to). An optional pod ID scopes inbox, domain, webhook, and list management; use `list_pods` to discover available pods. Message, thread, and draft tools target an inbox explicitly.
+
+Search results use AgentMail's relevance-ranked full-text search. `get_thread` returns a page of messages; follow its cursor to retrieve older pages. Send, reply, forward, and draft-send operations accept an optional idempotency key for safe retries within AgentMail's 24-hour window.
 
 ## License
 

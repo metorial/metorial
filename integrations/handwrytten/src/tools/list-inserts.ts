@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let insertSchema = z.object({
   insertId: z.string().describe('Unique ID of the insert'),
-  name: z.string().describe('Name of the insert'),
+  name: z.string().optional().describe('Name of the insert'),
   price: z.string().optional().describe('Price of the insert')
 });
 
@@ -18,7 +19,14 @@ export let listInserts = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      includeHistorical: z
+        .boolean()
+        .optional()
+        .describe('Include inserts that are out of stock')
+    })
+  )
   .output(
     z.object({
       inserts: z.array(insertSchema).describe('Available physical inserts')
@@ -27,12 +35,12 @@ export let listInserts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listInserts();
+    let result = await client.listInserts(ctx.input.includeHistorical);
     let rawInserts = result.inserts ?? [];
 
     let inserts = rawInserts.map((i: any) => ({
       insertId: String(i.id),
-      name: i.name ?? '',
+      name: responseString(i.name, 'insert name', true),
       price: i.price != null ? String(i.price) : undefined
     }));
 

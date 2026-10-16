@@ -1,4 +1,62 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import { z } from 'zod';
+
+let rateResponseSchema = z.object({
+  date: z.string(),
+  base: z.string(),
+  rates: z.record(z.string(), z.number())
+});
+
+let conversionResponseSchema = z.object({
+  timestamp: z.number(),
+  date: z.string(),
+  from: z.string(),
+  to: z.string(),
+  amount: z.number(),
+  value: z.number()
+});
+
+let timeSeriesResponseSchema = z.object({
+  base: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  rates: z.record(z.string(), z.record(z.string(), z.number()))
+});
+
+let currencyResponseSchema = z.array(
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    short_code: z.string(),
+    code: z.string(),
+    precision: z.number(),
+    subunit: z.number(),
+    symbol: z.string(),
+    symbol_first: z.boolean(),
+    decimal_mark: z.string(),
+    thousands_separator: z.string()
+  })
+);
+
+let currencyBeaconError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'CurrencyBeacon',
+    reason: 'currencyscoop_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    nestedKeys: ['meta', 'response', 'errors'],
+    detailKeys: ['message', 'detail', 'error', 'error_description', 'error_type'],
+    extractUpstreamCode: (_input, response) => {
+      let body = response?.data;
+      if (!isApiErrorRecord(body) || !isApiErrorRecord(body.meta)) return undefined;
+      let code = body.meta.code;
+      return typeof code === 'number' || typeof code === 'string' ? String(code) : undefined;
+    }
+  });
 
 export interface LatestRatesParams {
   base?: string;
@@ -9,6 +67,7 @@ export interface LatestRatesResponse {
   date: string;
   base: string;
   rates: Record<string, number>;
+  raw: Record<string, unknown>;
 }
 
 export interface HistoricalRatesParams {
@@ -21,6 +80,7 @@ export interface HistoricalRatesResponse {
   date: string;
   base: string;
   rates: Record<string, number>;
+  raw: Record<string, unknown>;
 }
 
 export interface ConvertParams {
@@ -37,6 +97,7 @@ export interface ConvertResponse {
   to: string;
   amount: number;
   value: number;
+  raw: Record<string, unknown>;
 }
 
 export interface TimeSeriesParams {
@@ -51,6 +112,7 @@ export interface TimeSeriesResponse {
   startDate: string;
   endDate: string;
   rates: Record<string, Record<string, number>>;
+  raw: Record<string, unknown>;
 }
 
 export interface CurrencyInfo {
@@ -70,12 +132,42 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.currencybeacon.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30_000,
+      errorAdapter: currencyBeaconError
     });
+  }
+
+  private async request<T>(
+    path: string,
+    params: Record<string, string>,
+    schema: z.ZodType<T>
+  ): Promise<{ response: T; raw: Record<string, unknown> }> {
+    let { data, status } = await this.axios.get<unknown>(path, { params });
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('CurrencyBeacon returned an invalid response envelope.', {
+        reason: 'currencyscoop_invalid_response'
+      });
+    }
+    let code = isApiErrorRecord(data.meta) ? data.meta.code : undefined;
+    if (
+      (typeof code === 'number' || typeof code === 'string') &&
+      Number.isFinite(Number(code)) &&
+      (Number(code) < 200 || Number(code) >= 300)
+    ) {
+      throw currencyBeaconError({ response: { status, data } });
+    }
+    let parsed = schema.safeParse(data.response);
+    if (!parsed.success) {
+      let fields = parsed.error.issues.map(issue => issue.path.join('.')).join(', ');
+      throw createApiServiceError(
+        `CurrencyBeacon returned missing or invalid ${path} response fields: ${fields}.`,
+        { reason: 'currencyscoop_invalid_response' }
+      );
+    }
+    return { response: parsed.data, raw: data };
   }
 
   async getLatestRates(params: LatestRatesParams = {}): Promise<LatestRatesResponse> {
@@ -87,12 +179,10 @@ export class Client {
       queryParams.symbols = params.symbols.join(',');
     }
 
-    let response = await this.axios.get('/latest', { params: queryParams });
-    let data = response.data;
+    let { response, raw } = await this.request('/latest', queryParams, rateResponseSchema);
     return {
-      date: data.response.date,
-      base: data.response.base,
-      rates: data.response.rates
+      ...response,
+      raw
     };
   }
 
@@ -107,12 +197,10 @@ export class Client {
       queryParams.symbols = params.symbols.join(',');
     }
 
-    let response = await this.axios.get('/historical', { params: queryParams });
-    let data = response.data;
+    let { response, raw } = await this.request('/historical', queryParams, rateResponseSchema);
     return {
-      date: data.response.date,
-      base: data.response.base,
-      rates: data.response.rates
+      ...response,
+      raw
     };
   }
 
@@ -126,15 +214,14 @@ export class Client {
       queryParams.date = params.date;
     }
 
-    let response = await this.axios.get('/convert', { params: queryParams });
-    let data = response.data;
+    let { response, raw } = await this.request(
+      '/convert',
+      queryParams,
+      conversionResponseSchema
+    );
     return {
-      timestamp: data.response.timestamp,
-      date: data.response.date,
-      from: data.response.from,
-      to: data.response.to,
-      amount: data.response.amount,
-      value: data.response.value
+      ...response,
+      raw
     };
   }
 
@@ -150,21 +237,27 @@ export class Client {
       queryParams.symbols = params.symbols.join(',');
     }
 
-    let response = await this.axios.get('/timeseries', { params: queryParams });
-    let data = response.data;
+    let { response, raw } = await this.request(
+      '/timeseries',
+      queryParams,
+      timeSeriesResponseSchema
+    );
     return {
-      base: data.response.base,
-      startDate: data.response.start_date,
-      endDate: data.response.end_date,
-      rates: data.response.rates
+      base: response.base,
+      startDate: response.start_date,
+      endDate: response.end_date,
+      rates: response.rates,
+      raw
     };
   }
 
-  async listCurrencies(): Promise<CurrencyInfo[]> {
-    let response = await this.axios.get('/currencies');
-    let data = response.data;
+  async listCurrencies(): Promise<{
+    currencies: CurrencyInfo[];
+    raw: Record<string, unknown>;
+  }> {
+    let { response, raw } = await this.request('/currencies', {}, currencyResponseSchema);
 
-    let currencies: CurrencyInfo[] = data.response.map((c: any) => ({
+    let currencies: CurrencyInfo[] = response.map(c => ({
       currencyId: c.id,
       name: c.name,
       shortCode: c.short_code,
@@ -177,6 +270,6 @@ export class Client {
       thousandsSeparator: c.thousands_separator
     }));
 
-    return currencies;
+    return { currencies, raw };
   }
 }

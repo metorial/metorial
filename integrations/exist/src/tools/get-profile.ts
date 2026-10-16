@@ -14,6 +14,10 @@ export let getProfileTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
+      localTime: z.string().optional().describe('Current local date and time at Exist'),
+      trial: z.boolean().optional().describe('Whether the account is on a trial'),
+      delinquent: z.boolean().optional().describe('Whether payment is overdue'),
       username: z.string().describe('Exist username'),
       firstName: z.string().describe('First name'),
       lastName: z.string().describe('Last name'),
@@ -36,6 +40,10 @@ export let getProfileTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: profile,
+        localTime: profile.local_time,
+        trial: profile.trial,
+        delinquent: profile.delinquent,
         username: profile.username,
         firstName: profile.first_name,
         lastName: profile.last_name,

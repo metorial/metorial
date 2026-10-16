@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,8 @@ export let auth = SlateAuth.create()
         .describe('BoxHero API token generated from Settings > Integrations & API')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim())
+        throw createApiServiceError('A BoxHero API token is required.');
       return {
         output: {
           token: ctx.input.apiToken

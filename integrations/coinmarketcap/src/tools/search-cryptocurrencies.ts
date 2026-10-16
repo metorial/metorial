@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,6 +57,7 @@ export let searchCryptocurrencies = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       cryptocurrencies: z
         .array(mapEntrySchema)
         .describe('List of matched cryptocurrency entries')
@@ -75,6 +76,12 @@ export let searchCryptocurrencies = SlateTool.create(spec, {
       limit: ctx.input.limit,
       sort: ctx.input.sort
     });
+
+    if (entries.some(entry => entry.isActive !== 0 && entry.isActive !== 1)) {
+      throw createApiServiceError(
+        'CoinMarketCap returned cryptocurrency entries without a valid activity status.'
+      );
+    }
 
     let cryptocurrencies = entries.map(entry => ({
       cryptocurrencyId: entry.id,
@@ -95,7 +102,7 @@ export let searchCryptocurrencies = SlateTool.create(spec, {
         : 'No cryptocurrencies found matching the criteria.';
 
     return {
-      output: { cryptocurrencies },
+      output: { cryptocurrencies, raw: client.rawResponse },
       message
     };
   })

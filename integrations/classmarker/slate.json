@@ -1,6 +1,6 @@
 {
   "name": "@metorial/classmarker",
-  "description": "Retrieve exam and quiz results, manage questions and categories, and control exam access for online assessments. Read test scores, user responses, and grading details. Add, edit, and organize questions with categories and point values. Manage access lists to control who can take exams. Discover available groups, links, and tests.",
+  "description": "Discover exam assignments, retrieve recent scores, manage question-bank content and categories, and control exam access codes. Validate question and category changes before saving, and download certificate PDFs returned with exam results.",
   "categories": ["education-and-learning"],
   "skills": [
     "retrieve exam results",
@@ -8,7 +8,7 @@
     "organize question categories",
     "manage exam access lists",
     "discover available tests",
-    "pre-populate exam taker info",
-    "control exam permissions"
+    "validate question changes",
+    "download exam certificates"
   ]
 }

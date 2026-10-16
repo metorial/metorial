@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Your World News API key from worldnewsapi.com/console')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Provide your World News API key.');
+      }
       return {
         output: {
           token: ctx.input.token

@@ -1,68 +1,49 @@
-Now let me get more details on the collections webhook feature and the destinations API:The Countdown API (a sibling product from Traject Data) shows the webhook pattern that RedCircle API also uses for collections. Let me look for the RedCircle-specific collections webhook docs.I now have sufficient information to write the specification. Based on all the research, RedCircle API by Traject Data is a Target product data extraction API. It supports webhooks on collections (same pattern as their sibling APIs like Countdown API and Rainforest API). Let me compile the specification.
+# RedCircle API integration specification
 
-# Slates Specification for RedCircle API
+RedCircle API retrieves public Target product data and runs scheduled collections of requests.
 
-## Overview
+## Authentication and configuration
 
-RedCircle API, by Traject Data, is a real-time data extraction API for retrieving publicly available product data from Target (the US retailer). It provides product details, pricing, availability, fulfillment information, and more, with results returned in JSON or CSV formats. It is an unofficial API for Target built for businesses in e-commerce.
+Connect with a RedCircle API key from https://app.redcircleapi.com/signup. Requests use `api_key` on `https://api.redcircleapi.com`. The account endpoint supplies the connection profile and account usage; the profile uses the account email as its identifier. The optional `customerZipcode` configuration supplies the default localization postcode. Configure that postcode with `manage_zipcodes` and wait until it is available. Store-stock postcode searches do not require registration.
 
-## Authentication
+## Tools
 
-RedCircle API uses API keys for authentication.
+| Key | Behavior |
+| --- | --- |
+| `search_products` | Search by term or Target URL with sorting, facets, fulfillment filters and pagination. |
+| `get_product_details` | Retrieve a product by TCIN, DPCI, GTIN or Target URL. |
+| `get_reviews` | Retrieve reviews with star, reviewer and media filters and pagination. |
+| `browse_categories` | Browse or search the category hierarchy, or retrieve category products. |
+| `check_store_stock` | Find up to 20 stores within 50 miles of a postcode and inspect product stock. |
+| `manage_zipcodes` | List, add or delete registered localization postcodes; list accepts pagination and search. |
+| `manage_collections` | List, get, create, update, start or delete bulk request collections. |
+| `manage_collection_requests` | List request IDs, add up to 1,000 requests, update request parameters or delete a request. |
+| `get_collection_results` | List completed result sets, prepare JSON/JSON Lines/CSV downloads or resend an existing webhook. |
+| `manage_destinations` | List, create, update or delete cloud export destinations. S3-compatible storage accepts endpoint and region settings. |
+| `get_account` | Read identity, plan, credits, quotas, usage history and provider status without consuming request credits. |
 
-- Sign up for a free account at `https://app.redcircleapi.com/signup` to obtain an API key.
-- The API key is passed as a query string parameter named `api_key` on every request.
-- Base URL: `https://api.redcircleapi.com`
-- Example request: `https://api.redcircleapi.com/request?api_key=YOUR_API_KEY&type=search&search_term=highlighter+pens`
+## Collection workflow
 
-There are no OAuth flows, scopes, or additional credentials required. All authentication is handled via the single `api_key` parameter.
+Create a collection with `manage_collections`, then use `manage_collection_requests` with action `add`. Each request uses provider parameter names, for example `{"type":"product","tcin":"78025470","custom_id":"catalog-item-001"}`. Start the collection, poll its status, list result sets, and get a completed result set. Request mutation calls must be sequential and the collection must not be running.
 
-## Features
+Collections hold up to 15,000 requests, or 100 when HTML is included. Result sets remain available for 14 days. Download retrieval returns the original result metadata and provider download URLs alongside downloadable files. Existing raw file responses remain available without transformation. Storage destinations support Amazon S3, Google Cloud Storage, Azure, Alibaba OSS, and S3-compatible storage. The public `s3_compatible` value maps to the provider's `s3compatible` wire value.
 
-### Product Data Retrieval
+## Compatibility and errors
 
-Retrieve detailed information for individual Target products, including title, description, pricing, availability, fulfillment options (shipping, in-store pickup), images, videos, specifications, ratings, reviews, and seller information. Products can be looked up by TCIN, DPCI, or URL. RedCircle API can automatically convert UPCs, GTINs, or ISBNs to TCINs.
+Existing tool keys, field types, enum values and schema requiredness are retained. Invalid branch-specific input is reported with a clear validation message. HTTP failures and provider `request_info.success=false` responses retain provider error details. Product URL and GTIN precedence follows the provider API. No OAuth scopes or token refresh are required.
 
-### Product Search
+The integration registers no triggers. Collection notification URLs can be configured through the collection tool; callback delivery is not verified by static builds.
 
-Search all of Target's inventory by criteria such as UPC, SKU, product name, and more. Results include product details per search result, position, related queries, categories, facets, and pagination. Results can be sorted (e.g., by best seller) and filtered by brand, price, color, and other facets.
+## Official documentation
 
-### Customer Reviews
-
-Retrieve customer reviews for a specific product on Target, including review ratings, text, and metadata.
-
-### Category Browsing
-
-The Categories API allows you to retrieve Target category IDs to use in category requests. You can browse Target's category listings to discover products within specific categories.
-
-### Zipcode-Based Localization
-
-The Zipcodes API allows you to set up zipcodes to localize your requests. View product results by specific United States zip codes to help understand shipping and product variances. Zipcodes can be added, listed, and deleted on your account.
-
-- Zipcodes take approximately 2 minutes to become active after being added.
-
-### Collections (Bulk/Scheduled Requests)
-
-Designed for high-scale applications, RedCircle API Collections allow you to schedule requests to run en masse and retrieve the results on demand. Run up to 15,000 requests at a time with Collections.
-
-- Collections can be run manually or on a schedule.
-- Results are organized into Result Sets that can be downloaded in JSON or CSV format.
-- A `notification_webhook` URL can be configured on a collection to receive an HTTP POST when a collection run completes.
-
-### Destinations (Cloud Storage Export)
-
-The Destinations API allows you to manage destinations. Destinations allow collection results to be automatically uploaded to Amazon S3 or Google Cloud Storage buckets.
-
-### Account Management
-
-Retrieve account information including usage metrics, credits remaining, and platform status. View error logs for troubleshooting failed requests.
-
-## Events
-
-RedCircle API supports webhooks on Collections. When a Collection has its `notification_webhook` property set, RedCircle API will make an HTTP POST to this URL when the Collection completes and a new Result Set is available. If no webhook URL is supplied on the Collection, it falls back to the webhook URL defined on your account profile.
-
-### Collection Completion
-
-- **Description:** Fires when a collection finishes executing all its requests and a new Result Set is ready for download.
-- **Configuration:** Set the `notification_webhook` property on a collection, or define a default webhook URL on your account profile. You can also configure whether the webhook body includes JSON and/or CSV download links via the `notification_as_json` and related properties.
-- You can resend a previously configured webhook POST request for a result set for debugging purposes.
+- [API overview](https://docs.trajectdata.com/redcircleapi)
+- [Product parameters](https://docs.trajectdata.com/redcircleapi/target-product-data-api/parameters/product)
+- [Search parameters](https://docs.trajectdata.com/redcircleapi/target-product-data-api/parameters/search)
+- [Review parameters](https://docs.trajectdata.com/redcircleapi/target-product-data-api/parameters/reviews)
+- [Store stock](https://docs.trajectdata.com/redcircleapi/target-product-data-api/parameters/store-stock)
+- [Category hierarchy](https://docs.trajectdata.com/redcircleapi/categories-api/list-and-search)
+- [Create collection requests](https://docs.trajectdata.com/redcircleapi/collections-api/requests/create)
+- [Get result sets](https://docs.trajectdata.com/redcircleapi/collections-api/results/get)
+- [Create destinations](https://docs.trajectdata.com/redcircleapi/destinations-api/create)
+- [Account](https://docs.trajectdata.com/redcircleapi/account-api)
+- [Response codes](https://docs.trajectdata.com/redcircleapi/response-codes)

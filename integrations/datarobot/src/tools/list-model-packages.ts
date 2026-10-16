@@ -1,9 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DataRobotClient } from '../lib/client';
+import { DataRobotClient, responseItems } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let modelPackageSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
   modelPackageId: z.string().describe('Unique model package identifier'),
   name: z.string().optional().describe('Model package name'),
   description: z.string().optional().describe('Model package description'),
@@ -13,6 +18,11 @@ let modelPackageSchema = z.object({
   registeredModelName: z.string().optional().describe('Registered model name'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   isArchived: z.boolean().optional().describe('Whether the package is archived')
+});
+
+let outputSchema = z.object({
+  modelPackages: z.array(modelPackageSchema).describe('List of model packages'),
+  totalCount: z.number().optional().describe('Total number of model packages')
 });
 
 export let listModelPackages = SlateTool.create(spec, {
@@ -30,16 +40,11 @@ export let listModelPackages = SlateTool.create(spec, {
       searchFor: z.string().optional().describe('Search string to filter packages')
     })
   )
-  .output(
-    z.object({
-      modelPackages: z.array(modelPackageSchema).describe('List of model packages'),
-      totalCount: z.number().optional().describe('Total number of model packages')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let result = await client.listModelPackages({
@@ -48,24 +53,28 @@ export let listModelPackages = SlateTool.create(spec, {
       searchFor: ctx.input.searchFor
     });
 
-    let items = result.data || result;
-    let packages = (Array.isArray(items) ? items : []).map((p: any) => ({
-      modelPackageId: p.id || p.modelPackageId,
+    let items = responseItems(result, 'model-packages');
+    let packages = items.map((p: any) => ({
+      raw: p,
+      modelPackageId: p.id ?? p.modelPackageId,
       name: p.name,
-      description: p.description,
+      description:
+        (p.modelDescription?.description ?? p.description) === null
+          ? undefined
+          : (p.modelDescription?.description ?? p.description),
       modelId: p.modelId,
-      targetName: p.target?.name || p.targetName,
-      targetType: p.target?.type || p.targetType,
+      targetName: p.target?.name === null ? undefined : (p.target?.name ?? p.targetName),
+      targetType: p.target?.type ?? p.targetType,
       registeredModelName: p.registeredModelName,
-      createdAt: p.createdAt,
+      createdAt: p.importMeta?.dateCreated ?? p.createdAt,
       isArchived: p.isArchived
     }));
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         modelPackages: packages,
-        totalCount: result.totalCount || result.count || packages.length
-      },
+        totalCount: result.totalCount
+      }),
       message: `Found **${packages.length}** model package(s) in the registry.`
     };
   })

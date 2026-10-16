@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDateRange, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 let naturalEventSchema = z.object({
@@ -66,16 +66,19 @@ export let getNaturalEvents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       title: z.string().describe('Response title'),
       events: z.array(naturalEventSchema).describe('List of natural events'),
       eventCount: z.number().describe('Number of events returned')
     })
   )
   .handleInvocation(async ctx => {
+    validateDateRange(ctx.input.startDate, ctx.input.endDate);
+    validateInteger(ctx.input.limit, 'Limit', 1);
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.getEonetEvents({
-      status: ctx.input.status === 'all' ? undefined : ctx.input.status,
+      status: ctx.input.status,
       category: ctx.input.category,
       source: ctx.input.source,
       start: ctx.input.startDate,
@@ -105,6 +108,7 @@ export let getNaturalEvents = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         title: result.title || 'EONET Events',
         events,
         eventCount: events.length

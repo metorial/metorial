@@ -26,6 +26,7 @@ export let manageLabels = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       labelUuid: z.string().optional().describe('UUID of the label'),
       name: z.string().optional().describe('Name of the label'),
       count: z.number().optional().describe('Number of messages with this label')
@@ -42,7 +43,7 @@ export let manageLabels = SlateTool.create(spec, {
       };
     }
 
-    let label: any;
+    let label: Awaited<ReturnType<Client['createLabel']>>;
     if (ctx.input.action === 'create') {
       label = await client.createLabel({ name: ctx.input.name! });
     } else {
@@ -51,6 +52,7 @@ export let manageLabels = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: label,
         labelUuid: label.uuid,
         name: label.name,
         count: label.count

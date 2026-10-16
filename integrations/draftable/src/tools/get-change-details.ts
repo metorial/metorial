@@ -33,7 +33,11 @@ export let getChangeDetails = SlateTool.create(spec, {
         .optional()
         .describe(
           'Summary statistics including total changes, word counts, and document metrics'
-        )
+        ),
+      raw: z
+        .any()
+        .optional()
+        .describe('Complete change-details response returned by Draftable')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,8 +51,9 @@ export let getChangeDetails = SlateTool.create(spec, {
     return {
       output: {
         comparisonIdentifier: ctx.input.comparisonIdentifier,
-        changes: result.changes ?? result,
-        summary: result.summary ?? undefined
+        changes: Object.hasOwn(result, 'changes') ? result.changes : result,
+        summary: result.summary,
+        raw: result
       },
       message: `Retrieved change details for comparison **${ctx.input.comparisonIdentifier}**.`
     };

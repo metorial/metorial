@@ -1,98 +1,37 @@
-Now let me get the webhook event types:# Slates Specification for Passcreator
-
-## Overview
-
-Passcreator is a platform for creating, managing, and distributing digital wallet passes (loyalty cards, coupons, event tickets, boarding passes, membership cards) for Apple Wallet and Google Wallet. It provides a RESTful API to programmatically manage pass templates and individual passes, validate passes via scanning, send passes via email/SMS, and receive real-time webhook notifications.
+# Passcreator Integration Specification
 
 ## Authentication
 
-The API key must be submitted in the HTTP `Authorization` header on every request. It is used to check if the caller is authorized to execute the function.
+Create an API key in **Settings → API Keys**. Every request to `https://app.passcreator.com` sends the key directly in the `Authorization` header, without a Bearer prefix. Keys use the account permissions; there is no OAuth refresh flow or additional connection configuration.
 
-**Method:** API Key
+## Tools
 
-**How to obtain an API key:**
+- Templates: list, describe, create, patch, copy, publish, delete, and discover exact required/optional personalization field keys.
+- Passes: create, get, list/search, patch, void/unvoid, move between compatible templates, and delete.
+- Bulk operations: target a nonempty filter and track progress plus individual failures using `get_process`.
+- Distribution: email delivery, automatic email/SMS during creation, push notifications, scheduled template notifications, and notification list/cancellation.
+- Bundles: create, update, read, void/unvoid, and delete bundles containing at most ten passes.
+- Validation: list/read app configurations, paginate scan history, and create scans.
+- Statistics: usage timelines and raw daily active/inactive history.
 
-1. Log in to Passcreator at `https://app.passcreator.com/en/login`.
-2. Navigate to **Integrations → API Keys** (or visit `https://app.passcreator.com/customeruser/apikeys`).
-3. Click the button to create a new API Key, enter a friendly name, and click **Create**.
-4. The key is shown once and cannot be recovered later.
+The integration registers 22 tools and no triggers. It preserves provider records for pass/template details, personalization fields, statistics, and process errors. `list_passes` returns `nextPageUrl` for both V1 and V3 pagination; pass queries use URL-safe Base64 encoding. Scan listings expose `nextStart` and `totalCount`.
 
-**How to use the API key:**
+Existing pass URI fields remain available. When Passcreator returns an `iPhoneUri`, creating or retrieving a pass also provides a downloadable `.pkpass` file. Google Wallet links open the provider save flow.
 
-Pass the API key directly in the `Authorization` HTTP header on every request, without any prefix (no "Bearer" or similar):
+Template creation retains the existing typed input contract. Field definitions default to the documented `text` type and optionally accept number, currency, date, or dateTime. Advanced template properties remain available through the existing `additionalProperties` record, which merges top-level provider template settings.
 
-```
-Authorization: yourApiKeyHere
-```
+## Provider documentation
 
-**Base URL:** `https://app.passcreator.com`
+- [API overview](https://developer.passcreator.com/en)
+- [Authentication and API keys](https://www.passcreator.com/en/docs/integrations/api/api-keys)
+- [V1 templates and notification lifecycle](https://developer.passcreator.com/en/api/v1/pass-template)
+- [V2 templates](https://developer.passcreator.com/en/api/v2/pass-template)
+- [V1 pass operations, file URIs, and statistics](https://developer.passcreator.com/en/api/v1/pass)
+- [V3 passes and bulk operations](https://developer.passcreator.com/en/api/v3/pass)
+- [Bulk process tracking](https://developer.passcreator.com/en/api/v3/process)
+- [Pass bundles](https://developer.passcreator.com/en/api/v2/pass-bundle)
+- [Validation and scan history](https://developer.passcreator.com/en/api/v1/validate-passes)
 
-**Scoping:** API keys are scoped to the user account's permissions. If a user only has access to certain templates, the API key will only provide access to those templates. It is recommended to create dedicated service users with restricted access for integrations.
+## Boundaries
 
-## Features
-
-### Pass Template Management
-
-Create, retrieve, update, and delete pass templates that define the layout, styling, and fields for wallet passes. This includes support for iOS 18 Enhanced Event Tickets. Templates define the structure (fields, colors, images, barcodes, localization) that individual passes are based on. Enhanced Event Ticket layouts are only available for NFC-enabled passes and require NFC approval and account-level enablement.
-
-### Pass Management
-
-Create, read, update, and delete wallet passes. Passes are created from templates and can be personalized with custom field data (e.g., names, IDs, balances). Key capabilities include:
-
-- **Personalization:** Set custom field values, barcode values, user-provided IDs, expiration dates, location-based notifications, and stored values (e.g., loyalty points or gift card balances).
-- **Voiding:** Mark a pass as voided/invalid, which greys out the QR code so the pass can't be used any longer. Useful for event ticket redemption.
-- **Moving passes:** Move a pass to another template that is part of the same project.
-- **Bulk updates:** Update multiple passes at once using segments or a flexible query language to target specific subsets of passes.
-- **Search:** Search for passes by text, with support for partial and fuzzy matching.
-- **Statistics:** Get detailed statistics about passes of a template, including timelines showing when and how many passes have been created, updated, deleted, or saved, along with operating system breakdowns. Configurable by time frame (day, week, month, year).
-
-### Pass Distribution
-
-- **Email:** If an email template is selected in the sendout settings, include an email address and Passcreator will automatically send the pass via email.
-- **SMS:** If an SMS text is specified in the sendout settings, include a phone number and Passcreator will automatically send the pass via SMS.
-- Each pass has a unique download page URL that auto-detects the user's device and provides the appropriate download.
-
-### Pass Bundling
-
-Bundle multiple passes together, allowing distribution of up to 10 wallet passes in a single download.
-
-### Pass Validation (App Scan)
-
-Manage app configurations and scans for validating passes. App configurations can be tied to a specific pass template, or validate all passes regardless of template. Scans can be created programmatically or through the Passcreator Smart Scan companion app. Custom properties can be collected during the scanning process.
-
-### Location-Based Notifications
-
-Attach geographic coordinates to passes with latitude, longitude, optional altitude, and a maximum distance radius. A relevant text can be specified for the push notification shown when the user reaches the location. Supports localized notification text for multilingual passes.
-
-### Query Language
-
-Specify segments using Passcreator's query language to filter passes by field values with operators like `contains`, `equals`, and `greaterThan`. Groups of conditions can be combined with logical OR/AND. Useful for targeted bulk updates and reading subsets of passes.
-
-## Events
-
-Passcreator supports webhooks for real-time event notifications. Subscriptions can be scoped to a specific template or apply account-wide.
-
-### Pass Events
-
-- **`pass_created`** — Triggered when a new pass is created.
-- **`pass_updated`** — Triggered when an existing pass is updated.
-- **`pass_voided`** — Triggered when a pass is voided (marked as invalid).
-- **`pushnotification_registered`** — Triggered when a pass is saved to a user's device.
-- **`first_pushnotification_registered`** — Triggered when a pass is saved to any device for the first time.
-- **`pushnotification_unregistered`** — Triggered when a pass is removed from a device or push notifications are deactivated.
-
-### Pass Template Events
-
-- **`pass_template_created`** — Triggered when a new template is created.
-- **`pass_template_updated`** — Triggered when an existing template is updated.
-
-### App Scan Events
-
-- **`app_scan_created`** — Triggered when a pass is scanned with the companion app.
-
-### Message Events
-
-- **`message_sent`** — Triggered when an email or SMS message is successfully sent or delivered.
-- **`message_failed`** — Triggered when an email or SMS message fails to send (bounced, skipped, spam).
-
-Webhook subscriptions support optional payload signing for authenticity verification and optional retry for failed deliveries.
+The published API reference has no current-user/account identity endpoint. Identity discovery is therefore unavailable. Webhooks, pull-mode webhook payloads, account administration, and specialized boarding-pass/NFC functionality are not exposed as new tools. No provider calls, live E2E suites, or tool-use evals were performed for this refresh.

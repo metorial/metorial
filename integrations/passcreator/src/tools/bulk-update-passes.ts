@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let bulkUpdatePasses = SlateTool.create(spec, {
     'Set fullReplace to true to fully replace pass data instead of patching (omitted fields will be deleted).'
   ],
   constraints: [
-    'This operation is processed asynchronously; use the returned processUrl to check status.'
+    'This operation is processed asynchronously; use get_process with the returned processUrl to check status.'
   ],
   tags: {
     destructive: false
@@ -67,6 +67,21 @@ export let bulkUpdatePasses = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    if (
+      !(
+        ctx.input.identifiers?.length ||
+        ctx.input.segmentId ||
+        (ctx.input.query && Object.keys(ctx.input.query).length > 0)
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide nonempty identifiers, a segmentId, or a query to select passes for the bulk update.'
+      );
+    }
+    if (Object.keys(ctx.input.updates).length === 0) {
+      throw createApiServiceError('Provide at least one field in updates.');
+    }
 
     let filter: Record<string, any> = {};
     if (ctx.input.identifiers) filter.identifiers = ctx.input.identifiers;

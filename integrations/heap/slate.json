@@ -1,6 +1,6 @@
 {
   "name": "@metorial/heap",
-  "description": "Track custom events, manage user identities, and enrich analytics data server-side. Send individual or bulk custom events with properties, attach user-level and account-level properties, identify and merge user profiles across sessions and devices, delete users for privacy compliance (GDPR/CCPA), and sync user segment membership to external systems via webhooks. Supports event-based webhooks and periodic segment sync callbacks for data export.",
+  "description": "Track custom events, link anonymous users to known identities, and enrich user and account profiles. Supports single and bulk ingestion, asynchronous privacy deletion requests, and deletion status checks.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "track custom events",
@@ -9,8 +9,7 @@
     "add user properties",
     "add account properties",
     "delete users for compliance",
-    "sync segment membership",
-    "configure event webhooks"
+    "check deletion status"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/heap.png"
 }

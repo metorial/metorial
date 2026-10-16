@@ -9,20 +9,27 @@ export let updateInventory = SlateTool.create(spec, {
   description: `Update inventory quantities and pricing for a product variant. Use this to sync stock levels between CloudCart and external systems, adjust prices, or update SKU/barcode information.`,
   instructions: [
     'Inventory is managed at the variant level in CloudCart. Provide a variant ID to update.',
-    'Use the List Products tool with includeVariants to find variant IDs.'
+    'Call list_variants to discover all variant IDs for a product, or get_product with includeVariants.'
   ]
 })
   .input(
     z.object({
       variantId: z.string().describe('ID of the variant to update inventory for'),
-      quantity: z.number().optional().describe('New stock quantity'),
-      price: z.any().optional().describe('Updated price for this variant'),
+      quantity: z
+        .number()
+        .optional()
+        .describe('New stock quantity; fractional quantities are supported'),
+      price: z
+        .any()
+        .optional()
+        .describe('Price in integer minor currency units; 5500 means 55.00'),
       sku: z.string().optional().describe('Updated SKU code'),
       barcode: z.string().optional().describe('Updated barcode')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       variantId: z.string(),
       quantity: z.any().optional(),
       price: z.any().optional(),
@@ -44,11 +51,12 @@ export let updateInventory = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         variantId: v.id,
         quantity: v.attributes.quantity,
         price: v.attributes.price,
-        sku: v.attributes.sku,
-        barcode: v.attributes.barcode
+        sku: v.attributes.sku ?? undefined,
+        barcode: v.attributes.barcode ?? undefined
       },
       message: `Updated variant **${v.id}** — quantity: **${v.attributes.quantity}**, price: **${v.attributes.price}**.`
     };

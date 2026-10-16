@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let connectionSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   connectionId: z.string().describe('Unique identifier of the connection'),
   name: z.string().describe('Human-readable name of the connection'),
   status: z
@@ -35,6 +39,7 @@ export let listConnections = SlateTool.create(spec, {
     let connections = await client.listConnections();
 
     let mapped = connections.map((c: any) => ({
+      raw: c,
       connectionId: c.id,
       name: c.name,
       status: c.status,
@@ -68,6 +73,7 @@ export let getConnection = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: c,
         connectionId: c.id,
         name: c.name,
         status: c.status,

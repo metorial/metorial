@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CloudClient, LocalClient } from '../lib/client';
+import { CloudClient, type CurrentMessage, LocalClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let readMessage = SlateTool.create(spec, {
@@ -10,7 +10,7 @@ export let readMessage = SlateTool.create(spec, {
 
 Available via the **Cloud API** and **Local API** only (not supported by the Subscription API).`,
   instructions: [
-    'Character codes: 0=blank, 1-26=A-Z, 27-36=digits 1-0, 63=red, 64=orange, 65=yellow, 66=green, 67=blue, 68=violet, 69=white, 70=black.'
+    'Character codes: 0=blank, 1-26=A-Z, 27-36=digits 1-0, 63=red, 64=orange, 65=yellow, 66=green, 67=blue, 68=violet, 69=white, 70=black, 71=filled (Cloud only). Local color appearance depends on board color.'
   ],
   constraints: ['Not available when using the Subscription API.'],
   tags: {
@@ -31,12 +31,12 @@ Available via the **Cloud API** and **Local API** only (not supported by the Sub
     let { apiType } = ctx.auth;
 
     if (apiType === 'subscription') {
-      throw new Error(
+      throw createApiServiceError(
         'Reading the current message is not supported by the Subscription API. Use the Cloud API or Local API instead.'
       );
     }
 
-    let result: any;
+    let result: CurrentMessage;
 
     if (apiType === 'cloud') {
       let client = new CloudClient(ctx.auth.token);
@@ -48,7 +48,7 @@ Available via the **Cloud API** and **Local API** only (not supported by the Sub
       );
       result = await client.readMessage();
     } else {
-      throw new Error(`Unsupported API type: ${apiType}`);
+      throw createApiServiceError(`Unsupported API type: ${apiType}`);
     }
 
     let rows = result.layout.length;

@@ -1,12 +1,80 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { linkhutApiError } from './lib/errors';
+
+let exchangeTokens = async (
+  params: Record<string, string>,
+  previous?: { token: string; refreshToken?: string; scope?: string }
+) => {
+  let client = createAuthenticatedAxios({
+    baseURL: 'https://api.ln.ht/v1',
+    contentType: 'application/x-www-form-urlencoded',
+    headers: { Accept: 'application/json' },
+    timeout: 30000,
+    errorAdapter: error =>
+      linkhutApiError(
+        error,
+        [
+          params.client_secret ?? '',
+          params.code ?? '',
+          params.refresh_token ?? '',
+          previous?.token ?? ''
+        ],
+        'OAuth token exchange'
+      )
+  });
+  let response = await client.post<unknown>(
+    '/oauth/token',
+    new URLSearchParams(params).toString()
+  );
+  let data = response.data;
+  if (
+    !isApiErrorRecord(data) ||
+    typeof data.expires_in !== 'number' ||
+    !Number.isFinite(data.expires_in) ||
+    data.expires_in <= 0 ||
+    Date.now() + data.expires_in * 1000 > 8640000000000000
+  ) {
+    throw createApiServiceError(
+      'Linkhut OAuth token response did not include a valid expires_in value.',
+      { reason: 'oauth_token_response' }
+    );
+  }
+  if (data.scope !== undefined && typeof data.scope !== 'string') {
+    throw createApiServiceError(
+      'Linkhut OAuth token response returned an invalid scope value.',
+      { reason: 'oauth_token_response' }
+    );
+  }
+  return {
+    ...normalizeOAuthTokenResponse(data, {
+      providerLabel: 'Linkhut',
+      operation: params.grant_type === 'refresh_token' ? 'refresh' : 'token exchange',
+      required: true,
+      expiresInType: 'number',
+      previousRefreshToken: previous?.refreshToken
+    }),
+    ...(data.scope === undefined
+      ? previous?.scope === undefined
+        ? {}
+        : { scope: previous.scope }
+      : { scope: data.scope })
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      scope: z.string().optional()
     })
   )
   .addOauth({
@@ -52,63 +120,38 @@ export let auth = SlateAuth.create()
       };
     },
 
-    handleCallback: async ctx => {
-      let axios = createAxios();
+    handleCallback: async ctx => ({
+      output: await exchangeTokens({
+        grant_type: 'authorization_code',
+        client_id: ctx.clientId,
+        client_secret: ctx.clientSecret,
+        code: ctx.code,
+        redirect_uri: ctx.redirectUri
+      })
+    }),
 
-      let response = await axios.post(
-        'https://api.ln.ht/v1/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string; scope?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken?.trim()) {
+        throw createApiServiceError(
+          'This Linkhut connection has no refresh token. Reconnect to renew access.'
+        );
+      }
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let axios = createAxios();
-
-      let response = await axios.post(
-        'https://api.ln.ht/v1/oauth/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || ''
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...ctx.output,
+          ...(await exchangeTokens(
+            {
+              grant_type: 'refresh_token',
+              client_id: ctx.clientId,
+              client_secret: ctx.clientSecret,
+              refresh_token: ctx.output.refreshToken
+            },
+            ctx.output
+          ))
         }
       };
     }
@@ -125,6 +168,8 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Enter a Linkhut personal access token.');
       return {
         output: {
           token: ctx.input.token

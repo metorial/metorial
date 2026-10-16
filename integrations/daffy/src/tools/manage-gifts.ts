@@ -21,7 +21,7 @@ export let createGift = SlateTool.create(spec, {
   name: 'Create Gift',
   key: 'create_gift',
   description: `Create a Daffy Gift — a digital charity gift card that lets the recipient choose which nonprofit to donate to. Returns a shareable URL the recipient can use to claim their gift.`,
-  constraints: ['Minimum gift amount is $18.'],
+  constraints: ['Minimum gift amount is $18, in whole dollars.'],
   tags: {
     destructive: false
   }
@@ -29,7 +29,7 @@ export let createGift = SlateTool.create(spec, {
   .input(
     z.object({
       recipientName: z.string().describe('Name of the gift recipient'),
-      amount: z.number().min(18).describe('Gift amount in USD (minimum $18)')
+      amount: z.number().min(18).describe('Gift amount in USD (minimum $18, in whole dollars)')
     })
   )
   .output(giftSchema)

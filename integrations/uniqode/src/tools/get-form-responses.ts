@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconstacClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,9 +18,33 @@ export let getFormResponses = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Page number for current API pagination'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of results per page for current API pagination'),
       action: z
         .enum(['list_forms', 'get_responses'])
         .describe('Action: "list_forms" to browse forms, "get_responses" to get submissions'),
+      organizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Organization ID from list_organizations; uses the configured default when omitted'
+        ),
+      since: z
+        .string()
+        .optional()
+        .describe('Earliest response timestamp in epoch milliseconds'),
+      until: z.string().optional().describe('Latest response timestamp in epoch milliseconds'),
+      timezone: z.string().optional().describe('Timezone for response timestamps'),
       formId: z.number().optional().describe('Form ID (required for get_responses)'),
       search: z.string().optional().describe('Search forms by title (for list_forms)'),
       limit: z.number().optional().describe('Maximum number of results'),
@@ -29,6 +53,7 @@ export let getFormResponses = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       forms: z
         .array(
           z.object({
@@ -50,6 +75,9 @@ export let getFormResponses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action === 'get_responses' && ctx.input.formId === undefined) {
+      throw createApiServiceError('Provide formId from list_forms to retrieve responses.');
+    }
     let client = new BeaconstacClient({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId
@@ -58,20 +86,23 @@ export let getFormResponses = SlateTool.create(spec, {
     if (ctx.input.action === 'list_forms') {
       let result = await client.listForms({
         search: ctx.input.search,
+        page: ctx.input.page,
+        pageSize: ctx.input.pageSize,
         limit: ctx.input.limit,
         offset: ctx.input.offset
       });
 
       let forms = result.results.map(f => ({
         formId: f.id,
-        title: f.title,
-        formType: f.form_type,
-        url: f.url,
-        createdAt: f.created
+        title: typeof f.title === 'string' ? f.title : undefined,
+        formType: typeof f.form_type === 'string' ? f.form_type : undefined,
+        url: typeof f.url === 'string' ? f.url : undefined,
+        createdAt: typeof f.created === 'string' ? f.created : undefined
       }));
 
       return {
         output: {
+          raw: result,
           totalFormCount: result.count,
           forms
         },
@@ -81,12 +112,19 @@ export let getFormResponses = SlateTool.create(spec, {
 
     // get_responses
     let result = await client.listFormResponses(ctx.input.formId!, {
+      organization: ctx.input.organizationId ?? ctx.config.organizationId,
+      since: ctx.input.since,
+      until: ctx.input.until,
+      timezone: ctx.input.timezone,
+      page: ctx.input.page,
+      pageSize: ctx.input.pageSize,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
     return {
       output: {
+        raw: result,
         totalResponseCount: result.count,
         responses: result.results
       },

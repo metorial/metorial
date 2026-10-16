@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords, type ProviderResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTechnicalAnalysis = SlateTool.create(spec, {
@@ -26,6 +26,10 @@ export let getTechnicalAnalysis = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       analysis: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of technical analysis records')
@@ -33,7 +37,7 @@ export let getTechnicalAnalysis = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProviderResponse;
 
     if (ctx.input.analysisType === 'resistance_support') {
       result = await client.getResistanceSupport({
@@ -51,10 +55,10 @@ export let getTechnicalAnalysis = SlateTool.create(spec, {
       });
     }
 
-    let analysis = result?.data ?? [];
+    let analysis = getRecords(result);
 
     return {
-      output: { analysis },
+      output: { analysis, raw: result },
       message: `Retrieved **${analysis.length}** ${ctx.input.analysisType.replace('_', ' & ')} record(s).`
     };
   })

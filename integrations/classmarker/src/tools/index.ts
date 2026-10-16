@@ -1,3 +1,4 @@
+export * from './download-certificate';
 export * from './get-results';
 export * from './list-groups-links';
 export * from './manage-access-list';

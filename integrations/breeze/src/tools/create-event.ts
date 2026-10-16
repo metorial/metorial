@@ -13,8 +13,8 @@ export let createEvent = SlateTool.create(spec, {
       name: z.string().describe('Name of the event'),
       startsOn: z
         .string()
-        .describe('Start date/time of the event (YYYY-MM-DD HH:MM:SS or YYYY-MM-DD format)'),
-      endsOn: z.string().optional().describe('End date/time of the event'),
+        .describe('Start time as Unix seconds in a string, as required by Breeze'),
+      endsOn: z.string().optional().describe('End time as Unix seconds in a string'),
       allDay: z.boolean().optional().describe('Whether this is an all-day event'),
       description: z.string().optional().describe('Description of the event'),
       categoryId: z.string().optional().describe('Calendar/category ID to place the event on'),

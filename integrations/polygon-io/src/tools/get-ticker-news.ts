@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorInput, cursorOutput, nextCursor, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let newsPublisherSchema = z.object({
@@ -40,6 +41,7 @@ export let getTickerNews = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorInput,
       ticker: z
         .string()
         .optional()
@@ -66,8 +68,9 @@ export let getTickerNews = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      articles: z.array(newsArticleSchema).describe('Array of news articles'),
-      count: z.number().describe('Number of articles returned')
+      nextCursor: cursorOutput,
+      articles: z.array(newsArticleSchema).optional().describe('Array of news articles'),
+      count: z.number().optional().describe('Number of articles returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,40 +82,42 @@ export let getTickerNews = SlateTool.create(spec, {
       publishedUtcLte: ctx.input.publishedBefore,
       order: ctx.input.order,
       sort: 'published_utc',
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let articles = (data.results || []).map((a: any) => ({
-      articleId: a.id,
-      title: a.title,
-      author: a.author,
-      articleUrl: a.article_url,
-      publishedUtc: a.published_utc,
-      tickers: a.tickers,
-      imageUrl: a.image_url,
-      description: a.description,
-      keywords: a.keywords,
+    let articles = responseRows(data.results)?.map((a: any) => ({
+      articleId: a.id ?? undefined,
+      title: a.title ?? undefined,
+      author: a.author ?? undefined,
+      articleUrl: a.article_url ?? undefined,
+      publishedUtc: a.published_utc ?? undefined,
+      tickers: a.tickers ?? undefined,
+      imageUrl: a.image_url ?? undefined,
+      description: a.description ?? undefined,
+      keywords: a.keywords ?? undefined,
       publisher: a.publisher
         ? {
-            name: a.publisher.name,
-            homepageUrl: a.publisher.homepage_url,
-            logoUrl: a.publisher.logo_url,
-            faviconUrl: a.publisher.favicon_url
+            name: a.publisher.name ?? undefined,
+            homepageUrl: a.publisher.homepage_url ?? undefined,
+            logoUrl: a.publisher.logo_url ?? undefined,
+            faviconUrl: a.publisher.favicon_url ?? undefined
           }
         : undefined,
       insights: a.insights?.map((i: any) => ({
-        ticker: i.ticker,
-        sentiment: i.sentiment,
-        sentimentReasoning: i.sentiment_reasoning
+        ticker: i.ticker ?? undefined,
+        sentiment: i.sentiment ?? undefined,
+        sentimentReasoning: i.sentiment_reasoning ?? undefined
       }))
     }));
 
     return {
       output: {
+        nextCursor: nextCursor(data),
         articles,
-        count: articles.length
+        count: articles?.length ?? undefined
       },
-      message: `Retrieved **${articles.length}** news article(s)${ctx.input.ticker ? ` for **${ctx.input.ticker}**` : ''}.`
+      message: `Retrieved **${articles?.length ?? 0}** news article(s)${ctx.input.ticker ? ` for **${ctx.input.ticker}**` : ''}.`
     };
   })
   .build();

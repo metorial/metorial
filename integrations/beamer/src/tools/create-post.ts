@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { translationParams } from '../lib/translations';
 import { spec } from '../spec';
 
 let translationSchema = z.object({
@@ -53,10 +54,11 @@ export let postOutputSchema = z.object({
 export let createPostTool = SlateTool.create(spec, {
   name: 'Create Post',
   key: 'create_post',
-  description: `Create a new changelog post or announcement in Beamer. Supports multi-language translations, categories (new, improvement, fix, or custom), scheduling, segmentation filters, and rich HTML content. Can target specific users or user segments.`,
+  description: `Create a new changelog post or announcement in Beamer. Supports multi-language translations, categories, scheduling, segmentation filters, and rich HTML content. Can target specific users or user segments.`,
   instructions: [
     'Provide at least one translation with title and content.',
-    'Use the category field for built-in categories: "new", "improvement", or "fix".',
+    'When supplying language codes, provide a two-letter code for every translation.',
+    'Use category for new, improvement, fix, comingsoon, announcement, or other.',
     'Use filterUserId to send single-user notifications.',
     'Set publish to true to publish immediately, or false to save as draft.'
   ],
@@ -72,8 +74,12 @@ export let createPostTool = SlateTool.create(spec, {
         .array(translationSchema)
         .min(1)
         .describe('Post content translations (at least one required)'),
+      userEmail: z
+        .string()
+        .optional()
+        .describe('Email of the team member creating or updating the post'),
       category: z
-        .enum(['new', 'improvement', 'fix'])
+        .enum(['new', 'improvement', 'fix', 'comingsoon', 'announcement', 'other'])
         .optional()
         .describe('Built-in post category'),
       publish: z.boolean().optional().default(true).describe('Publish the post immediately'),
@@ -106,22 +112,9 @@ export let createPostTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let titles = ctx.input.translations.map(t => t.title);
-    let contents = ctx.input.translations.map(t => t.content);
-    let languages = ctx.input.translations.map(t => t.language).filter(Boolean) as string[];
-    let linkUrls = ctx.input.translations.map(t => t.linkUrl).filter(Boolean) as string[];
-    let linkTexts = ctx.input.translations.map(t => t.linkText).filter(Boolean) as string[];
-    let customCategories = ctx.input.translations
-      .map(t => t.customCategory)
-      .filter(Boolean) as string[];
-
     let post = await client.createPost({
-      title: titles,
-      content: contents,
-      ...(languages.length > 0 ? { language: languages } : {}),
-      ...(linkUrls.length > 0 ? { linkUrl: linkUrls } : {}),
-      ...(linkTexts.length > 0 ? { linkText: linkTexts } : {}),
-      ...(customCategories.length > 0 ? { customCategory: customCategories } : {}),
+      ...translationParams(ctx.input.translations),
+      userEmail: ctx.input.userEmail,
       category: ctx.input.category,
       publish: ctx.input.publish,
       archive: ctx.input.archive,

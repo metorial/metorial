@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DictionaryClient } from '../lib/client';
+import { DictionaryClient, getPronunciationAudioUrl } from '../lib/client';
 import { spec } from '../spec';
 
 let phoneticEntrySchema = z.object({
@@ -12,7 +12,7 @@ let phoneticEntrySchema = z.object({
 export let getPhonetics = SlateTool.create(spec, {
   name: 'Get Phonetics',
   key: 'get_phonetics',
-  description: `Retrieve phonetic transcriptions and audio pronunciation URLs for a word. Returns IPA text representations and links to audio files where available. Useful for language learning and pronunciation reference.`,
+  description: `Retrieve phonetic transcriptions and audio pronunciation URLs for a word. Returns IPA text representations and downloadable pronunciation recordings where available. Useful for language learning and pronunciation reference.`,
   constraints: [
     'Not all words or languages have audio pronunciation available.',
     'Phonetic text may not be available for every entry.'
@@ -29,7 +29,7 @@ export let getPhonetics = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Language code override (e.g., "en", "fr", "es"). Uses the configured default if not specified.'
+          'Language code override, such as "en" for English. Uses the configured default when omitted; availability depends on the provider.'
         )
     })
   )
@@ -60,20 +60,25 @@ export let getPhonetics = SlateTool.create(spec, {
       for (let p of entry.phonetics) {
         allPhonetics.push({
           text: p.text,
-          audioUrl: p.audio || undefined,
+          audioUrl: getPronunciationAudioUrl(p.audio),
           sourceUrl: p.sourceUrl
         });
       }
     }
 
-    // Deduplicate phonetics by text + audioUrl combination
     let seen = new Set<string>();
     let uniquePhonetics = allPhonetics.filter(p => {
-      let key = `${p.text || ''}|${p.audioUrl || ''}`;
+      let key = JSON.stringify([p.text, p.audioUrl, p.sourceUrl]);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
+
+    primaryPhonetic ??= uniquePhonetics.find(phonetic => phonetic.text)?.text;
+
+    for (let url of new Set(uniquePhonetics.flatMap(p => (p.audioUrl ? [p.audioUrl] : [])))) {
+      await ctx.addAttachment({ type: 'url', url });
+    }
 
     let audioCount = uniquePhonetics.filter(p => p.audioUrl).length;
 

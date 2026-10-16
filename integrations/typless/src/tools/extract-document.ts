@@ -10,7 +10,7 @@ let extractedFieldSchema = z.object({
     .array(
       z.object({
         confidenceScore: z.number().describe('Confidence score of the prediction (0-1)'),
-        value: z.string().describe('Recognized value'),
+        value: z.string().optional().describe('Recognized value, omitted when unknown'),
         pageNumber: z.number().describe('Page number where the value was found'),
         x: z.number().describe('X coordinate of the value block'),
         y: z.number().describe('Y coordinate of the value block'),
@@ -56,8 +56,15 @@ export let extractDocument = SlateTool.create(spec, {
       extractedFields: z
         .array(extractedFieldSchema)
         .describe('List of extracted fields with predicted values'),
-      lineItems: z.array(z.any()).describe('Extracted line items if applicable'),
-      fileName: z.string().describe('Name of the processed file')
+      lineItems: z
+        .array(z.any())
+        .optional()
+        .describe('Extracted line items when returned by the provider'),
+      fileName: z.string().describe('Name of the processed file'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original provider response, including unknown values as null')
     })
   )
   .handleInvocation(async ctx => {
@@ -72,7 +79,7 @@ export let extractDocument = SlateTool.create(spec, {
     let fieldSummary = result.extractedFields
       .map(f => {
         let topValue = f.values[0];
-        return topValue
+        return topValue?.value !== undefined
           ? `**${f.name}**: ${topValue.value} (${(topValue.confidenceScore * 100).toFixed(1)}%)`
           : `**${f.name}**: no value extracted`;
       })

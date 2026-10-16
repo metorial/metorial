@@ -4,6 +4,7 @@ import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let vmSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   vmUuid: z.string().describe('VM unique identifier'),
   name: z.string().describe('VM name'),
   status: z.string().describe('Current status (e.g., running, stopped)'),
@@ -21,7 +22,7 @@ let vmSchema = z.object({
 export let listVms = SlateTool.create(spec, {
   name: 'List Virtual Machines',
   key: 'list_vms',
-  description: `List all virtual machines in your Pilvio account. Returns each VM's status, resource allocation (vCPU, RAM), networking details, and OS information.`,
+  description: `List virtual machines in the configured datacenter location (or the default location). Query each location separately for a complete account inventory. Returns each VM's status, resource allocation (vCPU, RAM), networking details, and OS information.`,
   tags: {
     readOnly: true
   }
@@ -40,18 +41,19 @@ export let listVms = SlateTool.create(spec, {
 
     let vms = await client.listVms();
 
-    let mapped = (Array.isArray(vms) ? vms : []).map((vm: any) => ({
+    let mapped = vms.map((vm: any) => ({
+      raw: vm,
       vmUuid: vm.uuid,
       name: vm.name,
       status: vm.status,
       vcpu: vm.vcpu,
-      ram: vm.ram,
-      osName: vm.os_name,
-      osVersion: vm.os_version,
-      publicIp: vm.public_ipv4,
-      privateIp: vm.private_ipv4,
-      createdAt: vm.created_at,
-      backup: vm.backup,
+      ram: vm.memory ?? vm.ram,
+      osName: vm.os_name ?? undefined,
+      osVersion: vm.os_version ?? undefined,
+      publicIp: vm.public_ipv4 ?? undefined,
+      privateIp: vm.private_ipv4 ?? undefined,
+      createdAt: vm.created_at ?? undefined,
+      backup: vm.backup ?? undefined,
       description: vm.description
     }));
 

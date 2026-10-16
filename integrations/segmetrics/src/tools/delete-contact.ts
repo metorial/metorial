@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let deleteContact = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ If an email address is used, all contacts in the integration with that email wil
 })
   .input(
     z.object({
+      ...importScopeFields,
       contactIdOrEmail: z
         .string()
         .describe('The contact ID or email address of the contact to delete.')
@@ -29,11 +31,7 @@ If an email address is used, all contacts in the integration with that email wil
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let response = await client.deleteContact(ctx.input.contactIdOrEmail);
 

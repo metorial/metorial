@@ -1,6 +1,10 @@
-# Highergov
+# HigherGov
 
-Search and retrieve U.S. government contracting and grants data. Query 61M+ federal contract awards, 4M+ grant awards, contract and grant opportunities, awardee profiles, government contacts, contract vehicles, agencies, and related documents. Filter opportunities by source type, date, agency, NAICS/PSC codes, and saved search criteria. Look up 1.5M+ contractor/grantee profiles with subsidiary relationships for competitive analysis and teaming partner research. Access 130K+ government buyer contacts. Retrieve 3M+ documents including RFPs, schedules, and protest decisions. Manage business development pursuit pipelines and push pursuits to external CRMs via webhooks. Supports quick search/autocomplete for building search interfaces.
+Search U.S. government contract and grant opportunities, federal prime and subawards, state and local contract awards, awardee profiles and relationships, government contacts, agencies, contract vehicles, and classification codes. Research National Stock Numbers and read pursuit records belonging to your connected account. Retrieve opportunity document metadata and downloadable files, with support for renewing expiring links.
+
+Create an API key as an account administrator at [HigherGov API management](https://www.highergov.com/api-management/). The standard subscription includes 10,000 API records per month. Search results support page numbers and up to 100 records per page.
+
+This integration provides read-only data tools. See [the supported capabilities](docs/SPEC.md) and [HigherGov's API guide](https://docs.highergov.com/import-and-export/highergov-api).
 
 ## License
 

@@ -27,6 +27,7 @@ export let manageGroups = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       groupUuid: z.string().optional().describe('UUID of the group'),
       name: z.string().optional().describe('Name of the group'),
       query: z.string().nullable().optional().describe('Smart group query (if applicable)'),
@@ -45,7 +46,7 @@ export let manageGroups = SlateTool.create(spec, {
       };
     }
 
-    let group: any;
+    let group: Awaited<ReturnType<Client['createGroup']>>;
     if (ctx.input.action === 'create') {
       group = await client.createGroup({ name: ctx.input.name! });
     } else {
@@ -54,6 +55,7 @@ export let manageGroups = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: group,
         groupUuid: group.uuid,
         name: group.name,
         query: group.query,

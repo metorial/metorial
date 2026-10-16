@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 let tleRecordSchema = z.object({
@@ -35,24 +35,28 @@ export let searchTle = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       totalItems: z.number().optional().describe('Total number of matching satellites'),
       records: z.array(tleRecordSchema).describe('TLE records')
     })
   )
   .handleInvocation(async ctx => {
+    validateInteger(ctx.input.satelliteNumber, 'Satellite number', 1);
+    validateInteger(ctx.input.page, 'Page', 1);
+    validateInteger(ctx.input.pageSize, 'Page size', 1);
     let client = new NasaClient({ token: ctx.auth.token });
 
-    if (ctx.input.satelliteNumber) {
+    if (ctx.input.satelliteNumber !== undefined) {
       let result = await client.getTleByNumber(ctx.input.satelliteNumber);
       let record = {
-        satelliteId: result.satelliteId || ctx.input.satelliteNumber,
+        satelliteId: result.satelliteId ?? ctx.input.satelliteNumber,
         name: result.name,
         date: result.date,
         line1: result.line1,
         line2: result.line2
       };
       return {
-        output: { totalItems: 1, records: [record] },
+        output: { raw: result, totalItems: 1, records: [record] },
         message: `Found TLE data for **${record.name}** (NORAD #${record.satelliteId}).`
       };
     }
@@ -72,7 +76,7 @@ export let searchTle = SlateTool.create(spec, {
     }));
 
     return {
-      output: { totalItems: result.totalItems, records },
+      output: { raw: result, totalItems: result.totalItems, records },
       message: `Found **${result.totalItems ?? records.length}** satellites${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Returned ${records.length} TLE records.`
     };
   })

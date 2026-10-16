@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ let paperSummarySchema = z
   })
   .passthrough();
 
-let authorDetailSchema = z
+export let authorDetailSchema = z
   .object({
     authorId: z.string().nullable().optional().describe('Semantic Scholar author ID'),
     name: z.string().nullable().optional().describe('Author name'),
@@ -74,9 +74,13 @@ For single author lookup, provide **authorId**. For batch lookup of up to 1,000 
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.authorId !== undefined && ctx.input.authorIds !== undefined) {
+      throw createApiServiceError('Provide either authorId or authorIds, not both.');
+    }
+
     if (ctx.input.authorIds && ctx.input.authorIds.length > 0) {
       let result = await client.getAuthorsBatch(ctx.input.authorIds, ctx.input.fields);
-      let authors = Array.isArray(result) ? result : [];
+      let authors = result;
 
       return {
         output: { authors },
@@ -93,9 +97,6 @@ For single author lookup, provide **authorId**. For batch lookup of up to 1,000 
       };
     }
 
-    return {
-      output: { authors: [] },
-      message: 'No author ID provided. Please specify either `authorId` or `authorIds`.'
-    };
+    throw createApiServiceError('Provide either authorId or a non-empty authorIds array.');
   })
   .build();

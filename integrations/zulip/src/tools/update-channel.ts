@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let updateChannel = SlateTool.create(spec, {
   name: 'Update Channel',
   key: 'update_channel',
-  description: `Update a Zulip channel's properties such as name, description, or privacy settings. Requires administrator permissions.`,
+  description: `Update a Zulip channel's properties such as name, description, or privacy settings. Requires permission to administer the channel.`,
   tags: {
     destructive: false,
     readOnly: false

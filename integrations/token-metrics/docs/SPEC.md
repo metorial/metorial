@@ -1,84 +1,70 @@
-# Slates Specification for Token Metrics
+# Token Metrics Specification
 
-## Overview
+Token Metrics supplies cryptocurrency market data, proprietary analytics, model grades,
+research, and AI-assisted answers through its versioned HTTP API.
 
-Token Metrics is an AI-powered cryptocurrency analytics platform that provides market data, proprietary trading and investment grades, trading signals, sentiment analysis, and AI-generated research reports for thousands of digital assets. It is a RESTful service that delivers real-time and historical crypto data, AI-generated Trader & Investor Grades, market sentiment, smart indices, deep-dive AI reports, and more.
+## Connection
 
-## Authentication
+Create an API key in the Token Metrics account dashboard. The integration sends the saved
+key as the `x-api-key` header. All original tools retain `https://api.tokenmetrics.com/v2`;
+`get_tm_grades`, `get_grade_history`, and `get_moonshot_tokens` use their documented
+`https://api.tokenmetrics.com/v3` endpoints. Existing API-key
+connections require no migration. No account, workspace, or project identifier is required.
+Endpoint availability and historical coverage depend on the provider and the connected key.
 
-The Token Metrics API uses API key authentication via headers.
+## Tools
 
-To authenticate:
+| Tool | Capability |
+| --- | --- |
+| `search_tokens` | Discover token IDs by name, symbol, categories, exchange, or contract |
+| `get_top_tokens` | Read tokens ranked by market capitalization |
+| `get_price_data` | Current price or daily/hourly OHLCV records |
+| `get_grades` | Retained trader, investor, technology, and fundamental grade routes |
+| `get_tm_grades` | Current TM Grade records, component grades, momentum, and signals |
+| `get_grade_history` | Historical TM, technology, or fundamental grades |
+| `get_trading_signals` | Daily or hourly signal records |
+| `get_market_metrics` | Market-wide indicator and metric records |
+| `get_sentiment` | Retained social sentiment route |
+| `get_technical_analysis` | Resistance/support or correlation records |
+| `get_quant_metrics` | Quantitative risk and performance records |
+| `get_price_prediction` | Retained price prediction and scenario-analysis routes |
+| `get_ai_reports` | Provider-generated token research records |
+| `get_indices` | Discover indices, then retrieve holdings or historical performance using an index ID |
+| `get_crypto_investors` | Crypto investor records and scores |
+| `ask_ai_agent` | Crypto questions with prior user-message context |
+| `get_moonshot_tokens` | Active or past Moonshot selections with documented sorting |
 
-1. Create a free account at app.tokenmetrics.com → API, click Generate Key, and keep the key private.
-2. Include the API key in the `x-api-key` HTTP header with every request.
+All tools are read-only. Call `search_tokens` to discover token identifiers and slugs.
+Call `get_indices` with `queryType: "list"` to discover index IDs. The integration returns
+one provider response per invocation; use the provider's pagination in `raw` to request
+subsequent pages. An actual empty provider array remains empty. Missing or malformed data
+raises an error instead of manufacturing a result. Original nullable record fields and the
+complete response are preserved in `raw`.
 
-Example request header:
+Existing tools retain their original v2 endpoint paths and request parameter spelling.
+The current official SDK targets v3 and cannot establish v2 date/filter acceptance.
+Historical availability is not guaranteed back to a fixed inception date. Older
+trader/investor, sentiment, and scenario routes remain for existing workflows; their current
+availability was not verified. Use `get_tm_grades` and `get_grade_history` for the currently
+documented v3 TM Grade families.
 
-```
-x-api-key: YOUR_API_KEY
-```
+## API Scope
 
-The base URL for all API requests is `https://api.tokenmetrics.com/v2/`.
+This package uses one Token Metrics product, preserving v2 compatibility and adding selected
+current v3 endpoints. API versions do not represent distinct product categories. It has no webhook registrations, file downloads,
+or token-refresh flow. The official HTTP endpoint inventory has no suitable current-user
+or account-profile discovery endpoint. WebSocket streaming is outside this request/response
+tool surface.
 
-If the API key is inactive or your current plan does not have access to the requested endpoint, you will receive a 403 Forbidden error. Access to certain endpoints depends on the subscription tier (Basic, Advanced, Premium, VIP).
+## Official References
 
-## Features
-
-### Token Discovery & Market Data
-
-Get the list of coins and their associated TOKEN_ID supported by Token Metrics, along with key market data such as contract address, current price, market cap, trading volume, supply metrics, and 24-hour price change. Tokens can be looked up by ID, symbol, or name.
-
-### Price Data (OHLCV)
-
-Retrieve historical OHLCV (Open, High, Low, Close, Volume) data for tokens on both daily and hourly granularity. Can be filtered by token ID, date range, and symbol. Token Metrics pricing data starts on 2019-01-01 for most tokens.
-
-### AI-Powered Grading
-
-- **Trader Grades:** The Trader Grade empowers traders to make informed buy and sell decisions by calculating grades for a specific crypto asset using a combination of Technical Analysis, Quantitative-Driven Performance Metrics, and On-chain Metrics. This is a short-term oriented grade.
-- **Investor Grades:** The Investor Grade provides long-term assessments of cryptocurrency assets using Token Metrics' proprietary research methodology, which considers an asset's Technology, Fundamentals, and Valuation Grades.
-- **Fundamental Grades:** Includes grade class, community score, exchange score, VC score, tokenomics score, and DeFi scanner score.
-
-### Trading Signals
-
-AI-generated trading signals for long and short positions for all tokens. Filterable by date range, token ID, symbol, category, exchange, market cap, volume, FDV, and signal type. Available on both daily and hourly intervals. The Market Indicator provides "Bullish" and "Bearish" signals on the entire crypto market based on market conditions and trend analysis.
-
-### AI Indices (Model Portfolios)
-
-The Indices feature provides access to Token Metrics' AI-based model portfolios, allowing you to follow the trades made by their AI across a range of indices, with detailed information on each portfolio's rebalancing dates, exchange, risk options, and token weights. You can also retrieve historical performance data and current holdings/weights for indices.
-
-### Sentiment Analysis
-
-The Sentiment feature collects data from 3 social platforms—Twitter, Reddit, and Telegram—and analyzes the discussions surrounding a particular crypto asset to determine the sentiment or attitude expressed towards it. Hourly sentiment scores are available along with news summaries.
-
-### Technical Analysis
-
-Support and resistance levels, correlation analysis are available. The resistance and support feature returns historical price levels for a given token. Correlation data shows the top 10 and bottom 10 correlations of tokens with the top 100 market cap tokens.
-
-### Quantitative Metrics
-
-Get the latest quantitative metrics for tokens. Advanced quantitative analysis and grading systems for deeper analytical use cases.
-
-### Scenario Analysis & Price Predictions
-
-Get price predictions based on different crypto market scenarios. Provides forecasting and scenario-based analysis for tokens.
-
-### AI Reports
-
-AI-generated reports providing comprehensive analyses of cryptocurrency tokens, including deep dives, investment analyses, and code reviews.
-
-### Crypto Investors
-
-Get the latest list of crypto investors and their scores. Provides information about notable crypto investors and their activity.
-
-### Conversational AI Agent
-
-Ask questions in plain English and receive token facts or instant dashboards on demand. An AI chatbot endpoint for market insights.
-
-### Top Tokens by Market Cap
-
-Retrieve a ranked list of top tokens by market capitalization for quick market overview.
-
-## Events
-
-The provider does not support events. Token Metrics is a data-retrieval API without webhooks or event subscription mechanisms.
+- [API reference](https://developers.tokenmetrics.com/reference/tokens)
+- [Official TypeScript SDK](https://github.com/token-metrics/tmai-api-sdk-typescript)
+- [TM Grade routes](https://github.com/token-metrics/tmai-api-sdk-typescript/blob/master/src/endpoints/tm_grades.ts)
+- [Technology Grade routes](https://github.com/token-metrics/tmai-api-sdk-typescript/blob/master/src/endpoints/technology_grades.ts)
+- [Fundamental Grade routes](https://github.com/token-metrics/tmai-api-sdk-typescript/blob/master/src/endpoints/fundamental_grades.ts)
+- [Moonshot selections](https://developers.tokenmetrics.com/v3/reference/moonshot-tokens)
+- [Current TM Grade](https://developers.tokenmetrics.com/v3/reference/tm-grade)
+- [TM Grade history](https://developers.tokenmetrics.com/v3/reference/tm-grade-history)
+- [Technology Grade history](https://developers.tokenmetrics.com/v3/reference/technology-grade-history)
+- [Fundamental Grade history](https://developers.tokenmetrics.com/v3/reference/fundamental-grade-history)

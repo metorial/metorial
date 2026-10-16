@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,7 @@ export let uploadSubtitles = SlateTool.create(spec, {
       subFormat: z.string().describe('Format of the subtitles'),
       author: z
         .object({
-          username: z.string().describe('Author username'),
+          username: z.string().optional().describe('Author username, when returned'),
           userId: z.string().describe('Author user ID')
         })
         .describe('Author of this version')
@@ -50,6 +50,9 @@ export let uploadSubtitles = SlateTool.create(spec, {
       username: ctx.auth.username
     });
 
+    if ((ctx.input.subtitles !== undefined) === (ctx.input.subtitlesUrl !== undefined)) {
+      throw createApiServiceError('Provide exactly one of subtitles or subtitlesUrl.');
+    }
     let s = await client.createSubtitles(ctx.input.videoId, ctx.input.languageCode, {
       subtitles: ctx.input.subtitles,
       subtitlesUrl: ctx.input.subtitlesUrl,
@@ -65,8 +68,8 @@ export let uploadSubtitles = SlateTool.create(spec, {
         languageCode: s.language?.code ?? ctx.input.languageCode,
         subFormat: s.sub_format,
         author: {
-          username: s.author?.username ?? '',
-          userId: s.author?.id ?? ''
+          username: s.author.username,
+          userId: s.author.id
         }
       },
       message: `Uploaded subtitles as version **${s.version_number}** for language **${s.language?.name ?? ctx.input.languageCode}**.${ctx.input.action ? ` Action "${ctx.input.action}" applied.` : ''}`

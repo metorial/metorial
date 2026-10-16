@@ -1,13 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireArray, requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
   serverId: z.string().describe('ID of the server'),
   userId: z.string().describe('User ID of the member'),
   nickname: z.string().optional().describe('Member nickname in the server'),
-  roles: z.array(z.string()).describe('Role IDs assigned to the member'),
+  roles: z.array(z.string()).optional().describe('Role IDs assigned to the member'),
   joinedAt: z.string().describe('ISO 8601 timestamp when the member joined'),
   timeout: z.string().optional().describe('ISO 8601 timestamp when the timeout expires')
 });
@@ -15,7 +16,7 @@ let memberSchema = z.object({
 export let fetchMembers = SlateTool.create(spec, {
   name: 'Fetch Server Members',
   key: 'fetch_members',
-  description: `Fetch members of a Revolt server. Can fetch all members or a specific member by user ID.`,
+  description: `Fetch members of a Stoat server. Can fetch all members or a specific member by user ID.`,
   tags: {
     readOnly: true
   }
@@ -42,10 +43,10 @@ export let fetchMembers = SlateTool.create(spec, {
         output: {
           members: [
             {
-              serverId: member._id?.server ?? ctx.input.serverId,
-              userId: member._id?.user ?? ctx.input.userId,
+              serverId: member._id?.server,
+              userId: member._id?.user,
               nickname: member.nickname ?? undefined,
-              roles: member.roles ?? [],
+              roles: member.roles ?? undefined,
               joinedAt: member.joined_at,
               timeout: member.timeout ?? undefined
             }
@@ -56,13 +57,16 @@ export let fetchMembers = SlateTool.create(spec, {
     }
 
     let result = await client.fetchMembers(ctx.input.serverId, ctx.input.excludeOffline);
-    let membersArray = result.members ?? result;
+    let membersArray = requireArray(
+      Array.isArray(result) ? result : requireRecord(result, 'server members').members,
+      'server members'
+    );
 
     let members = membersArray.map((m: any) => ({
-      serverId: m._id?.server ?? ctx.input.serverId,
+      serverId: m._id?.server,
       userId: m._id?.user,
       nickname: m.nickname ?? undefined,
-      roles: m.roles ?? [],
+      roles: m.roles ?? undefined,
       joinedAt: m.joined_at,
       timeout: m.timeout ?? undefined
     }));
@@ -108,7 +112,7 @@ export let editMember = SlateTool.create(spec, {
       serverId: z.string().describe('ID of the server'),
       userId: z.string().describe('User ID of the edited member'),
       nickname: z.string().optional().describe('Updated nickname'),
-      roles: z.array(z.string()).describe('Updated role IDs')
+      roles: z.array(z.string()).optional().describe('Updated role IDs')
     })
   )
   .handleInvocation(async ctx => {
@@ -124,10 +128,10 @@ export let editMember = SlateTool.create(spec, {
 
     return {
       output: {
-        serverId: result._id?.server ?? ctx.input.serverId,
-        userId: result._id?.user ?? ctx.input.userId,
+        serverId: result._id?.server,
+        userId: result._id?.user,
         nickname: result.nickname ?? undefined,
-        roles: result.roles ?? []
+        roles: result.roles ?? undefined
       },
       message: `Updated member \`${ctx.input.userId}\` in server \`${ctx.input.serverId}\``
     };
@@ -137,7 +141,7 @@ export let editMember = SlateTool.create(spec, {
 export let kickMember = SlateTool.create(spec, {
   name: 'Kick Member',
   key: 'kick_member',
-  description: `Kick a member from a Revolt server. The member can rejoin if they have an invite.`,
+  description: `Kick a member from a Stoat server. The member can rejoin if they have an invite.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -169,7 +173,7 @@ export let kickMember = SlateTool.create(spec, {
 export let manageBan = SlateTool.create(spec, {
   name: 'Ban / Unban Member',
   key: 'manage_ban',
-  description: `Ban or unban a user from a Revolt server. Banning prevents the user from rejoining. Can also list all bans for a server.`,
+  description: `Ban or unban a user from a Stoat server. Banning prevents the user from rejoining. Can also list all bans for a server.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -205,7 +209,10 @@ export let manageBan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let result = await client.fetchBans(ctx.input.serverId);
-      let bansArray = result.bans ?? result;
+      let bansArray = requireArray(
+        Array.isArray(result) ? result : requireRecord(result, 'server bans').bans,
+        'server bans'
+      );
       let bans = bansArray.map((b: any) => ({
         userId: b._id?.user ?? b.user?._id ?? b.id,
         reason: b.reason ?? undefined
@@ -216,7 +223,8 @@ export let manageBan = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.userId) throw new Error('userId is required for ban/unban actions');
+    if (!ctx.input.userId)
+      throw createApiServiceError('userId is required for ban/unban actions');
 
     if (ctx.input.action === 'ban') {
       await client.banMember(ctx.input.serverId, ctx.input.userId, ctx.input.reason);

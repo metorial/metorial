@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getGovernmentBonds = SlateTool.create(spec, {
   name: 'Get Government Bonds',
   key: 'get_government_bonds',
-  description: `Retrieve 10-year government bond yield data for 53+ countries. Returns yield, daily price change, and weekly/monthly/yearly percentage changes. Use the search parameter to filter by country name.`,
+  description: `Retrieve 10-year government bond yield data for 53+ countries. Returns yield, daily price change, and weekly/monthly/yearly percentage changes. Use the search parameter to filter by country name within the requested country-list page. Fetches a list page, then one detail request per matching country.`,
   constraints: ['Available on Basic plan and higher'],
   tags: {
     readOnly: true
@@ -21,6 +21,7 @@ export let getGovernmentBonds = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -29,12 +30,12 @@ export let getGovernmentBonds = SlateTool.create(spec, {
       }),
       bonds: z.array(
         z.object({
-          symbol: z.string(),
-          name: z.string(),
+          symbol: z.string().optional(),
+          name: z.string().optional(),
           country: z.string(),
           yield: z.number().nullable(),
           change: z.number().nullable(),
-          changePercent: z.number().nullable(),
+          changePercent: z.number().nullable().optional(),
           weekChangePercent: z.number().nullable(),
           monthChangePercent: z.number().nullable(),
           yearChangePercent: z.number().nullable(),
@@ -68,9 +69,10 @@ export let getGovernmentBonds = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         bonds
       },
-      message: `Retrieved ${bonds.length} government bond records${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${bonds.length} government bond records${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

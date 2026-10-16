@@ -46,6 +46,7 @@ export let updateQrCode = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       qrCodeId: z.number().describe('ID of the updated QR code'),
       name: z.string().describe('Updated name'),
       qrType: z.number().describe('QR code type'),
@@ -85,11 +86,12 @@ export let updateQrCode = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         qrCodeId: result.id,
         name: result.name,
         qrType: result.qr_type,
-        url: result.url,
-        updatedAt: result.updated
+        url: typeof result.url === 'string' ? result.url : undefined,
+        updatedAt: typeof result.updated === 'string' ? result.updated : undefined
       },
       message: `Updated QR code **"${result.name}"** (ID: ${result.id}).`
     };

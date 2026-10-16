@@ -1,29 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { itemSchema, mapItem } from '../lib/schemas';
 import { spec } from '../spec';
-
-let attributeSchema = z.object({
-  attributeId: z.number().describe('Unique identifier for the attribute'),
-  name: z.string().describe('Attribute name (e.g., Category, Expiration date)'),
-  type: z.string().describe('Attribute data type (text, number, date, barcode)'),
-  value: z.union([z.string(), z.number(), z.null()]).describe('Attribute value')
-});
-
-let itemSchema = z.object({
-  itemId: z.number().describe('Unique identifier for the item'),
-  name: z.string().describe('Item name'),
-  sku: z.string().describe('Stock Keeping Unit code'),
-  barcode: z.string().describe('Barcode number'),
-  photoUrl: z.string().nullable().describe('URL of the item photo'),
-  cost: z.string().nullable().describe('Purchase cost of the item'),
-  price: z.string().nullable().describe('Selling price of the item'),
-  quantity: z
-    .number()
-    .optional()
-    .describe('Current stock quantity (available when filtering by location)'),
-  attributes: z.array(attributeSchema).describe('Custom attributes for the item')
-});
 
 export let listItems = SlateTool.create(spec, {
   name: 'List Items',
@@ -43,7 +22,10 @@ export let listItems = SlateTool.create(spec, {
       locationIds: z
         .array(z.number())
         .optional()
-        .describe('Filter items by one or more location IDs'),
+        .describe(
+          'Filter items by nonzero stock at these locations. Call list_locations to discover IDs'
+        ),
+      itemIds: z.array(z.number()).optional().describe('Filter to item IDs from list_items'),
       limit: z
         .number()
         .optional()
@@ -58,7 +40,8 @@ export let listItems = SlateTool.create(spec, {
     z.object({
       items: z.array(itemSchema).describe('List of inventory items'),
       hasMore: z.boolean().describe('Whether more items are available beyond this page'),
-      cursor: z.string().optional().describe('Cursor to use for fetching the next page')
+      cursor: z.string().optional().describe('Cursor to use for fetching the next page'),
+      raw: z.unknown().optional().describe('Original page returned by BoxHero')
     })
   )
   .handleInvocation(async ctx => {
@@ -66,32 +49,19 @@ export let listItems = SlateTool.create(spec, {
 
     let response = await client.listItems({
       locationIds: ctx.input.locationIds,
+      itemIds: ctx.input.itemIds,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor
     });
 
-    let items = response.items.map(item => ({
-      itemId: item.id,
-      name: item.name,
-      sku: item.sku,
-      barcode: item.barcode,
-      photoUrl: item.photo_url,
-      cost: item.cost,
-      price: item.price,
-      quantity: item.quantity,
-      attributes: item.attrs.map(attr => ({
-        attributeId: attr.id,
-        name: attr.name,
-        type: attr.type,
-        value: attr.value
-      }))
-    }));
+    let items = response.items.map(mapItem);
 
     return {
       output: {
         items,
         hasMore: response.has_more,
-        cursor: response.cursor
+        cursor: response.cursor == null ? undefined : String(response.cursor),
+        raw: response
       },
       message: `Retrieved ${items.length} item(s).${response.has_more ? ' More items available — use the cursor to fetch the next page.' : ''}`
     };

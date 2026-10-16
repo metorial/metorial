@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { getTotalCount, requireRecords } from '../lib/response';
 import { spec } from '../spec';
 
 export let listGalleries = SlateTool.create(spec, {
@@ -13,6 +14,11 @@ export let listGalleries = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      search: z.string().optional().describe('Search gallery metadata'),
+      filterTags: z
+        .string()
+        .optional()
+        .describe('Comma-separated tags; prefix a tag with - to exclude it'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z.number().optional().describe('Number of galleries per page')
     })
@@ -27,18 +33,24 @@ export let listGalleries = SlateTool.create(spec, {
     let client = new CincopaClient({ token: ctx.auth.token });
     let data = await client.listGalleries({
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      search: ctx.input.search,
+      filterTags: ctx.input.filterTags
     });
 
-    let galleries = data?.galleries || data?.items || [];
-    let totalCount = data?.total_count ?? data?.count ?? galleries.length;
+    let galleries = requireRecords(data?.galleries ?? data?.items, 'gallery');
+    let totalCount = getTotalCount(
+      data?.items_data?.items_count,
+      data?.total_count,
+      data?.count
+    );
 
     return {
       output: {
         galleries,
         totalCount
       },
-      message: `Found **${totalCount}** galleries.`
+      message: `Found **${galleries.length}** galleries on this page.`
     };
   })
   .build();

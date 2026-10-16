@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import { polygonOutput, polygonResponseFields } from '../lib/response';
 import { spec } from '../spec';
 
 export let getForexData = SlateTool.create(spec, {
@@ -46,6 +47,7 @@ export let getForexData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       conversion: z
         .object({
           from: z.string().optional(),
@@ -106,8 +108,15 @@ export let getForexData = SlateTool.create(spec, {
     let client = new PolygonClient(ctx.auth.token);
 
     if (ctx.input.dataType === 'conversion') {
-      if (!ctx.input.fromCurrency || !ctx.input.toCurrency) {
-        throw new Error('fromCurrency and toCurrency are required for conversion.');
+      if (
+        ctx.input.precision !== undefined &&
+        (ctx.input.precision < 0 || ctx.input.precision > 4)
+      )
+        throw createApiServiceError('precision must be between 0 and 4.');
+      if (!ctx.input.fromCurrency?.trim() || !ctx.input.toCurrency?.trim()) {
+        throw createApiServiceError(
+          'fromCurrency and toCurrency are required for conversion.'
+        );
       }
       let response = await client.getForexConversion({
         from: ctx.input.fromCurrency,
@@ -115,25 +124,44 @@ export let getForexData = SlateTool.create(spec, {
         amount: ctx.input.amount,
         precision: ctx.input.precision
       });
+      if (
+        typeof response.from !== 'string' ||
+        !response.from ||
+        typeof response.to !== 'string' ||
+        !response.to ||
+        typeof response.initialAmount !== 'number' ||
+        !Number.isFinite(response.initialAmount) ||
+        typeof response.converted !== 'number' ||
+        !Number.isFinite(response.converted)
+      ) {
+        throw createApiServiceError(
+          'Massive returned an incomplete currency conversion. Retry the request.'
+        );
+      }
       return {
-        output: {
-          conversion: {
-            from: response.from,
-            to: response.to,
-            initialAmount: response.initialAmount,
-            convertedAmount: response.converted,
-            lastBid: response.last?.bid,
-            lastAsk: response.last?.ask,
-            lastTimestamp: response.last?.timestamp
-          }
-        },
+        output: polygonOutput(
+          {
+            conversion: {
+              from: response.from,
+              to: response.to,
+              initialAmount: response.initialAmount,
+              convertedAmount: response.converted,
+              lastBid: response.last?.bid,
+              lastAsk: response.last?.ask,
+              lastTimestamp: response.last?.timestamp
+            }
+          },
+          response
+        ),
         message: `Converted **${response.initialAmount} ${response.from}** to **${response.converted} ${response.to}**.`
       };
     }
 
     if (ctx.input.dataType === 'last_quote') {
-      if (!ctx.input.fromCurrency || !ctx.input.toCurrency) {
-        throw new Error('fromCurrency and toCurrency are required for last_quote.');
+      if (!ctx.input.fromCurrency?.trim() || !ctx.input.toCurrency?.trim()) {
+        throw createApiServiceError(
+          'fromCurrency and toCurrency are required for last_quote.'
+        );
       }
       let response = await client.getForexLastQuote(
         ctx.input.fromCurrency,
@@ -141,16 +169,19 @@ export let getForexData = SlateTool.create(spec, {
       );
       let lq = response.last;
       return {
-        output: {
-          lastQuote: lq
-            ? {
-                ask: lq.ask,
-                bid: lq.bid,
-                exchange: lq.exchange,
-                timestamp: lq.timestamp
-              }
-            : undefined
-        },
+        output: polygonOutput(
+          {
+            lastQuote: lq
+              ? {
+                  ask: lq.ask,
+                  bid: lq.bid,
+                  exchange: lq.exchange,
+                  timestamp: lq.timestamp
+                }
+              : undefined
+          },
+          response
+        ),
         message: lq
           ? `Last forex quote **${ctx.input.fromCurrency}/${ctx.input.toCurrency}**: Bid ${lq.bid} / Ask ${lq.ask}.`
           : `No last quote found.`
@@ -158,8 +189,8 @@ export let getForexData = SlateTool.create(spec, {
     }
 
     // snapshot
-    if (!ctx.input.ticker) {
-      throw new Error('ticker is required for snapshot (e.g., C:EURUSD).');
+    if (!ctx.input.ticker?.trim()) {
+      throw createApiServiceError('ticker is required for snapshot (e.g., C:EURUSD).');
     }
     let response = await client.getForexSnapshot(ctx.input.ticker);
     let t = response.ticker;
@@ -175,24 +206,27 @@ export let getForexData = SlateTool.create(spec, {
         : undefined;
 
     return {
-      output: {
-        snapshot: t
-          ? {
-              ticker: t.ticker,
-              todaysChange: t.todaysChange,
-              todaysChangePercent: t.todaysChangePerc,
-              day: mapBar(t.day),
-              prevDay: mapBar(t.prevDay),
-              lastQuote: t.lastQuote
-                ? {
-                    ask: t.lastQuote.a,
-                    bid: t.lastQuote.b,
-                    timestamp: t.lastQuote.t
-                  }
-                : undefined
-            }
-          : undefined
-      },
+      output: polygonOutput(
+        {
+          snapshot: t
+            ? {
+                ticker: t.ticker,
+                todaysChange: t.todaysChange,
+                todaysChangePercent: t.todaysChangePerc,
+                day: mapBar(t.day),
+                prevDay: mapBar(t.prevDay),
+                lastQuote: t.lastQuote
+                  ? {
+                      ask: t.lastQuote.a,
+                      bid: t.lastQuote.b,
+                      timestamp: t.lastQuote.t
+                    }
+                  : undefined
+              }
+            : undefined
+        },
+        response
+      ),
       message: t
         ? `Forex snapshot for **${t.ticker}**: Change ${t.todaysChangePerc?.toFixed(2)}%.`
         : `No snapshot found for **${ctx.input.ticker}**.`

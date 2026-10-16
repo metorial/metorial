@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'customjs',
   name: 'CustomJS',
   description:
-    'Automation platform for executing custom JavaScript/Python code, generating PDFs and images from HTML, capturing screenshots, scraping web content, and hosting static HTML pages.',
+    'Run custom JavaScript and saved functions, generate PDFs and images, extract web data, and manage hosted HTML pages.',
   metadata: {},
   config,
   auth

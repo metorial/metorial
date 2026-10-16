@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createChannel = SlateTool.create(spec, {
   name: 'Create Channel',
   key: 'create_channel',
-  description: `Create a new text or voice channel within a Revolt server, or create a group DM with specified users.`,
+  description: `Create a new text or voice channel within a Stoat server, or create a group DM with specified users.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -72,7 +72,7 @@ export let createChannel = SlateTool.create(spec, {
 export let fetchChannel = SlateTool.create(spec, {
   name: 'Fetch Channel',
   key: 'fetch_channel',
-  description: `Fetch details about a Revolt channel including its type, name, description, and other properties.`,
+  description: `Fetch details about a Stoat channel including its type, name, description, and other properties.`,
   tags: {
     readOnly: true
   }
@@ -120,7 +120,7 @@ export let fetchChannel = SlateTool.create(spec, {
 export let editChannel = SlateTool.create(spec, {
   name: 'Edit Channel',
   key: 'edit_channel',
-  description: `Edit a Revolt channel's settings. Can update name, description, NSFW status, and archive status. Only fields provided will be updated.`,
+  description: `Edit a Stoat channel's settings. Can update name, description, NSFW status, and archive status. Only fields provided will be updated.`,
   tags: {
     destructive: false,
     readOnly: false

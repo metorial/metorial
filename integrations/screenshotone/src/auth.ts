@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       accessKey: z.string().describe('Your ScreenshotOne access key from the access page')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.accessKey.trim()) {
+        throw createApiServiceError('A ScreenshotOne access key is required.');
+      }
       return {
         output: {
           token: ctx.input.accessKey

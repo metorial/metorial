@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'twocaptcha',
   name: '2Captcha',
   description:
-    'Human-powered CAPTCHA solving and image recognition service that solves CAPTCHAs quickly and accurately using AI models backed by verified human workers.',
+    'CAPTCHA solving and image recognition through asynchronous tasks, result retrieval, solution feedback, and account balance checks.',
   metadata: {},
   config,
   auth

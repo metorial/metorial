@@ -1,60 +1,47 @@
-# Slates Specification for U301
-
-## Overview
-
-U301 is a URL shortening and link management service. It allows users to create shortened URLs using custom domains, generate QR codes, and track link performance. The platform also supports Link-in-bio pages.
+# U301 Integration Specification
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens, except for some specific endpoints that allow both authenticated and anonymous users to access them.
+Connect with the existing API Key method (`api_key`). The token is sent as `Authorization: Bearer <token>`. Create an API key in the [U301 dashboard](https://u301.com/app/api-key). API keys can expire according to their dashboard settings; reconnect with a new token when needed. No OAuth refresh flow is documented for this method. No connection configuration fields or workspace IDs are required at setup.
 
-- **Method:** API Key (Bearer Token)
-- **Header:** `Authorization: Bearer <api_key>`
-- **Obtaining a key:** Create your API key in the dashboard at `https://u301.com/dashboard/settings/api-key`. The key will start with the prefix `oat_`.
-- **Expiration:** It is recommended to set an appropriate expiration time for your API key to enhance account security.
-- **Base URL:** `https://api.u301.com/v2`
+## Existing capabilities
 
-Note: Some endpoints (URL shortening and QR code generation) can be used without authentication (anonymous mode), but results will be associated with an anonymous account rather than your own.
+The original tools continue to use `https://api.u301.com/v2`:
 
-## Features
+| Tool | Request | Result |
+| --- | --- | --- |
+| `shorten_url` | `GET /shorten` with URL and optional domain, slug and title | Code, original URL, shortened URL and provider status |
+| `delete_link` | `DELETE /links/{shortenedLink}` | Provider success flag |
+| `list_domains` | `GET /shorten-domains` with optional visibility and pagination | Available domains and provider pagination |
+| `generate_qr_code` | `GET /qrcode` with appearance options | SVG content and a downloadable SVG file |
 
-### URL Shortening
+The SVG content field remains available for existing callers. Download preparation does not establish later file availability. The stable provider QR endpoint uses the same token and query parameters when the file is downloaded.
 
-Create shortened URLs from long links. If the same long URL has already been shortened within the same account, the previously shortened URL is returned.
+Current provider documentation primarily covers V3. The existing V2 routes, field names and output contracts are retained for compatibility; V3 availability does not imply that V2 is retired.
 
-- **Parameters:**
-  - `url` (required): The long URL to shorten (must include `http://` or `https://`).
-  - `domain`: Specify a custom domain for the short link (e.g., `go.example.com`).
-  - `slug`: Custom alias for the short link (letters, numbers, underscores, hyphens only; must be unique).
-  - `title`: A descriptive title for the link.
-- **Considerations:** The shortening endpoint can be used without authentication, but the link will belong to an anonymous account and cannot be managed later.
+## Workspace and link discovery
 
-### Link Deletion
+The new read-only tools use `https://api.u301.com/v3`:
 
-Delete a previously created short link by its identifier.
+| Tool | Request | Result |
+| --- | --- | --- |
+| `list_workspaces` | `GET /workspaces` | Provider JSON containing accessible workspace information |
+| `get_link` | `GET /shorten/{domain}/{slug}` | Link details, destination, owner, workspace and state |
+| `list_links` | `GET /shorten/list` | Links plus total, page and page-size metadata |
+| `get_click_analytics` | `GET /shorten/analytics/clicks` | Start/end timestamps and daily or hourly click data |
 
-- Requires authentication.
+Call `list_workspaces` to discover the workspace ID used by `list_links` and `get_click_analytics`. `get_link` accepts an optional workspace ID. Workspace discovery retains the provider JSON because the official collection does not publish its response schema. No undocumented workspace field names are assumed.
 
-### Custom Domain Management
+Link listing accepts positive whole page and page-size values. Omitting page uses page 1; omitting page size leaves U301's default of 10. List responses retain `domainName` and nullable expiry/update values. Single-link responses use `domain`; raw provider fields are retained without fabricating missing values.
 
-List all available domains for URL shortening, including system-provided public domains and user-added custom (private) domains.
+Click analytics supports `24h`, `1d`, `3d`, `7d`, `14d`, `30d`, `60d` and `1m`, with `day` or `hour` granularity. Timezone is optional and uses U301's UTC default. Analytics aggregates the entire selected workspace.
 
-- **Parameters:**
-  - `visibility`: Filter by `public` (system domains), `private` (your custom domains), or `all`.
-- **Considerations:** Custom domains must first be added and verified via the U301 dashboard by configuring a CNAME DNS record.
+## Provider limits
 
-### QR Code Generation
+U301's documented monthly workspace link allowance is shared across V2, V3, website and bulk operations. A monthly allowance failure returns HTTP 429 with `MONTHLY_LINK_LIMIT_REACHED`; immediate retries do not restore the allowance. Existing short links continue to work. The client preserves provider status, code and body error details.
 
-Generate a QR code (SVG format) for any shortened URL.
+## Scope and verification
 
-- **Parameters:**
-  - `url` (required): The shortened URL.
-  - `width`: QR code width.
-  - `margin`: QR code padding.
-  - `level`: Error correction level (`L`, `M`, `Q`, `H`; default `M`).
-  - `dark` / `light`: Hex color values for foreground and background.
-- **Considerations:** Only SVG format is currently supported. This endpoint does not require authentication.
+No suitable documented self/profile endpoint was found; workspace discovery provides the documented connection-context discovery. Billing, paid domain redirect features, translator and emoji utilities are outside the common link-management scope. No webhook registration contract was established.
 
-## Events
-
-The provider does not support events.
+Official references: [API documentation](https://u301.com/docs), [link retrieval](https://u301.com/docs/links/get), [link listing](https://u301.com/docs/links/list), [click analytics](https://u301.com/docs/analytics/clicks), [official SDK source](https://github.com/u301-shortener/u301-js), and [official Postman collection](https://www.postman.com/tealightuk/u301/collection/xvm0lzp/u301-url-shortener-v3).

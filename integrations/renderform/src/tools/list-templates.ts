@@ -14,6 +14,10 @@ export let listTemplates = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      sourceTemplateId: z
+        .string()
+        .optional()
+        .describe('Filter by the source template identifier'),
       name: z.string().optional().describe('Filter templates by name'),
       tags: z.array(z.string()).optional().describe('Filter templates by tags'),
       page: z.number().optional().describe('Page number for pagination (0-indexed)'),
@@ -50,6 +54,7 @@ export let listTemplates = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let templates = await client.listTemplates({
+      sourceTemplateId: ctx.input.sourceTemplateId,
       name: ctx.input.name,
       tags: ctx.input.tags,
       page: ctx.input.page,
@@ -71,7 +76,7 @@ export let listTemplates = SlateTool.create(spec, {
 
     return {
       output: { templates: mapped },
-      message: `Found **${mapped.length}** template(s).`
+      message: `Found **${mapped.length}** template(s) on this page.`
     };
   })
   .build();

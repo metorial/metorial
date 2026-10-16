@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,6 +14,10 @@ export let getWeather = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      forecast: z
+        .boolean()
+        .optional()
+        .describe('Include the seven-day forecast when the plan supports it'),
       city: z.string().optional().describe('City name (e.g. "San Francisco", "London")'),
       zip: z.string().optional().describe('ZIP/postal code (e.g. "64082")')
     })
@@ -38,21 +42,21 @@ export let getWeather = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.input.city && !ctx.input.zip) {
-      throw new Error('Either city or zip must be provided');
+      throw createApiServiceError('Either city or zip must be provided');
     }
 
+    if (ctx.input.city && ctx.input.zip)
+      throw createApiServiceError('Provide either city or zip, not both.');
+
     let client = new Client({ token: ctx.auth.token });
-    let params: { city?: string; zip?: string } = {};
+    let params: { city?: string; zip?: string; forecast?: boolean } = {};
+    if (ctx.input.forecast !== undefined) params.forecast = ctx.input.forecast;
     if (ctx.input.city) params.city = ctx.input.city;
     if (ctx.input.zip) params.zip = ctx.input.zip;
 
     let result = await client.getWeather(params);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'Weather lookup failed');
-    }
-
-    let data = result.data as any;
+    let data = result.data;
 
     let output = {
       tempC: data.tempC ?? data.temp_c,
@@ -66,8 +70,11 @@ export let getWeather = SlateTool.create(spec, {
       feelslikeC: data.feelslikeC ?? data.feelslike_c,
       feelslikeF: data.feelslikeF ?? data.feelslike_f,
       humidity: data.humidity,
-      condition: data.condition?.text ?? data.conditionText ?? data.condition,
-      location: data.location?.name ?? data.locationName ?? (ctx.input.city || ctx.input.zip),
+      condition:
+        typeof data.condition === 'object'
+          ? data.condition.text
+          : (data.conditionText ?? data.condition),
+      location: data.location?.name ?? data.locationName,
       rawData: data
     };
 
@@ -75,8 +82,10 @@ export let getWeather = SlateTool.create(spec, {
     let tempInfo = output.tempC != null ? ` ${output.tempC}°C / ${output.tempF}°F` : '';
 
     return {
-      output,
-      message: `Weather for **${locationLabel}**:${tempInfo}${output.condition ? `, ${output.condition}` : ''}.`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `Weather for **${locationLabel}**:${tempInfo}${output.condition ? `, ${output.condition}` : ''}.`
+      )
     };
   })
   .build();

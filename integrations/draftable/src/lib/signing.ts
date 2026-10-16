@@ -1,19 +1,29 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+import { createApiServiceError } from 'slates';
+import { getBaseUrl, validateIdentifier } from './client';
 
 export let getViewerUrlSignature = (
   accountId: string,
   authToken: string,
   identifier: string,
-  validUntil: string
+  validUntil: number
 ): string => {
   let policy = JSON.stringify({
     account_id: accountId,
-    identifier: identifier,
+    identifier,
     valid_until: validUntil
   });
-  let hmac = crypto.createHmac('sha256', authToken);
-  hmac.update(policy, 'utf8');
-  return hmac.digest('hex');
+  return crypto.createHmac('sha256', authToken).update(policy, 'utf8').digest('hex');
+};
+
+let viewerBaseUrl = (params: {
+  baseUrl: string;
+  accountId: string;
+  comparisonIdentifier: string;
+}) => {
+  if (!params.accountId.trim())
+    throw createApiServiceError('A Draftable Account ID is required.');
+  return `${getBaseUrl(params.baseUrl)}/comparisons/viewer/${encodeURIComponent(params.accountId)}/${encodeURIComponent(validateIdentifier(params.comparisonIdentifier))}`;
 };
 
 export let generateSignedViewerUrl = (params: {
@@ -25,23 +35,29 @@ export let generateSignedViewerUrl = (params: {
   wait?: boolean;
 }): { viewerUrl: string; validUntil: string } => {
   let minutes = params.validUntilMinutes ?? 30;
-  let validUntilDate = new Date(Date.now() + minutes * 60 * 1000);
-  let validUntil = validUntilDate.toISOString().replace('Z', '+00:00');
-
+  let timestamp = Math.floor((Date.now() + minutes * 60 * 1000) / 1000);
+  if (
+    !Number.isFinite(minutes) ||
+    minutes <= 0 ||
+    !Number.isFinite(timestamp) ||
+    timestamp * 1000 > 8.64e15 ||
+    timestamp <= Date.now() / 1000
+  ) {
+    throw createApiServiceError(
+      'validForMinutes must be a positive duration that produces a valid future expiry.'
+    );
+  }
+  if (!params.authToken.trim())
+    throw createApiServiceError('A Draftable API token is required.');
   let signature = getViewerUrlSignature(
     params.accountId,
     params.authToken,
     params.comparisonIdentifier,
-    validUntil
+    timestamp
   );
-
-  let url = `${params.baseUrl}/comparisons/viewer/${params.accountId}/${params.comparisonIdentifier}?valid_until=${encodeURIComponent(validUntil)}&signature=${signature}`;
-
-  if (params.wait) {
-    url += '&wait';
-  }
-
-  return { viewerUrl: url, validUntil: validUntilDate.toISOString() };
+  let url = `${viewerBaseUrl(params)}?valid_until=${timestamp}&signature=${signature}`;
+  if (params.wait) url += '&wait';
+  return { viewerUrl: url, validUntil: new Date(timestamp * 1000).toISOString() };
 };
 
 export let generatePublicViewerUrl = (params: {
@@ -49,10 +65,4 @@ export let generatePublicViewerUrl = (params: {
   accountId: string;
   comparisonIdentifier: string;
   wait?: boolean;
-}): string => {
-  let url = `${params.baseUrl}/comparisons/viewer/${params.accountId}/${params.comparisonIdentifier}`;
-  if (params.wait) {
-    url += '?wait';
-  }
-  return url;
-};
+}): string => `${viewerBaseUrl(params)}${params.wait ? '?wait' : ''}`;

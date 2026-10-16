@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StockClient } from '../lib/stock';
 import { spec } from '../spec';
@@ -64,24 +64,32 @@ export let searchStock = SlateTool.create(spec, {
     });
 
     let files = result.files || [];
-    let results = files.map((f: any) => ({
-      contentId: String(f.id),
-      title: f.title,
-      thumbnailUrl: f.thumbnail_url,
-      width: f.width,
-      height: f.height,
-      creatorName: f.creator_name,
-      contentType: f.content_type,
-      isLicensed: f.is_licensed === 'true' || f.is_licensed === true,
-      category: f.category?.name
-    }));
+    let results = files.map((f: any) => {
+      if (typeof f.id !== 'number' && typeof f.id !== 'string') {
+        throw createApiServiceError('Adobe Stock returned an asset without a content ID.');
+      }
+      return {
+        contentId: String(f.id),
+        title: f.title,
+        thumbnailUrl: f.thumbnail_url,
+        width: f.width,
+        height: f.height,
+        creatorName: f.creator_name,
+        contentType: f.content_type,
+        isLicensed:
+          f.is_licensed === undefined || f.is_licensed === null
+            ? undefined
+            : f.is_licensed === 'true' || f.is_licensed === true,
+        category: f.category?.name
+      };
+    });
 
     return {
       output: {
         results,
         totalResults: result.nb_results
       },
-      message: `Found **${result.nb_results || results.length}** stock assets for "${ctx.input.keywords}". Showing ${results.length} results.`
+      message: `Found **${result.nb_results ?? results.length}** stock assets for "${ctx.input.keywords}". Showing ${results.length} results.`
     };
   })
   .build();

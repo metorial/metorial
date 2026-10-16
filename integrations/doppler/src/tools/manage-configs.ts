@@ -1,9 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let configSchema = z.object({
+  raw: z.unknown().optional().describe('Original config metadata returned by Doppler'),
+  slug: z.string().optional().describe('Config slug used when enabling webhooks'),
   name: z.string().optional().describe('Config name'),
   root: z.boolean().optional().describe('Whether this is a root config'),
   locked: z.boolean().optional().describe('Whether the config is locked'),
@@ -17,14 +20,14 @@ let configSchema = z.object({
 export let manageConfigs = SlateTool.create(spec, {
   name: 'Manage Configs',
   key: 'manage_configs',
-  description: `List, create, update, delete, clone, lock, or unlock configs within a Doppler project. Configs hold the actual secret values for an environment. Supports branch configs, cloning, and locking to prevent modifications.`,
+  description: `List, create, update, delete, clone, lock, or unlock configs within a Doppler project. Configs hold the actual secret values for an environment. Locking prevents renaming or deletion; it does not prevent secret changes. Discover projects with manage_projects.`,
   instructions: [
     'Use action "list" to see all configs in a project (optionally filtered by environment).',
     'Use action "get" to retrieve a specific config.',
     'Use action "create" to add a new branch config under an environment.',
     'Use action "update" to rename a config.',
     'Use action "clone" to duplicate a config with a new name.',
-    'Use action "lock" or "unlock" to prevent or allow modifications to a config.',
+    'Use action "lock" or "unlock" to prevent or allow renaming and deletion of a config.',
     'Use action "delete" to permanently remove a config.'
   ],
   tags: {
@@ -34,7 +37,7 @@ export let manageConfigs = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug'),
+      project: projectInput,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete', 'clone', 'lock', 'unlock'])
         .describe('Action to perform'),
@@ -62,6 +65,8 @@ export let manageConfigs = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapConfig = (c: any) => ({
+      raw: c,
+      slug: c.slug,
       name: c.name,
       root: c.root,
       locked: c.locked,
@@ -89,7 +94,8 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.config) throw new Error('config is required for "get" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "get" action');
 
       let config = await client.getConfig(ctx.input.project, ctx.input.config);
 
@@ -101,8 +107,8 @@ export let manageConfigs = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.environment)
-        throw new Error('environment is required for "create" action');
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
+        throw createApiServiceError('environment is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
 
       let config = await client.createConfig(
         ctx.input.project,
@@ -117,8 +123,9 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.config) throw new Error('config is required for "update" action');
-      if (!ctx.input.name) throw new Error('name is required for "update" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "update" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "update" action');
 
       let config = await client.updateConfig(
         ctx.input.project,
@@ -133,8 +140,9 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'clone') {
-      if (!ctx.input.config) throw new Error('config is required for "clone" action');
-      if (!ctx.input.name) throw new Error('name is required for "clone" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "clone" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "clone" action');
 
       let config = await client.cloneConfig(
         ctx.input.project,
@@ -149,7 +157,8 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'lock') {
-      if (!ctx.input.config) throw new Error('config is required for "lock" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "lock" action');
 
       let config = await client.lockConfig(ctx.input.project, ctx.input.config);
 
@@ -160,7 +169,8 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'unlock') {
-      if (!ctx.input.config) throw new Error('config is required for "unlock" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "unlock" action');
 
       let config = await client.unlockConfig(ctx.input.project, ctx.input.config);
 
@@ -171,7 +181,8 @@ export let manageConfigs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.config) throw new Error('config is required for "delete" action');
+      if (!ctx.input.config)
+        throw createApiServiceError('config is required for "delete" action');
 
       await client.deleteConfig(ctx.input.project, ctx.input.config);
 
@@ -181,6 +192,6 @@ export let manageConfigs = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

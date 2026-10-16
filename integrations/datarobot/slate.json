@@ -1,18 +1,18 @@
 {
   "name": "@metorial/datarobot",
-  "description": "Create and manage machine learning projects, train predictive models, and deploy them to production. Run AutoML/Autopilot to automatically select and build best-fit models. Upload and manage datasets in the AI Catalog. Deploy custom models (Python, R, Java) as real-time or batch prediction endpoints. Monitor deployments for data drift, accuracy, and service health. Generate prediction explanations, feature impact scores, and compliance documentation. Manage registered models, credentials, and time series projects.",
+  "description": "Manage DataRobot projects, start Autopilot, inspect trained models, and manage AI Catalog datasets. Register and deploy model packages, make serverless and batch predictions, and monitor service health, accuracy, and drift. Discover deployment infrastructure and download datasets, scored CSV files, and custom-task artifacts.",
   "categories": ["apis-and-http-requests"],
   "skills": [
-    "create ML projects",
-    "train predictive models",
-    "run automated machine learning",
-    "deploy models to production",
-    "make real-time predictions",
+    "manage ML projects",
+    "start Autopilot",
+    "inspect model performance",
+    "manage datasets",
+    "register model packages",
+    "deploy models",
+    "make serverless predictions",
     "run batch predictions",
     "monitor deployment health",
-    "manage datasets and catalogs",
-    "generate compliance documentation",
-    "detect data drift"
+    "download model artifacts"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/datarobot.png"
 }

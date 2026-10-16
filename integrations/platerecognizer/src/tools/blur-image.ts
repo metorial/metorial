@@ -6,15 +6,17 @@ import { spec } from '../spec';
 export let blurImage = SlateTool.create(spec, {
   name: 'Blur Plates and Faces',
   key: 'blur_image',
-  description: `Blur license plates and/or faces in an image. Returns the blurred image as base64-encoded data along with detection coordinates for all found plates and faces.
+  description: `DEPRECATED — use \`blur_image_file\` instead. Blur license plates and/or faces in an image. Returns the blurred image as base64-encoded data along with detection coordinates for all found plates and faces.
 Configurable blur intensity on a scale of 1-10 for both plates and faces independently.`,
   instructions: [
+    'Use blur_image_file to receive a downloadable image and detection metadata. This compatibility tool retains its original structured image-data response.',
     'Provide either an imageUrl or imageBase64, not both.',
     'Set plates and/or faces blur intensity (1-10). At least one must be specified.',
     'Intensity 1 = lightest blur, 10 = heaviest blur.'
   ],
   constraints: ['Maximum image size is 3 MB.', 'Rate limit applies per account subscription.'],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

@@ -18,8 +18,13 @@ Location-based searching requires a Google Maps API key configured in the site's
       category: z.string().optional().describe('Category filter.'),
       address: z.string().optional().describe('Location/address filter.'),
       dateRange: z.string().optional().describe('Date range filter.'),
-      limit: z.number().optional().describe('Number of results per page (20-100).'),
-      page: z.string().optional().describe('Pagination token from a previous response.'),
+      limit: z.number().optional().describe('Number of results per page (1-100).'),
+      page: z
+        .string()
+        .optional()
+        .describe(
+          'Page number as a string for the search endpoint. For cursor pagination, use list_records.'
+        ),
       outputType: z.enum(['array', 'html']).optional().describe('Output format.'),
       additionalFilters: z
         .record(z.string(), z.string())
@@ -30,6 +35,10 @@ Location-based searching requires a Google Maps API key configured in the site's
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       posts: z.any().describe('The search results.')
     })
   )
@@ -44,7 +53,7 @@ Location-based searching requires a Google Maps API key configured in the site's
     if (ctx.input.category) params.category = ctx.input.category;
     if (ctx.input.address) params.address = ctx.input.address;
     if (ctx.input.dateRange) params.daterange = ctx.input.dateRange;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
     if (ctx.input.page) params.page = ctx.input.page;
     if (ctx.input.outputType) params.output_type = ctx.input.outputType;
     if (ctx.input.additionalFilters) {
@@ -58,6 +67,7 @@ Location-based searching requires a Google Maps API key configured in the site's
     return {
       output: {
         status: result.status,
+        raw: result,
         posts: result.message
       },
       message: `Found posts matching the search criteria.`

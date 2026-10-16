@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
 import { categorySchema, coordinatesSchema, locationSchema } from './search-businesses';
 
@@ -38,6 +39,14 @@ let businessDetailsSchema = z.object({
   price: z.string().optional().describe('Price level ($ to $$$$)'),
   location: locationSchema.optional().describe('Business location'),
   photos: z.array(z.string()).optional().describe('URLs of business photos'),
+  attributes: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Business attributes returned for the current API plan'),
+  mobileLink: z
+    .string()
+    .optional()
+    .describe('Link to the business for the requested device platform'),
   hours: z.array(hoursSchema).optional().describe('Business operating hours'),
   specialHours: z
     .array(
@@ -63,6 +72,8 @@ let businessDetailsSchema = z.object({
     .describe('Business messaging information')
 });
 
+let outputSchema = businessDetailsSchema;
+
 export let getBusinessDetails = SlateTool.create(spec, {
   name: 'Get Business Details',
   key: 'get_business_details',
@@ -78,82 +89,94 @@ export let getBusinessDetails = SlateTool.create(spec, {
         .describe(
           'Yelp business ID or alias (e.g., "gary-danko-san-francisco" or "WavvLdfdP6g8aZTtbBQHTw")'
         ),
-      locale: z.string().optional().describe('Locale code (e.g., "en_US")')
+      locale: z.string().optional().describe('Locale code (e.g., "en_US")'),
+      devicePlatform: z
+        .enum(['android', 'ios', 'mobile-generic'])
+        .optional()
+        .describe('Device platform for the returned mobile link')
     })
   )
-  .output(businessDetailsSchema)
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let b = await client.getBusinessDetails(ctx.input.businessIdOrAlias, ctx.input.locale);
+    let b = await client.getBusinessDetails(
+      ctx.input.businessIdOrAlias,
+      ctx.input.locale,
+      ctx.input.devicePlatform
+    );
 
-    let output = {
-      businessId: b.id,
-      alias: b.alias,
-      name: b.name,
-      imageUrl: b.image_url,
-      isClaimed: b.is_claimed,
-      isClosed: b.is_closed,
-      url: b.url,
-      phone: b.phone,
-      displayPhone: b.display_phone,
-      reviewCount: b.review_count,
-      categories: b.categories,
-      rating: b.rating,
-      coordinates: b.coordinates,
-      transactions: b.transactions,
-      price: b.price,
-      location: b.location
-        ? {
-            address1: b.location.address1,
-            address2: b.location.address2,
-            address3: b.location.address3,
-            city: b.location.city,
-            zipCode: b.location.zip_code,
-            country: b.location.country,
-            state: b.location.state,
-            displayAddress: b.location.display_address
-          }
-        : undefined,
-      photos: b.photos,
-      hours: b.hours?.map((h: any) => ({
-        hoursType: h.hours_type,
-        isOpenNow: h.is_open_now,
-        open: h.open?.map((o: any) => ({
-          day: o.day,
-          start: o.start,
-          end: o.end,
-          isOvernight: o.is_overnight
-        }))
-      })),
-      specialHours: b.special_hours?.map((sh: any) => ({
-        date: sh.date,
-        start: sh.start,
-        end: sh.end,
-        isClosed: sh.is_closed,
-        isOvernight: sh.is_overnight
-      })),
-      messaging: b.messaging
-        ? {
-            url: b.messaging.url,
-            useCaseText: b.messaging.use_case_text,
-            responseRate: b.messaging.response_rate,
-            responseTime: b.messaging.response_time,
-            isEnabled: b.messaging.is_enabled
-          }
-        : undefined
-    };
+    return mapYelpOutput(outputSchema, () => {
+      let output = {
+        businessId: b.id,
+        alias: b.alias,
+        name: b.name,
+        imageUrl: b.image_url,
+        isClaimed: b.is_claimed,
+        isClosed: b.is_closed,
+        url: b.url,
+        phone: b.phone,
+        displayPhone: b.display_phone,
+        reviewCount: b.review_count,
+        categories: b.categories,
+        rating: b.rating,
+        coordinates: b.coordinates,
+        transactions: b.transactions,
+        price: b.price,
+        location: b.location
+          ? {
+              address1: b.location.address1,
+              address2: b.location.address2,
+              address3: b.location.address3,
+              city: b.location.city,
+              zipCode: b.location.zip_code,
+              country: b.location.country,
+              state: b.location.state,
+              displayAddress: b.location.display_address
+            }
+          : undefined,
+        photos: b.photos,
+        attributes: b.attributes,
+        mobileLink: b.mobile_link,
+        hours: b.hours?.map((h: any) => ({
+          hoursType: h.hours_type,
+          isOpenNow: h.is_open_now,
+          open: h.open?.map((o: any) => ({
+            day: o.day,
+            start: o.start,
+            end: o.end,
+            isOvernight: o.is_overnight
+          }))
+        })),
+        specialHours: b.special_hours?.map((sh: any) => ({
+          date: sh.date,
+          start: sh.start,
+          end: sh.end,
+          isClosed: sh.is_closed,
+          isOvernight: sh.is_overnight
+        })),
+        messaging: b.messaging
+          ? {
+              url: b.messaging.url,
+              useCaseText: b.messaging.use_case_text,
+              responseRate: b.messaging.response_rate,
+              responseTime: b.messaging.response_time,
+              isEnabled: b.messaging.is_enabled
+            }
+          : undefined
+      };
 
-    let statusParts: string[] = [`**${b.name}**`];
-    if (b.rating) statusParts.push(`${b.rating}★`);
-    if (b.review_count) statusParts.push(`(${b.review_count} reviews)`);
-    if (b.price) statusParts.push(`· ${b.price}`);
-    if (b.location?.display_address)
-      statusParts.push(`\n📍 ${b.location.display_address.join(', ')}`);
+      let statusParts: string[] = [`**${b.name}**`];
+      if (b.rating !== undefined) statusParts.push(`${b.rating}★`);
+      if (b.review_count !== undefined) statusParts.push(`(${b.review_count} reviews)`);
+      if (b.price) statusParts.push(`· ${b.price}`);
+      if (b.location?.display_address)
+        statusParts.push(`\n📍 ${b.location.display_address.join(', ')}`);
 
-    return {
-      output,
-      message: statusParts.join(' ')
-    };
+      return {
+        output,
+        message: statusParts.join(' ')
+      };
+    });
   })
   .build();

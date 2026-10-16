@@ -25,6 +25,10 @@ export let configureAnalysisTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       toolUuid: z.string().describe('UUID of the configured tool.'),
       configured: z.boolean().describe('Whether the configuration was applied.')
     })
@@ -33,9 +37,9 @@ export let configureAnalysisTool = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let body: any = {};
-    if (ctx.input.isEnabled !== undefined) body.isEnabled = ctx.input.isEnabled;
+    if (ctx.input.isEnabled !== undefined) body.enabled = ctx.input.isEnabled;
     if (ctx.input.usesConfigurationFile !== undefined)
-      body.usesConfigurationFile = ctx.input.usesConfigurationFile;
+      body.useConfigurationFile = ctx.input.usesConfigurationFile;
 
     await client.configureAnalysisTool(ctx.input.repositoryName, ctx.input.toolUuid, body);
 

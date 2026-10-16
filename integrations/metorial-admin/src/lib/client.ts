@@ -131,7 +131,12 @@ export class MetorialClient {
   private async requestJson<T>(path: string, options: RequestOptions) {
     let response = await this.request(path, options);
     let contentType = response.headers.get('content-type') ?? undefined;
-    let body = await response.text();
+    let body: string;
+    try {
+      body = await response.text();
+    } catch (error) {
+      throw metorialApiError(error, `${options.operation} response reading`);
+    }
 
     if (!response.ok) {
       throw metorialHttpError({
@@ -171,6 +176,23 @@ export class MetorialClient {
     });
   }
 
+  async getTokenContext(token: string) {
+    return await this.requestJson<Record<string, unknown>>('/token', {
+      operation: 'get authenticated account context',
+      token
+    });
+  }
+
+  async getInstance(token: string, instanceId: string) {
+    return await this.requestJson<Record<string, unknown>>(
+      `/instances/${encodeURIComponent(instanceId)}`,
+      {
+        operation: 'get instance',
+        token
+      }
+    );
+  }
+
   async callEndpoint(input: {
     method: MetorialMethod;
     path: string;
@@ -188,7 +210,15 @@ export class MetorialClient {
       body: input.body
     });
     let contentType = response.headers.get('content-type') ?? undefined;
-    let buffer = await readResponseBuffer(response);
+    let buffer: Buffer;
+    try {
+      buffer = await readResponseBuffer(response);
+    } catch (error) {
+      throw metorialApiError(
+        error,
+        `${input.method.toUpperCase()} ${input.path} response reading`
+      );
+    }
 
     if (!response.ok) {
       throw metorialHttpError({

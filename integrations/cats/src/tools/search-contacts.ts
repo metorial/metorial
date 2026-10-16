@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchContacts = SlateTool.create(spec, {
@@ -39,8 +40,11 @@ export let searchContacts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.query !== undefined && ctx.input.filters !== undefined) {
+      throw createApiServiceError('Provide query or filters, not both.');
+    }
     let data: any;
-    if (ctx.input.filters) {
+    if (ctx.input.filters !== undefined) {
       data = await client.filterContacts(ctx.input.filters, {
         page: ctx.input.page,
         perPage: ctx.input.perPage
@@ -52,18 +56,18 @@ export let searchContacts = SlateTool.create(spec, {
       });
     }
 
-    let contacts = (data?._embedded?.contacts ?? []).map((c: any) => ({
-      contactId: c.id?.toString() ?? '',
-      firstName: c.first_name,
-      lastName: c.last_name,
-      title: c.title,
-      isHot: c.is_hot
+    let contacts = collection(data, 'contacts').map((c: any) => ({
+      contactId: requiredId(c.id, 'record'),
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      title: c.title ?? undefined,
+      isHot: c.is_hot ?? undefined
     }));
 
     return {
       output: {
         contacts,
-        totalCount: data?.total ?? contacts.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Found **${contacts.length}** contact(s).`

@@ -190,14 +190,14 @@ describe('Item tool validation and response mapping', () => {
     ]);
   });
 
-  it('guarantees the requested view ID when the success response omits view metadata', async () => {
+  it('does not invent returned view metadata when the success response omits it', async () => {
     clientMocks.executeView.mockResolvedValueOnce({ data: [], view: undefined });
 
     let result = await executeView.handleInvocation(
       invocation({ objectType: 'contacts', viewId: uuid })
     );
 
-    expect(result.output.viewId).toBe(uuid);
+    expect(result.output.viewId).toBeUndefined();
     expect(result.output.objectRecords).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getOrder = SlateTool.create(spec, {
@@ -35,7 +36,10 @@ export let getOrder = SlateTool.create(spec, {
         .optional()
         .describe('Transcriptions associated with the order and their states.'),
       ingestions: z.any().optional().describe('File ingestion status for the order.'),
-      outputIds: z.array(z.string()).optional().describe('IDs of output transcriptions.')
+      outputIds: z.array(z.string()).optional().describe('IDs of output transcriptions.'),
+      raw: rawSchema
+        .optional()
+        .describe('Complete order response, including pricing and failures.')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,11 +50,12 @@ export let getOrder = SlateTool.create(spec, {
       output: {
         orderId: result.id,
         state: result.state,
-        folderId: result.folder_id,
+        folderId: result.folder_id == null ? result.folder_id : String(result.folder_id),
         operations: result.operations,
         transcriptions: result.transcriptions,
         ingestions: result.ingestions,
-        outputIds: result.outputsIds
+        outputIds: result.outputsIds ?? undefined,
+        raw: result
       },
       message: `Order **${result.id}** is in state **${result.state}**.`
     };

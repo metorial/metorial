@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,7 +46,7 @@ Use this tool to create new lists, rename existing ones, or remove lists that ar
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Name is required when creating a list');
+        throw createApiServiceError('Name is required when creating a list');
       }
       let result = await client.createList(ctx.input.name);
       return {
@@ -59,11 +59,11 @@ Use this tool to create new lists, rename existing ones, or remove lists that ar
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.listId) {
-        throw new Error('listId is required when updating a list');
+      if (ctx.input.listId === undefined) {
+        throw createApiServiceError('listId is required when updating a list');
       }
       if (!ctx.input.name) {
-        throw new Error('name is required when updating a list');
+        throw createApiServiceError('name is required when updating a list');
       }
       await client.updateList(ctx.input.listId, ctx.input.name);
       return {
@@ -76,8 +76,8 @@ Use this tool to create new lists, rename existing ones, or remove lists that ar
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.listId) {
-        throw new Error('listId is required when deleting a list');
+      if (ctx.input.listId === undefined) {
+        throw createApiServiceError('listId is required when deleting a list');
       }
       await client.deleteList(ctx.input.listId);
       return {
@@ -89,6 +89,6 @@ Use this tool to create new lists, rename existing ones, or remove lists that ar
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     workspaceId: z
       .string()
+      .optional()
       .describe(
-        'Your DotSimple Workspace UUID. Found in your browser URL bar: https://app.dotsimple.io/app/<workspace-id>'
+        'Optional default DotSimple Workspace UUID. Tools can select another workspace. Found in your browser URL bar: https://app.dotsimple.io/app/<workspace-id>'
       )
   })
 );

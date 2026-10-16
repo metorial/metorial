@@ -54,25 +54,26 @@ export let updateCandidate = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
 
-    if (ctx.input.firstName) body.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) body.last_name = ctx.input.lastName;
-    if (ctx.input.middleName) body.middle_name = ctx.input.middleName;
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.currentEmployer) body.current_employer = ctx.input.currentEmployer;
-    if (ctx.input.dateAvailable) body.date_available = ctx.input.dateAvailable;
-    if (ctx.input.currentPay) body.current_pay = ctx.input.currentPay;
-    if (ctx.input.desiredPay) body.desired_pay = ctx.input.desiredPay;
+    if (ctx.input.firstName !== undefined) body.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) body.last_name = ctx.input.lastName;
+    if (ctx.input.middleName !== undefined) body.middle_name = ctx.input.middleName;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.currentEmployer !== undefined)
+      body.current_employer = ctx.input.currentEmployer;
+    if (ctx.input.dateAvailable !== undefined) body.date_available = ctx.input.dateAvailable;
+    if (ctx.input.currentPay !== undefined) body.current_pay = ctx.input.currentPay;
+    if (ctx.input.desiredPay !== undefined) body.desired_pay = ctx.input.desiredPay;
     if (ctx.input.isWillingToRelocate !== undefined)
       body.is_willing_to_relocate = ctx.input.isWillingToRelocate;
-    if (ctx.input.keySkills) body.key_skills = ctx.input.keySkills;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.source) body.source = ctx.input.source;
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.keySkills !== undefined) body.key_skills = ctx.input.keySkills;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.source !== undefined) body.source = ctx.input.source;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isActive !== undefined) body.is_active = ctx.input.isActive;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
-    if (ctx.input.address) {
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,

@@ -1,4 +1,6 @@
 export * from './curated-photos';
+export * from './download-photo';
+export * from './download-video';
 export * from './get-collection-media';
 export * from './get-photo';
 export * from './get-video';

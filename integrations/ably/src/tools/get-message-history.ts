@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
+import { nextPageOutput, pageInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getMessageHistory = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getMessageHistory = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum 1000 messages per request.',
-    'Messages persist for 2 minutes by default, or 24-72 hours if persistence is enabled on the channel namespace.'
+    'Available history depends on channel persistence and the account retention period. Without persistence, historical availability is not guaranteed.'
   ],
   tags: {
     readOnly: true
@@ -21,6 +22,7 @@ export let getMessageHistory = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: pageInput,
       channelId: z.string().describe('Channel name to retrieve message history from'),
       start: z
         .string()
@@ -44,9 +46,14 @@ export let getMessageHistory = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: nextPageOutput,
       messages: z
         .array(
           z.object({
+            raw: z
+              .any()
+              .optional()
+              .describe('Complete provider record, including metadata and encoded values'),
             messageId: z.string().optional().describe('Unique message identifier'),
             name: z.string().optional().describe('Event name'),
             messageData: z.any().optional().describe('Message payload'),
@@ -63,16 +70,21 @@ export let getMessageHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
-    let messages = await client.getMessageHistory(ctx.input.channelId, {
-      start: ctx.input.start,
-      end: ctx.input.end,
-      limit: ctx.input.limit,
-      direction: ctx.input.direction
-    });
+    let page = await client.getMessageHistory(
+      ctx.input.channelId,
+      {
+        start: ctx.input.start,
+        end: ctx.input.end,
+        limit: ctx.input.limit,
+        direction: ctx.input.direction
+      },
+      ctx.input.page
+    );
 
-    let mapped = (messages || []).map((msg: any) => ({
+    let mapped = page.items.map((msg: any) => ({
+      raw: msg,
       messageId: msg.id,
       name: msg.name,
       messageData: msg.data,
@@ -83,7 +95,7 @@ export let getMessageHistory = SlateTool.create(spec, {
     }));
 
     return {
-      output: { messages: mapped },
+      output: { messages: mapped, nextPageUrl: page.nextPageUrl },
       message: `Retrieved **${mapped.length}** message(s) from channel **${ctx.input.channelId}**.`
     };
   })

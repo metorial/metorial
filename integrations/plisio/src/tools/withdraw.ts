@@ -1,7 +1,35 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlisioClient } from '../lib/client';
+import {
+  optionalValue,
+  readRecord,
+  requireText,
+  validateDestinations,
+  validateOutput
+} from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  operationId: z.string().describe('Plisio operation ID for the withdrawal'),
+  type: z.string().describe('Withdrawal type: cash_out or mass_cash_out'),
+  status: z.string().describe('Current withdrawal status'),
+  currency: z.string().describe('Cryptocurrency code'),
+  amount: z.string().describe('Total amount withdrawn'),
+  fee: z.string().optional().describe('Network transaction fee'),
+  walletHash: z.string().optional().describe('Destination address (single withdrawal)'),
+  sendMany: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Address-to-amount mapping (mass withdrawal)'),
+  txUrl: z.string().optional().describe('Block explorer URL for the transaction'),
+  transactionUrls: z
+    .array(z.string())
+    .optional()
+    .describe('All block explorer URLs when the provider returns multiple links'),
+  createdAtUtc: z.number().optional().describe('Creation timestamp (UTC)'),
+  raw: z.unknown().describe('Original provider response with credentials removed')
+});
 
 export let withdraw = SlateTool.create(spec, {
   name: 'Withdraw',
@@ -39,51 +67,42 @@ export let withdraw = SlateTool.create(spec, {
         .describe('Fee plan to use for the transaction')
     })
   )
-  .output(
-    z.object({
-      operationId: z.string().describe('Plisio operation ID for the withdrawal'),
-      type: z.string().describe('Withdrawal type: cash_out or mass_cash_out'),
-      status: z.string().describe('Current withdrawal status'),
-      currency: z.string().describe('Cryptocurrency code'),
-      amount: z.string().describe('Total amount withdrawn'),
-      fee: z.string().optional().describe('Network transaction fee'),
-      walletHash: z.string().optional().describe('Destination address (single withdrawal)'),
-      sendMany: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Address-to-amount mapping (mass withdrawal)'),
-      txUrl: z.string().optional().describe('Block explorer URL for the transaction'),
-      createdAtUtc: z.number().optional().describe('Creation timestamp (UTC)')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new PlisioClient({ token: ctx.auth.token });
 
-    let isMass = ctx.input.addresses.includes(',');
+    requireText(ctx.input.currency, 'Currency');
+    let isMass = validateDestinations(ctx.input.addresses, ctx.input.amounts);
     let type: 'cash_out' | 'mass_cash_out' = isMass ? 'mass_cash_out' : 'cash_out';
 
-    let result = await client.withdraw({
-      currency: ctx.input.currency,
-      type,
-      to: ctx.input.addresses,
-      amount: ctx.input.amounts,
-      feePlan: ctx.input.feePlan
-    });
+    let result = readRecord(
+      await client.withdraw({
+        currency: ctx.input.currency,
+        type,
+        to: ctx.input.addresses,
+        amount: ctx.input.amounts,
+        feePlan: ctx.input.feePlan
+      })
+    );
 
     return {
-      output: {
+      output: validateOutput(outputSchema, {
         operationId: result.id,
         type: result.type,
         status: result.status,
         currency: result.currency ?? result.psys_cid,
         amount: result.amount,
-        fee: result.fee,
-        walletHash: result.wallet_hash,
-        sendMany: result.sendmany,
-        txUrl: result.tx_url,
-        createdAtUtc: result.created_at_utc
-      },
-      message: `Withdrawal of **${result.amount} ${result.currency || result.psys_cid}** initiated (${type === 'mass_cash_out' ? 'mass withdrawal' : 'single withdrawal'}). Operation ID: \`${result.id}\`. Status: ${result.status}`
+        fee: optionalValue(result.fee),
+        walletHash: optionalValue(result.wallet_hash),
+        sendMany: optionalValue(result.sendmany),
+        txUrl: typeof result.tx_url === 'string' ? result.tx_url : undefined,
+        transactionUrls: Array.isArray(result.tx_url) ? result.tx_url : undefined,
+        createdAtUtc: optionalValue(result.created_at_utc),
+        raw: result
+      }),
+      message: client.redact(
+        `Withdrawal of **${result.amount} ${result.currency || result.psys_cid}** initiated (${type === 'mass_cash_out' ? 'mass withdrawal' : 'single withdrawal'}). Operation ID: \`${result.id}\`. Status: ${result.status}`
+      )
     };
   })
   .build();

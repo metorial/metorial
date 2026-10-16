@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecord = SlateTool.create(spec, {
@@ -51,11 +51,7 @@ export let getRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverDomain: ctx.config.serverDomain,
-      accountName: ctx.config.accountName
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let sheet = {
       tabFolder: ctx.input.tabFolder,
@@ -70,7 +66,12 @@ export let getRecord = SlateTool.create(spec, {
     });
 
     let recordIdStr = String(ctx.input.recordId);
-    let recordData = data[recordIdStr] || data;
+    let recordData =
+      data[recordIdStr] ?? (String(data._ragicId) === recordIdStr ? data : undefined);
+    if (!isApiErrorRecord(recordData))
+      throw createApiServiceError('Ragic did not return the requested record.', {
+        reason: 'invalid_response'
+      });
 
     return {
       output: {

@@ -19,6 +19,9 @@ export let listSupportedChains = SlateTool.create(spec, {
   name: 'List Supported Chains',
   key: 'list_supported_chains',
   description: `Lists all blockchain networks supported by Blocknative with their metadata including chain ID, architecture, available features, and system/network identifiers. Use this to discover which chains are available for gas estimation and other Blocknative services.`,
+  instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.'
+  ],
   tags: {
     readOnly: true
   }

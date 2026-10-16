@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let upsertOrder = SlateTool.create(spec, {
@@ -21,6 +22,7 @@ All monetary amounts are specified in **cents** (e.g., 4999 = $49.99).`,
 })
   .input(
     z.object({
+      ...importScopeFields,
       orderId: z.string().describe('Unique identifier for the order/invoice.'),
       contactId: z
         .string()
@@ -34,14 +36,27 @@ All monetary amounts are specified in **cents** (e.g., 4999 = $49.99).`,
         .number()
         .optional()
         .describe('Whether the order has been refunded (0 or 1).'),
+      discount: z.number().optional().describe('Order discount in cents.'),
+      tax: z.number().optional().describe('Order tax in cents.'),
+      shipping: z.number().optional().describe('Order shipping cost in cents.'),
       items: z
         .array(
           z.object({
+            id: z
+              .string()
+              .optional()
+              .describe('Stable line item ID; defaults to the order ID and item number.'),
             name: z.string().describe('Name of the product/item.'),
             productId: z
               .string()
               .optional()
-              .describe("Product identifier. Auto-created if it doesn't exist."),
+              .describe(
+                "Required by SegMetrics: product identifier. Auto-created if it doesn't exist."
+              ),
+            subscriptionId: z
+              .string()
+              .optional()
+              .describe('Subscription ID linked to this purchase.'),
             amount: z.number().describe('Amount for this line item in cents.'),
             totalPaid: z
               .number()
@@ -59,11 +74,7 @@ All monetary amounts are specified in **cents** (e.g., 4999 = $49.99).`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let body: Record<string, unknown> = {
       id: ctx.input.orderId,
@@ -71,16 +82,21 @@ All monetary amounts are specified in **cents** (e.g., 4999 = $49.99).`,
       paid: ctx.input.paid,
       date_created: ctx.input.dateCreated,
       items: ctx.input.items.map(item => ({
+        id: item.id,
         name: item.name,
         product_id: item.productId,
         amount: item.amount,
-        total_paid: item.totalPaid
+        total_paid: item.totalPaid,
+        subscription_id: item.subscriptionId
       }))
     };
 
     if (ctx.input.contactId) body.contact_id = ctx.input.contactId;
     if (ctx.input.email) body.email = ctx.input.email;
     if (ctx.input.isRefunded !== undefined) body.is_refunded = ctx.input.isRefunded;
+    if (ctx.input.discount !== undefined) body.discount = ctx.input.discount;
+    if (ctx.input.tax !== undefined) body.tax = ctx.input.tax;
+    if (ctx.input.shipping !== undefined) body.shipping = ctx.input.shipping;
 
     let response = await client.upsertInvoice(body);
 

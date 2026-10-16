@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as translate from '../lib/translate';
 import { spec } from '../spec';
@@ -40,7 +40,8 @@ export let translateText = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await translate.translateText(ctx.auth, {
       folderId,
@@ -82,7 +83,8 @@ export let detectLanguage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await translate.detectLanguage(ctx.auth, {
       folderId,
@@ -124,7 +126,8 @@ export let listLanguages = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await translate.listLanguages(ctx.auth, folderId);
 

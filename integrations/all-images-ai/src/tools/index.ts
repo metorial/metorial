@@ -8,3 +8,4 @@ export * from './list-generations';
 export * from './retry-generation';
 export * from './search-images';
 export * from './update-generation';
+export * from './who-am-i';

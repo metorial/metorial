@@ -3,12 +3,18 @@ import { spec } from './spec';
 import {
   calculateBatchPrice,
   cancelOrder,
+  getCollection,
+  getCurrentUser,
   getOrder,
   getOrderBatch,
   getProduct,
+  listBrands,
   listCards,
+  listCollections,
+  listOrderActivities,
   listOrderBatches,
   listOrderBatchOrders,
+  listOrderBatchRecipients,
   listOrders,
   listPaymentMethods,
   listProducts,
@@ -19,6 +25,10 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listBrands,
+    listCollections,
+    getCollection,
     listProducts,
     getProduct,
     listCards,
@@ -30,6 +40,8 @@ export let provider = Slate.create({
     getOrderBatch,
     listOrderBatches,
     listOrderBatchOrders,
+    listOrderBatchRecipients,
+    listOrderActivities,
     calculateBatchPrice,
     listPaymentMethods,
     listWorkspaces

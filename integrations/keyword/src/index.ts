@@ -2,18 +2,24 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAiCitations,
+  getAiDomain,
   getAiMetrics,
   getAiSearchTerms,
   getAiSentiment,
+  getKeywordCompetitors,
   getKeywordMetrics,
   getKeywordRankings,
+  getProject,
   getProjectRegions,
+  getShareOfVoice,
   listAiDomains,
   listKeywords,
   listProjects,
   manageKeywords,
   manageProject,
-  refreshKeywords
+  refreshKeywords,
+  updateKeyword,
+  whoAmI
 } from './tools';
 
 export let provider = Slate.create({
@@ -31,7 +37,13 @@ export let provider = Slate.create({
     getAiSearchTerms,
     getAiMetrics,
     getAiSentiment,
-    getAiCitations
+    getAiCitations,
+    getAiDomain,
+    getProject,
+    getKeywordCompetitors,
+    getShareOfVoice,
+    updateKeyword,
+    whoAmI
   ],
   triggers: []
 });

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, formatStatistics } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDomainStatistics = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let getDomainStatistics = SlateTool.create(spec, {
   key: 'get_domain_statistics',
   description: `Retrieve aggregate click statistics for an entire domain. Returns total clicks, human clicks, and breakdowns by browser, country, city, referrer, social platform, and operating system for a given time period.`,
   instructions: [
-    'When using "custom" period, startDate and endDate are required in milliseconds since epoch.'
+    'When using "custom" period, provide startDate and endDate as ISO dates or milliseconds since epoch. Use tz for the timezone name; tzOffset is a legacy option.'
   ],
   tags: {
     readOnly: true
@@ -16,10 +17,7 @@ export let getDomainStatistics = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      domainId: z
-        .number()
-        .optional()
-        .describe('Domain ID to get statistics for. Falls back to config default.'),
+      domainId: domainIdSchema.optional(),
       period: z
         .enum([
           'today',
@@ -33,18 +31,28 @@ export let getDomainStatistics = SlateTool.create(spec, {
           'custom'
         ])
         .describe('Time period for statistics.'),
+      tz: z
+        .string()
+        .optional()
+        .describe(
+          'Timezone name such as UTC or Europe/Berlin. Takes precedence over tzOffset.'
+        ),
       tzOffset: z
         .number()
         .optional()
-        .describe('Timezone offset (e.g., 0 for UTC, -5 for EST). Defaults to 0.'),
+        .describe('Legacy timezone offset in minutes. Prefer tz with a timezone name.'),
       startDate: z
         .string()
         .optional()
-        .describe('Start date in milliseconds from epoch. Required when period is "custom".'),
+        .describe(
+          'Start ISO date or milliseconds since epoch. Required when period is "custom".'
+        ),
       endDate: z
         .string()
         .optional()
-        .describe('End date in milliseconds from epoch. Required when period is "custom".')
+        .describe(
+          'End ISO date or milliseconds since epoch. Required when period is "custom".'
+        )
     })
   )
   .output(
@@ -65,14 +73,27 @@ export let getDomainStatistics = SlateTool.create(spec, {
       referer: z.record(z.string(), z.number()).describe('Click breakdown by referrer.'),
       social: z.record(z.string(), z.number()).describe('Click breakdown by social platform.'),
       os: z.record(z.string(), z.number()).describe('Click breakdown by operating system.'),
-      intervalStart: z.string().describe('Start of the statistics interval.'),
-      intervalEnd: z.string().describe('End of the statistics interval.')
+      intervalStart: z
+        .string()
+        .describe(
+          'Provider interval start. Empty only when the all-time response explicitly has null bounds.'
+        ),
+      intervalEnd: z
+        .string()
+        .describe(
+          'Provider interval end. Empty only when the all-time response explicitly has null bounds.'
+        ),
+      raw: z
+        .unknown()
+        .describe(
+          'Complete provider statistics, including chart datasets and original breakdown rows.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let domainId = ctx.input.domainId || ctx.config.domainId;
+    let domainId = ctx.input.domainId ?? ctx.config.domainId;
     if (!domainId) {
-      throw new Error(
+      throw createApiServiceError(
         'Domain ID is required. Provide it in the input or set a default in config.'
       );
     }
@@ -82,26 +103,15 @@ export let getDomainStatistics = SlateTool.create(spec, {
     let stats = await client.getDomainStatistics(domainId, {
       period: ctx.input.period,
       tzOffset: ctx.input.tzOffset,
+      tz: ctx.input.tz,
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate
     });
 
+    let output = formatStatistics(stats, ctx.input.period, 'domain');
     return {
-      output: {
-        totalClicks: stats.totalClicks,
-        humanClicks: stats.humanClicks,
-        humanClicksChange: stats.humanClicksChange,
-        totalClicksChange: stats.totalClicksChange,
-        browser: stats.browser,
-        country: stats.country,
-        city: stats.city,
-        referer: stats.referer,
-        social: stats.social,
-        os: stats.os,
-        intervalStart: stats.interval.startDate,
-        intervalEnd: stats.interval.endDate
-      },
-      message: `Domain statistics for period **${ctx.input.period}**: **${stats.totalClicks}** total clicks, **${stats.humanClicks}** human clicks`
+      output,
+      message: `Domain statistics for period **${ctx.input.period}**: **${output.totalClicks}** total clicks, **${output.humanClicks}** human clicks`
     };
   })
   .build();

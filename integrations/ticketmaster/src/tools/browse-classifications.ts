@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DiscoveryClient } from '../lib/client';
 import { mapClassification, mapPagination } from '../lib/mappers';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let classificationDetailSchema = z.object({
@@ -35,7 +36,21 @@ let classificationDetailSchema = z.object({
       name: z.string()
     })
     .nullable(),
-  primary: z.boolean()
+  hierarchy: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete classification tree returned by Ticketmaster'),
+  primary: z.boolean().optional()
+});
+
+let outputSchema = z.object({
+  classifications: z.array(classificationDetailSchema),
+  pagination: z.object({
+    totalElements: z.number(),
+    totalPages: z.number(),
+    currentPage: z.number(),
+    pageSize: z.number()
+  })
 });
 
 export let browseClassificationsTool = SlateTool.create(spec, {
@@ -53,17 +68,7 @@ export let browseClassificationsTool = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number (0-indexed)')
     })
   )
-  .output(
-    z.object({
-      classifications: z.array(classificationDetailSchema),
-      pagination: z.object({
-        totalElements: z.number(),
-        totalPages: z.number(),
-        currentPage: z.number(),
-        pageSize: z.number()
-      })
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -78,12 +83,21 @@ export let browseClassificationsTool = SlateTool.create(spec, {
     });
 
     let rawClassifications = response?._embedded?.classifications || [];
-    let classifications = rawClassifications.map(mapClassification).filter(Boolean);
+    let classifications = rawClassifications
+      .map((classification: any) => ({
+        ...mapClassification(classification),
+        hierarchy: classification
+      }))
+      .filter(Boolean);
     let pagination = mapPagination(response?.page);
 
     return {
-      output: { classifications, pagination },
-      message: `Found **${pagination.totalElements}** classifications (showing page ${pagination.currentPage + 1} of ${pagination.totalPages}).`
+      output: parseTicketmasterOutput(
+        outputSchema,
+        { classifications, pagination },
+        'browse-classifications'
+      ),
+      message: `Returned **${classifications.length}** classifications.`
     };
   })
   .build();

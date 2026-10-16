@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let getAccountStatus = SlateTool.create(spec, {
   name: 'Get Account Status',
   key: 'get_account_status',
   description: `Retrieve the current account status from GageList.
-Returns general information about the GageList account.`,
+Returns the current account and site context, accessible sites, roles, permissions, usage, and plan limits.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -154,6 +154,9 @@ Allows modifying account configuration such as notification preferences, email s
     if (ctx.input.distributions !== undefined) data.Distributions = ctx.input.distributions;
     if (ctx.input.statement !== undefined) data.Statement = ctx.input.statement;
 
+    if (Object.keys(data).length === 0) {
+      throw createApiServiceError('Provide at least one account setting to update.');
+    }
     let result = await client.updateAccountSettings(data);
 
     return {

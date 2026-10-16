@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 export let getEmailCampaignReport = SlateTool.create(spec, {
@@ -27,10 +27,13 @@ export let getEmailCampaignReport = SlateTool.create(spec, {
       summary: z.any().describe('Campaign report summary'),
       opens: z.array(z.any()).optional().describe('Contacts who opened'),
       clicks: z.array(z.any()).optional().describe('Click details'),
-      bounces: z.array(z.any()).optional().describe('Bounce details'),
+      bounces: z
+        .array(z.any())
+        .optional()
+        .describe('Bounce report records, including provider aggregates'),
       unsubscribed: z.array(z.any()).optional().describe('Unsubscribed contacts'),
-      complaints: z.array(z.any()).optional().describe('Spam complaints'),
-      domains: z.array(z.any()).optional().describe('Per-domain statistics')
+      complaints: z.array(z.any()).optional().describe('Complaint report records'),
+      domains: z.array(z.any()).optional().describe('Per-domain report records')
     })
   )
   .handleInvocation(async ctx => {
@@ -57,13 +60,16 @@ export let getEmailCampaignReport = SlateTool.create(spec, {
       output.complaints = await client.getCampaignReportComplaints(campaignId, pagination);
     }
     if (ctx.input.includeDomains) {
-      output.domains = await client.getCampaignReportDomains(campaignId);
+      output.domains = await client.getCampaignReportDomains(campaignId, pagination);
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved report for email campaign **${campaignId}**.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved report for email campaign **${campaignId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -94,11 +100,14 @@ export let listCampaignReports = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let reports = Array.isArray(result) ? result : [];
-    return {
-      output: { reports },
-      message: `Found **${reports.length}** campaign report(s).`
-    };
+    let reports = readList(result);
+    return redactProviderData(
+      {
+        output: { reports },
+        message: `Found **${reports.length}** campaign report(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -121,9 +130,12 @@ export let getSmsCampaignReport = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let report = await client.getSmsCampaignReport(ctx.input.campaignId);
-    return {
-      output: { report },
-      message: `Retrieved report for SMS campaign **${ctx.input.campaignId}**.`
-    };
+    return redactProviderData(
+      {
+        output: { report },
+        message: `Retrieved report for SMS campaign **${ctx.input.campaignId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

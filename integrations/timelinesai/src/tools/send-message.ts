@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let sendMessage = SlateTool.create(spec, {
   instructions: [
     'Provide either a phone number, chatId, chatName, or jid as the recipient.',
     'Phone numbers must be in international format (e.g., +1234567890).',
-    'To attach a file, first upload it using the Upload File tool, then pass the returned fileUid.',
+    'To attach a file, first upload it using manage_files with action "upload", then pass the returned fileUid.',
     'Use \\n for line breaks in message text.'
   ],
   constraints: [
@@ -67,7 +67,7 @@ export let sendMessage = SlateTool.create(spec, {
 
     let result: any;
 
-    if (chatId) {
+    if (chatId !== undefined) {
       result = await client.sendMessageToChat(chatId, { text, fileUid, label, replyTo });
     } else if (phone) {
       result = await client.sendMessageToPhone({
@@ -95,10 +95,13 @@ export let sendMessage = SlateTool.create(spec, {
         replyTo
       });
     } else {
-      throw new Error('One of phone, chatId, chatName, or jid must be provided');
+      throw createApiServiceError('One of phone, chatId, chatName, or jid must be provided');
     }
 
-    let messageUid = result?.data?.message_uid || result?.message_uid || '';
+    let messageUid = result?.data?.message_uid ?? result?.message_uid;
+    if (typeof messageUid !== 'string' || messageUid.length === 0) {
+      throw createApiServiceError('TimelinesAI did not return the accepted message UID.');
+    }
 
     return {
       output: { messageUid },

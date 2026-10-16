@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RiteKitClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,6 +26,7 @@ Use this to create trackable short links for social media posts with optional pr
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       shortenedUrl: z.string().describe('The shortened URL'),
       originalUrl: z.string().describe('The original URL that was shortened'),
       service: z.string().describe('The shortening service used'),
@@ -36,12 +37,23 @@ Use this to create trackable short links for social media posts with optional pr
     let client = new RiteKitClient({ token: ctx.auth.token });
     let result = await client.shortenLink(ctx.input.url, ctx.input.ctaId);
 
+    let ctaId =
+      typeof result.ctaId === 'number'
+        ? result.ctaId
+        : /^\d+$/.test(result.ctaId)
+          ? Number(result.ctaId)
+          : undefined;
+    if (ctaId === undefined || !Number.isFinite(ctaId)) {
+      throw createApiServiceError('RiteKit did not return a numeric CTA identifier.');
+    }
+
     return {
       output: {
+        raw: { ...result },
         shortenedUrl: result.url,
         originalUrl: result.original,
         service: result.service,
-        ctaId: result.ctaId
+        ctaId
       },
       message: `Shortened link: **${result.url}** (from ${result.original})`
     };

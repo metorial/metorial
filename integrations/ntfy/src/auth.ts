@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -18,6 +18,9 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Ntfy access token (starts with tk_)')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Provide a non-empty ntfy access token.');
+      }
       return {
         output: {
           token: ctx.input.token
@@ -30,10 +33,17 @@ export let auth = SlateAuth.create()
     name: 'Username & Password',
     key: 'basic_auth',
     inputSchema: z.object({
-      username: z.string().describe('Ntfy username'),
-      password: z.string().describe('Ntfy password')
+      username: z
+        .string()
+        .describe('Ntfy username, or an empty string when using a token as the password'),
+      password: z.string().describe('Ntfy password, or an access token with an empty username')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.password || ctx.input.username.includes(':')) {
+        throw createApiServiceError(
+          'Provide a non-empty ntfy password or token and a username without a colon.'
+        );
+      }
       return {
         output: {
           username: ctx.input.username,

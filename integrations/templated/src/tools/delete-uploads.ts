@@ -18,6 +18,7 @@ export let deleteUploads = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       deletedIds: z.array(z.string()).optional(),
       message: z.string().optional()
     })
@@ -28,6 +29,7 @@ export let deleteUploads = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         deletedIds: result.deleted,
         message: result.message
       },

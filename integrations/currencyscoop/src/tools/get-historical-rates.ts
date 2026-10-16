@@ -36,7 +36,10 @@ Useful for auditing, accounting, back-testing, and trend analysis.`,
       baseCurrency: z.string().describe('Base currency code used for the rates'),
       rates: z
         .record(z.string(), z.number())
-        .describe('Map of currency codes to their exchange rates on the specified date')
+        .describe(
+          'Map of currency codes to units of that currency per one unit of the base currency on the returned date'
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,7 +58,8 @@ Useful for auditing, accounting, back-testing, and trend analysis.`,
       output: {
         date: result.date,
         baseCurrency: result.base,
-        rates: result.rates
+        rates: result.rates,
+        raw: result.raw
       },
       message: `Retrieved **${rateCount}** historical exchange rates for **${result.base}** on **${result.date}**.`
     };

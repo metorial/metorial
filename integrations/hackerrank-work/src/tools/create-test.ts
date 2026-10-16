@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { testSettings } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createTest = SlateTool.create(spec, {
@@ -13,6 +14,34 @@ export let createTest = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      roleIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Role IDs associated with the test; required by HackerRank when creating a test'
+        ),
+      experienceLevels: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Experience levels: Intern, New Graduate, 0-2 years, 2-5 years, >5 years, All Experience Levels. Use instead of experience for multiple levels.'
+        ),
+      questionIds: z
+        .array(z.string())
+        .optional()
+        .describe('Question IDs to include; call list_questions to discover IDs'),
+      draft: z
+        .boolean()
+        .optional()
+        .describe('Whether the test is a draft; only published tests accept invitations'),
+      startTime: z
+        .string()
+        .optional()
+        .describe('Earliest test login time as an ISO 8601 timestamp'),
+      endTime: z
+        .string()
+        .optional()
+        .describe('Latest test login time as an ISO 8601 timestamp'),
       name: z.string().describe('Name of the test'),
       duration: z.number().optional().describe('Test duration in minutes'),
       instructions: z
@@ -26,7 +55,9 @@ export let createTest = SlateTool.create(spec, {
       experience: z
         .string()
         .optional()
-        .describe('Expected experience level (e.g., "intern", "entry", "mid", "senior")'),
+        .describe(
+          'One documented experience level (e.g., "Intern", "New Graduate", "0-2 years"). Use experienceLevels for multiple values.'
+        ),
       cutoffScore: z.number().optional().describe('Minimum passing score for the test'),
       tags: z.array(z.string()).optional().describe('Tags to categorize the test'),
       candidateTabSwitch: z
@@ -47,17 +78,16 @@ export let createTest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.createTest({
-      name: ctx.input.name,
-      duration: ctx.input.duration,
-      instructions: ctx.input.instructions,
-      languages: ctx.input.languages,
-      experience: ctx.input.experience,
-      cutoff_score: ctx.input.cutoffScore,
-      tags: ctx.input.tags,
-      candidate_tab_switch: ctx.input.candidateTabSwitch,
-      hide_compile_test: ctx.input.hideCompileTest
-    });
+    if (
+      ctx.input.duration === undefined ||
+      ctx.input.roleIds === undefined ||
+      (ctx.input.experience === undefined && ctx.input.experienceLevels === undefined)
+    ) {
+      throw createApiServiceError(
+        'HackerRank requires duration, roleIds, and experience or experienceLevels when creating a test.'
+      );
+    }
+    let result = await client.createTest({ ...testSettings(ctx.input), name: ctx.input.name });
 
     let test = result.data ?? result;
 

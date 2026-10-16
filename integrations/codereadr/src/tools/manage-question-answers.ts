@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,9 @@ export let manageQuestionAnswers = SlateTool.create(spec, {
 
     if (ctx.input.operation === 'add') {
       if (!ctx.input.questionId || !ctx.input.answerText) {
-        throw new Error('questionId and answerText are required for the "add" operation.');
+        throw createApiServiceError(
+          'questionId and answerText are required for the "add" operation.'
+        );
       }
       let answerId = await client.addAnswer(ctx.input.questionId, ctx.input.answerText);
       return {
@@ -47,7 +49,7 @@ export let manageQuestionAnswers = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.answerId) {
-        throw new Error('answerId is required for the "delete" operation.');
+        throw createApiServiceError('answerId is required for the "delete" operation.');
       }
       await client.deleteAnswer(ctx.input.answerId);
       return {

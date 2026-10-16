@@ -1,4 +1,34 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+let toBreezeError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Breeze',
+    reason: 'breeze_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    nestedKeys: ['error', 'errors'],
+    extractUpstreamCode: (_error, response) => {
+      if (!isApiErrorRecord(response?.data)) return undefined;
+      let code = response.data.code ?? response.data.error_code;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+    },
+    fallbackMessage: 'The request was not accepted by Breeze.'
+  });
+
+let validateCount = (value: number | undefined, name: string, maximum?: number) => {
+  if (
+    value !== undefined &&
+    (!Number.isInteger(value) || value < 0 || (maximum !== undefined && value > maximum))
+  ) {
+    throw createApiServiceError(
+      `${name} must be a nonnegative whole number${maximum === undefined ? '' : ` no greater than ${maximum}`}.`
+    );
+  }
+};
 
 export class Client {
   private axios;
@@ -8,12 +38,44 @@ export class Client {
     subdomain: string;
     teamId?: string;
   }) {
-    this.axios = createAxios({
+    if (!params.token.trim()) {
+      throw createApiServiceError('A Breeze API key is required.');
+    }
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(params.subdomain)) {
+      throw createApiServiceError(
+        'Enter only your Breeze account subdomain, such as "yourchurch".'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${params.subdomain}.breezechms.com/api`,
+      authHeader: { name: 'Api-Key', value: params.token },
+      contentType: false,
       headers: {
-        'Api-Key': params.token,
         ...(params.teamId ? { HTTP_X_TEAM_ID: params.teamId } : {})
+      },
+      errorAdapter: toBreezeError
+    });
+    this.axios.interceptors.response.use(response => {
+      let body: unknown = response.data;
+      if (
+        body === false ||
+        body === 'false' ||
+        (isApiErrorRecord(body) &&
+          (body.success === false ||
+            body.success === 'false' ||
+            body.error ||
+            (Array.isArray(body.errors)
+              ? body.errors.length > 0
+              : isApiErrorRecord(body.errors)
+                ? Object.keys(body.errors).length > 0
+                : body.errors)))
+      ) {
+        throw toBreezeError({
+          response: { status: response.status, data: body },
+          message: 'Breeze reported that the operation failed.'
+        });
       }
+      return response;
     });
   }
 
@@ -25,10 +87,12 @@ export class Client {
     details?: boolean;
     filterJson?: string;
   }) {
+    validateCount(options?.limit, 'limit');
+    validateCount(options?.offset, 'offset');
     let params: Record<string, string> = {};
     if (options?.limit !== undefined) params.limit = String(options.limit);
     if (options?.offset !== undefined) params.offset = String(options.offset);
-    if (options?.details) params.details = '1';
+    if (options?.details !== undefined) params.details = options.details ? '1' : '0';
     if (options?.filterJson) params.filter_json = options.filterJson;
 
     let response = await this.axios.get('/people', { params });
@@ -37,9 +101,9 @@ export class Client {
 
   async getPerson(personId: string, details?: boolean) {
     let params: Record<string, string> = {};
-    if (details) params.details = '1';
+    if (details !== undefined) params.details = details ? '1' : '0';
 
-    let response = await this.axios.get(`/people/${personId}`, { params });
+    let response = await this.axios.get(`/people/${encodeURIComponent(personId)}`, { params });
     return response.data;
   }
 
@@ -175,12 +239,13 @@ export class Client {
     details?: boolean;
     limit?: number;
   }) {
+    validateCount(options?.limit, 'limit', 1000);
     let params: Record<string, string> = {};
     if (options?.start) params.start = options.start;
     if (options?.end) params.end = options.end;
     if (options?.categoryId) params.category_id = options.categoryId;
-    if (options?.eligible) params.eligible = '1';
-    if (options?.details) params.details = '1';
+    if (options?.eligible !== undefined) params.eligible = options.eligible ? '1' : '0';
+    if (options?.details !== undefined) params.details = options.details ? '1' : '0';
     if (options?.limit !== undefined) params.limit = String(options.limit);
 
     let response = await this.axios.get('/events', { params });
@@ -197,13 +262,21 @@ export class Client {
       details?: boolean;
     }
   ) {
+    validateCount(options?.scheduleLimit, 'scheduleLimit', 100);
     let params: Record<string, string> = { instance_id: instanceId };
-    if (options?.schedule) params.schedule = '1';
-    if (options?.scheduleDirection) params.schedule_direction = options.scheduleDirection;
+    if (options?.schedule !== undefined) params.schedule = options.schedule ? '1' : '0';
+    if (options?.scheduleDirection) {
+      params.schedule_direction =
+        options.scheduleDirection === 'previous'
+          ? 'before'
+          : options.scheduleDirection === 'next'
+            ? 'after'
+            : options.scheduleDirection;
+    }
     if (options?.scheduleLimit !== undefined)
       params.schedule_limit = String(options.scheduleLimit);
-    if (options?.eligible) params.eligible = '1';
-    if (options?.details) params.details = '1';
+    if (options?.eligible !== undefined) params.eligible = options.eligible ? '1' : '0';
+    if (options?.details !== undefined) params.details = options.details ? '1' : '0';
 
     let response = await this.axios.get('/events/list_event', { params });
     return response.data;
@@ -223,7 +296,7 @@ export class Client {
       starts_on: options.startsOn
     };
     if (options.endsOn) params.ends_on = options.endsOn;
-    if (options.allDay) params.all_day = '1';
+    if (options.allDay !== undefined) params.all_day = options.allDay ? '1' : '0';
     if (options.description) params.description = options.description;
     if (options.categoryId) params.category_id = options.categoryId;
     if (options.eventId) params.event_id = options.eventId;
@@ -277,7 +350,7 @@ export class Client {
     }
   ) {
     let params: Record<string, string> = { instance_id: instanceId };
-    if (options?.details) params.details = '1';
+    if (options?.details !== undefined) params.details = options.details ? '1' : '0';
     if (options?.type) params.type = options.type;
 
     let response = await this.axios.get('/events/attendance/list', { params });
@@ -337,7 +410,7 @@ export class Client {
 
   async listFormEntries(formId: string, details?: boolean) {
     let params: Record<string, string> = { form_id: formId };
-    if (details) params.details = '1';
+    if (details !== undefined) params.details = details ? '1' : '0';
 
     let response = await this.axios.get('/forms/list_form_entries', { params });
     return response.data;
@@ -386,13 +459,14 @@ export class Client {
 
   async listVolunteerRoles(instanceId: string, showQuantity?: boolean) {
     let params: Record<string, string> = { instance_id: instanceId };
-    if (showQuantity) params.show_quantity = '1';
+    if (showQuantity !== undefined) params.show_quantity = showQuantity ? '1' : '0';
 
     let response = await this.axios.get('/volunteers/list_roles', { params });
     return response.data;
   }
 
   async addVolunteerRole(instanceId: string, name: string, quantity?: number) {
+    validateCount(quantity, 'quantity');
     let params: Record<string, string> = { instance_id: instanceId, name };
     if (quantity !== undefined) params.quantity = String(quantity);
 
@@ -422,11 +496,12 @@ export class Client {
     details?: boolean;
     limit?: number;
   }) {
+    validateCount(options.limit, 'limit', 3000);
     let params: Record<string, string> = { action: options.action };
     if (options.start) params.start = options.start;
     if (options.end) params.end = options.end;
     if (options.userId) params.user_id = options.userId;
-    if (options.details) params.details = '1';
+    if (options.details !== undefined) params.details = options.details ? '1' : '0';
     if (options.limit !== undefined) params.limit = String(options.limit);
 
     let response = await this.axios.get('/account/list_log', { params });

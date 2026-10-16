@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalNumber,
+  optionalString,
+  pagination,
+  readList,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listPayments = SlateTool.create(spec, {
@@ -17,8 +24,8 @@ export let listPayments = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Number of payments to return (default: 20, max: 100)'),
-      offset: z.number().optional().describe('Number of payments to skip (default: 0)'),
+        .describe('Number of payments to return (the provider may use a fixed page size)'),
+      offset: z.number().optional().describe('Number of payments to skip (zero-based)'),
       status: z
         .enum(['pending', 'completed', 'failed'])
         .optional()
@@ -48,6 +55,7 @@ export let listPayments = SlateTool.create(spec, {
           })
         )
         .describe('List of payments'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       total: z.number().optional().describe('Total number of payments')
     })
   )
@@ -62,27 +70,29 @@ export let listPayments = SlateTool.create(spec, {
       end_date: ctx.input.endDate
     });
 
-    let rawPayments = result?.data ?? result?.payments ?? result ?? [];
-    let paymentsArray = Array.isArray(rawPayments) ? rawPayments : [];
-
-    let payments = paymentsArray.map((p: any) => ({
-      paymentId: String(p.id),
-      invoiceId: p.invoice_id ? String(p.invoice_id) : undefined,
-      amount: p.amount,
-      date: p.date,
-      mode: p.mode,
-      reference: p.reference,
-      status: p.status
+    let payments = readList(result, 'payments').map(p => ({
+      paymentId: requireId(p.id, 'payment ID'),
+      ...pickDefined({
+        invoiceId:
+          p.invoice_id === undefined || p.invoice_id === null
+            ? undefined
+            : requireId(p.invoice_id, 'payment invoice ID'),
+        amount: optionalNumber(p.amount, 'payment amount'),
+        date: optionalString(p.date, 'payment date'),
+        mode: optionalString(p.mode, 'payment mode'),
+        reference: optionalString(p.reference, 'payment reference'),
+        status: optionalString(p.status, 'payment status')
+      })
     }));
 
-    let total = result?.total ?? result?.meta?.total;
-
+    let metadata = pagination(result);
     return {
       output: {
         payments,
-        total
+        total: metadata.total,
+        rawResponse: result
       },
-      message: `Found **${payments.length}** payment(s)${total ? ` out of ${total} total` : ''}.`
+      message: `Found **${payments.length}** payment(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
     };
   })
   .build();

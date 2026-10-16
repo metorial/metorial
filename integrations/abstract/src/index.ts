@@ -1,11 +1,15 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   captureScreenshot,
+  emailReputation,
   enrichCompany,
   exchangeRates,
   generateAvatar,
   geolocateIp,
+  ipIntelligence,
+  phoneIntelligence,
   processImage,
   publicHolidays,
   scrapeWebsite,
@@ -18,7 +22,11 @@ import {
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
+    emailReputation,
+    phoneIntelligence,
+    ipIntelligence,
     validateEmail,
     validatePhone,
     geolocateIp,

@@ -1,4 +1,4 @@
-import { createAxios } from '@slates/provider';
+import { createAxios } from 'slates';
 import type { FabricRuntimeConfig } from '../config';
 import { fabricApiError, fabricValidationError } from './errors';
 import { encodeOneLakePath, encodePathSegment, validateOneLakePath } from './paths';
@@ -127,6 +127,7 @@ type FabricCreateItemInput = {
   creationPayload?: unknown;
   folderId?: string;
   sensitivityLabelSettings?: unknown;
+  options?: Record<string, unknown>;
 };
 
 type FabricCreateDataFactoryItemInput = {
@@ -208,8 +209,110 @@ export class FabricClient {
     return { items, continuationToken, pageCount };
   }
 
+  async listWorkspaces(input: {
+    continuationToken?: string;
+    pageLimit?: number;
+    roles?: string;
+    preferWorkspaceSpecificEndpoints?: boolean;
+  }) {
+    return this.listPaginated('/workspaces', {
+      continuationToken: input.continuationToken,
+      pageLimit: input.pageLimit,
+      params: compactRecord({
+        roles: input.roles,
+        preferWorkspaceSpecificEndpoints: input.preferWorkspaceSpecificEndpoints
+      })
+    });
+  }
+
+  async listItems(input: {
+    workspaceId: string;
+    continuationToken?: string;
+    pageLimit?: number;
+    itemType?: string;
+    recursive?: boolean;
+    rootFolderId?: string;
+    include?: string[];
+  }) {
+    return this.listPaginated(`/workspaces/${encodePathSegment(input.workspaceId)}/items`, {
+      continuationToken: input.continuationToken,
+      pageLimit: input.pageLimit,
+      params: compactRecord({
+        type: input.itemType,
+        recursive: input.recursive,
+        rootFolderId: input.rootFolderId,
+        include: input.include?.join(',')
+      })
+    });
+  }
+
+  async getItem(input: { workspaceId: string; itemId: string; include?: string[] }) {
+    let response = await this.request('get Fabric item', {
+      method: 'GET',
+      url: `/workspaces/${encodePathSegment(input.workspaceId)}/items/${encodePathSegment(input.itemId)}`,
+      params: compactRecord({ include: input.include?.join(',') })
+    });
+    return response.data;
+  }
+
+  async updateItem(input: {
+    workspaceId: string;
+    itemId: string;
+    displayName?: string;
+    description?: string;
+  }) {
+    if (input.displayName === undefined && input.description === undefined) {
+      throw fabricValidationError('Provide displayName or description to update the item.');
+    }
+    let response = await this.request('update Fabric item', {
+      method: 'PATCH',
+      url: `/workspaces/${encodePathSegment(input.workspaceId)}/items/${encodePathSegment(input.itemId)}`,
+      data: compactRecord({ displayName: input.displayName, description: input.description })
+    });
+    return response.data;
+  }
+
+  async deleteItem(input: { workspaceId: string; itemId: string; hardDelete?: boolean }) {
+    let response = await this.request('delete Fabric item', {
+      method: 'DELETE',
+      url: `/workspaces/${encodePathSegment(input.workspaceId)}/items/${encodePathSegment(input.itemId)}`,
+      params: compactRecord({ hardDelete: input.hardDelete })
+    });
+    return { result: response.data, operation: extractOperationMetadata(response) };
+  }
+
+  async getOperationState(operationId: string) {
+    let response = await this.request('get operation state', {
+      method: 'GET',
+      url: `/operations/${encodePathSegment(operationId)}`
+    });
+    return { state: response.data, operation: extractOperationMetadata(response) };
+  }
+
+  async getItemJob(input: { workspaceId: string; itemId: string; jobInstanceId: string }) {
+    let response = await this.request('get item job instance', {
+      method: 'GET',
+      url: `/workspaces/${encodePathSegment(input.workspaceId)}/items/${encodePathSegment(input.itemId)}/jobs/instances/${encodePathSegment(input.jobInstanceId)}`
+    });
+    return { job: response.data, operation: extractOperationMetadata(response) };
+  }
+
+  async cancelItemJob(input: { workspaceId: string; itemId: string; jobInstanceId: string }) {
+    let response = await this.request('cancel item job instance', {
+      method: 'POST',
+      url: `/workspaces/${encodePathSegment(input.workspaceId)}/items/${encodePathSegment(input.itemId)}/jobs/instances/${encodePathSegment(input.jobInstanceId)}/cancel`
+    });
+    return { result: response.data, operation: extractOperationMetadata(response) };
+  }
+
   async createItem(input: FabricCreateItemInput) {
     rejectMutuallyExclusivePayloads(input);
+    if (
+      input.options !== undefined &&
+      (input.definition === undefined || input.definition === null)
+    ) {
+      throw fabricValidationError('options requires an item definition.');
+    }
 
     let response = await this.request('create Fabric item', {
       method: 'POST',
@@ -221,7 +324,8 @@ export class FabricClient {
         definition: input.definition,
         creationPayload: input.creationPayload,
         folderId: input.folderId,
-        sensitivityLabelSettings: input.sensitivityLabelSettings
+        sensitivityLabelSettings: input.sensitivityLabelSettings,
+        options: input.options
       })
     });
 
@@ -472,17 +576,17 @@ export class OneLakeClient {
 
   async downloadFile(input: { workspace: string; item: string; filePath: string }) {
     let filePath = validateOneLakePath(input.filePath, 'filePath');
+    let url = `/${encodePathSegment(input.workspace)}/${encodePathSegment(input.item)}/${encodeOneLakePath(filePath)}`;
     let response = await this.request(this.blob, 'download OneLake file', {
       method: 'GET',
-      url: `/${encodePathSegment(input.workspace)}/${encodePathSegment(input.item)}/${encodeOneLakePath(
-        filePath
-      )}`,
+      url,
       responseType: 'arraybuffer'
     });
     let buffer = responseDataToBuffer(response.data);
 
     return {
       base64: buffer.toString('base64'),
+      downloadUrl: this.blob.getUri({ url }),
       contentType: getHeader(response.headers, 'content-type') ?? 'application/octet-stream',
       size: buffer.byteLength,
       etag: getHeader(response.headers, 'etag'),
@@ -581,34 +685,49 @@ export class OneLakeClient {
     return response.data;
   }
 
-  async listTableNamespaces(input: { workspace: string; item: string }) {
+  private tablePrefix(input: { workspace: string; item: string; catalogPrefix?: string }) {
+    if (input.catalogPrefix !== undefined) {
+      return encodeOneLakePath(validateOneLakePath(input.catalogPrefix, 'catalogPrefix'));
+    }
+    return `${encodePathSegment(input.workspace)}/${encodePathSegment(input.item)}`;
+  }
+
+  async listTableNamespaces(input: {
+    workspace: string;
+    item: string;
+    catalogPrefix?: string;
+  }) {
     let response = await this.request(this.table, 'list OneLake table namespaces', {
       method: 'GET',
-      url: `/iceberg/v1/${encodePathSegment(input.workspace)}/${encodePathSegment(
-        input.item
-      )}/namespaces`
+      url: `/iceberg/v1/${this.tablePrefix(input)}/namespaces`
     });
 
     return response.data;
   }
 
-  async getTableNamespace(input: { workspace: string; item: string; namespace: string }) {
+  async getTableNamespace(input: {
+    workspace: string;
+    item: string;
+    namespace: string;
+    catalogPrefix?: string;
+  }) {
     let response = await this.request(this.table, 'get OneLake table namespace', {
       method: 'GET',
-      url: `/iceberg/v1/${encodePathSegment(input.workspace)}/${encodePathSegment(
-        input.item
-      )}/namespaces/${encodeOneLakePath(input.namespace)}`
+      url: `/iceberg/v1/${this.tablePrefix(input)}/namespaces/${encodeOneLakePath(input.namespace)}`
     });
 
     return response.data;
   }
 
-  async listTables(input: { workspace: string; item: string; namespace: string }) {
+  async listTables(input: {
+    workspace: string;
+    item: string;
+    namespace: string;
+    catalogPrefix?: string;
+  }) {
     let response = await this.request(this.table, 'list OneLake tables', {
       method: 'GET',
-      url: `/iceberg/v1/${encodePathSegment(input.workspace)}/${encodePathSegment(
-        input.item
-      )}/namespaces/${encodeOneLakePath(input.namespace)}/tables`
+      url: `/iceberg/v1/${this.tablePrefix(input)}/namespaces/${encodeOneLakePath(input.namespace)}/tables`
     });
 
     return response.data;
@@ -619,12 +738,11 @@ export class OneLakeClient {
     item: string;
     namespace: string;
     table: string;
+    catalogPrefix?: string;
   }) {
     let response = await this.request(this.table, 'get OneLake table', {
       method: 'GET',
-      url: `/iceberg/v1/${encodePathSegment(input.workspace)}/${encodePathSegment(
-        input.item
-      )}/namespaces/${encodeOneLakePath(input.namespace)}/tables/${encodePathSegment(
+      url: `/iceberg/v1/${this.tablePrefix(input)}/namespaces/${encodeOneLakePath(input.namespace)}/tables/${encodePathSegment(
         input.table
       )}`
     });

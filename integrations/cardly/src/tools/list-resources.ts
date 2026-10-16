@@ -30,6 +30,10 @@ export let listResources = SlateTool.create(spec, {
         .describe(
           'If true, only return resources exclusive to your organisation (applies to fonts and doodles)'
         ),
+      offset: z
+        .number()
+        .optional()
+        .describe('Records to skip per resource type for pagination'),
       limit: z
         .number()
         .optional()
@@ -38,12 +42,16 @@ export let listResources = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Pagination metadata for each requested resource type'),
       media: z
         .array(
           z.object({
             mediaId: z.string().describe('Media type ID'),
             name: z.string().describe('Media name (e.g. Standard Greeting Card)'),
-            slug: z.string().describe('URL-friendly slug'),
+            slug: z.string().optional().describe('URL-friendly slug, when returned by Cardly'),
             dimensions: z
               .record(z.string(), z.unknown())
               .optional()
@@ -58,7 +66,7 @@ export let listResources = SlateTool.create(spec, {
           z.object({
             fontId: z.string().describe('Font ID'),
             name: z.string().describe('Font name'),
-            slug: z.string().describe('URL-friendly slug'),
+            slug: z.string().optional().describe('URL-friendly slug, when returned by Cardly'),
             category: z
               .string()
               .optional()
@@ -72,7 +80,7 @@ export let listResources = SlateTool.create(spec, {
           z.object({
             styleId: z.string().describe('Writing style ID'),
             name: z.string().describe('Style name'),
-            slug: z.string().describe('URL-friendly slug')
+            slug: z.string().optional().describe('URL-friendly slug, when returned by Cardly')
           })
         )
         .optional()
@@ -93,26 +101,30 @@ export let listResources = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CardlyClient({ token: ctx.auth.token });
     let summaryParts: string[] = [];
+    let pagination: Record<string, unknown> = {};
 
     let media:
       | Array<{
           mediaId: string;
           name: string;
-          slug: string;
+          slug?: string;
           dimensions?: Record<string, unknown>;
           creditCost?: number;
         }>
       | undefined;
     let fonts:
-      | Array<{ fontId: string; name: string; slug: string; category?: string }>
+      | Array<{ fontId: string; name: string; slug?: string; category?: string }>
       | undefined;
-    let writingStyles: Array<{ styleId: string; name: string; slug: string }> | undefined;
+    let writingStyles: Array<{ styleId: string; name: string; slug?: string }> | undefined;
     let doodles:
       | Array<{ doodleId: string; name: string; slug: string; url?: string }>
       | undefined;
 
     if (ctx.input.includeMedia) {
-      let result = await client.listMedia({ limit: ctx.input.limit });
+      let result = await client.listMedia({
+        limit: ctx.input.limit,
+        offset: ctx.input.offset
+      });
       media = result.media.map(m => ({
         mediaId: m.id,
         name: m.name,
@@ -120,12 +132,14 @@ export let listResources = SlateTool.create(spec, {
         dimensions: m.dimensions,
         creditCost: m.creditCost
       }));
+      pagination.media = result.meta;
       summaryParts.push(`**${media.length}** media type(s)`);
     }
 
     if (ctx.input.includeFonts) {
       let result = await client.listFonts({
         limit: ctx.input.limit,
+        offset: ctx.input.offset,
         organisationOnly: ctx.input.organisationOnly
       });
       fonts = result.fonts.map(f => ({
@@ -134,22 +148,28 @@ export let listResources = SlateTool.create(spec, {
         slug: f.slug,
         category: f.category
       }));
+      pagination.fonts = result.meta;
       summaryParts.push(`**${fonts.length}** font(s)`);
     }
 
     if (ctx.input.includeWritingStyles) {
-      let result = await client.listWritingStyles({ limit: ctx.input.limit });
+      let result = await client.listWritingStyles({
+        limit: ctx.input.limit,
+        offset: ctx.input.offset
+      });
       writingStyles = result.styles.map(s => ({
         styleId: s.id,
         name: s.name,
         slug: s.slug
       }));
+      pagination.writingStyles = result.meta;
       summaryParts.push(`**${writingStyles.length}** writing style(s)`);
     }
 
     if (ctx.input.includeDoodles) {
       let result = await client.listDoodles({
         limit: ctx.input.limit,
+        offset: ctx.input.offset,
         organisationOnly: ctx.input.organisationOnly
       });
       doodles = result.doodles.map(d => ({
@@ -158,6 +178,7 @@ export let listResources = SlateTool.create(spec, {
         slug: d.slug,
         url: d.url
       }));
+      pagination.doodles = result.meta;
       summaryParts.push(`**${doodles.length}** doodle(s)`);
     }
 
@@ -167,7 +188,7 @@ export let listResources = SlateTool.create(spec, {
         : 'No resource types were selected. Set at least one include flag to true.';
 
     return {
-      output: { media, fonts, writingStyles, doodles },
+      output: { media, fonts, writingStyles, doodles, pagination },
       message: summary
     };
   })

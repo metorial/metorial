@@ -1,5 +1,7 @@
 export * from './browse-catalog';
 export * from './browse-framing';
+export * from './build-frame';
+export * from './discovery';
 export * from './get-order-status';
 export * from './get-prices';
 export * from './get-product-details';

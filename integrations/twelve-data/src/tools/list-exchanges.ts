@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { optionalString, records } from '../lib/response';
 import { spec } from '../spec';
 
 export let listExchanges = SlateTool.create(spec, {
@@ -25,6 +26,10 @@ Useful for discovering which exchanges are supported and finding exchange codes 
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       exchanges: z
         .array(
           z.object({
@@ -48,20 +53,18 @@ Useful for discovering which exchanges are supported and finding exchange codes 
       country: ctx.input.country
     });
 
-    let exchanges = result.data || result || [];
-    if (!Array.isArray(exchanges)) {
-      exchanges = [];
-    }
+    let exchanges = records(result.data, 'data');
 
     let mapped = exchanges.map((ex: any) => ({
-      name: ex.name,
-      code: ex.code,
-      country: ex.country,
-      timezone: ex.timezone
+      name: optionalString(ex.name),
+      code: optionalString(ex.code),
+      country: optionalString(ex.country),
+      timezone: optionalString(ex.timezone)
     }));
 
     return {
       output: {
+        raw: result,
         exchanges: mapped,
         totalCount: mapped.length
       },

@@ -17,8 +17,8 @@ export let searchStateLocalContracts = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter to contracts captured on or after this date (YYYY-MM-DD)'),
-      startDate: z.string().optional().describe('Filter by contract start date (YYYY-MM-DD)'),
-      endDate: z.string().optional().describe('Filter by contract end date (YYYY-MM-DD)'),
+      startDate: z.string().optional().describe('Earliest contract start date (YYYY-MM-DD)'),
+      endDate: z.string().optional().describe('Latest contract end date (YYYY-MM-DD)'),
       searchId: z
         .string()
         .optional()

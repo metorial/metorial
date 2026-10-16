@@ -1,67 +1,64 @@
-There seem to be multiple products called "Timelink." Based on the Zapier/Pipedream integrations referencing `api.timelink.io`, this appears to be the time tracking tool at timelink.io. Let me get more details about their API.Now let me check the timelink.io website for more details on their API.Now I have enough information to write the specification. Let me compile what I've found:
+# Timelink API integration
 
-- Timelink (timelink.io) is a time tracking tool with a physical touch display panel
-- API base URL: `https://api.timelink.io/api/v1/`
-- Authentication: Bearer token (API token)
-- Resources: Users, Clients, Projects, Services, Time Entries
-- Zapier triggers are marked as "Instant" (webhooks): New Time Entry, Updated Time Entry, Deleted Time Entry
-- Actions: CRUD operations on clients, projects, services, time entries
+Timelink tracks work for clients, projects, services, and users. The current API
+uses `https://api.timelink.io/api/v1` and API tokens created under **My Account >
+API Tokens**. Requests use `Authorization: Bearer <token>`. No OAuth refresh or
+additional connection settings are required.
 
-# Slates Specification for Timelink
+Official references:
 
-## Overview
+- [API setup and token management](https://docs.timelink.io/api)
+- [Interactive API documentation](https://api.timelink.io/documentation)
+- [Published OpenAPI schema](https://api.timelink.io/docs?api-docs.json)
 
-Timelink is a time recording tool that optionally uses a physical touch display as an input device. It is a comprehensive time tracking and management tool designed to help individuals and teams efficiently manage their time and tasks, with features like time logging, project tracking, and detailed reporting. The API is hosted at `https://api.timelink.io/api/v1/`.
+## Current tools
 
-## Authentication
+- `list_records`: discover clients, projects, services, users, or time entries.
+  Accepts documented search, sort, ID, and resource-specific filters. Returns
+  one page, its original pagination metadata when supplied, and the number of
+  records on that page. The published API schema does not specify a page or
+  cursor request parameter; the tool does not claim to traverse all pages.
+- `get_record`: retrieve any of those records by string ID, including services
+  and users.
+- `manage_client_record`, `manage_project_record`, `manage_service_record`:
+  create, update, or permanently delete records. Create requires a name;
+  update and delete require a string ID from `list_records`. Updates use PATCH
+  and send only supplied fields. Nullable fields accept null to clear a value.
+- `manage_time_entry_record`: create, update, or permanently delete time entries.
+  Create requires a user string ID and start time. The end time may be omitted
+  or null for a running entry. Supports client/project/service assignment,
+  billable status, billing timestamp, interruption status, external ID, and
+  temporary ID. Billing time does not represent payment status.
+- `list_active_time_entries`: retrieve a page of running entries.
+- `get_time_entry_fields`: inspect company-specific required entry fields.
+- `get_current_token`: inspect the connected token's identity, abilities, and
+  timestamps. This identifies the credential, rather than a user.
+- `get_company`: identify the company and retrieve its provider-reported contact,
+  subscription, integration, and settings details.
 
-Timelink uses **Bearer Token** authentication via an API token.
+Current resource IDs are strings. Returned records retain provider field names
+and original values, including nullable fields. Mutations require a provider
+success confirmation. Downloads, exports, administrative user changes, image
+uploads, and webhook subscriptions are outside this tool set.
 
-API requests are authenticated by including an `Authorization: Bearer <api_token>` header, where `<api_token>` is the user's API token obtained from the timelink account settings.
+## Compatibility
 
-- **Base URL:** `https://api.timelink.io/api/v1/`
-- **Header:** `Authorization: Bearer <api_token>`
+The 17 earlier numeric-ID tools remain registered and deprecated with their
+original input/output schemas, invocation handlers, and client behavior. Their
+descriptions point to the current replacements. The published current API uses
+string resource IDs, `data` response envelopes, `/timeEntries`, `started_at`,
+`ended_at`, and `ext_tool_id`; these differ from the legacy assumptions.
 
-To authenticate, generate an API token from your timelink account and include it in every API request as a Bearer token in the Authorization header.
+| Earlier tools | Current replacement |
+| --- | --- |
+| `list_users`, `list_clients`, `list_projects`, `list_services`, `search_time_entries` | `list_records` with the corresponding resource |
+| `get_client`, `get_project`, `get_time_entry` | `get_record` with the corresponding resource |
+| `create_client`, `update_client` | `manage_client_record` with create or update |
+| `create_project`, `update_project` | `manage_project_record` with create or update |
+| `create_service`, `update_service` | `manage_service_record` with create or update |
+| `create_time_entry`, `update_time_entry`, `delete_time_entry` | `manage_time_entry_record` with the corresponding action |
 
-## Features
-
-### User Management
-
-Retrieve information about users in the timelink workspace. Users represent team members who record time entries.
-
-### Client Management
-
-Manage clients by listing all clients, creating new clients, retrieving details of a specific client, and updating client details. Clients can be configured with properties including name, information/description, color, acronym, active status, billable flag, and an external ID for syncing with other systems.
-
-### Project Management
-
-Create and manage projects associated with clients. Projects support properties including name, info, color, acronym, active status, billable flag, client assignment, and an external ID. Projects can be searched by name and can be linked to a specific client.
-
-### Service Management
-
-Create and manage services (activity types) that can be associated with time entries. Services have properties including name, information, color, acronym, active status, and an external ID.
-
-### Time Entry Management
-
-Create, update, search, and manage time entries. Time entries represent tracked work periods and include:
-
-- **Required fields:** Start time, end time
-- **Optional fields:** Client ID, project ID, service ID, description, user ID, paid status, billable flag, external ID
-- Time entries can be searched/filtered by date range (after/before), client, project, service, and external ID.
-
-## Events
-
-Timelink supports webhooks for real-time notifications on time entry changes. The available webhook triggers fire instantly when time entry events occur:
-
-### Time Entry Created
-
-Triggers instantly when a new time entry is created in timelink.
-
-### Time Entry Updated
-
-Triggers instantly when an existing time entry is updated in timelink.
-
-### Time Entry Deleted
-
-Triggers instantly when a time entry is deleted from timelink.
+Legacy numeric IDs must not be converted into current ULIDs. Discover current
+IDs with `list_records`. There is no documented current `paid` field; use
+`billedAt` only when recording billing time. The continued availability of legacy
+routes has not been verified.

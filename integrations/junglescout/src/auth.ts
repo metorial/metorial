@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -20,9 +20,16 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let keyName = ctx.input.keyName.trim();
+      let apiKey = ctx.input.apiKey.trim();
+      if (!keyName || !apiKey || /[\r\n]/.test(keyName + apiKey)) {
+        throw createApiServiceError('Enter a valid Jungle Scout key name and API key.', {
+          reason: 'invalid_input'
+        });
+      }
       return {
         output: {
-          token: `${ctx.input.keyName}:${ctx.input.apiKey}`
+          token: `${keyName}:${apiKey}`
         }
       };
     }

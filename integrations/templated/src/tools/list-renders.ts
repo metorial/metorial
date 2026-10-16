@@ -26,6 +26,7 @@ export let listRenders = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       renders: z.array(renderSchema)
     })
   )
@@ -37,6 +38,7 @@ export let listRenders = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: renders,
         renders: items.map((r: any) => ({
           renderId: r.id,
           url: r.url,

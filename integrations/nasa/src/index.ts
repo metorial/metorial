@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   getApod,
+  getApodEntries,
   getCloseApproaches,
   getEarthImagery,
   getEpicImages,
@@ -9,10 +11,13 @@ import {
   getMarsRoverManifest,
   getMarsRoverPhotos,
   getNasaMediaAssets,
+  getNasaMediaMetadata,
+  getNaturalEventCatalog,
   getNaturalEvents,
   getSpaceWeather,
   getTechPortProject,
   lookupSmallBody,
+  queryCloseApproaches,
   queryExoplanets,
   searchAsteroids,
   searchNasaMedia,
@@ -23,11 +28,15 @@ export let provider = Slate.create({
   spec,
   tools: [
     getApod,
+    getApodEntries,
     searchAsteroids,
     getMarsRoverPhotos,
     getMarsRoverManifest,
     getEpicImages,
     getNaturalEvents,
+    getNaturalEventCatalog,
+    getNasaMediaMetadata,
+    queryCloseApproaches,
     getSpaceWeather,
     getEarthImagery,
     searchNasaMedia,
@@ -39,5 +48,6 @@ export let provider = Slate.create({
     getFireballs,
     lookupSmallBody
   ],
+  toolCategories,
   triggers: []
 });

@@ -32,6 +32,13 @@ export let getTask = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let status = await client.getTaskStatus(ctx.input.taskId);
+    if (status.status === 'SUCCESS' && status.file_id) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: client.fileDownloadUrl(status.file_id),
+        headers: { Authorization: `Bearer ${ctx.auth.token}` }
+      });
+    }
 
     return {
       output: {

@@ -10,4 +10,5 @@ export * from './manage-secret';
 export * from './manage-task';
 export * from './manage-telegraf';
 export * from './query-data';
+export { getBucket, getCurrentUser, getDashboard, getTaskRunLogs } from './retrieve-resources';
 export * from './write-data';

@@ -44,10 +44,7 @@ export let createCustomerRequestTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let body: any = {
       serviceDeskId: ctx.input.serviceDeskId,

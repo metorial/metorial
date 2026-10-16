@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ContentClient } from '../lib/client';
+import { ContentClient, optionalString, providerId, providerList } from '../lib/client';
 import { spec } from '../spec';
 
 let mappedLocationSchema = z.object({
@@ -63,10 +63,10 @@ export let mapLocation = SlateTool.create(spec, {
       category: ctx.input.category
     });
 
-    let locations = (result.data || []).map((loc: any) => ({
-      locationId: String(loc.location_id),
+    let locations = providerList(result.data).map((loc: any) => ({
+      locationId: providerId(loc.location_id),
       name: loc.name,
-      distance: loc.distance ? String(loc.distance) : undefined,
+      distance: optionalString(loc.distance),
       bearing: loc.bearing,
       address: loc.address_obj
         ? {

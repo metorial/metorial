@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SubscriptionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,10 +32,12 @@ Only available via the **Subscription API**. Use subscription IDs to target spec
     let { apiType } = ctx.auth;
 
     if (apiType !== 'subscription') {
-      throw new Error('Listing subscriptions is only available via the Subscription API.');
+      throw createApiServiceError(
+        'Listing subscriptions is only available via the Subscription API.'
+      );
     }
 
-    let client = new SubscriptionClient(ctx.auth.token, ctx.auth.apiSecret!);
+    let client = new SubscriptionClient(ctx.auth.token, ctx.auth.apiSecret);
     let subscriptions = await client.listSubscriptions();
 
     return {

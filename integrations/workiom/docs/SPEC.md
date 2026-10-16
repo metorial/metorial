@@ -1,4 +1,4 @@
-# Slates Specification for Workiom
+# Workiom API Capabilities
 
 ## Overview
 
@@ -24,7 +24,7 @@ curl -X GET "https://api.workiom.com/api/services/app/Apps/GetAll" \
 
 You can also obtain an authentication token by using the API's `api/TokenAuth/Authenticate` endpoint. This endpoint accepts user credentials (username/password) and returns a bearer token. The token is then passed via the `Authorization: Bearer {token}` header.
 
-The authentication token allows access to all Workiom apps the user has permissions on. The token expires after 10 hours of generating it.
+The authentication token allows access to Workiom apps the user has permissions on. Reconnect if it expires; no fixed expiry or automatic refresh is assumed.
 
 **Base URL:** `https://api.workiom.com`
 
@@ -54,6 +54,24 @@ To attach a file to a record you need to upload the file to the server, then get
 ### Webhook Subscription Management
 
 You can programmatically create, list, update, and delete webhook subscriptions via the API. Each subscription is scoped to a specific app and list.
+
+The integration exposes all five documented subscription operations: list, get, create, update, and delete. `GetSubscription` and `DeleteSubscription` use the query parameter `subscriptionId`. `UpdateSubscription` receives the subscription's `id`, `appId`, `listId`, `name`, `webHook`, `eventType`, and `isActive` in a JSON body. Updating does not perform a preliminary API read, so write access does not depend on permission to inspect a subscription.
+
+### Response and Pagination Behavior
+
+Query results preserve the provider's record values and summary. `maxResultCount` and `skipCount` are forwarded only when supplied. `totalCount` is returned only when supplied by Workiom; a page length is not presented as the total result count. App, query, and subscription listing outputs also include the complete unwrapped response in `raw`.
+
+HTTP failures and explicit `success: false` or `unAuthorizedRequest: true` envelopes surface Workiom's error details. Accepted responses are not rejected merely because optional metadata is absent. No file-upload or file-download tool is exposed; existing file field values are passed through as record data.
+
+### Identity and Product Scope
+
+This integration covers the Workiom application API and does not need separate product categories. The provider's current session examples document `Session/GetCurrentLoginInformations` in a browser/JWT context with tenant headers. Compatibility with the integration's API-key connections has not been established, so no current-user tool or additional authentication-validation request is added.
+
+### Provider References
+
+- [Workiom API guide](https://help.workiom.com/article/workiom-api-guide)
+- [Workiom webhook subscriptions](https://help.workiom.com/article/workiom-webhooks)
+- [Provider-maintained API/session examples](https://github.com/workiom/workiom-plugin/blob/main/skills/workiom-vibe-apps/SKILL.md)
 
 ## Events
 

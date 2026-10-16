@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let prepareCheckoutTool = SlateTool.create(spec, {
@@ -23,6 +24,7 @@ export let prepareCheckoutTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       paymentOptions: z
         .array(
           z.object({
@@ -90,7 +92,7 @@ export let prepareCheckoutTool = SlateTool.create(spec, {
     let ticketTypes = data.tickettypes?.map((t: any) => ({
       ticketTypeId: t.ticket_type_id,
       ticketTypeName: t.ticket_type_name,
-      ticketTypePrice: t.ticket_type_price,
+      ticketTypePrice: asText(t.ticket_type_price),
       ticketTypeMinLimit: t.ticket_type_min_limit,
       ticketTypeMaxLimit: t.ticket_type_max_limit,
       ticketTypeAvailQuantity: t.ticket_type_avail_quantity,
@@ -102,7 +104,7 @@ export let prepareCheckoutTool = SlateTool.create(spec, {
       questionId: q.question_id,
       questionType: q.question_type,
       questionText: q.question_text,
-      questionChoices: q.question_choices,
+      questionChoices: q.question_choices ?? q.question_choice,
       questionWaiver: q.question_waiver,
       hasSubquestion: q.has_subquestion
     }));
@@ -110,11 +112,12 @@ export let prepareCheckoutTool = SlateTool.create(spec, {
     let taxes = data.tax?.map((t: any) => ({
       taxType: t.tax_type,
       taxName: t.tax_name,
-      taxValue: t.tax_value
+      taxValue: asText(t.tax_value)
     }));
 
     return {
       output: {
+        raw: data,
         paymentOptions,
         ticketTypes,
         questions,

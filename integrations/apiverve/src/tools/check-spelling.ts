@@ -18,6 +18,7 @@ export let checkSpelling = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       passed: z.boolean().describe('Whether the text passed the spell check with no errors'),
       misspellingCount: z.number().describe('Number of misspellings found'),
       corrections: z
@@ -34,32 +35,31 @@ export let checkSpelling = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.checkSpelling(ctx.input.text);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'Spell check failed');
-    }
-
     let data = result.data;
     let output = {
+      rawData: data,
       passed: data.spellPass,
       misspellingCount: data.mispellingsFound,
-      corrections: data.corrections ?? []
+      corrections: data.corrections
     };
 
     if (data.spellPass) {
       return {
-        output,
+        output: client.sanitize(output),
         message: 'No spelling errors found.'
       };
     }
 
-    let correctionList = (data.corrections ?? [])
+    let correctionList = data.corrections
       .slice(0, 5)
       .map(c => `\`${c.word}\` → ${c.suggestions.slice(0, 3).join(', ')}`)
       .join('; ');
 
     return {
-      output,
-      message: `Found **${data.mispellingsFound}** misspelling(s): ${correctionList}.`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `Found **${data.mispellingsFound}** misspelling(s): ${correctionList}.`
+      )
     };
   })
   .build();

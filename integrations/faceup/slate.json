@@ -1,15 +1,13 @@
 {
   "name": "@metorial/faceup",
-  "description": "Monitor and manage whistleblower reports and compliance cases. Query report statistics by date range, retrieve case details and statuses, access internal investigator comments, and track anonymous messages between reporters and case handlers. Integrate case data with external project management and collaboration tools for automated task creation and alerting.",
+  "description": "Query FaceUp reporting statistics with date and classification filters, retrieve report metadata, and create or update employee directory entries by email.",
   "categories": ["hr-and-recruiting", "legal-and-compliance", "task-and-project-management"],
   "skills": [
     "query report statistics",
-    "monitor whistleblower reports",
-    "track case messages",
-    "access internal comments",
-    "receive new report alerts",
-    "receive new message alerts",
-    "receive new comment alerts",
-    "integrate case management"
+    "filter compliance analytics",
+    "retrieve report metadata",
+    "paginate reports",
+    "synchronize employee directory",
+    "update employee status"
   ]
 }

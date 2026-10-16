@@ -60,6 +60,10 @@ export let addContribution = SlateTool.create(spec, {
     let personJson: string | undefined;
     if (ctx.input.donorFirstName || ctx.input.donorLastName || ctx.input.donorEmail) {
       let person: Record<string, string> = {};
+      let name = [ctx.input.donorFirstName, ctx.input.donorLastName]
+        .filter(value => value !== undefined && value !== '')
+        .join(' ');
+      if (name) person.name = name;
       if (ctx.input.donorFirstName) person.first = ctx.input.donorFirstName;
       if (ctx.input.donorLastName) person.last = ctx.input.donorLastName;
       if (ctx.input.donorEmail) person.email = ctx.input.donorEmail;

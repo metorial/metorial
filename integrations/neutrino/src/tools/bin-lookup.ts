@@ -42,7 +42,8 @@ export let binLookupTool = SlateTool.create(spec, {
       ipCountry: z.string().describe('Customer IP country (if customerIp provided)'),
       ipBlocklisted: z
         .boolean()
-        .describe('Whether customer IP is blocklisted (if customerIp provided)')
+        .describe('Whether customer IP is blocklisted (if customerIp provided)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,21 +59,22 @@ export let binLookupTool = SlateTool.create(spec, {
 
     return {
       output: {
-        valid: result.valid ?? false,
-        binNumber: result.binNumber ?? ctx.input.binNumber,
-        cardBrand: result.cardBrand ?? '',
-        cardType: result.cardType ?? '',
-        cardCategory: result.cardCategory ?? '',
-        issuer: result.issuer ?? '',
-        issuerWebsite: result.issuerWebsite ?? '',
-        issuerPhone: result.issuerPhone ?? '',
-        country: result.country ?? '',
-        countryCode: result.countryCode ?? '',
-        isCommercial: result.isCommercial ?? false,
-        isPrepaid: result.isPrepaid ?? false,
-        ipMatchesBin: result.ipMatchesBin ?? false,
-        ipCountry: result.ipCountry ?? '',
-        ipBlocklisted: result.ipBlocklisted ?? false
+        raw: result.raw,
+        valid: result.valid,
+        binNumber: result.binNumber,
+        cardBrand: result.cardBrand,
+        cardType: result.cardType,
+        cardCategory: result.cardCategory,
+        issuer: result.issuer,
+        issuerWebsite: result.issuerWebsite,
+        issuerPhone: result.issuerPhone,
+        country: result.country,
+        countryCode: result.countryCode,
+        isCommercial: result.isCommercial,
+        isPrepaid: result.isPrepaid,
+        ipMatchesBin: result.ipMatchesBin,
+        ipCountry: result.ipCountry,
+        ipBlocklisted: result.ipBlocklisted
       },
       message: result.valid
         ? `**${result.cardBrand} ${result.cardType}** (${result.cardCategory}) issued by ${result.issuer || 'unknown'} in ${result.country}.${ctx.input.customerIp ? (result.ipMatchesBin ? ' IP matches BIN country.' : ' ⚠️ IP does NOT match BIN country.') : ''}${result.ipBlocklisted ? ' ⚠️ Customer IP is blocklisted.' : ''}`

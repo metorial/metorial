@@ -1,8 +1,13 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export type Environment = 'production' | 'sandbox';
 
-let getBaseUrl = (environment: Environment): string => {
+export let getBaseUrl = (environment: Environment): string => {
   return environment === 'sandbox'
     ? 'https://api.sandbox.freeagent.com/v2'
     : 'https://api.freeagent.com/v2';
@@ -14,7 +19,66 @@ let extractId = (url: string): string => {
 };
 
 let buildResourceUrl = (baseUrl: string, resource: string, id: string): string => {
-  return `${baseUrl}/${resource}/${id}`;
+  let prefix = `${baseUrl}/${resource}/`;
+  if (id.startsWith(prefix) && /^[^/?#]+$/.test(id.slice(prefix.length))) return id;
+  if (!id.trim() || /[/:?#]/.test(id)) {
+    throw createApiServiceError(
+      `Provide a ${resource} ID or its URL in the selected FreeAgent environment.`
+    );
+  }
+  return `${prefix}${encodeURIComponent(id)}`;
+};
+
+export let createFreeAgentHttp = (environment: Environment = 'production', token?: string) => {
+  if (token !== undefined && !token.trim()) {
+    throw createApiServiceError('Reconnect FreeAgent: the access token is missing.');
+  }
+  let http = createAuthenticatedAxios({
+    baseURL: getBaseUrl(environment),
+    authHeader: token ? { value: `Bearer ${token}` } : undefined,
+    headers: { Accept: 'application/json' },
+    timeout: 30000,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'FreeAgent',
+        reason: 'freeagent_api_error',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        detailKeys: ['message', 'error', 'error_description'],
+        nestedKeys: ['errors']
+      })
+  });
+  http.interceptors.request.use(request => {
+    for (let [key, maximum] of [
+      ['page', Number.MAX_SAFE_INTEGER],
+      ['per_page', 100]
+    ] as const) {
+      let value = request.params?.[key];
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > maximum)
+      ) {
+        throw createApiServiceError(
+          `FreeAgent ${key} must be a whole number from 1 to ${maximum}.`
+        );
+      }
+    }
+    return request;
+  });
+  return http;
+};
+
+export let createClient = (ctx: {
+  auth: { token: string; environment?: Environment };
+  config: unknown;
+}) => {
+  let legacyEnvironment: Environment =
+    isApiErrorRecord(ctx.config) && ctx.config.environment === 'sandbox'
+      ? 'sandbox'
+      : 'production';
+  return new FreeAgentClient({
+    token: ctx.auth.token,
+    environment: ctx.auth.environment ?? legacyEnvironment
+  });
 };
 
 export class FreeAgentClient {
@@ -23,14 +87,46 @@ export class FreeAgentClient {
 
   constructor(config: { token: string; environment?: Environment }) {
     this.baseUrl = getBaseUrl(config.environment || 'production');
-    this.http = createAxios({
-      baseURL: this.baseUrl,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
+    this.http = createFreeAgentHttp(config.environment || 'production', config.token);
+  }
+
+  private requireCollection(data: unknown, key: string) {
+    if (!isApiErrorRecord(data) || !Array.isArray(data[key])) {
+      throw createApiServiceError(`FreeAgent returned an invalid ${key} collection.`);
+    }
+    return data[key] as Record<string, any>[];
+  }
+
+  private async readAfterUpdate(resource: string, id: string, read: () => Promise<any>) {
+    try {
+      let result = await read();
+      if (!isApiErrorRecord(result)) {
+        throw createApiServiceError(`FreeAgent did not return the updated ${resource}.`);
       }
-    });
+      return result;
+    } catch (error) {
+      throw createApiServiceError(
+        `FreeAgent accepted the ${resource} update for ${id}, but reading its current state failed. Do not repeat the update automatically; retrieve the resource to verify it.`,
+        { reason: 'freeagent_update_readback', parent: error }
+      );
+    }
+  }
+
+  async getInvoicePdf(invoiceId: string) {
+    let response = await this.http.get(`/invoices/${encodeURIComponent(invoiceId)}/pdf`);
+    let content = response.data?.pdf?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw createApiServiceError('FreeAgent did not return PDF content for this invoice.');
+    }
+    let compact = content.replace(/\s/g, '');
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(compact) || compact.length % 4 !== 0) {
+      throw createApiServiceError('FreeAgent returned invalid PDF content.');
+    }
+    let bytes = Buffer.from(compact, 'base64');
+    if (!bytes.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+      throw createApiServiceError('FreeAgent returned content that is not a PDF.');
+    }
+    return bytes;
   }
 
   // ==================== Contacts ====================
@@ -46,15 +142,15 @@ export class FreeAgentClient {
     if (params?.view) queryParams.view = params.view;
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.updatedSince) queryParams.updated_since = params.updatedSince;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/contacts', { params: queryParams });
-    return response.data.contacts || [];
+    return this.requireCollection(response.data, 'contacts');
   }
 
   async getContact(contactId: string) {
-    let response = await this.http.get(`/contacts/${contactId}`);
+    let response = await this.http.get(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data.contact;
   }
 
@@ -64,12 +160,17 @@ export class FreeAgentClient {
   }
 
   async updateContact(contactId: string, contact: Record<string, any>) {
-    let response = await this.http.put(`/contacts/${contactId}`, { contact });
-    return response.data.contact;
+    let response = await this.http.put(`/contacts/${encodeURIComponent(contactId)}`, {
+      contact
+    });
+    return (
+      response.data?.contact ??
+      this.readAfterUpdate('contact', contactId, () => this.getContact(contactId))
+    );
   }
 
   async deleteContact(contactId: string) {
-    await this.http.delete(`/contacts/${contactId}`);
+    await this.http.delete(`/contacts/${encodeURIComponent(contactId)}`);
   }
 
   // ==================== Invoices ====================
@@ -81,11 +182,23 @@ export class FreeAgentClient {
     contactId?: string;
     projectId?: string;
     nestedItems?: boolean;
+    months?: number;
     page?: number;
     perPage?: number;
   }) {
     let queryParams: Record<string, string> = {};
-    if (params?.view) queryParams.view = params.view;
+    if (params?.view === 'last_N_months') {
+      if (
+        !Number.isSafeInteger(params.months) ||
+        params.months === undefined ||
+        params.months < 1
+      ) {
+        throw createApiServiceError(
+          'Provide months as a positive whole number when view is last_N_months.'
+        );
+      }
+      queryParams.view = `last_${params.months}_months`;
+    } else if (params?.view) queryParams.view = params.view;
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.updatedSince) queryParams.updated_since = params.updatedSince;
     if (params?.contactId)
@@ -93,51 +206,79 @@ export class FreeAgentClient {
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
     if (params?.nestedItems) queryParams.nested_invoice_items = 'true';
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/invoices', { params: queryParams });
-    return response.data.invoices || [];
+    return this.requireCollection(response.data, 'invoices');
   }
 
   async getInvoice(invoiceId: string) {
-    let response = await this.http.get(`/invoices/${invoiceId}`);
+    let response = await this.http.get(`/invoices/${encodeURIComponent(invoiceId)}`);
     return response.data.invoice;
   }
 
   async createInvoice(invoice: Record<string, any>) {
-    if (invoice.contact && !invoice.contact.startsWith('http')) {
+    if (invoice.contact) {
       invoice.contact = buildResourceUrl(this.baseUrl, 'contacts', invoice.contact);
     }
-    if (invoice.project && !invoice.project.startsWith('http')) {
+    if (invoice.project) {
       invoice.project = buildResourceUrl(this.baseUrl, 'projects', invoice.project);
+    }
+    if (Array.isArray(invoice.invoice_items)) {
+      invoice.invoice_items = invoice.invoice_items.map((item: Record<string, any>) => ({
+        ...item,
+        ...(item.category
+          ? { category: buildResourceUrl(this.baseUrl, 'categories', item.category) }
+          : {})
+      }));
     }
     let response = await this.http.post('/invoices', { invoice });
     return response.data.invoice;
   }
 
   async updateInvoice(invoiceId: string, invoice: Record<string, any>) {
-    if (invoice.contact && !invoice.contact.startsWith('http')) {
+    if (invoice.contact) {
       invoice.contact = buildResourceUrl(this.baseUrl, 'contacts', invoice.contact);
     }
-    if (invoice.project && !invoice.project.startsWith('http')) {
+    if (invoice.project) {
       invoice.project = buildResourceUrl(this.baseUrl, 'projects', invoice.project);
     }
-    let response = await this.http.put(`/invoices/${invoiceId}`, { invoice });
-    return response.data.invoice;
+    if (Array.isArray(invoice.invoice_items)) {
+      invoice.invoice_items = invoice.invoice_items.map((item: Record<string, any>) => ({
+        ...item,
+        ...(item.category
+          ? { category: buildResourceUrl(this.baseUrl, 'categories', item.category) }
+          : {})
+      }));
+    }
+    let response = await this.http.put(`/invoices/${encodeURIComponent(invoiceId)}`, {
+      invoice
+    });
+    return (
+      response.data?.invoice ??
+      this.readAfterUpdate('invoice', invoiceId, () => this.getInvoice(invoiceId))
+    );
   }
 
   async deleteInvoice(invoiceId: string) {
-    await this.http.delete(`/invoices/${invoiceId}`);
+    await this.http.delete(`/invoices/${encodeURIComponent(invoiceId)}`);
   }
 
   async transitionInvoice(invoiceId: string, transition: string) {
-    let response = await this.http.put(`/invoices/${invoiceId}/transitions/${transition}`);
-    return response.data.invoice;
+    let response = await this.http.put(
+      `/invoices/${encodeURIComponent(invoiceId)}/transitions/${transition}`
+    );
+    return (
+      response.data?.invoice ??
+      this.readAfterUpdate('invoice', invoiceId, () => this.getInvoice(invoiceId))
+    );
   }
 
   async emailInvoice(invoiceId: string, emailParams: Record<string, any>) {
-    await this.http.post(`/invoices/${invoiceId}/send_email`, { invoice: emailParams });
+    await this.http.post(`/invoices/${encodeURIComponent(invoiceId)}/send_email`, {
+      invoice: emailParams
+    });
   }
 
   // ==================== Estimates ====================
@@ -159,41 +300,59 @@ export class FreeAgentClient {
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
     if (params?.nestedItems) queryParams.nested_estimate_items = 'true';
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/estimates', { params: queryParams });
-    return response.data.estimates || [];
+    return this.requireCollection(response.data, 'estimates');
   }
 
   async getEstimate(estimateId: string) {
-    let response = await this.http.get(`/estimates/${estimateId}`);
+    let response = await this.http.get(`/estimates/${encodeURIComponent(estimateId)}`);
     return response.data.estimate;
   }
 
   async createEstimate(estimate: Record<string, any>) {
-    if (estimate.contact && !estimate.contact.startsWith('http')) {
+    if (estimate.contact) {
       estimate.contact = buildResourceUrl(this.baseUrl, 'contacts', estimate.contact);
     }
-    if (estimate.project && !estimate.project.startsWith('http')) {
+    if (estimate.project) {
       estimate.project = buildResourceUrl(this.baseUrl, 'projects', estimate.project);
+    }
+    if (Array.isArray(estimate.estimate_items)) {
+      estimate.estimate_items = estimate.estimate_items.map((item: Record<string, any>) => ({
+        ...item,
+        ...(item.category
+          ? { category: buildResourceUrl(this.baseUrl, 'categories', item.category) }
+          : {})
+      }));
     }
     let response = await this.http.post('/estimates', { estimate });
     return response.data.estimate;
   }
 
   async updateEstimate(estimateId: string, estimate: Record<string, any>) {
-    let response = await this.http.put(`/estimates/${estimateId}`, { estimate });
-    return response.data.estimate;
+    let response = await this.http.put(`/estimates/${encodeURIComponent(estimateId)}`, {
+      estimate
+    });
+    return (
+      response.data?.estimate ??
+      this.readAfterUpdate('estimate', estimateId, () => this.getEstimate(estimateId))
+    );
   }
 
   async deleteEstimate(estimateId: string) {
-    await this.http.delete(`/estimates/${estimateId}`);
+    await this.http.delete(`/estimates/${encodeURIComponent(estimateId)}`);
   }
 
   async transitionEstimate(estimateId: string, transition: string) {
-    let response = await this.http.put(`/estimates/${estimateId}/transitions/${transition}`);
-    return response.data.estimate;
+    let response = await this.http.put(
+      `/estimates/${encodeURIComponent(estimateId)}/transitions/${transition}`
+    );
+    return (
+      response.data?.estimate ??
+      this.readAfterUpdate('estimate', estimateId, () => this.getEstimate(estimateId))
+    );
   }
 
   // ==================== Credit Notes ====================
@@ -215,20 +374,20 @@ export class FreeAgentClient {
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
     if (params?.sort) queryParams.sort = params.sort;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/credit_notes', { params: queryParams });
-    return response.data.credit_notes || [];
+    return this.requireCollection(response.data, 'credit_notes');
   }
 
   async getCreditNote(creditNoteId: string) {
-    let response = await this.http.get(`/credit_notes/${creditNoteId}`);
+    let response = await this.http.get(`/credit_notes/${encodeURIComponent(creditNoteId)}`);
     return response.data.credit_note;
   }
 
   async createCreditNote(creditNote: Record<string, any>) {
-    if (creditNote.contact && !creditNote.contact.startsWith('http')) {
+    if (creditNote.contact) {
       creditNote.contact = buildResourceUrl(this.baseUrl, 'contacts', creditNote.contact);
     }
     let response = await this.http.post('/credit_notes', { credit_note: creditNote });
@@ -236,7 +395,7 @@ export class FreeAgentClient {
   }
 
   async deleteCreditNote(creditNoteId: string) {
-    await this.http.delete(`/credit_notes/${creditNoteId}`);
+    await this.http.delete(`/credit_notes/${encodeURIComponent(creditNoteId)}`);
   }
 
   // ==================== Expenses ====================
@@ -257,36 +416,50 @@ export class FreeAgentClient {
     if (params?.updatedSince) queryParams.updated_since = params.updatedSince;
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/expenses', { params: queryParams });
-    return response.data.expenses || [];
+    return this.requireCollection(response.data, 'expenses');
   }
 
   async getExpense(expenseId: string) {
-    let response = await this.http.get(`/expenses/${expenseId}`);
+    let response = await this.http.get(`/expenses/${encodeURIComponent(expenseId)}`);
     return response.data.expense;
   }
 
   async createExpense(expense: Record<string, any>) {
-    if (expense.user && !expense.user.startsWith('http')) {
+    if (expense.user) {
       expense.user = buildResourceUrl(this.baseUrl, 'users', expense.user);
     }
-    if (expense.project && !expense.project.startsWith('http')) {
+    if (expense.project) {
       expense.project = buildResourceUrl(this.baseUrl, 'projects', expense.project);
+    }
+    if (expense.category && expense.category !== 'Mileage') {
+      expense.category = buildResourceUrl(this.baseUrl, 'categories', expense.category);
     }
     let response = await this.http.post('/expenses', { expense });
     return response.data.expense;
   }
 
   async updateExpense(expenseId: string, expense: Record<string, any>) {
-    let response = await this.http.put(`/expenses/${expenseId}`, { expense });
-    return response.data.expense;
+    if (expense.category && expense.category !== 'Mileage') {
+      expense.category = buildResourceUrl(this.baseUrl, 'categories', expense.category);
+    }
+    if (expense.project)
+      expense.project = buildResourceUrl(this.baseUrl, 'projects', expense.project);
+    if (expense.user) expense.user = buildResourceUrl(this.baseUrl, 'users', expense.user);
+    let response = await this.http.put(`/expenses/${encodeURIComponent(expenseId)}`, {
+      expense
+    });
+    return (
+      response.data?.expense ??
+      this.readAfterUpdate('expense', expenseId, () => this.getExpense(expenseId))
+    );
   }
 
   async deleteExpense(expenseId: string) {
-    await this.http.delete(`/expenses/${expenseId}`);
+    await this.http.delete(`/expenses/${encodeURIComponent(expenseId)}`);
   }
 
   // ==================== Projects ====================
@@ -303,20 +476,20 @@ export class FreeAgentClient {
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.contactId)
       queryParams.contact = buildResourceUrl(this.baseUrl, 'contacts', params.contactId);
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/projects', { params: queryParams });
-    return response.data.projects || [];
+    return this.requireCollection(response.data, 'projects');
   }
 
   async getProject(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}`);
+    let response = await this.http.get(`/projects/${encodeURIComponent(projectId)}`);
     return response.data.project;
   }
 
   async createProject(project: Record<string, any>) {
-    if (project.contact && !project.contact.startsWith('http')) {
+    if (project.contact) {
       project.contact = buildResourceUrl(this.baseUrl, 'contacts', project.contact);
     }
     let response = await this.http.post('/projects', { project });
@@ -324,15 +497,20 @@ export class FreeAgentClient {
   }
 
   async updateProject(projectId: string, project: Record<string, any>) {
-    if (project.contact && !project.contact.startsWith('http')) {
+    if (project.contact) {
       project.contact = buildResourceUrl(this.baseUrl, 'contacts', project.contact);
     }
-    let response = await this.http.put(`/projects/${projectId}`, { project });
-    return response.data.project;
+    let response = await this.http.put(`/projects/${encodeURIComponent(projectId)}`, {
+      project
+    });
+    return (
+      response.data?.project ??
+      this.readAfterUpdate('project', projectId, () => this.getProject(projectId))
+    );
   }
 
   async deleteProject(projectId: string) {
-    await this.http.delete(`/projects/${projectId}`);
+    await this.http.delete(`/projects/${encodeURIComponent(projectId)}`);
   }
 
   // ==================== Tasks ====================
@@ -351,15 +529,15 @@ export class FreeAgentClient {
     if (params?.updatedSince) queryParams.updated_since = params.updatedSince;
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/tasks', { params: queryParams });
-    return response.data.tasks || [];
+    return this.requireCollection(response.data, 'tasks');
   }
 
   async getTask(taskId: string) {
-    let response = await this.http.get(`/tasks/${taskId}`);
+    let response = await this.http.get(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data.task;
   }
 
@@ -375,12 +553,14 @@ export class FreeAgentClient {
   }
 
   async updateTask(taskId: string, task: Record<string, any>) {
-    let response = await this.http.put(`/tasks/${taskId}`, { task });
-    return response.data.task;
+    let response = await this.http.put(`/tasks/${encodeURIComponent(taskId)}`, { task });
+    return (
+      response.data?.task ?? this.readAfterUpdate('task', taskId, () => this.getTask(taskId))
+    );
   }
 
   async deleteTask(taskId: string) {
-    await this.http.delete(`/tasks/${taskId}`);
+    await this.http.delete(`/tasks/${encodeURIComponent(taskId)}`);
   }
 
   // ==================== Timeslips ====================
@@ -407,26 +587,26 @@ export class FreeAgentClient {
       queryParams.task = buildResourceUrl(this.baseUrl, 'tasks', params.taskId);
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/timeslips', { params: queryParams });
-    return response.data.timeslips || [];
+    return this.requireCollection(response.data, 'timeslips');
   }
 
   async getTimeslip(timeslipId: string) {
-    let response = await this.http.get(`/timeslips/${timeslipId}`);
+    let response = await this.http.get(`/timeslips/${encodeURIComponent(timeslipId)}`);
     return response.data.timeslip;
   }
 
   async createTimeslip(timeslip: Record<string, any>) {
-    if (timeslip.user && !timeslip.user.startsWith('http')) {
+    if (timeslip.user) {
       timeslip.user = buildResourceUrl(this.baseUrl, 'users', timeslip.user);
     }
-    if (timeslip.task && !timeslip.task.startsWith('http')) {
+    if (timeslip.task) {
       timeslip.task = buildResourceUrl(this.baseUrl, 'tasks', timeslip.task);
     }
-    if (timeslip.project && !timeslip.project.startsWith('http')) {
+    if (timeslip.project) {
       timeslip.project = buildResourceUrl(this.baseUrl, 'projects', timeslip.project);
     }
     let response = await this.http.post('/timeslips', { timeslip });
@@ -434,21 +614,28 @@ export class FreeAgentClient {
   }
 
   async updateTimeslip(timeslipId: string, timeslip: Record<string, any>) {
-    let response = await this.http.put(`/timeslips/${timeslipId}`, { timeslip });
-    return response.data.timeslip;
+    let response = await this.http.put(`/timeslips/${encodeURIComponent(timeslipId)}`, {
+      timeslip
+    });
+    return (
+      response.data?.timeslip ??
+      this.readAfterUpdate('timeslip', timeslipId, () => this.getTimeslip(timeslipId))
+    );
   }
 
   async deleteTimeslip(timeslipId: string) {
-    await this.http.delete(`/timeslips/${timeslipId}`);
+    await this.http.delete(`/timeslips/${encodeURIComponent(timeslipId)}`);
   }
 
   async startTimer(timeslipId: string) {
-    let response = await this.http.post(`/timeslips/${timeslipId}/timer`);
+    let response = await this.http.post(`/timeslips/${encodeURIComponent(timeslipId)}/timer`);
     return response.data.timeslip;
   }
 
   async stopTimer(timeslipId: string) {
-    let response = await this.http.delete(`/timeslips/${timeslipId}/timer`);
+    let response = await this.http.delete(
+      `/timeslips/${encodeURIComponent(timeslipId)}/timer`
+    );
     return response.data.timeslip;
   }
 
@@ -457,15 +644,15 @@ export class FreeAgentClient {
   async listBankAccounts(params?: { view?: string; page?: number; perPage?: number }) {
     let queryParams: Record<string, string> = {};
     if (params?.view) queryParams.view = params.view;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/bank_accounts', { params: queryParams });
-    return response.data.bank_accounts || [];
+    return this.requireCollection(response.data, 'bank_accounts');
   }
 
   async getBankAccount(bankAccountId: string) {
-    let response = await this.http.get(`/bank_accounts/${bankAccountId}`);
+    let response = await this.http.get(`/bank_accounts/${encodeURIComponent(bankAccountId)}`);
     return response.data.bank_account;
   }
 
@@ -475,14 +662,19 @@ export class FreeAgentClient {
   }
 
   async updateBankAccount(bankAccountId: string, bankAccount: Record<string, any>) {
-    let response = await this.http.put(`/bank_accounts/${bankAccountId}`, {
+    let response = await this.http.put(`/bank_accounts/${encodeURIComponent(bankAccountId)}`, {
       bank_account: bankAccount
     });
-    return response.data.bank_account;
+    return (
+      response.data?.bank_account ??
+      this.readAfterUpdate('bank_account', bankAccountId, () =>
+        this.getBankAccount(bankAccountId)
+      )
+    );
   }
 
   async deleteBankAccount(bankAccountId: string) {
-    await this.http.delete(`/bank_accounts/${bankAccountId}`);
+    await this.http.delete(`/bank_accounts/${encodeURIComponent(bankAccountId)}`);
   }
 
   // ==================== Bank Transactions ====================
@@ -505,15 +697,17 @@ export class FreeAgentClient {
     if (params?.fromDate) queryParams.from_date = params.fromDate;
     if (params?.toDate) queryParams.to_date = params.toDate;
     if (params?.updatedSince) queryParams.updated_since = params.updatedSince;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/bank_transactions', { params: queryParams });
-    return response.data.bank_transactions || [];
+    return this.requireCollection(response.data, 'bank_transactions');
   }
 
   async getBankTransaction(transactionId: string) {
-    let response = await this.http.get(`/bank_transactions/${transactionId}`);
+    let response = await this.http.get(
+      `/bank_transactions/${encodeURIComponent(transactionId)}`
+    );
     return response.data.bank_transaction;
   }
 
@@ -540,36 +734,46 @@ export class FreeAgentClient {
     if (params?.projectId)
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
     if (params?.nestedItems) queryParams.nested_bill_items = 'true';
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/bills', { params: queryParams });
-    return response.data.bills || [];
+    return this.requireCollection(response.data, 'bills');
   }
 
   async getBill(billId: string) {
-    let response = await this.http.get(`/bills/${billId}`);
+    let response = await this.http.get(`/bills/${encodeURIComponent(billId)}`);
     return response.data.bill;
   }
 
   async createBill(bill: Record<string, any>) {
-    if (bill.contact && !bill.contact.startsWith('http')) {
+    if (bill.contact) {
       bill.contact = buildResourceUrl(this.baseUrl, 'contacts', bill.contact);
     }
-    if (bill.project && !bill.project.startsWith('http')) {
+    if (bill.project) {
       bill.project = buildResourceUrl(this.baseUrl, 'projects', bill.project);
+    }
+    if (Array.isArray(bill.bill_items)) {
+      bill.bill_items = bill.bill_items.map((item: Record<string, any>) => ({
+        ...item,
+        ...(item.category
+          ? { category: buildResourceUrl(this.baseUrl, 'categories', item.category) }
+          : {})
+      }));
     }
     let response = await this.http.post('/bills', { bill });
     return response.data.bill;
   }
 
   async updateBill(billId: string, bill: Record<string, any>) {
-    let response = await this.http.put(`/bills/${billId}`, { bill });
-    return response.data.bill;
+    let response = await this.http.put(`/bills/${encodeURIComponent(billId)}`, { bill });
+    return (
+      response.data?.bill ?? this.readAfterUpdate('bill', billId, () => this.getBill(billId))
+    );
   }
 
   async deleteBill(billId: string) {
-    await this.http.delete(`/bills/${billId}`);
+    await this.http.delete(`/bills/${encodeURIComponent(billId)}`);
   }
 
   // ==================== Users ====================
@@ -577,15 +781,15 @@ export class FreeAgentClient {
   async listUsers(params?: { view?: string; page?: number; perPage?: number }) {
     let queryParams: Record<string, string> = {};
     if (params?.view) queryParams.view = params.view;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/users', { params: queryParams });
-    return response.data.users || [];
+    return this.requireCollection(response.data, 'users');
   }
 
   async getUser(userId: string) {
-    let response = await this.http.get(`/users/${userId}`);
+    let response = await this.http.get(`/users/${encodeURIComponent(userId)}`);
     return response.data.user;
   }
 
@@ -603,7 +807,7 @@ export class FreeAgentClient {
 
   async getTaxTimeline() {
     let response = await this.http.get('/company/tax_timeline');
-    return response.data.timeline_items || [];
+    return this.requireCollection(response.data, 'timeline_items');
   }
 
   // ==================== Categories ====================
@@ -617,7 +821,7 @@ export class FreeAgentClient {
   }
 
   async getCategory(nominalCode: string) {
-    let response = await this.http.get(`/categories/${nominalCode}`);
+    let response = await this.http.get(`/categories/${encodeURIComponent(nominalCode)}`);
     return response.data.category;
   }
 
@@ -626,15 +830,17 @@ export class FreeAgentClient {
   async listRecurringInvoices(params?: { view?: string; page?: number; perPage?: number }) {
     let queryParams: Record<string, string> = {};
     if (params?.view) queryParams.view = params.view;
-    if (params?.page) queryParams.page = String(params.page);
-    if (params?.perPage) queryParams.per_page = String(params.perPage);
+    if (params?.page !== undefined) queryParams.page = String(params.page);
+    if (params?.perPage !== undefined) queryParams.per_page = String(params.perPage);
 
     let response = await this.http.get('/recurring_invoices', { params: queryParams });
-    return response.data.recurring_invoices || [];
+    return this.requireCollection(response.data, 'recurring_invoices');
   }
 
   async getRecurringInvoice(recurringInvoiceId: string) {
-    let response = await this.http.get(`/recurring_invoices/${recurringInvoiceId}`);
+    let response = await this.http.get(
+      `/recurring_invoices/${encodeURIComponent(recurringInvoiceId)}`
+    );
     return response.data.recurring_invoice;
   }
 
@@ -680,7 +886,7 @@ export class FreeAgentClient {
       queryParams.project = buildResourceUrl(this.baseUrl, 'projects', params.projectId);
 
     let response = await this.http.get('/notes', { params: queryParams });
-    return response.data.notes || [];
+    return this.requireCollection(response.data, 'notes');
   }
 
   async createNote(params: { contactId?: string; projectId?: string; note: string }) {
@@ -699,7 +905,7 @@ export class FreeAgentClient {
   }
 
   async deleteNote(noteId: string) {
-    await this.http.delete(`/notes/${noteId}`);
+    await this.http.delete(`/notes/${encodeURIComponent(noteId)}`);
   }
 }
 

@@ -13,6 +13,7 @@ export * from './list-customers';
 export * from './list-employees';
 export * from './list-items';
 export * from './list-payment-types';
+export { listPosDevices } from './list-pos-devices';
 export * from './list-receipts';
 export * from './list-shifts';
 export * from './list-stores';

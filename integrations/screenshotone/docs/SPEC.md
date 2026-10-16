@@ -1,4 +1,4 @@
-# Slates Specification for ScreenshotOne
+# ScreenshotOne Integration
 
 ## Overview
 

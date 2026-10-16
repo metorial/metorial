@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let categorySchema = z.object({
   categoryId: z.string().describe('Unique ID of the category'),
-  name: z.string().describe('Name of the category')
+  name: z.string().optional().describe('Name of the category')
 });
 
 export let listCardCategories = SlateTool.create(spec, {
@@ -31,7 +32,7 @@ export let listCardCategories = SlateTool.create(spec, {
 
     let categories = rawCategories.map((c: any) => ({
       categoryId: String(c.id),
-      name: c.name ?? ''
+      name: responseString(c.name, 'category name', true)
     }));
 
     return {

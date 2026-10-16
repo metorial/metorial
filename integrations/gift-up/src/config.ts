@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     testMode: z
       .boolean()
       .default(false)
-      .describe('Enable test mode to operate against sandbox data without affecting live data')
+      .describe(
+        'Use test data on supported gift card, order, and report endpoints. Catalog and account settings are shared with live mode.'
+      )
   })
 );

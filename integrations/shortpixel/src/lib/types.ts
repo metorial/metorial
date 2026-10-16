@@ -49,24 +49,24 @@ export interface OptimizationResultError {
 export type OptimizationResult = OptimizationResultSuccess | OptimizationResultError;
 
 export interface ApiStatusResponse {
-  APICallsMade: number;
-  APICallsQuota: number;
-  APICallsMadeOneTime: number;
-  APICallsQuotaOneTime: number;
-  APICallsMadeNumeric: number;
-  APICallsQuotaNumeric: number;
+  APICallsMade: number | string;
+  APICallsQuota: number | string;
+  APICallsMadeOneTime: number | string;
+  APICallsQuotaOneTime: number | string;
+  APICallsMadeNumeric?: number | string;
+  APICallsQuotaNumeric?: number | string;
   DomainCount?: number;
   [key: string]: unknown;
 }
 
 export interface DomainStatusResponse {
-  Status: number;
+  Status: number | string;
   QuotaExceeded?: boolean;
   [key: string]: unknown;
 }
 
 export interface DomainCdnUsageResponse {
-  PaidAPICalls?: number;
-  PaidAPICallsOneTime?: number;
+  PaidAPICalls?: number | string;
+  PaidAPICallsOneTime?: number | string;
   [key: string]: unknown;
 }

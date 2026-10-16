@@ -4,7 +4,8 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      accountId: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -14,14 +15,22 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .trim()
+        .min(1)
+        .describe('Your SegMetrics API key. Open the gear menu, then Account Settings.'),
+      accountId: z
+        .string()
+        .trim()
+        .min(1)
         .describe(
-          'Your SegMetrics API Key (22 characters). Found in your Account Settings page.'
+          'Account ID paired with this API key. Open the gear menu, then Account Settings.'
         )
     }),
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          accountId: ctx.input.accountId
         }
       };
     }

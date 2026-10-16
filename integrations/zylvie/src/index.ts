@@ -6,6 +6,8 @@ import {
   deleteCoupon,
   deleteProduct,
   getAccount,
+  getCouponEligibility,
+  grantCouponEligibility,
   listCoupons,
   redeemLicenseKey,
   refundLicenseKey,
@@ -28,7 +30,9 @@ export let provider = Slate.create({
     redeemLicenseKey,
     refundLicenseKey,
     verifySubscription,
-    getAccount
+    getAccount,
+    getCouponEligibility,
+    grantCouponEligibility
   ],
   triggers: []
 });

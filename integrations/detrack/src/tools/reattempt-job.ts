@@ -16,7 +16,17 @@ export let reattemptJobTool = SlateTool.create(spec, {
   .input(
     z.object({
       doNumber: z.string().describe('Delivery order number of the failed job'),
-      date: z.string().describe('Job date in YYYY-MM-DD format')
+      date: z.string().describe('Job date in YYYY-MM-DD format'),
+      newDate: z
+        .string()
+        .optional()
+        .describe(
+          'Date of the new attempt in YYYY-MM-DD format, when different from the original date'
+        ),
+      type: z
+        .enum(['Delivery', 'Collection'])
+        .optional()
+        .describe('Job type to disambiguate matching D.O. numbers')
     })
   )
   .output(
@@ -35,13 +45,18 @@ export let reattemptJobTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DetrackClient(ctx.auth.token);
 
-    let result = await client.reattemptJob(ctx.input.doNumber, ctx.input.date);
+    let result = await client.reattemptJob(
+      ctx.input.doNumber,
+      ctx.input.date,
+      ctx.input.newDate,
+      ctx.input.type
+    );
 
     return {
       output: {
         jobId: result.id ? String(result.id) : undefined,
-        doNumber: String(result.do_number ?? ctx.input.doNumber),
-        date: String(result.date ?? ctx.input.date),
+        doNumber: result.do_number,
+        date: result.date,
         status: result.status ? String(result.status) : undefined,
         attempt: typeof result.attempt === 'number' ? result.attempt : undefined,
         raw: result

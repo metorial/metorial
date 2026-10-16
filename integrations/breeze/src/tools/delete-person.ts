@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let deletePerson = SlateTool.create(spec, {
@@ -27,7 +27,7 @@ export let deletePerson = SlateTool.create(spec, {
     let result = await client.deletePerson(ctx.input.personId);
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `Deleted person (ID: ${ctx.input.personId}).`
     };
   })

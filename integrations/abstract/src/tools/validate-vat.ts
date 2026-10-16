@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AbstractClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,10 @@ export let validateVat = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .union([z.record(z.string(), z.unknown()), z.array(z.record(z.string(), z.unknown()))])
+        .optional()
+        .describe('Complete VAT provider response'),
       // Validate mode
       vatNumber: z.string().optional().describe('The validated VAT number'),
       isValid: z.boolean().optional().describe('Whether the VAT number is valid'),
@@ -81,11 +85,13 @@ export let validateVat = SlateTool.create(spec, {
     let { mode, vatNumber, amount, countryCode, isVatIncluded, vatCategory } = ctx.input;
 
     if (mode === 'validate') {
-      if (!vatNumber) throw new Error('vatNumber is required for "validate" mode.');
+      if (!vatNumber)
+        throw createApiServiceError('vatNumber is required for "validate" mode.');
       let result = await client.validateVat({ vatNumber });
 
       return {
         output: {
+          rawResponse: result,
           vatNumber: result.vat_number ?? vatNumber,
           isValid: result.is_valid ?? undefined,
           companyName: result.company_name ?? undefined,
@@ -93,11 +99,13 @@ export let validateVat = SlateTool.create(spec, {
           countryCode: result.country_code ?? undefined,
           countryName: result.country_name ?? undefined
         },
-        message: `VAT number **${vatNumber}** is **${result.is_valid ? 'valid' : 'invalid'}**${result.company_name ? ` — ${result.company_name}` : ''}.`
+        message: `VAT number **${vatNumber}** is **${result.is_valid === true ? 'valid' : result.is_valid === false ? 'invalid' : 'unknown'}**${result.company_name ? ` — ${result.company_name}` : ''}.`
       };
     } else if (mode === 'calculate') {
-      if (amount === undefined) throw new Error('amount is required for "calculate" mode.');
-      if (!countryCode) throw new Error('countryCode is required for "calculate" mode.');
+      if (amount === undefined)
+        throw createApiServiceError('amount is required for "calculate" mode.');
+      if (!countryCode)
+        throw createApiServiceError('countryCode is required for "calculate" mode.');
 
       let result = await client.calculateVat({
         amount,
@@ -108,6 +116,7 @@ export let validateVat = SlateTool.create(spec, {
 
       return {
         output: {
+          rawResponse: result,
           countryCode: result.country_code ?? countryCode,
           countryName: result.country_name ?? undefined,
           amountExclVat:
@@ -120,19 +129,25 @@ export let validateVat = SlateTool.create(spec, {
         message: `VAT calculation for **${amount}** in **${countryCode}**: VAT amount **${result.vat_amount ?? 'N/A'}** at **${result.vat_rate ?? 'N/A'}%**.`
       };
     } else {
-      if (!countryCode) throw new Error('countryCode is required for "rates" mode.');
+      if (!countryCode)
+        throw createApiServiceError('countryCode is required for "rates" mode.');
 
       let result = await client.getVatRates({ countryCode });
-      let categories = Array.isArray(result) ? result : [];
+      let categories = Array.isArray(result) ? result : result.categories;
+      if (!Array.isArray(categories))
+        throw createApiServiceError(
+          'Abstract returned an unexpected VAT categories response.'
+        );
 
       let mappedCategories = categories.map((c: any) => ({
-        category: c.country_code ?? c.category ?? undefined,
+        category: c.category ?? c.country_code ?? undefined,
         rate: c.rate != null ? Number(c.rate) : undefined,
         description: c.description ?? c.category ?? undefined
       }));
 
       return {
         output: {
+          rawResponse: result,
           countryCode,
           vatCategories: mappedCategories
         },

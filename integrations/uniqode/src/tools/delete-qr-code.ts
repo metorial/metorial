@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteQrCode = SlateTool.create(spec, {
   name: 'Delete QR Code',
   key: 'delete_qr_code',
-  description: `Permanently delete a QR code from your Beaconstac account. This action cannot be undone. The QR code will no longer be scannable after deletion.`,
+  description: `Permanently delete a QR code from your Uniqode account. This action cannot be undone. Deleting a dynamic code affects its managed destination; content encoded directly in a static code is unaffected.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -19,6 +19,7 @@ export let deleteQrCode = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       deleted: z.boolean().describe('Whether the deletion was successful'),
       qrCodeId: z.number().describe('ID of the deleted QR code')
     })
@@ -29,10 +30,11 @@ export let deleteQrCode = SlateTool.create(spec, {
       organizationId: ctx.config.organizationId
     });
 
-    await client.deleteQrCode(ctx.input.qrCodeId);
+    let result = await client.deleteQrCode(ctx.input.qrCodeId);
 
     return {
       output: {
+        raw: result,
         deleted: true,
         qrCodeId: ctx.input.qrCodeId
       },

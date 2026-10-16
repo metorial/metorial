@@ -56,7 +56,11 @@ Time-series data supports aggregation by time interval, geography, referrer, and
       timeSeries: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Time-series data points')
+        .describe('Time-series data points'),
+      rawOverview: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Original provider overview')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,6 +69,7 @@ Time-series data supports aggregation by time interval, geography, referrer, and
     let overview = await client.getLinkInsightsOverview(ctx.input.linkId);
 
     let output: any = {
+      rawOverview: overview,
       overview: {
         clicks: overview?.clicks,
         clickthroughs: overview?.clickthroughs,
@@ -93,7 +98,7 @@ Time-series data supports aggregation by time interval, geography, referrer, and
 
     return {
       output,
-      message: `FanLink **${ctx.input.linkId}** insights: ${overview?.clicks ?? 0} clicks, ${overview?.clickthroughs ?? 0} clickthroughs, CTR: ${overview?.ctr ?? 'N/A'}.`
+      message: `FanLink **${ctx.input.linkId}** insights: ${overview?.clicks ?? 'N/A'} clicks, ${overview?.clickthroughs ?? 'N/A'} clickthroughs, CTR: ${overview?.ctr ?? 'N/A'}.`
     };
   })
   .build();

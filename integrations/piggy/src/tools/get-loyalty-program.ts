@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity } from '../lib/response';
 import { spec } from '../spec';
 
 export let getLoyaltyProgram = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let getLoyaltyProgram = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.any()).optional().describe('Original provider response'),
       programName: z.string().optional().describe('Loyalty program name'),
       maxAmount: z.number().optional().describe('Maximum credit amount per transaction'),
       customCreditName: z.string().optional().describe('Custom name for credits'),
@@ -60,50 +62,45 @@ export let getLoyaltyProgram = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getLoyaltyProgram();
-    let program = result.data || result;
+    let program = result.data;
 
     let output: any = {
       programName: program.name,
       maxAmount: program.max_amount,
       customCreditName: program.custom_credit_name,
       unitName: program.unit?.name,
-      unitLabel: program.unit?.label
+      unitLabel: program.unit?.label,
+      raw: program
     };
 
     if (ctx.input.includeTiers) {
-      try {
-        let tiersResult = await client.listTiers();
-        output.tiers = (tiersResult.data || []).map((t: any) => ({
+      let tiersResult = await client.listTiers();
+      output.tiers = tiersResult.data.map((t: any) =>
+        mapEntity(t, {
           tierUuid: t.uuid,
           name: t.name,
           description: t.description,
-          position: t.position,
-          ...t
-        }));
-      } catch {
-        output.tiers = [];
-      }
+          position: t.position
+        })
+      );
     }
 
     if (ctx.input.includeGiftcardPrograms) {
-      try {
-        let programsResult = await client.listGiftcardPrograms();
-        output.giftcardPrograms = (programsResult.data || []).map((p: any) => ({
+      let programsResult = await client.listGiftcardPrograms();
+      output.giftcardPrograms = programsResult.data.map((p: any) =>
+        mapEntity(p, {
           programUuid: p.uuid,
           name: p.name,
           active: p.active,
           maxAmountInCents: p.max_amount_in_cents,
-          minAmountInCents: p.min_amount_in_cents,
-          ...p
-        }));
-      } catch {
-        output.giftcardPrograms = [];
-      }
+          minAmountInCents: p.min_amount_in_cents
+        })
+      );
     }
 
     return {
       output,
-      message: `Loyalty program: **${program.name || 'unnamed'}**${output.tiers ? `, ${output.tiers.length} tier(s)` : ''}${output.giftcardPrograms ? `, ${output.giftcardPrograms.length} gift card program(s)` : ''}.`
+      message: `Loyalty program: **${program.name ?? 'configuration retrieved'}**${output.tiers ? `, ${output.tiers.length} tier(s)` : ''}${output.giftcardPrograms ? `, ${output.giftcardPrograms.length} gift card program(s)` : ''}.`
     };
   })
   .build();

@@ -1,21 +1,34 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   production: 'https://api.notif.immo',
-  sandbox: 'https://preprod-api.notif.immo'
+  sandbox: 'https://preprod-api.notif.immo',
+  stream_estate: 'https://api.stream.estate'
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; environment?: string }) {
     let baseURL = BASE_URLS[config.environment ?? 'production'] ?? BASE_URLS.production;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': config.token
-      }
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Melo',
+          reason: 'melo_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: [
+            'hydra:description',
+            'description',
+            'detail',
+            'message',
+            'title',
+            'error'
+          ],
+          nestedKeys: ['violations', 'errors']
+        })
     });
   }
 
@@ -29,7 +42,9 @@ export class Client {
   }
 
   async getProperty(propertyId: string): Promise<PropertyDocument> {
-    let response = await this.axios.get(`/documents/properties/${propertyId}`);
+    let response = await this.axios.get(
+      `/documents/properties/${encodeURIComponent(propertyId)}`
+    );
     return response.data;
   }
 
@@ -38,7 +53,7 @@ export class Client {
     params?: Record<string, unknown>
   ): Promise<HydraCollection<PropertyDocument>> {
     let response = await this.axios.get(
-      `/documents/properties/${propertyId}/similar-properties`,
+      `/documents/properties/${encodeURIComponent(propertyId)}/similar-properties`,
       { params }
     );
     return response.data;
@@ -55,7 +70,7 @@ export class Client {
   }
 
   async getSearch(searchId: string): Promise<SavedSearch> {
-    let response = await this.axios.get(`/searches/${searchId}`);
+    let response = await this.axios.get(`/searches/${encodeURIComponent(searchId)}`);
     return response.data;
   }
 
@@ -65,12 +80,12 @@ export class Client {
   }
 
   async updateSearch(searchId: string, data: Record<string, unknown>): Promise<SavedSearch> {
-    let response = await this.axios.put(`/searches/${searchId}`, data);
+    let response = await this.axios.put(`/searches/${encodeURIComponent(searchId)}`, data);
     return response.data;
   }
 
   async deleteSearch(searchId: string): Promise<void> {
-    await this.axios.delete(`/searches/${searchId}`);
+    await this.axios.delete(`/searches/${encodeURIComponent(searchId)}`);
   }
 
   // ── Market Indicators ──

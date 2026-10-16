@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listMetadata, readList } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageInfotypeCategory = SlateTool.create(spec, {
@@ -8,12 +9,16 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
   key: 'manage_infotype_category',
   description: `Create, retrieve, list, or delete infotype categories for organizing and grouping sensitive data types. Categories help classify discovered data (PII, PFI, PHI, etc.) into meaningful hierarchies.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Action to perform'),
       categoryLabel: z
         .string()
@@ -23,7 +28,18 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('List of infotype identifiers to include in the category'),
-      page: z.number().optional().describe('Page number for listing'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation token returned by the previous list response. Omit page when using this token.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Zero-based page number. Later pages follow provider continuation tokens; prefer nextToken for efficient paging.'
+        ),
       size: z.number().optional().describe('Page size for listing'),
       sortBy: z.string().optional().describe('Field to sort by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction')
@@ -41,7 +57,8 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let { action, categoryLabel } = ctx.input;
@@ -49,7 +66,7 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
     switch (action) {
       case 'create': {
         if (!categoryLabel || !ctx.input.infotypes?.length) {
-          throw new Error(
+          throw createApiServiceError(
             'categoryLabel and infotypes are required for creating an infotype category'
           );
         }
@@ -57,16 +74,17 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
           categoryLabel,
           infotypes: ctx.input.infotypes
         });
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { category: data, success: true },
           message: `Infotype category **${categoryLabel}** created with **${ctx.input.infotypes.length}** infotype(s).`
         };
       }
       case 'get': {
-        if (!categoryLabel) throw new Error('categoryLabel is required for get action');
+        if (!categoryLabel)
+          throw createApiServiceError('categoryLabel is required for get action');
         let result = await client.getInfotypeCategory(categoryLabel);
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { category: data, success: true },
           message: `Retrieved infotype category **${categoryLabel}**.`
@@ -75,19 +93,21 @@ export let manageInfotypeCategory = SlateTool.create(spec, {
       case 'list': {
         let result = await client.listInfotypeCategories({
           page: ctx.input.page,
+          nextToken: ctx.input.nextToken,
           size: ctx.input.size,
           sortBy: ctx.input.sortBy,
           sortOrder: ctx.input.sortOrder
         });
-        let data = result?.data ?? result;
-        let categories = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+        let data = result;
+        let categories = readList(data, 'categories');
         return {
-          output: { categories, success: true },
+          output: { categories, success: true, ...listMetadata(data) },
           message: `Found **${categories.length}** infotype category/ies.`
         };
       }
       case 'delete': {
-        if (!categoryLabel) throw new Error('categoryLabel is required for delete action');
+        if (!categoryLabel)
+          throw createApiServiceError('categoryLabel is required for delete action');
         await client.deleteInfotypeCategory(categoryLabel);
         return {
           output: { success: true },

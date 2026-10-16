@@ -37,10 +37,7 @@ export let searchUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let results = await client.searchUsers(ctx.input.query, ctx.input.maxResults);
 

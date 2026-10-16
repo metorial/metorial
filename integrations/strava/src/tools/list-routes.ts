@@ -19,6 +19,7 @@ export let listRoutes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       routes: z
         .array(
           z.object({
@@ -38,8 +39,8 @@ export let listRoutes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let athlete = await client.getAuthenticatedAthlete();
-    let routes = await client.listAthleteRoutes(athlete.id, {
+    let athleteId = ctx.auth.athleteId ?? (await client.getAuthenticatedAthlete()).id;
+    let routes = await client.listAthleteRoutes(athleteId, {
       page: ctx.input.page,
       perPage: ctx.input.perPage
     });
@@ -56,6 +57,7 @@ export let listRoutes = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: routes,
         routes: mapped,
         count: mapped.length
       },

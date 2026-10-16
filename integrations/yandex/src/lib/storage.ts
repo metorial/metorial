@@ -13,6 +13,19 @@ export let listBuckets = async (auth: AuthType) => {
   return response.data;
 };
 
+export let listFolderBuckets = async (
+  auth: AuthType,
+  folderId: string,
+  pageSize?: number,
+  pageToken?: string
+) => {
+  let client = createServiceClient(STORAGE_API_URL, auth);
+  let response = await client.get('/storage/v1/buckets', {
+    params: { folderId, pageSize, pageToken }
+  });
+  return response.data;
+};
+
 export let createBucket = async (
   auth: AuthType,
   params: {
@@ -73,8 +86,8 @@ export let listObjects = async (
 ) => {
   let client = createServiceClient(S3_BASE_URL, auth);
   let params: Record<string, string | number> = { 'list-type': 2 };
-  if (prefix) params.prefix = prefix;
-  if (maxKeys) params['max-keys'] = maxKeys;
+  if (prefix !== undefined) params.prefix = prefix;
+  if (maxKeys !== undefined) params['max-keys'] = maxKeys;
   if (continuationToken) params['continuation-token'] = continuationToken;
   let response = await client.get(`/${bucketName}`, { params });
   return response.data;

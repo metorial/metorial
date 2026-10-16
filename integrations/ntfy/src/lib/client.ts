@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
 
 export interface NtfyAuth {
   token?: string;
@@ -23,6 +30,8 @@ export interface PublishOptions {
   attachUrl?: string;
   filename?: string;
   delay?: string;
+  timezone?: string;
+  sequenceId?: string;
   email?: string;
   call?: string;
   actions?: ActionButton[];
@@ -45,6 +54,7 @@ export interface ActionButton {
 
 export interface NtfyMessage {
   messageId: string;
+  sequenceId?: string;
   time: number;
   expires?: number;
   event: string;
@@ -80,6 +90,7 @@ export interface PollOptions {
   topic: string;
   since?: string;
   scheduled?: boolean;
+  includeEvents?: boolean;
   filterMessageId?: string;
   filterMessage?: string;
   filterTitle?: string;
@@ -87,170 +98,313 @@ export interface PollOptions {
   filterTags?: string;
 }
 
+let messageResponse = z.object({
+  id: z.string().min(1),
+  time: z.number(),
+  event: z.string(),
+  topic: z.string(),
+  sequence_id: z.string().nullish(),
+  expires: z.number().nullish(),
+  title: z.string().nullish(),
+  message: z.string().nullish(),
+  priority: z.number().nullish(),
+  tags: z.array(z.string()).nullish(),
+  click: z.string().nullish(),
+  icon: z.string().nullish(),
+  attachment: z
+    .object({
+      name: z.string(),
+      url: z.string(),
+      type: z.string().nullish(),
+      size: z.number().nullish(),
+      expires: z.number().nullish()
+    })
+    .nullish()
+});
+
+let accountResponse = z.object({
+  username: z.string(),
+  role: z.string().nullish(),
+  tier: z.object({ code: z.string().optional(), name: z.string().optional() }).nullish(),
+  limits: z.record(z.string(), z.union([z.string(), z.number()])).nullish(),
+  stats: z.record(z.string(), z.number()).nullish(),
+  reservations: z.array(z.object({ topic: z.string(), everyone: z.string() })).nullish()
+});
+
+let validateTopic = (topic: string, multiple = false) => {
+  let topics = multiple ? topic.split(',') : [topic];
+  if (!topics.every(value => /^[-_A-Za-z0-9]{1,64}$/.test(value))) {
+    throw createApiServiceError(
+      'Topic names must contain 1–64 letters, numbers, underscores, or dashes. Separate polling topics with commas.'
+    );
+  }
+};
+
+let validatePriority = (priority?: number) => {
+  if (
+    priority !== undefined &&
+    (!Number.isInteger(priority) || priority < 1 || priority > 5)
+  ) {
+    throw createApiServiceError('Priority must be a whole number from 1 to 5.');
+  }
+};
+
 export class Client {
-  private serverUrl: string;
-  private auth: NtfyAuth;
+  private http;
 
   constructor(config: NtfyClientConfig) {
-    this.serverUrl = config.serverUrl.replace(/\/$/, '');
-    this.auth = config.auth;
-  }
-
-  private getAuthHeaders(): Record<string, string> {
-    if (this.auth.token) {
-      return { Authorization: `Bearer ${this.auth.token}` };
+    let serverUrl = z.url().safeParse(config.serverUrl);
+    if (!serverUrl.success) {
+      throw createApiServiceError('Provide a valid http:// or https:// ntfy server URL.');
     }
-    if (this.auth.username && this.auth.password) {
-      let encoded = Buffer.from(`${this.auth.username}:${this.auth.password}`).toString(
+    let url = new URL(serverUrl.data);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw createApiServiceError(
+        'Use an http:// or https:// ntfy server URL without embedded credentials, query parameters, or fragments.'
+      );
+    }
+    let headers: Record<string, string> = {};
+    if (config.auth.token !== undefined) {
+      if (!config.auth.token.trim()) {
+        throw createApiServiceError('Reconnect with a non-empty ntfy access token.');
+      }
+      headers.Authorization = `Bearer ${config.auth.token}`;
+    } else if (config.auth.username !== undefined || config.auth.password !== undefined) {
+      if (
+        config.auth.username === undefined ||
+        !config.auth.password ||
+        config.auth.username.includes(':')
+      ) {
+        throw createApiServiceError(
+          'Reconnect with a valid ntfy username and password, or an empty username and access token as the password.'
+        );
+      }
+      let encoded = Buffer.from(`${config.auth.username}:${config.auth.password}`).toString(
         'base64'
       );
-      return { Authorization: `Basic ${encoded}` };
+      headers.Authorization = `Basic ${encoded}`;
     }
-    return {};
-  }
-
-  private createAxiosInstance() {
-    return createAxios({
-      baseURL: this.serverUrl,
-      headers: this.getAuthHeaders()
+    this.http = createAuthenticatedAxios({
+      baseURL: url.toString().replace(/\/+$/, ''),
+      headers,
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ntfy',
+          reason: 'ntfy_api_error',
+          extractResponse: (error, helpers) => {
+            let response = helpers.getResponseWithBody(error);
+            if (typeof response?.data === 'string') {
+              try {
+                return { ...response, data: JSON.parse(response.data) };
+              } catch {
+                return response;
+              }
+            }
+            return response;
+          },
+          extractUpstreamCode: (_error, response, helpers) => {
+            let data = response?.data;
+            return helpers.isRecord(data) &&
+              (typeof data.code === 'number' || typeof data.code === 'string')
+              ? String(data.code)
+              : undefined;
+          }
+        })
     });
   }
 
   async publish(options: PublishOptions): Promise<NtfyMessage> {
-    let http = this.createAxiosInstance();
-
-    let payload: Record<string, unknown> = {
-      topic: options.topic
-    };
-
-    if (options.message !== undefined) payload.message = options.message;
-    if (options.title !== undefined) payload.title = options.title;
-    if (options.priority !== undefined) payload.priority = options.priority;
-    if (options.tags !== undefined && options.tags.length > 0) payload.tags = options.tags;
-    if (options.markdown !== undefined) payload.markdown = options.markdown;
-    if (options.clickUrl !== undefined) payload.click = options.clickUrl;
-    if (options.iconUrl !== undefined) payload.icon = options.iconUrl;
-    if (options.attachUrl !== undefined) payload.attach = options.attachUrl;
-    if (options.filename !== undefined) payload.filename = options.filename;
-    if (options.delay !== undefined) payload.delay = options.delay;
-    if (options.email !== undefined) payload.email = options.email;
-    if (options.call !== undefined) payload.call = options.call;
-    if (options.cacheDisabled) payload.cache = 'no';
-    if (options.firebaseDisabled) payload.firebase = 'no';
-
-    if (options.actions && options.actions.length > 0) {
-      payload.actions = options.actions.map(a => {
-        let action: Record<string, unknown> = {
-          action: a.action,
-          label: a.label
-        };
-        if (a.url !== undefined) action.url = a.url;
-        if (a.method !== undefined) action.method = a.method;
-        if (a.headers !== undefined) action.headers = a.headers;
-        if (a.body !== undefined) action.body = a.body;
-        if (a.intent !== undefined) action.intent = a.intent;
-        if (a.extras !== undefined) action.extras = a.extras;
-        if (a.value !== undefined) action.value = a.value;
-        if (a.clear !== undefined) action.clear = a.clear;
-        return action;
-      });
+    validateTopic(options.topic);
+    validatePriority(options.priority);
+    if (options.cacheDisabled && options.delay) {
+      throw createApiServiceError(
+        'Scheduled delivery requires message caching. Remove delay or enable caching.'
+      );
     }
-
-    let response = await http.post('/', payload, {
-      headers: { 'Content-Type': 'application/json' }
+    for (let action of options.actions ?? []) {
+      if ((action.action === 'view' || action.action === 'http') && !action.url?.trim()) {
+        throw createApiServiceError(`Provide a URL for the ${action.action} action button.`);
+      }
+      if (action.action === 'copy' && action.value === undefined) {
+        throw createApiServiceError('Provide a value for the copy action button.');
+      }
+    }
+    let payload = pickDefined({
+      topic: options.topic,
+      message: options.message,
+      title: options.title,
+      priority: options.priority,
+      tags: options.tags,
+      markdown: options.markdown,
+      click: options.clickUrl,
+      icon: options.iconUrl,
+      attach: options.attachUrl,
+      filename: options.filename,
+      delay: options.delay,
+      timezone: options.timezone,
+      sequence_id: options.sequenceId,
+      email: options.email,
+      call: options.call,
+      cache: options.cacheDisabled ? 'no' : undefined,
+      firebase: options.firebaseDisabled ? 'no' : undefined,
+      actions: options.actions
     });
-
+    let response = await this.http.post('/', payload);
     return mapMessage(response.data);
   }
 
   async updateMessage(options: UpdateMessageOptions): Promise<NtfyMessage> {
-    let http = this.createAxiosInstance();
-
-    let payload: Record<string, unknown> = {
-      topic: options.topic,
-      event: options.eventType,
-      id: options.messageId
-    };
-
-    if (options.message !== undefined) payload.message = options.message;
-    if (options.title !== undefined) payload.title = options.title;
-    if (options.priority !== undefined) payload.priority = options.priority;
-    if (options.tags !== undefined && options.tags.length > 0) payload.tags = options.tags;
-    if (options.markdown !== undefined) payload.markdown = options.markdown;
-
-    let response = await http.post('/', payload, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    validateTopic(options.topic);
+    validatePriority(options.priority);
+    if (!options.messageId.trim()) {
+      throw createApiServiceError(
+        'Provide the original message ID or the sequence ID used for the first notification.'
+      );
+    }
+    let path = `/${encodeURIComponent(options.topic)}/${encodeURIComponent(options.messageId)}`;
+    if (options.eventType === 'message_clear') {
+      let response = await this.http.put(`${path}/clear`);
+      return mapMessage(response.data);
+    }
+    if (options.eventType === 'message_delete') {
+      let response = await this.http.delete(path);
+      return mapMessage(response.data);
+    }
+    if (options.eventType !== 'message') {
+      throw createApiServiceError(
+        'Choose update, clear, or delete for the notification action.'
+      );
+    }
+    let response = await this.http.post(
+      '/',
+      pickDefined({
+        topic: options.topic,
+        sequence_id: options.messageId,
+        message: options.message,
+        title: options.title,
+        priority: options.priority,
+        tags: options.tags,
+        markdown: options.markdown
+      })
+    );
     return mapMessage(response.data);
   }
 
-  async pollMessages(options: PollOptions): Promise<NtfyMessage[]> {
-    let http = this.createAxiosInstance();
-
-    let params: Record<string, string> = {
-      poll: '1'
-    };
-
-    if (options.since) params.since = options.since;
-    if (options.scheduled) params.scheduled = '1';
-    if (options.filterMessageId) params.id = options.filterMessageId;
-    if (options.filterMessage) params.message = options.filterMessage;
-    if (options.filterTitle) params.title = options.filterTitle;
-    if (options.filterPriority) params.priority = options.filterPriority;
-    if (options.filterTags) params.tags = options.filterTags;
-
-    let response = await http.get(`/${encodeURIComponent(options.topic)}/json`, {
-      params
+  async pollMessages(
+    options: PollOptions
+  ): Promise<{ messages: NtfyMessage[]; truncated: boolean }> {
+    validateTopic(options.topic, true);
+    let params = pickDefined({
+      poll: '1',
+      since: options.since,
+      scheduled: options.scheduled ? '1' : undefined,
+      id: options.filterMessageId,
+      message: options.filterMessage,
+      title: options.filterTitle,
+      priority: options.filterPriority,
+      tags: options.filterTags
     });
-
-    let text =
-      typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-    let lines = text
-      .trim()
-      .split('\n')
-      .filter((line: string) => line.trim().length > 0);
+    let response = await this.http.get(
+      `/${options.topic.split(',').map(encodeURIComponent).join(',')}/json`,
+      {
+        params,
+        responseType: 'text',
+        transformResponse: [(data: unknown) => data]
+      }
+    );
+    if (typeof response.data !== 'string') {
+      throw createApiServiceError('ntfy returned an unexpected message stream.', {
+        reason: 'ntfy_invalid_response'
+      });
+    }
     let messages: NtfyMessage[] = [];
-
-    for (let line of lines) {
+    for (let line of response.data.split('\n')) {
+      if (!line.trim()) continue;
+      let parsed: unknown;
       try {
-        let parsed = JSON.parse(line);
-        if (parsed.event === 'message') {
-          messages.push(mapMessage(parsed));
-        }
+        parsed = JSON.parse(line);
       } catch {
-        // skip unparseable lines
+        throw createApiServiceError(
+          'ntfy returned a malformed message stream. Retry the poll.',
+          { reason: 'ntfy_invalid_response' }
+        );
+      }
+      let message = mapMessage(parsed);
+      if (
+        message.event === 'message' ||
+        (options.includeEvents && ['message_clear', 'message_delete'].includes(message.event))
+      ) {
+        messages.push(message);
       }
     }
+    return {
+      messages,
+      truncated: getResponseHeaderValue(response.headers, 'x-messages-truncated') === '1'
+    };
+  }
 
-    return messages;
+  async getAccount() {
+    let response = await this.http.get('/v1/account');
+    let parsed = accountResponse.safeParse(response.data);
+    if (!parsed.success) {
+      throw createApiServiceError('ntfy returned an unexpected account response.', {
+        reason: 'ntfy_invalid_response'
+      });
+    }
+    let data = parsed.data;
+    return {
+      username: data.username,
+      ...pickDefined({
+        role: data.role ?? undefined,
+        tier: data.tier ?? undefined,
+        limits: data.limits ?? undefined,
+        stats: data.stats ?? undefined,
+        reservations: data.reservations ?? undefined
+      })
+    };
   }
 }
 
-export let mapMessage = (data: Record<string, unknown>): NtfyMessage => {
-  let attachment = data.attachment as Record<string, unknown> | undefined;
-
+export let mapMessage = (data: unknown): NtfyMessage => {
+  let result = messageResponse.safeParse(data);
+  if (!result.success) {
+    throw createApiServiceError('ntfy returned an unexpected notification response.', {
+      reason: 'ntfy_invalid_response'
+    });
+  }
+  let value = result.data;
   return {
-    messageId: data.id as string,
-    time: data.time as number,
-    expires: data.expires as number | undefined,
-    event: data.event as string,
-    topic: data.topic as string,
-    title: data.title as string | undefined,
-    message: data.message as string | undefined,
-    priority: data.priority as number | undefined,
-    tags: data.tags as string[] | undefined,
-    clickUrl: data.click as string | undefined,
-    iconUrl: data.icon as string | undefined,
-    actions: data.actions as ActionButton[] | undefined,
-    attachment: attachment
-      ? {
-          name: attachment.name as string,
-          url: attachment.url as string,
-          type: attachment.type as string | undefined,
-          size: attachment.size as number | undefined,
-          expires: attachment.expires as number | undefined
-        }
-      : undefined
+    messageId: value.id,
+    time: value.time,
+    event: value.event,
+    topic: value.topic,
+    ...pickDefined({
+      sequenceId: value.sequence_id ?? undefined,
+      expires: value.expires ?? undefined,
+      title: value.title ?? undefined,
+      message: value.message ?? undefined,
+      priority: value.priority ?? undefined,
+      tags: value.tags ?? undefined,
+      clickUrl: value.click ?? undefined,
+      iconUrl: value.icon ?? undefined,
+      attachment: value.attachment
+        ? {
+            name: value.attachment.name,
+            url: value.attachment.url,
+            ...pickDefined({
+              type: value.attachment.type ?? undefined,
+              size: value.attachment.size ?? undefined,
+              expires: value.attachment.expires ?? undefined
+            })
+          }
+        : undefined
+    })
   };
 };

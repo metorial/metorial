@@ -1,0 +1,101 @@
+{
+  "key": "domain_lookup",
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "host": {
+        "type": "string",
+        "description": "Domain name or FQDN to look up"
+      },
+      "live": {
+        "description": "Enable real-time reconnaissance for previously unseen domains (may increase latency)",
+        "type": "boolean"
+      }
+    },
+    "required": ["host"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "valid": {
+        "type": "boolean",
+        "description": "Whether the domain is valid"
+      },
+      "fqdn": {
+        "type": "string",
+        "description": "Fully qualified domain name"
+      },
+      "registrarName": {
+        "type": "string",
+        "description": "Domain registrar name"
+      },
+      "registrarId": {
+        "type": "number",
+        "description": "IANA registrar ID"
+      },
+      "registeredDate": {
+        "type": "string",
+        "description": "Domain registration date"
+      },
+      "expiryDate": {
+        "type": "string",
+        "description": "Domain expiry date"
+      },
+      "age": {
+        "type": "number",
+        "description": "Domain age in days"
+      },
+      "hostCountry": {
+        "type": "string",
+        "description": "Hosting country"
+      },
+      "hostCountryCode": {
+        "type": "string",
+        "description": "Hosting country ISO code"
+      },
+      "mailProvider": {
+        "type": "string",
+        "description": "Mail provider name"
+      },
+      "isMailConfigured": {
+        "type": "boolean",
+        "description": "Whether mail is configured"
+      },
+      "isWebConfigured": {
+        "type": "boolean",
+        "description": "Whether web hosting is configured"
+      },
+      "isMalicious": {
+        "type": "boolean",
+        "description": "Whether the domain is flagged as malicious"
+      },
+      "blocklists": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Blocklist categories the domain appears on"
+      }
+    },
+    "required": [
+      "valid",
+      "fqdn",
+      "registrarName",
+      "registrarId",
+      "registeredDate",
+      "expiryDate",
+      "age",
+      "hostCountry",
+      "hostCountryCode",
+      "mailProvider",
+      "isMailConfigured",
+      "isWebConfigured",
+      "isMalicious",
+      "blocklists"
+    ],
+    "additionalProperties": false
+  }
+}

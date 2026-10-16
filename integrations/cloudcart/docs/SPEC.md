@@ -1,79 +1,25 @@
-Let me get more details on the CloudCart webhooks page and look for the full API documentation.Now I have enough information to write the specification. Let me also check the Zapier integration page for more details on available triggers/actions.I have enough information now to write the specification.
+# CloudCart API integration
 
-# Slates Specification for Cloudcart
+CloudCart API v2 uses JSON:API resources beneath `https://{domain}.cloudcart.net/api/v2`. Connect using the store subdomain and an API key from **Settings > API keys**. Requests send `X-CloudCart-ApiKey` and `application/vnd.api+json`. Authentication uses a static API key; there is no OAuth refresh flow.
 
-## Overview
+## Tool coverage
 
-CloudCart is a SaaS e-commerce platform that enables businesses to create and manage online stores. The CloudCart API enables you to interact programmatically with your CloudCart store, offering endpoints to manage products, orders, customers, and more. With CloudCart's REST API, you can integrate external systems and share resources and information with high security and controlled access.
+- Products: `list_products`, `get_product`, `create_product`, `update_product`, `delete_product`.
+- Variants and inventory: `list_variants`, `get_variant`, `update_inventory`. Filter `list_variants` by `productId` to discover all inventory IDs. `get_product` with `includeVariants` requests the plural `variants` relationship.
+- Orders: `list_orders`, `get_order`, `update_order`. The API completion status is `completed`; the existing `complete` input remains accepted as an alias. Fulfillment status is read-only on orders. The legacy `statusFulfillment` field is retained, but providing it raises a validation error before any changes; use the store admin or separate order-fulfillment API. `usn` means Unique Sale Number.
+- Customers: `list_customers`, `get_customer`, `create_customer`, `update_customer`, `delete_customer`. `list_customer_groups` discovers group IDs; customer creation and updates assign groups through a relationship.
+- Categories and vendors: `list_categories`, `get_category`, `manage_category`, `list_vendors`. Set `parentId` to change a category's parent, or `clearParent: true` on an update to make it a root category.
 
-## Authentication
+All 21 tools accept object inputs. List tools return one page; `pageNumber` is a positive integer and `pageSize` is an integer from 1 to 100 (provider default 20). Pagination comes from `meta.page`. Existing summary fields are retained, and `raw` exposes the complete JSON response for reads and successful resource writes. Existing optional string summaries omit provider nulls while `raw` preserves them unchanged. `get_order.desiredDeliveryDate` retains its optional string contract and returns only a genuine provider string; object-valued schedules are available as the additive `desiredDeliveryWindow` and in `raw`. Variant prices are integer minor currency units: `5500` means `55.00`; quantities may be fractional. Product flag inputs remain booleans and are translated into the provider's `yes`/`no` or `1`/`0` representation.
 
-CloudCart supports API key-based authentication for its REST API (v2).
+The public API documents catalog, customer, order, and related resources, but no authenticated-user/profile endpoint. Physical store-location resources are not an account identity. No identity tool is fabricated. Webhook triggers, file exports, bulk catalog editing, image uploads, and discount management are outside this integration's registered tool surface.
 
-CloudCart uses API keys for authentication. API keys can be created and managed from the store's admin panel under **Settings > API keys**. Each store has a "Default" API key that is automatically created.
+## Official references
 
-To authenticate requests, include the API key in the request header:
-
-- **Header name:** `X-CloudCart-ApiKey`
-- **Header value:** Your API key
-
-The API base URL is store-specific and follows this pattern:
-
-```
-https://{domain}.cloudcart.net/api/v2/
-```
-
-Where `{domain}` is your store's unique CloudCart subdomain.
-
-**Required credentials:**
-
-- **Domain** – Your store's CloudCart subdomain (the part before `.cloudcart.net`)
-- **API Key** – Generated from Settings > API keys in the store admin panel
-
-Note: Some sources reference OAuth 2.0 (Authorization Code Grant and Client Credentials Grant) as a possible authentication method, but the primary and most commonly documented method is API key authentication via the `X-CloudCart-ApiKey` header.
-
-## Features
-
-### Product Management
-
-Create, read, update, and delete products in the store. This includes managing product details such as descriptions, pricing, images, variants (color, size, etc.), availability, and stock quantities. Custom product types can be created to fit specific business needs. Supports bulk operations for product edits, quantities, variants, and statuses.
-
-### Order Management
-
-Access and manage orders including order details, line items, shipping information, and payment data. Orders include statuses such as: pending, voided, timeouted, cancelled, failed, refunded, paid, and complete. Orders also carry payment statuses (requested, pending, held, completed, failed, refunded, cancelled, timeouted) and fulfilment statuses (not_fulfilled, fulfilled).
-
-### Customer Management
-
-Manage customer records including registration details, contact information, and order history. Triggers are available when a new customer is added to a CloudCart account.
-
-### Category Management
-
-Organize products into categories and manage the store's category hierarchy. Import and export entire categories along with their products.
-
-### Inventory Management
-
-Keep inventory levels in check by syncing them between CloudCart and external systems whenever a sale is made or new stock is added. Track stock quantities and prevent overselling.
-
-### Webhook Management
-
-Create and configure webhooks programmatically via the API to receive notifications about store events. Webhooks are associated with API keys and send data to specified destination URLs.
-
-## Events
-
-CloudCart supports webhooks that send event data to a specified destination URL when store events occur. When an event occurs, information is sent to the endpoint via an API key. Webhook event data can be stored as JSON or XML.
-
-Webhooks are configured in the admin panel under **Settings > Webhooks** by specifying an API key, a destination URL, and the event trigger.
-
-### Order Events
-
-Receive notifications when orders are created or their status changes. For example, if there is a new order, the action will execute the webhook to the destination of the specified URL. Order webhooks include order status (pending, voided, timeouted, cancelled, failed, refunded, paid, complete), payment status, and fulfilment status.
-
-### Product Events
-
-Triggers are available when a product is updated or when a new product is created.
-
-### Customer Events
-
-Triggers when a new customer is added to the CloudCart account.
-
-**Webhook delivery considerations:** After 6 unsuccessful attempts, if the information is not received, it will not be sent again. If response codes 400, 401, 403, 404, 405, 406, 410, 411 are received, the webhook will be deactivated. If the response text contains "please unsubscribe me", the webhook will be deleted.
+- [Overview and base URL](https://developers.cloudcart.com/2.0/overview)
+- [Authentication](https://developers.cloudcart.com/2.0/authentication), [content type](https://developers.cloudcart.com/2.0/content-type), [errors](https://developers.cloudcart.com/2.0/errors), [pagination](https://developers.cloudcart.com/2.0/pagination), [filtering](https://developers.cloudcart.com/2.0/filtering), [includes](https://developers.cloudcart.com/2.0/includes)
+- [Product resource](https://developers.cloudcart.com/2.0/products), [create](https://developers.cloudcart.com/2.0/products-create), [update](https://developers.cloudcart.com/2.0/products-update), [list](https://developers.cloudcart.com/2.0/products-list), [get](https://developers.cloudcart.com/2.0/products-get), [delete](https://developers.cloudcart.com/2.0/products-delete)
+- [Variant resource](https://developers.cloudcart.com/2.0/variants), [list](https://developers.cloudcart.com/2.0/variants-list), [get](https://developers.cloudcart.com/2.0/variants-get), [update](https://developers.cloudcart.com/2.0/variants-update)
+- [Orders](https://developers.cloudcart.com/2.0/orders), [list](https://developers.cloudcart.com/2.0/orders-list), [get](https://developers.cloudcart.com/2.0/orders-get), [update and metadata](https://developers.cloudcart.com/2.0/orders-update)
+- [Customers](https://developers.cloudcart.com/2.0/customers), [create](https://developers.cloudcart.com/2.0/customers-create), [update](https://developers.cloudcart.com/2.0/customers-update), [list](https://developers.cloudcart.com/2.0/customers-list), [get](https://developers.cloudcart.com/2.0/customers-get), [delete](https://developers.cloudcart.com/2.0/customers-delete), [groups](https://developers.cloudcart.com/2.0/customer-groups-list)
+- [Categories](https://developers.cloudcart.com/2.0/categories), [create](https://developers.cloudcart.com/2.0/categories-create), [update](https://developers.cloudcart.com/2.0/categories-update), [list](https://developers.cloudcart.com/2.0/categories-list), [get](https://developers.cloudcart.com/2.0/categories-get), [delete](https://developers.cloudcart.com/2.0/categories-delete), [vendors](https://developers.cloudcart.com/2.0/vendors-list)

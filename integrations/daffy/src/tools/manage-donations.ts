@@ -5,14 +5,14 @@ import { spec } from '../spec';
 
 let donationSchema = z.object({
   donationId: z.number().describe('Unique donation identifier'),
-  amount: z.number().describe('Donation amount in USD'),
+  amount: z.number().optional().describe('Donation amount in USD, when included'),
   status: z
     .string()
     .describe(
       'Donation status (scheduled, waiting_for_funds, approved, rejected, completed, not_completed, check_mailed)'
     ),
   note: z.string().nullable().describe('Public note on the donation'),
-  visibility: z.string().nullable().describe('Donation visibility setting'),
+  visibility: z.string().nullable().optional().describe('Donation visibility setting'),
   createdAt: z.string().describe('Creation timestamp'),
   mailedAt: z.string().nullable().describe('Date the check was mailed'),
   nonProfit: z
@@ -33,13 +33,14 @@ export let createDonation = SlateTool.create(spec, {
   instructions: [
     "Use the Search Nonprofits tool to find a nonprofit EIN if you don't have one."
   ],
+  constraints: ['Minimum donation amount is $10 USD.'],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      amount: z.number().describe('Donation amount in USD'),
+      amount: z.number().describe('Donation amount in USD (minimum $10)'),
       ein: z
         .string()
         .describe('EIN (Employer Identification Number) of the nonprofit to donate to'),
@@ -60,7 +61,7 @@ export let createDonation = SlateTool.create(spec, {
     return {
       output: {
         donationId: donation.id,
-        amount: donation.amount,
+        amount: donation.amount ?? undefined,
         status: donation.status,
         note: donation.note,
         visibility: donation.visibility,
@@ -74,7 +75,7 @@ export let createDonation = SlateTool.create(spec, {
           state: donation.non_profit.state
         }
       },
-      message: `Created donation of **$${donation.amount.toFixed(2)}** to **${donation.non_profit.name}** (EIN: ${donation.non_profit.ein}). Status: ${donation.status}.`
+      message: `Created donation **#${donation.id}** to **${donation.non_profit.name}** (EIN: ${donation.non_profit.ein}). Status: ${donation.status}.`
     };
   })
   .build();

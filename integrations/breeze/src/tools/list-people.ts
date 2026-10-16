@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listPeople = SlateTool.create(spec, {
@@ -58,7 +58,7 @@ export let listPeople = SlateTool.create(spec, {
       filterJson
     });
 
-    let peopleArray = Array.isArray(people) ? people : [];
+    let peopleArray = requireList(people, 'list-people');
 
     return {
       output: { people: peopleArray },

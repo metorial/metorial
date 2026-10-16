@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createVm,
   deleteVm,
+  getCurrentUser,
   getVm,
+  listBillingAccounts,
   listPlatformConfig,
   listVms,
   manageBlockStorage,
@@ -21,6 +23,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listBillingAccounts,
     listVms,
     getVm,
     createVm,

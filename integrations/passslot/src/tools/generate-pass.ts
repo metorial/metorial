@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let generatePass = SlateTool.create(spec, {
   key: 'generate_pass',
   description: `Generate a new mobile wallet pass from a template. Each generated pass receives a unique serial number. Provide either a template ID or template name along with placeholder values to personalize the pass.`,
   instructions: [
-    'Provide either templateId or templateName, not both. If both are provided, templateId takes precedence.',
+    'Provide templateId or templateName. If both are provided, templateId takes precedence.',
     'The values object should contain key-value pairs matching the template placeholder fields.'
   ]
 })
@@ -39,13 +39,21 @@ export let generatePass = SlateTool.create(spec, {
     let passValues = ctx.input.values || {};
 
     let result: any;
-    if (ctx.input.templateId) {
+    if (ctx.input.templateId !== undefined) {
       result = await client.createPassFromTemplate(ctx.input.templateId, passValues);
     } else if (ctx.input.templateName) {
       result = await client.createPassFromTemplateName(ctx.input.templateName, passValues);
     } else {
-      throw new Error('Either templateId or templateName must be provided.');
+      throw createApiServiceError('Either templateId or templateName must be provided.');
     }
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.getPassDownloadUrl(result.passTypeIdentifier, result.serialNumber),
+      headers: { Authorization: ctx.auth.token },
+      filename: `${encodeURIComponent(result.serialNumber)}.pkpass`,
+      mimeType: 'application/vnd.apple.pkpass'
+    });
 
     return {
       output: {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateRecord = SlateTool.create(spec, {
@@ -41,7 +41,15 @@ export let updateRecord = SlateTool.create(spec, {
         .optional()
         .default(false)
         .describe('Execute link and load operations'),
-      doWorkflow: z.boolean().optional().default(false).describe('Execute workflow scripts'),
+      doWorkflow: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Execute workflow scripts; false skips the workflow'),
+      doValidation: z
+        .boolean()
+        .optional()
+        .describe('Run the sheet field validation rules before saving'),
       sendNotification: z
         .boolean()
         .optional()
@@ -60,11 +68,7 @@ export let updateRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverDomain: ctx.config.serverDomain,
-      accountName: ctx.config.accountName
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let sheet = {
       tabFolder: ctx.input.tabFolder,
@@ -74,8 +78,9 @@ export let updateRecord = SlateTool.create(spec, {
     let result = await client.updateRecord(sheet, ctx.input.recordId, ctx.input.fields, {
       doFormula: ctx.input.doFormula,
       doDefaultValue: ctx.input.doDefaultValue,
-      doLinkLoad: ctx.input.doLinkLoad || undefined,
+      doLinkLoad: ctx.input.doLinkLoad,
       doWorkflow: ctx.input.doWorkflow,
+      doValidation: ctx.input.doValidation,
       notification: ctx.input.sendNotification,
       checkLock: ctx.input.checkLock
     });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let updateProduct = SlateTool.create(spec, {
@@ -72,6 +73,12 @@ export let updateProduct = SlateTool.create(spec, {
       gatedPageBody: z.string().optional().describe('Gated page body (HTML)'),
 
       isLicensed: z.boolean().optional().describe('Whether to generate license keys'),
+      useUploadedLicenseCodes: z
+        .boolean()
+        .optional()
+        .describe(
+          'Issue codes from the CSV pool uploaded in the dashboard when license key generation is enabled'
+        ),
       redemptionInstructions: z
         .string()
         .optional()
@@ -85,6 +92,7 @@ export let updateProduct = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       productId: z.string().describe('ID of the updated product'),
       title: z.string().describe('Product title'),
       url: z.string().describe('Product vanity URL slug'),
@@ -134,6 +142,8 @@ export let updateProduct = SlateTool.create(spec, {
     if (ctx.input.gatedPageUrl !== undefined) data.gated_page_url = ctx.input.gatedPageUrl;
     if (ctx.input.gatedPageBody !== undefined) data.gated_page_body = ctx.input.gatedPageBody;
     if (ctx.input.isLicensed !== undefined) data.is_licensed = ctx.input.isLicensed;
+    if (ctx.input.useUploadedLicenseCodes !== undefined)
+      data.use_uploaded_license_codes = ctx.input.useUploadedLicenseCodes;
     if (ctx.input.redemptionInstructions !== undefined)
       data.redemption_instructions = ctx.input.redemptionInstructions;
     if (ctx.input.excludeFromAutomations !== undefined)
@@ -143,6 +153,7 @@ export let updateProduct = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         productId: result.id as string,
         title: result.title as string,
         url: result.url as string,

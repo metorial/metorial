@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let retrieveTranscript = SlateTool.create(spec, {
   name: 'Retrieve Transcript',
   key: 'retrieve_transcript',
-  description: `Download a completed transcript for an audiofile. Supports plain text, Word document, RTF, and HTML formats. The audiofile must be in the **Delivered** state for the transcript to be available.`,
+  description: `Retrieve transcript text and a downloadable file for a completed audiofile. Use download_transcript for DOCX, timestamped text, SRT, or VTT. Supports plain text, Word document, RTF, and HTML formats. The audiofile must be in the **Delivered** state for the transcript to be available.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -33,7 +33,10 @@ export let retrieveTranscript = SlateTool.create(spec, {
 
     let content = await client.getTranscript(ctx.input.audiofileId, ctx.input.format);
 
-    let transcript = typeof content === 'string' ? content : JSON.stringify(content);
+    let transcript = content;
+    await ctx.addAttachment(
+      client.getTranscriptDownload(ctx.input.audiofileId, ctx.input.format)
+    );
 
     return {
       output: {

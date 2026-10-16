@@ -10,6 +10,7 @@ let connectionSchema = z.object({
   type: z.string().optional().describe('Connection type (connection or aggregator)'),
   credentialSource: z.string().optional().describe('Credential source (self or integration)'),
   state: z.string().optional().describe('Connection state'),
+  status: z.string().optional().describe('Connection status reported by the provider'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().optional().describe('Last update timestamp')
 });
@@ -31,7 +32,9 @@ export let listConnections = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       limit: z.number().optional().describe('Maximum number of results to return'),
       nextToken: z.string().optional().describe('Pagination cursor from a previous response')
     })
@@ -43,18 +46,11 @@ export let listConnections = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.scope, ctx.input.ownerHandle);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listUserConnections']>>;
     if (ctx.input.scope === 'org') {
       result = await client.listOrgConnections(ownerHandle, {
         limit: ctx.input.limit,

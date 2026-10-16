@@ -1,9 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
   projectId: z.string().describe('Unique project identifier'),
   projectName: z.string().describe('Name of the project'),
   fileName: z.string().optional().describe('Name of the uploaded dataset file'),
@@ -20,6 +25,10 @@ let projectSchema = z.object({
   holdoutUnlocked: z.boolean().optional().describe('Whether holdout data has been unlocked')
 });
 
+let outputSchema = z.object({
+  projects: z.array(projectSchema).describe('List of projects')
+});
+
 export let listProjects = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
@@ -30,21 +39,17 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectName: z.string().optional().describe('Filter by project name (partial match)'),
+      projectName: z.string().optional().describe('Filter by project name'),
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of projects to return'),
-      orderBy: z.string().optional().describe('Sort field (e.g. "-created" for newest first)')
+      orderBy: z.string().optional().describe('Sort by projectName or -projectName')
     })
   )
-  .output(
-    z.object({
-      projects: z.array(projectSchema).describe('List of projects')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let projects = await client.listProjects({
@@ -54,8 +59,9 @@ export let listProjects = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     });
 
-    let mapped = (Array.isArray(projects) ? projects : []).map((p: any) => ({
-      projectId: p.id || p.projectId,
+    let mapped = projects.map((p: any) => ({
+      raw: p,
+      projectId: p.id ?? p.projectId,
       projectName: p.projectName,
       fileName: p.fileName,
       stage: p.stage,
@@ -68,7 +74,7 @@ export let listProjects = SlateTool.create(spec, {
     }));
 
     return {
-      output: { projects: mapped },
+      output: parseOutput(outputSchema, { projects: mapped }),
       message: `Found **${mapped.length}** project(s).`
     };
   })

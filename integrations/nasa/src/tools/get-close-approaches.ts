@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getCloseApproaches = SlateTool.create(spec, {
   name: 'Get Close Approach Data',
   key: 'get_close_approaches',
-  description: `Retrieve close approach data for asteroids and comets from NASA's SSD/CNEOS system. Find when small bodies pass near Earth or other solar system bodies, with distance and velocity information.`,
+  description: `DEPRECATED — use query_close_approaches instead. Retrieve close approach data for asteroids and comets from NASA's SSD/CNEOS system. Find when small bodies pass near Earth or other solar system bodies, with distance and velocity information.`,
+  instructions: [
+    'Use query_close_approaches for provider-accurate nullable measurements and complete metadata.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

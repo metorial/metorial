@@ -1,14 +1,30 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let httpClient = createAxios({
-  baseURL: 'https://www.triggercmd.com'
+let httpClient = createAuthenticatedAxios({
+  baseURL: 'https://www.triggercmd.com',
+  timeout: 30000,
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'TRIGGERcmd',
+      reason: 'triggercmd_oauth_error',
+      operation: 'token exchange'
+    })
 });
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -56,18 +72,29 @@ export let auth = SlateAuth.create()
       );
 
       return {
-        output: {
-          token: response.data.access_token
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'TRIGGERcmd',
+          operation: 'token exchange'
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'The TRIGGERcmd refresh token is missing. Reconnect the account.',
+          { reason: 'triggercmd_missing_refresh_token' }
+        );
+      }
       let response = await httpClient.post(
         '/oauth/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.token,
+          refresh_token: ctx.output.refreshToken,
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret
         }).toString(),
@@ -79,9 +106,12 @@ export let auth = SlateAuth.create()
       );
 
       return {
-        output: {
-          token: response.data.access_token
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'TRIGGERcmd',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     }
   })
@@ -99,6 +129,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('A TRIGGERcmd API token is required.', {
+          reason: 'triggercmd_missing_token'
+        });
+      }
       return {
         output: {
           token: ctx.input.token

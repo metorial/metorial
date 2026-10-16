@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCompany = SlateTool.create(spec, {
@@ -29,6 +30,7 @@ export let getCompany = SlateTool.create(spec, {
       updatedAt: z.string().optional().describe('Updated date'),
       address: z.any().optional().describe('Address'),
       phones: z.array(z.any()).optional().describe('Phone numbers'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links')
     })
   )
@@ -38,17 +40,18 @@ export let getCompany = SlateTool.create(spec, {
 
     return {
       output: {
-        companyId: (data.id ?? ctx.input.companyId).toString(),
-        name: data.name,
-        website: data.website,
-        notes: data.notes,
-        isHot: data.is_hot,
-        keyTechnologies: data.key_technologies,
-        countryCode: data.country_code,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        companyId: requiredId(data?.id, 'record'),
+        name: data.name ?? undefined,
+        website: data.website ?? undefined,
+        notes: data.notes ?? undefined,
+        isHot: data.is_hot ?? undefined,
+        keyTechnologies: data.key_technologies ?? undefined,
+        countryCode: data.country_code ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
         address: data._embedded?.address ?? data.address,
-        phones: data._embedded?.phones,
+        phones: data._embedded?.phones ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved company **${data.name ?? ctx.input.companyId}** (ID: ${ctx.input.companyId}).`

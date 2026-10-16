@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let promotionSchema = z
@@ -10,7 +11,10 @@ let promotionSchema = z
     description: z.string().optional().describe('Promotion description'),
     voucherLimit: z.number().optional().describe('Maximum number of vouchers'),
     limitPerContact: z.number().optional().describe('Maximum vouchers per contact'),
-    expirationDuration: z.number().optional().describe('Voucher expiration duration in days')
+    expirationDuration: z
+      .number()
+      .optional()
+      .describe('Voucher expiration duration in seconds')
   })
   .passthrough();
 
@@ -43,33 +47,33 @@ export let listPromotions = SlateTool.create(spec, {
 
     if (ctx.input.promotionUuid) {
       let result = await client.getPromotion(ctx.input.promotionUuid);
-      let p = result.data || result;
+      let p = result.data;
       return {
         output: {
-          promotion: {
-            promotionUuid: p.uuid,
+          promotion: mapEntity(p, {
+            promotionUuid: requiredString(p.uuid, 'promotionUuid'),
             name: p.name,
             description: p.description,
             voucherLimit: p.voucher_limit,
             limitPerContact: p.limit_per_contact,
-            expirationDuration: p.expiration_duration,
-            ...p
-          }
+            expirationDuration: p.expiration_duration
+          })
         },
         message: `Retrieved promotion **${p.name || p.uuid}**.`
       };
     }
 
     let result = await client.listPromotions();
-    let promotions = (result.data || []).map((p: any) => ({
-      promotionUuid: p.uuid,
-      name: p.name,
-      description: p.description,
-      voucherLimit: p.voucher_limit,
-      limitPerContact: p.limit_per_contact,
-      expirationDuration: p.expiration_duration,
-      ...p
-    }));
+    let promotions = result.data.map((p: any) =>
+      mapEntity(p, {
+        promotionUuid: requiredString(p.uuid, 'promotionUuid'),
+        name: p.name,
+        description: p.description,
+        voucherLimit: p.voucher_limit,
+        limitPerContact: p.limit_per_contact,
+        expirationDuration: p.expiration_duration
+      })
+    );
 
     return {
       output: { promotions },

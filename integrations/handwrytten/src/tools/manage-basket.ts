@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,12 @@ export let manageBasket = SlateTool.create(spec, {
 
       cardId: z.string().optional().describe('Card design ID (for add)'),
       message: z.string().optional().describe('Handwritten message text (for add)'),
-      fontLabel: z.string().optional().describe('Handwriting style font label (for add)'),
+      fontLabel: z
+        .string()
+        .optional()
+        .describe(
+          'Handwriting font ID from list_handwriting_styles, such as hwJeff (for add)'
+        ),
       returnAddressId: z
         .string()
         .optional()
@@ -74,12 +79,27 @@ export let manageBasket = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!ctx.input.cardId || !ctx.input.message || !ctx.input.fontLabel) {
-        throw new Error('cardId, message, and fontLabel are required to add to basket');
+        throw createApiServiceError(
+          'cardId, message, and fontLabel are required to add to basket'
+        );
+      }
+      if (Boolean(ctx.input.addressId) === Boolean(ctx.input.recipients?.length)) {
+        throw createApiServiceError(
+          'Provide either addressId from manage_address_book or a nonempty recipients array.'
+        );
+      }
+      let fonts = await client.listFonts();
+      let font = (fonts.fonts ?? []).find(
+        (item: { id: string; label: string }) =>
+          item.id === ctx.input.fontLabel || item.label === ctx.input.fontLabel
+      );
+      if (!font) {
+        throw createApiServiceError('Choose a font ID or label from list_handwriting_styles.');
       }
       let result = await client.addToBasket({
         cardId: ctx.input.cardId,
         message: ctx.input.message,
-        font: ctx.input.fontLabel,
+        font: String(font.id),
         returnAddressId: ctx.input.returnAddressId,
         addressId: ctx.input.addressId,
         addresses: ctx.input.recipients,
@@ -87,7 +107,17 @@ export let manageBasket = SlateTool.create(spec, {
         insertId: ctx.input.insertId,
         dateSend: ctx.input.sendDate
       });
-      let orderId = String(result.order_id ?? result.id ?? '');
+      let returnedId = result.order_id ?? result.id;
+      if (
+        returnedId === undefined ||
+        returnedId === null ||
+        String(returnedId).trim() === ''
+      ) {
+        throw createApiServiceError(
+          'Handwrytten did not return a basket order ID. Check the basket before retrying.'
+        );
+      }
+      let orderId = String(returnedId);
       return {
         output: { orderId, success: true },
         message: `Added order to basket. Order ID: \`${orderId}\``
@@ -121,6 +151,6 @@ export let manageBasket = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

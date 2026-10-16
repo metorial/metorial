@@ -23,6 +23,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       balance: z.number().nullable().describe('Account balance in rubles'),
       stats: z
         .object({
@@ -54,6 +55,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
     let balance: number | null = null;
     let stats: any = null;
     let versions: any = null;
+    let rawData: Record<string, unknown> = {};
 
     let promises: Promise<void>[] = [];
 
@@ -61,6 +63,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
       promises.push(
         client.getBalance().then(data => {
           balance = data.balance ?? null;
+          rawData.balance = data;
         })
       );
     }
@@ -68,6 +71,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
     if (include.includes('stats')) {
       promises.push(
         client.getDailyStats().then(data => {
+          rawData.stats = data;
           stats = {
             date: data.date ?? null,
             servicesUsed: data.services ?? null,
@@ -81,6 +85,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
       promises.push(
         client.getVersions().then(data => {
           versions = data ?? null;
+          rawData.versions = data;
         })
       );
     }
@@ -92,7 +97,7 @@ Useful for monitoring API consumption and checking that reference data is up to 
     if (stats?.date) messageParts.push(`Stats date: ${stats.date}`);
 
     return {
-      output: { balance, stats, versions },
+      output: { balance, stats, versions, rawData },
       message: messageParts.length > 0 ? messageParts.join('. ') : 'Account info retrieved.'
     };
   })

@@ -7,6 +7,7 @@ export let getAbuseContact = SlateTool.create(spec, {
   name: 'Get Abuse Contact',
   key: 'get_abuse_contact',
   description: `Retrieve the abuse contact information for an IP address. Returns the network administrator's contact details (email, phone, address) for reporting fraudulent or malicious activities.`,
+  constraints: ['Requires an IPinfo Custom API subscription with Abuse Contact access.'],
   tags: {
     destructive: false,
     readOnly: true

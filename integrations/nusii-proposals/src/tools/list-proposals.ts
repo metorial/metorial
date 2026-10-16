@@ -17,6 +17,18 @@ export let listProposals = SlateTool.create(spec, {
         .enum(['draft', 'pending', 'accepted', 'rejected', 'clarification'])
         .optional()
         .describe('Filter proposals by status'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Search titles, document numbers, public IDs, or client names, businesses, and emails'
+        ),
+      recipientEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Filter proposals by recipient email; comma-separate up to 30 addresses to match any'
+        ),
       archived: z
         .boolean()
         .optional()
@@ -29,6 +41,7 @@ export let listProposals = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       proposals: z.array(
         z.object({
           proposalId: z.string(),
@@ -50,9 +63,11 @@ export let listProposals = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listProposals({
       status: ctx.input.status,
+      query: ctx.input.query,
+      recipientEmail: ctx.input.recipientEmail,
       archived: ctx.input.archived,
       page: ctx.input.page,
       perPage: ctx.input.perPage
@@ -61,6 +76,7 @@ export let listProposals = SlateTool.create(spec, {
     return {
       output: {
         proposals: result.items,
+        raw: result.raw,
         currentPage: result.pagination.currentPage,
         totalPages: result.pagination.totalPages,
         totalCount: result.pagination.totalCount

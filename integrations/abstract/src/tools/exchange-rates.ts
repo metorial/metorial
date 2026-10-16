@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AbstractClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,10 @@ export let exchangeRates = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete exchange rate or conversion response'),
       baseCurrency: z.string().describe('The base currency code'),
       targetCurrency: z.string().optional().describe('The target currency code'),
       date: z.string().optional().describe('The date for the rates'),
@@ -68,13 +72,14 @@ export let exchangeRates = SlateTool.create(spec, {
     let { mode, baseCurrency, targetCurrency, date, amount } = ctx.input;
 
     if (mode === 'convert' && !targetCurrency) {
-      throw new Error('targetCurrency is required for "convert" mode.');
+      throw createApiServiceError('targetCurrency is required for "convert" mode.');
     }
     if (mode === 'historical' && !date) {
-      throw new Error('date is required for "historical" mode.');
+      throw createApiServiceError('date is required for "historical" mode.');
     }
 
     let output: {
+      rawResponse?: Record<string, unknown>;
       baseCurrency: string;
       targetCurrency?: string;
       date?: string;
@@ -93,6 +98,7 @@ export let exchangeRates = SlateTool.create(spec, {
       });
 
       output = {
+        rawResponse: result,
         baseCurrency: result.base ?? baseCurrency,
         targetCurrency: targetCurrency,
         date: result.date ?? date,
@@ -110,6 +116,7 @@ export let exchangeRates = SlateTool.create(spec, {
       });
 
       output = {
+        rawResponse: result,
         baseCurrency: result.base ?? baseCurrency,
         targetCurrency,
         date: result.date ?? date,
@@ -123,6 +130,7 @@ export let exchangeRates = SlateTool.create(spec, {
       });
 
       output = {
+        rawResponse: result,
         baseCurrency: result.base ?? baseCurrency,
         targetCurrency,
         exchangeRates: result.exchange_rates ?? undefined,

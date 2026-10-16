@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { testSettings } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateTest = SlateTool.create(spec, {
@@ -18,6 +19,34 @@ export let updateTest = SlateTool.create(spec, {
   .input(
     z.object({
       testId: z.string().describe('ID of the test to update'),
+      roleIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Role IDs associated with the test; required by HackerRank when creating a test'
+        ),
+      experienceLevels: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Experience levels: Intern, New Graduate, 0-2 years, 2-5 years, >5 years, All Experience Levels. Use instead of experience for multiple levels.'
+        ),
+      questionIds: z
+        .array(z.string())
+        .optional()
+        .describe('Question IDs to include; call list_questions to discover IDs'),
+      draft: z
+        .boolean()
+        .optional()
+        .describe('Whether the test is a draft; only published tests accept invitations'),
+      startTime: z
+        .string()
+        .optional()
+        .describe('Earliest test login time as an ISO 8601 timestamp'),
+      endTime: z
+        .string()
+        .optional()
+        .describe('Latest test login time as an ISO 8601 timestamp'),
       name: z.string().optional().describe('New name for the test'),
       duration: z.number().optional().describe('New test duration in minutes'),
       instructions: z.string().optional().describe('New instructions for the test'),
@@ -47,6 +76,13 @@ export let updateTest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    let updateData = testSettings(ctx.input);
+    if (
+      (ctx.input.remove && ctx.input.archive) ||
+      ((ctx.input.remove || ctx.input.archive) && Object.keys(updateData).length > 0)
+    ) {
+      throw createApiServiceError('Choose one operation: update fields, archive, or remove.');
+    }
     if (ctx.input.remove) {
       await client.deleteTest(ctx.input.testId);
       return {
@@ -67,18 +103,8 @@ export let updateTest = SlateTool.create(spec, {
       };
     }
 
-    let updateData: Record<string, any> = {};
-    if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-    if (ctx.input.duration !== undefined) updateData.duration = ctx.input.duration;
-    if (ctx.input.instructions !== undefined) updateData.instructions = ctx.input.instructions;
-    if (ctx.input.languages !== undefined) updateData.languages = ctx.input.languages;
-    if (ctx.input.experience !== undefined) updateData.experience = ctx.input.experience;
-    if (ctx.input.cutoffScore !== undefined) updateData.cutoff_score = ctx.input.cutoffScore;
-    if (ctx.input.tags !== undefined) updateData.tags = ctx.input.tags;
-    if (ctx.input.candidateTabSwitch !== undefined)
-      updateData.candidate_tab_switch = ctx.input.candidateTabSwitch;
-    if (ctx.input.hideCompileTest !== undefined)
-      updateData.hide_compile_test = ctx.input.hideCompileTest;
+    if (Object.keys(updateData).length === 0)
+      throw createApiServiceError('Provide at least one test setting to update.');
 
     let result = await client.updateTest(ctx.input.testId, updateData);
     let test = result.data ?? result;

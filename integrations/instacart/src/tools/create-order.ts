@@ -9,6 +9,17 @@ let productCodeSchema = z.object({
 });
 
 let orderItemSchema = z.object({
+  item: z
+    .object({ upc: z.string().optional(), rrc: z.string().optional() })
+    .optional()
+    .describe(
+      'Current item identification; specify exactly one UPC or retailer reference code'
+    ),
+  replacementItems: z
+    .array(z.object({ upc: z.string().optional(), rrc: z.string().optional() }))
+    .optional()
+    .describe('Requested replacement item codes, when enabled for the retailer'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Provider item metadata'),
   lineNum: z.string().describe('Unique line number identifier for this item'),
   count: z.number().describe('Quantity of the item'),
   weight: z.number().optional().describe('Weight of the item'),
@@ -30,7 +41,7 @@ export let createOrder = SlateTool.create(spec, {
 
 Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope.`,
   instructions: [
-    'Use "Find Stores" to get a locationCode and "List Cart Service Options" to get a serviceOptionHoldId before creating an order.',
+    'Use "Find Stores" to get a locationCode and "List Cart Service Options" and "Reserve Time Slot" to get a serviceOptionHoldId before creating an order.',
     'A serviceOptionHoldId from reserving a time slot is recommended for delivery orders.',
     'Cancellation is only possible before a shopper is assigned (before "acknowledged" status).'
   ],
@@ -90,6 +101,7 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete created order data'),
       orderId: z.string().describe('Instacart order ID'),
       status: z.string().describe('Current order status'),
       orderUrl: z.string().optional().describe('URL to view the order'),
@@ -111,7 +123,8 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
       warnings: z
         .array(
           z.object({
-            message: z.string().describe('Warning message')
+            raw: z.unknown().optional(),
+            message: z.string().optional().describe('Warning message')
           })
         )
         .optional()
@@ -121,10 +134,11 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
-    let order: any;
+    let order: Awaited<ReturnType<ConnectClient['createDeliveryOrder']>>;
     if (ctx.input.fulfillmentType === 'delivery') {
       order = await client.createDeliveryOrder({
         userId: ctx.input.userId,
@@ -156,6 +170,7 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
 
     return {
       output: {
+        raw: order.raw,
         orderId: order.orderId,
         status: order.status,
         orderUrl: order.orderUrl,

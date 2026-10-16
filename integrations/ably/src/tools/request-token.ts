@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
+import { validateInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let requestToken = SlateTool.create(spec, {
@@ -29,13 +30,13 @@ Use this to generate tokens for client-side applications instead of exposing you
         .number()
         .optional()
         .describe(
-          'Time to live in milliseconds. Default is 60 minutes (3600000 ms). Max is 24 hours.'
+          'Time to live in milliseconds. Default is 60 minutes (3600000 ms). Maximum is 24 hours, or one hour for revocable tokens.'
         ),
       capability: z
         .record(z.string(), z.array(z.string()))
         .optional()
         .describe(
-          'Capabilities map: channel name/pattern -> array of operations (publish, subscribe, presence, history, push-subscribe, push-admin, channel-metadata, statistics)'
+          'Capabilities map: channel name/pattern -> array of operations (publish, subscribe, presence, history, push-subscribe, push-admin, channel-metadata, stats). Grant stats on the wildcard resource "*", for example {"*":["stats"]}.'
         ),
       clientId: z
         .string()
@@ -47,6 +48,7 @@ Use this to generate tokens for client-side applications instead of exposing you
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete issued token details returned by Ably'),
       tokenValue: z.string().describe('The issued token string'),
       keyName: z.string().describe('Key name the token was issued from'),
       issued: z.number().describe('Token issuance timestamp in milliseconds'),
@@ -56,8 +58,9 @@ Use this to generate tokens for client-side applications instead of exposing you
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
+    validateInteger('ttl', ctx.input.ttl, 1, 86400000);
     let result = await client.requestToken(ctx.input.keyName, {
       ttl: ctx.input.ttl,
       capability: ctx.input.capability,
@@ -66,6 +69,7 @@ Use this to generate tokens for client-side applications instead of exposing you
 
     return {
       output: {
+        raw: result,
         tokenValue: result.token,
         keyName: result.keyName,
         issued: result.issued,

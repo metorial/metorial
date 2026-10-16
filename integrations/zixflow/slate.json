@@ -1,6 +1,6 @@
 {
   "name": "@metorial/zixflow",
-  "description": "Manage CRM data and send multichannel messages via WhatsApp, SMS, RCS, and Email. Create, read, update, and delete collection records, list entries, and custom attributes. Send WhatsApp template and direct messages, SMS (transactional/promotional), RCS rich media messages, and emails with attachments. Deliver OTPs with automatic multi-channel fallback. Manage activities and tasks tied to CRM records. Retrieve campaign delivery reports across channels. Access workspace member information.",
+  "description": "Manage CRM data and send multichannel messages via WhatsApp, SMS, RCS, and Email. Create, read, update, and delete collection records and list entries. Discover collection and list attributes, field definitions, and select or status options. Send WhatsApp template and direct messages, SMS (transactional/promotional), RCS rich media messages, and emails with attachments. Deliver OTPs with automatic multi-channel fallback. Manage activities and tasks tied to CRM records. Retrieve campaign delivery reports across channels. Access workspace member information.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "send WhatsApp messages",
@@ -8,7 +8,7 @@
     "send RCS messages",
     "send emails with attachments",
     "manage CRM records",
-    "manage collection attributes",
+    "discover attributes and options",
     "deliver OTPs multi-channel",
     "retrieve campaign reports",
     "manage activities and tasks"

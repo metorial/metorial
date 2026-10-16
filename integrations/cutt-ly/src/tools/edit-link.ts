@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CuttlyClient, getEditStatusMessage } from '../lib/client';
+import { CuttlyClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let editLink = SlateTool.create(spec, {
@@ -121,25 +121,95 @@ export let editLink = SlateTool.create(spec, {
     let input = ctx.input;
     let messages: string[] = [];
 
-    // Handle password separately (requires POST)
-    if (input.removePassword) {
-      let pwResult = await client.removePassword(input.shortLink);
-      if (pwResult.status !== 1) {
-        throw new Error(`Failed to remove password: ${getEditStatusMessage(pwResult.status)}`);
+    if (input.removePassword && input.password !== undefined) {
+      throw createApiServiceError('Provide password or removePassword, not both.');
+    }
+    if (
+      input.uniqueClickMinutes !== undefined &&
+      (!Number.isInteger(input.uniqueClickMinutes) ||
+        (![0, 1].includes(input.uniqueClickMinutes) &&
+          (input.uniqueClickMinutes < 15 || input.uniqueClickMinutes > 1440)))
+    ) {
+      throw createApiServiceError(
+        'uniqueClickMinutes must be 0, 1, or an integer from 15 to 1440.'
+      );
+    }
+    if (input.expireType !== undefined && input.expireCondition === undefined) {
+      throw createApiServiceError('Provide expireCondition when setting expireType.');
+    }
+    if (input.expireCondition !== undefined && input.expireCondition !== '0') {
+      if (input.expireType === undefined || !input.expireRedirectUrl) {
+        throw createApiServiceError(
+          'Provide expireType and expireRedirectUrl when setting expiration.'
+        );
       }
+      if (input.expireType === 'clicks' && !/^[1-9]\d*$/.test(input.expireCondition)) {
+        throw createApiServiceError('Click expiration requires a positive whole click count.');
+      }
+      if (
+        input.expireType === 'date' &&
+        (!/^\d{4}-\d{2}-\d{2}$/.test(input.expireCondition) ||
+          !Number.isFinite(Date.parse(input.expireCondition)) ||
+          new Date(input.expireCondition).toISOString().slice(0, 10) !== input.expireCondition)
+      ) {
+        throw createApiServiceError(
+          'Date expiration requires a valid date in YYYY-MM-DD format.'
+        );
+      }
+    }
+    if (
+      input.mobileRedirect &&
+      input.mobileRedirect.platform !== 'android' &&
+      (input.mobileRedirect.androidPackageId !== undefined ||
+        input.mobileRedirect.installReferrer !== undefined)
+    ) {
+      throw createApiServiceError(
+        'androidPackageId and installReferrer apply only to Android redirects.'
+      );
+    }
+    if (input.mobileRedirect?.installReferrer && !input.mobileRedirect.androidPackageId) {
+      throw createApiServiceError('Provide androidPackageId with installReferrer.');
+    }
+    if (input.abTest && input.abTest.type !== 'remove') {
+      let test = input.abTest;
+      if (
+        test.bPercentage === undefined ||
+        test.bPercentage < 0 ||
+        test.bPercentage > 100 ||
+        !test.bUrl
+      ) {
+        throw createApiServiceError(
+          'A/B and A/B/C tests require bPercentage from 0 to 100 and bUrl.'
+        );
+      }
+      if (
+        test.type === 'abc' &&
+        (test.cPercentage === undefined ||
+          test.cPercentage < 0 ||
+          test.cPercentage > 100 ||
+          test.bPercentage + test.cPercentage > 100 ||
+          !test.cUrl)
+      ) {
+        throw createApiServiceError(
+          'A/B/C tests require cPercentage from 0 to 100 and cUrl; B and C percentages must total at most 100.'
+        );
+      }
+      if (test.type === 'ab' && (test.cPercentage !== undefined || test.cUrl !== undefined)) {
+        throw createApiServiceError('C variation fields require an A/B/C test.');
+      }
+    }
+
+    if (input.removePassword) {
+      await client.removePassword(input.shortLink);
       messages.push('Password removed');
     } else if (input.password !== undefined) {
-      let pwResult = await client.setPassword({
+      await client.setPassword({
         shortLink: input.shortLink,
         password: input.password
       });
-      if (pwResult.status !== 1) {
-        throw new Error(`Failed to set password: ${getEditStatusMessage(pwResult.status)}`);
-      }
       messages.push('Password set');
     }
 
-    // Build edit params for all GET-based edits
     let hasGetEdits =
       input.alias !== undefined ||
       input.sourceUrl !== undefined ||
@@ -148,6 +218,8 @@ export let editLink = SlateTool.create(spec, {
       input.uniqueClickMinutes !== undefined ||
       input.expireType !== undefined ||
       input.expireCondition !== undefined ||
+      input.expireRedirectUrl !== undefined ||
+      input.expireUniqueClicks !== undefined ||
       input.mobileRedirect !== undefined ||
       input.abTest !== undefined;
 
@@ -160,37 +232,44 @@ export let editLink = SlateTool.create(spec, {
       }
 
       let expireValue: number | undefined;
-      if (input.expireType === 'clicks') expireValue = 0;
+      if (input.expireCondition === '0') expireValue = 0;
+      else if (input.expireType === 'clicks') expireValue = 0;
       else if (input.expireType === 'date') expireValue = 1;
 
-      let result = await client.editLink({
-        shortLink: input.shortLink,
-        name: input.alias,
-        source: input.sourceUrl,
-        title: input.title,
-        tag: input.tag,
-        unique: input.uniqueClickMinutes,
-        mobile: input.mobileRedirect?.platform,
-        destination: input.mobileRedirect?.destinationUrl,
-        packageId: input.mobileRedirect?.androidPackageId,
-        referrer: input.mobileRedirect?.installReferrer,
-        expire: expireValue,
-        expireCond: input.expireCondition,
-        expireRedirect: input.expireRedirectUrl,
-        expireUnique: input.expireUniqueClicks
-          ? 1
-          : input.expireUniqueClicks === false
-            ? 0
-            : undefined,
-        abtest: abTestValue,
-        abtestB: input.abTest?.bPercentage,
-        abtestBVariation: input.abTest?.bUrl,
-        abtestC: input.abTest?.cPercentage,
-        abtestCVariation: input.abTest?.cUrl
-      });
-
-      if (result.status !== 1) {
-        throw new Error(`Failed to edit link: ${getEditStatusMessage(result.status)}`);
+      try {
+        await client.editLink({
+          shortLink: input.shortLink,
+          name: input.alias,
+          source: input.sourceUrl,
+          title: input.title,
+          tag: input.tag,
+          unique: input.uniqueClickMinutes,
+          mobile: input.mobileRedirect?.platform,
+          destination: input.mobileRedirect?.destinationUrl,
+          packageId: input.mobileRedirect?.androidPackageId,
+          referrer: input.mobileRedirect?.installReferrer,
+          expire: expireValue,
+          expireCond: input.expireCondition,
+          expireRedirect: input.expireRedirectUrl,
+          expireUnique: input.expireUniqueClicks
+            ? 1
+            : input.expireUniqueClicks === false
+              ? 0
+              : undefined,
+          abtest: abTestValue,
+          abtestB: input.abTest?.type === 'remove' ? undefined : input.abTest?.bPercentage,
+          abtestBVariation: input.abTest?.type === 'remove' ? undefined : input.abTest?.bUrl,
+          abtestC: input.abTest?.type === 'abc' ? input.abTest.cPercentage : undefined,
+          abtestCVariation: input.abTest?.type === 'abc' ? input.abTest.cUrl : undefined
+        });
+      } catch (error) {
+        if (messages.length > 0) {
+          throw createApiServiceError(
+            `${messages.join('. ')}. Remaining link edits failed: ${error instanceof Error ? error.message : 'Cutt.ly API error'}`,
+            { parent: error, reason: 'cuttly_partial_update' }
+          );
+        }
+        throw error;
       }
 
       let editedFields: string[] = [];
@@ -199,7 +278,12 @@ export let editLink = SlateTool.create(spec, {
       if (input.title !== undefined) editedFields.push('title');
       if (input.tag !== undefined) editedFields.push('tag');
       if (input.uniqueClickMinutes !== undefined) editedFields.push('unique click tracking');
-      if (input.expireType !== undefined || input.expireCondition !== undefined)
+      if (
+        input.expireType !== undefined ||
+        input.expireCondition !== undefined ||
+        input.expireRedirectUrl !== undefined ||
+        input.expireUniqueClicks !== undefined
+      )
         editedFields.push('expiration');
       if (input.mobileRedirect !== undefined) editedFields.push('mobile redirect');
       if (input.abTest !== undefined) editedFields.push('A/B test');

@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let streamSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   streamId: z.string().describe('Unique identifier of the stream'),
   name: z.string().describe('Human-readable name of the stream'),
   status: z
@@ -32,6 +36,7 @@ export let listStreams = SlateTool.create(spec, {
     let streams = await client.listStreams();
 
     let mapped = streams.map((s: any) => ({
+      raw: s,
       streamId: s.id,
       name: s.name,
       status: s.status,
@@ -65,6 +70,7 @@ export let getStream = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: s,
         streamId: s.id,
         name: s.name,
         status: s.status,

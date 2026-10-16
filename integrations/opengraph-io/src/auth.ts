@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -21,6 +21,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.appId.trim()) {
+        throw createApiServiceError(
+          'Enter your OpenGraph.io App ID from the API keys dashboard.'
+        );
+      }
       return {
         output: {
           token: ctx.input.appId

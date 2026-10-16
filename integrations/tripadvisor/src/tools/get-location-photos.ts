@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ContentClient } from '../lib/client';
+import { ContentClient, optionalNumber, providerId, providerList } from '../lib/client';
 import { spec } from '../spec';
 
 let imageVariantSchema = z.object({
@@ -36,7 +36,9 @@ export let getLocationPhotos = SlateTool.create(spec, {
   name: 'Get Location Photos',
   key: 'get_location_photos',
   description: `Retrieve high-quality recent photos for a specific Tripadvisor location. Returns photo URLs in multiple sizes (thumbnail, small, medium, large, original), captions, and source info. Optionally filter by photo source (Expert, Management, Traveler). Use a location ID obtained from the search tools.`,
-  constraints: ['Returns up to 5 photos per location.'],
+  constraints: [
+    'Photo availability and maximum result counts depend on the API subscription; standard access returns up to 5 photos.'
+  ],
   tags: {
     readOnly: true
   }
@@ -48,7 +50,10 @@ export let getLocationPhotos = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Language code for results (overrides global config)'),
-      limit: z.number().optional().describe('Number of photos to return (max 5)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of photos to return, within your API subscription limit'),
       offset: z.number().optional().describe('Index of the first result for pagination'),
       source: z
         .string()
@@ -77,12 +82,18 @@ export let getLocationPhotos = SlateTool.create(spec, {
       ctx.input.source
     );
 
-    let photos = (result.data || []).map((p: any) => {
+    let photos = providerList(result.data).map((p: any) => {
       let mapImage = (img: any) =>
-        img ? { url: img.url, width: img.width, height: img.height } : undefined;
+        img
+          ? {
+              url: img.url,
+              width: optionalNumber(img.width),
+              height: optionalNumber(img.height)
+            }
+          : undefined;
 
       return {
-        photoId: String(p.id),
+        photoId: providerId(p.id),
         caption: p.caption,
         publishedDate: p.published_date,
         isBlessed: p.is_blessed,
@@ -105,7 +116,7 @@ export let getLocationPhotos = SlateTool.create(spec, {
       };
     });
 
-    let totalResults = result.paging?.total_results;
+    let totalResults = optionalNumber(result.paging?.total_results);
 
     return {
       output: { photos, totalResults },

@@ -32,7 +32,7 @@ let fixtureSchema = z.object({
 export let getFixturesTool = SlateTool.create(spec, {
   name: 'Get Fixtures',
   key: 'get_fixtures',
-  description: `Retrieve match fixtures, results, and schedules. Supports filtering by league, team, date range, status, and round. Use for football fixtures; for other sports, the same filters apply but map to the sport's game/match data. Can also retrieve live games by setting **live** to true.`,
+  description: `Retrieve match fixtures, results, and schedules. Supports filtering by league, team, date range, status, and round. Filters vary by sport: football supports date ranges and last/next; most other team sports use an ID, date, league, season or team. NBA uses nbaLeague names. Formula 1 returns races and MMA returns fights; their complete details are retained in raw. Can also retrieve live games by setting **live** to true.`,
   instructions: [
     'Provide at least one filter (league, team, date, fixtureId, or live) to avoid overly broad queries.',
     'Date format is YYYY-MM-DD. Date ranges use "from" and "to" parameters.'
@@ -63,6 +63,18 @@ export let getFixturesTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      nbaLeague: z
+        .string()
+        .optional()
+        .describe('NBA league name from get_nba_leagues; use instead of numeric league'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe(
+          'Exact string season from get_seasons for basketball; use instead of season'
+        ),
+      fighter: z.number().optional().describe('MMA fighter ID from get_player_stats'),
+      category: z.string().optional().describe('MMA weight category'),
       fixtureId: z.number().optional().describe('Get a specific fixture by ID'),
       live: z.boolean().optional().describe('Set to true to get only live/in-play matches'),
       league: z.number().optional().describe('League ID to filter by'),
@@ -83,6 +95,10 @@ export let getFixturesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       fixtures: z.array(fixtureSchema),
       count: z.number().describe('Number of fixtures returned')
     })
@@ -93,8 +109,10 @@ export let getFixturesTool = SlateTool.create(spec, {
 
     let isFootball = sport === 'football';
     let params: any = {
-      league: ctx.input.league,
-      season: ctx.input.season,
+      league: ctx.input.nbaLeague ?? ctx.input.league,
+      season: ctx.input.seasonName ?? ctx.input.season,
+      fighter: ctx.input.fighter,
+      category: ctx.input.category,
       team: ctx.input.team,
       date: ctx.input.date,
       from: ctx.input.from,
@@ -106,7 +124,7 @@ export let getFixturesTool = SlateTool.create(spec, {
       next: ctx.input.next
     };
 
-    if (ctx.input.fixtureId) {
+    if (ctx.input.fixtureId !== undefined) {
       params.id = ctx.input.fixtureId;
     }
     if (ctx.input.live) {
@@ -153,48 +171,56 @@ export let getFixturesTool = SlateTool.create(spec, {
           awayScoreHalftime: score.halftime?.away ?? null
         };
       }
-      // Generic sport mapping
+      const fixture = item.game ?? item;
+      const gameDate = fixture.date;
+      const score = (value: any) =>
+        typeof value === 'number' ? value : (value?.total ?? value?.points ?? null);
       return {
-        fixtureId: item.id ?? null,
-        referee: null,
-        date: item.date ?? item.time ?? null,
-        timestamp: item.timestamp ?? null,
-        venueName: null,
-        venueCity: null,
-        statusLong: item.status?.long ?? null,
-        statusShort: item.status?.short ?? null,
-        elapsed: item.status?.timer ?? item.timer ?? null,
+        fixtureId: fixture.id,
+        referee: typeof fixture.referee === 'string' ? fixture.referee : null,
+        date:
+          typeof gameDate === 'string'
+            ? gameDate
+            : (gameDate?.start ?? gameDate?.date ?? null),
+        timestamp: fixture.timestamp ?? gameDate?.timestamp ?? null,
+        venueName: fixture.venue?.name ?? item.arena?.name ?? item.circuit?.name ?? null,
+        venueCity: fixture.venue?.city ?? item.arena?.city ?? null,
+        statusLong:
+          fixture.status?.long ?? (typeof fixture.status === 'string' ? fixture.status : null),
+        statusShort: fixture.status?.short != null ? String(fixture.status.short) : null,
+        elapsed:
+          typeof fixture.status?.timer === 'number'
+            ? fixture.status.timer
+            : typeof item.timer === 'number'
+              ? item.timer
+              : null,
         leagueId: item.league?.id ?? null,
-        leagueName: item.league?.name ?? null,
-        leagueSeason: item.league?.season ?? null,
-        leagueRound: null,
+        leagueName:
+          typeof item.league === 'string' ? item.league : (item.league?.name ?? null),
+        leagueSeason: item.league?.season ?? item.season ?? null,
+        leagueRound: fixture.week ?? item.week ?? null,
         homeTeamId: item.teams?.home?.id ?? null,
         homeTeamName: item.teams?.home?.name ?? null,
         homeTeamLogo: item.teams?.home?.logo ?? null,
-        awayTeamId: item.teams?.away?.id ?? null,
-        awayTeamName: item.teams?.away?.name ?? null,
-        awayTeamLogo: item.teams?.away?.logo ?? null,
-        homeGoals: item.scores?.home?.total ?? item.scores?.home ?? null,
-        awayGoals: item.scores?.away?.total ?? item.scores?.away ?? null,
+        awayTeamId: item.teams?.away?.id ?? item.teams?.visitors?.id ?? null,
+        awayTeamName: item.teams?.away?.name ?? item.teams?.visitors?.name ?? null,
+        awayTeamLogo: item.teams?.away?.logo ?? item.teams?.visitors?.logo ?? null,
+        homeGoals: score(item.scores?.home),
+        awayGoals: score(item.scores?.away ?? item.scores?.visitors),
         homeScoreHalftime: null,
         awayScoreHalftime: null
       };
     });
 
-    let liveCount = results.filter(
-      (f: any) =>
-        f.statusShort &&
-        !['FT', 'NS', 'TBD', 'PST', 'CANC', 'ABD', 'AWD', 'WO'].includes(f.statusShort)
-    ).length;
-
     return {
       output: {
+        raw: data,
         fixtures: results,
         count: results.length
       },
       message: ctx.input.live
         ? `Found **${results.length}** live fixture(s) for **${sport}**.`
-        : `Found **${results.length}** fixture(s) for **${sport}**${liveCount > 0 ? ` (${liveCount} currently live)` : ''}.`
+        : `Found **${results.length}** fixture(s) for **${sport}**.`
     };
   })
   .build();

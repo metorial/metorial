@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { providerRecordSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let participantSchema = z.object({
@@ -23,7 +24,7 @@ let participantSchema = z.object({
 export let listParticipants = SlateTool.create(spec, {
   name: 'List Participants',
   key: 'list_participants',
-  description: `Retrieves all participants (attendees who have joined the event) with their profile information and check-in status.
+  description: `Retrieves all participants (including attendees, speakers, admins, and moderators) with their profile information and check-in status. Fields absent from the provider response are empty strings; raw records retain roles, tickets, group IDs, personal URLs and timestamps.
 Use this to get a complete list of people currently participating in the event.`,
   tags: {
     readOnly: true
@@ -33,18 +34,22 @@ Use this to get a complete list of people currently participating in the event.`
   .output(
     z.object({
       participants: z.array(participantSchema).describe('List of event participants'),
+      raw: z
+        .array(providerRecordSchema)
+        .describe('Complete provider records with all original fields'),
       totalCount: z.number().describe('Total number of participants')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let participants = await client.listParticipants();
+    let { participants, raw } = await client.listParticipants();
 
     let checkedInCount = participants.filter(p => p.checkedIn).length;
 
     return {
       output: {
         participants,
+        raw,
         totalCount: participants.length
       },
       message: `Retrieved **${participants.length}** participant(s). **${checkedInCount}** currently checked in.`

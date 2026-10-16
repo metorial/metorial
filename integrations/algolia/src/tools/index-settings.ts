@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ export let indexSettings = SlateTool.create(spec, {
 
     // action === 'update'
     if (!ctx.input.settings || Object.keys(ctx.input.settings).length === 0) {
-      throw new Error(
+      throw createApiServiceError(
         'Settings object is required and must not be empty when updating index settings.'
       );
     }

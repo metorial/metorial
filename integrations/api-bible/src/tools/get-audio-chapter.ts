@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,7 @@ let chapterSummarySchema = z.object({
 export let getAudioChapter = SlateTool.create(spec, {
   name: 'Get Audio Chapter',
   key: 'get_audio_chapter',
-  description: `Retrieve audio Bible content. Can list books in an audio Bible, list chapters for a book, or get the audio resource URL for a specific chapter. The resource URL provides the audio file for playback.`,
+  description: `Retrieve audio Bible content. Can list books in an audio Bible, list chapters for a book, or get the audio resource URL for a specific chapter. The audio file is available to download; its signed resource URL expires.`,
   instructions: [
     'Provide audioBibleId alone to list available books. Add bookId to list chapters. Add chapterId to get the audio URL.',
     'Use the List Audio Bibles tool first to find available audio Bible IDs.'
@@ -47,7 +47,20 @@ export let getAudioChapter = SlateTool.create(spec, {
         .describe('List of chapters (when listing chapters)'),
       chapterId: z.string().optional().describe('Chapter ID (when retrieving audio)'),
       reference: z.string().optional().describe('Human-readable reference'),
-      resourceUrl: z.string().optional().describe('URL to the audio resource file'),
+      resourceUrl: z
+        .string()
+        .optional()
+        .describe('Original signed URL to the audio resource file'),
+      expiresAt: z.number().optional().describe('Original provider expiry timestamp'),
+      timecodes: z
+        .array(z.object({ start: z.string(), end: z.string(), verseId: z.string() }))
+        .optional()
+        .describe('Verse timing information when supplied'),
+      fumsToken: z.string().optional().describe('Current FUMS token for listening engagement'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original scripture response metadata'),
       copyright: z.string().optional().describe('Copyright information'),
       fumsId: z.string().optional().describe('FUMS tracking token'),
       nextChapterId: z.string().optional().nullable().describe('ID of the next chapter'),
@@ -64,17 +77,32 @@ export let getAudioChapter = SlateTool.create(spec, {
     if (ctx.input.chapterId) {
       let result = await client.getAudioChapter(ctx.input.audioBibleId, ctx.input.chapterId);
       let ch = result.data;
+      if (!ch.resourceUrl) {
+        throw createApiServiceError('API.Bible did not return an audio download URL.');
+      }
+      await ctx.addAttachment({
+        type: 'url',
+        url: ch.resourceUrl,
+        mimeType: 'audio/mpeg',
+        refreshReference: { audioBibleId: ctx.input.audioBibleId, chapterId: ch.id },
+        // Request a fresh signed URL on every download instead of guessing its lifetime.
+        refreshAt: new Date().toISOString()
+      });
       return {
         output: {
-          chapterId: ch.chapterId,
-          reference: ch.reference || '',
-          resourceUrl: ch.resourceUrl || '',
-          copyright: ch.copyright || '',
-          fumsId: result.meta?.fumsId || '',
-          nextChapterId: ch.next?.chapterId || null,
-          previousChapterId: ch.previous?.chapterId || null
+          chapterId: ch.id,
+          reference: ch.reference,
+          resourceUrl: ch.resourceUrl,
+          expiresAt: ch.expiresAt,
+          timecodes: ch.timecodes,
+          fumsToken: result.meta?.fumsToken,
+          meta: result.meta,
+          copyright: ch.copyright,
+          fumsId: result.meta?.fumsId,
+          nextChapterId: ch.next?.id ?? null,
+          previousChapterId: ch.previous?.id ?? null
         },
-        message: `Retrieved audio for chapter **${ch.reference}**. Resource URL: ${ch.resourceUrl}`
+        message: `Prepared audio for chapter **${ch.reference}** for download.`
       };
     }
 
@@ -83,12 +111,12 @@ export let getAudioChapter = SlateTool.create(spec, {
         ctx.input.audioBibleId,
         ctx.input.bookId
       );
-      let chapters = (result.data || []).map(ch => ({
-        chapterId: ch.chapterId,
+      let chapters = result.data.map(ch => ({
+        chapterId: ch.id,
         bibleId: ch.bibleId,
         bookId: ch.bookId,
         number: ch.number,
-        reference: ch.reference || ''
+        reference: ch.reference
       }));
       return {
         output: { chapters },
@@ -97,12 +125,12 @@ export let getAudioChapter = SlateTool.create(spec, {
     }
 
     let result = await client.getAudioBibleBooks(ctx.input.audioBibleId);
-    let books = (result.data || []).map(b => ({
-      bookId: b.bookId,
+    let books = result.data.map(b => ({
+      bookId: b.id,
       bibleId: b.bibleId,
-      abbreviation: b.abbreviation || '',
-      name: b.name || '',
-      nameLong: b.nameLong || ''
+      abbreviation: b.abbreviation,
+      name: b.name,
+      nameLong: b.nameLong
     }));
     return {
       output: { books },

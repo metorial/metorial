@@ -11,7 +11,8 @@ export let queryRecords = SlateTool.create(spec, {
 Use filters to narrow results by field values. Supported filter operators:
 - **1** = Contains, **2** = DoesNotContain, **3** = Is, **4** = IsNot
 - **5** = GreaterThan, **6** = LessThan, **7** = IsEmpty, **8** = IsNotEmpty
-- **11** = Between`,
+- **9** = GreaterOrEqual, **10** = LessOrEqual, **11** = Between
+- **12** = In, **13** = NotIn`,
   instructions: [
     'Get list metadata first to find field IDs for filtering and sorting.',
     'Sorting format: "fieldId ASC" or "fieldId DESC".',
@@ -50,7 +51,8 @@ Use filters to narrow results by field values. Supported filter operators:
     z.object({
       totalCount: z.number().optional().describe('Total number of matching records'),
       records: z.array(z.any()).describe('Array of record objects with field IDs as keys'),
-      summary: z.any().optional().describe('Summary data if available')
+      summary: z.any().optional().describe('Summary data if available'),
+      raw: z.any().optional().describe('Complete query response, including provider metadata')
     })
   )
   .handleInvocation(async ctx => {
@@ -64,15 +66,16 @@ Use filters to narrow results by field values. Supported filter operators:
     });
 
     let records = result?.items ?? result?.data ?? [];
-    let totalCount = result?.totalCount ?? records.length;
+    let totalCount = result?.totalCount ?? undefined;
 
     return {
       output: {
         totalCount,
         records,
-        summary: result?.summary
+        summary: result?.summary,
+        raw: result
       },
-      message: `Retrieved **${records.length}** record(s) out of **${totalCount}** total from list **${ctx.input.listId}**.`
+      message: `Retrieved **${records.length}** record(s)${totalCount === undefined || totalCount === null ? '' : ` out of **${totalCount}** total`} from list **${ctx.input.listId}**.`
     };
   })
   .build();

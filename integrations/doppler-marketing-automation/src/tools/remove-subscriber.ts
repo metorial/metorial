@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,8 +57,10 @@ When removing from a list, the subscriber is only disassociated from that list. 
     });
 
     if (ctx.input.action === 'remove_from_list') {
-      if (!ctx.input.listId) {
-        throw new Error('listId is required when removing a subscriber from a list');
+      if (ctx.input.listId === undefined) {
+        throw createApiServiceError(
+          'listId is required when removing a subscriber from a list'
+        );
       }
       await client.removeSubscriberFromList(ctx.input.listId, ctx.input.email);
       return {
@@ -85,6 +87,6 @@ When removing from a list, the subscriber is only disassociated from that list. 
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

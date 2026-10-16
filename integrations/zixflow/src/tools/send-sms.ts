@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let sendSms = SlateTool.create(spec, {
@@ -15,6 +16,7 @@ export let sendSms = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      reportUrl: z.string().optional().describe('URL to receive provider delivery reports'),
       senderId: z.string().describe('Registered and approved sender name'),
       route: z.enum(['transactional', 'promotional', 'otp']).describe('SMS route type'),
       number: z
@@ -31,14 +33,21 @@ export let sendSms = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the SMS was sent successfully'),
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
+      messageId: z.string().optional().describe('Message ID when returned by Zixflow'),
+      campaignId: z.string().optional().describe('Campaign ID when returned by Zixflow'),
+      success: z.boolean().describe('Whether Zixflow acknowledged successful SMS submission'),
       responseMessage: z.string().describe('Response message from the API')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
 
+    requireInput(ctx.input.senderId, 'senderId');
+    requireInput(ctx.input.number, 'number');
+    requireInput(ctx.input.message, 'message');
     let result = await client.sendSms({
+      reportUrl: ctx.input.reportUrl,
       senderId: ctx.input.senderId,
       route: ctx.input.route,
       number: ctx.input.number,
@@ -50,12 +59,12 @@ export let sendSms = SlateTool.create(spec, {
 
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response'
+        ...operationOutput(result),
+        messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
+        campaignId: typeof result.campaignId === 'string' ? result.campaignId : undefined
       },
-      message: result.status
-        ? `SMS sent to ${ctx.input.number} via ${ctx.input.route} route.`
-        : `Failed to send SMS: ${result.message}`
+      message:
+        'Zixflow accepted the message request; use a delivery report to check recipient delivery.'
     };
   })
   .build();

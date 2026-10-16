@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { optionalString, records, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let symbolResultSchema = z.object({
@@ -42,6 +43,10 @@ Use this to find the correct symbol before making other data requests.`,
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       results: z.array(symbolResultSchema).describe('Array of matching symbols'),
       totalCount: z.number().describe('Total number of results returned')
     })
@@ -54,20 +59,21 @@ Use this to find the correct symbol before making other data requests.`,
       outputsize: ctx.input.outputsize
     });
 
-    let data = result.data || [];
+    let data = records(result.data, 'data');
     let results = data.map((item: any) => ({
-      symbol: item.symbol,
-      instrumentName: item.instrument_name,
-      exchange: item.exchange,
-      micCode: item.mic_code,
-      exchangeTimezone: item.exchange_timezone,
-      instrumentType: item.instrument_type,
-      country: item.country,
-      currency: item.currency
+      symbol: requiredString(item.symbol, 'data.symbol'),
+      instrumentName: optionalString(item.instrument_name),
+      exchange: optionalString(item.exchange),
+      micCode: optionalString(item.mic_code),
+      exchangeTimezone: optionalString(item.exchange_timezone),
+      instrumentType: optionalString(item.instrument_type),
+      country: optionalString(item.country),
+      currency: optionalString(item.currency)
     }));
 
     return {
       output: {
+        raw: result,
         results,
         totalCount: results.length
       },

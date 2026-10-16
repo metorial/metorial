@@ -23,6 +23,10 @@ Optionally provide an email to receive a notification when the podcast is added.
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       status: z
         .string()
         .describe(
@@ -54,6 +58,7 @@ Optionally provide an email to receive a notification when the podcast is added.
 
     return {
       output: {
+        raw: data,
         status: data.status,
         podcast: data.podcast
       },

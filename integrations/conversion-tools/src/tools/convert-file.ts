@@ -74,7 +74,7 @@ Common conversion types include: \`convert.pdf_to_word\`, \`convert.json_to_exce
 
     let options: Record<string, unknown> = { ...ctx.input.conversionOptions };
 
-    if (ctx.input.fileId) {
+    if (ctx.input.fileId !== undefined) {
       options.file_id = ctx.input.fileId;
     }
 
@@ -96,6 +96,13 @@ Common conversion types include: \`convert.pdf_to_word\`, \`convert.json_to_exce
     if (ctx.input.waitForCompletion) {
       ctx.progress('Waiting for conversion to complete...');
       let finalStatus = await client.pollUntilComplete(taskId);
+      if (finalStatus.status === 'SUCCESS' && finalStatus.file_id) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: client.fileDownloadUrl(finalStatus.file_id),
+          headers: { Authorization: `Bearer ${ctx.auth.token}` }
+        });
+      }
 
       return {
         output: {
@@ -113,6 +120,13 @@ Common conversion types include: \`convert.pdf_to_word\`, \`convert.json_to_exce
     }
 
     let currentStatus = await client.getTaskStatus(taskId);
+    if (currentStatus.status === 'SUCCESS' && currentStatus.file_id) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: client.fileDownloadUrl(currentStatus.file_id),
+        headers: { Authorization: `Bearer ${ctx.auth.token}` }
+      });
+    }
 
     return {
       output: {

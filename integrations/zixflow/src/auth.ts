@@ -1,11 +1,15 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ZixflowClient } from './lib/client';
+import { providerRecords, requireInput } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
-    z.object({
-      token: z.string()
-    })
+    z
+      .object({
+        token: z.string()
+      })
+      .passthrough()
   )
   .addTokenAuth({
     type: 'auth.token',
@@ -19,6 +23,7 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      requireInput(ctx.input.apiKey, 'API key');
       return {
         output: {
           token: ctx.input.apiKey
@@ -26,23 +31,16 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.zixflow.com/api/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/workspace-member');
-      let members = response.data?.data;
-      let firstMember = Array.isArray(members) && members.length > 0 ? members[0] : null;
+      let client = new ZixflowClient({ token: ctx.output.token });
+      let response = await client.getWorkspaceMembers();
+      let workspace = providerRecords(response.data).find(
+        member => typeof member.workspaceId === 'string'
+      );
 
       return {
         profile: {
-          id: firstMember?.userId ?? undefined,
-          name: firstMember?.fullName ?? undefined,
-          email: firstMember?.email ?? undefined,
-          imageUrl: firstMember?.avatar ?? undefined
+          id: workspace?.workspaceId,
+          name: 'Zixflow workspace'
         }
       };
     }

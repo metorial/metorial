@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection, getMediaId } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listMedia = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listMedia = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       page: z.number().optional().default(1).describe('Page number for pagination')
     })
   )
@@ -42,12 +44,12 @@ export let listMedia = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listMedia(ctx.input.page);
-    let files = (result?.data ?? []).map((f: any) => ({
-      fileId: f.id,
+    let files = getCollection(result).map((f: any) => ({
+      fileId: getMediaId(f.id),
       fileUuid: f.uuid,
       name: f.name,
       mimeType: f.mime_type,

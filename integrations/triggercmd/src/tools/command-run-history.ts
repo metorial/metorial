@@ -14,7 +14,9 @@ export let commandRunHistory = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      commandId: z.string().describe('ID of the command to retrieve run history for')
+      commandId: z
+        .string()
+        .describe('Command ID from list_commands to retrieve run history for')
     })
   )
   .output(
@@ -39,7 +41,7 @@ export let commandRunHistory = SlateTool.create(spec, {
 
     let data = await client.listRuns(ctx.input.commandId);
 
-    let runs = (data.records || []).map(r => ({
+    let runs = data.records.map(r => ({
       runId: r._id,
       status: r.status,
       createdAt: r.createdAt

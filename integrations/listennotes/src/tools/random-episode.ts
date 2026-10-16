@@ -14,6 +14,10 @@ export let randomEpisode = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       episodeId: z.string().describe('Episode ID.'),
       title: z.string().describe('Episode title.'),
       description: z.string().describe('Episode description.'),
@@ -46,23 +50,24 @@ export let randomEpisode = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         episodeId: data.id,
         title: data.title,
         description: data.description,
         pubDateMs: data.pub_date_ms,
-        audio: data.audio || '',
+        audio: data.audio,
         audioLengthSec: data.audio_length_sec,
-        image: data.image || '',
-        thumbnail: data.thumbnail || '',
+        image: data.image,
+        thumbnail: data.thumbnail,
         explicitContent: data.explicit_content,
         listennotesUrl: data.listennotes_url,
-        link: data.link || '',
+        link: data.link,
         podcast: {
-          podcastId: data.podcast?.id || '',
-          title: data.podcast?.title || '',
-          publisher: data.podcast?.publisher || '',
-          image: data.podcast?.image || '',
-          listennotesUrl: data.podcast?.listennotes_url || ''
+          podcastId: data.podcast.id,
+          title: data.podcast.title,
+          publisher: data.podcast.publisher,
+          image: data.podcast.image,
+          listennotesUrl: data.podcast.listennotes_url
         }
       },
       message: `Random episode: **${data.title}** from "${data.podcast?.title}".`

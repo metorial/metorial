@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageOrderTool = SlateTool.create(spec, {
@@ -29,6 +30,7 @@ export let manageOrderTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       result: z.string().describe('Result status of the action (e.g., "success")'),
       action: z.string().describe('The action performed')
     })
@@ -36,30 +38,32 @@ export let manageOrderTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result: string;
+    let data: Record<string, unknown>;
 
     if (ctx.input.action === 'confirm') {
-      let data = await client.confirmOrder({
+      data = await client.confirmOrder({
         checkoutId: ctx.input.checkoutId,
         eventId: ctx.input.eventId,
         comments: ctx.input.comments,
         sendEmail: ctx.input.sendEmail
       });
-      result = data.orderconfirm ?? 'success';
+      result = requireText(data.orderconfirm, 'order confirmation result');
     } else {
-      let data = await client.cancelOrder({
+      data = await client.cancelOrder({
         checkoutId: ctx.input.checkoutId,
         eventId: ctx.input.eventId,
         comments: ctx.input.comments
       });
-      result = data.ordercancel ?? 'success';
+      result = requireText(data.ordercancel ?? data.orderconfirm, 'order cancellation result');
     }
 
     return {
       output: {
+        raw: data,
         result,
         action: ctx.input.action
       },
-      message: `Order **${ctx.input.checkoutId}** ${ctx.input.action === 'confirm' ? 'confirmed' : 'cancelled'} successfully.`
+      message: `Eventzilla returned **${result}** for order ${ctx.input.checkoutId} (${ctx.input.action}).`
     };
   })
   .build();

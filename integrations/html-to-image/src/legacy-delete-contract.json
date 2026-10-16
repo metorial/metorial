@@ -1,0 +1,40 @@
+{
+  "baseline": "c455f13e5899b077e59260226c1c56dd9e41c158",
+  "key": "delete_images",
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "imageIds": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "One or more image IDs to delete"
+      }
+    },
+    "required": ["imageIds"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "deletedCount": {
+        "type": "number",
+        "description": "Number of images deleted"
+      },
+      "deletedImageIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "IDs of the deleted images"
+      }
+    },
+    "required": ["deletedCount", "deletedImageIds"],
+    "additionalProperties": false
+  },
+  "handlerSuffix": "(async ctx => {\n    let client = new Client({\n      userId: ctx.auth.userId,\n      token: ctx.auth.token\n    });\n\n    if (ctx.input.imageIds.length === 1) {\n      await client.deleteImage(ctx.input.imageIds[0]!);\n    } else {\n      await client.deleteImagesBatch(ctx.input.imageIds);\n    }\n\n    return {\n      output: {\n        deletedCount: ctx.input.imageIds.length,\n        deletedImageIds: ctx.input.imageIds\n      },\n      message: `Permanently deleted **${ctx.input.imageIds.length}** image(s).`\n    };\n  })\n  .build();\n"
+}

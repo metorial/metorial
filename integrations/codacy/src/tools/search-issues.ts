@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let searchIssues = SlateTool.create(spec, {
@@ -49,6 +49,10 @@ export let searchIssues = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       issues: z
         .array(
           z.object({
@@ -92,11 +96,11 @@ export let searchIssues = SlateTool.create(spec, {
     });
 
     let issues = (response.data ?? []).map((issue: any) => ({
-      issueId: issue.issueId ?? '',
+      issueId: requireCodacyString(issue.issueId, 'issue.issueId'),
       filePath: issue.filePath ?? undefined,
       lineNumber: issue.lineNumber ?? undefined,
       message: issue.message ?? undefined,
-      level: issue.patternInfo?.level ?? undefined,
+      level: issue.patternInfo?.severityLevel ?? issue.patternInfo?.level ?? undefined,
       category: issue.patternInfo?.category ?? undefined,
       patternId: issue.patternInfo?.id ?? undefined,
       toolName: issue.toolInfo?.name ?? undefined,
@@ -106,6 +110,7 @@ export let searchIssues = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         issues,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

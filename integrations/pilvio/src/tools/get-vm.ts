@@ -4,6 +4,7 @@ import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let diskSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   diskUuid: z.string().describe('Disk unique identifier'),
   name: z.string().optional().describe('Disk device name'),
   sizeGb: z.number().optional().describe('Disk size in GB'),
@@ -11,6 +12,7 @@ let diskSchema = z.object({
 });
 
 let vmDetailSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   vmUuid: z.string().describe('VM unique identifier'),
   name: z.string().describe('VM name'),
   status: z.string().describe('Current status'),
@@ -53,29 +55,31 @@ export let getVm = SlateTool.create(spec, {
     let disks = (vm.storage || []).map((d: any) => ({
       diskUuid: d.uuid,
       name: d.name,
-      sizeGb: d.size_gb,
-      primary: d.primary
+      sizeGb: d.size ?? d.size_gb,
+      primary: d.primary ?? undefined,
+      raw: d
     }));
 
     return {
       output: {
+        raw: vm,
         vmUuid: vm.uuid,
         name: vm.name,
-        status: vm.status,
+        status: vm.status ?? undefined,
         vcpu: vm.vcpu,
-        ram: vm.ram,
-        osName: vm.os_name,
-        osVersion: vm.os_version,
-        publicIp: vm.public_ipv4,
-        privateIp: vm.private_ipv4,
-        createdAt: vm.created_at,
-        backup: vm.backup,
-        description: vm.description,
+        ram: vm.memory ?? vm.ram,
+        osName: vm.os_name ?? undefined,
+        osVersion: vm.os_version ?? undefined,
+        publicIp: vm.public_ipv4 ?? undefined,
+        privateIp: vm.private_ipv4 ?? undefined,
+        createdAt: vm.created_at ?? undefined,
+        backup: vm.backup ?? undefined,
+        description: vm.description ?? undefined,
         disks,
-        networkUuid: vm.network_uuid,
-        poolUuid: vm.designated_pool_uuid
+        networkUuid: vm.network_uuid ?? undefined,
+        poolUuid: vm.designated_pool_uuid ?? undefined
       },
-      message: `VM **${vm.name}** (${vm.uuid}) is **${vm.status}** with ${vm.vcpu} vCPU(s), ${vm.ram} MB RAM.`
+      message: `VM **${vm.name}** (${vm.uuid}) is **${vm.status}** with ${vm.vcpu} vCPU(s), ${vm.memory ?? vm.ram} MB RAM.`
     };
   })
   .build();

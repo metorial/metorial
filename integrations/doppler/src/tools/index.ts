@@ -1,7 +1,10 @@
 export * from './activity-logs';
 export * from './config-logs';
 export * from './download-secrets';
+export * from './export-secrets';
+export * from './get-current-token';
 export * from './get-workplace';
+export * from './list-secret-names';
 export * from './manage-configs';
 export * from './manage-environments';
 export * from './manage-projects';
@@ -9,3 +12,4 @@ export * from './manage-secrets';
 export * from './manage-trusted-ips';
 export * from './manage-webhooks';
 export * from './share-secret';
+export * from './update-secret-note';

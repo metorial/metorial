@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  requireConfirmed,
+  requiredString,
+  responseData,
+  responseRecord,
+  teamIdSchema
+} from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
@@ -22,7 +29,9 @@ Use **create** to set up a new team, **edit** to rename an existing team, or **d
       action: z
         .enum(['create', 'edit', 'delete'])
         .describe('The operation to perform on the team'),
-      teamId: z.string().optional().describe('Required for edit and delete actions'),
+      teamId: teamIdSchema
+        .optional()
+        .describe('Team ID from list_teams (required for edit and delete actions)'),
       name: z.string().optional().describe('Team name. Required for create and edit actions')
     })
   )
@@ -36,25 +45,29 @@ Use **create** to set up a new team, **edit** to rename an existing team, or **d
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) {
-        throw new Error('Name is required to create a team');
+      if (!ctx.input.name?.trim()) {
+        throw createApiServiceError('Name is required to create a team');
       }
-      let result = await client.createTeam(ctx.input.name);
+      let result = responseRecord(
+        responseData(await client.createTeam(ctx.input.name)),
+        'created team'
+      );
+      let teamId = requiredString(result.teamId, 'created team ID');
       return {
         output: {
-          teamId: result.data?.teamId,
+          teamId: teamId,
           success: true
         },
-        message: `Team "${ctx.input.name}" created successfully with ID ${result.data?.teamId}.`
+        message: `Team "${ctx.input.name}" created successfully with ID ${teamId}.`
       };
     }
 
     if (ctx.input.action === 'edit') {
-      if (!ctx.input.teamId) {
-        throw new Error('teamId is required to edit a team');
+      if (!ctx.input.teamId?.trim()) {
+        throw createApiServiceError('teamId is required to edit a team');
       }
-      if (!ctx.input.name) {
-        throw new Error('Name is required to edit a team');
+      if (!ctx.input.name?.trim()) {
+        throw createApiServiceError('Name is required to edit a team');
       }
       await client.editTeam(ctx.input.teamId, ctx.input.name);
       return {
@@ -67,10 +80,10 @@ Use **create** to set up a new team, **edit** to rename an existing team, or **d
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.teamId) {
-        throw new Error('teamId is required to delete a team');
+      if (!ctx.input.teamId?.trim()) {
+        throw createApiServiceError('teamId is required to delete a team');
       }
-      await client.deleteTeam(ctx.input.teamId);
+      requireConfirmed(await client.deleteTeam(ctx.input.teamId));
       return {
         output: {
           teamId: ctx.input.teamId,
@@ -80,5 +93,5 @@ Use **create** to set up a new team, **edit** to rename an existing team, or **d
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   });

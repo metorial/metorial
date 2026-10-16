@@ -9,13 +9,13 @@ export let auth = SlateAuth.create()
   )
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
+    name: 'API Key',
     key: 'api_token',
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Beaconstac Developer Token. Found in your Beaconstac dashboard under Account > Account Details > Developer Token.'
+          'Uniqode API key from the API section of your dashboard. Existing developer tokens remain supported.'
         )
     }),
     getOutput: async ctx => {

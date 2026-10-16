@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  polygonTickerList
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getUnifiedSnapshot = SlateTool.create(spec, {
@@ -17,6 +24,16 @@ export let getUnifiedSnapshot = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Page size; provider default is 10.'),
+      order: z.enum(['asc', 'desc']).optional(),
+      sort: z.enum(['ticker']).optional(),
       tickers: z
         .string()
         .describe('Comma-separated list of tickers (e.g., "AAPL,C:EURUSD,X:BTCUSD,I:SPX")')
@@ -24,10 +41,25 @@ export let getUnifiedSnapshot = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       snapshots: z
         .array(
           z.object({
             ticker: z.string().optional().describe('Ticker symbol'),
+            error: z
+              .string()
+              .optional()
+              .describe('Provider error code for this ticker, when unavailable.'),
+            errorMessage: z
+              .string()
+              .optional()
+              .describe('Provider error message for this ticker.'),
+            marketStatus: z.string().optional().describe('Current trading status.'),
+            value: z.number().optional().describe('Current index value, when present.'),
+            lastUpdated: z
+              .number()
+              .optional()
+              .describe('Provider update timestamp, when present.'),
             name: z.string().optional().describe('Asset name'),
             type: z.string().optional().describe('Asset type'),
             market: z.string().optional().describe('Market type'),
@@ -72,11 +104,20 @@ export let getUnifiedSnapshot = SlateTool.create(spec, {
     let client = new PolygonClient(ctx.auth.token);
 
     let response = await client.getUnifiedSnapshot({
-      tickers: ctx.input.tickers
+      cursor: ctx.input.cursor,
+      tickers: polygonTickerList(ctx.input.tickers).join(','),
+      limit: ctx.input.limit,
+      order: ctx.input.order,
+      sort: ctx.input.sort
     });
 
-    let snapshots = (response.results || []).map((r: any) => ({
+    let snapshots = polygonRecords(response.results).map((r: any) => ({
       ticker: r.ticker,
+      error: r.error,
+      errorMessage: r.message,
+      marketStatus: r.market_status,
+      value: r.value,
+      lastUpdated: r.last_updated,
       name: r.name,
       type: r.type,
       market: r.market_status,
@@ -112,7 +153,7 @@ export let getUnifiedSnapshot = SlateTool.create(spec, {
     }));
 
     return {
-      output: { snapshots },
+      output: polygonOutput({ snapshots }, response),
       message: `Retrieved **${snapshots.length}** unified snapshots across multiple asset classes.`
     };
   })

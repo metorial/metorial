@@ -16,13 +16,28 @@ export let getAccount = SlateTool.create(spec, {
   .output(
     z.object({
       displayName: z.string().describe('Account display name'),
-      email: z.string().describe('Account email address'),
-      plan: z.string().describe('Current subscription plan'),
+      email: z.string().optional().describe('Account email address'),
+      plan: z.string().optional().describe('Current subscription plan'),
       creditsUsed: z.number().describe('Credits used in the current billing period'),
       creditsRemaining: z.number().describe('Credits remaining in the current billing period'),
       creditsLimit: z.number().describe('Total credit limit for the billing period'),
-      billingPeriodStart: z.string().describe('Start date of the current billing period'),
-      billingPeriodEnd: z.string().describe('End date of the current billing period')
+      billingPeriodStart: z
+        .string()
+        .optional()
+        .describe('Start date of the current billing period'),
+      billingPeriodEnd: z
+        .string()
+        .optional()
+        .describe('Subscription renewal or expiration date, when a subscription exists'),
+      notificationEmail: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Account notification email; this is not an identity email'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider account record')
     })
   )
   .handleInvocation(async ctx => {
@@ -32,16 +47,21 @@ export let getAccount = SlateTool.create(spec, {
 
     return {
       output: {
-        displayName: account.display_name,
-        email: account.email,
-        plan: account.plan,
-        creditsUsed: account.credits_used,
-        creditsRemaining: account.credits_remaining,
-        creditsLimit: account.credits_limit,
-        billingPeriodStart: account.billing_period_start,
-        billingPeriodEnd: account.billing_period_end
+        displayName: account.name,
+        email: typeof account.email === 'string' ? account.email : undefined,
+        plan: account.subscription?.plan_name,
+        creditsUsed: account.usage,
+        creditsRemaining: account.usage_limit - account.usage,
+        creditsLimit: account.usage_limit,
+        billingPeriodStart:
+          typeof account.billing_period_start === 'string'
+            ? account.billing_period_start
+            : undefined,
+        billingPeriodEnd: account.subscription?.expires_at,
+        notificationEmail: account.notification_email,
+        raw: account
       },
-      message: `Account **${account.display_name}** on **${account.plan}** plan — ${account.credits_remaining} credits remaining (${account.credits_used}/${account.credits_limit} used).`
+      message: `Account **${account.name}**: ${account.usage_limit - account.usage} credits remaining (${account.usage}/${account.usage_limit} used).`
     };
   })
   .build();

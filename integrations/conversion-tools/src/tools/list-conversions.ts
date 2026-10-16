@@ -34,7 +34,11 @@ Each conversion type includes a type identifier (e.g. \`convert.pdf_to_word\`) a
             title: z.string().describe('Human-readable name of the conversion'),
             options: z
               .array(z.record(z.string(), z.unknown()))
-              .describe('Available configuration options for this conversion type')
+              .describe('Available configuration options for this conversion type'),
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Original conversion details')
           })
         )
         .describe('List of available conversion types'),
@@ -44,12 +48,15 @@ Each conversion type includes a type identifier (e.g. \`convert.pdf_to_word\`) a
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let config = await client.getConversions();
+    let catalog = await client.getConversions();
 
-    let conversions = config.conversions.map(c => ({
+    let conversions = catalog.map(c => ({
       conversionType: c.type,
       title: c.title,
-      options: c.options
+      options: c.options.map(option =>
+        typeof option === 'string' ? { key: option } : option
+      ),
+      raw: c
     }));
 
     if (ctx.input.filterCategory) {

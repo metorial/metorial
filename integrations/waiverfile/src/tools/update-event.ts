@@ -18,11 +18,17 @@ export let updateEvent = SlateTool.create(spec, {
       dateStart: z.string().describe('Updated start date/time (UTC, ISO 8601)'),
       dateEnd: z.string().describe('Updated end date/time (UTC, ISO 8601)'),
       isAllDay: z.boolean().describe('Whether this is an all-day event'),
-      eventCategoryId: z.string().describe('Category ID for the event'),
+      eventCategoryId: z
+        .string()
+        .describe(
+          'Category ID from manage_event_categories. Use 00000000-0000-0000-0000-000000000000 for no category.'
+        ),
       waiverFormIds: z
         .array(z.string())
         .optional()
-        .describe('Array of waiver form IDs to associate with this event')
+        .describe(
+          'Waiver form IDs from get_waiver_forms. Omit or pass an empty array to attach all active forms.'
+        )
     })
   )
   .output(
@@ -48,7 +54,7 @@ export let updateEvent = SlateTool.create(spec, {
 
     return {
       output: { result },
-      message: `Updated event **${ctx.input.eventName}** (${ctx.input.eventId}).`
+      message: 'Received the event update response.'
     };
   })
   .build();

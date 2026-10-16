@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ServeClient } from '../lib/client';
+import { record, records, ServeClient, text } from '../lib/client';
+import { attachUrl } from '../lib/files';
 import { spec } from '../spec';
 
 let assetSchema = z.object({
@@ -15,17 +16,20 @@ let assetSchema = z.object({
   updated: z.string().optional().describe('Last update timestamp')
 });
 
-let mapAsset = (item: any) => ({
-  assetId: item.attributes?.id || item.id,
-  owner: item.attributes?.owner,
-  region: item.attributes?.region,
-  renderId: item.attributes?.renderId,
-  filename: item.attributes?.filename,
-  url: item.attributes?.url,
-  status: item.attributes?.status,
-  created: item.attributes?.created,
-  updated: item.attributes?.updated
-});
+let mapAsset = (item: any) => {
+  let attrs = record(item.attributes, 'asset attributes');
+  return {
+    assetId: text(attrs.id ?? item.id, 'asset ID'),
+    owner: attrs.owner,
+    region: attrs.region,
+    renderId: attrs.renderId,
+    filename: attrs.filename,
+    url: attrs.url,
+    status: attrs.status,
+    created: attrs.created,
+    updated: attrs.updated
+  };
+};
 
 export let getAssetTool = SlateTool.create(spec, {
   name: 'Get Hosted Asset',
@@ -46,6 +50,7 @@ export let getAssetTool = SlateTool.create(spec, {
     let result = await client.getAsset(ctx.input.assetId);
 
     let asset = mapAsset(result.data);
+    if (asset.status === 'ready') await attachUrl(ctx, asset.url);
 
     return {
       output: asset,
@@ -76,8 +81,11 @@ export let getAssetsByRenderIdTool = SlateTool.create(spec, {
     let client = new ServeClient(ctx.auth.token, ctx.config.environment);
     let result = await client.getAssetsByRenderId(ctx.input.renderId);
 
-    let assets = (result.data || []).map(mapAsset);
+    let assets = records(result.data, 'assets').map(mapAsset);
 
+    for (let asset of assets) {
+      if (asset.status === 'ready') await attachUrl(ctx, asset.url);
+    }
     return {
       output: { assets },
       message: `Found **${assets.length}** asset(s) for render **${ctx.input.renderId}**.`
@@ -167,15 +175,15 @@ export let transferAssetTool = SlateTool.create(spec, {
 
     let result = await client.transferAsset(body);
 
-    let attrs = result.data?.attributes || {};
+    let attrs = record(result.data.attributes, 'transfer attributes');
 
     return {
       output: {
-        assetId: attrs.id || result.data?.id,
-        status: attrs.status || 'queued',
+        assetId: text(attrs.id ?? result.data.id, 'transfer ID'),
+        status: text(attrs.status, 'transfer status'),
         created: attrs.created
       },
-      message: `Transfer queued with asset ID **${attrs.id || result.data?.id}**.`
+      message: `Transfer queued with asset ID **${text(attrs.id ?? result.data.id, 'transfer ID')}**.`
     };
   })
   .build();

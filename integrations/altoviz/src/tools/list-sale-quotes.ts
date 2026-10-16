@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let quoteSummarySchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   quoteId: z.number().describe('Altoviz quote ID'),
   number: z.string().nullable().optional().describe('Quote number'),
   date: z.string().nullable().optional().describe('Quote date (YYYY-MM-DD)'),
@@ -26,11 +27,12 @@ export let listSaleQuotes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageIndex: z.number().optional().describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
+      orderBy: z
+        .string()
         .optional()
-        .describe('Number of results per page (1-100, default 10)')
+        .describe('Provider ordering expression, for example name desc'),
+      pageIndex: z.number().optional().describe('Page index (starts at 1)'),
+      pageSize: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
@@ -41,11 +43,13 @@ export let listSaleQuotes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let quotes = await client.listSaleQuotes({
+      orderBy: ctx.input.orderBy,
       pageIndex: ctx.input.pageIndex,
       pageSize: ctx.input.pageSize
     });
 
     let mapped = quotes.map((q: any) => ({
+      raw: q,
       quoteId: q.id,
       number: q.number,
       date: q.date,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listRepositories = SlateTool.create(spec, {
@@ -26,6 +26,10 @@ export let listRepositories = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       repositories: z
         .array(
           z.object({
@@ -63,21 +67,29 @@ export let listRepositories = SlateTool.create(spec, {
     });
 
     let repositories = (response.data ?? []).map((item: any) => ({
-      repositoryName: item.repository?.name ?? '',
+      repositoryName: requireCodacyString(item.repository?.name, 'repository.name'),
       provider: item.repository?.provider ?? undefined,
       owner: item.repository?.owner ?? undefined,
       gradeLetter: item.gradeLetter ?? undefined,
       grade: item.grade ?? undefined,
-      totalIssues: item.totalIssues ?? undefined,
-      coverage: item.coverage ?? undefined,
-      totalComplexFiles: item.totalComplexFiles ?? undefined,
+      totalIssues: item.issuesCount ?? item.totalIssues ?? undefined,
+      coverage:
+        (typeof item.coverage === 'number'
+          ? item.coverage
+          : (item.coverage?.coveragePercentageWithDecimals ??
+            item.coverage?.coveragePercentage)) ?? undefined,
+      totalComplexFiles: item.complexFilesCount ?? item.totalComplexFiles ?? undefined,
       totalDuplicatedFiles: item.totalDuplicatedFiles ?? undefined,
-      lastAnalysedCommitSha: item.lastAnalysedCommit ?? undefined,
+      lastAnalysedCommitSha:
+        (typeof item.lastAnalysedCommit === 'string'
+          ? item.lastAnalysedCommit
+          : item.lastAnalysedCommit?.sha) ?? undefined,
       lastUpdated: item.repository?.lastUpdated ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         repositories,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

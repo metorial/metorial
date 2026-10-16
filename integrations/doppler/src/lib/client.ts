@@ -1,15 +1,32 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export let dopplerApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Doppler',
+    reason: 'doppler_api_error',
+    extractResponse: (input, helpers) => {
+      let response = helpers.getResponseWithBody(input);
+      if (response && typeof response.data === 'string') {
+        try {
+          return { ...response, data: JSON.parse(response.data) };
+        } catch {
+          return response;
+        }
+      }
+      return response;
+    },
+    detailKeys: ['message', 'detail', 'error', 'error_description', 'code'],
+    nestedKeys: ['messages', 'errors']
+  });
 
 export class DopplerClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.doppler.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: dopplerApiError
     });
   }
 
@@ -134,7 +151,7 @@ export class DopplerClient {
   }
 
   async deleteConfig(project: string, config: string): Promise<void> {
-    await this.axios.delete('/v3/configs/config', { data: { project, config } });
+    await this.axios.delete('/v3/configs/config', { params: { project, config } });
   }
 
   async cloneConfig(project: string, config: string, name: string): Promise<any> {
@@ -236,6 +253,16 @@ export class DopplerClient {
     return response.data;
   }
 
+  async downloadExport(params: Record<string, string>): Promise<string> {
+    let response = await this.axios.get('/v3/configs/config/secrets/download', {
+      params,
+      responseType: 'text',
+      // All documented formats are text; retain the original JSON/text without parsing.
+      transformResponse: [(data: string) => data]
+    });
+    return response.data;
+  }
+
   // ---- Config Logs ----
 
   async listConfigLogs(
@@ -296,10 +323,10 @@ export class DopplerClient {
   }
 
   async getWebhook(project: string, slug: string): Promise<any> {
-    let response = await this.axios.get(`/v3/webhooks/webhook/${slug}`, {
+    let response = await this.axios.get(`/v3/webhooks/webhook/${encodeURIComponent(slug)}`, {
       params: { project }
     });
-    return response.data.webhook;
+    return response.data.webhook ?? response.data;
   }
 
   async createWebhook(
@@ -310,6 +337,7 @@ export class DopplerClient {
       enabled?: boolean;
       enabledConfigs?: string[];
       payload?: string;
+      name?: string;
       authentication?: {
         type?: string;
         token?: string;
@@ -318,16 +346,19 @@ export class DopplerClient {
       };
     }
   ): Promise<any> {
-    let response = await this.axios.post('/v3/webhooks', {
-      project,
-      url: params.url,
-      secret: params.secret,
-      enabled: params.enabled,
-      enabledConfigs: params.enabledConfigs,
-      payload: params.payload,
-      authentication: params.authentication
-    });
-    return response.data.webhook;
+    let response = await this.axios.post(
+      '/v3/webhooks',
+      {
+        url: params.url,
+        secret: params.secret,
+        enableConfigs: params.enabledConfigs,
+        payload: params.payload,
+        authentication: params.authentication,
+        name: params.name
+      },
+      { params: { project } }
+    );
+    return response.data.webhook ?? response.data;
   }
 
   async updateWebhook(
@@ -338,6 +369,8 @@ export class DopplerClient {
       secret?: string;
       enabledConfigs?: string[];
       payload?: string;
+      name?: string;
+      disableConfigs?: string[];
       authentication?: {
         type?: string;
         token?: string;
@@ -346,29 +379,42 @@ export class DopplerClient {
       };
     }
   ): Promise<any> {
-    let response = await this.axios.patch(`/v3/webhooks/webhook/${slug}`, {
-      project,
-      ...params
-    });
-    return response.data.webhook;
+    let response = await this.axios.patch(
+      `/v3/webhooks/webhook/${encodeURIComponent(slug)}`,
+      {
+        url: params.url,
+        secret: params.secret,
+        enableConfigs: params.enabledConfigs,
+        disableConfigs: params.disableConfigs,
+        payload: params.payload,
+        authentication: params.authentication,
+        name: params.name
+      },
+      { params: { project } }
+    );
+    return response.data.webhook ?? response.data;
   }
 
   async enableWebhook(project: string, slug: string): Promise<any> {
-    let response = await this.axios.post(`/v3/webhooks/webhook/${slug}/enable`, {
-      project
-    });
-    return response.data.webhook;
+    let response = await this.axios.post(
+      `/v3/webhooks/webhook/${encodeURIComponent(slug)}/enable`,
+      {},
+      { params: { project } }
+    );
+    return response.data.webhook ?? response.data;
   }
 
   async disableWebhook(project: string, slug: string): Promise<any> {
-    let response = await this.axios.post(`/v3/webhooks/webhook/${slug}/disable`, {
-      project
-    });
-    return response.data.webhook;
+    let response = await this.axios.post(
+      `/v3/webhooks/webhook/${encodeURIComponent(slug)}/disable`,
+      {},
+      { params: { project } }
+    );
+    return response.data.webhook ?? response.data;
   }
 
   async deleteWebhook(project: string, slug: string): Promise<void> {
-    await this.axios.delete(`/v3/webhooks/webhook/${slug}`, {
+    await this.axios.delete(`/v3/webhooks/webhook/${encodeURIComponent(slug)}`, {
       params: { project }
     });
   }
@@ -423,6 +469,34 @@ export class DopplerClient {
     return response.data.workplace;
   }
 
+  async getCurrentToken(): Promise<Record<string, unknown>> {
+    let response = await this.axios.get('/v3/me');
+    return response.data;
+  }
+
+  async listSecretNames(
+    project: string,
+    config: string,
+    includeManagedSecrets?: boolean
+  ): Promise<string[]> {
+    let response = await this.axios.get('/v3/configs/config/secrets/names', {
+      params: { project, config, include_managed_secrets: includeManagedSecrets }
+    });
+    if (!Array.isArray(response.data.names)) {
+      throw createApiServiceError('Doppler did not return a secret names list.');
+    }
+    return response.data.names;
+  }
+
+  async updateSecretNote(project: string, secret: string, note: string): Promise<unknown> {
+    let response = await this.axios.post(
+      '/v3/projects/project/note',
+      { secret, note },
+      { params: { project } }
+    );
+    return response.data;
+  }
+
   async updateWorkplace(params: {
     name?: string;
     billingEmail?: string;
@@ -445,7 +519,7 @@ export class DopplerClient {
     slug: string
   ): Promise<void> {
     await this.axios.delete(`/v3/configs/config/dynamic_secrets/dynamic_secret/leases/lease`, {
-      params: { project, config, dynamic_secret: dynamicSecret, slug }
+      data: { project, config, dynamic_secret: dynamicSecret, slug }
     });
   }
 }

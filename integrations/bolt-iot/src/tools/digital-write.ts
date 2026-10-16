@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BoltResponse, Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let digitalWrite = SlateTool.create(spec, {
   name: 'Digital Write',
   key: 'digital_write',
-  description: `Set one or more digital GPIO pins on a Bolt device to HIGH (5V) or LOW (0V). Supports writing to a single pin or multiple pins at once. Use this to control LEDs, relays, motors, and other on/off actuators.`,
+  description: `Set one or more digital GPIO pins on a Bolt device to HIGH or LOW. Supports writing to a single pin or multiple pins at once. Use this to control LEDs, relays, motors, and other on/off actuators.`,
   instructions: [
     'Valid pins are 0, 1, 2, 3, 4 for digital output.',
     'To write to multiple pins at once, provide arrays of pins and states with matching lengths.'
@@ -18,6 +19,7 @@ export let digitalWrite = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      deviceName,
       pins: z.array(z.string()).describe('List of pin numbers to write to (e.g., ["0", "1"])'),
       states: z
         .array(z.enum(['HIGH', 'LOW']))
@@ -26,6 +28,7 @@ export let digitalWrite = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponse,
       success: z
         .string()
         .describe('Whether the write operation was successful ("1" for success)'),
@@ -35,10 +38,10 @@ export let digitalWrite = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
-    let response: any;
+    let response: BoltResponse;
     if (ctx.input.pins.length === 1) {
       response = await client.digitalWrite(ctx.input.pins[0]!, ctx.input.states[0]!);
     } else {
@@ -51,6 +54,7 @@ export let digitalWrite = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         success: response.success,
         resultValue: response.value
       },

@@ -11,8 +11,16 @@ export let enableChapterAccessTool = SlateTool.create(spec, {
   .input(
     z.object({
       email: z.string().describe('Email address of the user'),
-      courseId: z.string().describe('ID of the course containing the chapter'),
-      chapterId: z.string().describe('ID of the chapter to enable access to')
+      courseId: z
+        .string()
+        .describe(
+          'ID of the course containing the chapter. Call list_courses to discover course IDs.'
+        ),
+      chapterId: z
+        .string()
+        .describe(
+          'Chapter ID from your course settings; the public API has no chapter discovery endpoint'
+        )
     })
   )
   .output(

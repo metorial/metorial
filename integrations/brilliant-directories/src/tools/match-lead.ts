@@ -22,6 +22,10 @@ Returns the results of each match attempt including successes and failures.`
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       matchResults: z.any().describe('Results showing successful and failed matches.')
     })
   )
@@ -36,6 +40,7 @@ Returns the results of each match attempt including successes and failures.`
     return {
       output: {
         status: result.status,
+        raw: result,
         matchResults: result.message
       },
       message: `Matched lead **${ctx.input.leadId}** with specified members.`

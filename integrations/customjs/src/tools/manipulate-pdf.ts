@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExecutionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -74,9 +74,15 @@ export let manipulatePdf = SlateTool.create(spec, {
     switch (operation) {
       case 'merge': {
         if (!pdfUrls || pdfUrls.length === 0) {
-          throw new Error('pdfUrls is required for the merge operation.');
+          throw createApiServiceError('pdfUrls is required for the merge operation.');
         }
         let resultBase64 = await client.mergePdfs({ urls: pdfUrls });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.pdf',
+          mimeType: 'application/pdf'
+        });
         return {
           output: { resultBase64 },
           message: `Successfully merged ${pdfUrls.length} PDFs into one document.`
@@ -84,9 +90,16 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'extract_pages': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for extract_pages.');
-        if (!pageRange) throw new Error('pageRange is required for extract_pages.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for extract_pages.');
+        if (!pageRange)
+          throw createApiServiceError('pageRange is required for extract_pages.');
         let resultBase64 = await client.extractPdfPages({ pdfUrl, pageRange });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.pdf',
+          mimeType: 'application/pdf'
+        });
         return {
           output: { resultBase64 },
           message: `Extracted pages ${pageRange} from the PDF.`
@@ -94,8 +107,14 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'compress': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for compress.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for compress.');
         let resultBase64 = await client.compressPdf({ pdfUrl });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.pdf',
+          mimeType: 'application/pdf'
+        });
         return {
           output: { resultBase64 },
           message: `PDF compressed successfully.`
@@ -103,8 +122,14 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'to_text': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for to_text.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for to_text.');
         let text = await client.pdfToText({ pdfUrl });
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(text),
+          filename: 'document.txt',
+          mimeType: 'text/plain'
+        });
         return {
           output: { text },
           message: `Text extracted from PDF successfully.`
@@ -112,8 +137,14 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'to_png': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for to_png.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for to_png.');
         let resultBase64 = await client.pdfToPng({ pdfUrl });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.png',
+          mimeType: 'image/png'
+        });
         return {
           output: { resultBase64 },
           message: `PDF converted to PNG image successfully.`
@@ -121,7 +152,7 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'read_form_fields': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for read_form_fields.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for read_form_fields.');
         let formFieldNames = await client.readPdfFormFields({ pdfUrl });
         return {
           output: { formFieldNames },
@@ -130,13 +161,19 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       case 'fill_form': {
-        if (!pdfUrl) throw new Error('pdfUrl is required for fill_form.');
-        if (!formFields) throw new Error('formFields is required for fill_form.');
+        if (!pdfUrl) throw createApiServiceError('pdfUrl is required for fill_form.');
+        if (!formFields) throw createApiServiceError('formFields is required for fill_form.');
         let fieldsRecord: Record<string, string> = {};
         for (let [k, v] of Object.entries(formFields)) {
           fieldsRecord[k] = String(v);
         }
         let resultBase64 = await client.fillPdfForm({ pdfUrl, fields: fieldsRecord });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.pdf',
+          mimeType: 'application/pdf'
+        });
         return {
           output: { resultBase64 },
           message: `PDF form fields filled successfully.`
@@ -144,7 +181,7 @@ export let manipulatePdf = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown operation: ${operation}`);
+        throw createApiServiceError(`Unknown operation: ${operation}`);
     }
   })
   .build();

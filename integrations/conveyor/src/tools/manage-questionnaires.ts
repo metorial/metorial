@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConveyorClient } from '../lib/client';
+import { createUpload } from '../lib/upload';
 import { spec } from '../spec';
 
 let assigneeSchema = z
@@ -61,7 +62,9 @@ export let listQuestionnaires = SlateTool.create(spec, {
       completedAtStart: z.string().optional().describe('Completed on or after (YYYY-MM-DD)'),
       completedAtEnd: z.string().optional().describe('Completed on or before (YYYY-MM-DD)'),
       dueAtStart: z.string().optional().describe('Due on or after (YYYY-MM-DD)'),
-      dueAtEnd: z.string().optional().describe('Due on or before (YYYY-MM-DD)')
+      dueAtEnd: z.string().optional().describe('Due on or before (YYYY-MM-DD)'),
+      page: z.number().optional().describe('Page number; provider default is 1'),
+      perPage: z.number().optional().describe('Results per page; provider default is 100')
     })
   )
   .output(
@@ -80,7 +83,9 @@ export let listQuestionnaires = SlateTool.create(spec, {
       completedAtStart: ctx.input.completedAtStart,
       completedAtEnd: ctx.input.completedAtEnd,
       dueAtStart: ctx.input.dueAtStart,
-      dueAtEnd: ctx.input.dueAtEnd
+      dueAtEnd: ctx.input.dueAtEnd,
+      page: ctx.input.page,
+      perPage: ctx.input.perPage
     });
 
     let questionnaires = (data?._embedded?.questionnaires || []).map((q: any) => ({
@@ -122,7 +127,7 @@ export let listQuestionnaires = SlateTool.create(spec, {
 export let submitQuestionnaire = SlateTool.create(spec, {
   name: 'Submit Questionnaire',
   key: 'submit_questionnaire',
-  description: `Submit a new questionnaire to Conveyor for AI-powered answering. Provide the customer domain, submitter email, and format. For portal-based questionnaires, provide the portal URL. For file-based, a file upload is required separately.`,
+  description: `Submit a new questionnaire to Conveyor for AI-powered answering. Provide the customer domain, submitter email, and format. For portal-based questionnaires, provide the portal URL. For a file upload, provide the base64 content and filename. Salesforce files can be referenced by content version ID, filename and MIME type.`,
   instructions: [
     'The domain should be the customer domain (e.g., "google.com"), not a URL.',
     'Original format: "spreadsheet" for Excel/CSV, "file" for Word/PDF, "portal" for web portal questionnaires.',
@@ -148,7 +153,23 @@ export let submitQuestionnaire = SlateTool.create(spec, {
       notes: z.string().optional().describe('Access notes for portal-based questionnaires'),
       customerName: z.string().optional().describe('CRM record readable name'),
       crmId: z.string().optional().describe('Unique CRM record ID'),
-      crmAmount: z.number().optional().describe('Monetary amount of CRM record')
+      crmAmount: z.number().optional().describe('Monetary amount of CRM record'),
+      fileContentBase64: z
+        .string()
+        .optional()
+        .describe('Base64-encoded questionnaire file content for a direct upload'),
+      fileName: z
+        .string()
+        .optional()
+        .describe('Filename for a direct upload or Salesforce content version'),
+      contentType: z
+        .string()
+        .optional()
+        .describe('MIME type; required for a Salesforce content version'),
+      contentVersionId: z
+        .string()
+        .optional()
+        .describe('Salesforce content version ID to attach instead of a direct upload')
     })
   )
   .output(
@@ -161,6 +182,16 @@ export let submitQuestionnaire = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
 
+    if (ctx.input.contentVersionId && (!ctx.input.fileName || !ctx.input.contentType)) {
+      throw createApiServiceError('Provide fileName and contentType with contentVersionId.');
+    }
+    if (ctx.input.contentVersionId && ctx.input.fileContentBase64 !== undefined) {
+      throw createApiServiceError(
+        'Provide either contentVersionId or fileContentBase64, not both.'
+      );
+    }
+    let file = createUpload(ctx.input);
+
     let result = await client.createQuestionnaire({
       domain: ctx.input.domain,
       email: ctx.input.email,
@@ -172,7 +203,11 @@ export let submitQuestionnaire = SlateTool.create(spec, {
       notes: ctx.input.notes,
       customerName: ctx.input.customerName,
       crmId: ctx.input.crmId,
-      crmAmount: ctx.input.crmAmount
+      crmAmount: ctx.input.crmAmount,
+      file,
+      contentVersionId: ctx.input.contentVersionId,
+      filename: ctx.input.fileName,
+      contentType: ctx.input.contentType
     });
 
     return {

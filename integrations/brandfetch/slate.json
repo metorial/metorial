@@ -1,6 +1,6 @@
 {
   "name": "@metorial/brandfetch",
-  "description": "Retrieve company brand assets and data by domain, ticker, ISIN, or cryptocurrency symbol. Look up logos (with light/dark themes in SVG, PNG, WebP), color palettes, fonts, images, company descriptions, and firmographic data (employee count, founding year, industry, headquarters). Search brands by name for autocomplete experiences. Resolve raw payment transaction descriptors to merchant brands. Embed brand logos via CDN URLs with customizable dimensions, formats, and fallback options. Monitor brand data changes via webhooks for updates, claims, verifications, and deletions.",
+  "description": "Retrieve company brand assets and data by domain, website URL, email address, Brand ID, ticker, ISIN, or cryptocurrency symbol. Look up logos, color palettes, fonts, images, company descriptions, and firmographic data. Search brands by name, resolve transaction descriptors to merchant brands, and create logo URLs for direct embedding. Retrieve brand context covering positioning, audiences, products, voice, visual style, and competitors. Verify the connected credential and inspect API credit usage.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "document-processing"],
   "skills": [
     "retrieve brand assets",
@@ -10,7 +10,9 @@
     "get firmographic company data",
     "resolve transaction descriptors",
     "embed logos via CDN",
-    "monitor brand data changes",
+    "retrieve brand context and positioning",
+    "verify connected credential identity",
+    "inspect API credit usage",
     "look up brands by ticker or ISIN"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/brandfetch.png"

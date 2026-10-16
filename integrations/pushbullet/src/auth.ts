@@ -1,5 +1,11 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 let outputSchema = z.object({
   token: z.string()
@@ -8,26 +14,13 @@ let outputSchema = z.object({
 type AuthOutput = z.infer<typeof outputSchema>;
 
 let fetchProfile = async (token: string) => {
-  let http = createAxios({
-    baseURL: 'https://api.pushbullet.com',
-    headers: {
-      'Access-Token': token
-    }
-  });
-
-  let response = await http.get('/v2/users/me');
-  let user = response.data as {
-    iden: string;
-    email: string;
-    name: string;
-    image_url?: string;
-  };
+  let user = await new Client({ token }).getMe();
 
   return {
     profile: {
       id: user.iden,
       email: user.email,
-      name: user.name,
+      name: user.name ?? user.email,
       imageUrl: user.image_url
     }
   };
@@ -49,6 +42,10 @@ export let auth = SlateAuth.create()
         response_type: 'code',
         state: ctx.state
       });
+      // Pushbullet documents state as part of the redirect URI, which it echoes unchanged.
+      let redirectUri = new URL(ctx.redirectUri);
+      redirectUri.searchParams.set('state', ctx.state);
+      params.set('redirect_uri', redirectUri.toString());
 
       return {
         url: `https://www.pushbullet.com/authorize?${params.toString()}`
@@ -57,23 +54,27 @@ export let auth = SlateAuth.create()
 
     handleCallback: async ctx => {
       let http = createAxios({
-        baseURL: 'https://api.pushbullet.com'
+        baseURL: 'https://api.pushbullet.com',
+        timeout: 30_000
       });
 
-      let response = await http.post('/oauth2/token', {
-        grant_type: 'authorization_code',
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code
-      });
-
-      let data = response.data as { access_token: string };
-
-      return {
-        output: {
-          token: data.access_token
-        }
-      };
+      try {
+        let response = await http.post('/oauth2/token', {
+          grant_type: 'authorization_code',
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          code: ctx.code
+        });
+        let data = normalizeOAuthTokenResponse(response.data, { providerLabel: 'Pushbullet' });
+        return { output: { token: data.token } };
+      } catch (error) {
+        throw buildApiServiceError(error, {
+          providerLabel: 'Pushbullet',
+          reason: 'pushbullet_oauth_error',
+          operation: 'token exchange',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        });
+      }
     },
 
     getProfile: async (ctx: { output: AuthOutput }) => {

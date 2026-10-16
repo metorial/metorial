@@ -7,6 +7,7 @@ export let sendClipboard = SlateTool.create(spec, {
   name: 'Send Clipboard',
   key: 'send_clipboard',
   description: `Copy text to the clipboard on all connected devices using Pushbullet's universal copy/paste feature. The text is delivered in real time as an ephemeral message.`,
+  constraints: ['Encrypted clipboard messages are not supported.'],
   tags: {
     destructive: false,
     readOnly: false

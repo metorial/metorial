@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { requireMinerstatCredential } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -43,9 +44,12 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.bearerToken,
-          accessKey: ctx.input.accessKey,
-          developerApiKey: ctx.input.developerApiKey
+          token: requireMinerstatCredential(ctx.input.bearerToken, 'Bearer token'),
+          accessKey: requireMinerstatCredential(ctx.input.accessKey, 'Monitoring access key'),
+          developerApiKey:
+            ctx.input.developerApiKey === undefined
+              ? undefined
+              : requireMinerstatCredential(ctx.input.developerApiKey, 'Developer API key')
         }
       };
     }
@@ -69,9 +73,32 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: '',
-          accessKey: ctx.input.accessKey,
-          developerApiKey: ctx.input.developerApiKey
+          accessKey: requireMinerstatCredential(ctx.input.accessKey, 'Monitoring access key'),
+          developerApiKey:
+            ctx.input.developerApiKey === undefined
+              ? undefined
+              : requireMinerstatCredential(ctx.input.developerApiKey, 'Developer API key')
         }
       };
     }
+  })
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Developer Data Only',
+    key: 'developer_only',
+    inputSchema: z.object({
+      developerApiKey: z
+        .string()
+        .describe('Developer API key for coin, hardware, and pool data')
+    }),
+    getOutput: async ctx => ({
+      output: {
+        token: '',
+        accessKey: '',
+        developerApiKey: requireMinerstatCredential(
+          ctx.input.developerApiKey,
+          'Developer API key'
+        )
+      }
+    })
   });

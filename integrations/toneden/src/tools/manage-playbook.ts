@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ToneDenClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ let playbookOutputSchema = z.object({
   userId: z.number().optional().describe('Owner user ID'),
   templateId: z.number().optional().describe('Playbook template ID'),
   status: z.string().optional().describe('Campaign status'),
-  isArchived: z.boolean().optional().describe('Whether the campaign is archived')
+  isArchived: z.boolean().optional().describe('Whether the campaign is archived'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let managePlaybook = SlateTool.create(spec, {
@@ -75,12 +76,13 @@ Each playbook campaign can contain subcampaigns of type ad, attachment, link, or
       userId: p.user_id,
       templateId: p.template_id,
       status: p.status,
-      isArchived: p.is_archived
+      isArchived: p.is_archived,
+      raw: p
     });
 
     if (action === 'get') {
       if (!playbookCampaignId)
-        throw new Error('playbookCampaignId is required for get action');
+        throw createApiServiceError('playbookCampaignId is required for get action');
       let campaign = await client.getPlaybookCampaign(playbookCampaignId);
       return {
         output: { playbookCampaign: mapPlaybook(campaign) },
@@ -90,7 +92,7 @@ Each playbook campaign can contain subcampaigns of type ad, attachment, link, or
 
     if (action === 'delete') {
       if (!playbookCampaignId)
-        throw new Error('playbookCampaignId is required for delete action');
+        throw createApiServiceError('playbookCampaignId is required for delete action');
       await client.deletePlaybookCampaign(playbookCampaignId);
       return {
         output: { deleted: true },
@@ -124,7 +126,7 @@ Each playbook campaign can contain subcampaigns of type ad, attachment, link, or
 
     // update
     if (!playbookCampaignId)
-      throw new Error('playbookCampaignId is required for update action');
+      throw createApiServiceError('playbookCampaignId is required for update action');
     let campaign = await client.updatePlaybookCampaign(playbookCampaignId, data);
     return {
       output: { playbookCampaign: mapPlaybook(campaign) },

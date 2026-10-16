@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -45,10 +45,7 @@ export let listContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let contacts = await client.listContacts(ctx.input);
     let count = contacts.length;

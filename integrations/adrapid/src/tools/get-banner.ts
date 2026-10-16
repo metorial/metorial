@@ -1,18 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bannerSchema, getBannerOutput } from '../lib/schemas';
 import { spec } from '../spec';
-
-let bannerFileSchema = z.object({
-  fileId: z.string().describe('Unique identifier of the banner file'),
-  url: z.string().describe('URL to download or preview the banner file'),
-  status: z.string().describe('Processing status of the file'),
-  name: z.string().optional().describe('File name'),
-  type: z.string().optional().describe('File MIME type'),
-  size: z.number().optional().describe('File size in bytes'),
-  width: z.number().optional().describe('Banner width in pixels'),
-  height: z.number().optional().describe('Banner height in pixels')
-});
 
 export let getBanner = SlateTool.create(spec, {
   name: 'Get Banner',
@@ -38,18 +28,7 @@ export let getBanner = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      bannerId: z.string().describe('Unique identifier of the banner'),
-      status: z
-        .string()
-        .describe('Current status of the banner (exporting, ready, or failed)'),
-      templateId: z.string().describe('Template ID used to create the banner'),
-      files: z
-        .array(bannerFileSchema)
-        .describe('List of generated banner files with download URLs')
-    })
-  )
+  .output(bannerSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -64,31 +43,24 @@ export let getBanner = SlateTool.create(spec, {
       banner = await client.pollBannerUntilReady(banner.bannerId);
     }
 
-    let readyFiles = banner.files.filter(f => f.status === 'ready').length;
+    let readyFiles = banner.files.filter(
+      f => f.url && (banner.status === 'ready' || f.status === 'ready')
+    );
+    for (let file of readyFiles) {
+      if (file.url) {
+        await ctx.addAttachment({ type: 'url', url: file.url, filename: file.name });
+      }
+    }
 
     let statusMessage =
       banner.status === 'ready'
-        ? `Banner **${banner.bannerId}** is ready with **${readyFiles}** file(s).`
+        ? `Banner **${banner.bannerId}** is ready with **${readyFiles.length}** downloadable file(s).`
         : banner.status === 'failed'
           ? `Banner **${banner.bannerId}** has **failed**.`
           : `Banner **${banner.bannerId}** is still **${banner.status}**.`;
 
     return {
-      output: {
-        bannerId: banner.bannerId,
-        status: banner.status,
-        templateId: banner.templateId,
-        files: banner.files.map(f => ({
-          fileId: f.id,
-          url: f.url,
-          status: f.status,
-          name: f.name,
-          type: f.type,
-          size: f.size,
-          width: f.width,
-          height: f.height
-        }))
-      },
+      output: getBannerOutput(banner),
       message: statusMessage
     };
   })

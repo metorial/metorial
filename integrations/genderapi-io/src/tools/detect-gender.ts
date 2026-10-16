@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type GenderSingleResponse, requireText } from '../lib/client';
 import { spec } from '../spec';
 
 export let detectGender = SlateTool.create(spec, {
@@ -67,19 +67,27 @@ Specify exactly one of **name**, **email**, or **username** as the input source.
     let client = new Client({ token: ctx.auth.token });
 
     let inputCount = [ctx.input.name, ctx.input.email, ctx.input.username].filter(
-      Boolean
+      value => value !== undefined
     ).length;
     if (inputCount === 0) {
-      throw new Error('Provide exactly one of name, email, or username.');
+      throw createApiServiceError('Provide exactly one of name, email, or username.');
     }
     if (inputCount > 1) {
-      throw new Error('Provide only one of name, email, or username per request.');
+      throw createApiServiceError('Provide only one of name, email, or username per request.');
     }
 
-    let result: any;
+    if (ctx.input.country !== undefined && !/^[a-z]{2}$/i.test(ctx.input.country)) {
+      throw createApiServiceError('country must be a two-letter ISO country code.');
+    }
+    if (ctx.input.email !== undefined && ctx.input.forceToGenderize) {
+      throw createApiServiceError('forceToGenderize is unavailable for email input.');
+    }
+
+    let result: GenderSingleResponse;
     let sourceType: string;
 
-    if (ctx.input.name) {
+    if (ctx.input.name !== undefined) {
+      requireText(ctx.input.name, 'name');
       sourceType = 'name';
       result = await client.detectGenderFromName({
         name: ctx.input.name,
@@ -87,7 +95,8 @@ Specify exactly one of **name**, **email**, or **username** as the input source.
         askToAI: ctx.input.askToAI,
         forceToGenderize: ctx.input.forceToGenderize
       });
-    } else if (ctx.input.email) {
+    } else if (ctx.input.email !== undefined) {
+      requireText(ctx.input.email, 'email');
       sourceType = 'email';
       result = await client.detectGenderFromEmail({
         email: ctx.input.email,
@@ -95,6 +104,7 @@ Specify exactly one of **name**, **email**, or **username** as the input source.
         askToAI: ctx.input.askToAI
       });
     } else {
+      requireText(ctx.input.username!, 'username');
       sourceType = 'username';
       result = await client.detectGenderFromUsername({
         username: ctx.input.username!,

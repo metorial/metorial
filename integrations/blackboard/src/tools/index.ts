@@ -1,3 +1,4 @@
+export * from './discovery';
 export * from './list-terms';
 export * from './manage-announcements';
 export * from './manage-attempts';

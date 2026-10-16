@@ -28,7 +28,9 @@ export let listProcesses = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -48,18 +50,11 @@ export let listProcesses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listUserProcesses']>>;
     if (ctx.input.ownerType === 'org') {
       result = await client.listOrgProcesses(ownerHandle, ctx.input.workspaceHandle, {
         limit: ctx.input.limit,
@@ -96,26 +91,29 @@ export let getProcess = SlateTool.create(spec, {
     z.object({
       workspaceHandle: z.string().describe('Handle of the workspace'),
       processId: z.string().describe('Process ID to retrieve'),
+      ownerType: z
+        .enum(['user', 'org'])
+        .optional()
+        .describe('Whether the owner is a user or organization'),
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user). Defaults to the authenticated user.')
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        )
     })
   )
   .output(processSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let process = await client.getUserProcess(
+    let readProcess =
+      ctx.input.ownerType === 'org'
+        ? client.getOrgProcess.bind(client)
+        : client.getUserProcess.bind(client);
+    let process = await readProcess(
       ownerHandle,
       ctx.input.workspaceHandle,
       ctx.input.processId
@@ -123,7 +121,7 @@ export let getProcess = SlateTool.create(spec, {
 
     return {
       output: process,
-      message: `Process **${process.processId}** is in state **${process.state || 'unknown'}** (type: ${process.type || 'unknown'}).`
+      message: `Retrieved process **${process.processId}**.`
     };
   })
   .build();

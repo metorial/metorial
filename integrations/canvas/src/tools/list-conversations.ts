@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listConversationsTool = SlateTool.create(spec, {
@@ -21,6 +21,7 @@ export let listConversationsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       conversations: z.array(
         z.object({
           conversationId: z.string().describe('Conversation ID'),
@@ -47,10 +48,7 @@ export let listConversationsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let raw = await client.listConversations({
       scope: ctx.input.scope
@@ -68,7 +66,7 @@ export let listConversationsTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { conversations },
+      output: { raw: raw, conversations },
       message: `Found **${conversations.length}** conversation(s).`
     };
   })

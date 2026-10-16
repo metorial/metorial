@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prooflyString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getActivityLogs = SlateTool.create(spec, {
@@ -34,16 +35,14 @@ export let getActivityLogs = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.getActivityLogs();
-
-    let activities = Array.isArray(data) ? data : (data.activities ?? data.logs ?? []);
+    let activities = await client.getActivityLogs();
 
     return {
       output: {
-        activities: activities.map((a: any) => ({
-          activityType: a.type ?? a.activityType ?? a.activity_type ?? a.action,
-          timestamp: a.timestamp ?? a.createdAt ?? a.created_at ?? a.date,
-          ipAddress: a.ip ?? a.ipAddress ?? a.ip_address
+        activities: activities.map(a => ({
+          activityType: prooflyString(a.type, a.activityType, a.activity_type, a.action),
+          timestamp: prooflyString(a.date, a.timestamp, a.createdAt, a.created_at),
+          ipAddress: prooflyString(a.ip, a.ipAddress, a.ip_address)
         }))
       },
       message: `Retrieved **${activities.length}** activity log entries.`

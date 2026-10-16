@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,6 +18,7 @@ export let lookupIp = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       address: z.string().describe('The queried IP address'),
       isValid: z.boolean().describe('Whether the IP address is valid'),
       country: z.string().optional().describe('Country name'),
@@ -34,20 +35,26 @@ export let lookupIp = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getIpLookup(ctx.input.address);
+    if (typeof result.is_valid !== 'boolean') {
+      throw createApiServiceError(
+        'API Ninjas did not return an IP validity status. Retry the request.'
+      );
+    }
 
     return {
       output: {
+        raw: result,
         address: result.address ?? ctx.input.address,
-        isValid: result.is_valid ?? false,
-        country: result.country,
-        countryCode: result.country_code,
-        region: result.region,
-        regionCode: result.region_code,
-        timezone: result.timezone,
-        city: result.city,
-        isp: result.isp,
-        lat: result.lat,
-        lon: result.lon
+        isValid: result.is_valid,
+        country: result.country ?? undefined,
+        countryCode: result.country_code ?? undefined,
+        region: result.region ?? undefined,
+        regionCode: result.region_code ?? undefined,
+        timezone: result.timezone ?? undefined,
+        city: result.city ?? undefined,
+        isp: result.isp ?? undefined,
+        lat: result.lat ?? undefined,
+        lon: result.lon ?? undefined
       },
       message: result.is_valid
         ? `**${ctx.input.address}** → ${result.country ?? 'Unknown'}${result.region ? `, ${result.region}` : ''}${result.city ? `, ${result.city}` : ''}`

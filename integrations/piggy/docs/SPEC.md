@@ -1,135 +1,39 @@
-Now let me get more details on the webhook event types available:Now I have enough information to write the specification.
+# Piggy API coverage
 
-# Slates Specification for Piggy
-
-## Overview
-
-Piggy (now also known as Leat) is a loyalty and rewards platform that enables businesses to manage customer loyalty programs, gift cards, promotions, vouchers, and CRM contacts. The Piggy API provides a suite of loyalty and reward services allowing businesses to manage customer loyalty programs, offer discounts, and track customer engagement. The API base URL is `https://api.piggy.eu`.
+Piggy is now known as Leat. The current [official API reference](https://docs.leat.com/llms.txt) uses `https://api.leat.com/api/v3/oauth/clients`. This integration retains the documented `https://api.piggy.eu` host used by existing connections and the official PHP SDK; requests use the `/api/v3/oauth/clients` route prefix.
 
 ## Authentication
 
-Piggy supports two authentication methods depending on the integration type:
+[Personal Access Tokens](https://docs.leat.com/v3/authentication.md) from a Private App are the recommended credential. Tokens use `Authorization: Bearer <token>` and may have a user-selected expiration date. Renew an expired token in the provider dashboard and reconnect.
 
-### OAuth API (Server-to-Server / Client Credentials)
+The existing `oauth_client_credentials` method remains available. It exchanges the saved client ID and secret at `/oauth/token` using `grant_type=client_credentials`, retains the returned token expiration, and acquires a fresh token using those credentials when renewal is needed. No authorization-code grant or refresh-token grant is substituted for that flow.
 
-Used for server-side integrations with full account-level access. The Client ID and Client Secret from the Client can be used to initiate the OAuth handshake between Piggy and your integration.
+The optional `shopUuid` setting supplies a default shop for transaction tools. Call `list_shops` to discover available shops and override the default in individual tool inputs.
 
-To request an access token, perform a call to `https://api.piggy.eu/oauth/token` with the following payload:
+## Available operations
 
-```json
-{
-  "grant_type": "client_credentials",
-  "client_id": "your-client-id",
-  "client_secret": "your-client-secret"
-}
-```
+| Area | Tools |
+| --- | --- |
+| Contacts | `list_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact` |
+| Attribute discovery | `list_contact_attributes` |
+| Contact identifiers | `manage_contact_identifiers`: find, create, link, unlink, list |
+| Credits | `award_credits`, `calculate_credits`, `list_loyalty_transactions` |
+| Rewards | `list_rewards`, `claim_reward`: claim or reverse |
+| Vouchers | `manage_vouchers`: list, find, create, update, redeem |
+| Gift cards | `manage_giftcards`: list, get, findByHash, create, transact; `list_giftcard_transactions` |
+| Prepaid | `manage_prepaid`: balance, list, transact |
+| Reversals | `reverse_transaction`: credit, prepaid, giftcard |
+| Program discovery | `list_shops`, `list_promotions`, `get_loyalty_program` |
+| Automations | `trigger_automation`: list or trigger |
 
-OAuth 2.0 access tokens are provided as a bearer token in the Authorization HTTP header. Your application needs to manage access token expiration. Access tokens expire after a certain time, and the authorization server does not support refresh requests, so your application needs to obtain a new access token before or after expiration.
+## Provider constraints
 
-### Register API (Per-Register Authorization)
+Credit awards require either `credits` or `unitValue`. Credit calculation is a preview: time-based loyalty rules can change the eventual award. Use reversal for refunds so the original transaction values are compensated accurately. The provider recommends Orders, Visits, or Bookings for new purchase workflows; the existing credit-reception interface remains available.
 
-Used for POS system integrations. The main difference between the OAuth API and the Register API is that authorization is done on a per-register basis, meaning each access token is linked to a specific Register and thus Shop. This uses an API key passed as a Bearer token in the Authorization header.
+Money amounts are whole numbers in cents. A positive gift card or prepaid amount adds funds and a negative amount deducts funds. Gift card transactions are subject to the provider's program and increment restrictions. Only the most recent gift card transaction can be reversed.
 
-For both methods, requests include the header:
+Voucher updates require `status` to be `ACTIVE` or `DEACTIVATED`; the other existing status values apply to listing. Redemption requires a contact UUID when the voucher has no assigned contact. Promotion expiration durations are seconds. Contact deletion is scheduled asynchronously and is irreversible.
 
-```
-Authorization: Bearer {access_token_or_api_key}
-```
+Only automations with event `contact_updated` can be triggered through the automation-run endpoint. The list response may omit automation UUIDs, so obtain the UUID from the provider dashboard when absent.
 
-## Features
-
-### Contact Management (CRM)
-
-Manage end-user contacts in the loyalty system. Contacts are provided with basic attributes such as an email address, first name, last name, and so forth. Any custom attributes can also be created, either in the Business Dashboard or via API. Email address is the standard unique identifier, and Contact Identifiers can also be used to find a Contact. Supports creating, updating, listing, and looking up contacts. Contacts can also be verified via email verification flow. Supports contact subscriptions, referrals, and tier management.
-
-### Custom Attributes
-
-Piggy provides a number of standard Contact Attributes, such as first and last name, birthdate, email address and phone number. Any number of custom contact attributes that are relevant for your business can be created as well. Supported data types include: url, text, date, phone, float, color, email, number, select, boolean, rich_text, date_time, long_text, date_range, time_range, identifier, birth_date, file_upload, media_upload, multi_select, and license_plate. Attributes can be organized into groups.
-
-### Loyalty & Credits
-
-Contacts can earn points (Credits) and build up a Credit Balance at an Account. Units are the input values for Credit Receptions — an input value goes in, a certain amount of credits comes out. For most Piggy Clients, 'purchase_amount' will be the default value, but it can be virtually anything (calories, kilometers, visits; anything countable). Loyalty Transactions encompass both Credit Receptions and Reward Receptions, representing all changes to a Credit Balance. Transactions can be filtered by contact, shop, and type.
-
-### Loyalty Tokens
-
-A Loyalty Token is a Credit Reception not yet assigned to a specific Contact. The Contact needs to claim the credits reserved by the Loyalty Token through a unique link. Useful for distributing credits via URLs (e.g., in emails or marketing campaigns).
-
-### Rewards
-
-Using the Loyalty & Rewards tools, Clients can create their own Rewards system by creating a list of Rewards for their Contacts. Supports standard rewards (claimed in-store) and digital rewards (unique codes sent via email). Includes collectable rewards and perks. Reward receptions track when contacts claim rewards.
-
-### Promotions & Vouchers
-
-Manage promotions and associated vouchers. Vouchers can be created, updated, listed, and redeemed by contacts. Promotions can be configured and updated.
-
-### Gift Cards & Prepaid
-
-Gift cards consist of a QR-code/hash and a balance, and exist in either digital or physical form. There is no relation between Gift cards and Contacts, as physical gift cards can be reused and are therefore anonymous. For gift cards linked directly to a Contact, the Prepaid Balance tool is available. Gift card programs can be connected to shops. Gift card transactions track balance changes.
-
-### Orders & Products
-
-Manage orders, order returns, products, and product categories. Orders link purchasing activity to contacts for loyalty tracking.
-
-### Bookings & Visits
-
-Track bookings and visits for contacts, useful for service-based businesses.
-
-### Shops
-
-Manage shop locations connected to an account. Piggy Clients connect one or several Shops to their Accounts, which can be both physical shops and web shops. Shops are required for many API operations.
-
-### Forms
-
-Create and manage forms (public or private) with statuses of PUBLISHED, DRAFT, or BIN. Forms can be used to collect information from contacts.
-
-### Automations
-
-Configure automations through the API. Within the Automations tool, you can set up a more delicate webhook system, only firing after some set of filters have passed.
-
-### Portal Sessions
-
-Manage portal sessions for contacts, enabling self-service access to the Contacts Portal.
-
-### Brand Kit & Subscription Types
-
-Configure brand kit settings and manage subscription types for contact communications.
-
-## Events
-
-Piggy supports webhooks for event subscriptions. For a number of events, you can subscribe to Webhooks to receive event data. Most information concerning the event itself is on the Webhook data. For most related entities, you may only receive its UUID, which then requires an API call to retrieve more data if needed.
-
-Webhook subscriptions can be created, listed, updated, and deleted via the API. Each subscription has a status (ACTIVE or INACTIVE) and targets a specific URL. The subscription's event type and secret cannot be altered after creation.
-
-### Contact Events
-
-- **contact_created**: New contact has been created.
-- **contact_updated**: Contact has been updated. When subscribing, an array of one or more contact attributes is required, specifying which attribute changes should trigger the webhook.
-- **contact_identifier_created**: New contact identifier created for a contact.
-
-### Loyalty Events
-
-- **credit_reception_created**: New credit reception has been created for a contact.
-
-### Financial Events
-
-- **prepaid_transaction_created**: New prepaid transaction has been created for a contact.
-- **giftcard_transaction_created**: New giftcard transaction has been created.
-
-### Voucher Events
-
-- **voucher_created**: New voucher has been created.
-- **voucher_updated**: Voucher has been updated.
-- **voucher_redeemed**: Contact has redeemed a voucher.
-
-### Promotion Events
-
-- **promotion_updated**: Promotion has been updated.
-
-### Reward Events
-
-- **reward_updated**: Reward has been updated.
-
-### Engagement Events
-
-- **form_submission_completed**: Contact has submitted and completed a form.
-- **referral_completed**: Contact has completed a referral.
+Outputs preserve provider resource data in their existing passthrough fields or an additive `raw` object. Typed aliases omit unavailable/null values rather than inventing balances or statuses. Gift card transaction responses identify the card but may omit its post-transaction balance; use the get action to retrieve the current balance separately.

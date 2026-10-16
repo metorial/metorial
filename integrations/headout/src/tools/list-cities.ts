@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
 
 let citySchema = z
@@ -30,6 +31,7 @@ Returns city codes, names, and image URLs. Use city codes to filter products, ca
     z.object({
       cities: z.array(citySchema).describe('List of active cities'),
       total: z.number().optional().describe('Total number of cities'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       nextOffset: z.number().optional().describe('Offset for the next page')
     })
   )
@@ -46,17 +48,20 @@ Returns city codes, names, and image URLs. Use city codes to filter products, ca
       limit: ctx.input.limit
     });
 
-    let cities = (result.items ?? []).map((c: any) => ({
-      cityCode: c.code ?? c.cityCode ?? '',
-      name: c.name ?? '',
-      imageUrl: c.image?.url ?? c.imageUrl
+    let cities = (result.items ?? result.cities ?? []).map((c: any) => ({
+      ...c,
+      cityCode: requireHeadoutText(c?.code ?? c?.cityCode, 'city code'),
+      name: requireHeadoutText(c.name, 'city name'),
+      imageUrl:
+        (typeof c.image === 'string' ? c.image : c.image?.url) ?? c.imageUrl ?? undefined
     }));
 
     return {
       output: {
         cities,
+        raw: result,
         total: result.total,
-        nextOffset: result.nextOffset
+        nextOffset: result.nextOffset ?? undefined
       },
       message: `Found ${result.total ?? cities.length} active cities. Showing ${cities.length} results.`
     };

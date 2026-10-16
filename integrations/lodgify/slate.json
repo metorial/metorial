@@ -1,11 +1,7 @@
 {
   "name": "@metorial/lodgify",
-  "description": "Manage vacation rental properties, reservations, and guest communication. Browse property listings, room types, rate add-ons, and payment settings. Create and update bookings with status tracking (open, booked, tentative, declined), record check-in and check-out times, set door key codes, and move bookings to the trash or restore them. Create and track pre-booking enquiries and work the combined bookings-and-enquiries inbox. Query and update availability calendars across connected channels. Set nightly rates and seasonal pricing. Generate quotes and payment links, and request payment from guests. Read message threads and send guest messages.",
-  "categories": [
-    "e-commerce-and-retail",
-    "financial-data-and-stock-market",
-    "scheduling-and-calendars"
-  ],
+  "description": "Manage vacation rental properties, reservations, and guest communication. Browse property listings, room types, rate add-ons, and payment settings. Create and update bookings with status tracking (open, booked, tentative, declined), record check-in and check-out times, set door key codes, and move bookings to the trash or restore them. Create and track pre-booking enquiries and work the combined bookings-and-enquiries inbox. Query and update availability calendars across connected channels. Read property pricing settings independently of stay dates. Set nightly rates and seasonal pricing. Generate quotes and payment links, and request payment from guests. Read message threads and send guest messages.",
+  "categories": ["e-commerce-and-retail", "scheduling-and-calendars"],
   "skills": [
     "browse property listings and room types",
     "create and update bookings",
@@ -14,7 +10,7 @@
     "set nightly rates and pricing",
     "generate quotes and payment links",
     "automate guest communication",
-    "sync multi-channel listings",
+    "read property pricing settings",
     "track reservation status",
     "retrieve guest information"
   ],

@@ -1,11 +1,11 @@
 # <img src="logo.png" height="20"> Finage
 
-Retrieve real-time and historical financial market data across stocks (US and 55+ global markets), forex, cryptocurrencies, decentralized exchanges, CFD indices, ETFs, commodities, and US bonds. Look up last trades, last quotes, OHLC aggregates, previous close prices, and snapshots. Convert currencies and crypto pairs. Access financial fundamentals including income statements, balance sheets, cash flow, market cap, financial ratios, and company details for up to 30 years of history. Retrieve financial calendars covering earnings, dividends, stock splits, IPOs, and economic events. Search and filter market news by symbol, keyword, or asset type. Look up technical indicators and trading signals for stocks and forex. Get market movers including top gainers, top losers, and most active stocks. Search and look up symbols across stocks, forex, and crypto. Stream real-time price updates via WebSocket subscriptions for stocks, forex, crypto, and CFD instruments.
+Access financial market data through 19 read-only tools: US stock quotes, trades and snapshots; stock, forex and cryptocurrency historical bars; currency conversion; company profiles and financial statements; symbol discovery; market news, status and movers; sector performance; calendars; and technical indicators and trading signals.
 
-## License
+Connect with a Finage API key. Data availability and market entitlements depend on the connected account's plan.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Use `list_symbols` to discover supported symbols and `get_stock_details` for company information. Historical requests accept a date range and explicit result limit. `search_market` currently supports the US market, matching the provider's documented scope. Economic calendar requests require both dates; earnings date filters apply to the returned calendar locally. Symbol news requires a stock or cryptocurrency symbol and supports up to 30 articles; the legacy page input supports page 1 only.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Existing summary fields retain their types. Additional `raw` responses preserve provider values, including nulls, nested objects, and numeric strings. Stock last-trade prices come from the trade endpoint. Stock signal confidence is presented as a percentage from 0 to 100, with the original fractional value preserved in `raw`.
+
+See the [tool specification](docs/SPEC.md) and [official API documentation](https://finage.co.uk/docs/api).

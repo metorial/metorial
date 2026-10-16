@@ -1,4 +1,4 @@
-# Slates Specification for Heyzine
+# Heyzine Integration Specification
 
 ## Overview
 
@@ -25,11 +25,13 @@ Both credentials are obtained by registering and logging into a Heyzine account.
 Convert PDF, DOCX, or PPTX files into interactive flipbooks by providing a URL to the source document. Supports both synchronous (waits for conversion to complete) and asynchronous (returns immediately with a status) modes. Configurable options include title, subtitle, description, page effects (via template), logo, background color, and UI controls (download button, fullscreen, share, navigation buttons). A template flipbook ID can be specified to copy styling from an existing flipbook.
 
 - Source files must be accessible via a direct URL with no redirections.
-- Free plan is limited to 5 flipbooks; paid plans offer unlimited conversions.
+- The free plan retains up to 5 flipbooks; additional conversions remove the oldest publications.
 - Synchronous conversion requires sufficient client timeout for large documents.
 - Async conversion returns a state (`started`, `processed`, or `failed`); the flipbook URL returns a not-found page until processing completes.
 
 ### Flipbook Management
+
+Existing reader design, metadata, tags, and controls can be updated without converting the document again. Conversion uses POST JSON with client_id; management uses Bearer API keys. The embed-code option retrieves the documented oEmbed response for the publication URL. Password and access tools also accept an optional bookshelf resource type.
 
 List all flipbooks in an account, retrieve detailed information about a specific flipbook (including metadata, links, thumbnail, and oEmbed data), and delete flipbooks. Flipbooks can be tagged with comma-separated labels for organization.
 
@@ -62,7 +64,7 @@ Retrieve oEmbed data for flipbooks, returning standard oEmbed 1.0 responses with
 
 A client-side jQuery plugin that automatically converts PDF links on a webpage into flipbook links. Supports modal presentation and customization via DOM attributes.
 
-## Events
+## Provider Webhooks (Not Implemented)
 
 ### Lead Collection Webhook
 

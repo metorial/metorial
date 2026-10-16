@@ -1,7 +1,27 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
+
+const rulePayloadSchema = z
+  .object({
+    title: z.string().min(1).max(255),
+    table_name: z.string().min(1).max(255),
+    table_actions: z.array(
+      z.object({ method: z.enum(['URL', 'EMAIL', 'SLACK', 'ZAPIER']) }).passthrough()
+    ),
+    events: z.array(
+      z
+        .object({
+          event: z.enum(['ADD_ROW', 'UPDATE_ROW', 'DELETE_ROW', 'CUSTOM']),
+          type: z.enum(['single', 'multiple']),
+          title: z.string().min(1).max(255),
+          require_confirmation: z.boolean()
+        })
+        .passthrough()
+    )
+  })
+  .passthrough();
 
 export let manageActionRules = SlateTool.create(spec, {
   name: 'Manage Action Rules',
@@ -13,20 +33,32 @@ export let manageActionRules = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      masterPassword: z
+        .string()
+        .optional()
+        .describe('Master password for an encrypted connection'),
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().optional().describe('Table name (required for list and create)'),
       ruleId: z.string().optional().describe('Rule ID (required for update, delete)'),
       ruleTitle: z.string().optional().describe('Title of the rule'),
       ruleEvent: z
         .string()
         .optional()
-        .describe('Event type that triggers the rule (e.g., "created", "updated", "deleted")'),
+        .describe(
+          'Row event: created/updated/deleted or ADD_ROW/UPDATE_ROW/DELETE_ROW; custom events use CUSTOM'
+        ),
       webhookUrl: z.string().optional().describe('Webhook URL to call when the rule triggers'),
       ruleData: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Additional rule configuration')
+        .describe(
+          'Provider rule configuration. Use table_actions and events arrays for full configuration; events require type, title, and require_confirmation.'
+        )
     })
   )
   .output(
@@ -40,10 +72,7 @@ export let manageActionRules = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let {
       action,
@@ -57,7 +86,7 @@ export let manageActionRules = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'list') {
-      if (!tableName) throw new Error('tableName is required for listing rules');
+      if (!tableName) throw createApiServiceError('tableName is required for listing rules');
       let rules = await client.listActionRules(connectionId, tableName);
       return {
         output: { rules, success: true },
@@ -65,36 +94,49 @@ export let manageActionRules = SlateTool.create(spec, {
       };
     }
 
-    if (action === 'create') {
-      if (!tableName) throw new Error('tableName is required for creating a rule');
-      let rule = await client.createActionRule(connectionId, tableName, {
-        ...(ruleTitle ? { title: ruleTitle } : {}),
-        ...(ruleEvent ? { event: ruleEvent } : {}),
-        ...(webhookUrl ? { webhookUrl } : {}),
-        ...(ruleData || {})
-      });
-      return {
-        output: { rule, success: true },
-        message: `Action rule created for table **${tableName}**.`
+    if (action === 'create' || action === 'update') {
+      if (action === 'update' && !ruleId)
+        throw createApiServiceError('ruleId is required for updating a rule.');
+      let eventsByName: Record<string, string> = {
+        created: 'ADD_ROW',
+        updated: 'UPDATE_ROW',
+        deleted: 'DELETE_ROW'
       };
-    }
-
-    if (action === 'update') {
-      if (!ruleId) throw new Error('ruleId is required for updating a rule');
-      let rule = await client.updateActionRule(ruleId, {
-        ...(ruleTitle ? { title: ruleTitle } : {}),
-        ...(ruleEvent ? { event: ruleEvent } : {}),
-        ...(webhookUrl ? { webhookUrl } : {}),
-        ...(ruleData || {})
-      });
+      let event = ruleEvent === undefined ? undefined : (eventsByName[ruleEvent] ?? ruleEvent);
+      let payload = {
+        ...ruleData,
+        ...(ruleTitle !== undefined ? { title: ruleTitle } : {}),
+        ...(tableName !== undefined ? { table_name: tableName } : {}),
+        ...(webhookUrl !== undefined
+          ? { table_actions: [{ method: 'URL', url: webhookUrl }] }
+          : {}),
+        ...(event !== undefined
+          ? {
+              events: [{ event, type: 'single', title: ruleTitle, require_confirmation: true }]
+            }
+          : {})
+      };
+      let parsed = rulePayloadSchema.safeParse(payload);
+      if (!parsed.success) {
+        throw createApiServiceError(
+          `Provide a complete action-rule configuration: ${parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`
+        );
+      }
+      let rule: Record<string, unknown>;
+      if (action === 'create') {
+        rule = await client.createActionRule(connectionId, parsed.data);
+      } else {
+        if (!ruleId) throw createApiServiceError('ruleId is required for updating a rule.');
+        rule = await client.updateActionRule(connectionId, ruleId, parsed.data);
+      }
       return {
         output: { rule, success: true },
-        message: `Action rule **${ruleId}** updated.`
+        message: `Action rule ${action === 'create' ? 'created' : 'updated'}.`
       };
     }
 
     if (action === 'delete') {
-      if (!ruleId) throw new Error('ruleId is required for deleting a rule');
+      if (!ruleId) throw createApiServiceError('ruleId is required for deleting a rule');
       await client.deleteActionRule(connectionId, ruleId);
       return {
         output: { success: true },
@@ -102,6 +144,6 @@ export let manageActionRules = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

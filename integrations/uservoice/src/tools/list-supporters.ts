@@ -5,17 +5,21 @@ import { spec } from '../spec';
 
 let supporterSchema = z.object({
   supporterId: z.number().describe('Unique ID of the supporter record'),
-  isSubscribed: z.boolean().describe('Whether the supporter is subscribed to updates'),
+  isSubscribed: z
+    .boolean()
+    .optional()
+    .describe('Whether the supporter is subscribed to updates'),
   how: z.string().nullable().describe('How the supporter was added'),
   channel: z.string().nullable().describe('Channel through which support was given'),
-  requestsCount: z.number().describe('Number of requests from this supporter'),
-  commentsCount: z.number().describe('Number of comments from this supporter'),
-  createdAt: z.string().describe('When the supporter was added'),
-  updatedAt: z.string().describe('When the supporter record was last updated'),
+  requestsCount: z.number().optional().describe('Number of requests from this supporter'),
+  commentsCount: z.number().optional().describe('Number of comments from this supporter'),
+  createdAt: z.string().optional().describe('When the supporter was added'),
+  updatedAt: z.string().optional().describe('When the supporter record was last updated'),
   links: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Associated resource links (suggestion, user)')
+    .describe('Associated resource links (suggestion, user)'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listSupporters = SlateTool.create(spec, {
@@ -34,44 +38,46 @@ export let listSupporters = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      supporters: z.array(supporterSchema),
-      totalRecords: z.number().describe('Total number of matching supporters'),
-      totalPages: z.number().describe('Total number of pages')
+      supporters: z.array(supporterSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of matching supporters'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let params: Record<string, unknown> = {};
-    if (ctx.input.suggestionId) params.suggestion = ctx.input.suggestionId;
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.perPage) params.perPage = ctx.input.perPage;
+    if (ctx.input.suggestionId !== undefined) params.suggestion = ctx.input.suggestionId;
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.perPage = ctx.input.perPage;
     if (ctx.input.sort) params.sort = ctx.input.sort;
 
     let result = await client.listSupporters(params);
 
-    let supporters = result.supporters.map((s: any) => ({
+    let supporters = result.supporters?.map((s: any) => ({
       supporterId: s.id,
-      isSubscribed: s.is_subscribed ?? true,
-      how: s.how || null,
-      channel: s.channel || null,
-      requestsCount: s.requests_count || 0,
-      commentsCount: s.comments_count || 0,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at,
-      links: s.links
+      isSubscribed: s.is_subscribed,
+      how: s.how ?? null,
+      channel: s.channel ?? null,
+      requestsCount: s.requests_count,
+      commentsCount: s.comments_count,
+      createdAt: s.created_at ?? undefined,
+      updatedAt: s.updated_at ?? undefined,
+      links: s.links,
+      raw: s
     }));
 
     return {
       output: {
         supporters,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages
       },
-      message: `Found **${supporters.length}** supporters.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ThanksIoClient } from '../lib/client';
+import { mailerTypeSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
@@ -18,6 +19,12 @@ Templates are managed through the Thanks.io dashboard and referenced by ID when 
 })
   .input(
     z.object({
+      page: z.number().int().positive().optional().describe('Page number'),
+      itemsPerPage: z.number().int().positive().optional().describe('Results per page'),
+      subAccountId: z.number().int().positive().optional(),
+      mailerType: mailerTypeSchema
+        .optional()
+        .describe('Only templates matching this mailer type'),
       templateType: z
         .enum(['image', 'message', 'both'])
         .default('both')
@@ -26,6 +33,14 @@ Templates are managed through the Thanks.io dashboard and referenced by ID when 
   )
   .output(
     z.object({
+      imageResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete image-template response with pagination'),
+      messageResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete message-template response with pagination'),
       imageTemplates: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -40,11 +55,20 @@ Templates are managed through the Thanks.io dashboard and referenced by ID when 
     let client = new ThanksIoClient({ token: ctx.auth.token });
     let { templateType } = ctx.input;
 
+    let imageResponse: Record<string, unknown> | undefined;
+    let messageResponse: Record<string, unknown> | undefined;
+    let params = {
+      page: ctx.input.page,
+      itemsPerPage: ctx.input.itemsPerPage,
+      subAccountId: ctx.input.subAccountId,
+      type: ctx.input.mailerType
+    };
     let imageTemplates: Record<string, unknown>[] | undefined;
     let messageTemplates: Record<string, unknown>[] | undefined;
 
     if (templateType === 'image' || templateType === 'both') {
-      let result = await client.listImageTemplates();
+      let result = await client.listImageTemplates(params);
+      imageResponse = result;
       imageTemplates = (Array.isArray(result) ? result : result.data || []) as Record<
         string,
         unknown
@@ -52,7 +76,8 @@ Templates are managed through the Thanks.io dashboard and referenced by ID when 
     }
 
     if (templateType === 'message' || templateType === 'both') {
-      let result = await client.listMessageTemplates();
+      let result = await client.listMessageTemplates(params);
+      messageResponse = result;
       messageTemplates = (Array.isArray(result) ? result : result.data || []) as Record<
         string,
         unknown
@@ -65,6 +90,8 @@ Templates are managed through the Thanks.io dashboard and referenced by ID when 
 
     return {
       output: {
+        imageResponse,
+        messageResponse,
         imageTemplates,
         messageTemplates
       },

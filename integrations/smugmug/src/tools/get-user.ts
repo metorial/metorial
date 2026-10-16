@@ -28,6 +28,11 @@ export let getUserTool = SlateTool.create(spec, {
       plan: z.string().optional().describe('Account plan type'),
       domain: z.string().optional().describe('Custom domain if configured'),
       imageCount: z.number().optional().describe('Total number of images'),
+      rootNodeUri: z
+        .string()
+        .optional()
+        .describe('Root node API URI; use its ID with get_node to browse the account'),
+      rootNodeId: z.string().optional().describe('Root node ID for get_node'),
       profile: z
         .object({
           bioText: z.string().optional().describe('User bio text'),
@@ -56,31 +61,36 @@ export let getUserTool = SlateTool.create(spec, {
       user = await client.getAuthenticatedUser();
     }
 
-    let nickname = user?.NickName || '';
+    let nickname = user.NickName;
     let profile: any;
     try {
       let profileData = await client.getUserProfile(nickname);
       profile = {
-        bioText: profileData?.BioText || undefined,
-        firstName: profileData?.FirstName || undefined,
-        lastName: profileData?.LastName || undefined,
-        facebook: profileData?.Facebook || undefined,
-        instagram: profileData?.Instagram || undefined,
-        twitter: profileData?.Twitter || undefined
+        bioText: profileData?.BioText ?? undefined,
+        firstName: profileData?.FirstName ?? undefined,
+        lastName: profileData?.LastName ?? undefined,
+        facebook: profileData?.Facebook ?? undefined,
+        instagram: profileData?.Instagram ?? undefined,
+        twitter: profileData?.Twitter ?? undefined
       };
     } catch {
-      // Profile may not be accessible
+      ctx.warn('The account was retrieved, but its public profile could not be retrieved.');
     }
 
     return {
       output: {
         nickname: nickname,
-        displayName: user?.Name || nickname,
-        webUri: user?.WebUri || undefined,
-        accountStatus: user?.AccountStatus || undefined,
-        plan: user?.Plan || undefined,
-        domain: user?.Domain || undefined,
-        imageCount: user?.ImageCount || undefined,
+        displayName: user.Name,
+        webUri: user?.WebUri ?? undefined,
+        accountStatus: user?.AccountStatus ?? undefined,
+        plan: user?.Plan ?? undefined,
+        domain: user?.Domain ?? undefined,
+        imageCount: user?.ImageCount ?? undefined,
+        rootNodeUri: typeof user.Uris?.Node?.Uri === 'string' ? user.Uris.Node.Uri : undefined,
+        rootNodeId:
+          typeof user.Uris?.Node?.Uri === 'string'
+            ? user.Uris.Node.Uri.match(/^\/api\/v2\/node\/([^/?#]+)$/)?.[1]
+            : undefined,
         profile
       },
       message: `Retrieved user **${user?.Name || nickname}** (${nickname})`

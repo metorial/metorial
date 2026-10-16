@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient, record, records, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 let connectionSchema = z.object({
@@ -26,31 +26,34 @@ export let listConnections = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      connections: z.array(connectionSchema).describe('List of database connections')
+      connections: z.array(connectionSchema).describe('List of database connections'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config);
 
     let data = await client.listConnections();
 
-    let connections = data.map((c: Record<string, unknown>) => ({
-      connectionId: String(c.id || ''),
-      title: c.title as string | undefined,
-      type: c.type as string | undefined,
-      host: c.host as string | undefined,
-      port: c.port as number | undefined,
-      database: c.database as string | undefined,
-      username: c.username as string | undefined,
-      ssl: c.ssl as boolean | undefined,
-      isTestConnection: c.isTestConnection as boolean | undefined
-    }));
+    let entries = Array.isArray(data) ? data : record(data).connections;
+    let connections = records(entries, 'connections').map(entry => {
+      let c = entry.connection === undefined ? entry : record(entry.connection, 'connection');
+      return {
+        connectionId: requiredString(c.id, 'connection ID'),
+        title: typeof c.title === 'string' ? c.title : undefined,
+        type: typeof c.type === 'string' ? c.type : undefined,
+        host: typeof c.host === 'string' ? c.host : undefined,
+        port: typeof c.port === 'number' ? c.port : undefined,
+        database: typeof c.database === 'string' ? c.database : undefined,
+        username: typeof c.username === 'string' ? c.username : undefined,
+        ssl: typeof c.ssl === 'boolean' ? c.ssl : undefined,
+        isTestConnection:
+          typeof c.isTestConnection === 'boolean' ? c.isTestConnection : undefined
+      };
+    });
 
     return {
-      output: { connections },
+      output: { connections, raw: data },
       message: `Found **${connections.length}** connection(s).`
     };
   })

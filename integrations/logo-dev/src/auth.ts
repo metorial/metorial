@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -20,10 +20,16 @@ export let auth = SlateAuth.create()
         .string()
         .optional()
         .describe(
-          'Logo.dev publishable key (pk_...). Used for generating image CDN URLs. If not provided, logo URLs will omit the token parameter.'
+          'Logo.dev publishable key (pk_...). Required by get_logo_url for image CDN URLs. Other API tools use the secret key.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.secretKey.trim()) {
+        throw createApiServiceError('Enter a Logo.dev secret API key (sk_...).');
+      }
+      if (ctx.input.publishableKey !== undefined && !ctx.input.publishableKey.trim()) {
+        throw createApiServiceError('Enter a publishable key (pk_...) or leave it unset.');
+      }
       return {
         output: {
           token: ctx.input.secretKey,

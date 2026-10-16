@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,14 @@ export let auth = SlateAuth.create()
         .describe('Your Ticketmaster API key (Consumer Key) from developer.ticketmaster.com')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('A Ticketmaster API key is required.', {
+          reason: 'missing_api_key'
+        });
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

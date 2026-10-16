@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listFilesTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listFilesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       resourceType: z
         .enum(['files', 'directories', 'branches'])
         .default('files')
@@ -27,6 +28,7 @@ export let listFilesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       items: z.array(
         z.object({
           resourceId: z.number().describe('Resource ID'),
@@ -60,7 +62,7 @@ export let listFilesTool = SlateTool.create(spec, {
         resourceId: item.data.id,
         name: item.data.name,
         type: 'branch',
-        title: item.data.title || undefined,
+        title: item.data.title ?? undefined,
         createdAt: item.data.createdAt
       }));
     } else if (resourceType === 'directories') {
@@ -73,9 +75,9 @@ export let listFilesTool = SlateTool.create(spec, {
         resourceId: item.data.id,
         name: item.data.name,
         type: 'directory',
-        title: item.data.title || undefined,
-        branchId: item.data.branchId || undefined,
-        directoryId: item.data.directoryId || undefined,
+        title: item.data.title ?? undefined,
+        branchId: item.data.branchId ?? undefined,
+        directoryId: item.data.directoryId ?? undefined,
         createdAt: item.data.createdAt
       }));
     } else {
@@ -90,19 +92,16 @@ export let listFilesTool = SlateTool.create(spec, {
         resourceId: item.data.id,
         name: item.data.name,
         type: 'file',
-        path: item.data.path || undefined,
-        title: item.data.title || undefined,
-        branchId: item.data.branchId || undefined,
-        directoryId: item.data.directoryId || undefined,
+        path: item.data.path ?? undefined,
+        title: item.data.title ?? undefined,
+        branchId: item.data.branchId ?? undefined,
+        directoryId: item.data.directoryId ?? undefined,
         createdAt: item.data.createdAt
       }));
     }
 
     return {
-      output: {
-        items,
-        pagination: result.pagination
-      },
+      output: { raw: client.lastResponse, items, pagination: result.pagination },
       message: `Found **${items.length}** ${resourceType}.`
     };
   })

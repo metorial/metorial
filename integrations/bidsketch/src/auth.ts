@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,11 @@ export let auth = SlateAuth.create()
         .describe('Bidsketch API token. Found at Account Settings > API & Integration tab.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('A Bidsketch API token is required.', {
+          reason: 'missing_api_token'
+        });
+      }
       return {
         output: {
           token: ctx.input.token

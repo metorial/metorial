@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,9 +48,16 @@ export let createLoginLink = SlateTool.create(spec, {
       resourceId: ctx.input.resourceId
     });
 
+    let loginLink = [result.LoginLink, result.login_link, result.loginLink].find(
+      value => typeof value === 'string' && value.trim().length > 0
+    );
+    if (typeof loginLink !== 'string') {
+      throw createApiServiceError('Postalytics did not return a usable login link.');
+    }
+
     return {
       output: {
-        loginLink: (result.login_link || result.loginLink || '') as string,
+        loginLink,
         raw: result
       },
       message: `Login link generated for **${ctx.input.targetUrl}**${ctx.input.resourceId ? ` (resource: ${ctx.input.resourceId})` : ''}.`

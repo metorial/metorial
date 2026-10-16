@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalNumber,
+  optionalString,
+  optionalTimestamp,
+  readEntity,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let getProduct = SlateTool.create(spec, {
@@ -33,18 +40,20 @@ export let getProduct = SlateTool.create(spec, {
     let client = new FinmeiClient(ctx.auth.token);
 
     let result = await client.getProduct(ctx.input.productId);
-    let product = result?.data ?? result;
+    let product = readEntity(result, 'product');
 
     return {
       output: {
-        productId: String(product?.id ?? ctx.input.productId),
-        name: product?.name,
-        price: product?.price,
-        currency: product?.currency,
-        description: product?.description,
-        createdAt: product?.created_at,
-        updatedAt: product?.updated_at,
-        rawProduct: product
+        productId: requireId(product.id, 'product ID'),
+        ...pickDefined({
+          name: optionalString(product.name, 'product name'),
+          price: optionalNumber(product.price, 'product price'),
+          currency: optionalString(product.currency, 'product currency'),
+          description: optionalString(product.description, 'product description'),
+          createdAt: optionalTimestamp(product.created_at, 'creation timestamp'),
+          updatedAt: optionalTimestamp(product.updated_at, 'update timestamp'),
+          rawProduct: product
+        })
       },
       message: `Retrieved product **${product?.name ?? ctx.input.productId}**.`
     };

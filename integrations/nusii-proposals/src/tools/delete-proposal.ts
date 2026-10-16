@@ -18,11 +18,12 @@ export let deleteProposal = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteProposal(ctx.input.proposalId);
 
     return {

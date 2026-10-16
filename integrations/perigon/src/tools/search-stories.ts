@@ -1,69 +1,82 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PerigonClient } from '../lib/client';
+import { formatStory } from '../lib/responses';
 import { spec } from '../spec';
 
-let storySchema = z.object({
-  storyId: z.string().describe('Unique story cluster ID'),
-  name: z.string().describe('AI-generated story name'),
-  summary: z.string().describe('AI-generated story summary'),
-  description: z.string().describe('AI-generated story description'),
-  createdAt: z.string().describe('When the story was first detected (ISO 8601)'),
-  updatedAt: z.string().describe('When the story was last updated (ISO 8601)'),
-  uniqueCount: z.number().describe('Number of unique articles in this story'),
-  reprintCount: z.number().describe('Number of reprints/duplicates'),
-  totalCount: z.number().describe('Total article count including reprints'),
-  categories: z
-    .array(
-      z.object({
-        name: z.string(),
-        count: z.number()
-      })
-    )
-    .describe('Categories with article counts'),
-  topics: z
-    .array(
-      z.object({
-        name: z.string(),
-        count: z.number()
-      })
-    )
-    .describe('Topics with article counts'),
-  people: z
-    .array(
-      z.object({
-        wikidataId: z.string(),
-        name: z.string(),
-        count: z.number()
-      })
-    )
-    .describe('People mentioned with article counts'),
-  companies: z
-    .array(
-      z.object({
-        companyId: z.string(),
-        name: z.string(),
-        count: z.number()
-      })
-    )
-    .describe('Companies mentioned with article counts'),
-  countries: z
-    .array(
-      z.object({
-        name: z.string(),
-        count: z.number()
-      })
-    )
-    .describe('Countries with article counts'),
-  keyArticleTitle: z
-    .string()
-    .optional()
-    .describe('Title of the representative article for this story'),
-  keyArticleUrl: z
-    .string()
-    .optional()
-    .describe('URL of the representative article for this story')
-});
+let storySchema = z
+  .object({
+    storyId: z.string().describe('Unique story cluster ID'),
+    name: z.string().describe('AI-generated story name'),
+    summary: z.string().describe('AI-generated story summary'),
+    description: z.string().describe('AI-generated story description'),
+    createdAt: z.string().describe('When the story was first detected (ISO 8601)'),
+    updatedAt: z.string().describe('When the story was last updated (ISO 8601)'),
+    uniqueCount: z.number().describe('Number of unique articles in this story'),
+    reprintCount: z.number().describe('Number of reprints/duplicates'),
+    totalCount: z.number().describe('Total article count including reprints'),
+    categories: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            count: z.number()
+          })
+          .partial()
+      )
+      .describe('Categories with article counts'),
+    topics: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            count: z.number()
+          })
+          .partial()
+      )
+      .describe('Topics with article counts'),
+    people: z
+      .array(
+        z
+          .object({
+            wikidataId: z.string(),
+            name: z.string(),
+            count: z.number()
+          })
+          .partial()
+      )
+      .describe('People mentioned with article counts'),
+    companies: z
+      .array(
+        z
+          .object({
+            companyId: z.string(),
+            name: z.string(),
+            count: z.number()
+          })
+          .partial()
+      )
+      .describe('Companies mentioned with article counts'),
+    countries: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            count: z.number()
+          })
+          .partial()
+      )
+      .describe('Countries with article counts'),
+    keyArticleTitle: z
+      .string()
+      .optional()
+      .describe('Title of the representative article for this story'),
+    keyArticleUrl: z
+      .string()
+      .optional()
+      .describe('URL of the representative article for this story')
+  })
+  .partial();
 
 export let searchStories = SlateTool.create(spec, {
   name: 'Search Stories',
@@ -79,6 +92,19 @@ export let searchStories = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      clusterId: z.string().optional().describe('Retrieve a story by its story ID'),
+      updatedFrom: z
+        .string()
+        .optional()
+        .describe('Only stories updated on or after this ISO 8601 date'),
+      updatedTo: z
+        .string()
+        .optional()
+        .describe('Only stories updated on or before this ISO 8601 date'),
+      minClusterSize: z
+        .number()
+        .optional()
+        .describe('Minimum number of unique articles in a story'),
       query: z.string().optional().describe('Search keywords with optional Boolean operators'),
       source: z.string().optional().describe('Filter by source domain'),
       sourceGroup: z
@@ -88,7 +114,12 @@ export let searchStories = SlateTool.create(spec, {
       category: z.string().optional().describe('Filter by category'),
       topic: z.string().optional().describe('Filter by topic'),
       country: z.string().optional().describe('Filter by country code'),
-      language: z.string().optional().describe('Filter by language code'),
+      language: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy passthrough retained for compatibility; Perigon documents language filtering only for articles, with no documented filtering effect here'
+        ),
       personName: z.string().optional().describe('Filter by person mentioned'),
       companyName: z.string().optional().describe('Filter by company mentioned'),
       dateFrom: z.string().optional().describe('Start date filter (ISO 8601)'),
@@ -97,13 +128,19 @@ export let searchStories = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Include duplicate story clusters (default: false)'),
-      sortBy: z.enum(['date', 'relevance', 'createdAt']).optional().describe('Sort order'),
+      sortBy: z
+        .enum(['date', 'relevance', 'createdAt', 'updatedAt', 'count', 'totalCount'])
+        .optional()
+        .describe('Sort order'),
       page: z.number().optional().describe('Page number (zero-based)'),
       size: z.number().optional().describe('Results per page (1-100, default: 10)')
     })
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Complete provider response, including unavailable enrichment values'),
       numResults: z.number().describe('Total number of matching stories'),
       stories: z.array(storySchema).describe('List of matching story clusters')
     })
@@ -112,6 +149,10 @@ export let searchStories = SlateTool.create(spec, {
     let client = new PerigonClient(ctx.auth.token);
 
     let result = await client.searchStories({
+      clusterId: ctx.input.clusterId,
+      updatedFrom: ctx.input.updatedFrom,
+      updatedTo: ctx.input.updatedTo,
+      minClusterSize: ctx.input.minClusterSize,
       q: ctx.input.query,
       source: ctx.input.source,
       sourceGroup: ctx.input.sourceGroup,
@@ -124,44 +165,20 @@ export let searchStories = SlateTool.create(spec, {
       from: ctx.input.dateFrom,
       to: ctx.input.dateTo,
       showDuplicates: ctx.input.showDuplicates,
-      sortBy: ctx.input.sortBy,
+      sortBy: ctx.input.sortBy === 'date' ? 'createdAt' : ctx.input.sortBy,
       page: ctx.input.page,
       size: ctx.input.size
     });
 
-    let stories = (result.results || []).map(s => ({
-      storyId: s.id || '',
-      name: s.name || '',
-      summary: s.summary || '',
-      description: s.description || '',
-      createdAt: s.createdAt || '',
-      updatedAt: s.updatedAt || '',
-      uniqueCount: s.uniqueCount || 0,
-      reprintCount: s.reprintCount || 0,
-      totalCount: s.totalCount || 0,
-      categories: (s.categories || []).map(c => ({ name: c.name, count: c.count })),
-      topics: (s.topics || []).map(t => ({ name: t.name, count: t.count })),
-      people: (s.people || []).map(p => ({
-        wikidataId: p.wikidataId || '',
-        name: p.name,
-        count: p.count
-      })),
-      companies: (s.companies || []).map(c => ({
-        companyId: c.id || '',
-        name: c.name,
-        count: c.count
-      })),
-      countries: (s.countries || []).map(c => ({ name: c.name, count: c.count })),
-      keyArticleTitle: s.keyArticle?.title,
-      keyArticleUrl: s.keyArticle?.url
-    }));
+    let stories = result.results.map(formatStory);
 
     return {
       output: {
-        numResults: result.numResults || 0,
+        raw: result,
+        numResults: result.numResults,
         stories
       },
-      message: `Found **${result.numResults || 0}** story clusters (showing ${stories.length} on this page).`
+      message: `Found **${result.numResults}** story clusters (showing ${stories.length} on this page).`
     };
   })
   .build();

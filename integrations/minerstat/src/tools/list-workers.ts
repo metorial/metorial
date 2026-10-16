@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MonitoringClient } from '../lib/client';
+import { parseMinerstatResponse } from '../lib/response';
 import { spec } from '../spec';
 
 let workerOutputSchema = z.object({
@@ -35,6 +36,12 @@ let workerOutputSchema = z.object({
     .describe('List of hardware devices')
 });
 
+let outputSchema = z.object({
+  workers: z.array(workerOutputSchema),
+  response: z.any().optional().describe('Original API response'),
+  totalCount: z.number().describe('Number of workers returned')
+});
+
 export let listWorkersTool = SlateTool.create(spec, {
   name: 'List Workers',
   key: 'list_workers',
@@ -54,12 +61,7 @@ export let listWorkersTool = SlateTool.create(spec, {
         .describe('Specific worker name to retrieve. Leave empty to list all workers.')
     })
   )
-  .output(
-    z.object({
-      workers: z.array(workerOutputSchema),
-      totalCount: z.number().describe('Number of workers returned')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new MonitoringClient({ accessKey: ctx.auth.accessKey });
 
@@ -71,31 +73,36 @@ export let listWorkersTool = SlateTool.create(spec, {
       data = await client.listWorkers();
     }
 
+    data = parseMinerstatResponse(z.record(z.string(), z.record(z.string(), z.any())), data);
+
     let workers = Object.entries(data).map(([name, w]: [string, any]) => ({
       workerName: name,
-      status: w?.info?.status ?? 'unknown',
-      workerType: w?.info?.type ?? '',
-      system: w?.info?.system ?? '',
-      syncSeconds: w?.info?.sync ?? 0,
-      groups: w?.info?.groups ?? '',
-      deviceCount: w?.info?.devices ?? 0,
-      totalConsumption: w?.info?.consumption ?? 0,
-      mainCoin: w?.info?.mining?.coin ?? '',
-      mainHashrate: w?.info?.hashrate?.main?.hashrate ?? 0,
-      mainHashrateUnit: w?.info?.hashrate?.main?.unit ?? '',
-      dualCoin: w?.info?.mining?.dualCoin ?? '',
-      dualHashrate: w?.info?.hashrate?.dual?.hashrate ?? 0,
-      dualHashrateUnit: w?.info?.hashrate?.dual?.unit ?? '',
-      miningClient: w?.info?.mining?.client ?? '',
-      revenueMainUsd: w?.info?.revenue?.main ?? 0,
-      revenueDualUsd: w?.info?.revenue?.dual ?? 0,
-      acceptedSharesMain: w?.info?.shares?.main?.accepted ?? 0,
-      rejectedSharesMain: w?.info?.shares?.main?.rejected ?? 0,
-      hardware: (w?.hardware ?? []).map((h: any) => ({
-        name: h?.name ?? '',
-        temperature: h?.temperature ?? 0,
-        fan: h?.fan ?? 0,
-        power: h?.power ?? 0
+      status: w?.info?.status,
+      workerType: w?.info?.type,
+      system: w?.info?.system,
+      syncSeconds: w?.info?.sync,
+      groups: w?.info?.groups,
+      deviceCount: w?.info?.devices,
+      totalConsumption: w?.info?.consumption,
+      mainCoin: w?.info?.mining?.coin,
+      mainHashrate: w?.info?.hashrate?.main?.hashrate,
+      mainHashrateUnit: w?.info?.hashrate?.main?.unit,
+      dualCoin: w?.info?.mining?.dualCoin,
+      dualHashrate: w?.info?.hashrate?.dual?.hashrate,
+      dualHashrateUnit: w?.info?.hashrate?.dual?.unit,
+      miningClient: w?.info?.mining?.client,
+      revenueMainUsd: w?.info?.revenue?.main,
+      revenueDualUsd: w?.info?.revenue?.dual,
+      acceptedSharesMain: w?.info?.shares?.main?.accepted,
+      rejectedSharesMain: w?.info?.shares?.main?.rejected,
+      hardware: parseMinerstatResponse(
+        z.array(z.record(z.string(), z.any())),
+        w?.hardware
+      ).map((h: any) => ({
+        name: h?.name,
+        temperature: h?.temperature,
+        fan: h?.fan,
+        power: h?.power
       }))
     }));
 
@@ -103,10 +110,11 @@ export let listWorkersTool = SlateTool.create(spec, {
     let offlineCount = workers.filter(w => w.status === 'offline').length;
 
     return {
-      output: {
+      output: parseMinerstatResponse(outputSchema, {
         workers,
-        totalCount: workers.length
-      },
+        totalCount: workers.length,
+        response: data
+      }),
       message: `Retrieved **${workers.length}** worker(s): **${onlineCount}** online, **${offlineCount}** offline.`
     };
   })

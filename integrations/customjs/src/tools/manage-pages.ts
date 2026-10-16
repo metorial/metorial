@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PagesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,25 +15,30 @@ export let managePages = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['create_or_update', 'list', 'get', 'delete'])
+        .enum(['create_or_update', 'list', 'get', 'delete', 'update'])
         .describe('The page management action to perform.'),
       name: z
         .string()
         .optional()
         .describe(
-          'Unique name/identifier for the page. Used for upsert matching. Required for create_or_update.'
+          'Unique name/identifier for the page. Used for upsert matching. Required for create_or_update. Optional for update.'
         ),
       htmlContent: z
         .string()
         .optional()
-        .describe('Full HTML content of the page. Required for create_or_update.'),
+        .describe('Full HTML content of the page. Required for create_or_update and update.'),
       slug: z
         .string()
         .optional()
         .describe(
           'Custom URL slug (lowercase letters, numbers, hyphens, 3-100 chars). Optional for create_or_update.'
         ),
-      pageId: z.string().optional().describe('Page ID. Required for get and delete actions.')
+      pageId: z
+        .string()
+        .optional()
+        .describe(
+          'Page ID. Call manage_pages with action list to discover IDs. Required for get, update, and delete.'
+        )
     })
   )
   .output(
@@ -57,9 +62,10 @@ export let managePages = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'create_or_update': {
-        if (!ctx.input.name) throw new Error('name is required for create_or_update.');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for create_or_update.');
         if (!ctx.input.htmlContent)
-          throw new Error('htmlContent is required for create_or_update.');
+          throw createApiServiceError('htmlContent is required for create_or_update.');
 
         let result = await client.upsertPage({
           name: ctx.input.name,
@@ -80,6 +86,29 @@ export let managePages = SlateTool.create(spec, {
         };
       }
 
+      case 'update': {
+        if (!ctx.input.pageId)
+          throw createApiServiceError(
+            'pageId is required for update. Call manage_pages with action list to find it.'
+          );
+        if (!ctx.input.htmlContent)
+          throw createApiServiceError('htmlContent is required for update.');
+        let page = await client.updatePage(ctx.input.pageId, {
+          htmlContent: ctx.input.htmlContent,
+          name: ctx.input.name
+        });
+        return {
+          output: {
+            pageId: page.pageId,
+            pageUrl: page.htmlFileUrl,
+            pageName: page.name,
+            created: false,
+            page
+          },
+          message: 'Hosted page updated successfully.'
+        };
+      }
+
       case 'list': {
         let pages = await client.listPages();
         return {
@@ -89,7 +118,7 @@ export let managePages = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.pageId) throw new Error('pageId is required for get.');
+        if (!ctx.input.pageId) throw createApiServiceError('pageId is required for get.');
         let page = await client.getPage(ctx.input.pageId);
         return {
           output: { page },
@@ -98,7 +127,7 @@ export let managePages = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.pageId) throw new Error('pageId is required for delete.');
+        if (!ctx.input.pageId) throw createApiServiceError('pageId is required for delete.');
         await client.deletePage(ctx.input.pageId);
         return {
           output: {},
@@ -107,7 +136,7 @@ export let managePages = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

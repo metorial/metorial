@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getDividendsAndSplits = SlateTool.create(spec, {
@@ -40,7 +41,9 @@ export let getDividendsAndSplits = SlateTool.create(spec, {
         .array(
           z.object({
             effectiveDate: z.string().describe('Date of the stock split'),
-            splitRatio: z.string().describe('Split ratio, e.g. "4:1"')
+            splitRatio: z
+              .string()
+              .describe('Split ratio or factor exactly as returned by the provider')
           })
         )
         .optional()
@@ -55,22 +58,22 @@ export let getDividendsAndSplits = SlateTool.create(spec, {
 
     if (dataType === 'dividends' || dataType === 'both') {
       let divData = await client.dividends({ symbol });
-      let rawDividends: any[] = divData.data || [];
+      let rawDividends: any[] = responseRows(divData.data, 'data');
       dividends = rawDividends.map((d: any) => ({
-        exDividendDate: d.ex_dividend_date || '',
-        declarationDate: d.declaration_date || '',
-        recordDate: d.record_date || '',
-        paymentDate: d.payment_date || '',
-        amount: d.amount || ''
+        exDividendDate: responseText(d.ex_dividend_date, 'ex_dividend_date'),
+        declarationDate: responseText(d.declaration_date, 'declaration_date'),
+        recordDate: responseText(d.record_date, 'record_date'),
+        paymentDate: responseText(d.payment_date, 'payment_date'),
+        amount: responseText(d.amount, 'amount')
       }));
     }
 
     if (dataType === 'splits' || dataType === 'both') {
       let splitData = await client.splits({ symbol });
-      let rawSplits: any[] = splitData.data || [];
+      let rawSplits: any[] = responseRows(splitData.data, 'data');
       splits = rawSplits.map((s: any) => ({
-        effectiveDate: s.effective_date || '',
-        splitRatio: s.split_ratio || ''
+        effectiveDate: responseText(s.effective_date, 'effective_date'),
+        splitRatio: responseText(s.split_ratio ?? s.split_factor, 'split ratio or factor')
       }));
     }
 

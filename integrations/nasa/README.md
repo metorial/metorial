@@ -1,6 +1,12 @@
-# <img src="logo.png" height="20"> Nasa
+# <img src="logo.png" height="20"> NASA
 
-Access NASA's extensive collection of space and Earth science data, imagery, and metadata. Retrieve the Astronomy Picture of the Day (APOD) with explanations. Search near-Earth asteroid data including orbits and hazard assessments. Browse Mars rover photos filtered by sol, date, and camera. View Earth imagery from EPIC and satellite observations by coordinates. Track natural events (wildfires, storms, volcanoes) via EONET. Query space weather data including solar flares, coronal mass ejections, and geomagnetic storms from DONKI. Search NASA's image and video library. Look up satellite orbital elements (TLE), NASA technology projects (TechPort), space biology experiments (GeneLab), exoplanet archive data, and solar system dynamics. All APIs are read-only data retrieval services.
+Read NASA astronomy, near-Earth asteroid, EPIC Earth image, natural event, space weather, media, technology project, exoplanet, and solar-system data. Search satellite TLE records through the community service linked by NASA's API catalog. Retrieve downloadable images, media variants, metadata JSON, and video captions while retaining source URLs and scientific metadata.
+
+Connect with a free NASA API key from [api.nasa.gov](https://api.nasa.gov/); `DEMO_KEY` supports limited exploration. All tools are read-only.
+
+NASA marks its legacy Earth and Mars Rover APIs archived; historical availability is not guaranteed. Use `get_apod_entries` for NASA's current APOD service with article permalinks and optional actual media URLs; legacy `get_apod` remains available for compatibility. Use `query_close_approaches` for nullable scientific measurements; the historical `get_close_approaches` tool remains available for compatibility.
+
+See [API coverage, sources, and compatibility notes](docs/SPEC.md).
 
 ## License
 

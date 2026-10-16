@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios, getResponseHeaderValue } from 'slates';
+import { redactCredentials, requireRecord, requireString, smugMugError } from './errors';
 import { buildOAuth1Header, type OAuth1Credentials } from './oauth1';
 
 export interface SmugMugClientConfig {
@@ -23,12 +24,6 @@ export interface PaginatedResponse<T> {
   };
 }
 
-let headerValueToString = (value: unknown): string | undefined => {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.join(', ');
-  return undefined;
-};
-
 export class Client {
   private credentials: OAuth1Credentials;
 
@@ -41,6 +36,10 @@ export class Client {
     };
   }
 
+  private get secrets(): string[] {
+    return Object.values(this.credentials);
+  }
+
   private getAuthHeader(method: string, fullUrl: string): string {
     return buildOAuth1Header(method, fullUrl, this.credentials);
   }
@@ -49,33 +48,100 @@ export class Client {
     path: string,
     params?: Record<string, string | number | undefined>
   ): string {
-    let url = `https://api.smugmug.com${path}`;
-    let searchParams = new URLSearchParams();
-    if (params) {
-      for (let [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null) {
-          searchParams.set(key, String(value));
+    if (
+      !path.startsWith('/api/v2') ||
+      path.includes('\\') ||
+      path.includes('#') ||
+      path.includes('?')
+    ) {
+      throw createApiServiceError('Use a SmugMug API resource URI without query parameters.', {
+        reason: 'invalid_uri'
+      });
+    }
+    let url = new URL(path, 'https://api.smugmug.com');
+    if (url.origin !== 'https://api.smugmug.com' || !url.pathname.startsWith('/api/v2')) {
+      throw createApiServiceError('The resource must belong to the SmugMug API.', {
+        reason: 'invalid_uri'
+      });
+    }
+    for (let [key, value] of Object.entries(params ?? {})) {
+      if (value !== undefined) {
+        if (
+          (key === 'start' || key === 'count') &&
+          (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1)
+        ) {
+          throw createApiServiceError(`${key} must be a positive integer.`, {
+            reason: 'invalid_pagination'
+          });
         }
+        url.searchParams.set(key, String(value));
       }
     }
-    let queryString = searchParams.toString();
-    return queryString ? `${url}?${queryString}` : url;
+    return url.toString();
+  }
+
+  private folderPath(path: string): string {
+    return path
+      .split('/')
+      .map(segment => {
+        if (!segment || segment === '.' || segment === '..' || segment.includes('\\')) {
+          throw createApiServiceError(
+            'Use folder URL-name segments separated by a single slash.',
+            { reason: 'invalid_folder_path' }
+          );
+        }
+        return encodeURIComponent(segment);
+      })
+      .join('/');
+  }
+
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, string | number | undefined>
+  ): Promise<any> {
+    let url = this.buildUrl(path, params);
+    try {
+      let response = await createAxios({ maxRedirects: 0 }).request({
+        method,
+        url,
+        data,
+        headers: {
+          Authorization: this.getAuthHeader(method, url),
+          Accept: 'application/json',
+          ...(data !== undefined ? { 'Content-Type': 'application/json' } : {})
+        }
+      });
+      if (method !== 'GET' && response.status === 202) {
+        throw createApiServiceError(
+          'SmugMug accepted the operation for background processing; completion is not confirmed. Check the resource before retrying.',
+          { reason: 'operation_pending' }
+        );
+      }
+      if (method === 'DELETE' && response.status === 204) return;
+      let body = requireRecord(response.data, 'API response');
+      if (method !== 'GET' && body.Code === 202) {
+        throw createApiServiceError(
+          'SmugMug accepted the operation for background processing; completion is not confirmed. Check the resource before retrying.',
+          { reason: 'operation_pending' }
+        );
+      }
+      if (typeof body.Code === 'number' && body.Code >= 400) {
+        throw smugMugError(
+          { response: { status: body.Code, data: body } },
+          `${method} request`,
+          this.secrets
+        );
+      }
+      return redactCredentials(body, this.secrets);
+    } catch (error) {
+      throw smugMugError(error, `${method} request`, this.secrets);
+    }
   }
 
   async get(path: string, params?: Record<string, string | number | undefined>): Promise<any> {
-    let fullUrl = this.buildUrl(path, params);
-    let authHeader = this.getAuthHeader('GET', fullUrl);
-    let httpClient = createAxios({ baseURL: 'https://api.smugmug.com' });
-
-    let response = await httpClient.get(path, {
-      params,
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json'
-      }
-    });
-
-    return response.data;
+    return this.request('GET', path, undefined, params);
   }
 
   async post(
@@ -83,68 +149,73 @@ export class Client {
     data?: any,
     params?: Record<string, string | number | undefined>
   ): Promise<any> {
-    let fullUrl = this.buildUrl(path, params);
-    let authHeader = this.getAuthHeader('POST', fullUrl);
-    let httpClient = createAxios({ baseURL: 'https://api.smugmug.com' });
-
-    let response = await httpClient.post(path, data, {
-      params,
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
-    });
-
-    return response.data;
+    return this.request('POST', path, data, params);
   }
 
   async patch(path: string, data?: any): Promise<any> {
-    let fullUrl = this.buildUrl(path);
-    let authHeader = this.getAuthHeader('PATCH', fullUrl);
-    let httpClient = createAxios({ baseURL: 'https://api.smugmug.com' });
-
-    let response = await httpClient.patch(path, data, {
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
-    });
-
-    return response.data;
+    return this.request('PATCH', path, data);
   }
 
   async delete(path: string): Promise<any> {
-    let fullUrl = this.buildUrl(path);
-    let authHeader = this.getAuthHeader('DELETE', fullUrl);
-    let httpClient = createAxios({ baseURL: 'https://api.smugmug.com' });
+    return this.request('DELETE', path);
+  }
 
-    let response = await httpClient.delete(path, {
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json'
+  private object(data: unknown, key: string, required: string[] = []): any {
+    let object = requireRecord(
+      requireRecord(requireRecord(data, 'API response').Response, 'response data')[key],
+      key
+    );
+    for (let field of required) requireString(object[field], `${key}.${field}`);
+    return object;
+  }
+
+  private page(data: unknown, key: string, required: string[] = []): PaginatedResponse<any> {
+    let response = requireRecord(
+      requireRecord(data, 'API response').Response,
+      'response data'
+    );
+    if (!Array.isArray(response[key])) {
+      throw createApiServiceError(`SmugMug returned an invalid ${key} collection.`, {
+        reason: 'invalid_response'
+      });
+    }
+    let pages = requireRecord(response.Pages, 'pagination data');
+    for (let field of ['Total', 'Start', 'Count']) {
+      if (
+        typeof pages[field] !== 'number' ||
+        !Number.isSafeInteger(pages[field]) ||
+        pages[field] < 0
+      ) {
+        throw createApiServiceError(`SmugMug returned invalid pagination ${field}.`, {
+          reason: 'invalid_response'
+        });
       }
-    });
-
-    return response.data;
+    }
+    for (let item of response[key]) {
+      requireRecord(item, `${key} item`);
+      for (let field of required) requireString(item[field], `${key}.${field}`);
+    }
+    return {
+      items: response[key],
+      pages: { total: pages.Total, start: pages.Start, count: pages.Count }
+    };
   }
 
   // ===== User =====
 
   async getAuthenticatedUser(): Promise<any> {
     let data = await this.get('/api/v2!authuser');
-    return data?.Response?.User;
+    return this.object(data, 'User', ['NickName', 'Name']);
   }
 
   async getUser(nickname: string): Promise<any> {
     let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}`);
-    return data?.Response?.User;
+    return this.object(data, 'User', ['NickName', 'Name']);
   }
 
   async getUserProfile(nickname: string): Promise<any> {
     let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}!profile`);
-    return data?.Response?.UserProfile;
+    return this.object(data, 'UserProfile', []);
   }
 
   async updateUserProfile(nickname: string, profileData: Record<string, any>): Promise<any> {
@@ -152,14 +223,14 @@ export class Client {
       `/api/v2/user/${encodeURIComponent(nickname)}!profile`,
       profileData
     );
-    return data?.Response?.UserProfile;
+    return this.object(data, 'UserProfile', []);
   }
 
   // ===== Nodes =====
 
   async getNode(nodeId: string): Promise<any> {
     let data = await this.get(`/api/v2/node/${encodeURIComponent(nodeId)}`);
-    return data?.Response?.Node;
+    return this.object(data, 'Node', ['NodeID', 'Name']);
   }
 
   async getNodeChildren(
@@ -167,14 +238,11 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(`/api/v2/node/${encodeURIComponent(nodeId)}!children`, params);
-    return {
-      items: data?.Response?.Node || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Node', ['NodeID', 'Name']);
   }
 
   async createNode(parentNodeId: string, nodeData: Record<string, any>): Promise<any> {
@@ -182,12 +250,12 @@ export class Client {
       `/api/v2/node/${encodeURIComponent(parentNodeId)}!children`,
       nodeData
     );
-    return data?.Response?.Node;
+    return this.object(data, 'Node', ['NodeID', 'Name']);
   }
 
   async updateNode(nodeId: string, nodeData: Record<string, any>): Promise<any> {
     let data = await this.patch(`/api/v2/node/${encodeURIComponent(nodeId)}`, nodeData);
-    return data?.Response?.Node;
+    return this.object(data, 'Node', ['NodeID', 'Name']);
   }
 
   async deleteNode(nodeId: string): Promise<void> {
@@ -201,21 +269,18 @@ export class Client {
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = { Text: text };
     if (scope) params.Scope = scope;
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get('/api/v2/node!search', params);
-    return {
-      items: data?.Response?.Node || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Node', ['NodeID', 'Name']);
   }
 
   // ===== Albums =====
 
   async getAlbum(albumKey: string): Promise<any> {
     let data = await this.get(`/api/v2/album/${encodeURIComponent(albumKey)}`);
-    return data?.Response?.Album;
+    return this.object(data, 'Album', ['AlbumKey', 'Uri', 'Name']);
   }
 
   async createAlbum(
@@ -224,15 +289,15 @@ export class Client {
     albumData: Record<string, any>
   ): Promise<any> {
     let path = folderPath
-      ? `/api/v2/folder/user/${encodeURIComponent(nickname)}/${folderPath}!albums`
+      ? `/api/v2/folder/user/${encodeURIComponent(nickname)}/${this.folderPath(folderPath)}!albums`
       : `/api/v2/folder/user/${encodeURIComponent(nickname)}!albums`;
     let data = await this.post(path, albumData);
-    return data?.Response?.Album;
+    return this.object(data, 'Album', ['AlbumKey', 'Uri', 'Name']);
   }
 
   async updateAlbum(albumKey: string, albumData: Record<string, any>): Promise<any> {
     let data = await this.patch(`/api/v2/album/${encodeURIComponent(albumKey)}`, albumData);
-    return data?.Response?.Album;
+    return this.object(data, 'Album', ['AlbumKey', 'Uri', 'Name']);
   }
 
   async deleteAlbum(albumKey: string): Promise<void> {
@@ -244,14 +309,11 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(`/api/v2/album/${encodeURIComponent(albumKey)}!images`, params);
-    return {
-      items: data?.Response?.AlbumImage || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'AlbumImage', ['ImageKey']);
   }
 
   async searchAlbums(
@@ -261,31 +323,28 @@ export class Client {
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = { Text: text };
     if (scope) params.Scope = scope;
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get('/api/v2/album!search', params);
-    return {
-      items: data?.Response?.Album || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Album', ['AlbumKey']);
   }
 
   async getAlbumShareUris(albumKey: string): Promise<any> {
     let data = await this.get(`/api/v2/album/${encodeURIComponent(albumKey)}!shareuris`);
-    return data?.Response?.ShareUris;
+    return this.object(data, 'ShareUris', []);
   }
 
   // ===== Images =====
 
   async getImage(imageKey: string): Promise<any> {
     let data = await this.get(`/api/v2/image/${encodeURIComponent(imageKey)}-0`);
-    return data?.Response?.Image;
+    return this.object(data, 'Image', ['ImageKey']);
   }
 
   async updateImage(imageKey: string, imageData: Record<string, any>): Promise<any> {
     let data = await this.patch(`/api/v2/image/${encodeURIComponent(imageKey)}-0`, imageData);
-    return data?.Response?.Image;
+    return this.object(data, 'Image', ['ImageKey']);
   }
 
   async deleteImage(imageKey: string): Promise<void> {
@@ -294,12 +353,12 @@ export class Client {
 
   async getImageMetadata(imageKey: string): Promise<any> {
     let data = await this.get(`/api/v2/image/${encodeURIComponent(imageKey)}-0!metadata`);
-    return data?.Response?.ImageMetadata;
+    return this.object(data, 'ImageMetadata', []);
   }
 
   async getImageSizes(imageKey: string): Promise<any> {
     let data = await this.get(`/api/v2/image/${encodeURIComponent(imageKey)}-0!sizedetails`);
-    return data?.Response?.ImageSizeDetails;
+    return this.object(data, 'ImageSizeDetails', []);
   }
 
   async searchImages(
@@ -309,14 +368,11 @@ export class Client {
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = { Text: text };
     if (scope) params.Scope = scope;
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get('/api/v2/image!search', params);
-    return {
-      items: data?.Response?.Image || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Image', ['ImageKey']);
   }
 
   async collectImage(targetAlbumKey: string, imageUri: string): Promise<any> {
@@ -351,59 +407,96 @@ export class Client {
     }
   ): Promise<any> {
     let uploadUrl = 'https://upload.smugmug.com/';
-    let authHeader = this.getAuthHeader('POST', uploadUrl);
-
-    let headers: Record<string, string> = {
-      Authorization: authHeader,
-      'Content-Type': 'application/json',
-      'X-Smug-AlbumUri': albumUri,
-      'X-Smug-ResponseType': 'JSON',
-      'X-Smug-Version': 'v2'
-    };
-
-    if (options?.fileName) headers['X-Smug-FileName'] = options.fileName;
-    if (options?.title) headers['X-Smug-Title'] = options.title;
-    if (options?.caption) headers['X-Smug-Caption'] = options.caption;
-    if (options?.keywords) headers['X-Smug-Keywords'] = options.keywords;
-    if (options?.hidden !== undefined) headers['X-Smug-Hidden'] = String(options.hidden);
-    if (options?.replaceImageUri) headers['X-Smug-ImageUri'] = options.replaceImageUri;
-
-    let httpClient = createAxios();
-
-    // First download the image from the URL
-    let imageResponse = await httpClient.get(sourceUrl, { responseType: 'arraybuffer' });
-
-    let imageBuffer = Buffer.from(imageResponse.data);
-
-    let md5 = await this.computeMd5(imageBuffer);
-    headers['Content-Length'] = String(imageBuffer.length);
-    headers['Content-MD5'] = md5;
-    headers['Content-Type'] =
-      headerValueToString(imageResponse.headers['content-type']) || 'application/octet-stream';
-
-    // Re-generate auth header for the actual upload with proper content type
-    headers.Authorization = this.getAuthHeader('POST', uploadUrl);
-
-    let response = await httpClient.post(uploadUrl, imageBuffer, { headers });
-    return response.data;
-  }
-
-  private async computeMd5(buffer: Uint8Array): Promise<string> {
-    return crypto.createHash('md5').update(buffer).digest('base64');
+    if (!/^\/api\/v2\/album\/[A-Za-z0-9]+$/.test(albumUri)) {
+      throw createApiServiceError('Use an album API URI such as /api/v2/album/ABC123.', {
+        reason: 'invalid_album_uri'
+      });
+    }
+    if (
+      options?.replaceImageUri &&
+      !/^\/api\/v2\/(?:album\/[A-Za-z0-9]+\/)?image\/[A-Za-z0-9]+(?:-\d+)?$/.test(
+        options.replaceImageUri
+      )
+    ) {
+      throw createApiServiceError('Use a SmugMug image API URI for the replacement image.', {
+        reason: 'invalid_image_uri'
+      });
+    }
+    let source: URL;
+    try {
+      source = new URL(sourceUrl);
+    } catch {
+      throw createApiServiceError('Use a publicly accessible HTTP or HTTPS source URL.', {
+        reason: 'invalid_source_url'
+      });
+    }
+    if (!['http:', 'https:'].includes(source.protocol) || source.username || source.password) {
+      throw createApiServiceError(
+        'Use a publicly accessible HTTP or HTTPS source URL without embedded credentials.',
+        { reason: 'invalid_source_url' }
+      );
+    }
+    try {
+      let httpClient = createAxios({ maxRedirects: 0 });
+      let imageResponse = await httpClient.get(source.toString(), {
+        responseType: 'arraybuffer'
+      });
+      let imageBuffer = Buffer.from(imageResponse.data);
+      if (!imageBuffer.length) {
+        throw createApiServiceError('The source URL returned an empty file.', {
+          reason: 'invalid_source_file'
+        });
+      }
+      let headers: Record<string, string> = {
+        Authorization: this.getAuthHeader('POST', uploadUrl),
+        'Content-Type':
+          getResponseHeaderValue(imageResponse.headers, 'content-type') ||
+          'application/octet-stream',
+        'Content-Length': String(imageBuffer.length),
+        'Content-MD5': crypto.createHash('md5').update(imageBuffer).digest('base64'),
+        'X-Smug-AlbumUri': albumUri,
+        'X-Smug-ResponseType': 'JSON',
+        'X-Smug-Version': 'v2'
+      };
+      for (let [key, value] of Object.entries(options ?? {})) {
+        let names: Record<string, string> = {
+          fileName: 'FileName',
+          title: 'Title',
+          caption: 'Caption',
+          keywords: 'Keywords',
+          hidden: 'Hidden',
+          replaceImageUri: 'ImageUri'
+        };
+        if (value !== undefined) headers[`X-Smug-${names[key]}`] = String(value);
+      }
+      let response = await httpClient.post(uploadUrl, imageBuffer, { headers });
+      let result = requireRecord(response.data, 'upload response');
+      if (result.stat !== 'ok') {
+        throw smugMugError(
+          { response: { status: response.status, data: result } },
+          'upload',
+          this.secrets
+        );
+      }
+      requireRecord(result.Image, 'uploaded image');
+      return redactCredentials(result, this.secrets);
+    } catch (error) {
+      throw smugMugError(error, 'image upload', this.secrets);
+    }
   }
 
   // ===== Folders =====
 
   async getRootFolder(nickname: string): Promise<any> {
     let data = await this.get(`/api/v2/folder/user/${encodeURIComponent(nickname)}`);
-    return data?.Response?.Folder;
+    return this.object(data, 'Folder', []);
   }
 
   async getFolder(nickname: string, folderPath: string): Promise<any> {
     let data = await this.get(
-      `/api/v2/folder/user/${encodeURIComponent(nickname)}/${folderPath}`
+      `/api/v2/folder/user/${encodeURIComponent(nickname)}/${this.folderPath(folderPath)}`
     );
-    return data?.Response?.Folder;
+    return this.object(data, 'Folder', []);
   }
 
   // ===== Comments =====
@@ -413,17 +506,14 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(
       `/api/v2/album/${encodeURIComponent(albumKey)}!comments`,
       params
     );
-    return {
-      items: data?.Response?.Comment || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Comment', ['Text']);
   }
 
   async getImageComments(
@@ -431,31 +521,44 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(
       `/api/v2/image/${encodeURIComponent(imageKey)}-0!comments`,
       params
     );
-    return {
-      items: data?.Response?.Comment || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Comment', ['Text']);
   }
 
   // ===== Watermarks =====
 
   async getUserWatermarks(nickname: string): Promise<any[]> {
-    let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}!watermarks`);
-    return data?.Response?.Watermark || [];
+    let items: any[] = [];
+    let start = 1;
+    while (true) {
+      let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}!watermarks`, {
+        start
+      });
+      let page = this.page(data, 'Watermark');
+      items.push(...page.items);
+      let next = page.pages.start + page.pages.count;
+      if (next > page.pages.total) return items;
+      if (next <= start || page.items.length === 0) {
+        throw createApiServiceError(
+          'SmugMug returned a watermark page that cannot be advanced.',
+          { reason: 'invalid_pagination' }
+        );
+      }
+      start = next;
+    }
   }
 
   // ===== Featured Albums & Popular Media =====
 
   async getFeaturedAlbums(nickname: string): Promise<any[]> {
     let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}!features`);
-    return data?.Response?.Feature || [];
+    return this.page(data, 'Feature').items;
   }
 
   async getRecentImages(
@@ -463,17 +566,14 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(
       `/api/v2/user/${encodeURIComponent(nickname)}!recentimages`,
       params
     );
-    return {
-      items: data?.Response?.Image || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Image', ['ImageKey']);
   }
 
   async getPopularMedia(
@@ -481,21 +581,18 @@ export class Client {
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, string | number | undefined> = {};
-    if (pagination?.start) params.start = pagination.start;
-    if (pagination?.count) params.count = pagination.count;
+    if (pagination?.start !== undefined) params.start = pagination.start;
+    if (pagination?.count !== undefined) params.count = pagination.count;
 
     let data = await this.get(
       `/api/v2/user/${encodeURIComponent(nickname)}!popularmedia`,
       params
     );
-    return {
-      items: data?.Response?.Image || [],
-      pages: data?.Response?.Pages || { total: 0, start: 1, count: 0 }
-    };
+    return this.page(data, 'Image', ['ImageKey']);
   }
 
   async getTopKeywords(nickname: string): Promise<any> {
     let data = await this.get(`/api/v2/user/${encodeURIComponent(nickname)}!topkeywords`);
-    return data?.Response?.TopKeywords;
+    return this.object(data, 'TopKeywords', []);
   }
 }

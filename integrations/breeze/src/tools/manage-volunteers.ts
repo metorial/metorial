@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageVolunteers = SlateTool.create(spec, {
@@ -37,7 +37,7 @@ export let manageVolunteers = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let volunteers = await client.listVolunteers(ctx.input.instanceId);
-      let volunteersArray = Array.isArray(volunteers) ? volunteers : [];
+      let volunteersArray = requireList(volunteers, 'manage-volunteers');
       return {
         output: { volunteers: volunteersArray },
         message: `Found **${volunteersArray.length}** volunteers for event instance (ID: ${ctx.input.instanceId}).`
@@ -45,7 +45,7 @@ export let manageVolunteers = SlateTool.create(spec, {
     }
 
     if (!ctx.input.personId) {
-      throw new Error('personId is required for add, remove, and update actions');
+      throw createApiServiceError('personId is required for add, remove, and update actions');
     }
 
     let result: unknown;
@@ -62,7 +62,7 @@ export let manageVolunteers = SlateTool.create(spec, {
         break;
       case 'update':
         if (!ctx.input.roleIds) {
-          throw new Error('roleIds is required for the update action');
+          throw createApiServiceError('roleIds is required for the update action');
         }
         result = await client.updateVolunteer(
           ctx.input.instanceId,
@@ -74,7 +74,7 @@ export let manageVolunteers = SlateTool.create(spec, {
     }
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `${actionLabel!} volunteer (person ID: ${ctx.input.personId}) for event instance (ID: ${ctx.input.instanceId}).`
     };
   })

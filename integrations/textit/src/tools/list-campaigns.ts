@@ -6,13 +6,17 @@ import { spec } from '../spec';
 export let listCampaigns = SlateTool.create(spec, {
   name: 'List Campaigns',
   key: 'list_campaigns',
-  description: `Retrieve campaigns from your TextIt workspace. Filter by UUID or creation date. Returns campaigns with their associated groups and events.`,
+  description: `Retrieve campaigns from your TextIt workspace. Filter by UUID or creation date. Returns campaigns with their associated groups. Use list_campaign_events to retrieve events.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       campaignUuid: z.string().optional().describe('Filter by a specific campaign UUID'),
       before: z
         .string()
@@ -35,6 +39,8 @@ export let listCampaigns = SlateTool.create(spec, {
           createdOn: z.string()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -42,6 +48,7 @@ export let listCampaigns = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listCampaigns({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.campaignUuid,
       before: ctx.input.before,
       after: ctx.input.after
@@ -58,6 +65,8 @@ export let listCampaigns = SlateTool.create(spec, {
     return {
       output: {
         campaigns,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${campaigns.length}** campaign(s).`

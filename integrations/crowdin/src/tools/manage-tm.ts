@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { attachDownload } from '../lib/downloads';
 import { createClient } from '../lib/helpers';
+import { rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTMTool = SlateTool.create(spec, {
@@ -8,14 +10,31 @@ export let manageTMTool = SlateTool.create(spec, {
   key: 'manage_tm',
   description: `List, create, update, or delete translation memories. Translation memories store previously translated segments for reuse across projects. Also supports exporting TM data.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       action: z
-        .enum(['list', 'get', 'create', 'update', 'delete', 'export'])
+        .enum([
+          'list',
+          'get',
+          'create',
+          'update',
+          'delete',
+          'export',
+          'export_status',
+          'download_export'
+        ])
         .describe('Action to perform'),
+      exportId: z
+        .string()
+        .optional()
+        .describe(
+          'Export job identifier from the export action, required for export_status/download_export'
+        ),
+      sourceLanguageId: z.string().optional().describe('Limit export to this source language'),
+      targetLanguageId: z.string().optional().describe('Limit export to this target language'),
       tmId: z
         .number()
         .optional()
@@ -30,18 +49,21 @@ export let manageTMTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       tms: z
         .array(
           z.object({
             tmId: z.number(),
             name: z.string(),
-            languageId: z.string(),
+            languageId: z.string().optional(),
             segmentsCount: z.number().optional(),
             createdAt: z.string().optional()
           })
         )
         .optional(),
       exportStatus: z.string().optional(),
+      progress: z.number().optional(),
+      expiresAt: z.string().optional(),
       exportId: z.string().optional(),
       downloadUrl: z.string().optional(),
       deleted: z.boolean().optional(),
@@ -63,31 +85,32 @@ export let manageTMTool = SlateTool.create(spec, {
       let tms = result.data.map((item: any) => ({
         tmId: item.data.id,
         name: item.data.name,
-        languageId: item.data.languageId,
+        languageId: item.data.languageId ?? undefined,
         segmentsCount: item.data.segmentsCount,
-        createdAt: item.data.createdAt
+        createdAt: item.data.createdAt ?? undefined
       }));
 
       return {
-        output: { tms, pagination: result.pagination },
+        output: { raw: client.lastResponse, tms, pagination: result.pagination },
         message: `Found **${tms.length}** translation memories.`
       };
     }
 
     if (action === 'get') {
-      if (!ctx.input.tmId) throw new Error('tmId is required for get');
+      if (!ctx.input.tmId) throw createApiServiceError('tmId is required for get');
 
       let tm = await client.getTM(ctx.input.tmId);
 
       return {
         output: {
+          raw: client.lastResponse,
           tms: [
             {
               tmId: tm.id,
               name: tm.name,
-              languageId: tm.languageId,
+              languageId: tm.languageId ?? undefined,
               segmentsCount: tm.segmentsCount,
-              createdAt: tm.createdAt
+              createdAt: tm.createdAt ?? undefined
             }
           ]
         },
@@ -97,7 +120,7 @@ export let manageTMTool = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.languageId) {
-        throw new Error('name and languageId are required for create');
+        throw createApiServiceError('name and languageId are required for create');
       }
 
       let tm = await client.createTM({
@@ -108,13 +131,14 @@ export let manageTMTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           tms: [
             {
               tmId: tm.id,
               name: tm.name,
-              languageId: tm.languageId,
-              segmentsCount: tm.segmentsCount || 0,
-              createdAt: tm.createdAt
+              languageId: tm.languageId ?? undefined,
+              segmentsCount: tm.segmentsCount,
+              createdAt: tm.createdAt ?? undefined
             }
           ]
         },
@@ -123,23 +147,25 @@ export let manageTMTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.tmId) throw new Error('tmId is required for update');
+      if (!ctx.input.tmId) throw createApiServiceError('tmId is required for update');
 
       let patches: Array<{ op: string; path: string; value: any }> = [];
       if (ctx.input.name !== undefined)
         patches.push({ op: 'replace', path: '/name', value: ctx.input.name });
 
+      if (!patches.length) throw createApiServiceError('Provide a name to update.');
       let tm = await client.updateTM(ctx.input.tmId, patches);
 
       return {
         output: {
+          raw: client.lastResponse,
           tms: [
             {
               tmId: tm.id,
               name: tm.name,
-              languageId: tm.languageId,
+              languageId: tm.languageId ?? undefined,
               segmentsCount: tm.segmentsCount,
-              createdAt: tm.createdAt
+              createdAt: tm.createdAt ?? undefined
             }
           ]
         },
@@ -148,31 +174,66 @@ export let manageTMTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.tmId) throw new Error('tmId is required for delete');
+      if (!ctx.input.tmId) throw createApiServiceError('tmId is required for delete');
       await client.deleteTM(ctx.input.tmId);
 
       return {
-        output: { deleted: true },
+        output: { raw: client.lastResponse, deleted: true },
         message: `Deleted TM with ID **${ctx.input.tmId}**.`
       };
     }
 
     if (action === 'export') {
-      if (!ctx.input.tmId) throw new Error('tmId is required for export');
+      if (!ctx.input.tmId) throw createApiServiceError('tmId is required for export');
 
       let exportResult = await client.exportTM(ctx.input.tmId, {
-        format: ctx.input.format
+        format: ctx.input.format,
+        sourceLanguageId: ctx.input.sourceLanguageId,
+        targetLanguageId: ctx.input.targetLanguageId
       });
 
       return {
         output: {
-          exportId: exportResult.identifier || String(exportResult.id),
+          raw: client.lastResponse,
+          exportId: exportResult.identifier,
           exportStatus: exportResult.status
         },
         message: `Started TM export (status: ${exportResult.status}).`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'export_status' || action === 'download_export') {
+      if (!ctx.input.tmId || !ctx.input.exportId)
+        throw createApiServiceError('tmId and exportId are required.');
+      if (action === 'export_status') {
+        const result = await client.getTMExportStatus(ctx.input.tmId, ctx.input.exportId);
+        return {
+          output: {
+            raw: client.lastResponse,
+            exportId: result.identifier,
+            exportStatus: result.status,
+            progress: result.progress
+          },
+          message: `TM export status: ${result.status}.`
+        };
+      }
+      const result = await client.downloadTMExport(ctx.input.tmId, ctx.input.exportId);
+      const file = await attachDownload(ctx, result, {
+        kind: 'tm',
+        tmId: ctx.input.tmId,
+        exportId: ctx.input.exportId
+      });
+      return {
+        output: {
+          raw: client.lastResponse,
+          exportId: ctx.input.exportId,
+          downloadUrl: file.url,
+          expiresAt: file.expiresAt
+        },
+        message: 'The translation memory download is ready.'
+      };
+    }
+
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

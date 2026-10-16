@@ -4,14 +4,17 @@ import {
   askAiAgent,
   getAiReports,
   getCryptoInvestors,
+  getGradeHistory,
   getGrades,
   getIndices,
   getMarketMetrics,
+  getMoonshotTokens,
   getPriceData,
   getPricePrediction,
   getQuantMetrics,
   getSentiment,
   getTechnicalAnalysis,
+  getTmGrades,
   getTopTokens,
   getTradingSignals,
   searchTokens
@@ -33,7 +36,10 @@ export let provider = Slate.create({
     getAiReports,
     getIndices,
     getCryptoInvestors,
-    askAiAgent
+    askAiAgent,
+    getTmGrades,
+    getGradeHistory,
+    getMoonshotTokens
   ],
   triggers: []
 });

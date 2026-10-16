@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let createCompany = SlateTool.create(spec, {
@@ -43,11 +44,16 @@ export let createCompany = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.ownerId === undefined)
+      throw createApiServiceError(
+        'ownerId is required by CATS. Call list_users to discover user IDs.'
+      );
+
     let body: Record<string, any> = {
       name: ctx.input.name
     };
 
-    if (ctx.input.address) {
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -55,18 +61,21 @@ export let createCompany = SlateTool.create(spec, {
         postal_code: ctx.input.address.postalCode
       };
     }
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.faxNumber) body.fax_number = ctx.input.faxNumber;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    let phones: { number: string; type: string }[] = [];
+    if (ctx.input.phone !== undefined) phones.push({ number: ctx.input.phone, type: 'main' });
+    if (ctx.input.faxNumber !== undefined)
+      phones.push({ number: ctx.input.faxNumber, type: 'fax' });
+    if (phones.length) body.phones = phones;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
-    if (ctx.input.keyTechnologies) body.key_technologies = ctx.input.keyTechnologies;
+    if (ctx.input.keyTechnologies !== undefined)
+      body.key_technologies = ctx.input.keyTechnologies;
 
     let result = await client.createCompany(body);
-    let companyId =
-      result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let companyId = requiredId(result?.id, 'created record');
 
     return {
       output: {

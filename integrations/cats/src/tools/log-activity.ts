@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let logActivity = SlateTool.create(spec, {
@@ -33,11 +34,16 @@ export let logActivity = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {
-      type: ctx.input.type
+      type:
+        ctx.input.type === 'call'
+          ? 'call_talked'
+          : ctx.input.type === 'text'
+            ? 'text_message'
+            : ctx.input.type
     };
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.date) body.date = ctx.input.date;
-    if (ctx.input.regardingJobId) body.regarding_id = ctx.input.regardingJobId;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.date !== undefined) body.date = ctx.input.date;
+    if (ctx.input.regardingJobId !== undefined) body.regarding_id = ctx.input.regardingJobId;
 
     let result: any;
     if (ctx.input.resourceType === 'candidates') {
@@ -46,8 +52,7 @@ export let logActivity = SlateTool.create(spec, {
       result = await client.createContactActivity(ctx.input.resourceId, body);
     }
 
-    let activityId =
-      result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let activityId = requiredId(result?.id, 'created record');
 
     return {
       output: { activityId },
@@ -77,6 +82,7 @@ export let getActivity = SlateTool.create(spec, {
       date: z.string().optional().describe('Activity date'),
       createdAt: z.string().optional().describe('Created date'),
       updatedAt: z.string().optional().describe('Updated date'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links')
     })
   )
@@ -86,12 +92,13 @@ export let getActivity = SlateTool.create(spec, {
 
     return {
       output: {
-        activityId: (data.id ?? ctx.input.activityId).toString(),
-        type: data.type,
-        notes: data.notes,
-        date: data.date,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        activityId: requiredId(data?.id, 'record'),
+        type: data.type ?? undefined,
+        notes: data.notes ?? undefined,
+        date: data.date ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved activity **${ctx.input.activityId}**.`
@@ -136,17 +143,17 @@ export let listActivities = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let activities = (data?._embedded?.activities ?? []).map((a: any) => ({
-      activityId: a.id?.toString() ?? '',
-      type: a.type,
-      notes: a.notes,
-      date: a.date
+    let activities = collection(data, 'activities').map((a: any) => ({
+      activityId: requiredId(a.id, 'record'),
+      type: a.type ?? undefined,
+      notes: a.notes ?? undefined,
+      date: a.date ?? undefined
     }));
 
     return {
       output: {
         activities,
-        totalCount: data?.total ?? activities.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Listed **${activities.length}** activity(ies).`

@@ -10,7 +10,7 @@ export let podioRawApi = SlateTool.create(spec, {
 Use this for advanced operations not covered by other tools. ProcFu handles the Podio OAuth automatically.`,
   instructions: [
     'The url should be the Podio API path (e.g. "/item/123456"), not a full URL.',
-    'Attributes and options should be valid JSON strings.'
+    'Provide attributes and options as JSON objects.'
   ],
   tags: {
     readOnly: false,

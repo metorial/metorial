@@ -1,18 +1,16 @@
 {
   "name": "@metorial/uniqode",
-  "description": "Create, manage, and track QR codes, NFC tags, BLE beacons, and geofences for proximity marketing. Build campaigns including URL redirects, landing pages, feedback forms, digital business cards, coupons, and vCard contacts. Download QR codes in multiple formats (PNG, SVG, PDF) with custom branding. Bulk-create QR codes via CSV upload. Manage geofences with geographic triggers. Retrieve scan analytics with time-series performance data, impression details, and CSV report exports. Capture leads and form responses from campaign interactions. Monitor beacon battery levels and hardware status. Organize products by physical places and locations.",
+  "description": "Manage Uniqode QR codes, digital business cards, campaign landing pages, feedback form responses, and scan analytics. Discover organizations and manage QR code and card lifecycle. Existing beacon, NFC tag, geofence, and earlier reporting interfaces remain available for compatible accounts.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "iot-and-device-control"],
   "skills": [
     "create and manage QR codes",
-    "build marketing campaigns",
-    "track scan analytics",
-    "manage NFC tags",
-    "configure BLE beacons",
-    "create geofences",
-    "capture form responses",
-    "bulk create QR codes",
     "manage digital business cards",
-    "export analytics reports"
+    "discover organizations",
+    "track QR scan analytics",
+    "activate and deactivate QR codes and cards",
+    "manage campaign landing pages",
+    "capture form responses",
+    "manage legacy proximity resources"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/beaconstac.png"
 }

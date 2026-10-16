@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
@@ -24,6 +25,14 @@ export let manageTeam = SlateTool.create(spec, {
         .describe('ID of an existing team to update or delete. Omit to create a new team.'),
       name: z.string().optional().describe('Name of the team (required when creating)'),
       description: z.string().optional().describe('Description of the team'),
+      recruiterCap: z.number().optional().describe('Recruiter license capacity for the team'),
+      developerCap: z.number().optional().describe('Developer license capacity for the team'),
+      inviteAs: z
+        .string()
+        .optional()
+        .describe('Display name used on candidate invitation emails'),
+      locations: z.array(z.string()).optional().describe('Team locations'),
+      departments: z.array(z.string()).optional().describe('Team departments'),
       remove: z.boolean().optional().describe('Set to true to delete the team (must be empty)')
     })
   )
@@ -39,6 +48,23 @@ export let manageTeam = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.remove && !ctx.input.teamId)
+      throw createApiServiceError('Provide teamId to delete an existing team.');
+    validateInteger(ctx.input.recruiterCap, 'recruiterCap');
+    validateInteger(ctx.input.developerCap, 'developerCap');
+    let settings = {
+      name: ctx.input.name,
+      description: ctx.input.description,
+      recruiter_cap: ctx.input.recruiterCap,
+      developer_cap: ctx.input.developerCap,
+      invite_as: ctx.input.inviteAs,
+      locations: ctx.input.locations,
+      departments: ctx.input.departments
+    };
+    if (ctx.input.remove && Object.values(settings).some(value => value !== undefined))
+      throw createApiServiceError(
+        'Deleting a team cannot be combined with updating team fields.'
+      );
     if (ctx.input.teamId && ctx.input.remove) {
       await client.deleteTeam(ctx.input.teamId);
       return {
@@ -50,9 +76,11 @@ export let manageTeam = SlateTool.create(spec, {
     }
 
     if (ctx.input.teamId) {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-      if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
+      let updateData = Object.fromEntries(
+        Object.entries(settings).filter(([, value]) => value !== undefined)
+      );
+      if (Object.keys(updateData).length === 0)
+        throw createApiServiceError('Provide at least one team field to update.');
 
       let result = await client.updateTeam(ctx.input.teamId, updateData);
       let team = result.data ?? result;
@@ -66,12 +94,12 @@ export let manageTeam = SlateTool.create(spec, {
     }
 
     if (!ctx.input.name) {
-      throw new Error('Name is required when creating a new team');
+      throw createApiServiceError('Name is required when creating a new team.');
     }
 
     let result = await client.createTeam({
-      name: ctx.input.name,
-      description: ctx.input.description
+      ...settings,
+      name: ctx.input.name
     });
 
     let team = result.data ?? result;

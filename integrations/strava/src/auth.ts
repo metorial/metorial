@@ -1,21 +1,67 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let authAxios = createAxios({
-  baseURL: 'https://www.strava.com'
+  baseURL: 'https://www.strava.com',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
 });
 
 let apiAxios = createAxios({
   baseURL: 'https://www.strava.com/api/v3'
 });
 
+for (let client of [authAxios, apiAxios]) {
+  client.interceptors.response.use(undefined, error => {
+    throw buildApiServiceError(error, {
+      providerLabel: 'Strava',
+      reason: 'strava_api_error',
+      extractResponse: (upstream, helpers) => helpers.getResponseWithBody(upstream),
+      detailKeys: ['message', 'resource', 'field', 'code'],
+      nestedKeys: ['errors']
+    });
+  });
+}
+
+let getScopes = (scope: unknown, fallback: string[]) =>
+  typeof scope === 'string' ? scope.split(/[\s,]+/).filter(Boolean) : fallback;
+
+let getExpiry = (expiresAt: unknown, fallback?: string) => {
+  if (expiresAt === undefined || expiresAt === null) return fallback;
+  let date = typeof expiresAt === 'number' ? new Date(expiresAt * 1000) : undefined;
+  if (!date || !Number.isFinite(date.getTime())) {
+    throw createApiServiceError('Strava returned an invalid access token expiration.', {
+      reason: 'oauth_token_response'
+    });
+  }
+  return date.toISOString();
+};
+
+type AuthOutput = {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  scopes?: string[];
+  athleteId?: number;
+  [key: string]: unknown;
+};
+
 export let auth = SlateAuth.create()
   .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
+    z
+      .object({
+        token: z.string(),
+        refreshToken: z.string().optional(),
+        expiresAt: z.string().optional(),
+        scopes: z.array(z.string()).optional(),
+        athleteId: z.number().optional()
+      })
+      .passthrough()
   )
   .addOauth({
     type: 'auth.oauth',
@@ -90,19 +136,32 @@ export let auth = SlateAuth.create()
       });
 
       let data = response.data;
+      let tokens = normalizeOAuthTokenResponse(data, { providerLabel: 'Strava' });
+      let scopes = getScopes(data.scope ?? ctx.callbackParams?.scope, ctx.scopes);
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_at
-            ? new Date(data.expires_at * 1000).toISOString()
-            : undefined
-        }
+          ...tokens,
+          expiresAt: getExpiry(data.expires_at, tokens.expiresAt),
+          scopes,
+          athleteId: typeof data.athlete?.id === 'number' ? data.athlete.id : undefined
+        },
+        scopes
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: AuthOutput;
+      input: Record<string, never>;
+      clientId: string;
+      clientSecret: string;
+      scopes: string[];
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError('Reconnect Strava to obtain a refresh token.', {
+          reason: 'missing_refresh_token'
+        });
+      }
       let response = await authAxios.post('/oauth/token', {
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
@@ -112,19 +171,24 @@ export let auth = SlateAuth.create()
 
       let data = response.data;
 
+      let tokens = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'Strava',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken
+      });
+
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_at
-            ? new Date(data.expires_at * 1000).toISOString()
-            : undefined
+          ...ctx.output,
+          ...tokens,
+          expiresAt: getExpiry(data.expires_at, tokens.expiresAt ?? ctx.output.expiresAt),
+          scopes: getScopes(data.scope, ctx.output.scopes ?? ctx.scopes)
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
+      output: AuthOutput;
       input: Record<string, never>;
       scopes: string[];
     }) => {
@@ -135,11 +199,19 @@ export let auth = SlateAuth.create()
       });
 
       let athlete = response.data;
+      if (typeof athlete.id !== 'number' && typeof athlete.id !== 'string') {
+        throw createApiServiceError('Strava did not return an athlete identifier.', {
+          reason: 'invalid_athlete_response'
+        });
+      }
 
       return {
         profile: {
           id: String(athlete.id),
-          name: `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim(),
+          name:
+            [athlete.firstname, athlete.lastname].filter(Boolean).join(' ') ||
+            athlete.username ||
+            undefined,
           imageUrl: athlete.profile || undefined,
           email: undefined,
           username: athlete.username,

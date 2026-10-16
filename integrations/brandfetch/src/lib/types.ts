@@ -2,8 +2,8 @@ export interface LogoFormat {
   src: string;
   background: string | null;
   format: string;
-  height?: number;
-  width?: number;
+  height?: number | null;
+  width?: number | null;
   size?: number;
 }
 
@@ -21,11 +21,11 @@ export interface BrandColor {
 }
 
 export interface BrandFont {
-  name: string;
+  name: string | null;
   type: string;
   origin: string | null;
   originId: string | null;
-  weights: number[];
+  weights: unknown[];
 }
 
 export interface BrandImage {
@@ -44,12 +44,14 @@ export interface Industry {
   name: string;
   emoji: string;
   slug: string;
-  parent: {
-    id: string;
-    name: string;
-    emoji: string;
-    slug: string;
-  } | null;
+  parent: IndustryParent | IndustryParent[] | null;
+}
+
+export interface IndustryParent {
+  id: string;
+  name: string;
+  emoji: string;
+  slug: string;
 }
 
 export interface BrandLocation {
@@ -75,7 +77,7 @@ export interface BrandCompany {
 
 export interface BrandResponse {
   id?: string;
-  name: string;
+  name: string | null;
   domain: string;
   claimed: boolean;
   description: string | null;
@@ -93,9 +95,9 @@ export interface BrandResponse {
 
 export interface SearchResult {
   brandId: string;
-  name: string;
+  name: string | null;
   domain: string;
-  icon: string;
+  icon: string | null;
   claimed: boolean;
 }
 
@@ -105,3 +107,28 @@ export interface TransactionRequest {
 }
 
 export interface TransactionResponse extends BrandResponse {}
+
+export interface BrandLookupOptions {
+  allowNsfw?: boolean;
+  cachedOnly?: boolean;
+  palette?: boolean;
+}
+
+export interface BrandContextResponse extends Record<string, unknown> {
+  meta?: {
+    domain: string;
+    canonical_name: string;
+    resolved_at: string;
+  };
+}
+
+export interface ViewerResponse extends Record<string, unknown> {
+  type: 'api-key' | 'user';
+  id: string;
+  urn: string;
+  name: string | null;
+  createdAt: string | null;
+  email?: string | null;
+  usage?: { used: number; quota: number };
+  organization?: { id: string; urn: string; name: string | null };
+}

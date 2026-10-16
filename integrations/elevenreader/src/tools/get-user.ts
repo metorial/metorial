@@ -14,6 +14,8 @@ export let getUserTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
+      workspaceId: z.string().optional().describe('Workspace associated with the API key'),
       userId: z.string().describe('Unique user identifier'),
       firstName: z.string().optional().describe('User first name'),
       subscriptionTier: z.string().optional().describe('Current subscription tier'),
@@ -47,19 +49,21 @@ export let getUserTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: user.raw,
+        workspaceId: user.workspace_id ?? undefined,
         userId: user.user_id,
-        firstName: user.first_name,
-        subscriptionTier: sub?.tier,
-        subscriptionStatus: sub?.status,
-        characterCount: sub?.character_count,
-        characterLimit: sub?.character_limit,
-        voiceSlots: sub?.voice_limit,
-        professionalVoiceLimit: sub?.professional_voice_limit,
-        canExtendCharacterLimit: sub?.can_extend_character_limit,
-        canUseInstantVoiceCloning: sub?.can_use_instant_voice_cloning,
-        canUseProfessionalVoiceCloning: sub?.can_use_professional_voice_cloning
+        firstName: user.first_name ?? undefined,
+        subscriptionTier: sub?.tier ?? undefined,
+        subscriptionStatus: sub?.status ?? undefined,
+        characterCount: sub?.character_count ?? undefined,
+        characterLimit: sub?.character_limit ?? undefined,
+        voiceSlots: sub?.voice_limit ?? undefined,
+        professionalVoiceLimit: sub?.professional_voice_limit ?? undefined,
+        canExtendCharacterLimit: sub?.can_extend_character_limit ?? undefined,
+        canUseInstantVoiceCloning: sub?.can_use_instant_voice_cloning ?? undefined,
+        canUseProfessionalVoiceCloning: sub?.can_use_professional_voice_cloning ?? undefined
       },
-      message: `User **${user.first_name || user.user_id}**, tier: **${sub?.tier || 'unknown'}**. Characters: ${sub?.character_count || 0}/${sub?.character_limit || 0}.`
+      message: `Retrieved account information for user \`${user.user_id}\`.`
     };
   })
   .build();

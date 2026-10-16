@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listScanners = SlateTool.create(spec, {
   name: 'List Scanners',
   key: 'list_scanners',
-  description: `List all scanner configurations in your PassSlot account. Scanners are used with the Pass Verifier app to scan, validate, and redeem passes.`,
+  description: `List all scanner configurations in your PassSlot account. Scanners are used with the Pass Verifier app to scan, validate, and redeem passes. Requires an App Key with full access. Call get_scanner for device authorization details.`,
   tags: {
     readOnly: true
   }

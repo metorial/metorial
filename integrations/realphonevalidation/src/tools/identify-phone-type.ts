@@ -27,7 +27,7 @@ export let identifyPhoneType = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      phoneType: z.string().describe('Phone line type: Wireless or Landline'),
+      phoneType: z.string().describe('Provider phone line type, such as cell or Landline'),
       responseMessage: z.string().optional().describe('Additional response message if any')
     })
   )

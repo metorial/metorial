@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,9 +15,13 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('Your The Odds API key')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Enter a non-empty The Odds API key.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

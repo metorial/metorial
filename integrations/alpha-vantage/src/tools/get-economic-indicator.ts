@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 let indicatorEnum = z.enum([
@@ -31,7 +32,7 @@ export let getEconomicIndicator = SlateTool.create(spec, {
     z.object({
       indicator: indicatorEnum.describe('Economic indicator to retrieve'),
       interval: z
-        .enum(['daily', 'weekly', 'monthly', 'quarterly', 'annual'])
+        .enum(['daily', 'weekly', 'monthly', 'quarterly', 'annual', 'semiannual'])
         .optional()
         .describe('Data interval. Not all intervals are available for every indicator.'),
       maturity: z
@@ -58,25 +59,49 @@ export let getEconomicIndicator = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { indicator, interval, maturity } = ctx.input;
 
+    let intervals: Record<string, readonly string[]> = {
+      REAL_GDP: ['quarterly', 'annual'],
+      REAL_GDP_PER_CAPITA: ['quarterly'],
+      TREASURY_YIELD: ['daily', 'weekly', 'monthly'],
+      FEDERAL_FUNDS_RATE: ['daily', 'weekly', 'monthly'],
+      CPI: ['monthly', 'semiannual'],
+      INFLATION: ['annual'],
+      RETAIL_SALES: ['monthly'],
+      DURABLES: ['monthly'],
+      UNEMPLOYMENT: ['monthly'],
+      NONFARM_PAYROLL: ['monthly']
+    };
+    if (interval !== undefined && !intervals[indicator]?.includes(interval))
+      throw createApiServiceError(
+        `${indicator} supports these intervals: ${intervals[indicator]?.join(', ')}.`
+      );
+    if (maturity !== undefined && indicator !== 'TREASURY_YIELD')
+      throw createApiServiceError('maturity applies only to TREASURY_YIELD.');
+    let configurableInterval = [
+      'REAL_GDP',
+      'TREASURY_YIELD',
+      'FEDERAL_FUNDS_RATE',
+      'CPI'
+    ].includes(indicator);
     let data = await client.economicIndicator({
       indicatorFunction: indicator,
-      interval,
+      interval: configurableInterval ? interval : undefined,
       maturity
     });
 
-    let rawData: any[] = data.data || [];
+    let rawData: any[] = responseRows(data.data, 'data');
 
     let dataPoints = rawData
       .filter((d: any) => d.value !== '.')
       .map((d: any) => ({
-        date: d.date || '',
-        value: d.value || ''
+        date: responseText(d.date, 'date'),
+        value: responseText(d.value, 'value')
       }));
 
     return {
       output: {
-        indicator: data.name || indicator,
-        unit: data.unit || '',
+        indicator: responseText(data.name, 'indicator name'),
+        unit: responseText(data.unit, 'unit'),
         dataPoints
       },
       message: `Retrieved ${dataPoints.length} data points for **${indicator}**.`

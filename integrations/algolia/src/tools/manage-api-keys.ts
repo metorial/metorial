@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -98,7 +98,7 @@ export let manageApiKeys = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!keyValue) {
-        throw new Error('keyValue is required for the "get" action.');
+        throw createApiServiceError('keyValue is required for the "get" action.');
       }
 
       let result = await client.getApiKey(keyValue);
@@ -111,7 +111,9 @@ export let manageApiKeys = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.acl || ctx.input.acl.length === 0) {
-        throw new Error('acl is required and must not be empty when creating an API key.');
+        throw createApiServiceError(
+          'acl is required and must not be empty when creating an API key.'
+        );
       }
 
       let params: Record<string, any> = {
@@ -139,7 +141,7 @@ export let manageApiKeys = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!keyValue) {
-        throw new Error('keyValue is required for the "update" action.');
+        throw createApiServiceError('keyValue is required for the "update" action.');
       }
 
       let params: Record<string, any> = {};
@@ -157,7 +159,9 @@ export let manageApiKeys = SlateTool.create(spec, {
         params.queryParameters = ctx.input.queryParameters;
 
       if (Object.keys(params).length === 0) {
-        throw new Error('At least one field must be provided when updating an API key.');
+        throw createApiServiceError(
+          'At least one field must be provided when updating an API key.'
+        );
       }
 
       let result = await client.updateApiKey(keyValue, params);
@@ -170,7 +174,7 @@ export let manageApiKeys = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!keyValue) {
-        throw new Error('keyValue is required for the "delete" action.');
+        throw createApiServiceError('keyValue is required for the "delete" action.');
       }
 
       let result = await client.deleteApiKey(keyValue);
@@ -183,7 +187,7 @@ export let manageApiKeys = SlateTool.create(spec, {
 
     // action === 'restore'
     if (!keyValue) {
-      throw new Error('keyValue is required for the "restore" action.');
+      throw createApiServiceError('keyValue is required for the "restore" action.');
     }
 
     let result = await client.restoreApiKey(keyValue);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UploadClient } from '../lib/upload-client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let uploadFromUrl = SlateTool.create(spec, {
   name: 'Upload from URL',
   key: 'upload_from_url',
-  description: `Upload a file to Uploadcare by providing a publicly accessible URL. Uploadcare will fetch the file and store it. Returns a token to check upload status, plus the file UUID once available.`,
+  description: `Upload a file to Uploadcare by providing a publicly accessible URL. Uploadcare fetches the file using your selected storage option. Returns an upload token, or an existing file when duplicate prevention finds a match.`,
   instructions: [
     'The source URL must be publicly accessible.',
-    'Use the returned token to poll for upload completion if the file is not immediately ready.'
+    'Call get_url_upload_status with the returned token to poll for upload completion if the file is not immediately ready.'
   ]
 })
   .input(
@@ -23,7 +23,7 @@ export let uploadFromUrl = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe(
-          'Whether to permanently store the file (default: auto based on project settings)'
+          'Whether to permanently store the file; omitted uses the provider default for your account'
         ),
       checkUrlDuplicates: z
         .boolean()
@@ -41,16 +41,34 @@ export let uploadFromUrl = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      uploadToken: z.string().describe('Token for checking upload status'),
-      status: z.string().describe('Current upload status (waiting, progress, success, error)'),
-      fileId: z
+      uploadToken: z
         .string()
         .optional()
-        .describe('UUID of the uploaded file (available when status is success)')
+        .describe(
+          'Token for checking upload status; absent when an existing duplicate file is returned'
+        ),
+      status: z
+        .string()
+        .describe(
+          'Current upload status (waiting, progress, success, error), or file for an existing duplicate'
+        ),
+      originalFilename: z
+        .string()
+        .optional()
+        .describe('Original filename when an existing duplicate is returned'),
+      size: z
+        .number()
+        .optional()
+        .describe('Size in bytes when an existing duplicate is returned'),
+      mimeType: z
+        .string()
+        .optional()
+        .describe('MIME type when an existing duplicate is returned'),
+      fileId: z.string().optional().describe('UUID of the uploaded or existing duplicate file')
     })
   )
   .handleInvocation(async ctx => {
-    let uploadClient = new UploadClient(ctx.auth.publicKey);
+    let uploadClient = new UploadClient(ctx.auth.publicKey, ctx.auth.secretKey);
 
     let storeValue: string | undefined;
     if (ctx.input.store === true) storeValue = '1';
@@ -65,18 +83,40 @@ export let uploadFromUrl = SlateTool.create(spec, {
       metadata: ctx.input.metadata
     });
 
+    if (uploadResult.type === 'file') {
+      return {
+        output: {
+          status: uploadResult.type,
+          fileId: uploadResult.uuid,
+          originalFilename: uploadResult.original_filename,
+          size: uploadResult.size,
+          mimeType: uploadResult.mime_type
+        },
+        message: `Found the existing file **${uploadResult.uuid}** for this source URL.`
+      };
+    }
+
     let statusResult = await uploadClient.getUrlUploadStatus(uploadResult.token);
+    if (statusResult.status === 'error') {
+      throw createApiServiceError(
+        statusResult.error ?? 'Uploadcare could not fetch the source URL.',
+        {
+          reason: 'uploadcare_url_upload_failed',
+          upstreamCode: statusResult.error_code
+        }
+      );
+    }
 
     return {
       output: {
         uploadToken: uploadResult.token,
         status: statusResult.status,
-        fileId: statusResult.uuid || statusResult.file_id
+        fileId: statusResult.uuid ?? statusResult.file_id
       },
       message:
         statusResult.status === 'success'
-          ? `File uploaded successfully with UUID **${statusResult.uuid || statusResult.file_id}**.`
-          : `Upload initiated, current status: **${statusResult.status}**. Use token \`${uploadResult.token}\` to check progress.`
+          ? `File uploaded with UUID **${statusResult.uuid ?? statusResult.file_id}**.`
+          : `Upload initiated, current status: **${statusResult.status}**. Call get_url_upload_status with token \`${uploadResult.token}\` to check progress.`
     };
   })
   .build();

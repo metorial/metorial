@@ -28,6 +28,7 @@ export let listActivities = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       activities: z
         .array(
           z.object({
@@ -99,6 +100,7 @@ export let listActivities = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: activities,
         activities: mapped,
         count: mapped.length
       },

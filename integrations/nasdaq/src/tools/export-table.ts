@@ -1,24 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TablesClient } from '../lib/client';
+import { exportDownloadUrl, exportRefreshAt } from '../lib/export';
 import { spec } from '../spec';
 
 export let exportTable = SlateTool.create(spec, {
   name: 'Export Table',
   key: 'export_table',
-  description: `Request a bulk export of an entire Nasdaq Data Link table as a downloadable ZIP file. Returns a download link and the export status.
-Use this for large datasets that exceed the 10,000-row pagination limit.`,
+  description:
+    'Request a bulk ZIP export of a Nasdaq Data Link table or filtered subset. Returns export status and a downloadable file when generation completes.',
   instructions: [
-    'The download link expires after 30 minutes.',
-    'If the status is "creating" or "regenerating", wait a few minutes and retry to get the download link.'
+    'If the export is not fresh, wait and retry with the same table and filters. Download links can expire; request the export again if necessary.'
   ],
-  constraints: [
-    'Limited to 60 bulk downloads per hour.',
-    'Premium tables require an active subscription.'
-  ],
-  tags: {
-    readOnly: true
-  }
+  constraints: ['Premium tables require an active subscription.'],
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -33,38 +28,47 @@ Use this for large datasets that exceed the 10,000-row pagination limit.`,
   )
   .output(
     z.object({
-      downloadLink: z.string().describe('URL to download the exported ZIP file.'),
+      downloadLink: z.string().optional().describe('Provider download URL, when available.'),
       fileStatus: z
         .string()
-        .describe(
-          'File status: "fresh" (ready), "creating" (in progress), or "regenerating" (outdated, new version being created).'
-        ),
-      snapshotTime: z.string().describe('Timestamp of the data snapshot.'),
-      lastRefreshedTime: z.string().describe('Timestamp of the last data refresh.')
+        .describe('Provider export status, such as fresh, creating, or regenerating.'),
+      snapshotTime: z.string().optional().describe('Data snapshot timestamp, when supplied.'),
+      lastRefreshedTime: z
+        .string()
+        .optional()
+        .describe('Last data refresh timestamp, when supplied.'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original export metadata.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
-
-    let response = await client.requestBulkExport(
-      ctx.input.tablePath,
-      ctx.input.filters as Record<string, string> | undefined
-    );
-
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
+    let response = await client.requestBulkExport(ctx.input.tablePath, ctx.input.filters);
     let file = response.datatable_bulk_download.file;
     let datatable = response.datatable_bulk_download.datatable;
-
+    if (file.status === 'fresh') {
+      let url = exportDownloadUrl(file);
+      await ctx.addAttachment({
+        type: 'url',
+        url,
+        mimeType: 'application/zip',
+        refreshReference: { tablePath: ctx.input.tablePath, filters: ctx.input.filters },
+        refreshAt: exportRefreshAt(url)
+      });
+    }
     return {
       output: {
-        downloadLink: file.link || '',
+        ...(file.link ? { downloadLink: file.link } : {}),
         fileStatus: file.status,
-        snapshotTime: file.data_snapshot_time || '',
-        lastRefreshedTime: datatable.last_refreshed_time || ''
+        ...(file.data_snapshot_time != null ? { snapshotTime: file.data_snapshot_time } : {}),
+        ...(datatable?.last_refreshed_time != null
+          ? { lastRefreshedTime: datatable.last_refreshed_time }
+          : {}),
+        raw: response
       },
       message:
         file.status === 'fresh'
-          ? `Export ready for **${ctx.input.tablePath}**. Download link expires in 30 minutes.`
-          : `Export for **${ctx.input.tablePath}** is being generated (status: ${file.status}). Retry in a few minutes.`
+          ? `Export ready for **${ctx.input.tablePath}**.`
+          : `Export for **${ctx.input.tablePath}** has status **${file.status}**. Retry after generation completes.`
     };
   })
   .build();

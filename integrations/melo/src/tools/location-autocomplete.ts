@@ -50,7 +50,7 @@ export let locationAutocomplete = SlateTool.create(spec, {
     });
 
     let params: Record<string, unknown> = {
-      q: ctx.input.query
+      query: ctx.input.query
     };
     if (ctx.input.excludedCityIds) params['excludedCitiesIds[]'] = ctx.input.excludedCityIds;
     if (ctx.input.excludedDepartmentIds)

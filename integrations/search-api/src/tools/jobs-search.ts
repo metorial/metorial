@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let jobResultSchema = z.object({
@@ -50,6 +50,7 @@ export let jobsSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       jobs: z.array(jobResultSchema).describe('Job listings'),
       nextPageToken: z.string().optional().describe('Token for next page of results')
@@ -67,15 +68,21 @@ export let jobsSearch = SlateTool.create(spec, {
       next_page_token: ctx.input.nextPageToken
     });
 
-    let jobs = (data.jobs || []).map((j: any) => {
-      let highlights = [
-        ...(j.job_highlights?.qualifications || []),
-        ...(j.job_highlights?.responsibilities || []),
-        ...(j.job_highlights?.benefits || [])
-      ].filter(Boolean);
+    let jobs = resultArray(data.jobs, 'jobs').map((j: any) => {
+      let highlights = (
+        Array.isArray(j.job_highlights)
+          ? j.job_highlights.flatMap((section: any) =>
+              resultArray(section.items, 'job_highlights.items', true)
+            )
+          : [
+              ...(j.job_highlights?.qualifications || []),
+              ...(j.job_highlights?.responsibilities || []),
+              ...(j.job_highlights?.benefits || [])
+            ]
+      ).filter(Boolean);
 
-      let applyLinks = (j.apply_links || []).map((a: any) => ({
-        title: a.title,
+      let applyLinks = resultArray(j.apply_links, 'apply_links').map((a: any) => ({
+        title: a.source ?? a.title,
         link: a.link
       }));
 
@@ -83,10 +90,10 @@ export let jobsSearch = SlateTool.create(spec, {
         title: j.title,
         companyName: j.company_name,
         location: j.location,
-        link: j.share_link || j.link,
+        link: j.sharing_link ?? j.share_link ?? j.link ?? j.apply_link,
         description: j.description,
         postedAt: j.detected_extensions?.posted_at,
-        scheduleType: j.detected_extensions?.schedule_type,
+        scheduleType: j.detected_extensions?.schedule ?? j.detected_extensions?.schedule_type,
         salary: j.detected_extensions?.salary,
         highlights: highlights.length > 0 ? highlights : undefined,
         applyLinks: applyLinks.length > 0 ? applyLinks : undefined
@@ -95,11 +102,12 @@ export let jobsSearch = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         jobs,
         nextPageToken: data.pagination?.next_page_token
       },
-      message: `Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${jobs.length} job${jobs.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

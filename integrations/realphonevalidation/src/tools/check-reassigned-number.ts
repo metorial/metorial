@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,7 +31,9 @@ export let checkReassignedNumber = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      reassigned: z.string().describe('Reassignment status: yes, no, or no_data'),
+      reassigned: z
+        .string()
+        .describe('Provider reassignment status: yes, no, no_data, no data, or undetermined'),
       lookupId: z.string().describe('Unique transaction identifier for this lookup'),
       responseMessage: z.string().optional().describe('Additional response message if any')
     })
@@ -41,12 +43,27 @@ export let checkReassignedNumber = SlateTool.create(spec, {
     let result = await client.reassignedNumberLookup(ctx.input.phone, ctx.input.consentDate);
     let responseMsg = normalizeResponseMsg(result.RESPONSEMSG);
 
-    let statusDescription =
-      result.reassigned === 'yes'
-        ? 'has been reassigned'
-        : result.reassigned === 'no'
-          ? 'has not been reassigned'
-          : 'has no reassignment data available';
+    let message: string;
+    switch (result.reassigned) {
+      case 'yes':
+        message = `Phone **${ctx.input.phone}** has been reassigned since ${ctx.input.consentDate}.`;
+        break;
+      case 'no':
+        message = `Phone **${ctx.input.phone}** has not been reassigned since ${ctx.input.consentDate}.`;
+        break;
+      case 'no_data':
+      case 'no data':
+        message = `Phone **${ctx.input.phone}** has no reassignment data available since ${ctx.input.consentDate}.`;
+        break;
+      case 'undetermined':
+        message = `Reassignment of phone **${ctx.input.phone}** since ${ctx.input.consentDate} is **undetermined**. Check that the phone contains exactly 10 US digits and the consent date uses YYYY-MM-DD format, then contact RealPhoneValidation support.`;
+        break;
+      default:
+        throw createApiServiceError(
+          `RealPhoneValidation returned an unsupported reassignment status: ${result.reassigned}. Check the phone and consent-date formatting, then contact RealPhoneValidation support.`,
+          { reason: 'unknown_reassignment_status', upstreamCode: result.reassigned }
+        );
+    }
 
     return {
       output: {
@@ -54,7 +71,7 @@ export let checkReassignedNumber = SlateTool.create(spec, {
         lookupId: result.id,
         responseMessage: responseMsg || undefined
       },
-      message: `Phone **${ctx.input.phone}** ${statusDescription} since ${ctx.input.consentDate}.`
+      message
     };
   })
   .build();

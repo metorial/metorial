@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyControlClient } from '../lib/control-client';
+import { appIdInput } from '../lib/schemas';
+import { validateInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageQueues = SlateTool.create(spec, {
@@ -11,7 +13,9 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
   instructions: [
     'Requires Control API Token authentication.',
     'App ID is required for all operations.',
-    'Queues are region-specific and can be configured with TTL and max length.'
+    'Queues are region-specific and can be configured with TTL and max length.',
+    'For create, supply ttlMinutes, maxLength, and region as required by the Control API. ttlMinutes takes precedence over ttl.',
+    'The legacy ttl field retains its historical unchanged numeric request value; its seconds label is inaccurate for the provider. Use ttlMinutes to set an unambiguous duration.'
   ],
   tags: {
     destructive: false,
@@ -21,9 +25,15 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
   .input(
     z.object({
       action: z.enum(['list', 'create', 'delete']).describe('Operation to perform'),
-      appId: z.string().optional().describe('App ID. Overrides config value if provided.'),
+      appId: appIdInput,
       queueId: z.string().optional().describe('Queue ID. Required for delete.'),
       name: z.string().optional().describe('Queue name. Required for create.'),
+      ttlMinutes: z
+        .number()
+        .optional()
+        .describe(
+          'Message TTL in minutes for create. Takes precedence over the legacy ttl field.'
+        ),
       ttl: z
         .number()
         .optional()
@@ -43,9 +53,12 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyControlClient(ctx.auth.token);
+    let client = new AblyControlClient(ctx.auth.token, ctx.auth.authType);
     let appId = ctx.input.appId || ctx.config.appId;
-    if (!appId) throw new Error('appId is required. Set it in config or input.');
+    if (!appId)
+      throw createApiServiceError(
+        'appId is required. Call manage_apps with action list to discover an app ID, then supply appId.'
+      );
 
     if (ctx.input.action === 'list') {
       let queues = await client.listQueues(appId);
@@ -56,10 +69,12 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a queue.');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating a queue.');
+      validateInteger('ttlMinutes', ctx.input.ttlMinutes, 1);
       let queue = await client.createQueue(appId, {
         name: ctx.input.name,
-        ttl: ctx.input.ttl,
+        ttl: ctx.input.ttlMinutes ?? ctx.input.ttl,
         maxLength: ctx.input.maxLength,
         region: ctx.input.region
       });
@@ -70,7 +85,8 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.queueId) throw new Error('queueId is required for deleting a queue.');
+      if (!ctx.input.queueId)
+        throw createApiServiceError('queueId is required for deleting a queue.');
       await client.deleteQueue(appId, ctx.input.queueId);
       return {
         output: { deleted: true },
@@ -78,6 +94,6 @@ Queues allow worker servers to consume realtime messages via AMQP or STOMP proto
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let billItemSchema = z.object({
@@ -38,10 +38,11 @@ export let createBill = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (ctx.input.billItems.length === 0) {
+      throw createApiServiceError('Include at least one bill item.');
+    }
+
+    let client = createClient(ctx);
 
     let billData: Record<string, any> = {
       contact: ctx.input.contactId,

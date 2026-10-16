@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageEnrollmentTool = SlateTool.create(spec, {
@@ -46,6 +46,7 @@ export let manageEnrollmentTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       enrollmentId: z.string().describe('Enrollment ID'),
       courseId: z.string().describe('Course ID'),
       userId: z.string().describe('User ID'),
@@ -54,18 +55,16 @@ export let manageEnrollmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let result: any;
     let actionDesc: string;
 
     if (ctx.input.action === 'enroll') {
-      if (!ctx.input.userId) throw new Error('userId is required for enroll action');
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required for enroll action');
       if (!ctx.input.enrollmentRole)
-        throw new Error('enrollmentRole is required for enroll action');
+        throw createApiServiceError('enrollmentRole is required for enroll action');
 
       result = await client.enrollUser(ctx.input.courseId, {
         userId: ctx.input.userId,
@@ -77,7 +76,7 @@ export let manageEnrollmentTool = SlateTool.create(spec, {
       actionDesc = 'Enrolled user';
     } else {
       if (!ctx.input.enrollmentId)
-        throw new Error('enrollmentId is required for conclude/delete/deactivate');
+        throw createApiServiceError('enrollmentId is required for conclude/delete/deactivate');
       let task =
         ctx.input.action === 'deactivate'
           ? ('deactivate' as const)
@@ -88,6 +87,7 @@ export let manageEnrollmentTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         enrollmentId: String(result.id),
         courseId: String(result.course_id),
         userId: String(result.user_id),

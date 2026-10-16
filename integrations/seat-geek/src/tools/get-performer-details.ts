@@ -18,6 +18,7 @@ export let getPerformerDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       performerId: z.number().describe('Unique performer ID'),
       name: z.string().describe('Full performer name'),
       shortName: z.string().describe('Abbreviated performer name'),
@@ -55,7 +56,7 @@ export let getPerformerDetails = SlateTool.create(spec, {
         .array(
           z.object({
             provider: z.string().describe('External service provider'),
-            linkId: z.string().describe('Provider-specific ID'),
+            linkId: z.string().optional().describe('Provider-specific ID when supplied'),
             url: z.string().describe('External URL')
           })
         )
@@ -89,6 +90,7 @@ export let getPerformerDetails = SlateTool.create(spec, {
     }
 
     let output = {
+      raw: p,
       performerId: p.id,
       name: p.name,
       shortName: p.short_name,
@@ -112,7 +114,7 @@ export let getPerformerDetails = SlateTool.create(spec, {
       })),
       links: (p.links || []).map(l => ({
         provider: l.provider,
-        linkId: l.id,
+        linkId: l.id ?? undefined,
         url: l.url
       })),
       divisions: (p.divisions || []).map(d => ({

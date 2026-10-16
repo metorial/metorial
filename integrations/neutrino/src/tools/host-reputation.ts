@@ -47,7 +47,8 @@ export let hostReputationTool = SlateTool.create(spec, {
             responseTime: z.number().describe('Response time in milliseconds')
           })
         )
-        .describe('Individual DNSBL check results')
+        .describe('Individual DNSBL check results'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -62,21 +63,22 @@ export let hostReputationTool = SlateTool.create(spec, {
       zones: ctx.input.zones
     });
 
-    let lists = (result.lists ?? []).map((l: any) => ({
-      isListed: l.isListed ?? false,
-      listName: l.listName ?? '',
-      listHost: l.listHost ?? '',
-      listRating: l.listRating ?? 3,
-      txtRecord: l.txtRecord ?? '',
-      returnCode: l.returnCode ?? '',
-      responseTime: l.responseTime ?? 0
+    let lists = result.lists.map(l => ({
+      isListed: l.isListed,
+      listName: l.listName,
+      listHost: l.listHost,
+      listRating: l.listRating,
+      txtRecord: l.txtRecord,
+      returnCode: l.returnCode,
+      responseTime: l.responseTime
     }));
 
     return {
       output: {
-        host: result.host ?? ctx.input.host,
-        isListed: result.isListed ?? false,
-        listCount: result.listCount ?? 0,
+        raw: result.raw,
+        host: result.host,
+        isListed: result.isListed,
+        listCount: result.listCount,
         lists
       },
       message: result.isListed

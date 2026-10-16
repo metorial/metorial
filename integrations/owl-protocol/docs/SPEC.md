@@ -1,79 +1,39 @@
-Now let me look at the actual API reference to understand the full feature set:Now I have enough information to write the specification. Let me compile everything.
+# Owl Protocol Integration
 
-# Slates Specification for Owl Protocol
+## Scope and authentication
 
-## Overview
+The integration covers project-scoped ERC721 collection deployment and minting, project user profiles and Safe wallets, reusable token templates, token metadata, contract metadata, and contract discovery. Authentication uses a project API key sent in the `x-api-key` header. No private key is required in the connection configuration.
 
-Owl Protocol is a Web3 developer platform that simplifies deploying and managing smart contracts and digital assets (ERC20, ERC721, ERC1155) across EVM-compatible blockchains. It serves as a bridge between Web2 and Web3, allowing developers to deploy and manage smart contracts utilizing REST API endpoints without the need for private keys or crypto. Each API key comes with a secure MPC (Multi-Party Compute) key pair, and all API endpoints automatically handle the gas fees.
+The API calls use the provider's published tRPC procedure contract at `https://api.owl.build/api/trpc/`. Queries send JSON input in the `input` query parameter; mutations send a JSON request body. Successful responses expose procedure output in `result.data`. The published API declares no custom data transformer.
 
-## Authentication
+## Capability map
 
-Owl Protocol uses **API key** authentication. Owl Protocol uses API keys for authentication.
+| Tools | Provider procedures | Behavior |
+| --- | --- | --- |
+| `get_project` | `project.get` | Identify the project and its actual default chain ID. |
+| `deploy_collection` | `collection.deploy` | Deploy an ERC721 collection with royalties, token metadata URI, description, and contract metadata URI/image. |
+| `mint_tokens` | `collection.erc721AutoId.mintBatch` | Mint to email addresses, user IDs, or EVM addresses using optional inline metadata or a template. Optional `wait` controls whether execution details are requested. |
+| `get_token`, `update_token` | `projectToken.get`, `projectToken.patch` | Retrieve or update a project token's metadata by chain, contract address, and token ID. |
+| `create_token_template`, `get_token_template`, `list_token_templates`, `update_token_template` | `projectTokenTemplate.createOrSet`, `.get`, `.list`, `.patch` | Create or retrieve reusable metadata templates; optional collection address, chain ID, and external ID can be supplied on creation. |
+| `create_user`, `get_user`, `list_users` | `projectUser.createOrSet`, `.get`, `.list` | Save user profiles, retrieve chain-specific Safe wallet addresses, or discover project users. |
+| `list_user_tokens` | `projectUser.listTokens` | Retrieve a user's project tokens and metadata. |
+| `get_contract_metadata`, `update_contract_metadata`, `list_contracts` | `projectContractMetadata.get`, `.patch`, `.list` | Read and partially update contract metadata; list metadata records. Updates send a nested `metadata` object. |
+| `list_project_contracts`, `get_contract` | `projectContract.list`, `.get` | Discover contract addresses, chain IDs, implementation names, and available deployment details. |
 
-- **Obtaining an API key**: Using the API requires having a Project API key. You need to log into the dashboard, create a project if you haven't done so yet, and copy your project API key.
-- **Passing the API key**: The API key is passed in requests via the `x-api-key` HTTP header. For example: `x-api-key: <your_api_key>`.
-- **JWT authentication**: The API also supports checking authentication with JWT or API key, though API key is the primary method for programmatic access.
-- **TypeScript SDK**: When using the TypeScript SDK, the API key is passed during client initialization: `createClient({ apiKey: "API_KEY" })`.
-- **Base URL**: The REST API is hosted at `https://contracts-api.owlprotocol.xyz/api/`.
+## Input and response behavior
 
-## Features
+Existing tool fields retain their original types and requiredness. List tools accept optional `limit`, `skip`, `orderBy`, and `order` values and return one provider page. Use increasing `skip` values to retrieve subsequent pages; no total count is inferred.
 
-### Collection (Smart Contract) Deployment and Management
+`get_user` and `list_user_tokens` require at least one user selector. If multiple selectors are supplied, email takes precedence, then external ID, then user ID. For `get_user`, an omitted chain ID resolves from the connection's configured default or the actual `project.get` response. Other existing chain-scoped tools retain their required chain ID inputs.
 
-Deploy and manage contracts utilizing API endpoints with the ability to update parameters and configuration as needed. Collections represent smart contracts for digital assets (NFTs or fungible tokens) deployed on any supported EVM chain.
+Minting rejects simultaneous metadata and template IDs, empty recipient arrays, and empty recipients. Metadata updates require at least one parsed metadata field. Required returned IDs, user operation hashes, and list structures are validated; malformed data produces a service error. Optional summaries omit nulls and incompatible values while original provider data remains available in `raw`.
 
-- Requires specifying a `chainId` for the target blockchain network, along with collection `name` and `symbol`.
-- Supports configuring ERC2981 royalty receiver and royalty amount in basis points (defaults to 5%).
-- Supports custom base URIs for token metadata or defaults to the Owl Protocol hosted endpoint.
-- Supports setting a contract image.
+Template get and patch responses may omit the template ID. Their summaries retain the actual requested template ID because the procedure uniquely identifies that resource. Contract metadata responses may omit chain/address; the known requested identifiers are retained. Contract metadata listing does not infer missing contract addresses; use `list_project_contracts` for deployment discovery.
 
-### Token Minting and Management
+User operation hashes identify submitted ERC4337 operations. Missing token details do not imply a minted token count or final transaction confirmation. Token images and other metadata URLs remain provider data.
 
-Mint, burn, and transfer tokens with dedicated endpoints. Supports both individual and batch minting of ERC721 tokens.
+The published SDK exports `waitForUserOperationReceiptTimeoutMs = 300000`. Mint requests with `wait: true` or an omitted `wait` therefore allow 330,000 ms: five minutes for receipt waiting plus 30 seconds for HTTP overhead. The provider's omitted-wait default is not documented here and remains unchanged in the request. Explicit `wait: false` and other API requests retain a bounded 120,000 ms timeout. Mint timeout errors include reconciliation guidance: the operation may continue; inspect the project and recipient token records using any actually available operation hash before retrying, because another mint may duplicate tokens. Successful responses and original provider data are retained; no hash or completion result is fabricated on timeout.
 
-- Tokens can be associated with metadata templates.
-- Token metadata (images, attributes) can be updated after minting.
+## Sources and verification boundary
 
-### Token Templates
-
-Create and manage reusable token templates that define default metadata (images, attributes) for tokens within a collection.
-
-- Templates can be created, retrieved, listed, and updated.
-- Useful for defining consistent metadata across multiple tokens.
-
-### User Management
-
-Create and manage project users who each receive a universal wallet for interacting with your project's digital assets.
-
-- Every user on your platform can have a User Wallet created with just a social login.
-- Each user has a single universal User Wallet that can store digital assets from any blockchain.
-- Users can be created, retrieved, and listed within a project scope.
-
-### Wallet Management
-
-Owl Protocol API manages various types of wallets without the need for private keys or crypto.
-
-- **Developer Wallets**: Controlled by your API Secret, developer wallets are useful for server-side management. Implemented as MPC wallets.
-- **User Wallets**: Controlled via social login, meant for end-user onboarding.
-- **Smart Wallets**: Both Developer Wallets and User Wallets are integrated with smart wallets. Owl Protocol smart wallets are ERC4337 compatible.
-- Smart wallets offer gas-free sponsored transactions via a paymaster, single and batched transaction execution, multiple owners on a single wallet, and scoped session keys.
-
-### Contract Metadata Management
-
-Manage on-chain and off-chain metadata associated with deployed contracts. Retrieve, update, and list metadata for contracts within a project.
-
-### Token Bridges (VeraBridge)
-
-Deploy and manage token bridges for transferring digital assets between different EVM chains.
-
-### Custom EVM Chains
-
-Add custom EVM chain configurations and even launch custom chains or EVM rollups for your project.
-
-### Web2 Integration (Zapier)
-
-With built-in Zapier integration, you can create numerous workflows and trigger on-chain events with the 6000+ apps marketplace. Connect to e-commerce platforms, Point of Sale systems, CRM software, spreadsheets, and more. Pre-built templates exist for Google Forms, Google Sheets, GitHub, Eventbrite, and Shopify.
-
-## Events
-
-The provider does not support webhooks or purpose-built event subscription mechanisms through its API. On-chain event monitoring and workflow triggers are handled indirectly through the Zapier integration rather than through a native webhook system.
+The public [provider documentation source](https://github.com/owlprotocol/workspace-public/tree/main/docs), [`@owlprotocol/core-trpc` API declarations](https://www.npmjs.com/package/@owlprotocol/core-trpc), and [tRPC HTTP specification](https://trpc.io/docs/rpc) define the request contract. No live provider or blockchain invocation was used to verify this implementation.

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -113,6 +113,11 @@ export let manageSynonyms = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Search query to filter synonyms — used with search action'),
+      page: z.number().optional().describe('Zero-based result page for search action.'),
+      hitsPerPage: z
+        .number()
+        .optional()
+        .describe('Results per page for search action, from 1 to 1000.'),
       synonymType: z
         .enum(['synonym', 'oneWaySynonym', 'altCorrection1', 'altCorrection2', 'placeholder'])
         .optional()
@@ -139,7 +144,7 @@ export let manageSynonyms = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.synonymId) {
-        throw new Error('synonymId is required for get action');
+        throw createApiServiceError('synonymId is required for get action');
       }
       let result = await client.getSynonym(indexName, ctx.input.synonymId);
       return {
@@ -151,6 +156,8 @@ export let manageSynonyms = SlateTool.create(spec, {
     if (action === 'search') {
       let params: Record<string, any> = {};
       if (ctx.input.searchQuery !== undefined) params.query = ctx.input.searchQuery;
+      if (ctx.input.page !== undefined) params.page = ctx.input.page;
+      if (ctx.input.hitsPerPage !== undefined) params.hitsPerPage = ctx.input.hitsPerPage;
       if (ctx.input.synonymType !== undefined) params.type = ctx.input.synonymType;
       let result = await client.searchSynonyms(indexName, params);
       let count = result.hits?.length ?? result.nbHits ?? 0;
@@ -162,10 +169,10 @@ export let manageSynonyms = SlateTool.create(spec, {
 
     if (action === 'save') {
       if (!ctx.input.synonymId) {
-        throw new Error('synonymId is required for save action');
+        throw createApiServiceError('synonymId is required for save action');
       }
       if (!ctx.input.synonym) {
-        throw new Error('synonym object is required for save action');
+        throw createApiServiceError('synonym object is required for save action');
       }
       let result = await client.saveSynonym(
         indexName,
@@ -181,7 +188,7 @@ export let manageSynonyms = SlateTool.create(spec, {
 
     if (action === 'saveBatch') {
       if (!ctx.input.synonyms || ctx.input.synonyms.length === 0) {
-        throw new Error('synonyms array is required for saveBatch action');
+        throw createApiServiceError('synonyms array is required for saveBatch action');
       }
       let result = await client.saveSynonyms(
         indexName,
@@ -197,7 +204,7 @@ export let manageSynonyms = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.synonymId) {
-        throw new Error('synonymId is required for delete action');
+        throw createApiServiceError('synonymId is required for delete action');
       }
       let result = await client.deleteSynonym(
         indexName,

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/jira.svg" height="20"> Jira Service Management
 
-Create, view, search, and manage customer service requests (tickets) including comments, attachments, approvals, and SLA tracking. Manage service desk projects, request types, queues, customers, and organizations. Search knowledge base articles linked to Confluence. Manage assets and configuration items (CMDB) including schemas, object types, and attributes. Handle incident and alert management with on-call schedules, escalation policies, and routing rules. Perform full Jira issue CRUD, workflow transitions, JQL searches, and project management.
+Create, read, and search Jira Service Management customer requests and Jira issues. Manage comments, approvals, SLA information, request types, queues, customers, and organizations. Search linked knowledge base articles and discover Jira projects and users.
 
 ## Tools
 
@@ -22,7 +22,7 @@ Permanently delete a Jira issue. Optionally deletes subtasks as well. This actio
 
 ### Get Issue
 
-Retrieve detailed information about a specific Jira issue by its key or ID. Returns the full issue fields including summary, description, status, assignee, comments, transitions, and SLA information for service desk requests.
+Retrieve detailed information about a specific Jira issue by its key or ID. Returns issue details and optional workflow transitions. Use Get SLA Information for SLA metrics.
 
 ### Get SLA Information
 
@@ -58,7 +58,7 @@ List service desk queues and optionally retrieve the issues within a specific qu
 
 ### Search Issues
 
-Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, priority, labels, and any other issue fields. Use JQL syntax like \
+Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, priority, labels, and any other issue fields. Use JQL such as `project = "KEY" AND status = "Open"`.
 
 ### Search Knowledge Base
 
@@ -71,6 +71,18 @@ Search for Jira users by name or email. Returns matching user accounts with thei
 ### Update Issue
 
 Update an existing Jira issue's fields. Supports changing summary, description, priority, labels, components, assignee, and custom fields. Can also transition the issue to a new status or assign/unassign it.
+
+### Get Current User
+
+Read the authenticated Jira user's account ID and profile.
+
+### Get Customer Request
+
+Read a customer request, its fields, current status, reporter, and portal link.
+
+### List Customer Requests
+
+List visible customer requests with text, ownership, status, service desk, and pagination filters.
 
 ## License
 

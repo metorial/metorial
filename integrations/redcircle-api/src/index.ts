@@ -7,6 +7,7 @@ import {
   getCollectionResults,
   getProductDetails,
   getReviews,
+  manageCollectionRequests,
   manageCollections,
   manageDestinations,
   manageZipcodes,
@@ -22,6 +23,7 @@ export let provider = Slate.create({
     checkStoreStock,
     manageZipcodes,
     manageCollections,
+    manageCollectionRequests,
     getCollectionResults,
     manageDestinations,
     getAccount

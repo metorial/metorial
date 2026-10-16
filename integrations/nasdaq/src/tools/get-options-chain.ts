@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RealtimeClient } from '../lib/realtime-client';
+import { createRealtimeClient, realtimeRecords } from '../lib/realtime-client';
 import { spec } from '../spec';
 
 export let getOptionsChain = SlateTool.create(spec, {
@@ -10,7 +10,7 @@ export let getOptionsChain = SlateTool.create(spec, {
 Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
   instructions: [
     'Requires OAuth2 Client Credentials authentication (not API Key).',
-    'Set includeGreeks to true to also fetch Greeks and implied volatility data.'
+    'Set includeGreeks to true to fetch Greeks for every returned contract identifier. This makes additional requests and requires real-time Greeks entitlement.'
   ],
   tags: {
     readOnly: true
@@ -40,27 +40,7 @@ Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
     })
   )
   .handleInvocation(async ctx => {
-    if (
-      ctx.auth.authMethod !== 'oauth' ||
-      !ctx.auth.baseUrl ||
-      !ctx.auth.oauthToken ||
-      !ctx.auth.tokenEndpoint ||
-      !ctx.auth.clientId ||
-      !ctx.auth.clientSecret
-    ) {
-      throw new Error(
-        'This tool requires OAuth2 Client Credentials authentication. Please use the OAuth2 authentication method.'
-      );
-    }
-
-    let client = new RealtimeClient({
-      baseUrl: ctx.auth.baseUrl,
-      oauthToken: ctx.auth.oauthToken,
-      tokenEndpoint: ctx.auth.tokenEndpoint,
-      clientId: ctx.auth.clientId,
-      clientSecret: ctx.auth.clientSecret,
-      oauthTokenExpiresAt: ctx.auth.oauthTokenExpiresAt || ''
-    });
+    let client = createRealtimeClient(ctx.auth);
 
     let chainResult = await client.getOptionsChain({
       symbol: ctx.input.symbol,
@@ -68,12 +48,33 @@ Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
       offset: ctx.input.offset
     });
 
-    let chain = Array.isArray(chainResult) ? chainResult : [chainResult];
+    let chain = realtimeRecords(chainResult, 'options chain');
 
-    let greeks: Record<string, any>[] | undefined;
+    let greeks: Record<string, unknown>[] | undefined;
     if (ctx.input.includeGreeks) {
-      let greeksResult = await client.getGreeksAndVols({ symbols: [ctx.input.symbol] });
-      greeks = Array.isArray(greeksResult) ? greeksResult : [greeksResult];
+      if (ctx.input.offset === 'delayed')
+        throw createApiServiceError(
+          'Nasdaq option Greeks are currently available only in real time. Disable includeGreeks for delayed chains.'
+        );
+      let identifiers = chain.map(contract => {
+        if (typeof contract.identifier !== 'string' || !contract.identifier.trim()) {
+          throw createApiServiceError(
+            'Nasdaq returned an options contract without its identifier.'
+          );
+        }
+        return contract.identifier;
+      });
+      greeks = [];
+      for (let index = 0; index < identifiers.length; index += 4) {
+        let batch = await Promise.all(
+          identifiers
+            .slice(index, index + 4)
+            .map(async identifier =>
+              realtimeRecords(await client.getOptionGreeks(identifier), 'option Greeks')
+            )
+        );
+        greeks.push(...batch.flat());
+      }
     }
 
     return {

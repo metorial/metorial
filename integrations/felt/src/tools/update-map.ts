@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -65,6 +65,12 @@ export let updateMap = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      Object.entries(ctx.input).every(([key, value]) => key === 'mapId' || value === undefined)
+    ) {
+      throw createApiServiceError('Provide at least one map property to update.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let map = await client.updateMap(ctx.input.mapId, {

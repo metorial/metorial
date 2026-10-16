@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listPromotionsTool = SlateTool.create(spec, {
   name: 'List Promotions',
   key: 'list_promotions',
-  description: `List all promotions (giveaways, contests, fortune wheels) in your Rafflys account. Returns each promotion's ID and name. Useful for discovering available promotions before fetching their leads.`,
+  description: `List promotions in your Rafflys account. Returns each promotion's ID and name for fetching its leads.`,
   tags: {
     readOnly: true
   }
@@ -29,7 +29,7 @@ export let listPromotionsTool = SlateTool.create(spec, {
     let promotions = await client.listPromotions();
 
     let mapped = promotions.map(p => ({
-      promotionId: p.id?.toString(),
+      promotionId: p.id.toString(),
       name: p.name
     }));
 

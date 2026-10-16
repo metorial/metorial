@@ -59,6 +59,18 @@ export let getTeamStats = SlateTool.create(spec, {
         startWeek: ctx.input.startWeek,
         endWeek: ctx.input.endWeek
       });
+      if (ctx.input.conference) {
+        let teams = await client.getTeams({
+          year: ctx.input.year,
+          conference: ctx.input.conference
+        });
+        let schools = new Set<string>(
+          teams.map((team: { school: string }) => team.school.toLowerCase())
+        );
+        advancedStats = advancedStats.filter((record: { team: string }) =>
+          schools.has(record.team.toLowerCase())
+        );
+      }
     }
 
     return {

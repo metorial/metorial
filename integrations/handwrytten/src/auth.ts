@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,21 +30,19 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.handwrytten.com/v1',
-        headers: {
-          Authorization: ctx.output.token,
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await client.get('/auth/getUser');
-      let user = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let user = await client.getUser();
+      let id = user.id ?? user.user_id;
+      if (id === undefined || id === null || String(id).trim() === '') {
+        throw createApiServiceError('Handwrytten did not return an account ID.', {
+          reason: 'invalid_handwrytten_profile'
+        });
+      }
 
       return {
         profile: {
-          id: String(user.user_id ?? ''),
-          email: user.email ?? '',
+          id: String(id),
+          ...(typeof user.email === 'string' ? { email: user.email } : {}),
           name: [user.fname, user.lname].filter(Boolean).join(' ') || undefined
         }
       };

@@ -1,4 +1,4 @@
-# Slates Specification for Proxiedmail
+# ProxiedMail Integration Specification
 
 ## Overview
 
@@ -37,7 +37,7 @@ Create, list, and update proxy email addresses (aliases) that forward to one or 
 - A callback/webhook URL to receive HTTP notifications on incoming mail.
 - A type classification (regular or news).
 - An `is_browsable` flag to enable browsing received emails via the API.
-- To disable forwarding while still receiving callbacks, use `int.proxiedmail.com` as the real address.
+- To disable forwarding while still receiving callbacks, leave forwarding addresses empty when creating an alias or use an address such as `notifications@int.proxiedmail.com`.
 
 ### Received Email Browsing
 

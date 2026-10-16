@@ -1,6 +1,6 @@
 {
   "name": "@metorial/apibible",
-  "description": "Access Bible scripture content in text and audio formats across nearly 2500 versions and over 1600 languages. Browse and filter Bible versions by language and metadata. Retrieve scripture content hierarchically by book, chapter, verse, passage, or section, returned in unified HTML format. Search Bible text by keyword or reference, scoped to specific books or ranges. List and retrieve audio Bible versions. Track scripture engagement via the Fair Use Management System (FUMS).",
+  "description": "Browse Bible editions and books, retrieve scripture in HTML, text or JSON form, search keywords and references, and download licensed audio chapters. Responses retain copyright and scripture engagement metadata.",
   "categories": ["document-processing", "education-and-learning"],
   "skills": [
     "browse Bible versions",
@@ -10,8 +10,7 @@
     "retrieve audio Bibles",
     "filter Bibles by language",
     "get verse content",
-    "list thematic sections",
-    "track scripture engagement"
+    "list thematic sections"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/api-bible.png"
 }

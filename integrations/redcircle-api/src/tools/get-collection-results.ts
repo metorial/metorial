@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let getCollectionResults = SlateTool.create(spec, {
     'Use action "resend_webhook" to re-trigger the webhook POST for a result set (useful for debugging).'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -50,6 +50,11 @@ export let getCollectionResults = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action !== 'list' && !ctx.input.resultSetId?.trim()) {
+      throw createApiServiceError(
+        'Provide resultSetId. Use get_collection_results with action list to find result sets.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
@@ -72,10 +77,52 @@ export let getCollectionResults = SlateTool.create(spec, {
         format,
         ctx.input.csvFields
       );
+      let downloadLinks = data.download_links ?? data.result?.download_links;
+      let urls =
+        typeof downloadLinks?.all_pages === 'string'
+          ? [downloadLinks.all_pages]
+          : Array.isArray(downloadLinks?.pages)
+            ? downloadLinks.pages
+            : [];
+      for (let url of urls) {
+        if (
+          typeof url !== 'string' ||
+          !URL.canParse(url) ||
+          !['https:', 'http:'].includes(new URL(url).protocol)
+        ) {
+          throw createApiServiceError(
+            'RedCircle returned an invalid result download URL. Request the result set again.'
+          );
+        }
+        await ctx.addAttachment({
+          type: 'url',
+          url,
+          mimeType: new URL(url).pathname.endsWith('.zip')
+            ? 'application/zip'
+            : format === 'csv'
+              ? 'text/csv'
+              : format === 'jsonlines'
+                ? 'application/x-ndjson'
+                : 'application/json'
+        });
+      }
+      // Preserve legacy raw file responses as well as their public output value.
+      if (typeof data === 'string') {
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(data),
+          mimeType:
+            format === 'csv'
+              ? 'text/csv'
+              : format === 'jsonlines'
+                ? 'application/x-ndjson'
+                : 'application/json'
+        });
+      }
       return {
         output: {
           resultSet: data,
-          downloadLinks: data.download_links,
+          downloadLinks,
           requestInfo: data.request_info
         },
         message: `Retrieved result set **${ctx.input.resultSetId}** in ${format} format.`

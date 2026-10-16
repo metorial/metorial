@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getLists = SlateTool.create(spec, {
@@ -19,14 +19,17 @@ Supports fetching all lists or a specific list by ID.`,
         .number()
         .optional()
         .describe(
-          'If provided, fetches a single list by its ID. Otherwise returns all lists.'
+          'If provided, fetches a single list by its ID. Otherwise returns one page of lists.'
         ),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      pageSize: z.number().optional().describe('Number of items per page (max 20)')
+      pageSize: z.number().optional().describe('Number of items per page (max 100)')
     })
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       lists: z
         .array(
           z.object({
@@ -53,6 +56,7 @@ Supports fetching all lists or a specific list by ID.`,
       let list = await client.getList(ctx.input.listId);
       return {
         output: {
+          raw: list,
           lists: [
             {
               listId: list.listId,
@@ -69,7 +73,7 @@ Supports fetching all lists or a specific list by ID.`,
     }
 
     let result = await client.getLists(ctx.input.page, ctx.input.pageSize);
-    let lists = (result.items ?? []).map(l => ({
+    let lists = result.items.map(l => ({
       listId: l.listId,
       name: l.name,
       currentStatus: l.currentStatus,
@@ -79,6 +83,7 @@ Supports fetching all lists or a specific list by ID.`,
 
     return {
       output: {
+        raw: result.raw,
         lists,
         totalCount: result.itemsCount,
         currentPage: result.currentPage,

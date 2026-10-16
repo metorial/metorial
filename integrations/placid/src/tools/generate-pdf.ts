@@ -102,6 +102,14 @@ export let generatePdf = SlateTool.create(spec, {
       passthrough: ctx.input.passthrough
     });
 
+    if (result.status === 'finished' && result.pdf_url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.pdf_url,
+        mimeType: 'application/pdf'
+      });
+    }
+
     return {
       output: {
         pdfId: result.id,

@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your Ecologi API key, generated from your Ecologi account settings.')
+        .trim()
+        .min(1)
+        .describe('Your Ecologi API key from Integrations > API keys in your Ecologi account.')
     }),
     getOutput: async ctx => {
       return {

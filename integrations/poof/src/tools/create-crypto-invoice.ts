@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PoofClient } from '../lib/client';
+import { getPoofPaymentUrl, PoofClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createCryptoInvoice = SlateTool.create(spec, {
@@ -39,10 +39,7 @@ export let createCryptoInvoice = SlateTool.create(spec, {
       redirect: ctx.input.redirect
     });
 
-    let paymentLink =
-      result?.payment_link ||
-      result?.paymentLink ||
-      (typeof result === 'string' ? result : JSON.stringify(result));
+    let paymentLink = getPoofPaymentUrl(result, ['payment_link', 'paymentLink']);
 
     return {
       output: {

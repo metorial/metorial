@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listRecords = SlateTool.create(spec, {
@@ -17,9 +17,13 @@ export let listRecords = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table (e.g. "A", "B")'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
+      tableId: z
+        .string()
+        .describe('Table ID (e.g. "A", "B"). Use get_table_schema to discover tables.'),
       page: z.number().optional().describe('Page number (0-indexed). Defaults to 0.'),
       perPage: z.number().optional().describe('Number of records per page. Defaults to 100.'),
       order: z.string().optional().describe('Field name to sort by'),
@@ -60,10 +64,7 @@ export let listRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let records = await client.listRecords(
       ctx.input.teamId,
@@ -87,9 +88,9 @@ export let listRecords = SlateTool.create(spec, {
           recordId: r.id,
           sequence: r.sequence,
           createdAt: r.createdAt,
-          createdBy: r.createdBy,
+          createdBy: r.createdBy === undefined ? undefined : String(r.createdBy),
           modifiedAt: r.modifiedAt,
-          modifiedBy: r.modifiedBy,
+          modifiedBy: r.modifiedBy === undefined ? undefined : String(r.modifiedBy),
           fields: r.fields
         })),
         totalCount: records.length

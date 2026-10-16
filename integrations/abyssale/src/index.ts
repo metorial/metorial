@@ -7,16 +7,30 @@ import {
   exportBanners,
   generateImage,
   generateMultiFormat,
+  generateMultipagePdf,
+  getCredits,
+  getDesign,
   getDesignFormat,
   getDuplicationStatus,
+  getGeneratedFile,
   getGenerationStatus,
+  getWorkspace,
   listDesigns,
   listFonts,
-  listProjects
+  listProjects,
+  listWorkspaceTemplateCategories,
+  listWorkspaceTemplates
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    getWorkspace,
+    getCredits,
+    getDesign,
+    getGeneratedFile,
+    listWorkspaceTemplates,
+    listWorkspaceTemplateCategories,
+    generateMultipagePdf,
     listDesigns,
     getDesignFormat,
     generateImage,

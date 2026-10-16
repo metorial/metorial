@@ -1,4 +1,5 @@
-import { type AdobeAuthConfig, createAdobeAxios } from './client';
+import { isApiErrorRecord } from 'slates';
+import { type AdobeAuthConfig, adobeApiError, createAdobeAxios } from './client';
 
 let STOCK_BASE_URL = 'https://stock.adobe.io';
 
@@ -7,6 +8,17 @@ export class StockClient {
 
   constructor(auth: AdobeAuthConfig) {
     this.http = createAdobeAxios(STOCK_BASE_URL, auth);
+    this.http.defaults.headers.common['X-Product'] = 'CreativeCloudIntegration/0.3.0';
+    this.http.interceptors.response.use(response => {
+      let data = response.data;
+      let error = Array.isArray(data)
+        ? data.find(item => isApiErrorRecord(item) && item.error)
+        : data;
+      if (isApiErrorRecord(error) && error.error) {
+        throw adobeApiError({ response: { status: response.status, data: error } });
+      }
+      return response;
+    });
   }
 
   async search(params: {
@@ -33,8 +45,8 @@ export class StockClient {
   }) {
     let searchParams: Record<string, any> = {
       'search_parameters[words]': params.keywords,
-      'search_parameters[limit]': params.limit || 20,
-      'search_parameters[offset]': params.offset || 0
+      'search_parameters[limit]': params.limit ?? 20,
+      'search_parameters[offset]': params.offset ?? 0
     };
 
     if (params.filters) {
@@ -83,9 +95,7 @@ export class StockClient {
       'category',
       'keywords'
     ];
-    for (let col of columns) {
-      searchParams[`result_columns[]`] = col;
-    }
+    searchParams['result_columns[]'] = columns;
 
     let response = await this.http.get('/Rest/Media/1/Search/Files', {
       params: searchParams
@@ -112,9 +122,7 @@ export class StockClient {
     let params: Record<string, any> = {
       ids: contentId
     };
-    for (let col of columns) {
-      params[`result_columns[]`] = col;
-    }
+    params['result_columns[]'] = columns;
 
     let response = await this.http.get('/Rest/Media/1/Files', { params });
     return response.data;
@@ -152,8 +160,8 @@ export class StockClient {
   async getLicenseHistory(params?: { limit?: number; offset?: number }) {
     let response = await this.http.get('/Rest/Libraries/1/Member/LicenseHistory', {
       params: {
-        'search_parameters[limit]': params?.limit || 20,
-        'search_parameters[offset]': params?.offset || 0,
+        'search_parameters[limit]': params?.limit ?? 20,
+        'search_parameters[offset]': params?.offset ?? 0,
         'result_columns[]': [
           'id',
           'title',

@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://api.catsone.com/v3'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,15 +25,14 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await axios.get('/site', {
-        headers: {
-          Authorization: `Token ${ctx.output.token}`
-        }
-      });
+      let data = await new Client({ token: ctx.output.token }).getSite();
+      if (typeof data?.subdomain !== 'string' || !data.subdomain.trim()) {
+        throw createApiServiceError('CATS returned a site without its subdomain.');
+      }
       return {
         profile: {
-          id: response.data.subdomain,
-          name: response.data.subdomain
+          id: data.subdomain,
+          name: data.subdomain
         }
       };
     }

@@ -1,75 +1,37 @@
-Now let me fetch the actual API documentation:That didn't yield much. Let me search for the actual API docs page:Let me look at the PHP SDK on GitHub for more endpoint details:Let me fetch the GitHub repo for the PHP SDK to get more details on the API endpoints:Now I have enough information to write the specification. Let me also check for the email finder/lead generation features mentioned in the dashboard:I now have enough information to compile the specification. Here's what I know:
+# Listclean API specification
 
-- Listclean is an email verification/validation service
-- API base URL: `https://api.listclean.xyz/v1/`
-- Authentication: API key via `X-Auth-Token` header
-- Key endpoints: verify email, account profile, bulk upload/list management
-- The dashboard also shows email finder and SMTP/email sending (via Mail250), but these seem to be separate products
-- Webhooks are available for email sending events (delivered, open, click, bounce, etc.)
+Reviewed against the [official API reference](https://api.listclean.xyz/) and its [Swagger schema](https://api.listclean.xyz/v1/spec.json) on 2026-10-15.
 
-# Slates Specification for Listclean
+## Authentication and responses
 
-## Overview
+Base URL: `https://api.listclean.xyz/v1`. Authenticate with the `X-Auth-Token` header. JSON responses wrap payloads in `data` and carry numeric `success` (`1` for success, `0` for failure), a message, and sometimes `error_code`. A successful HTTP status alone does not prove success. The client handles both these envelopes and the existing tools' flat legacy payloads.
 
-Listclean is an email verification and list cleaning service that validates email addresses through syntax checks, DNS/MX record validation, SMTP checks, and risk signal analysis. It identifies Valid, Invalid, Catch-all, Disposable, Role-based, and other risky email types. It supports both single real-time verification via API and bulk verification via file uploads (CSV/TXT).
+## Documented workflows
 
-## Authentication
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `verify_email` | `GET /verify/email/{email}` | Returns email, status, and remarks. Status can be clean, dirty, unknown, or error. |
+| `get_account` | `GET /account/profile/` and `GET /credits` | Profile and credit balance are separate resources. Profile ID and email are not documented; name is optional in the profile schema. |
+| `verify_email_batch` | `POST /verify/email/batch` | Sends emails (maximum 3,000) and optional filename; returns the asynchronous job's list ID. |
+| `list_verification_lists` | `GET /lists/` | Reads `data.lists`, total, and cursor. |
+| `get_verification_list` | `GET /lists/{list_id}` | Returns the provider's array of matching list records. States include SUBMITTED, INPROCESS, and COMPLETED. |
+| `download_list_results` | `GET /downloads/{list_id}/{type}` | Provides a downloadable CSV for clean, dirty, or unknown results using authenticated access. |
 
-Listclean uses API key-based authentication. Listclean uses API keys for authentication. When you connect your Listclean account, you can securely store the keys. Sign in and generate your API Token in the API Tokens section of your account settings.
+No pagination request parameter is documented for `/lists/`; no parameter is guessed. The new list tools expose documented identity, filename, size, upload reference, request time, and processing state. Financial analytics are outside these tools' compact result schema.
 
-The API key must be passed in the `X-Auth-Token` HTTP header with every request.
+## Preserved legacy workflows
 
-- **Base URL:** `https://api.listclean.xyz/v1/`
-- **Header:** `X-Auth-Token: <your_api_key>`
+| Tool | Preserved request |
+| --- | --- |
+| `upload_bulk_list` | `POST /bulk/upload/` with the existing multipart file payload |
+| `get_bulk_list_status` | `GET /bulk/list/{listId}/` |
+| `list_bulk_lists` | `GET /bulk/lists/` |
+| `download_bulk_results` | `GET /bulk/list/{listId}/download/` with existing all/ok/bad filter mapping |
 
-You get multiple API keys per account, which allows you to use Listclean for multiple sites. Separate keys can be created for apps, environments, and teammates for easier control and tracking.
+These routes are not in the current public schema. Their retirement, aliases, and live response shapes have not been established, so they remain unchanged rather than being redirected or disabled. Their original output fields and raw CSV content contract remain. Missing metadata is no longer replaced by invented empty strings, zero counts, or processing states. The legacy CSV download additionally provides a downloadable file.
 
-Example request:
+The published chunk-upload API uses `POST /uploads/`, `POST /uploads/{upload_id}`, and `GET /uploads/{upload_id}`. It does not establish the initial chunk sequence or that its `request_id` equals a list ID. No upload-to-list identifier mapping is assumed.
 
-```
-GET https://api.listclean.xyz/v1/account/profile/
-X-Auth-Token: your-api-key-here
-```
+## Other API capabilities
 
-## Features
-
-### Single Email Verification
-
-Verify an individual email address in real time. The endpoint is `https://api.listclean.xyz/v1/verify/email/{email_address}` and accepts a GET request. The response includes the email address, a status (e.g., "clean" or "dirty"), and remarks explaining the result. ListClean checks syntax, MX, SMTP responses, and risk signals to classify each email.
-
-- **Status values:** Emails are classified as clean (valid), dirty (invalid), or unknown (unverifiable).
-- ListClean does not charge for "unknown" results. Additionally, duplicate email addresses are not charged.
-- Each verification consumes one credit.
-
-### Bulk Email List Verification
-
-Upload CSV or TXT files containing email lists for batch verification. The email column must have the header 'EMAIL', and you may include unlimited columns of other data. After upload, Listclean processes the list asynchronously. After uploading, you wait until the list status changes to COMPLETED. The system runs the list clean process, which might take a few minutes to a few hours depending on data size. Once completed, you can download the results.
-
-- Supported file formats: CSV (.csv) and TXT (.txt).
-- Results can be downloaded filtered by type: all, clean (ok), or dirty (bad).
-- Removes duplicates so you don't waste credits verifying the same address twice.
-
-### Account Management
-
-Retrieve account profile information and check your remaining credit balance via the API.
-
-- **Profile endpoint:** `GET /v1/account/profile/`
-- Credits operate on a pay-as-you-go model. Credits never expire.
-
-### Email Finder
-
-The platform offers an email finder feature that allows generating business email addresses. You can enter a first name, last name, and domain to instantly generate a single email address. You can also copy and paste multiple names and domains, or upload a CSV file containing names and domains to generate emails in bulk.
-
-- Note: It is unclear whether this feature is fully exposed via the API or limited to the dashboard interface.
-
-## Events
-
-Listclean supports webhooks for email-related delivery events (associated with its email sending functionality via Mail250). A Webhook is a way to deliver events like open, click, bounce, etc. over the HTTP Protocol, which helps to integrate with various applications.
-
-### Email Delivery Events
-
-The available webhook event types are: Request, Delivered, Open, Click, Soft Bounce, Hard Bounce, Unsubscribe, Spam, Soft Block, and Hard Block.
-
-- You can select which specific event types you want reported to your system.
-- A webhook URL is configured in the Listclean dashboard to receive these event notifications.
-- These events are related to the email sending/SMTP functionality (Mail250 integration), not to the email verification process itself.
+The reference also documents single-verification logs, profile updates, list deletion, and JSON result downloads. They were not added because the refresh focuses on the core verification workflow. Email finding, mail delivery, and delivery webhooks are not documented in this API schema and are not advertised by this integration.

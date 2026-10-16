@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,7 @@ let paperSchema = z
         url: z.string().nullable().optional(),
         status: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional(),
     tldr: z
@@ -37,6 +38,7 @@ let paperSchema = z
         model: z.string().nullable().optional(),
         text: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional(),
     externalIds: z.record(z.string(), z.any()).nullable().optional()
@@ -99,9 +101,19 @@ export let recommendPapers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.positivePaperIds.length === 0) {
+      throw createApiServiceError('Provide at least one positivePaperId.');
+    }
+
     let isSinglePaper =
       ctx.input.positivePaperIds.length === 1 &&
       (!ctx.input.negativePaperIds || ctx.input.negativePaperIds.length === 0);
+
+    if (!isSinglePaper && ctx.input.pool !== undefined) {
+      throw createApiServiceError(
+        'pool is only available for one positive paper without negative examples.'
+      );
+    }
 
     if (isSinglePaper) {
       let result = await client.getRecommendationsForPaper(ctx.input.positivePaperIds[0]!, {
@@ -110,7 +122,7 @@ export let recommendPapers = SlateTool.create(spec, {
         fields: ctx.input.fields
       });
 
-      let papers = result.recommendedPapers || [];
+      let papers = result.recommendedPapers;
 
       return {
         output: { recommendedPapers: papers },
@@ -128,7 +140,7 @@ export let recommendPapers = SlateTool.create(spec, {
         }
       );
 
-      let papers = result.recommendedPapers || [];
+      let papers = result.recommendedPapers;
 
       return {
         output: { recommendedPapers: papers },

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 let mediaItemSchema = z.object({
@@ -38,17 +38,28 @@ export let searchNasaMedia = SlateTool.create(spec, {
       yearEnd: z.string().optional().describe('End year for results (YYYY)'),
       keywords: z.string().optional().describe('Comma-separated keywords to filter by'),
       nasaId: z.string().optional().describe('Specific NASA ID to look up'),
+      pageSize: z.number().optional().describe('Number of results per page; default 100'),
+      title: z.string().optional().describe('Search terms in media titles'),
+      location: z.string().optional().describe('Search terms in location metadata'),
+      photographer: z.string().optional().describe('Primary photographer name'),
       page: z.number().optional().describe('Page number for paginated results')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
+      links: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Provider pagination links, including next and previous pages'),
       totalHits: z.number().optional().describe('Total number of matching results'),
       items: z.array(mediaItemSchema).describe('List of media items'),
       itemCount: z.number().describe('Number of items in this page')
     })
   )
   .handleInvocation(async ctx => {
+    validateInteger(ctx.input.page, 'Page', 1);
+    validateInteger(ctx.input.pageSize, 'Page size', 1);
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.searchNasaImages({
@@ -59,7 +70,11 @@ export let searchNasaMedia = SlateTool.create(spec, {
       yearEnd: ctx.input.yearEnd,
       keywords: ctx.input.keywords,
       nasaId: ctx.input.nasaId,
-      page: ctx.input.page
+      page: ctx.input.page,
+      pageSize: ctx.input.pageSize,
+      title: ctx.input.title,
+      location: ctx.input.location,
+      photographer: ctx.input.photographer
     });
 
     let collection = result.collection || {};
@@ -84,7 +99,13 @@ export let searchNasaMedia = SlateTool.create(spec, {
     });
 
     return {
-      output: { totalHits, items, itemCount: items.length },
+      output: {
+        raw: result,
+        links: collection.links,
+        totalHits,
+        items,
+        itemCount: items.length
+      },
       message: `Found **${totalHits ?? items.length}** results${ctx.input.query ? ` for "${ctx.input.query}"` : ''}. Returned ${items.length} items.`
     };
   })

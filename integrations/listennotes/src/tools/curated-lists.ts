@@ -30,6 +30,10 @@ With a curatedListId, returns the full details and podcasts in that specific cur
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       curatedListId: z
         .string()
         .optional()
@@ -87,6 +91,7 @@ With a curatedListId, returns the full details and podcasts in that specific cur
 
       return {
         output: {
+          raw: data,
           curatedListId: data.id,
           title: data.title,
           description: data.description,
@@ -102,6 +107,7 @@ With a curatedListId, returns the full details and podcasts in that specific cur
 
       return {
         output: {
+          raw: data,
           total: data.total,
           curatedLists: data.curated_lists.map(list => ({
             curatedListId: list.id,

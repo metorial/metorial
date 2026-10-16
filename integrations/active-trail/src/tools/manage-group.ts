@@ -1,6 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import {
+  ActiveTrailClient,
+  readId,
+  readList,
+  readString,
+  redactProviderData,
+  requireContactAddress,
+  requireInteger,
+  toContactStatus,
+  toCustomerState
+} from '../lib/client';
 import { spec } from '../spec';
 
 let groupOutputSchema = z.object({
@@ -12,8 +22,8 @@ let groupOutputSchema = z.object({
 });
 
 let mapGroupFromApi = (raw: any) => ({
-  groupId: raw.id,
-  name: raw.name,
+  groupId: readId(raw),
+  name: readString(raw.name, 'group name'),
   activeCounter: raw.active_counter,
   counter: raw.counter,
   created: raw.created
@@ -39,18 +49,21 @@ export let listGroups = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.listGroups({ page: ctx.input.page, limit: ctx.input.limit });
-    let groups = Array.isArray(result) ? result : [];
-    return {
-      output: { groups: groups.map(mapGroupFromApi) },
-      message: `Found **${groups.length}** group(s).`
-    };
+    let groups = readList(result);
+    return redactProviderData(
+      {
+        output: { groups: groups.map(mapGroupFromApi) },
+        message: `Found **${groups.length}** group(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
 export let getGroup = SlateTool.create(spec, {
   name: 'Get Group',
   key: 'get_group',
-  description: `Retrieve group details by ID, optionally including members and group events (opens, clicks, unsubscribes).`,
+  description: `Retrieve group details by ID, optionally including members and an event count. Set eventType when includeEvents is true.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
@@ -61,7 +74,11 @@ export let getGroup = SlateTool.create(spec, {
         .enum(['Active', 'Unsubscribed', 'Bounced'])
         .optional()
         .describe('Filter members by status'),
-      includeEvents: z.boolean().optional().describe('Include group events'),
+      includeEvents: z.boolean().optional().describe('Include a group event count'),
+      eventType: z
+        .string()
+        .optional()
+        .describe('ActiveTrail GroupEventTypes value. Required when includeEvents is true.'),
       page: z.number().optional().describe('Page for members pagination'),
       limit: z.number().optional().describe('Limit for members pagination')
     })
@@ -80,19 +97,30 @@ export let getGroup = SlateTool.create(spec, {
 
     if (ctx.input.includeMembers) {
       output.members = await client.getGroupMembers(ctx.input.groupId, {
-        customerStates: ctx.input.memberStatus,
+        customerStates: toCustomerState(ctx.input.memberStatus),
         page: ctx.input.page,
         limit: ctx.input.limit
       });
     }
     if (ctx.input.includeEvents) {
-      output.events = await client.getGroupEvents(ctx.input.groupId);
+      if (!ctx.input.eventType?.trim())
+        throw createApiServiceError('Provide eventType when requesting group event counts.');
+      let count = await client.getGroupEvents(ctx.input.groupId, ctx.input.eventType);
+      output.events = [
+        {
+          eventType: ctx.input.eventType,
+          count: requireInteger(count, 'ActiveTrail event count', 0)
+        }
+      ];
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved group **${group.name}** (ID: ${group.id}).`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved group **${group.name}** (ID: ${group.id}).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -111,10 +139,13 @@ export let createGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.createGroup({ name: ctx.input.name });
-    return {
-      output: mapGroupFromApi(result),
-      message: `Group **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+    return redactProviderData(
+      {
+        output: mapGroupFromApi(result),
+        message: `Group **${ctx.input.name}** created with ID **${result.id}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -134,10 +165,13 @@ export let updateGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.updateGroup(ctx.input.groupId, { name: ctx.input.name });
-    return {
-      output: mapGroupFromApi(result),
-      message: `Group **${ctx.input.groupId}** updated to **${ctx.input.name}**.`
-    };
+    return redactProviderData(
+      {
+        output: mapGroupFromApi(result),
+        message: `Group **${ctx.input.groupId}** updated to **${ctx.input.name}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -160,10 +194,13 @@ export let deleteGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteGroup(ctx.input.groupId);
-    return {
-      output: { success: true },
-      message: `Group **${ctx.input.groupId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Group **${ctx.input.groupId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -195,22 +232,26 @@ export let addContactToGroup = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    requireContactAddress(ctx.input);
     let data: Record<string, any> = {};
-    if (ctx.input.email) data.email = ctx.input.email;
-    if (ctx.input.sms) data.sms = ctx.input.sms;
-    if (ctx.input.firstName) data.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) data.last_name = ctx.input.lastName;
-    if (ctx.input.status) data.status = ctx.input.status;
+    if (ctx.input.email !== undefined) data.email = ctx.input.email;
+    if (ctx.input.sms !== undefined) data.sms = ctx.input.sms;
+    if (ctx.input.firstName !== undefined) data.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) data.last_name = ctx.input.lastName;
+    if (ctx.input.status !== undefined) data.status = toContactStatus(ctx.input.status);
 
     let result = await client.addContactToGroup(ctx.input.groupId, data);
-    return {
-      output: {
-        contactId: result.id,
-        email: result.email,
-        sms: result.sms
+    return redactProviderData(
+      {
+        output: {
+          contactId: readId(result),
+          email: result.email,
+          sms: result.sms
+        },
+        message: `Contact **${result.email || result.sms}** added to group **${ctx.input.groupId}**.`
       },
-      message: `Contact **${result.email || result.sms}** added to group **${ctx.input.groupId}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -234,9 +275,12 @@ export let removeContactFromGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.removeContactFromGroup(ctx.input.groupId, ctx.input.contactId);
-    return {
-      output: { success: true },
-      message: `Contact **${ctx.input.contactId}** removed from group **${ctx.input.groupId}**.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Contact **${ctx.input.contactId}** removed from group **${ctx.input.groupId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

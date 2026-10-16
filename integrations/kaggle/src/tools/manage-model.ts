@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleSummary, requireKaggleText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageModel = SlateTool.create(spec, {
@@ -41,6 +42,21 @@ export let manageModel = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    requireKaggleText(ctx.input.ownerSlug, 'Model owner');
+    requireKaggleText(ctx.input.modelSlug, 'Model slug');
+    if (ctx.input.action === 'create') requireKaggleText(ctx.input.title, 'Model title');
+    if (
+      ctx.input.action === 'update' &&
+      ![
+        ctx.input.title,
+        ctx.input.subtitle,
+        ctx.input.isPrivate,
+        ctx.input.description,
+        ctx.input.publishTime,
+        ctx.input.provenanceSourcesSummary
+      ].some(value => value !== undefined)
+    )
+      throw createApiServiceError('Provide at least one model field to update.');
     let client = new KaggleClient(ctx.auth);
 
     if (ctx.input.action === 'create') {
@@ -55,7 +71,7 @@ export let manageModel = SlateTool.create(spec, {
         provenanceSourcesSummary: ctx.input.provenanceSourcesSummary
       });
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model operation') },
         message: `Created model **${ctx.input.ownerSlug}/${ctx.input.modelSlug}**.`
       };
     }
@@ -70,7 +86,7 @@ export let manageModel = SlateTool.create(spec, {
         provenanceSourcesSummary: ctx.input.provenanceSourcesSummary
       });
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model operation') },
         message: `Updated model **${ctx.input.ownerSlug}/${ctx.input.modelSlug}**.`
       };
     }
@@ -78,7 +94,7 @@ export let manageModel = SlateTool.create(spec, {
     // delete
     let result = await client.deleteModel(ctx.input.ownerSlug, ctx.input.modelSlug);
     return {
-      output: { success: true, ...(result ?? {}) },
+      output: { success: true, ...kaggleSummary(result, 'model operation') },
       message: `Deleted model **${ctx.input.ownerSlug}/${ctx.input.modelSlug}**.`
     };
   })

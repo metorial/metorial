@@ -5,13 +5,13 @@ export interface PodcastSimple {
   image: string;
   thumbnail: string;
   listennotes_url: string;
-  listen_score: number;
-  listen_score_global_rank: string;
+  listen_score: number | null;
+  listen_score_global_rank: string | null;
   total_episodes: number;
   explicit_content: boolean;
   description: string;
   itunes_id: number;
-  rss: string;
+  rss?: string;
   latest_pub_date_ms: number;
   latest_episode_id: string;
   earliest_pub_date_ms: number;
@@ -23,7 +23,7 @@ export interface PodcastSimple {
   extra: Record<string, any>;
   is_claimed: boolean;
   type: string;
-  email: string;
+  email?: string;
   audio_length_sec: number;
 }
 
@@ -46,15 +46,15 @@ export interface EpisodeSimple {
     image: string;
     thumbnail: string;
     listennotes_url: string;
-    listen_score: number;
-    listen_score_global_rank: string;
+    listen_score: number | null;
+    listen_score_global_rank: string | null;
   };
 }
 
 export interface EpisodeFull extends EpisodeSimple {
   listennotes_edit_url: string;
   maybe_audio_invalid: boolean;
-  transcript: string;
+  transcript: string | null;
 }
 
 export interface PodcastFull extends PodcastSimple {
@@ -90,8 +90,8 @@ export interface SearchResponse {
 
 export interface TypeaheadResponse {
   terms: string[];
-  genres: { id: number; name: string; parent_id: number }[];
-  podcasts: any[];
+  genres?: { id: number; name: string; parent_id: number }[];
+  podcasts?: any[];
 }
 
 export interface Genre {
@@ -116,7 +116,7 @@ export interface CuratedListFull extends CuratedListSimple {
 }
 
 export interface PlaylistItem {
-  id: string;
+  id: number;
   type: string;
   notes: string;
   added_at_ms: number;
@@ -151,7 +151,22 @@ export interface PlaylistsResponse {
     image: string;
     thumbnail: string;
     visibility: string;
-    total: number;
+    episode_count: number;
+    podcast_count: number;
     updated_at_ms: number;
   }[];
+}
+
+export interface PlaylistSummary {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  thumbnail: string;
+  visibility: string;
+  type: string;
+  episode_count: number;
+  podcast_count: number;
+  total_audio_length_sec: number;
+  listennotes_url: string;
 }

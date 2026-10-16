@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { locationParams } from '../lib/location';
 import { spec } from '../spec';
 
 let pollutantSchema = z.object({
@@ -28,6 +29,7 @@ export let getAirQuality = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       overallAqi: z.number().describe('Overall Air Quality Index'),
       co: pollutantSchema.describe('Carbon Monoxide levels'),
       no2: pollutantSchema.describe('Nitrogen Dioxide levels'),
@@ -39,22 +41,15 @@ export let getAirQuality = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let params: Record<string, string | number> = {};
-
-    if (ctx.input.lat !== undefined && ctx.input.lon !== undefined) {
-      params.lat = ctx.input.lat;
-      params.lon = ctx.input.lon;
-    }
-    if (ctx.input.city) params.city = ctx.input.city;
-    if (ctx.input.state) params.state = ctx.input.state;
-    if (ctx.input.country) params.country = ctx.input.country;
+    let params = locationParams(ctx.input, false);
 
     let result = await client.getAirQuality(params);
 
-    let locationLabel = ctx.input.city ?? `${ctx.input.lat}, ${ctx.input.lon}`;
+    let locationLabel = params.city ?? `${params.lat}, ${params.lon}`;
 
     return {
       output: {
+        raw: result,
         overallAqi: result.overall_aqi,
         co: result.CO,
         no2: result.NO2,

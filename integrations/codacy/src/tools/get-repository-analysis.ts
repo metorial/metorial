@@ -15,6 +15,10 @@ export let getRepositoryAnalysis = SlateTool.create(spec, {
   .input(
     z.object({
       repositoryName: z.string().describe('Name of the repository to get analysis for.'),
+      branchName: z
+        .string()
+        .optional()
+        .describe('Branch name. Call list_branches to discover enabled branches.'),
       includeProgress: z
         .boolean()
         .optional()
@@ -24,6 +28,10 @@ export let getRepositoryAnalysis = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       repositoryName: z.string().describe('Repository name.'),
       provider: z.string().optional().describe('Git provider.'),
       gradeLetter: z.string().optional().describe('Quality grade letter (A-F).'),
@@ -36,6 +44,12 @@ export let getRepositoryAnalysis = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('SHA of the last analyzed commit.'),
+      analysisProgressRaw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Original analysis progress response, including individual steps and stuck state.'
+        ),
       analysisProgress: z
         .object({
           isAnalysing: z.boolean().optional(),
@@ -48,24 +62,39 @@ export let getRepositoryAnalysis = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let repoData = await client.getRepositoryWithAnalysis(ctx.input.repositoryName);
+    let repoData = await client.getRepositoryWithAnalysis(
+      ctx.input.repositoryName,
+      ctx.input.branchName
+    );
     let data = repoData.data ?? repoData;
 
     let result: any = {
+      raw: repoData,
       repositoryName: data.repository?.name ?? ctx.input.repositoryName,
       provider: data.repository?.provider ?? undefined,
       gradeLetter: data.gradeLetter ?? undefined,
       grade: data.grade ?? undefined,
-      totalIssues: data.totalIssues ?? undefined,
-      coverage: data.coverage ?? undefined,
-      totalComplexFiles: data.totalComplexFiles ?? undefined,
+      totalIssues: data.issuesCount ?? data.totalIssues ?? undefined,
+      coverage:
+        (typeof data.coverage === 'number'
+          ? data.coverage
+          : (data.coverage?.coveragePercentageWithDecimals ??
+            data.coverage?.coveragePercentage)) ?? undefined,
+      totalComplexFiles: data.complexFilesCount ?? data.totalComplexFiles ?? undefined,
       totalDuplicatedFiles: data.totalDuplicatedFiles ?? undefined,
-      lastAnalysedCommitSha: data.lastAnalysedCommit ?? undefined
+      lastAnalysedCommitSha:
+        (typeof data.lastAnalysedCommit === 'string'
+          ? data.lastAnalysedCommit
+          : data.lastAnalysedCommit?.sha) ?? undefined
     };
 
     if (ctx.input.includeProgress) {
-      let progress = await client.getAnalysisProgress(ctx.input.repositoryName);
+      let progress = await client.getAnalysisProgress(
+        ctx.input.repositoryName,
+        ctx.input.branchName
+      );
       let progressData = progress.data ?? progress;
+      result.analysisProgressRaw = progress;
       result.analysisProgress = {
         isAnalysing: progressData.isAnalysing ?? undefined,
         percentage: progressData.percentage ?? undefined
@@ -74,7 +103,7 @@ export let getRepositoryAnalysis = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Repository **${result.repositoryName}**: Grade **${result.gradeLetter ?? 'N/A'}**, ${result.totalIssues ?? 0} issues, ${result.coverage != null ? `${result.coverage}% coverage` : 'no coverage data'}.`
+      message: `Repository **${result.repositoryName}**: Grade **${result.gradeLetter ?? 'N/A'}**, ${result.totalIssues ?? 'unknown'} issues, ${result.coverage != null ? `${result.coverage}% coverage` : 'no coverage data'}.`
     };
   })
   .build();

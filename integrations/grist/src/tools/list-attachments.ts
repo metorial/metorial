@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GristClient } from '../lib/client';
+import { GristClient, getGristItems } from '../lib/client';
 import { spec } from '../spec';
 
 let attachmentSchema = z.object({
@@ -14,7 +14,7 @@ let attachmentSchema = z.object({
 export let listAttachments = SlateTool.create(spec, {
   name: 'List Attachments',
   key: 'list_attachments',
-  description: `List attachment metadata for a document. Returns file names, sizes, and upload times. Can also clean up unused attachments to free storage.`,
+  description: `List attachment metadata for a document. Returns file names, sizes, and upload times.`,
   tags: {
     readOnly: true
   }
@@ -40,7 +40,7 @@ export let listAttachments = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let attachments = (result.records || []).map((a: any) => ({
+    let attachments = getGristItems(result, 'records').map((a: any) => ({
       attachmentId: a.id,
       fileName: a.fields?.fileName,
       fileSize: a.fields?.fileSize,

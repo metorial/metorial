@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDate } from '../lib/client';
 import { spec } from '../spec';
 
 let epicImageSchema = z.object({
@@ -43,6 +43,7 @@ export let getEpicImages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       images: z.array(epicImageSchema).optional().describe('List of EPIC images'),
       availableDates: z
         .array(z.string())
@@ -51,6 +52,7 @@ export let getEpicImages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateDate(ctx.input.date, 'Date');
     let client = new NasaClient({ token: ctx.auth.token });
     let collection = ctx.input.collection || 'natural';
 
@@ -58,14 +60,24 @@ export let getEpicImages = SlateTool.create(spec, {
       let dates = await client.getEpicAvailableDates(collection);
       let dateList = (dates || []).map((d: any) => d.date || d);
       return {
-        output: { availableDates: dateList },
+        output: { raw: dates, availableDates: dateList },
         message: `Found **${dateList.length}** dates with available ${collection} EPIC imagery.`
       };
     }
 
     let result = await client.getEpicImages({ collection, date: ctx.input.date });
     let images = (result || []).map((img: any) => {
-      let dateStr = img.date || '';
+      if (
+        typeof img.date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}/.test(img.date) ||
+        typeof img.image !== 'string' ||
+        !img.image
+      ) {
+        throw createApiServiceError(
+          'NASA returned an EPIC image without its date or filename.'
+        );
+      }
+      let dateStr = img.date;
       let dateParts = dateStr.split(' ')[0]?.replace(/-/g, '/');
       let imageUrl = `https://epic.gsfc.nasa.gov/archive/${collection}/${dateParts}/png/${img.image}.png`;
 
@@ -83,8 +95,12 @@ export let getEpicImages = SlateTool.create(spec, {
       };
     });
 
+    for (let image of images) {
+      await ctx.addAttachment({ type: 'url', url: image.imageUrl, mimeType: 'image/png' });
+    }
+
     return {
-      output: { images },
+      output: { raw: result, images },
       message: `Retrieved **${images.length}** ${collection} EPIC Earth images${ctx.input.date ? ` for ${ctx.input.date}` : ''}.`
     };
   })

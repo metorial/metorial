@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as resourceManager from '../lib/resource-manager';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listClouds = SlateTool.create(spec, {
   name: 'List Clouds',
   key: 'list_clouds',
-  description: `List all Yandex Cloud organizations accessible by the authenticated account. Returns cloud IDs, names, and metadata.`,
+  description: `List accessible clouds in Yandex Cloud. Returns cloud IDs, names, and metadata.`,
   tags: { readOnly: true }
 })
   .input(
@@ -88,7 +88,7 @@ export let listFolders = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let cloudId = ctx.input.cloudId || ctx.config.cloudId;
-    if (!cloudId) throw new Error('cloudId is required either in input or config');
+    if (!cloudId) throw createApiServiceError('cloudId is required either in input or config');
 
     let result = await resourceManager.listFolders(
       ctx.auth,
@@ -142,8 +142,8 @@ export let manageFolder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let cloudId = ctx.input.cloudId || ctx.config.cloudId;
-      if (!cloudId) throw new Error('cloudId is required for folder creation');
-      if (!ctx.input.name) throw new Error('name is required for folder creation');
+      if (!cloudId) throw createApiServiceError('cloudId is required for folder creation');
+      if (!ctx.input.name) throw createApiServiceError('name is required for folder creation');
 
       let result = await resourceManager.createFolder(ctx.auth, {
         cloudId,
@@ -156,17 +156,23 @@ export let manageFolder = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           folderId: result.metadata?.folderId,
-          done: result.done || false
+          done: result.done
         },
         message: `Folder **${ctx.input.name}** creation initiated.`
       };
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.folderId) throw new Error('folderId is required for update');
+      if (!ctx.input.folderId) throw createApiServiceError('folderId is required for update');
 
       let updateFields: string[] = [];
       if (ctx.input.name !== undefined) updateFields.push('name');
       if (ctx.input.description !== undefined) updateFields.push('description');
       if (ctx.input.labels !== undefined) updateFields.push('labels');
+
+      if (updateFields.length === 0) {
+        throw createApiServiceError(
+          'Provide at least one field to update: name, description, or labels.'
+        );
+      }
 
       let result = await resourceManager.updateFolder(ctx.auth, ctx.input.folderId, {
         name: ctx.input.name,
@@ -179,19 +185,20 @@ export let manageFolder = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           folderId: ctx.input.folderId,
-          done: result.done || false
+          done: result.done
         },
         message: `Folder **${ctx.input.folderId}** update initiated.`
       };
     } else {
-      if (!ctx.input.folderId) throw new Error('folderId is required for deletion');
+      if (!ctx.input.folderId)
+        throw createApiServiceError('folderId is required for deletion');
 
       let result = await resourceManager.deleteFolder(ctx.auth, ctx.input.folderId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Folder **${ctx.input.folderId}** deletion initiated.`
       };

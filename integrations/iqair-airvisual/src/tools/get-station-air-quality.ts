@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type StationData } from '../lib/client';
 import { spec } from '../spec';
 
 let pollutantDetailSchema = z
   .object({
-    concentration: z.number().describe('Pollutant concentration in ug/m3 (CO in mg/m3)'),
+    concentration: z
+      .number()
+      .describe('Pollutant concentration in the unit reported in units for this pollutant'),
     aqiUs: z.number().describe('AQI value based on US EPA standard'),
     aqiChina: z.number().describe('AQI value based on China MEP standard')
   })
@@ -17,7 +19,7 @@ export let getStationAirQuality = SlateTool.create(spec, {
   description: `Retrieve air quality and weather data at the monitoring station level. Supports two modes: specify a station by name (along with city, state, country), or find the nearest station to GPS coordinates / IP location. Station-level data provides more granular pollutant concentration readings than city-level data.`,
   instructions: [
     'To look up a specific station, provide station, city, state, and country. Use "List Locations" to discover available stations.',
-    'To find the nearest station, omit the station/city/state/country fields and optionally provide latitude and longitude.'
+    "To find the nearest station, omit the station/city/state/country fields and provide both latitude and longitude, or omit both for the API request server's IP geolocation."
   ],
   constraints: ['Requires a Startup or Enterprise plan.'],
   tags: {
@@ -64,7 +66,11 @@ export let getStationAirQuality = SlateTool.create(spec, {
         humidityPercent: z.number().describe('Humidity percentage'),
         windSpeedMs: z.number().describe('Wind speed in m/s'),
         windDirectionDegrees: z.number().describe('Wind direction in degrees (0-360)'),
-        iconCode: z.string().describe('Weather icon code')
+        iconCode: z.string().describe('Weather icon code'),
+        heatIndexCelsius: z
+          .number()
+          .optional()
+          .describe('Felt temperature in Celsius, when available')
       }),
       pollution: z.object({
         timestamp: z.string().describe('Measurement timestamp (ISO 8601)'),
@@ -78,15 +84,61 @@ export let getStationAirQuality = SlateTool.create(spec, {
         nitrogenDioxide: pollutantDetailSchema.describe('NO2 details'),
         sulfurDioxide: pollutantDetailSchema.describe('SO2 details'),
         carbonMonoxide: pollutantDetailSchema.describe('CO details')
-      })
+      }),
+      forecasts: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Provider forecast records, when available on the API plan'),
+      history: z
+        .object({
+          weather: z.array(z.record(z.string(), z.unknown())).optional(),
+          pollution: z.array(z.record(z.string(), z.unknown())).optional()
+        })
+        .optional()
+        .describe('Provider historical measurements, when available on the API plan'),
+      dailyForecasts: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Daily AQI and weather forecasts, when available on the API plan'),
+      units: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Provider concentration units keyed by pollutant code, such as p2, p1, o3, n2, s2, and co'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let { station, city, state, country, latitude, longitude } = ctx.input;
 
-    let data: any;
-    if (station && city && state && country) {
+    let specificLocation = [station, city, state, country];
+    if (
+      specificLocation.some(value => value !== undefined) &&
+      specificLocation.some(value => value === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide station, city, state, and country together, or omit all four for nearest-station lookup.',
+        { reason: 'iqair_incomplete_station_location' }
+      );
+    }
+    if (
+      specificLocation.some(value => value !== undefined) &&
+      (latitude !== undefined || longitude !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Choose either a named station or GPS coordinates for nearest-station lookup.',
+        { reason: 'iqair_conflicting_station_lookup' }
+      );
+    }
+
+    let data: StationData;
+    if (
+      station !== undefined &&
+      city !== undefined &&
+      state !== undefined &&
+      country !== undefined
+    ) {
       ctx.progress(`Fetching data for station "${station}"...`);
       data = await client.getStationData(country, state, city, station);
     } else {
@@ -101,7 +153,7 @@ export let getStationAirQuality = SlateTool.create(spec, {
     };
 
     let output = {
-      station: data.station,
+      station: data.name ?? data.station,
       city: data.city,
       state: data.state,
       country: data.country,
@@ -114,7 +166,8 @@ export let getStationAirQuality = SlateTool.create(spec, {
         humidityPercent: data.current.weather.hu,
         windSpeedMs: data.current.weather.ws,
         windDirectionDegrees: data.current.weather.wd,
-        iconCode: data.current.weather.ic
+        iconCode: data.current.weather.ic,
+        heatIndexCelsius: data.current.weather.heatIndex
       },
       pollution: {
         timestamp: data.current.pollution.ts,
@@ -128,7 +181,11 @@ export let getStationAirQuality = SlateTool.create(spec, {
         nitrogenDioxide: mapPollutant(data.current.pollution.n2),
         sulfurDioxide: mapPollutant(data.current.pollution.s2),
         carbonMonoxide: mapPollutant(data.current.pollution.co)
-      }
+      },
+      forecasts: data.forecasts,
+      history: data.history,
+      dailyForecasts: data.forecasts_daily,
+      units: data.units
     };
 
     let stationLabel = output.station ? `Station: ${output.station}, ` : '';

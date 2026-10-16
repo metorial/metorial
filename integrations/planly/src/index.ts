@@ -7,6 +7,7 @@ import {
   finishMediaUpload,
   generateAiContent,
   getAiCredits,
+  getTeam,
   importMedia,
   listChannels,
   listMedia,
@@ -26,6 +27,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listTeams.build(),
+    getTeam.build(),
     manageTeam.build(),
     listTeamMembers.build(),
     manageTeamMembership.build(),

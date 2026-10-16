@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://api.templated.io/v1'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,16 +28,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await axios.get('/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let account = await new Client(ctx.output.token).getAccount();
 
       return {
         profile: {
-          name: response.data.name,
-          email: response.data.email
+          name: account.name,
+          email: account.email
         }
       };
     }

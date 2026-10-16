@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let telegrafSchema = z.object({
+export let telegrafSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   telegrafId: z.string().describe('Unique Telegraf configuration ID'),
   name: z.string().describe('Configuration name'),
   description: z.string().optional().describe('Configuration description'),
@@ -17,13 +19,17 @@ export let listTelegrafs = SlateTool.create(spec, {
   name: 'List Telegraf Configs',
   key: 'list_telegrafs',
   description: `List all Telegraf agent configurations in the organization. Telegraf configurations define how the Telegraf agent collects, processes, and outputs data.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ orgId: orgIdInput }))
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       telegrafs: z.array(telegrafSchema).describe('List of Telegraf configurations')
     })
   )
@@ -31,18 +37,19 @@ export let listTelegrafs = SlateTool.create(spec, {
     let client = createClient(ctx);
     let result = await client.listTelegrafs();
 
-    let telegrafs = (result.configurations || []).map((t: any) => ({
-      telegrafId: t.id,
+    let telegrafs = requireArray(result, 'configurations').map((t: any) => ({
+      raw: t,
+      telegrafId: resource(t, ['id', 'name']).id,
       name: t.name,
-      description: t.description,
-      orgId: t.orgID,
-      config: t.config,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt
+      description: optionalString(t.description),
+      orgId: optionalString(t.orgID),
+      config: optionalString(t.config),
+      createdAt: optionalString(t.createdAt),
+      updatedAt: optionalString(t.updatedAt)
     }));
 
     return {
-      output: { telegrafs },
+      output: { telegrafs, raw: result },
       message: `Found **${telegrafs.length}** Telegraf configuration(s).`
     };
   })
@@ -68,13 +75,14 @@ export let getTelegraf = SlateTool.create(spec, {
 
     return {
       output: {
-        telegrafId: t.id,
+        raw: t,
+        telegrafId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        config: t.config,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        config: optionalString(t.config),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt)
       },
       message: `Retrieved Telegraf configuration **${t.name}**.`
     };
@@ -85,12 +93,16 @@ export let createTelegraf = SlateTool.create(spec, {
   name: 'Create Telegraf Config',
   key: 'create_telegraf',
   description: `Create a new Telegraf agent configuration. The configuration should be in TOML format and define input, processor, and output plugins.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       name: z.string().describe('Name for the Telegraf configuration'),
       description: z.string().optional().describe('Description of the configuration'),
       config: z.string().describe('Telegraf configuration content in TOML format')
@@ -107,13 +119,14 @@ export let createTelegraf = SlateTool.create(spec, {
 
     return {
       output: {
-        telegrafId: t.id,
+        raw: t,
+        telegrafId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        config: t.config,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        config: optionalString(t.config),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt)
       },
       message: `Created Telegraf configuration **${t.name}** (ID: ${t.id}).`
     };
@@ -124,12 +137,16 @@ export let updateTelegraf = SlateTool.create(spec, {
   name: 'Update Telegraf Config',
   key: 'update_telegraf',
   description: `Update an existing Telegraf configuration's name, description, or TOML content.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       telegrafId: z.string().describe('ID of the Telegraf configuration to update'),
       name: z.string().optional().describe('New name'),
       description: z.string().optional().describe('New description'),
@@ -147,13 +164,14 @@ export let updateTelegraf = SlateTool.create(spec, {
 
     return {
       output: {
-        telegrafId: t.id,
+        raw: t,
+        telegrafId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        config: t.config,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        config: optionalString(t.config),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt)
       },
       message: `Updated Telegraf configuration **${t.name}** (ID: ${t.id}).`
     };

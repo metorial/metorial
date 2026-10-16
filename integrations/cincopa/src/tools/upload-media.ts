@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let uploadMedia = SlateTool.create(spec, {
@@ -72,7 +73,7 @@ export let uploadMedia = SlateTool.create(spec, {
 
     if (action === 'from_url') {
       if (!ctx.input.sourceUrl) {
-        throw new Error('sourceUrl is required for from_url action');
+        throw createApiServiceError('sourceUrl is required for from_url action');
       }
       let data = await client.uploadFromUrl({
         url: ctx.input.sourceUrl,
@@ -84,9 +85,9 @@ export let uploadMedia = SlateTool.create(spec, {
       });
       return {
         output: {
-          success: data.success === true,
+          success: requireSuccess(data),
           statusId: data.status_id || data.id,
-          assetId: data.rid
+          assetId: data.rid ?? data.resid
         },
         message: `Upload from URL initiated.${data.status_id ? ` Track progress with status ID \`${data.status_id}\`.` : ''}`
       };
@@ -100,7 +101,7 @@ export let uploadMedia = SlateTool.create(spec, {
       });
       return {
         output: {
-          success: data.success === true,
+          success: requireSuccess(data),
           uploadUrl: data.upload_url || data.url
         },
         message: `Upload URL generated: ${data.upload_url || data.url}`
@@ -109,19 +110,19 @@ export let uploadMedia = SlateTool.create(spec, {
 
     if (action === 'check_status') {
       if (!ctx.input.statusId) {
-        throw new Error('statusId is required for check_status action');
+        throw createApiServiceError('statusId is required for check_status action');
       }
       let data = await client.getUploadFromUrlStatus(ctx.input.statusId);
       return {
         output: {
-          success: data.success === true,
+          success: requireSuccess(data),
           status: data.status,
-          assetId: data.rid
+          assetId: data.rid ?? data.resid
         },
         message: `Upload status: **${data.status || 'unknown'}**${data.rid ? ` — Asset ID: \`${data.rid}\`` : ''}`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

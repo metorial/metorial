@@ -1,11 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+import { providerTimestamp } from './values';
 
 export class BTCPayClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { token: string; instanceUrl: string }) {
     let baseUrl = params.instanceUrl.replace(/\/+$/, '');
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BTCPay Server',
+          reason: 'btcpay_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          detailKeys: ['message', 'code', 'path'],
+          extractUpstreamCode: (_input, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        }),
+      paramsSerializer: { indexes: null },
       baseURL: baseUrl,
       headers: {
         Authorization: `token ${params.token}`,
@@ -22,7 +35,7 @@ export class BTCPayClient {
   }
 
   async getStore(storeId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/api/v1/stores/${storeId}`);
+    let response = await this.axios.get(`/api/v1/stores/${encodeURIComponent(storeId)}`);
     return response.data;
   }
 
@@ -31,11 +44,13 @@ export class BTCPayClient {
     defaultCurrency?: string;
     networkFeeMode?: string;
     speedPolicy?: string;
+    website?: string;
   }): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = { name: params.name };
     if (params.defaultCurrency !== undefined) body.defaultCurrency = params.defaultCurrency;
     if (params.networkFeeMode !== undefined) body.networkFeeMode = params.networkFeeMode;
     if (params.speedPolicy !== undefined) body.speedPolicy = params.speedPolicy;
+    if (params.website !== undefined) body.website = params.website;
     let response = await this.axios.post('/api/v1/stores', body);
     return response.data;
   }
@@ -44,12 +59,15 @@ export class BTCPayClient {
     storeId: string,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.put(`/api/v1/stores/${storeId}`, params);
+    let response = await this.axios.put(
+      `/api/v1/stores/${encodeURIComponent(storeId)}`,
+      params
+    );
     return response.data;
   }
 
   async deleteStore(storeId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/stores/${storeId}`);
+    await this.axios.delete(`/api/v1/stores/${encodeURIComponent(storeId)}`);
   }
 
   // ---- Invoices ----
@@ -70,25 +88,30 @@ export class BTCPayClient {
     if (params?.status) query.status = params.status;
     if (params?.orderId) query.orderId = params.orderId;
     if (params?.textSearch) query.textSearch = params.textSearch;
-    if (params?.startDate) query.startDate = params.startDate;
-    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.startDate) query.startDate = providerTimestamp(params.startDate);
+    if (params?.endDate) query.endDate = providerTimestamp(params.endDate);
     if (params?.take !== undefined) query.take = params.take;
     if (params?.skip !== undefined) query.skip = params.skip;
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/invoices`, {
-      params: query
-    });
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices`,
+      {
+        params: query
+      }
+    );
     return response.data;
   }
 
   async getInvoice(storeId: string, invoiceId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/invoices/${invoiceId}`);
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices/${encodeURIComponent(invoiceId)}`
+    );
     return response.data;
   }
 
   async createInvoice(
     storeId: string,
     params: {
-      amount?: number;
+      amount?: number | string;
       currency?: string;
       orderId?: string;
       buyerEmail?: string;
@@ -98,7 +121,7 @@ export class BTCPayClient {
     }
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {};
-    if (params.amount !== undefined) body.amount = params.amount;
+    if (params.amount !== undefined) body.amount = String(params.amount);
     if (params.currency !== undefined) body.currency = params.currency;
     if (params.orderId !== undefined) {
       body.metadata = { ...(params.metadata || {}), orderId: params.orderId };
@@ -117,7 +140,10 @@ export class BTCPayClient {
         ...((body.checkout as Record<string, unknown>) || {}),
         expirationMinutes: params.expirationMinutes
       };
-    let response = await this.axios.post(`/api/v1/stores/${storeId}/invoices`, body);
+    let response = await this.axios.post(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices`,
+      body
+    );
     return response.data;
   }
 
@@ -127,7 +153,7 @@ export class BTCPayClient {
     status: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/api/v1/stores/${storeId}/invoices/${invoiceId}/status`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices/${encodeURIComponent(invoiceId)}/status`,
       { status }
     );
     return response.data;
@@ -138,7 +164,7 @@ export class BTCPayClient {
     invoiceId: string
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/invoices/${invoiceId}/payment-methods`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices/${encodeURIComponent(invoiceId)}/payment-methods`
     );
     return response.data;
   }
@@ -154,6 +180,7 @@ export class BTCPayClient {
       subtractPercentage?: number;
       customAmount?: number;
       customCurrency?: string;
+      payoutMethods?: string[];
     }
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {};
@@ -162,11 +189,12 @@ export class BTCPayClient {
     if (params?.name !== undefined) body.name = params.name;
     if (params?.description !== undefined) body.description = params.description;
     if (params?.subtractPercentage !== undefined)
-      body.subtractPercentage = params.subtractPercentage;
-    if (params?.customAmount !== undefined) body.customAmount = params.customAmount;
+      body.subtractPercentage = String(params.subtractPercentage);
+    if (params?.customAmount !== undefined) body.customAmount = String(params.customAmount);
     if (params?.customCurrency !== undefined) body.customCurrency = params.customCurrency;
+    if (params?.payoutMethods !== undefined) body.payoutMethods = params.payoutMethods;
     let response = await this.axios.post(
-      `/api/v1/stores/${storeId}/invoices/${invoiceId}/refund`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/invoices/${encodeURIComponent(invoiceId)}/refund`,
       body
     );
     return response.data;
@@ -179,7 +207,7 @@ export class BTCPayClient {
     cryptoCode: string = 'BTC'
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/payment-methods/onchain/${cryptoCode}/wallet`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods/${encodeURIComponent(`${cryptoCode}-CHAIN`)}/wallet`
     );
     return response.data;
   }
@@ -200,7 +228,7 @@ export class BTCPayClient {
     if (params?.limit !== undefined) query.limit = params.limit;
     if (params?.skip !== undefined) query.skip = params.skip;
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/payment-methods/onchain/${cryptoCode}/wallet/transactions`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods/${encodeURIComponent(`${cryptoCode}-CHAIN`)}/wallet/transactions`,
       { params: query }
     );
     return response.data;
@@ -211,7 +239,7 @@ export class BTCPayClient {
     cryptoCode: string = 'BTC'
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/payment-methods/onchain/${cryptoCode}/wallet/address`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods/${encodeURIComponent(`${cryptoCode}-CHAIN`)}/wallet/address`
     );
     return response.data;
   }
@@ -228,14 +256,20 @@ export class BTCPayClient {
     }
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {
-      destinations: [{ destination: params.destination, amount: params.amount }]
+      destinations: [
+        {
+          destination: params.destination,
+          amount: params.amount,
+          ...(params.subtractFeeFromAmount !== undefined
+            ? { subtractFromAmount: params.subtractFeeFromAmount }
+            : {})
+        }
+      ]
     };
-    if (params.feeRate !== undefined) body.feeRate = params.feeRate;
-    if (params.subtractFeeFromAmount !== undefined)
-      body.subtractFeeFromAmount = params.subtractFeeFromAmount;
+    if (params.feeRate !== undefined) body.feerate = params.feeRate;
     if (params.noChange !== undefined) body.noChange = params.noChange;
     let response = await this.axios.post(
-      `/api/v1/stores/${storeId}/payment-methods/onchain/${cryptoCode}/wallet/transactions`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods/${encodeURIComponent(`${cryptoCode}-CHAIN`)}/wallet/transactions`,
       body
     );
     return response.data;
@@ -248,7 +282,7 @@ export class BTCPayClient {
     cryptoCode: string = 'BTC'
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/lightning/${cryptoCode}/balance`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}/balance`
     );
     return response.data;
   }
@@ -266,7 +300,7 @@ export class BTCPayClient {
     if (params.description !== undefined) body.description = params.description;
     if (params.expiry !== undefined) body.expiry = params.expiry;
     let response = await this.axios.post(
-      `/api/v1/stores/${storeId}/lightning/${cryptoCode}/invoices`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}/invoices`,
       body
     );
     return response.data;
@@ -278,7 +312,7 @@ export class BTCPayClient {
     lightningInvoiceId: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/lightning/${cryptoCode}/invoices/${lightningInvoiceId}`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}/invoices/${encodeURIComponent(lightningInvoiceId)}`
     );
     return response.data;
   }
@@ -293,10 +327,10 @@ export class BTCPayClient {
     }
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = { BOLT11: bolt11 };
-    if (params?.maxFeePercent !== undefined) body.maxFeePercent = params.maxFeePercent;
+    if (params?.maxFeePercent !== undefined) body.maxFeePercent = String(params.maxFeePercent);
     if (params?.maxFeeFlat !== undefined) body.maxFeeFlat = params.maxFeeFlat;
     let response = await this.axios.post(
-      `/api/v1/stores/${storeId}/lightning/${cryptoCode}/invoices/pay`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}/invoices/pay`,
       body
     );
     return response.data;
@@ -307,7 +341,7 @@ export class BTCPayClient {
     cryptoCode: string = 'BTC'
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/lightning/${cryptoCode}/channels`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}/channels`
     );
     return response.data;
   }
@@ -315,7 +349,9 @@ export class BTCPayClient {
   // ---- Payment Requests ----
 
   async getPaymentRequests(storeId: string): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/payment-requests`);
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-requests`
+    );
     return response.data;
   }
 
@@ -324,7 +360,7 @@ export class BTCPayClient {
     paymentRequestId: string
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/api/v1/stores/${storeId}/payment-requests/${paymentRequestId}`
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-requests/${encodeURIComponent(paymentRequestId)}`
     );
     return response.data;
   }
@@ -343,15 +379,19 @@ export class BTCPayClient {
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {
       title: params.title,
-      amount: params.amount
+      amount: String(params.amount)
     };
     if (params.currency !== undefined) body.currency = params.currency;
     if (params.description !== undefined) body.description = params.description;
     if (params.email !== undefined) body.email = params.email;
-    if (params.expiryDate !== undefined) body.expiryDate = params.expiryDate;
+    if (params.expiryDate !== undefined)
+      body.expiryDate = providerTimestamp(params.expiryDate);
     if (params.allowCustomPaymentAmounts !== undefined)
       body.allowCustomPaymentAmounts = params.allowCustomPaymentAmounts;
-    let response = await this.axios.post(`/api/v1/stores/${storeId}/payment-requests`, body);
+    let response = await this.axios.post(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-requests`,
+      body
+    );
     return response.data;
   }
 
@@ -361,14 +401,16 @@ export class BTCPayClient {
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.put(
-      `/api/v1/stores/${storeId}/payment-requests/${paymentRequestId}`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-requests/${encodeURIComponent(paymentRequestId)}`,
       params
     );
     return response.data;
   }
 
   async archivePaymentRequest(storeId: string, paymentRequestId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/stores/${storeId}/payment-requests/${paymentRequestId}`);
+    await this.axios.delete(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-requests/${encodeURIComponent(paymentRequestId)}`
+    );
   }
 
   // ---- Pull Payments ----
@@ -381,9 +423,12 @@ export class BTCPayClient {
   ): Promise<Record<string, unknown>[]> {
     let query: Record<string, unknown> = {};
     if (params?.includeArchived !== undefined) query.includeArchived = params.includeArchived;
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/pull-payments`, {
-      params: query
-    });
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/pull-payments`,
+      {
+        params: query
+      }
+    );
     return response.data;
   }
 
@@ -398,6 +443,8 @@ export class BTCPayClient {
       startsAt?: string;
       expiresAt?: string;
       autoApproveClaims?: boolean;
+      payoutMethods?: string[];
+      description?: string;
     }
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {
@@ -406,17 +453,24 @@ export class BTCPayClient {
       currency: params.currency
     };
     if (params.paymentMethods !== undefined) body.paymentMethods = params.paymentMethods;
+    if (params.payoutMethods !== undefined) body.payoutMethods = params.payoutMethods;
+    if (params.description !== undefined) body.description = params.description;
     if (params.period !== undefined) body.period = params.period;
-    if (params.startsAt !== undefined) body.startsAt = params.startsAt;
-    if (params.expiresAt !== undefined) body.expiresAt = params.expiresAt;
+    if (params.startsAt !== undefined) body.startsAt = providerTimestamp(params.startsAt);
+    if (params.expiresAt !== undefined) body.expiresAt = providerTimestamp(params.expiresAt);
     if (params.autoApproveClaims !== undefined)
       body.autoApproveClaims = params.autoApproveClaims;
-    let response = await this.axios.post(`/api/v1/stores/${storeId}/pull-payments`, body);
+    let response = await this.axios.post(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/pull-payments`,
+      body
+    );
     return response.data;
   }
 
   async archivePullPayment(storeId: string, pullPaymentId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/stores/${storeId}/pull-payments/${pullPaymentId}`);
+    await this.axios.delete(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/pull-payments/${encodeURIComponent(pullPaymentId)}`
+    );
   }
 
   // ---- Payouts ----
@@ -456,7 +510,9 @@ export class BTCPayClient {
   // ---- Webhooks ----
 
   async getWebhooks(storeId: string): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/webhooks`);
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/webhooks`
+    );
     return response.data;
   }
 
@@ -476,7 +532,10 @@ export class BTCPayClient {
     if (params.authorizedEvents !== undefined) body.authorizedEvents = params.authorizedEvents;
     if (params.secret !== undefined) body.secret = params.secret;
     if (params.enabled !== undefined) body.enabled = params.enabled;
-    let response = await this.axios.post(`/api/v1/stores/${storeId}/webhooks`, body);
+    let response = await this.axios.post(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/webhooks`,
+      body
+    );
     return response.data;
   }
 
@@ -486,14 +545,16 @@ export class BTCPayClient {
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.put(
-      `/api/v1/stores/${storeId}/webhooks/${webhookId}`,
+      `/api/v1/stores/${encodeURIComponent(storeId)}/webhooks/${encodeURIComponent(webhookId)}`,
       params
     );
     return response.data;
   }
 
   async deleteWebhook(storeId: string, webhookId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/stores/${storeId}/webhooks/${webhookId}`);
+    await this.axios.delete(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/webhooks/${encodeURIComponent(webhookId)}`
+    );
   }
 
   // ---- Notifications ----
@@ -512,11 +573,16 @@ export class BTCPayClient {
   }
 
   async markNotificationRead(notificationId: string): Promise<void> {
-    await this.axios.put(`/api/v1/users/me/notifications/${notificationId}`, { seen: true });
+    await this.axios.put(
+      `/api/v1/users/me/notifications/${encodeURIComponent(notificationId)}`,
+      { seen: true }
+    );
   }
 
   async deleteNotification(notificationId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/users/me/notifications/${notificationId}`);
+    await this.axios.delete(
+      `/api/v1/users/me/notifications/${encodeURIComponent(notificationId)}`
+    );
   }
 
   // ---- Server Info ----
@@ -536,7 +602,89 @@ export class BTCPayClient {
   // ---- Store Payment Methods ----
 
   async getStorePaymentMethods(storeId: string): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get(`/api/v1/stores/${storeId}/payment-methods`);
+    let response = await this.axios.get(
+      `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods`
+    );
     return response.data;
+  }
+
+  async manageInvoice(
+    storeId: string,
+    invoiceId: string,
+    action: string,
+    body?: Record<string, unknown>
+  ): Promise<Record<string, unknown> | undefined> {
+    let path = `/api/v1/stores/${encodeURIComponent(storeId)}/invoices/${encodeURIComponent(invoiceId)}`;
+    if (action === 'archive') {
+      await this.axios.delete(path);
+      return;
+    }
+    if (action === 'update') return (await this.axios.put(path, body)).data;
+    return (
+      await this.axios.post(
+        `${path}/${action === 'mark_status' ? 'status' : 'unarchive'}`,
+        body
+      )
+    ).data;
+  }
+
+  async payoutClaim(
+    storeId: string,
+    action: string,
+    payoutId?: string,
+    body?: Record<string, unknown>,
+    includeCancelled?: boolean
+  ): Promise<unknown> {
+    let path = `/api/v1/stores/${encodeURIComponent(storeId)}/payouts`;
+    if (action === 'list')
+      return (await this.axios.get(path, { params: { includeCancelled } })).data;
+    if (action === 'create') return (await this.axios.post(path, body)).data;
+    path += `/${encodeURIComponent(payoutId!)}`;
+    if (action === 'get') return (await this.axios.get(path)).data;
+    if (action === 'cancel') {
+      await this.axios.delete(path);
+      return;
+    }
+    return (await this.axios.post(action === 'mark_paid' ? `${path}/mark-paid` : path, body))
+      .data;
+  }
+
+  async getWalletDetails(
+    storeId: string,
+    cryptoCode: string,
+    action: string,
+    transactionId?: string,
+    blockTarget?: number
+  ): Promise<unknown> {
+    let path = `/api/v1/stores/${encodeURIComponent(storeId)}/payment-methods/${encodeURIComponent(`${cryptoCode}-CHAIN`)}/wallet`;
+    if (action === 'get_transaction')
+      path += `/transactions/${encodeURIComponent(transactionId!)}`;
+    else path += action === 'fee_rate' ? '/feerate' : '/utxos';
+    return (await this.axios.get(path, { params: { blockTarget } })).data;
+  }
+
+  async getLightningDetails(
+    storeId: string,
+    cryptoCode: string,
+    action: string,
+    params: {
+      paymentHash?: string;
+      pendingOnly?: boolean;
+      includePending?: boolean;
+      offsetIndex?: number;
+    }
+  ): Promise<unknown> {
+    let path = `/api/v1/stores/${encodeURIComponent(storeId)}/lightning/${encodeURIComponent(cryptoCode)}`;
+    if (action === 'get_payment')
+      path += `/payments/${encodeURIComponent(params.paymentHash!)}`;
+    else
+      path +=
+        action === 'list_invoices'
+          ? '/invoices'
+          : action === 'list_payments'
+            ? '/payments'
+            : '/info';
+    let { paymentHash: _paymentHash, ...query } = params;
+    return (await this.axios.get(path, { params: query })).data;
   }
 }

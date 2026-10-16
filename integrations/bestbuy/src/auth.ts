@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,12 @@ export let auth = SlateAuth.create()
         .describe('Best Buy Developer API key obtained from https://developer.bestbuy.com/')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('A Best Buy Developer API key is required.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

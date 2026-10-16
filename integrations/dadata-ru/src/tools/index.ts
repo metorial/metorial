@@ -1,6 +1,7 @@
 export * from './clean-address';
 export * from './clean-contact-data';
 export * from './find-affiliated-companies';
+export { findNearbyPostalOffices } from './find-nearby-postal-offices';
 export * from './geocode-address';
 export * from './get-account-info';
 export * from './ip-geolocate';
@@ -13,3 +14,5 @@ export * from './search-reference-directory';
 export * from './suggest-address';
 export * from './suggest-bank';
 export * from './suggest-company';
+export { suggestEmail } from './suggest-email';
+export { suggestName } from './suggest-name';

@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Certifier
 
-Create, issue, send, and manage digital credentials such as certificates and badges. Organize credentials into groups by course, program, or event. Issue credentials to recipients via email, track credential interactions (views, downloads, shares), and manage credential lifecycles (draft, scheduled, issued, expired). Retrieve certificate and badge design templates, set custom attributes, and create-issue-send credentials in a single automated step. Supports webhook events for credential lifecycle changes including creation, updates, deletion, and issuance.
+Create, issue, send, and manage digital certificates and badges with Certifier. Discover credential templates and designs, search credentials, update recipient details and dates, resend issued credentials, download rendered PNG/PDF files, and track credential interactions.
+
+Credential templates are also called groups in the API. Use ordered `designIds` for new templates; existing certificate/badge design inputs remain supported for compatibility.
 
 ## License
 

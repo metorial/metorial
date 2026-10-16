@@ -7,7 +7,9 @@ export let publishEvent = SlateTool.create(spec, {
   name: 'Publish/Unpublish Event',
   key: 'publish_event',
   description: `Publish or unpublish an Eventbrite event. Publishing makes the event publicly visible; unpublishing removes it from public listings.`,
-  instructions: ['An event must have at least one ticket class before it can be published.'],
+  instructions: [
+    'Publishing requires complete event details, an organizer, at least one ticket class, and valid payment options for paid tickets. Eventbrite validates remaining requirements. Unpublishing is subject to order and payout restrictions.'
+  ],
   tags: {
     destructive: false
   }

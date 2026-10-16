@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachJobFile } from '../lib/files';
+import { generationOutput } from '../lib/responses';
 import { imageOptionsSchema, jobResponseSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
@@ -30,19 +32,17 @@ The API call is asynchronous by default and returns a job ID.`,
   )
   .output(jobResponseSchema)
   .handleInvocation(async ctx => {
+    if (!ctx.input.html.trim())
+      throw createApiServiceError('Provide base64-encoded HTML content.');
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.generateImageFromHtml(ctx.input);
 
+    let output = generationOutput(result);
+    await attachJobFile(ctx, result);
     return {
-      output: {
-        jobId: result.jobId ?? result.id ?? '',
-        status: result.status ?? 'pending',
-        assetUrl: result.assetUrl ?? result.url,
-        previewUrl: result.previewUrl,
-        timestamp: result.timestamp
-      },
-      message: `Image generation job created with ID **${result.jobId ?? result.id}** (status: ${result.status ?? 'pending'}).`
+      output,
+      message: `Generation job **${output.jobId}** has status **${output.status}**. Use get_job to check progress, then retrieve_job_asset to download the result.`
     };
   })
   .build();

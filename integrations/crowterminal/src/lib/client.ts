@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
 import type {
   Account,
   CreatePostParams,
@@ -17,31 +17,38 @@ export class CrowTerminalClient {
   private http;
 
   constructor(config: { token: string; baseUrl?: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: config.baseUrl || DEFAULT_BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CrowTerminal',
+          reason: 'crowterminal_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          nestedKeys: ['errors', 'error']
+        })
     });
   }
 
   // --- Posts ---
 
   async createPost(params: CreatePostParams): Promise<Post> {
-    let response = await this.http.post('/posts', {
-      platform: params.platform,
-      account_id: params.accountId,
-      text: params.text,
-      media_urls: params.mediaUrls || [],
-      scheduled_at: params.scheduledAt || null,
-      idempotency_key: params.idempotencyKey || null
-    });
+    let response = await this.http.post(
+      '/posts',
+      pickDefined({
+        platform: params.platform,
+        account_id: params.accountId,
+        text: params.text,
+        media_urls: params.mediaUrls,
+        scheduled_at: params.scheduledAt,
+        idempotency_key: params.idempotencyKey
+      })
+    );
     return mapPost(response.data);
   }
 
   async getPost(postId: string): Promise<Post> {
-    let response = await this.http.get(`/posts/${postId}`);
+    let response = await this.http.get(`/posts/${encodeURIComponent(postId)}`);
     return mapPost(response.data);
   }
 
@@ -50,8 +57,8 @@ export class CrowTerminalClient {
     if (params?.platform) query.platform = params.platform;
     if (params?.accountId) query.account_id = params.accountId;
     if (params?.status) query.status = params.status;
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.offset !== undefined) query.offset = params.offset;
 
     let response = await this.http.get('/posts', { params: query });
     return {
@@ -68,16 +75,16 @@ export class CrowTerminalClient {
     if (params.mediaUrls !== undefined) body.media_urls = params.mediaUrls;
     if (params.scheduledAt !== undefined) body.scheduled_at = params.scheduledAt;
 
-    let response = await this.http.patch(`/posts/${postId}`, body);
+    let response = await this.http.patch(`/posts/${encodeURIComponent(postId)}`, body);
     return mapPost(response.data);
   }
 
   async deletePost(postId: string): Promise<void> {
-    await this.http.delete(`/posts/${postId}`);
+    await this.http.delete(`/posts/${encodeURIComponent(postId)}`);
   }
 
   async getPostJob(postId: string): Promise<PostJob> {
-    let response = await this.http.get(`/posts/${postId}/job`);
+    let response = await this.http.get(`/posts/${encodeURIComponent(postId)}/job`);
     return mapPostJob(response.data);
   }
 
@@ -89,7 +96,7 @@ export class CrowTerminalClient {
   }
 
   async getAccount(accountId: string): Promise<Account> {
-    let response = await this.http.get(`/accounts/${accountId}`);
+    let response = await this.http.get(`/accounts/${encodeURIComponent(accountId)}`);
     return mapAccount(response.data);
   }
 
@@ -114,11 +121,13 @@ export class CrowTerminalClient {
   }
 
   async deleteScheduleSlot(slotId: string): Promise<void> {
-    await this.http.delete(`/schedule/slots/${slotId}`);
+    await this.http.delete(`/schedule/slots/${encodeURIComponent(slotId)}`);
   }
 
   async toggleScheduleSlot(slotId: string, enabled: boolean): Promise<ScheduleSlot> {
-    let response = await this.http.patch(`/schedule/slots/${slotId}`, { enabled });
+    let response = await this.http.patch(`/schedule/slots/${encodeURIComponent(slotId)}`, {
+      enabled
+    });
     return mapScheduleSlot(response.data);
   }
 }

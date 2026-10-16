@@ -1,9 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MxClient } from '../lib/client';
 import { spec } from '../spec';
 
-let holdingSchema = z.object({
+export let holdingSchema = z.object({
   guid: z.string().optional().describe('MX-assigned unique identifier'),
   userGuid: z.string().optional().describe('GUID of the owning user'),
   accountGuid: z.string().optional().nullable().describe('GUID of the account'),
@@ -22,7 +22,11 @@ let holdingSchema = z.object({
   symbol: z.string().optional().nullable().describe('Ticker symbol'),
   currencyCode: z.string().optional().nullable().describe('Currency code'),
   createdAt: z.string().optional().nullable().describe('Creation timestamp'),
-  updatedAt: z.string().optional().nullable().describe('Last update timestamp')
+  updatedAt: z.string().optional().nullable().describe('Last update timestamp'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete MX holding record, preserving the original quantity value')
 });
 
 export let listHoldings = SlateTool.create(spec, {
@@ -39,7 +43,7 @@ export let listHoldings = SlateTool.create(spec, {
       accountGuid: z.string().optional().describe('Filter by account GUID'),
       memberGuid: z.string().optional().describe('Filter by member GUID'),
       page: z.number().optional().describe('Page number'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -58,6 +62,10 @@ export let listHoldings = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MxClient({ token: ctx.auth.token, environment: ctx.config.environment });
 
+    if (ctx.input.accountGuid && ctx.input.memberGuid)
+      throw createApiServiceError(
+        'Provide either accountGuid or memberGuid to filter holdings.'
+      );
     let result: any;
     if (ctx.input.accountGuid) {
       result = await client.listHoldingsByAccount(ctx.input.userGuid, ctx.input.accountGuid, {
@@ -76,23 +84,7 @@ export let listHoldings = SlateTool.create(spec, {
       });
     }
 
-    let holdings = (result.holdings || []).map((h: any) => ({
-      guid: h.guid,
-      userGuid: h.user_guid,
-      accountGuid: h.account_guid,
-      memberGuid: h.member_guid,
-      costBasis: h.cost_basis,
-      currentPrice: h.current_price,
-      dailyChange: h.daily_change,
-      description: h.description,
-      holdingType: h.holding_type,
-      marketValue: h.market_value,
-      quantity: h.quantity,
-      symbol: h.symbol,
-      currencyCode: h.currency_code,
-      createdAt: h.created_at,
-      updatedAt: h.updated_at
-    }));
+    let holdings = result.holdings.map(mapHolding);
 
     return {
       output: {
@@ -110,3 +102,30 @@ export let listHoldings = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let holdingQuantity = (value: unknown): number | null | undefined => {
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value)))
+    return Number(value);
+  throw createApiServiceError('MX returned an invalid holding quantity. Retry the request.');
+};
+
+export let mapHolding = (h: Record<string, any>) => ({
+  guid: h.guid ?? undefined,
+  userGuid: h.user_guid ?? undefined,
+  accountGuid: h.account_guid,
+  memberGuid: h.member_guid,
+  costBasis: h.cost_basis,
+  currentPrice: h.current_price,
+  dailyChange: h.daily_change,
+  description: h.description,
+  holdingType: h.holding_type,
+  marketValue: h.market_value,
+  quantity: holdingQuantity(h.quantity),
+  symbol: h.symbol,
+  currencyCode: h.currency_code,
+  createdAt: h.created_at,
+  updatedAt: h.updated_at,
+  raw: h
+});

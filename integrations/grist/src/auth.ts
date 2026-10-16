@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { GristClient, normalizeServerUrl } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -23,7 +24,7 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
-      let serverUrl = ctx.input.serverUrl.replace(/\/+$/, '');
+      let serverUrl = normalizeServerUrl(ctx.input.serverUrl);
       return {
         output: {
           token: ctx.input.apiKey,
@@ -35,14 +36,11 @@ export let auth = SlateAuth.create()
       output: { token: string; serverUrl: string };
       input: { apiKey: string; serverUrl: string };
     }) => {
-      let axios = createAxios({
-        baseURL: `${ctx.output.serverUrl}/api`,
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let response = await axios.get('/profile/user');
-      let user = response.data;
+      let client = new GristClient(ctx.output);
+      let user = await client.getCurrentUser();
+      if (typeof user.id !== 'number' && typeof user.id !== 'string') {
+        throw createApiServiceError('Grist did not return a user ID for this API key.');
+      }
       return {
         profile: {
           id: String(user.id),

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let screenStocks = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ Filters use JSON array format: \`[["field","operator",value],...]\`. Operators: 
   ],
   constraints: [
     'Each request consumes 5 API calls',
-    'Max 100 results per request, max offset 999'
+    'Max 500 results per request, max offset 999'
   ],
   tags: {
     readOnly: true
@@ -39,7 +39,7 @@ Filters use JSON array format: \`[["field","operator",value],...]\`. Operators: 
         .string()
         .optional()
         .describe('Sort field and direction, e.g., "market_capitalization.desc"'),
-      limit: z.number().optional().describe('Results per page (1-100, default: 50)'),
+      limit: z.number().optional().describe('Results per page (1-500, default: 50)'),
       offset: z.number().optional().describe('Pagination offset (default: 0, max: 999)')
     })
   )
@@ -59,7 +59,11 @@ Filters use JSON array format: \`[["field","operator",value],...]\`. Operators: 
       offset: ctx.input.offset
     });
 
-    let stocks = Array.isArray(result) ? result : (result?.data ?? []);
+    let stocks = eodhdArray(
+      result,
+      'stock screening',
+      Array.isArray(result) ? undefined : 'data'
+    );
 
     return {
       output: {

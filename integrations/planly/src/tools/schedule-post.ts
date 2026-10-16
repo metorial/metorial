@@ -1,6 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  mapSchedule,
+  optionalString,
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseRecord,
+  upsertGroups
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let mediaAttachment = z.object({
@@ -14,7 +24,7 @@ let mediaAttachment = z.object({
 let facebookOptions = z
   .object({
     postType: z
-      .enum(['REELS', 'STORY'])
+      .enum(['REELS', 'STORY', 'default'])
       .optional()
       .describe('Post type. Omit for standard post'),
     firstComment: z.boolean().optional().describe('Enable first comment'),
@@ -152,7 +162,8 @@ let scheduleResultSchema = z.object({
         scheduleId: z.string().describe('ID of the created schedule'),
         channelId: z.string().describe('Channel the post is scheduled to'),
         status: z.string().optional().describe('Schedule status'),
-        publishOn: z.string().optional().describe('Scheduled publish time (ISO 8601)')
+        publishOn: z.string().optional().describe('Scheduled publish time (ISO 8601)'),
+        raw: rawSchema
       })
     )
     .describe('Created schedule entries')
@@ -168,7 +179,8 @@ Posts can be scheduled for a future date or published immediately by omitting th
     'For Pinterest, a boardId is required - use "List Pinterest Boards" to find valid board IDs.',
     'For TikTok, privacyLevel is required.',
     'Media must be uploaded first using the media tools. Pass mediaId values in the media array.',
-    "Platform options should match the target channel's social network type."
+    "Platform options should match the target channel's social network type.",
+    'For mixed-network posts, use channelPlatformOptions to provide separate options for each channel. Global platformOptions must contain at most one network.'
   ],
   constraints: [
     'Maximum 3 collaborators for Instagram posts.',
@@ -189,66 +201,123 @@ Posts can be scheduled for a future date or published immediately by omitting th
         .optional()
         .describe('ISO 8601 datetime for scheduled publishing. Omit for immediate publishing'),
       media: z.array(mediaAttachment).optional().describe('Media files to attach to the post'),
-      platformOptions: platformOptions
+      platformOptions: platformOptions,
+      channelPlatformOptions: z
+        .array(
+          z.object({
+            channelId: z.string().describe('Target channel ID from list_channels'),
+            options: platformOptions
+              .unwrap()
+              .describe('Options for exactly one social network, matching this channel')
+          })
+        )
+        .optional()
+        .describe(
+          'Per-channel options for mixed-network publishing; overrides platformOptions for each listed channel'
+        )
     })
   )
   .output(scheduleResultSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.channelIds.length === 0 || ctx.input.channelIds.some(id => !id.trim())) {
+      throw createApiServiceError(
+        'Provide at least one nonempty channel ID from list_channels.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
-
-    let schedules = ctx.input.channelIds.map(channelId => {
-      let options: Record<string, unknown> = {};
-
-      if (ctx.input.platformOptions) {
-        let po = ctx.input.platformOptions;
-        if (po.facebook) {
-          options = { ...po.facebook };
-          if (po.facebook.locationId) {
-            options.location = { id: po.facebook.locationId };
-            options.locationId = undefined;
-          }
-        }
-        if (po.instagram) {
-          options = { ...po.instagram };
-          if (po.instagram.locationId) {
-            options.location = { id: po.instagram.locationId };
-            options.locationId = undefined;
-          }
-        }
-        if (po.linkedin) options = { ...po.linkedin };
-        if (po.twitter) options = { ...po.twitter };
-        if (po.tiktok) options = { ...po.tiktok };
-        if (po.youtube) options = { ...po.youtube };
-        if (po.pinterest) options = { ...po.pinterest };
-        if (po.mastodon) options = { ...po.mastodon };
-        if (po.threads) options = { ...po.threads };
+    let channelOptions = new Map<string, NonNullable<z.infer<typeof platformOptions>>>();
+    for (let entry of ctx.input.channelPlatformOptions ?? []) {
+      if (!ctx.input.channelIds.includes(entry.channelId)) {
+        throw createApiServiceError(
+          'Every channelPlatformOptions channelId must be included in channelIds.'
+        );
       }
-
-      return {
-        channelId,
-        content: ctx.input.content,
-        publishOn: ctx.input.publishOn,
-        media: ctx.input.media?.map(m => ({ id: m.mediaId, options: m.options || {} })),
-        options: Object.keys(options).length > 0 ? options : undefined
-      };
-    });
-
-    let result = await client.createSchedules(schedules);
-    let data = result.data || result;
-    let groups = Array.isArray(data) ? data : [data];
-    let firstGroup = groups[0] || {};
-    let createdSchedules = (firstGroup.schedules || []).map((s: any) => ({
-      scheduleId: s.id,
-      channelId: s.channelId || s.channel_id,
-      status: s.status,
-      publishOn: s.publishOn || s.publish_on
+      if (channelOptions.has(entry.channelId)) {
+        throw createApiServiceError(
+          'Provide only one channelPlatformOptions entry per channel.'
+        );
+      }
+      channelOptions.set(entry.channelId, entry.options);
+    }
+    let buildOptions = (
+      po: z.infer<typeof platformOptions>
+    ): Record<string, unknown> | undefined => {
+      if (!po) return undefined;
+      let selected = Object.entries(po).filter(([, value]) => value !== undefined);
+      if (selected.length > 1) {
+        throw createApiServiceError(
+          'Provide options for at most one network per channel. Use channelPlatformOptions for mixed-network publishing.'
+        );
+      }
+      let selectedEntry = selected[0];
+      if (!selectedEntry) return undefined;
+      let [network, value] = selectedEntry;
+      let options: Record<string, unknown> = { ...value };
+      if (
+        (network === 'facebook' || network === 'instagram') &&
+        typeof options.locationId === 'string'
+      ) {
+        options.location = { id: options.locationId };
+        options.locationId = undefined;
+      }
+      if (
+        network === 'instagram' &&
+        po.instagram?.collaborators &&
+        po.instagram.collaborators.length > 3
+      ) {
+        throw createApiServiceError('Instagram supports at most three collaborators.');
+      }
+      if (network === 'twitter') {
+        options.threads = po.twitter?.threads?.map(thread => ({
+          content: thread.content,
+          media: thread.media?.map(media => ({ id: media.mediaId, options: media.options }))
+        }));
+      }
+      if (network === 'mastodon') {
+        let poll = po.mastodon?.pollOptions;
+        if (poll && (poll.length > 4 || poll.some(choice => choice.length > 25))) {
+          throw createApiServiceError(
+            'Mastodon polls allow at most four choices with at most 25 characters each.'
+          );
+        }
+      }
+      return options;
+    };
+    let schedules = ctx.input.channelIds.map(channelId => ({
+      channelId,
+      content: ctx.input.content,
+      publishOn: ctx.input.publishOn,
+      media: ctx.input.media?.map(media => ({
+        id: media.mediaId,
+        options: media.options ?? {}
+      })),
+      options: buildOptions(channelOptions.get(channelId) ?? ctx.input.platformOptions)
     }));
-
+    let result = await client.createSchedules(schedules);
+    let groups = upsertGroups(responseData(result));
+    if (groups.length === 0)
+      throw createApiServiceError('Planly did not return created schedule groups.');
+    let firstGroup = responseRecord(groups[0], 'created schedule group');
+    let createdSchedules = groups.flatMap(value => {
+      let group = responseRecord(value, 'created schedule group');
+      return responseArray(group.schedules, 'created schedules').map(value => {
+        let schedule = mapSchedule(value, group.publishOn ?? group.publish_on);
+        return {
+          scheduleId: schedule.scheduleId,
+          channelId: requiredString(schedule.channelId, 'created schedule channel ID'),
+          status: schedule.status,
+          publishOn: optionalString(schedule.publishOn),
+          raw: schedule.raw
+        };
+      });
+    });
+    if (createdSchedules.length === 0)
+      throw createApiServiceError('Planly did not return created schedules.');
     return {
       output: {
-        scheduleGroupId: firstGroup.id,
+        scheduleGroupId: requiredString(firstGroup.id, 'created schedule group ID'),
         schedules: createdSchedules
       },
-      message: `Scheduled post to ${ctx.input.channelIds.length} channel(s)${ctx.input.publishOn ? ` for ${ctx.input.publishOn}` : ' for immediate publishing'}.`
+      message: `Created ${createdSchedules.length} schedule(s) across ${groups.length} group(s).`
     };
   });

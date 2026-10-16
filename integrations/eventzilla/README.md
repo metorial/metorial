@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Eventzilla
 
-Manage events, tickets, registrations, and attendees on the Eventzilla event ticketing platform. Retrieve event details, ticket configurations, and categories. Process end-to-end registrations through a multi-step checkout flow including preparing, creating, filling, and confirming orders. Manage attendees by retrieving details and checking in or reverting check-ins via barcode. Look up transactions by checkout ID or order reference. Confirm or cancel existing orders. Retrieve organizer and sub-organizer account details. Publish or unpublish event sale pages.
+Manage events, tickets, registrations, and attendees on the Eventzilla event ticketing platform. Retrieve event details, ticket configurations, and categories. Process end-to-end registrations through a multi-step checkout flow including preparing, creating, filling, and confirming orders. Manage attendees by retrieving details and checking in or reverting check-ins via barcode. Look up transactions by checkout ID or order reference. Confirm or cancel existing orders. List organizer and sub-organizer accounts and retrieve individual profiles by ID. Create and update free ticket types with sale windows, quantities, visibility, and purchase limits. Publish or unpublish event sale pages.
+
+API keys are available under Settings > Developers > API Credentials. See the [official API reference](https://developer.eventzilla.net/docs/) for provider behavior.
 
 ## License
 

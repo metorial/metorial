@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconstacClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,9 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
   instructions: [
     'Time range values (startDate, endDate) must be epoch timestamps in milliseconds.',
     'Product type must be one of: "qr", "beacon", "nfc", "geofence".',
-    'The organizationId from config is used if not explicitly provided.'
+    'The organizationId from config is used if not explicitly provided.',
+    'Performance reports require productId. Use an interval such as 1d, with suffix y, M, d, h, m, s, or w.',
+    'For QR code reports, prefer get_qr_analytics, which uses the current QR Code Analytics API. This tool retains the earlier reporting interface.'
   ],
   tags: {
     destructive: false,
@@ -39,12 +41,19 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
       interval: z
         .string()
         .optional()
-        .describe('Time interval for performance reports (e.g. "day", "week", "month")'),
+        .describe(
+          'Duration interval for performance reports (e.g. "1d"); supported suffixes: y, M, d, h, m, s, w'
+        ),
       timezone: z
         .string()
         .optional()
         .describe('Timezone for performance reports (e.g. "America/New_York")'),
-      productId: z.number().optional().describe('Filter to a specific product by ID'),
+      productId: z
+        .number()
+        .optional()
+        .describe(
+          'Required product ID for performance reports; optional filter for impressions'
+        ),
       placeId: z.number().optional().describe('Filter impressions by place ID'),
       limit: z.number().optional().describe('Maximum number of impression records to return'),
       offset: z.number().optional().describe('Pagination offset for impression records')
@@ -52,6 +61,7 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       reportType: z.string().describe('Type of report returned'),
       productType: z.string().describe('Product type queried'),
       overview: z
@@ -75,6 +85,13 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.reportType === 'performance' &&
+      (ctx.input.productId === undefined || !Number.isInteger(ctx.input.productId))
+    ) {
+      throw createApiServiceError('Performance reports require an integer productId.');
+    }
+
     let client = new BeaconstacClient({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId
@@ -82,7 +99,7 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
 
     let orgId = ctx.input.organizationId ?? ctx.config.organizationId;
     if (!orgId) {
-      throw new Error(
+      throw createApiServiceError(
         'Organization ID is required for analytics. Set it in config or provide it as input.'
       );
     }
@@ -97,17 +114,36 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
 
       return {
         output: {
+          raw: result,
           reportType: 'overview',
           productType: ctx.input.productType,
-          overview: {
-            productCount: result.product_count,
-            notificationCount: result.notification_count,
-            impressionCount: result.impression_count,
-            conversionPercentage: result.conversion_percentage,
-            uniqueVisitors: result.unique_visitors
-          }
+          overview:
+            result && typeof result === 'object' && !Array.isArray(result)
+              ? {
+                  productCount:
+                    typeof result.product_count === 'number'
+                      ? result.product_count
+                      : undefined,
+                  notificationCount:
+                    typeof result.notification_count === 'number'
+                      ? result.notification_count
+                      : undefined,
+                  impressionCount:
+                    typeof result.impression_count === 'number'
+                      ? result.impression_count
+                      : undefined,
+                  conversionPercentage:
+                    typeof result.conversion_percentage === 'number'
+                      ? result.conversion_percentage
+                      : undefined,
+                  uniqueVisitors:
+                    typeof result.unique_visitors === 'number'
+                      ? result.unique_visitors
+                      : undefined
+                }
+              : undefined
         },
-        message: `**${ctx.input.productType.toUpperCase()} Overview**: ${result.impression_count ?? 0} impressions, ${result.unique_visitors ?? 0} unique visitors, ${result.conversion_percentage ?? 0}% conversion.`
+        message: `Retrieved ${ctx.input.productType.toUpperCase()} overview data.`
       };
     }
 
@@ -124,11 +160,18 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
 
       return {
         output: {
+          raw: result,
           reportType: 'performance',
           productType: ctx.input.productType,
-          performanceData: result.data
+          performanceData:
+            Array.isArray(result?.data) &&
+            result.data.every(
+              row => row !== null && typeof row === 'object' && !Array.isArray(row)
+            )
+              ? result.data
+              : undefined
         },
-        message: `Retrieved **${ctx.input.productType.toUpperCase()} performance** data with ${result.data?.length ?? 0} data point(s).`
+        message: `Retrieved **${ctx.input.productType.toUpperCase()} performance** data.`
       };
     }
 
@@ -146,9 +189,11 @@ Requires an organization ID and a time range specified as epoch milliseconds.`,
 
     return {
       output: {
+        raw: result,
         reportType: 'impressions',
         productType: ctx.input.productType,
-        impressionsData: result
+        impressionsData:
+          result && typeof result === 'object' && !Array.isArray(result) ? result : undefined
       },
       message: `Retrieved **${ctx.input.productType.toUpperCase()} impressions** data.`
     };

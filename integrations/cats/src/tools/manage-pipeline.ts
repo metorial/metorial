@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId, validateNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let createPipeline = SlateTool.create(spec, {
@@ -16,7 +17,12 @@ export let createPipeline = SlateTool.create(spec, {
     z.object({
       candidateId: z.number().describe('Candidate ID to add to the pipeline'),
       jobId: z.number().describe('Job order ID'),
-      statusId: z.number().optional().describe('Initial workflow status ID'),
+      statusId: z
+        .number()
+        .optional()
+        .describe(
+          'Initial workflow status ID from list_workflow_statuses; applied after creation'
+        ),
       rating: z.number().optional().describe('Rating for the candidate (0-5)')
     })
   )
@@ -32,12 +38,21 @@ export let createPipeline = SlateTool.create(spec, {
       candidate_id: ctx.input.candidateId,
       job_id: ctx.input.jobId
     };
-    if (ctx.input.statusId) body.status_id = ctx.input.statusId;
+    validateNumber(ctx.input.statusId, 'statusId');
     if (ctx.input.rating !== undefined) body.rating = ctx.input.rating;
 
     let result = await client.createPipeline(body);
-    let pipelineId =
-      result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let pipelineId = requiredId(result?.id, 'created record');
+
+    if (ctx.input.statusId !== undefined) {
+      try {
+        await client.setPipelineStatus(pipelineId, ctx.input.statusId);
+      } catch {
+        throw createApiServiceError(
+          `Pipeline ${pipelineId} was created, but setting its initial status failed. Inspect it with get_pipeline before retrying.`
+        );
+      }
+    }
 
     return {
       output: { pipelineId },
@@ -66,8 +81,10 @@ export let getPipeline = SlateTool.create(spec, {
       jobId: z.string().optional().describe('Job ID'),
       rating: z.number().optional().describe('Rating (0-5)'),
       statusId: z.string().optional().describe('Current status ID'),
+      workflowId: z.string().optional().describe('Workflow ID for list_workflow_statuses'),
       createdAt: z.string().optional().describe('Created date'),
       updatedAt: z.string().optional().describe('Updated date'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links')
     })
   )
@@ -77,13 +94,15 @@ export let getPipeline = SlateTool.create(spec, {
 
     return {
       output: {
-        pipelineId: (data.id ?? ctx.input.pipelineId).toString(),
+        pipelineId: requiredId(data?.id, 'record'),
         candidateId: data.candidate_id?.toString(),
         jobId: data.job_id?.toString(),
-        rating: data.rating,
+        rating: data.rating ?? undefined,
         statusId: data.status_id?.toString(),
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        workflowId: data.workflow_id?.toString(),
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved pipeline **${ctx.input.pipelineId}**.`
@@ -103,11 +122,14 @@ export let updatePipelineStatus = SlateTool.create(spec, {
   .input(
     z.object({
       pipelineId: z.string().describe('Pipeline entry ID'),
-      statusId: z.number().optional().describe('New workflow status ID'),
+      statusId: z
+        .number()
+        .optional()
+        .describe('New workflow status ID from list_workflow_statuses'),
       fireTriggers: z
         .boolean()
         .optional()
-        .describe('Whether to fire status triggers (default: true)'),
+        .describe('Whether to fire each attached status trigger; omit to use CATS defaults'),
       rating: z.number().optional().describe('Updated rating (0-5)')
     })
   )
@@ -120,16 +142,23 @@ export let updatePipelineStatus = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    validateNumber(ctx.input.statusId, 'statusId');
+    validateNumber(ctx.input.rating, 'rating', 0, 5);
+    if (ctx.input.rating === undefined && ctx.input.statusId === undefined) {
+      throw createApiServiceError('Provide statusId or rating to update the pipeline.');
+    }
+    if (ctx.input.fireTriggers !== undefined && ctx.input.statusId === undefined) {
+      throw createApiServiceError('fireTriggers requires statusId.');
+    }
+    if (ctx.input.statusId !== undefined) {
+      await client.setPipelineStatus(
+        ctx.input.pipelineId,
+        ctx.input.statusId,
+        ctx.input.fireTriggers
+      );
+    }
     if (ctx.input.rating !== undefined) {
       await client.updatePipeline(ctx.input.pipelineId, { rating: ctx.input.rating });
-    }
-
-    if (ctx.input.statusId) {
-      let body: Record<string, any> = {
-        new_status_id: ctx.input.statusId
-      };
-      if (ctx.input.fireTriggers !== undefined) body.fire_triggers = ctx.input.fireTriggers;
-      await client.changePipelineStatus(ctx.input.pipelineId, body);
     }
 
     return {

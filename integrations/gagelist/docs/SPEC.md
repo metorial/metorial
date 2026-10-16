@@ -1,73 +1,33 @@
-Let me get more details on the API endpoints and authentication.Now I have all the information needed. Let me compile the specification.
+# GageList integration
 
-# Slates Specification for Gagelist
-
-## Overview
-
-GageList is a cloud-based calibration management software that allows organizations to track and manage gages (measurement equipment), calibration records, and compliance with quality standards such as ISO 9001, ISO 17025, AS 9100, and 21 CFR Parts 11 and 820. The GageList API allows integration with related software applications such as ERP, asset management platforms, or Manufacturing Execution Systems (MES).
+The integration manages gages, calibration records, manufacturer entries, custom field values, account settings, and downloadable record files.
 
 ## Authentication
 
-GageList uses OAuth authentication. The API uses Bearer token authentication via a client credentials flow with a `password` grant type.
+Use the API client ID and client secret issued by GageList. The documented token exchange is `POST https://gagelist.net/api/token` with form fields `grant_type=password`, `client_id`, and `client_secret`. Subsequent calls use the returned bearer token with base URL `https://gagelist.net/GageList/api`.
 
-To obtain a token, send a `POST` request to:
+Authentication validates that the provider returned a token. The profile name comes from the current site's `RequestedSite.Name`, with the enterprise name as a fallback. The public authentication article does not document refresh tokens or an expiry contract; reconnect if the provider rejects an expired token.
 
-```
-https://gagelist.net/api/token
-```
+## Tools
 
-**Request headers:**
+- Gages: `create_gage`, `get_gage`, `update_gage`, `delete_gage`, `list_gages`. Updates include asset, measurement, location, calibration environment, and scheduling fields. Detail responses include linked file metadata.
+- Calibrations: `create_calibration`, `get_calibration`, `update_calibration`, `delete_calibration`, `list_calibrations`, `generate_calibration_certificate`. Certificates are prepared as downloadable PDFs. Detail responses include linked file metadata.
+- Files: `get_attachment` downloads a file by its ID from a gage or calibration detail; `delete_attachment` submits the documented delete request.
+- Manufacturers: `list_manufacturers`, `create_manufacturer`, `update_manufacturer`, `delete_manufacturer`.
+- Account: `get_account_status` returns current site/account context, roles, accessible sites, permissions, usage, and limits; `get_account_settings` and `update_account_settings` manage the existing configuration surface.
+- Custom fields: `get_custom_fields`, `get_custom_field_values`, `update_custom_field_values`. Writes resolve exact field names to field IDs and submit the documented value-record array. Specify `recordType=Calibration` for calibration records; it defaults to `Gage`. Supply `valueIds` for existing value records; omitted IDs create new values. Non-string input values are serialized as JSON text for the provider's string `FieldValue`.
 
-- `Content-Type`: `application/x-www-form-urlencoded`
+The list tools use the documented `start` and `record_number` paging parameters. Gage/calibration lists preserve their page counts and expose the provider's total only when supplied. Provider-reported failures and malformed record responses produce actionable errors.
 
-**Request body parameters:**
+## API limitations
 
-- `grant_type`: `password`
-- `client_id`: Your client ID
-- `client_secret`: Your client secret
+The official custom-field-values read article repeats `/Account/Status`, despite describing custom-value request parameters and a custom-value response. The integration retains its existing read route until GageList confirms the correct endpoint. File-upload articles identify the routes but omit the upload request body and field name; upload tools are therefore unavailable. BI backup export is documented as a manual account workflow, with no published export API endpoint. No event or webhook capability is implemented.
 
-The returned Bearer token must be included in the `Authorization` header for all subsequent API requests:
+## Official references
 
-```
-Authorization: Bearer {access_token}
-```
-
-The `client_id` and `client_secret` are obtained from your GageList account. Pipedream notes that OAuth tokens are automatically refreshed, indicating the token endpoint also supports token refresh.
-
-The base URL for API calls is `https://gagelist.net/GageList/api/`.
-
-## Features
-
-### Gage Record Management
-
-Create, read, update, and delete gage (measurement equipment) records. GageList makes it easy to add gages, calibration data, manufacturers lists and supporting documents either by entering data directly or by importing from spreadsheets. Each gage record represents a piece of monitoring or measurement equipment with its identification, status, and metadata.
-
-### Calibration Record Management
-
-Create, read, update, and delete calibration records associated with gages. This includes logging calibration dates, results, responsible personnel, and calibration status. You can also generate calibration certificates for specific calibration records via the API.
-
-### Attachment Management
-
-Upload, retrieve, and delete file attachments on both gage records and calibration records. This supports attaching supporting documents such as calibration certificates, photos, or other evidence files.
-
-### Custom Fields
-
-Retrieve custom field definitions configured for your account, read their current values for specific records, and update custom field values. This allows extending the standard data model with organization-specific fields.
-
-### Manufacturer Management
-
-Create, read, update, and delete manufacturer entries. Manufacturers are referenced in gage records to identify the equipment maker.
-
-### Account Management
-
-Retrieve account status and account settings, and update account-level settings programmatically.
-
-### Business Intelligence Data Export
-
-Export data for Business Intelligence (BI) purposes, with detailed steps on exporting data, understanding data formats, and utilizing this information in BI tools.
-
-## Events
-
-The GageList API does not natively support webhooks or event subscription mechanisms. However, third-party platforms like Pipedream and Zapier offer polling-based event triggers for GageList. These are not purpose-built event systems from GageList itself, but rather integration-platform polling mechanisms.
-
-The provider does not support events.
+- [Developer API index](https://gagelist.com/developer-resources/)
+- [Authentication](https://gagelist.com/developer-resources/authenticate-with-gagelist/)
+- [Gage creation](https://gagelist.com/developer-resources/add-gage-record/) and [updates](https://gagelist.com/developer-resources/update-gage-record/)
+- [Calibration creation](https://gagelist.com/developer-resources/add-calibration-record/) and [certificates](https://gagelist.com/developer-resources/generate-calibration-certificate/)
+- [Download files](https://gagelist.com/developer-resources/get-attachment/) and [delete files](https://gagelist.com/developer-resources/delete-attachment/)
+- [Custom value writes](https://gagelist.com/developer-resources/update-custom-field-values/)

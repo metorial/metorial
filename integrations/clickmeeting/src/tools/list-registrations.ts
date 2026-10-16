@@ -15,9 +15,11 @@ export let listRegistrations = SlateTool.create(spec, {
     z.object({
       roomId: z.string().describe('ID of the conference room'),
       status: z
-        .enum(['active', 'pending'])
+        .enum(['active', 'pending', 'all'])
         .default('active')
-        .describe('Registration status filter'),
+        .describe(
+          'Registration status filter. The provider documents active and all; pending is retained for existing callers.'
+        ),
       sessionId: z
         .string()
         .optional()
@@ -33,7 +35,7 @@ export let listRegistrations = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: Record<string, unknown>[];
 
     if (ctx.input.sessionId) {
       result = await client.getSessionRegistrations(ctx.input.roomId, ctx.input.sessionId);
@@ -41,11 +43,11 @@ export let listRegistrations = SlateTool.create(spec, {
       result = await client.getRegistrations(ctx.input.roomId, ctx.input.status);
     }
 
-    let registrations = Array.isArray(result) ? result : [];
+    let registrations = result;
 
     return {
       output: { registrations },
-      message: `Found **${registrations.length}** ${ctx.input.status} registration(s) for room ${ctx.input.roomId}.`
+      message: `Found **${registrations.length}** ${ctx.input.sessionId ? 'session' : ctx.input.status} registration(s) for room ${ctx.input.roomId}.`
     };
   })
   .build();

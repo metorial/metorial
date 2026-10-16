@@ -13,6 +13,7 @@ let checkResultSchema = z.object({
   originalCarrier: z.string().describe('Original network carrier'),
   location: z.string().describe('Geographic location (landlines only)'),
   country: z.string().describe('Country of the phone number'),
+  linePrefix: z.string().describe('Area code prefix returned by TPSCheck'),
   reachabilityStatus: z.string().describe('Reachability status (e.g. reachable, unknown)'),
   reachabilityConfidence: z.string().describe('Confidence level (e.g. high, medium, low)'),
   riskScore: z
@@ -30,7 +31,7 @@ Uses **1 credit per number** checked.`,
   constraints: [
     'Maximum 100 phone numbers per request.',
     'Uses 1 credit per number.',
-    'Requires an Advanced or Unlimited plan.'
+    'Requires an eligible paid plan; confirm batch access in your TPSCheck account.'
   ],
   tags: {
     readOnly: true
@@ -65,6 +66,7 @@ Uses **1 credit per number** checked.`,
       originalCarrier: r.line.original_carrier,
       location: r.line.location,
       country: r.line.country,
+      linePrefix: r.line.prefix,
       reachabilityStatus: r.reachability.status,
       reachabilityConfidence: r.reachability.confidence,
       riskScore: r.risk

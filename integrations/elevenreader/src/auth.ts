@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ElevenLabsClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,17 +28,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.elevenlabs.io'
-      });
-
-      let response = await axios.get('/v1/user', {
-        headers: {
-          'xi-api-key': ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let user = await new ElevenLabsClient(ctx.output.token).getUser();
       return {
         profile: {
           id: user.user_id,

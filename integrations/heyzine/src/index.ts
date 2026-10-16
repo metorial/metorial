@@ -9,6 +9,7 @@ import {
   manageAccessList,
   manageBookshelf,
   managePasswordProtection,
+  updateFlipbookDesign,
   updateSocialMetadata
 } from './tools';
 export let provider = Slate.create({
@@ -22,7 +23,8 @@ export let provider = Slate.create({
     managePasswordProtection,
     manageAccessList,
     manageBookshelf,
-    getOembed
+    getOembed,
+    updateFlipbookDesign
   ],
   triggers: []
 });

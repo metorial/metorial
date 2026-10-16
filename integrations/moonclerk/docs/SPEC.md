@@ -1,63 +1,54 @@
-Let me get the full webhook topics list:Now let me check the forms API endpoint:# Slates Specification for Moonclerk
+# MoonClerk Integration Specification
 
-## Overview
-
-MoonClerk is a cloud-based payment processing platform built on top of Stripe that enables businesses to accept recurring and one-time payments through customizable payment forms. It offers a read-only REST-style API for retrieving payment, customer, and form data, along with a native webhook system for real-time event notifications.
+MoonClerk's read-only API exposes payment forms, payments, and customers. API
+customers correspond to recurring plans in the MoonClerk interface. All six
+operations use `GET`; creating or changing records happens in MoonClerk.
 
 ## Authentication
 
-MoonClerk uses **API Key** authentication.
+Generate a key at <https://app.moonclerk.com/settings/api-key>. Requests use
+`https://api.moonclerk.com`, with `Authorization: Token token=YOUR_API_KEY` and
+`Accept: application/vnd.moonclerk+json;version=1`. No account ID or configuration
+is required, and API keys do not require OAuth refresh.
 
-- To generate and obtain an API key, visit: `https://app.moonclerk.com/settings/api-key`.
-- Once you have the key, pass it in the `Authorization` header as an authorization token.
-- The header format is: `Authorization: Token token=[API Key]`
-- The API version and the authentication token are both sent in the header. You must also include an `Accept` header specifying the version and format: `Accept: application/vnd.moonclerk+json;version=1`
-- All URLs start with `https://api.moonclerk.com/`. SSL only.
+## Tools
 
-Example request:
+| Tool | Endpoint | Behavior |
+| --- | --- | --- |
+| `list_forms` | `/forms` | Discover forms and their IDs, titles, currencies, and activity totals. |
+| `get_form` | `/forms/:id` | Retrieve one form. |
+| `list_payments` | `/payments` | Filter by form, customer, payment date range, or status. |
+| `get_payment` | `/payments/:id` | Retrieve one payment, including payment method and custom responses. |
+| `list_customers` | `/customers` | Filter plans by form, checkout dates, upcoming payment dates, or status. |
+| `get_customer` | `/customers/:id` | Retrieve one plan with subscription, discount, and management details. |
 
-```
-curl -H "Authorization: Token token=YOUR_API_KEY" \
-     -H "Accept: application/vnd.moonclerk+json;version=1" \
-     https://api.moonclerk.com/forms
-```
+List tools accept optional `count` (1–100) and `offset`; the provider defaults to
+10 rows. Date filters use `YYYY-MM-DD` in UTC, with inclusive day boundaries.
+Payment statuses are `successful`, `refunded`, and `failed`. Customer statuses are
+`active`, `canceled`, `expired`, `past_due`, `pending`, and `unpaid`.
 
-## Features
+All monetary amounts are in cents. Keys ending in `_reference` identify Stripe
+resources. The public `paymentSource` object maps the API's `payment_method`
+object. Discount `startedAt` and `endedAt` map `starts_at` and `ends_at`.
+Subscription `planId` remains a string representation of the provider ID.
+Custom response values and checkout objects retain their provider data.
 
-### Payment Forms
+The API documents throttling via HTTP 429 and temporary failures via HTTP 5xx;
+reduce request frequency or retry later as appropriate. Requests have a
+30-second timeout. Malformed responses produce a clear error rather than empty
+lists or invented record values.
 
-Retrieve information about your MoonClerk payment forms. You can list all payment forms or retrieve a specific form by ID. Form data includes the form title and configuration details.
+## Scope
 
-### Payments
+The official REST reference includes no profile, account identity, write,
+export, or file-download endpoint. Webhook subscriptions are configured in the
+MoonClerk interface; this integration currently provides no triggers.
 
-Access payment transaction data. Payments can be filtered by form ID, date range (`date_from`/`date_to`), customer ID, and status (`successful`, `refunded`, or `failed`). Payment records include amount, currency, payer info, payment source details, custom fields collected at checkout, and associated coupon information.
+## Official references
 
-- The API is **read-only** — you cannot create, update, or delete payments through the API.
-
-### Customers (Plans)
-
-Retrieve customer/subscription data. There is a terminology difference: the MoonClerk web UI uses "Plan" to refer to the combination of a customer, subscription, and plan, while the API uses the `/customers` endpoint for this data.
-
-- Customers can be filtered by form ID, checkout date range, next payment date range, and status (`active`, `canceled`, `expired`, `past_due`, `pending`, or `unpaid`).
-- Customer records include name, email, payment source, subscription details, discount/coupon info, custom fields, and a management URL.
-- The API is **read-only** — you cannot modify customer or subscription data through the API.
-
-## Events
-
-MoonClerk provides a native webhook system. Once you set up a Webhook Endpoint in the MoonClerk dashboard, MoonClerk will send a POST request to the specified endpoint URL when the specified topic(s) takes place. Webhook endpoints must use HTTPS and can subscribe to one or more of the following topics:
-
-### Payment Created
-
-Notifies when a payment is created in any state (failed, succeeded, etc). Includes Payment data.
-
-### Plan Created
-
-Notifies when a plan is created. Includes Customer data.
-
-### Plan Ended
-
-Notifies when a plan is canceled or when the set number of periods have been exhausted. Includes Customer data.
-
-### Plan Payment Failed
-
-Triggers when a payment related to a plan has failed. Includes Customer data.
+- [API overview, authentication, paging, and errors](https://github.com/moonclerk/developer/blob/main/api/README.md)
+- [Forms](https://github.com/moonclerk/developer/blob/main/api/v1/forms.md)
+- [Payments](https://github.com/moonclerk/developer/blob/main/api/v1/payments.md)
+- [Customers](https://github.com/moonclerk/developer/blob/main/api/v1/customers.md)
+- [Developer overview](https://www.moonclerk.com/developers/)
+- [Webhooks](https://github.com/moonclerk/developer/blob/main/webhooks.md)

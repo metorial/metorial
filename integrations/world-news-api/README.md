@@ -1,6 +1,8 @@
 # World News API
 
-Search, retrieve, and analyze news articles from thousands of sources across 210+ countries and 86+ languages. Filter news by keywords, date, location, category, language, sentiment, and source. Retrieve top/breaking news headlines clustered by story importance. Extract structured article data from any URL. Discover news sources by name, country, or language. Look up newspaper front page images. Convert news websites to RSS feeds. Perform geo-located news searches by coordinates and radius. Access sentiment scores for articles.
+Search and retrieve news articles, browse top stories by country and language, extract article text and media metadata from a URL, discover indexed news sources, and look up geographic coordinates. Prepare newspaper front page images and RSS feeds for download.
+
+Connect with an API key from the [World News API console](https://worldnewsapi.com/console). API responses expose point usage when the provider supplies quota headers. Requests and RSS feed downloads can consume the account's daily quota.
 
 ## License
 

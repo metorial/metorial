@@ -48,17 +48,16 @@ export let addFriend = SlateTool.create(spec, {
       let f = ctx.input.friends[0]!;
       let result = await client.addFriend(f.email, f.firstName, f.lastName);
 
-      let addedUsers =
-        result.friends?.map((friend: any) => ({
-          userId: friend.id,
-          firstName: friend.first_name,
-          lastName: friend.last_name ?? null,
-          email: friend.email
-        })) || [];
+      let addedUsers = result.friends.map((friend: any) => ({
+        userId: friend.id,
+        firstName: friend.first_name,
+        lastName: friend.last_name ?? null,
+        email: friend.email
+      }));
 
       return {
         output: {
-          success: result.success !== false,
+          success: true,
           addedUsers
         },
         message: `Added friend **${f.email}**`
@@ -66,20 +65,19 @@ export let addFriend = SlateTool.create(spec, {
     } else {
       let result = await client.addFriends(ctx.input.friends);
 
-      let addedUsers =
-        result.friends?.map((friend: any) => ({
-          userId: friend.id,
-          firstName: friend.first_name,
-          lastName: friend.last_name ?? null,
-          email: friend.email
-        })) || [];
+      let addedUsers = result.friends.map((friend: any) => ({
+        userId: friend.id,
+        firstName: friend.first_name,
+        lastName: friend.last_name ?? null,
+        email: friend.email
+      }));
 
       return {
         output: {
-          success: result.success !== false,
+          success: true,
           addedUsers
         },
-        message: `Added **${ctx.input.friends.length}** friend(s)`
+        message: `Added **${addedUsers.length}** friend(s)`
       };
     }
   })

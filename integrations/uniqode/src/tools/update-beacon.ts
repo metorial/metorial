@@ -33,6 +33,7 @@ export let updateBeacon = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       beaconId: z.number().describe('ID of the updated beacon'),
       name: z.string().describe('Updated beacon name'),
       state: z.string().optional().describe('Beacon state'),
@@ -70,12 +71,13 @@ export let updateBeacon = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         beaconId: result.id,
         name: result.name,
-        state: result.state,
-        battery: result.battery,
-        heartbeat: result.heartbeat,
-        updatedAt: result.updated
+        state: typeof result.state === 'string' ? result.state : undefined,
+        battery: typeof result.battery === 'number' ? result.battery : undefined,
+        heartbeat: typeof result.heartbeat === 'string' ? result.heartbeat : undefined,
+        updatedAt: typeof result.updated === 'string' ? result.updated : undefined
       },
       message: `Updated beacon **"${result.name}"** (ID: ${result.id}).`
     };

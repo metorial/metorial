@@ -14,6 +14,12 @@ export let getAvailableFilters = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      apiVersion: z
+        .enum(['v1', 'v2'])
+        .optional()
+        .describe(
+          'Filter taxonomy version. Defaults to v1 for existing feeds and search_news; use v2 for search_news_v2.'
+        ),
       includeLanguages: z
         .boolean()
         .optional()
@@ -34,13 +40,13 @@ export let getAvailableFilters = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe(
-          'Map of language codes to language names (e.g., {"en": "English", "es": "Spanish"})'
+          'Provider map of language names to query codes (e.g., {"English": "en", "Spanish": "es"})'
         ),
       regions: z
         .record(z.string(), z.string())
         .optional()
         .describe(
-          'Map of region/country codes to country names (e.g., {"US": "United States", "GB": "United Kingdom"})'
+          'Provider map of region/country names to query codes (e.g., {"United States": "US"})'
         ),
       categories: z.array(z.string()).optional().describe('List of available news categories')
     })
@@ -64,7 +70,7 @@ export let getAvailableFilters = SlateTool.create(spec, {
 
     if (includeLanguages) {
       promises.push(
-        client.getAvailableLanguages().then(result => {
+        client.getAvailableLanguages(ctx.input.apiVersion).then(result => {
           output.languages = result.languages || {};
           fetched.push(`${Object.keys(output.languages).length} languages`);
         })
@@ -73,7 +79,7 @@ export let getAvailableFilters = SlateTool.create(spec, {
 
     if (includeRegions) {
       promises.push(
-        client.getAvailableRegions().then(result => {
+        client.getAvailableRegions(ctx.input.apiVersion).then(result => {
           output.regions = result.regions || {};
           fetched.push(`${Object.keys(output.regions).length} regions`);
         })
@@ -82,7 +88,7 @@ export let getAvailableFilters = SlateTool.create(spec, {
 
     if (includeCategories) {
       promises.push(
-        client.getAvailableCategories().then(result => {
+        client.getAvailableCategories(ctx.input.apiVersion).then(result => {
           output.categories = result.categories || [];
           fetched.push(`${output.categories.length} categories`);
         })

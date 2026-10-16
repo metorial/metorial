@@ -11,7 +11,7 @@ let normalizeErrorText = (errorText: string | Record<string, never>): string => 
 export let validatePhone = SlateTool.create(spec, {
   name: 'Validate Phone Number',
   key: 'validate_phone',
-  description: `Performs real-time phone number validation using live telco data, returning connection status, phone type, carrier, and subscriber information. Supports two validation modes: **full** (Turbo V3) returns caller name and subscriber type, while **standard** returns connection status and phone type at a lower cost. US phone numbers only.`,
+  description: `Performs real-time phone number validation using live telco data, returning connection status, phone type, carrier, and subscriber information. Supports two validation modes: **full** (Turbo V3) returns caller name and subscriber type, while **standard** uses the legacy Turbo API to return connection status, phone type, and carrier. US phone numbers only.`,
   constraints: [
     'Phone number must be exactly 10 numeric digits (US only).',
     'API rate limit of 10 requests per second.'
@@ -27,7 +27,7 @@ export let validatePhone = SlateTool.create(spec, {
         .enum(['full', 'standard'])
         .default('full')
         .describe(
-          'Validation mode: "full" returns caller name and subscriber type; "standard" returns connection status and phone type only'
+          'Validation mode: "full" returns caller name and subscriber type; "standard" uses legacy Turbo for connection status, phone type, and carrier'
         )
     })
   )

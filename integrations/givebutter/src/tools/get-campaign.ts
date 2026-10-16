@@ -25,6 +25,31 @@ let eventSchema = z
   })
   .nullable();
 
+let getCampaignOutputSchema = z.object({
+  campaignId: z.number().describe('Unique identifier of the campaign'),
+  accountId: z.string().nullable().describe('Account ID'),
+  type: z.string().nullable().describe('Campaign type'),
+  title: z.string().nullable().describe('Campaign title'),
+  subtitle: z.string().nullable().describe('Campaign subtitle'),
+  description: z.string().nullable().describe('HTML description of the campaign'),
+  slug: z.string().nullable().describe('URL slug'),
+  url: z.string().nullable().describe('Public URL'),
+  goal: z.number().nullable().describe('Fundraising goal amount'),
+  raised: z.number().nullable().describe('Total amount raised'),
+  donors: z.number().nullable().describe('Number of donors'),
+  currency: z.string().nullable().describe('Currency code'),
+  logo: z.string().nullable().optional().describe('Campaign logo URL'),
+  cover: coverSchema.describe('Cover media details'),
+  status: z.string().nullable().describe('Campaign status'),
+  endAt: z.string().nullable().describe('Campaign end date'),
+  event: eventSchema.optional().describe('Event-specific details (for event campaigns)'),
+  createdAt: z.string().nullable().describe('When created'),
+  updatedAt: z.string().nullable().describe('When last updated'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .describe('Original campaign data returned by Givebutter')
+});
+
 export let getCampaign = SlateTool.create(spec, {
   name: 'Get Campaign',
   key: 'get_campaign',
@@ -38,29 +63,7 @@ export let getCampaign = SlateTool.create(spec, {
       campaignId: z.number().describe('ID of the campaign to retrieve')
     })
   )
-  .output(
-    z.object({
-      campaignId: z.number().describe('Unique identifier of the campaign'),
-      accountId: z.string().nullable().describe('Account ID'),
-      type: z.string().nullable().describe('Campaign type'),
-      title: z.string().nullable().describe('Campaign title'),
-      subtitle: z.string().nullable().describe('Campaign subtitle'),
-      description: z.string().nullable().describe('HTML description of the campaign'),
-      slug: z.string().nullable().describe('URL slug'),
-      url: z.string().nullable().describe('Public URL'),
-      goal: z.number().nullable().describe('Fundraising goal amount'),
-      raised: z.number().nullable().describe('Total amount raised'),
-      donors: z.number().nullable().describe('Number of donors'),
-      currency: z.string().nullable().describe('Currency code'),
-      logo: z.string().nullable().describe('Campaign logo URL'),
-      cover: coverSchema.describe('Cover media details'),
-      status: z.string().nullable().describe('Campaign status'),
-      endAt: z.string().nullable().describe('Campaign end date'),
-      event: eventSchema.describe('Event-specific details (for event campaigns)'),
-      createdAt: z.string().nullable().describe('When created'),
-      updatedAt: z.string().nullable().describe('When last updated')
-    })
-  )
+  .output(getCampaignOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -68,49 +71,50 @@ export let getCampaign = SlateTool.create(spec, {
 
     let event = c.event
       ? {
-          title: c.event.title ?? null,
-          type: c.event.type ?? null,
-          locationName: c.event.location_name ?? null,
-          addressFormatted: c.event.address_formatted ?? null,
-          startAt: c.event.start_at ?? null,
-          endAt: c.event.end_at ?? null,
-          timezone: c.event.timezone ?? null,
-          isPrivate: c.event.private ?? null,
-          ticketsRequired: c.event.tickets_required ?? null
+          title: c.event.title,
+          type: c.event.type,
+          locationName: c.event.location_name,
+          addressFormatted: c.event.address_formatted,
+          startAt: c.event.start_at,
+          endAt: c.event.end_at,
+          timezone: c.event.timezone,
+          isPrivate: c.event.private,
+          ticketsRequired: c.event.tickets_required
         }
-      : null;
+      : c.event;
 
     let cover = c.cover
       ? {
-          type: c.cover.type ?? null,
-          url: c.cover.url ?? null,
-          source: c.cover.source ?? null
+          type: c.cover.type,
+          url: c.cover.url,
+          source: c.cover.source
         }
-      : null;
+      : c.cover;
 
     return {
-      output: {
+      output: client.output(getCampaignOutputSchema, {
         campaignId: c.id,
-        accountId: c.account_id ?? null,
-        type: c.type ?? null,
-        title: c.title ?? null,
-        subtitle: c.subtitle ?? null,
-        description: c.description ?? null,
-        slug: c.slug ?? null,
-        url: c.url ?? null,
-        goal: c.goal ?? null,
-        raised: c.raised ?? null,
-        donors: c.donors ?? null,
-        currency: c.currency ?? null,
-        logo: c.logo ?? null,
+        accountId: c.account_id,
+        type: c.type,
+        title: c.title,
+        subtitle: c.subtitle,
+        description: c.description,
+        slug: c.slug,
+        url: c.url,
+        goal: c.goal,
+        raised: c.raised,
+        donors: c.donors,
+        currency: c.currency,
+        logo: c.logo,
         cover,
-        status: c.status ?? null,
-        endAt: c.end_at ?? null,
+        status: c.status,
+        endAt: c.end_at,
         event,
-        createdAt: c.created_at ?? null,
-        updatedAt: c.updated_at ?? null
-      },
-      message: `Retrieved campaign **${c.title ?? c.id}** (${c.type ?? 'unknown type'}) — raised ${c.raised ?? 0} ${c.currency ?? 'USD'} of ${c.goal ?? 'no'} goal.`
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+        raw: client.rawData(c)
+      }),
+      message: client.publicData(`Retrieved campaign **${c.id}**.`)
     };
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray, weatherTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 let pollutantComponentsSchema = z.object({
@@ -69,8 +70,8 @@ export let getAirQuality = SlateTool.create(spec, {
     if (ctx.input.mode === 'forecast') {
       data = await client.getAirPollutionForecast(ctx.input.latitude, ctx.input.longitude);
     } else if (ctx.input.mode === 'history') {
-      if (!ctx.input.startTimestamp || !ctx.input.endTimestamp) {
-        throw new Error(
+      if (ctx.input.startTimestamp === undefined || ctx.input.endTimestamp === undefined) {
+        throw createApiServiceError(
           'startTimestamp and endTimestamp are required for historical air quality data.'
         );
       }
@@ -84,18 +85,18 @@ export let getAirQuality = SlateTool.create(spec, {
       data = await client.getCurrentAirPollution(ctx.input.latitude, ctx.input.longitude);
     }
 
-    let entries = (data.list || []).map((entry: any) => ({
-      timestamp: new Date(entry.dt * 1000).toISOString(),
+    let entries = weatherArray(data.list).map((entry: any) => ({
+      timestamp: weatherTimestamp(entry.dt),
       airQualityIndex: entry.main.aqi,
       components: {
-        co: entry.components?.co,
-        no: entry.components?.no,
-        no2: entry.components?.no2,
-        o3: entry.components?.o3,
-        so2: entry.components?.so2,
-        pm2_5: entry.components?.pm2_5,
-        pm10: entry.components?.pm10,
-        nh3: entry.components?.nh3
+        co: entry.components?.co ?? undefined,
+        no: entry.components?.no ?? undefined,
+        no2: entry.components?.no2 ?? undefined,
+        o3: entry.components?.o3 ?? undefined,
+        so2: entry.components?.so2 ?? undefined,
+        pm2_5: entry.components?.pm2_5 ?? undefined,
+        pm10: entry.components?.pm10 ?? undefined,
+        nh3: entry.components?.nh3 ?? undefined
       }
     }));
 
@@ -119,10 +120,10 @@ export let getAirQuality = SlateTool.create(spec, {
         : ctx.input.mode === 'history'
           ? 'historical'
           : 'current';
-    let aqiSummary =
-      entries.length > 0
-        ? `AQI: ${entries[0].airQualityIndex} (${aqiLabels[entries[0].airQualityIndex] || 'Unknown'})`
-        : 'No data';
+    let firstEntry = entries[0];
+    let aqiSummary = firstEntry
+      ? `AQI: ${firstEntry.airQualityIndex} (${aqiLabels[firstEntry.airQualityIndex] || 'Unknown'})`
+      : 'No data';
 
     return {
       output,

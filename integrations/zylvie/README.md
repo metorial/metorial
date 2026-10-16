@@ -1,6 +1,12 @@
 # <img src="logo.svg" height="20"> Zylvie
 
-Manage digital product sales, checkout flows, and subscriptions for creators and small businesses. Create, update, and delete products with configurable pricing models (one-time, subscription, delayed payments). Manage discount coupons with percentage or fixed-amount types, usage limits, and product scoping. Verify, redeem, and refund software license keys. Verify subscription status by subscriber email. Track sales events, new leads, affiliate sign-ups, and subscription lifecycle changes via webhooks.
+Manage digital products, discount coupons, per-email coupon eligibility, software license keys, and subscription verification. Retrieve the authenticated account’s email and brand information.
+
+Connect with an API key from **Settings > API** in the Zylvie dashboard. Product creation and updates support uploaded license-code pools, images, public file URLs, pricing, shipping, post-purchase emails, and gated pages. Product file URLs configure what customers receive; these tools do not download files.
+
+Coupon tools support one-use-per-email limits and eligibility windows. Use `grant_coupon_eligibility` when a customer becomes eligible; repeated grants retain the original start time. Use `get_coupon_eligibility` to inspect that grant. `list_coupons` returns either active or archived coupons according to its filter. Deleting a previously purchased product or used coupon can archive it instead; the provider’s response explains the outcome.
+
+License keys can be generated UUIDs or custom codes uploaded in the dashboard. Refunding a license key marks the key as invalid; it does not claim to process a payment refund.
 
 ## License
 

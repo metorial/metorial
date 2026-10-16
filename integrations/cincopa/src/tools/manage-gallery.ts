@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageGallery = SlateTool.create(spec, {
@@ -54,7 +55,7 @@ export let manageGallery = SlateTool.create(spec, {
         template: ctx.input.template
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Gallery \`${galleryId}\` updated successfully.`
       };
     }
@@ -65,36 +66,44 @@ export let manageGallery = SlateTool.create(spec, {
         deleteAssets: ctx.input.deleteAssets
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Gallery \`${galleryId}\` deleted${ctx.input.deleteAssets ? ' along with all its assets' : ''}.`
       };
     }
 
     if (action === 'set_master') {
       if (!ctx.input.masterAssetId) {
-        throw new Error('masterAssetId is required for set_master action');
+        throw createApiServiceError('masterAssetId is required for set_master action');
       }
       data = await client.setGalleryMaster({
         galleryId,
         rid: ctx.input.masterAssetId
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${ctx.input.masterAssetId}\` set as master for gallery \`${galleryId}\`.`
       };
     }
 
     if (action === 'zip') {
       data = await client.zipGallery(galleryId);
+      let downloadUrl = data.url || data.download_url;
+      if (typeof downloadUrl === 'string' && downloadUrl) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: downloadUrl,
+          mimeType: 'application/zip'
+        });
+      }
       return {
         output: {
-          success: data.success === true,
-          downloadUrl: data.url || data.download_url
+          success: requireSuccess(data),
+          downloadUrl
         },
         message: `Zip file generated for gallery \`${galleryId}\`.${data.url || data.download_url ? ` Download: ${data.url || data.download_url}` : ''}`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

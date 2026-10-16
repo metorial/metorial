@@ -19,20 +19,25 @@ export let photoSchema = z.object({
   photographer: z.string().describe('The name of the photographer'),
   photographerUrl: z.string().describe("The URL of the photographer's Pexels profile"),
   photographerId: z.number().describe('The ID of the photographer'),
-  avgColor: z.string().describe('The average color of the photo (hex)'),
+  avgColor: z
+    .string()
+    .optional()
+    .describe('The average color of the photo (hex), when available'),
   src: photoSrcSchema.describe('URLs for different image sizes'),
-  alt: z.string().describe('Alt text description of the photo'),
-  liked: z.boolean().optional().describe('Whether the user has liked the photo')
+  alt: z.string().optional().describe('Alt text description of the photo, when available'),
+  liked: z.boolean().optional().describe('Whether the user has liked the photo'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Original photo metadata')
 });
 
 export let videoFileSchema = z.object({
   fileId: z.number().describe('The ID of the video file'),
   quality: z.string().describe('The video quality (e.g., hd, sd)'),
   fileType: z.string().describe('The video format (e.g., video/mp4)'),
-  width: z.number().describe('The width in pixels'),
-  height: z.number().describe('The height in pixels'),
+  width: z.number().optional().describe('The width in pixels, when available'),
+  height: z.number().optional().describe('The height in pixels, when available'),
   fps: z.number().optional().describe('Frames per second'),
-  link: z.string().describe('Direct URL to the video file')
+  link: z.string().describe('Direct URL to the video file'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Original video file metadata')
 });
 
 export let videoPictureSchema = z.object({
@@ -56,7 +61,8 @@ export let videoSchema = z.object({
   duration: z.number().describe('The duration of the video in seconds'),
   user: videoUserSchema.describe('The videographer who shot the video'),
   videoFiles: z.array(videoFileSchema).describe('Available video file versions'),
-  videoPictures: z.array(videoPictureSchema).describe('Preview pictures for the video')
+  videoPictures: z.array(videoPictureSchema).describe('Preview pictures for the video'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Original video metadata')
 });
 
 export let collectionSchema = z.object({
@@ -66,7 +72,8 @@ export let collectionSchema = z.object({
   isPrivate: z.boolean().describe('Whether the collection is private'),
   mediaCount: z.number().describe('Total number of media in the collection'),
   photosCount: z.number().describe('Total number of photos in the collection'),
-  videosCount: z.number().describe('Total number of videos in the collection')
+  videosCount: z.number().describe('Total number of videos in the collection'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Original collection metadata')
 });
 
 export let paginationSchema = z.object({

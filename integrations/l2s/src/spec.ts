@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'l2s',
   name: 'L2S',
   description:
-    'URL shortening platform with link management, UTM tracking, QR codes, and click analytics.',
+    'Create, retrieve, and update shortened URLs with custom aliases, UTM tracking, titles, and tags. Read account settings.',
   metadata: {},
   config,
   auth

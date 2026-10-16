@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -59,9 +59,9 @@ export let listTags = SlateTool.create(spec, {
 
     let tags = await client.getTags(ctx.input.modelId);
 
-    let mappedTags = (tags || []).map((t: any) => ({
+    let mappedTags = tags.map((t: any) => ({
       tagId: t.id,
-      floorId: t.floor?.id || null,
+      floorId: t.floor?.id ?? null,
       created: t.created,
       modified: t.modified,
       enabled: t.enabled,
@@ -207,6 +207,9 @@ export let updateTag = SlateTool.create(spec, {
     if (ctx.input.stemEnabled !== undefined) patch.stemEnabled = ctx.input.stemEnabled;
     if (ctx.input.mediaType !== undefined) patch.mediaType = ctx.input.mediaType;
     if (ctx.input.mediaUrl !== undefined) patch.mediaUrl = ctx.input.mediaUrl;
+
+    if (Object.keys(patch).length === 0)
+      throw createApiServiceError('Provide at least one tag field to update.');
 
     let result = await client.updateTag(ctx.input.modelId, ctx.input.tagId, patch);
 

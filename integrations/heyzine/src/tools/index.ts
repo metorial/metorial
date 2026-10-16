@@ -6,4 +6,5 @@ export * from './list-flipbooks';
 export * from './manage-access-list';
 export * from './manage-bookshelf';
 export * from './manage-password-protection';
+export * from './update-flipbook-design';
 export * from './update-social-metadata';

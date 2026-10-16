@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { requiredString, requireRecord } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,22 +31,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.teamcamp.app/v1.0',
-        headers: {
-          apiKey: ctx.output.token
-        }
-      });
-
-      let _response = await axios.get('/verify');
-      let users = await axios.get('/company/users');
-      let firstUser = Array.isArray(users.data) ? users.data[0] : null;
-
+      let workspace = requireRecord(await new Client(ctx.output).verify());
       return {
         profile: {
-          id: firstUser?.id,
-          email: firstUser?.email,
-          name: firstUser?.name
+          id: requiredString(workspace.workspaceId, 'workspaceId'),
+          name: requiredString(workspace.workspaceName, 'workspaceName')
         }
       };
     }

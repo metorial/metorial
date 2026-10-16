@@ -1,10 +1,17 @@
 export { archiveLink } from './archive-link';
+export { createFolder } from './create-folder';
 export { createLink } from './create-link';
+export { createLinksBulk } from './create-links-bulk';
 export { deleteLink } from './delete-link';
+export { findLinksByOriginalUrl } from './find-links-by-original-url';
 export { generateQrCode } from './generate-qr-code';
+export { getDomain } from './get-domain';
 export { getDomainStatistics } from './get-domain-statistics';
 export { getLink } from './get-link';
+export { getLinkPreview } from './get-link-preview';
 export { getLinkStatistics } from './get-link-statistics';
 export { listDomains } from './list-domains';
+export { listFolders } from './list-folders';
 export { listLinks } from './list-links';
 export { updateLink } from './update-link';
+export { updateLinkPreview } from './update-link-preview';

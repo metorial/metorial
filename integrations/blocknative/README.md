@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Blocknative
 
-Estimate blockchain gas fees, monitor mempool transactions, decode L2 batches, and retrieve archived blob data. Get gas price predictions across 40+ chains (Ethereum, Bitcoin, Polygon, Arbitrum, Base, Optimism, etc.) with configurable confidence levels. Predict base fees and blob fees for upcoming Ethereum blocks. Retrieve gas price distribution data from the current mempool. Discover supported chains and on-chain gas oracle metadata. Decode L2 batch transactions (Optimism, Base, zkSync, Arbitrum, and others) from calldata or blobdata into human-readable format. Retrieve archived Ethereum blob data by versioned hash, including commitment, proof, and byte counts.
+Legacy Blocknative tools for gas fee estimates, base and blob fee predictions, mempool gas distributions, supported chain and gas oracle discovery, L2 batch decoding, and archived blob retrieval. Blocknative announced that its API services would stop after June 19, 2026; Blob Archive support ended March 1, 2025.
+
+The seven read-only tools preserve the existing endpoint contracts for compatibility. They do not provide transaction subscriptions or webhook configuration. See the [specification](docs/SPEC.md) for endpoint and authentication details.
+
+The [official service notice](https://www.blocknative.com/) announces the shutdown; the [Blob Archive documentation](https://docs.blocknative.com/data-archive/blob-archive) records its earlier support end. Runtime service availability has not been verified.
 
 ## License
 

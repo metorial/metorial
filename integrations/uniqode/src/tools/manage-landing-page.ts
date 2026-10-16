@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconstacClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,6 +20,10 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
 })
   .input(
     z.object({
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID from list_organizations; overrides the configured default'),
       action: z.enum(['list', 'create', 'update']).describe('Action to perform'),
       landingPageId: z.number().optional().describe('Landing page ID (required for update)'),
       title: z.string().optional().describe('Title for the landing page'),
@@ -33,6 +37,7 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       landingPages: z
         .array(
           z.object({
@@ -60,6 +65,14 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action === 'create' && !ctx.input.title) {
+      throw createApiServiceError('Provide a title to create a landing page.');
+    }
+    if (ctx.input.action === 'update' && ctx.input.landingPageId === undefined) {
+      throw createApiServiceError(
+        'Provide landingPageId from the list action to update a landing page.'
+      );
+    }
     let client = new BeaconstacClient({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId
@@ -74,15 +87,16 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
 
       let landingPages = result.results.map(card => ({
         landingPageId: card.id,
-        title: card.title,
-        description: card.description,
-        organizationId: card.organization,
-        createdAt: card.created,
-        updatedAt: card.updated
+        title: typeof card.title === 'string' ? card.title : undefined,
+        description: typeof card.description === 'string' ? card.description : undefined,
+        organizationId: typeof card.organization === 'number' ? card.organization : undefined,
+        createdAt: typeof card.created === 'string' ? card.created : undefined,
+        updatedAt: typeof card.updated === 'string' ? card.updated : undefined
       }));
 
       return {
         output: {
+          raw: result,
           totalCount: result.count,
           landingPages
         },
@@ -91,7 +105,9 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
     }
 
     if (ctx.input.action === 'create') {
-      let orgId = ctx.config.organizationId ? Number(ctx.config.organizationId) : undefined;
+      let orgId =
+        ctx.input.organizationId ??
+        (ctx.config.organizationId ? Number(ctx.config.organizationId) : undefined);
 
       let result = await client.createMarkdownCard({
         title: ctx.input.title!,
@@ -103,15 +119,17 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
 
       return {
         output: {
+          raw: result,
           landingPage: {
             landingPageId: result.id,
-            title: result.title,
-            description: result.description,
-            createdAt: result.created,
-            updatedAt: result.updated
+            title: typeof result.title === 'string' ? result.title : undefined,
+            description:
+              typeof result.description === 'string' ? result.description : undefined,
+            createdAt: typeof result.created === 'string' ? result.created : undefined,
+            updatedAt: typeof result.updated === 'string' ? result.updated : undefined
           }
         },
-        message: `Created landing page **"${result.title}"** (ID: ${result.id}).`
+        message: `Created landing page with ID ${result.id}.`
       };
     }
 
@@ -126,15 +144,16 @@ Use **action "list"** to browse existing pages, **"create"** to make a new one, 
 
     return {
       output: {
+        raw: result,
         landingPage: {
           landingPageId: result.id,
-          title: result.title,
-          description: result.description,
-          createdAt: result.created,
-          updatedAt: result.updated
+          title: typeof result.title === 'string' ? result.title : undefined,
+          description: typeof result.description === 'string' ? result.description : undefined,
+          createdAt: typeof result.created === 'string' ? result.created : undefined,
+          updatedAt: typeof result.updated === 'string' ? result.updated : undefined
         }
       },
-      message: `Updated landing page **"${result.title}"** (ID: ${result.id}).`
+      message: `Updated landing page with ID ${result.id}.`
     };
   })
   .build();

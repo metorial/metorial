@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .number()
       .optional()
       .describe(
-        'Default domain ID to use for API operations. If not set, you must specify it per request.'
+        'Optional default domain ID. Call list_domains to discover available domain IDs; tools also accept it per request.'
       ),
     domain: z
       .string()

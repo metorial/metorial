@@ -2,9 +2,14 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   addDocumentFeedback,
+  addTrainingDocument,
   extractDocument,
+  extractDocumentAsync,
+  getCurrentUser,
+  getExtractionData,
   getExtractionResult,
   listDocumentTypes,
+  listPendingExtractions,
   manageUserProfile,
   startTraining
 } from './tools';
@@ -17,7 +22,12 @@ export let provider = Slate.create({
     startTraining,
     listDocumentTypes,
     manageUserProfile,
-    getExtractionResult
+    getExtractionResult,
+    extractDocumentAsync,
+    getExtractionData,
+    listPendingExtractions,
+    addTrainingDocument,
+    getCurrentUser
   ],
   triggers: []
 });

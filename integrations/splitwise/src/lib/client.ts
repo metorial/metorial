@@ -1,15 +1,32 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
+import {
+  checkInteger,
+  checkResponse,
+  requireSuccess,
+  responseArray,
+  responseObject,
+  toSplitwiseError
+} from './errors';
 
 export class Client {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError('A Splitwise access token is required.');
+    }
+    this.http = createAuthenticatedAxios({
+      timeout: 30000,
+      errorAdapter: toSplitwiseError,
       baseURL: 'https://secure.splitwise.com/api/v3.0',
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
       }
+    });
+    this.http.interceptors.response.use(response => {
+      checkResponse(response.data, response.status);
+      return response;
     });
   }
 
@@ -17,12 +34,13 @@ export class Client {
 
   async getCurrentUser() {
     let response = await this.http.get('/get_current_user');
-    return response.data.user;
+    return responseObject(response.data.user, 'user');
   }
 
   async getUser(userId: number) {
+    checkInteger(userId, 'userId');
     let response = await this.http.get(`/get_user/${userId}`);
-    return response.data.user;
+    return responseObject(response.data.user, 'user');
   }
 
   async updateUser(
@@ -36,20 +54,22 @@ export class Client {
       default_currency?: string;
     }
   ) {
+    checkInteger(userId, 'userId');
     let response = await this.http.post(`/update_user/${userId}`, params);
-    return response.data.user;
+    return responseObject(response.data.user ?? response.data, 'user');
   }
 
   // ── Groups ──
 
   async getGroups() {
     let response = await this.http.get('/get_groups');
-    return response.data.groups;
+    return responseArray(response.data.groups, 'groups');
   }
 
   async getGroup(groupId: number) {
+    checkInteger(groupId, 'groupId');
     let response = await this.http.get(`/get_group/${groupId}`);
-    return response.data.group;
+    return responseObject(response.data.group, 'group');
   }
 
   async createGroup(params: {
@@ -73,7 +93,8 @@ export class Client {
 
     if (params.users) {
       params.users.forEach((user, index) => {
-        if (user.user_id) body[`users__${index}__user_id`] = user.user_id;
+        checkInteger(user.user_id, 'userId');
+        if (user.user_id !== undefined) body[`users__${index}__user_id`] = user.user_id;
         if (user.email) body[`users__${index}__email`] = user.email;
         if (user.first_name) body[`users__${index}__first_name`] = user.first_name;
         if (user.last_name) body[`users__${index}__last_name`] = user.last_name;
@@ -81,33 +102,39 @@ export class Client {
     }
 
     let response = await this.http.post('/create_group', body);
-    return response.data.group;
+    return responseObject(response.data.group, 'group');
   }
 
   async deleteGroup(groupId: number) {
+    checkInteger(groupId, 'groupId');
     let response = await this.http.post(`/delete_group/${groupId}`);
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   async restoreGroup(groupId: number) {
+    checkInteger(groupId, 'groupId');
     let response = await this.http.post(`/undelete_group/${groupId}`);
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   async addUserToGroup(groupId: number, userId: number) {
+    checkInteger(groupId, 'groupId');
+    checkInteger(userId, 'userId');
     let response = await this.http.post('/add_user_to_group', {
       group_id: groupId,
       user_id: userId
     });
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   async removeUserFromGroup(groupId: number, userId: number) {
+    checkInteger(groupId, 'groupId');
+    checkInteger(userId, 'userId');
     let response = await this.http.post('/remove_user_from_group', {
       group_id: groupId,
       user_id: userId
     });
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   // ── Expenses ──
@@ -122,13 +149,17 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
+    for (let [name, value] of Object.entries(params ?? {})) {
+      if (typeof value === 'number') checkInteger(value, name);
+    }
     let response = await this.http.get('/get_expenses', { params });
-    return response.data.expenses;
+    return responseArray(response.data.expenses, 'expenses');
   }
 
   async getExpense(expenseId: number) {
+    checkInteger(expenseId, 'expenseId');
     let response = await this.http.get(`/get_expense/${expenseId}`);
-    return response.data.expense;
+    return responseObject(response.data.expense, 'expense');
   }
 
   async createExpenseEqualSplit(params: {
@@ -141,6 +172,8 @@ export class Client {
     details?: string;
     repeat_interval?: string;
   }) {
+    checkInteger(params.group_id, 'groupId');
+    checkInteger(params.category_id, 'categoryId');
     let body: Record<string, any> = {
       cost: params.cost,
       description: params.description,
@@ -149,18 +182,17 @@ export class Client {
     };
 
     if (params.currency_code) body.currency_code = params.currency_code;
-    if (params.category_id) body.category_id = params.category_id;
+    if (params.category_id !== undefined) body.category_id = params.category_id;
     if (params.date) body.date = params.date;
     if (params.details) body.details = params.details;
     if (params.repeat_interval) body.repeat_interval = params.repeat_interval;
 
     let response = await this.http.post('/create_expense', body);
-
-    if (response.data.errors && Object.keys(response.data.errors).length > 0) {
-      throw new Error(`Failed to create expense: ${JSON.stringify(response.data.errors)}`);
+    if (!response.data.errors || typeof response.data.errors !== 'object') {
+      throw createApiServiceError('Splitwise did not confirm the expense operation.');
     }
 
-    return response.data.expenses;
+    return responseArray(response.data.expenses, 'expenses');
   }
 
   async createExpenseByShares(params: {
@@ -181,20 +213,23 @@ export class Client {
       owed_share: string;
     }>;
   }) {
+    checkInteger(params.group_id, 'groupId');
+    checkInteger(params.category_id, 'categoryId');
     let body: Record<string, any> = {
       cost: params.cost,
       description: params.description
     };
 
-    if (params.group_id) body.group_id = params.group_id;
+    if (params.group_id !== undefined) body.group_id = params.group_id;
     if (params.currency_code) body.currency_code = params.currency_code;
-    if (params.category_id) body.category_id = params.category_id;
+    if (params.category_id !== undefined) body.category_id = params.category_id;
     if (params.date) body.date = params.date;
     if (params.details) body.details = params.details;
     if (params.repeat_interval) body.repeat_interval = params.repeat_interval;
 
     params.users.forEach((user, index) => {
-      if (user.user_id) body[`users__${index}__user_id`] = user.user_id;
+      checkInteger(user.user_id, 'userId');
+      if (user.user_id !== undefined) body[`users__${index}__user_id`] = user.user_id;
       if (user.email) body[`users__${index}__email`] = user.email;
       if (user.first_name) body[`users__${index}__first_name`] = user.first_name;
       if (user.last_name) body[`users__${index}__last_name`] = user.last_name;
@@ -203,12 +238,11 @@ export class Client {
     });
 
     let response = await this.http.post('/create_expense', body);
-
-    if (response.data.errors && Object.keys(response.data.errors).length > 0) {
-      throw new Error(`Failed to create expense: ${JSON.stringify(response.data.errors)}`);
+    if (!response.data.errors || typeof response.data.errors !== 'object') {
+      throw createApiServiceError('Splitwise did not confirm the expense operation.');
     }
 
-    return response.data.expenses;
+    return responseArray(response.data.expenses, 'expenses');
   }
 
   async updateExpense(
@@ -232,6 +266,9 @@ export class Client {
       }>;
     }
   ) {
+    checkInteger(expenseId, 'expenseId');
+    checkInteger(params.group_id, 'groupId');
+    checkInteger(params.category_id, 'categoryId');
     let body: Record<string, any> = {};
 
     if (params.cost !== undefined) body.cost = params.cost;
@@ -245,7 +282,8 @@ export class Client {
 
     if (params.users) {
       params.users.forEach((user, index) => {
-        if (user.user_id) body[`users__${index}__user_id`] = user.user_id;
+        checkInteger(user.user_id, 'userId');
+        if (user.user_id !== undefined) body[`users__${index}__user_id`] = user.user_id;
         if (user.email) body[`users__${index}__email`] = user.email;
         if (user.first_name) body[`users__${index}__first_name`] = user.first_name;
         if (user.last_name) body[`users__${index}__last_name`] = user.last_name;
@@ -255,34 +293,36 @@ export class Client {
     }
 
     let response = await this.http.post(`/update_expense/${expenseId}`, body);
-
-    if (response.data.errors && Object.keys(response.data.errors).length > 0) {
-      throw new Error(`Failed to update expense: ${JSON.stringify(response.data.errors)}`);
+    if (!response.data.errors || typeof response.data.errors !== 'object') {
+      throw createApiServiceError('Splitwise did not confirm the expense operation.');
     }
 
-    return response.data.expenses;
+    return responseArray(response.data.expenses, 'expenses');
   }
 
   async deleteExpense(expenseId: number) {
+    checkInteger(expenseId, 'expenseId');
     let response = await this.http.post(`/delete_expense/${expenseId}`);
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   async restoreExpense(expenseId: number) {
+    checkInteger(expenseId, 'expenseId');
     let response = await this.http.post(`/undelete_expense/${expenseId}`);
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   // ── Friends ──
 
   async getFriends() {
     let response = await this.http.get('/get_friends');
-    return response.data.friends;
+    return responseArray(response.data.friends, 'friends');
   }
 
   async getFriend(friendId: number) {
+    checkInteger(friendId, 'friendId');
     let response = await this.http.get(`/get_friend/${friendId}`);
-    return response.data.friend;
+    return responseObject(response.data.friend, 'friend');
   }
 
   async addFriend(email: string, firstName?: string, lastName?: string) {
@@ -291,67 +331,87 @@ export class Client {
       user_first_name: firstName,
       user_last_name: lastName
     });
-    return response.data;
+    let friend = responseObject(response.data.friend ?? response.data.friends?.[0], 'friend');
+    if (typeof friend.id !== 'number')
+      throw createApiServiceError('Splitwise did not return the added friend ID.');
+    return { ...response.data, friends: [friend] };
   }
 
   async addFriends(users: Array<{ email: string; firstName?: string; lastName?: string }>) {
     let body: Record<string, any> = {};
     users.forEach((user, index) => {
-      body[`friends__${index}__email`] = user.email;
-      if (user.firstName) body[`friends__${index}__first_name`] = user.firstName;
-      if (user.lastName) body[`friends__${index}__last_name`] = user.lastName;
+      body[`users__${index}__email`] = user.email;
+      if (user.firstName) body[`users__${index}__first_name`] = user.firstName;
+      if (user.lastName) body[`users__${index}__last_name`] = user.lastName;
     });
     let response = await this.http.post('/create_friends', body);
-    return response.data;
+    let friends = responseArray(response.data.users ?? response.data.friends, 'friends');
+    if (friends.length === 0 || friends.some(friend => typeof friend.id !== 'number')) {
+      throw createApiServiceError('Splitwise did not return the added friend IDs.');
+    }
+    return { ...response.data, friends };
   }
 
   async deleteFriend(friendId: number) {
+    checkInteger(friendId, 'friendId');
     let response = await this.http.post(`/delete_friend/${friendId}`);
-    return response.data;
+    return requireSuccess(response.data);
   }
 
   // ── Comments ──
 
   async getComments(expenseId: number) {
+    checkInteger(expenseId, 'expenseId');
     let response = await this.http.get('/get_comments', {
       params: { expense_id: expenseId }
     });
-    return response.data.comments;
+    return responseArray(response.data.comments, 'comments');
   }
 
   async createComment(expenseId: number, content: string) {
+    checkInteger(expenseId, 'expenseId');
     let response = await this.http.post('/create_comment', {
       expense_id: expenseId,
       content
     });
-    return response.data.comment;
+    return responseObject(response.data.comment, 'comment');
   }
 
   async deleteComment(commentId: number) {
+    checkInteger(commentId, 'commentId');
     let response = await this.http.post(`/delete_comment/${commentId}`);
+    let comment = responseObject(response.data.comment, 'deleted comment');
+    if (
+      comment.id !== commentId ||
+      typeof comment.deleted_at !== 'string' ||
+      !comment.deleted_at
+    ) {
+      throw createApiServiceError('Splitwise did not confirm that the comment was deleted.');
+    }
     return response.data;
   }
 
   // ── Notifications ──
 
   async getNotifications(params?: { updatedAfter?: string; limit?: number }) {
+    checkInteger(params?.limit, 'limit');
     let queryParams: Record<string, any> = {};
     if (params?.updatedAfter) queryParams.updated_after = params.updatedAfter;
-    if (params?.limit) queryParams.limit = params.limit;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
 
     let response = await this.http.get('/get_notifications', { params: queryParams });
-    return response.data.notifications;
+    return responseArray(response.data.notifications, 'notifications');
   }
 
   // ── Reference Data ──
 
   async getCurrencies() {
     let response = await this.http.get('/get_currencies');
-    return response.data.currencies;
+    return responseArray(response.data.currencies, 'currencies');
   }
 
   async getCategories() {
     let response = await this.http.get('/get_categories');
-    return response.data.categories;
+    return responseArray(response.data.categories, 'categories');
   }
 }

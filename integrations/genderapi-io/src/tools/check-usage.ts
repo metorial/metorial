@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,8 +24,11 @@ export let checkUsage = SlateTool.create(spec, {
 
     let result = await client.getUsage();
 
-    let expiresDate =
-      result.expiresAt > 0 ? new Date(result.expiresAt * 1000).toISOString() : 'No expiration';
+    let date = new Date(result.expiresAt * 1000);
+    if (!Number.isFinite(date.getTime())) {
+      throw createApiServiceError('GenderAPI.io returned an invalid expiration timestamp.');
+    }
+    let expiresDate = result.expiresAt > 0 ? date.toISOString() : 'No expiration';
 
     return {
       output: {

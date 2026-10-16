@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -97,7 +97,7 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.objectId) {
-        throw new Error('objectId is required for the "get" action.');
+        throw createApiServiceError('objectId is required for the "get" action.');
       }
 
       let result = await client.getRecord(
@@ -114,7 +114,7 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!ctx.input.record) {
-        throw new Error('record is required for the "add" action.');
+        throw createApiServiceError('record is required for the "add" action.');
       }
 
       let result = await client.addRecord(indexName, ctx.input.record);
@@ -127,10 +127,10 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.objectId) {
-        throw new Error('objectId is required for the "update" action.');
+        throw createApiServiceError('objectId is required for the "update" action.');
       }
       if (!ctx.input.record) {
-        throw new Error('record is required for the "update" action.');
+        throw createApiServiceError('record is required for the "update" action.');
       }
 
       let result = await client.updateRecord(indexName, ctx.input.objectId, ctx.input.record);
@@ -143,10 +143,10 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'partialUpdate') {
       if (!ctx.input.objectId) {
-        throw new Error('objectId is required for the "partialUpdate" action.');
+        throw createApiServiceError('objectId is required for the "partialUpdate" action.');
       }
       if (!ctx.input.record) {
-        throw new Error('record is required for the "partialUpdate" action.');
+        throw createApiServiceError('record is required for the "partialUpdate" action.');
       }
 
       let result = await client.partialUpdateRecord(
@@ -164,7 +164,7 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.objectId) {
-        throw new Error('objectId is required for the "delete" action.');
+        throw createApiServiceError('objectId is required for the "delete" action.');
       }
 
       let result = await client.deleteRecord(indexName, ctx.input.objectId);
@@ -177,7 +177,7 @@ export let manageRecords = SlateTool.create(spec, {
 
     if (action === 'batch') {
       if (!ctx.input.batchRequests || ctx.input.batchRequests.length === 0) {
-        throw new Error(
+        throw createApiServiceError(
           'batchRequests is required and must not be empty for the "batch" action.'
         );
       }
@@ -201,7 +201,7 @@ export let manageRecords = SlateTool.create(spec, {
 
     // deleteBy
     if (!ctx.input.deleteByFilters) {
-      throw new Error('deleteByFilters is required for the "deleteBy" action.');
+      throw createApiServiceError('deleteByFilters is required for the "deleteBy" action.');
     }
 
     let result = await client.deleteBy(indexName, ctx.input.deleteByFilters);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,6 +54,17 @@ export let getTeamInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.includeTalent || ctx.input.includeATS) && ctx.input.year === undefined) {
+      throw createApiServiceError(
+        'Provide year when requesting talent ratings or against-the-spread records.',
+        { reason: 'missing_year' }
+      );
+    }
+    if (ctx.input.includeRecords && ctx.input.year === undefined && !ctx.input.team) {
+      throw createApiServiceError('Provide year or team when requesting season records.', {
+        reason: 'missing_filter'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let teams = await client.getTeams({
@@ -66,25 +77,32 @@ export let getTeamInfo = SlateTool.create(spec, {
         : teams;
     }
 
+    let selectedTeams = new Set<string>(
+      teams.map((team: { school: string }) => team.school.toLowerCase())
+    );
+
     let roster: any;
     if (ctx.input.includeRoster) {
       roster = await client.getRoster({ team: ctx.input.team, year: ctx.input.year });
+      if (ctx.input.conference) {
+        roster = roster.filter((player: { team: string }) =>
+          selectedTeams.has(player.team.toLowerCase())
+        );
+      }
     }
 
     let talent: any;
-    if (ctx.input.includeTalent && ctx.input.year) {
+    if (ctx.input.includeTalent && ctx.input.year !== undefined) {
       talent = await client.getTalent({ year: ctx.input.year });
-      if (ctx.input.team) {
-        talent = Array.isArray(talent)
-          ? talent.filter(
-              (t: any) => t.school?.toLowerCase() === ctx.input.team?.toLowerCase()
-            )
-          : talent;
+      if (ctx.input.team || ctx.input.conference) {
+        talent = talent.filter((record: { team: string }) =>
+          selectedTeams.has(record.team.toLowerCase())
+        );
       }
     }
 
     let records: any;
-    if (ctx.input.includeRecords && ctx.input.year) {
+    if (ctx.input.includeRecords) {
       records = await client.getRecords({
         year: ctx.input.year,
         team: ctx.input.team,
@@ -93,7 +111,7 @@ export let getTeamInfo = SlateTool.create(spec, {
     }
 
     let atsRecords: any;
-    if (ctx.input.includeATS && ctx.input.year) {
+    if (ctx.input.includeATS && ctx.input.year !== undefined) {
       atsRecords = await client.getTeamATS({
         year: ctx.input.year,
         team: ctx.input.team,

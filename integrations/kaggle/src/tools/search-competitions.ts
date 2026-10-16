@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let competitionSchema = z
@@ -93,9 +94,12 @@ export let searchCompetitions = SlateTool.create(spec, {
       sortBy: ctx.input.sortBy,
       page: ctx.input.page
     });
+    competitions = kaggleList(competitions, [], 'competitions').map(item =>
+      kaggleSummary(item, 'competitions item', ['ref', 'title', 'url'])
+    );
     return {
-      output: { competitions: competitions ?? [] },
-      message: `Found ${(competitions ?? []).length} competition(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
+      output: { competitions },
+      message: `Found ${competitions.length} competition(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

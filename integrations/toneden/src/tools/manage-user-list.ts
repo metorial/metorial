@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ToneDenClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
+  externalId: z.string().optional().describe('External user identifier for matching'),
   email: z.string().optional().describe('Contact email address'),
   phone: z.string().optional().describe('Contact phone number'),
   firstName: z.string().optional().describe('Contact first name'),
@@ -21,7 +22,8 @@ let userListSchema = z.object({
   externalAdAccountId: z.string().optional().describe('Facebook ad account ID'),
   name: z.string().optional().describe('List name'),
   userId: z.number().optional().describe('Owner user ID'),
-  type: z.string().optional().describe('List type')
+  type: z.string().optional().describe('List type'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let manageUserList = SlateTool.create(spec, {
@@ -77,7 +79,8 @@ User lists are linked to Facebook custom audiences and can be used for targeting
       externalAdAccountId: l.external_ad_account_id,
       name: l.name,
       userId: l.user_id,
-      type: l.type
+      type: l.type,
+      raw: l
     });
 
     if (action === 'list') {
@@ -90,7 +93,7 @@ User lists are linked to Facebook custom audiences and can be used for targeting
 
     if (action === 'create') {
       if (!ctx.input.externalAdAccountId)
-        throw new Error('externalAdAccountId is required for create action');
+        throw createApiServiceError('externalAdAccountId is required for create action');
       let list = await client.createUserList({
         external_ad_account_id: ctx.input.externalAdAccountId,
         type: 'manual'
@@ -103,10 +106,11 @@ User lists are linked to Facebook custom audiences and can be used for targeting
 
     // update_contacts
     if (!ctx.input.userListId)
-      throw new Error('userListId is required for update_contacts action');
+      throw createApiServiceError('userListId is required for update_contacts action');
 
     let mapContact = (c: any) => {
       let contact: Record<string, any> = {};
+      if (c.externalId !== undefined) contact.id = c.externalId;
       if (c.email) contact.email = c.email;
       if (c.phone) contact.phone = c.phone;
       if (c.firstName) contact.first_name = c.firstName;

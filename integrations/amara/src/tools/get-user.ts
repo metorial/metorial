@@ -18,7 +18,7 @@ export let getUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      username: z.string().describe('Username'),
+      username: z.string().optional().describe('Username, when returned'),
       userId: z.string().describe('User ID'),
       firstName: z.string().describe('First name'),
       lastName: z.string().describe('Last name'),
@@ -51,7 +51,7 @@ export let getUser = SlateTool.create(spec, {
         languages: u.languages,
         avatar: u.avatar
       },
-      message: `Retrieved profile for **${u.full_name || u.username}** (\`${u.username}\`).`
+      message: `Retrieved profile for **${u.full_name || u.username || u.id}** (\`${u.username || u.id}\`).`
     };
   })
   .build();

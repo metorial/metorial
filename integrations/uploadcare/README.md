@@ -1,6 +1,8 @@
 # Uploadcare
 
-Upload, store, manage, and deliver files via a global CDN. Process images on-the-fly with chainable URL operations including resizing, cropping, filters, blur, overlays, rotation, and background removal. Convert documents between formats (DOC, PDF, XLS, etc.) and encode videos to MP4, WEBM, and OGG. Organize files into groups, attach custom metadata, and manage file lifecycle (store, copy, delete). Run add-ons for virus scanning (ClamAV), object/scene detection (AWS Rekognition), and background removal (Remove.bg). Manage webhooks for file events (uploaded, stored, deleted, infected). Retrieve project information and configure signed uploads and signed URLs for security.
+Upload, store, find, organize, and download files from Uploadcare. Build image-processing CDN URLs, convert documents, encode videos, run file add-ons, manage metadata and tags, organize file groups, manage webhooks, and inspect the current project. Poll URL uploads and conversion jobs to track their progress.
+
+Connect with a project public key and secret key. Upload API requests support projects that require signed uploads. Downloads use the original public CDN URL returned by Uploadcare; private delivery policies can restrict access.
 
 ## License
 

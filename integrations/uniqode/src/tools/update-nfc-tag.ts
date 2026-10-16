@@ -33,6 +33,7 @@ export let updateNfcTag = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       nfcTagId: z.number().describe('ID of the updated NFC tag'),
       name: z.string().describe('Updated tag name'),
       uid: z.string().optional().describe('Tag UID'),
@@ -70,12 +71,13 @@ export let updateNfcTag = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         nfcTagId: result.id,
         name: result.name,
-        uid: result.uid,
-        state: result.state,
-        counter: result.counter,
-        updatedAt: result.updated
+        uid: typeof result.uid === 'string' ? result.uid : undefined,
+        state: typeof result.state === 'string' ? result.state : undefined,
+        counter: typeof result.counter === 'number' ? result.counter : undefined,
+        updatedAt: typeof result.updated === 'string' ? result.updated : undefined
       },
       message: `Updated NFC tag **"${result.name}"** (ID: ${result.id}).`
     };

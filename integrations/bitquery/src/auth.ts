@@ -1,4 +1,9 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let oauthAxios = createAxios({
@@ -9,6 +14,7 @@ export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      expiresAt: z.string().optional(),
       apiVersion: z
         .enum(['v1', 'v2'])
         .describe('Which API version this token authenticates for')
@@ -60,51 +66,44 @@ export let auth = SlateAuth.create()
       }
     ],
     getAuthorizationUrl: async ctx => {
-      // Client credentials flow doesn't use an authorization URL in the traditional sense.
-      // We generate the token directly and redirect back.
-      let response = await oauthAxios.post(
-        '/oauth2/token',
-        `grant_type=client_credentials&client_id=${encodeURIComponent(ctx.clientId)}&client_secret=${encodeURIComponent(ctx.clientSecret)}&scope=${encodeURIComponent(ctx.scopes.join(' '))}`,
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
       let redirectUrl = new URL(ctx.redirectUri);
       redirectUrl.searchParams.set('state', ctx.state);
-      redirectUrl.searchParams.set('code', response.data.access_token);
-
-      return {
-        url: redirectUrl.toString()
-      };
+      redirectUrl.searchParams.set('code', 'client_credentials');
+      return { url: redirectUrl.toString() };
     },
-    handleCallback: async ctx => {
-      // The code passed here is already the access token from getAuthorizationUrl
-      return {
-        output: {
-          token: ctx.code,
-          apiVersion: 'v2' as const
-        }
-      };
-    },
-    handleTokenRefresh: async (ctx: any) => {
-      let response = await oauthAxios.post(
-        '/oauth2/token',
-        `grant_type=client_credentials&client_id=${encodeURIComponent(ctx.clientId)}&client_secret=${encodeURIComponent(ctx.clientSecret)}&scope=${encodeURIComponent(ctx.scopes.join(' '))}`,
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      return {
-        output: {
-          token: response.data.access_token,
-          apiVersion: 'v2' as const
-        }
-      };
-    }
+    handleCallback: async ctx => ({ output: await issueClientToken(ctx) }),
+    handleTokenRefresh: async (ctx: Parameters<typeof issueClientToken>[0]) => ({
+      output: await issueClientToken(ctx)
+    })
   });
+
+let issueClientToken = async (ctx: {
+  clientId: string;
+  clientSecret: string;
+  scopes: string[];
+}) => {
+  try {
+    let response = await oauthAxios.post(
+      '/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: ctx.clientId,
+        client_secret: ctx.clientSecret,
+        scope: ctx.scopes.join(' ')
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    let tokens = normalizeOAuthTokenResponse(response.data, {
+      providerLabel: 'Bitquery',
+      required: true
+    });
+    return { token: tokens.token, expiresAt: tokens.expiresAt, apiVersion: 'v2' as const };
+  } catch (error) {
+    throw buildApiServiceError(error, {
+      providerLabel: 'Bitquery',
+      operation: 'token exchange',
+      reason: 'bitquery_oauth_error',
+      extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+    });
+  }
+};

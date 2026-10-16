@@ -1,6 +1,6 @@
 {
   "name": "@metorial/minerstat",
-  "description": "Monitor and manage cryptocurrency mining operations for GPU and ASIC workers. Retrieve real-time and historical worker data including hashrate, temperature, power consumption, and estimated earnings. Remotely control workers with commands such as reboot, shutdown, restart, and start/stop mining. Create, update, and delete workers, groups, tags, and customer accounts. Manage GPU overclocking (ClockTune) profiles and worker configurations including mining client, profit switching, and electricity settings. Query coin profitability data including price, difficulty, rewards, and network hashrate, filterable by ticker or algorithm. Look up mining hardware specs with hashrate benchmarks and power draw for GPUs and ASICs. Browse a mining pools directory with fees, supported coins, and payout thresholds. Access monitoring statistics such as activity logs, balance tracking, group stats, and global stats.",
+  "description": "Monitor cryptocurrency mining workers, inspect real-time and historical mining data, and read worker configuration. Create, update, and delete workers; manage group membership, pool and wallet tags, customer sub-accounts, and GPU overclocking profiles. Send remote worker commands and query coin profitability data, hardware benchmarks, and mining pools.",
   "categories": [
     "apis-and-http-requests",
     "financial-data-and-stock-market",
@@ -8,6 +8,7 @@
   ],
   "skills": [
     "monitor worker hashrate and hardware",
+    "read worker configuration",
     "execute remote worker commands",
     "manage worker configurations",
     "query coin profitability data",

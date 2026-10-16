@@ -1,6 +1,12 @@
 # <img src="logo.jpeg" height="20"> Gagelist
 
-Manage gages (measurement equipment), calibration records, and compliance tracking for quality standards such as ISO 9001, ISO 17025, AS 9100, and 21 CFR Parts 11/820. Create, read, update, and delete gage records and calibration records. Upload and manage file attachments on gages and calibrations. Generate calibration certificates. Manage manufacturer entries. Read and update custom field values for organization-specific data. Retrieve and update account settings. Export data for business intelligence and reporting purposes.
+Manage measurement equipment, calibration records, manufacturers, account settings, and custom field values in GageList. Discover and download files linked to gages or calibrations, delete files, and generate downloadable calibration certificates.
+
+Connect using the API client ID and client secret issued for your GageList account. `get_account_status` returns the current site, accessible sites, account roles, permissions, usage, and plan limits.
+
+Use `get_gage` or `get_calibration` to discover file IDs, then `get_attachment` to download a file. `update_gage` supports equipment details and calibration scheduling. Custom value writes use exact field names from `get_custom_fields`; specify `recordType` for calibration records and supply `valueIds` when updating existing values.
+
+File uploads are not exposed because the public API documentation omits the request body format. The provider's custom-field-values read article currently shows an unrelated endpoint; the existing read tool remains available, with its route awaiting provider confirmation. BI backup export is a manual account workflow and has no documented API endpoint.
 
 ## License
 

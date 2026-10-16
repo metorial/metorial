@@ -1,9 +1,11 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   browseClassificationsTool,
   checkInventoryStatusTool,
   getAttractionDetailsTool,
+  getClassificationDetailsTool,
   getEventDetailsTool,
   getEventOffersTool,
   getVenueDetailsTool,
@@ -14,6 +16,7 @@ import {
 } from './tools';
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
     searchEventsTool,
     getEventDetailsTool,
@@ -24,6 +27,7 @@ export let provider = Slate.create({
     getEventOffersTool,
     checkInventoryStatusTool,
     browseClassificationsTool,
+    getClassificationDetailsTool,
     suggestSearchTool
   ],
   triggers: []

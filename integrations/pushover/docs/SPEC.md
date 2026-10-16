@@ -1,4 +1,4 @@
-Let me get more details on specific API features like Glances, Groups, and the new Webhooks feature.Now let me also check the Receipts/Callback API for completeness on events:# Slates Specification for Pushover
+# Pushover API Specification
 
 ## Overview
 
@@ -12,7 +12,7 @@ Pushover uses a simple API key-based authentication model with two required cred
 
 2. **User Key** (`user`): A 30-character alphanumeric string assigned to each Pushover user account, found on the user's [dashboard](https://pushover.net/dashboard). This identifies the recipient of notifications. A Group Key (same format) can be used instead to target multiple users.
 
-Both credentials are passed as POST parameters (not as HTTP headers) with each API request. There is no OAuth, no session tokens, and no per-call signing. All API calls must be made over HTTPS.
+The application token is passed as a body parameter for POST requests and as a query parameter for GET requests. The user or group key is sent when the endpoint requires a recipient. There is no OAuth, no session tokens, and no per-call signing. All API calls must be made over HTTPS.
 
 ## Features
 
@@ -30,7 +30,7 @@ Emergency-priority messages return a receipt ID that can be polled to check ackn
 
 ### Delivery Groups
 
-Create and manage groups of users that can be addressed with a single group key. Users can be added, removed, temporarily disabled, or re-enabled within a group. Each group member can optionally be restricted to a specific device. Groups can be listed, inspected, and renamed via the API.
+Create and manage groups of users that can be addressed with a single group key. Users can be added, removed, temporarily disabled, or re-enabled within a group. Each group member can optionally be restricted to a specific device. Groups can be listed, inspected, and renamed via the API. The application token must belong to the account or team that owns the group.
 
 ### Subscriptions
 
@@ -66,3 +66,33 @@ When sending an emergency-priority notification, a `callback` URL can be include
 - This is only available for emergency-priority (priority=2) messages.
 
 Note: Pushover's inbound webhooks (described in Features) are for _receiving_ external data into Pushover, not for subscribing to Pushover events. There is no general-purpose event subscription or webhook system for listening to arbitrary Pushover events.
+
+
+## Implemented Tools
+
+| Tool | Supported workflow |
+| --- | --- |
+| `send_notification` | Send messages, images, and emergency notifications |
+| `check_receipt` | Read emergency acknowledgement and expiration status |
+| `cancel_emergency` | Cancel retries by one receipt or tag |
+| `list_groups` | Discover owned delivery-group keys and names without write permissions |
+| `get_group` | Read group membership, device restrictions, and member state |
+| `manage_group` | List, create, retrieve, or rename delivery groups |
+| `manage_group_members` | Add, remove, enable, or disable members |
+| `validate_user` | Validate a recipient and discover active devices |
+| `push_glance` | Update widget text and numeric data |
+| `check_app_limits` | Read the shared account or team monthly quota |
+| `list_sounds` | Discover notification sound identifiers |
+| `migrate_subscription` | Convert an existing user key to a subscription key |
+
+The APIs do not provide a current-user profile endpoint for these application-token credentials. `validate_user` checks the configured recipient, while `check_app_limits` checks the application owner's quota. Tokens do not use OAuth or require a refresh-token flow. Account or team quotas include all applications and can include purchased capacity.
+
+The inbound-webhook setup and Teams/licensing features above describe provider capabilities; this integration does not create webhook receivers or manage Teams licenses. Subscription creation takes place in the application dashboard. Message history is stored on recipient devices, so there is no server message-history tool. Encrypted message preparation and Open Client device APIs are outside the implemented surface.
+
+## Official References
+
+- [Message, validation, sound, quota, and error APIs](https://pushover.net/api)
+- [Delivery Groups API](https://pushover.net/api/groups)
+- [Receipts and callbacks](https://pushover.net/api/receipts)
+- [Glances API](https://pushover.net/api/glances)
+- [Subscription migration](https://pushover.net/api/subscriptions)

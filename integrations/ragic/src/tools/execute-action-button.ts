@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let executeActionButton = SlateTool.create(spec, {
@@ -33,11 +33,7 @@ Use the **List Action Buttons** tool first to discover available button IDs for 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverDomain: ctx.config.serverDomain,
-      accountName: ctx.config.accountName
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let sheet = {
       tabFolder: ctx.input.tabFolder,

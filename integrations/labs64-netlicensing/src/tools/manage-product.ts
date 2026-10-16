@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,7 +55,10 @@ export let manageProduct = SlateTool.create(spec, {
     let { action, productNumber, forceCascade, ...params } = ctx.input;
 
     if (action === 'delete') {
-      if (!productNumber) throw new Error('productNumber is required for delete');
+      if (!productNumber)
+        throw createApiServiceError('productNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteProduct(productNumber, forceCascade);
       return {
         output: { productNumber, deleted: true },
@@ -64,9 +67,15 @@ export let manageProduct = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!productNumber) throw new Error('productNumber is required for update');
+      if (!productNumber)
+        throw createApiServiceError('productNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateProduct(productNumber, params);
-      if (!result) throw new Error('Failed to update product');
+      if (!result)
+        throw createApiServiceError('Failed to update product', {
+          reason: 'invalid_response'
+        });
       return {
         output: {
           productNumber: result.number,
@@ -84,7 +93,8 @@ export let manageProduct = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (productNumber) createParams.number = productNumber;
     let result = await client.createProduct(createParams);
-    if (!result) throw new Error('Failed to create product');
+    if (!result)
+      throw createApiServiceError('Failed to create product', { reason: 'invalid_response' });
     return {
       output: {
         productNumber: result.number,

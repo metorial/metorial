@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Thanks.io
 
-Send personalized handwritten postcards, letters, notecards, and gift cards as physical direct mail at scale. Manage recipients and mailing lists, track order delivery status, and monitor QR code engagement. Supports dynamic image personalization, radius-based lead generation, multiple handwriting styles, gift card catalogs, sub-account management, and webhooks for delivery and scan events. Preview mail pieces before sending, use message and image templates, and personalize content with recipient-specific data tags.
+Send personalized handwritten postcards, letters, notecards, and gift cards. Discover saved creatives and templates, preview mail pieces as downloadable images, and estimate costs before sending. Manage mailing lists, recipients and sub-accounts; inspect orders and individual delivery results, QR scans, and gift card redemption status. Count nearby lead records before purchasing a radius-search list.
 
 ## License
 

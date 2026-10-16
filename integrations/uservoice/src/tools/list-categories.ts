@@ -6,14 +6,15 @@ import { spec } from '../spec';
 let categorySchema = z.object({
   categoryId: z.number().describe('Unique ID of the category'),
   name: z.string().describe('Name of the category'),
-  suggestionsCount: z.number().describe('Total suggestions in this category'),
-  openSuggestionsCount: z.number().describe('Open suggestions in this category'),
-  createdAt: z.string().describe('When the category was created'),
-  updatedAt: z.string().describe('When the category was last updated'),
+  suggestionsCount: z.number().optional().describe('Total suggestions in this category'),
+  openSuggestionsCount: z.number().optional().describe('Open suggestions in this category'),
+  createdAt: z.string().optional().describe('When the category was created'),
+  updatedAt: z.string().optional().describe('When the category was last updated'),
   links: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Associated resource links (e.g., forum)')
+    .describe('Associated resource links (e.g., forum)'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listCategories = SlateTool.create(spec, {
@@ -30,14 +31,15 @@ export let listCategories = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      categories: z.array(categorySchema),
-      totalRecords: z.number().describe('Total number of categories')
+      categories: z.array(categorySchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of categories')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listCategories({
@@ -45,22 +47,23 @@ export let listCategories = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let categories = result.categories.map((c: any) => ({
+    let categories = result.categories?.map((c: any) => ({
       categoryId: c.id,
       name: c.name,
-      suggestionsCount: c.suggestions_count || 0,
-      openSuggestionsCount: c.open_suggestions_count || 0,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
-      links: c.links
+      suggestionsCount: c.suggestions_count,
+      openSuggestionsCount: c.open_suggestions_count,
+      createdAt: c.created_at ?? undefined,
+      updatedAt: c.updated_at ?? undefined,
+      links: c.links,
+      raw: c
     }));
 
     return {
       output: {
         categories,
-        totalRecords: result.pagination?.totalRecords || categories.length
+        totalRecords: result.pagination?.totalRecords
       },
-      message: `Found **${categories.length}** categories.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

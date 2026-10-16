@@ -1,12 +1,14 @@
 {
   "name": "@metorial/metorial-admin",
-  "description": "Inspect authorized Metorial dashboard instance API endpoints, list accessible Metorial instances, and call validated instance endpoints through a controlled dynamic wrapper using Metorial OAuth or API key authentication.",
+  "description": "Inspect authorized Metorial dashboard instance API endpoints, discover accessible instances, read authenticated account context, and call validated endpoints using OAuth or API key authentication.",
   "categories": ["developer-tools", "productivity"],
   "skills": [
     "inspect Metorial API endpoints",
     "list accessible Metorial instances",
     "call dashboard instance endpoints",
     "administer Metorial instance resources",
-    "return non-JSON responses as attachments"
+    "prepare non-JSON response files for download",
+    "inspect authenticated account context",
+    "read instance metadata"
   ]
 }

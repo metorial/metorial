@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachmentSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getGage = SlateTool.create(spec, {
@@ -50,6 +51,12 @@ Returns all details about the gage including identification, calibration dates, 
       updatedBy: z.string().optional().describe('Last updated by user'),
       createdDate: z.string().optional().describe('Date the record was created'),
       updatedDate: z.string().optional().describe('Date the record was last updated'),
+      attachments: z
+        .array(attachmentSchema)
+        .optional()
+        .describe(
+          'Files linked to this record; use their Id with get_attachment or delete_attachment'
+        ),
       isDeleted: z.boolean().optional().describe('Whether the gage is soft-deleted')
     })
   )
@@ -91,6 +98,7 @@ Returns all details about the gage including identification, calibration dates, 
         updatedBy: gage.UpdatedBy,
         createdDate: gage.CreatedDate,
         updatedDate: gage.UpdatedDate,
+        attachments: gage.Attachments,
         isDeleted: gage.IsDeleted
       },
       message: `Retrieved gage **${gage.Id}** — Status: ${gage.Status ?? 'N/A'}, Type: ${gage.Type ?? 'N/A'}.`

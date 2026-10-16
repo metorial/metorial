@@ -42,18 +42,18 @@ export let createUser = SlateTool.create(spec, {
       UserName: ctx.input.userName,
       RoleId: ctx.input.roleId,
       IsActive: ctx.input.isActive,
-      ExternalEmail: ctx.input.externalEmail,
-      OrgDefinedId: ctx.input.orgDefinedId,
-      MiddleName: ctx.input.middleName,
-      SendCreationEmail: ctx.input.sendCreationEmail
+      ExternalEmail: ctx.input.externalEmail ?? null,
+      OrgDefinedId: ctx.input.orgDefinedId ?? null,
+      MiddleName: ctx.input.middleName ?? null,
+      SendCreationEmail: ctx.input.sendCreationEmail ?? false
     });
 
     return {
       output: {
         userId: String(user.UserId),
-        userName: user.UserName,
-        firstName: user.FirstName,
-        lastName: user.LastName
+        userName: user.UserName ?? undefined,
+        firstName: user.FirstName ?? undefined,
+        lastName: user.LastName ?? undefined
       },
       message: `Created user **${user.FirstName} ${user.LastName}** (ID: ${user.UserId}).`
     };

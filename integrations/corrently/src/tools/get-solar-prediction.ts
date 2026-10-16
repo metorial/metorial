@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let getSolarPrediction = SlateTool.create(spec, {
   name: 'Solar Generation Forecast',
   key: 'get_solar_prediction',
-  description: `Provides solar energy production forecasts for a specific location and panel configuration. Returns hourly output estimates in watts and watt-hours. Supports customization based on panel technology, tilt angle, azimuth, and installed capacity.`,
+  description: `Provides solar energy production forecasts for a specific location and panel configuration. Returns hourly energy estimates in watt-hours. Supports customization based on panel technology, tilt angle, azimuth, and installed capacity.`,
   instructions: [
-    'At minimum, provide a postal code and the installed capacity in kWp (kilowatt peak).',
+    'Provide a postal code, a complete latitude/longitude pair, or a solar plant ID. Capacity is optional.',
     'For more accurate predictions, also provide latitude, longitude, tilt angle, and azimuth.'
   ],
   tags: {
@@ -20,7 +20,10 @@ export let getSolarPrediction = SlateTool.create(spec, {
       zip: z.string().optional().describe('German postal code (Postleitzahl), 5 digits'),
       lat: z.number().optional().describe('Latitude of the solar installation'),
       lng: z.number().optional().describe('Longitude of the solar installation'),
-      kwp: z.number().optional().describe('Panel capacity in kilowatt peak (0.1-1000 kWp)'),
+      kwp: z
+        .number()
+        .optional()
+        .describe('Positive installed panel capacity in kilowatt peak (kWp)'),
       tilt: z
         .number()
         .optional()
@@ -29,11 +32,14 @@ export let getSolarPrediction = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Panel azimuth in degrees (0 = north, 90 = east, 180 = south, 270 = west)'),
-      technology: z.string().optional().describe('Solar panel technology type')
+      technology: z.string().optional().describe('Solar panel technology, e.g. crystSi'),
+      lossPercent: z.number().optional().describe('Estimated system losses in percent, 0-100'),
+      plant: z.string().optional().describe('Existing solar plant identifier, when known')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       forecast: z
         .array(
           z.object({
@@ -51,8 +57,15 @@ export let getSolarPrediction = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
-    if (!zip && !ctx.input.lat && !ctx.input.lng) {
-      throw new Error('Either a postal code (zip) or coordinates (lat/lng) are required.');
+    if (
+      !zip &&
+      ctx.input.lat === undefined &&
+      ctx.input.lng === undefined &&
+      !ctx.input.plant
+    ) {
+      throw createApiServiceError(
+        'Provide a postal code, a latitude/longitude pair, or a solar plant ID.'
+      );
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -63,18 +76,21 @@ export let getSolarPrediction = SlateTool.create(spec, {
       kwp: ctx.input.kwp,
       tilt: ctx.input.tilt,
       azimuth: ctx.input.azimuth,
-      technology: ctx.input.technology
+      technology: ctx.input.technology,
+      lossPercent: ctx.input.lossPercent,
+      plant: ctx.input.plant
     });
 
-    let forecast = (result.forecast || []).map(item => ({
-      epochTime: item.epochtime,
-      timeStamp: item.timeStamp,
+    let forecast = (result.output ?? result.forecast ?? []).map(item => ({
+      epochTime:
+        item.epochtime ?? (item.timestamp === undefined ? undefined : item.timestamp / 1000),
+      timeStamp: item.timestamp ?? item.timeStamp,
       wattHours: item.wh,
       watts: item.watt
     }));
 
     return {
-      output: { forecast },
+      output: { raw: result, forecast },
       message: `Retrieved solar generation forecast with **${forecast.length}** hourly entries${zip ? ` for postal code **${zip}**` : ''}.`
     };
   })

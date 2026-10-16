@@ -1,12 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCompanyUsers = SlateTool.create(spec, {
   name: 'Manage Company Users',
   key: 'manage_company_users',
   description: `Manage users within a Rocketadmin company (organization). Invite new users, list existing members, remove users, or suspend/unsuspend accounts.`,
+  instructions: [
+    'Hosted invitations require a current turnstileToken issued by Rocketadmin after completing its interactive invitation challenge. Self-hosted deployments may omit the token.'
+  ],
   tags: {
     destructive: false
   }
@@ -16,7 +19,9 @@ export let manageCompanyUsers = SlateTool.create(spec, {
       action: z
         .enum(['list', 'invite', 'remove', 'suspend', 'unsuspend'])
         .describe('Action to perform'),
-      companyId: z.string().describe('Company (organization) ID'),
+      companyId: z
+        .string()
+        .describe('Company ID. Call get_my_company to discover the current company.'),
       userId: z
         .string()
         .optional()
@@ -25,7 +30,19 @@ export let manageCompanyUsers = SlateTool.create(spec, {
       groupId: z
         .string()
         .optional()
-        .describe('Group ID to assign the invited user to (required for invite)')
+        .describe(
+          'Optional connection group to assign the invited user to; call manage_groups to discover IDs'
+        ),
+      role: z
+        .enum(['ADMIN', 'USER', 'DB_ADMIN'])
+        .optional()
+        .describe('Company role; required when inviting a user'),
+      turnstileToken: z
+        .string()
+        .optional()
+        .describe(
+          'Current token from the interactive Rocketadmin invitation challenge. Required for hosted invitations; self-hosted deployments may omit it.'
+        )
     })
   )
   .output(
@@ -38,12 +55,9 @@ export let manageCompanyUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config);
 
-    let { action, companyId, userId, email, groupId } = ctx.input;
+    let { action, companyId, userId, email, groupId, role, turnstileToken } = ctx.input;
 
     if (action === 'list') {
       let users = await client.getUsersInCompany(companyId);
@@ -54,9 +68,9 @@ export let manageCompanyUsers = SlateTool.create(spec, {
     }
 
     if (action === 'invite') {
-      if (!email) throw new Error('email is required for inviting a user');
-      if (!groupId) throw new Error('groupId is required for inviting a user');
-      await client.inviteUserToCompany(companyId, email, groupId);
+      if (!email) throw createApiServiceError('email is required for inviting a user');
+      if (!role) throw createApiServiceError('role is required for inviting a user.');
+      await client.inviteUserToCompany(companyId, email, groupId, role, turnstileToken);
       return {
         output: { success: true },
         message: `Invited **${email}** to company **${companyId}**.`
@@ -64,7 +78,7 @@ export let manageCompanyUsers = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!userId) throw new Error('userId is required for removing a user');
+      if (!userId) throw createApiServiceError('userId is required for removing a user');
       await client.removeUserFromCompany(companyId, userId);
       return {
         output: { success: true },
@@ -73,7 +87,7 @@ export let manageCompanyUsers = SlateTool.create(spec, {
     }
 
     if (action === 'suspend') {
-      if (!userId) throw new Error('userId is required for suspending a user');
+      if (!userId) throw createApiServiceError('userId is required for suspending a user');
       await client.suspendUser(companyId, userId);
       return {
         output: { success: true },
@@ -82,14 +96,14 @@ export let manageCompanyUsers = SlateTool.create(spec, {
     }
 
     if (action === 'unsuspend') {
-      if (!userId) throw new Error('userId is required for unsuspending a user');
-      await client.unsuspendUser(companyId, userId);
+      if (!userId) throw createApiServiceError('userId is required for unsuspending a user');
+      await client.suspendUser(companyId, userId, false);
       return {
         output: { success: true },
         message: `Unsuspended user **${userId}** in company **${companyId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -28,7 +28,8 @@ export let exportBanners = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      exportId: z.string().describe('ID of the export request')
+      exportId: z.string().describe('ID of the export request'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -41,7 +42,8 @@ export let exportBanners = SlateTool.create(spec, {
 
     return {
       output: {
-        exportId: result.export_id
+        exportId: result.export_id,
+        raw: result
       },
       message: `Export started for **${ctx.input.bannerIds.length}** banner(s). Export ID: \`${result.export_id}\`. The ZIP download link will be delivered to the callback URL.`
     };

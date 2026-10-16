@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,6 +19,8 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Alpha Vantage API key cannot be empty.');
       return {
         output: {
           token: ctx.input.apiKey

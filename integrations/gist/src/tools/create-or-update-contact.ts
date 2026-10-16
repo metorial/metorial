@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let createOrUpdateContact = SlateTool.create(spec, {
@@ -37,6 +38,7 @@ export let createOrUpdateContact = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       contactId: z.string().describe('Created/updated contact ID'),
       type: z.string().optional().describe('Contact type: "user" or "lead"'),
       name: z.string().optional(),
@@ -47,6 +49,8 @@ export let createOrUpdateContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
 
+    if (!ctx.input.email && !ctx.input.userId)
+      throw createApiServiceError('Provide email or userId.');
     let body: Record<string, any> = {};
     if (ctx.input.email) body.email = ctx.input.email;
     if (ctx.input.userId) body.user_id = ctx.input.userId;
@@ -63,11 +67,12 @@ export let createOrUpdateContact = SlateTool.create(spec, {
 
     return {
       output: {
-        contactId: String(contact.id),
+        rawResponse: client.responses,
+        contactId: requiredId(contact.id),
         type: contact.type,
         name: contact.name,
         email: contact.email,
-        userId: contact.user_id ? String(contact.user_id) : undefined
+        userId: contact.user_id !== undefined ? String(contact.user_id) : undefined
       },
       message: `Contact **${contact.name || contact.email || contact.id}** has been created/updated.`
     };

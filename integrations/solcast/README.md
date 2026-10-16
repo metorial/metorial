@@ -1,6 +1,12 @@
 # Solcast
 
-Retrieve global solar irradiance, weather, and PV power data for any location. Access live estimated actuals, forecasts up to 14 days ahead, and historical time series from 2007. Query 20+ weather parameters including GHI, DNI, DHI, GTI, air temperature, wind speed, humidity, cloud opacity, and precipitation. Estimate rooftop PV power output based on system capacity, tilt, and azimuth. Configure advanced PV power sites with detailed specifications including tracking type, bifacial settings, and derating factors. Retrieve Typical Meteorological Year (TMY) datasets for long-term resource assessment. Access grid aggregation data for PV fleets in total power or performance units. Supports probabilistic forecasting (P10/P50/P90), terrain shading, and 5- to 60-minute time resolution. Output available in JSON and CSV formats.
+Retrieve solar irradiance, weather, and PV power forecasts, live estimates, historical time series, and Typical Meteorological Year datasets. Manage Advanced PV Power sites, discover site identifiers, submit measured power records, inspect terrain horizons, and retrieve configured grid aggregations.
+
+Connect using an API key from the Solcast Toolkit. Tools return structured JSON data; access depends on the products enabled on your Solcast account.
+
+Site-management capacity and export-limit inputs use kW and are converted to the API's MW units. Advanced PV operational caps and submitted measurement power values use MW. Raw site responses retain the provider's units.
+
+See [the tool guide](docs/SPEC.md) and [Solcast's API reference](https://docs.solcast.com.au/).
 
 ## License
 

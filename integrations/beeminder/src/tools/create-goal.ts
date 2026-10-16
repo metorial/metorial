@@ -52,14 +52,23 @@ export let createGoal = SlateTool.create(spec, {
         .describe('Whether the goal is secret (not publicly visible)'),
       datapublic: z.boolean().optional().describe('Whether the data is publicly visible'),
       tags: z.array(z.string()).optional().describe('Tags to categorize the goal'),
-      pledge: z.number().optional().describe('Initial pledge amount in USD')
+      pledge: z
+        .number()
+        .optional()
+        .describe('Legacy initial pledge parameter; not documented by the current API'),
+      datasource: z
+        .string()
+        .optional()
+        .describe('Automatic data source: api, ifttt, zapier, or your registered client name'),
+      dryrun: z.boolean().optional().describe('Validate goal creation without creating a goal')
     })
   )
   .output(goalSchema)
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let raw = await client.createGoal(ctx.input);
@@ -67,7 +76,7 @@ export let createGoal = SlateTool.create(spec, {
 
     return {
       output: goal,
-      message: `Created goal **${goal.title}** (${goal.slug}) of type ${goal.goalType} with units "${goal.gunits}".`
+      message: `${ctx.input.dryrun ? 'Validated creation of' : 'Created'} goal **${goal.title}** (${goal.slug}) of type ${goal.goalType} with units "${goal.gunits}".`
     };
   })
   .build();

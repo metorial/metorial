@@ -13,7 +13,7 @@ export let getTimeSeries = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum time frame is 365 days between start and end dates.',
-    'Changing the base currency from EUR requires a paid Fixer plan.'
+    'Endpoint availability and permitted base currencies depend on the subscription for the selected API host.'
   ],
   tags: {
     destructive: false,
@@ -47,7 +47,7 @@ export let getTimeSeries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiHost: ctx.auth.apiHost });
 
     let base = ctx.input.baseCurrency || ctx.config.baseCurrency;
 

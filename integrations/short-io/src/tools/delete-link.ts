@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteLink = SlateTool.create(spec, {
   name: 'Delete Link',
   key: 'delete_link',
-  description: `Permanently delete a short link. This action cannot be undone. If you want to temporarily disable a link, consider archiving it instead.`,
+  description: `Permanently delete a short link. This action cannot be undone. Archived links continue redirecting; delete a link only when you intend to remove it permanently.`,
   constraints: ['Rate limit: 20 requests per second.'],
   tags: {
     destructive: true,

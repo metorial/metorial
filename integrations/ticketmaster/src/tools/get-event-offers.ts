@@ -33,10 +33,31 @@ let areaSchema = z.object({
   offers: z.array(z.string()).describe('List of offer IDs available in this area')
 });
 
+let outputSchema = z.object({
+  eventId: z.string(),
+  offers: z.array(offerSchema),
+  areas: z.array(areaSchema),
+  limits: z.object({
+    min: z.number().nullable(),
+    max: z.number().nullable()
+  }),
+  prices: z.array(
+    z.object({
+      type: z.string(),
+      currency: z.string(),
+      min: z.number().nullable(),
+      max: z.number().nullable()
+    })
+  )
+});
+
 export let getEventOffersTool = SlateTool.create(spec, {
   name: 'Get Event Offers',
   key: 'get_event_offers',
   description: `Retrieve ticket offers and pricing for a specific event. Returns available ticket types, price levels, face values, fees, purchase limits, and seating areas. Use this to understand ticket availability and pricing before purchase.`,
+  constraints: [
+    'Requires authorized Commerce API access. Current public endpoint documentation is unavailable; confirm access and endpoint support with Ticketmaster.'
+  ],
   tags: {
     readOnly: true
   }
@@ -46,25 +67,7 @@ export let getEventOffersTool = SlateTool.create(spec, {
       eventId: z.string().describe('Ticketmaster event ID')
     })
   )
-  .output(
-    z.object({
-      eventId: z.string(),
-      offers: z.array(offerSchema),
-      areas: z.array(areaSchema),
-      limits: z.object({
-        min: z.number().nullable(),
-        max: z.number().nullable()
-      }),
-      prices: z.array(
-        z.object({
-          type: z.string(),
-          currency: z.string(),
-          min: z.number().nullable(),
-          max: z.number().nullable()
-        })
-      )
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new CommerceClient({
       token: ctx.auth.token
@@ -74,32 +77,34 @@ export let getEventOffersTool = SlateTool.create(spec, {
 
     let rawOffers = response?.offers?.offer || response?.offers || [];
     let offers = (Array.isArray(rawOffers) ? rawOffers : []).map((o: any) => ({
-      offerId: o.id || o.offerId || '',
-      name: o.name || '',
-      type: o.type || '',
-      description: o.description || '',
+      offerId: o.id ?? o.offerId ?? undefined,
+      name: o.name ?? undefined,
+      type: o.type ?? undefined,
+      description: o.description ?? undefined,
       rank: o.rank ?? null,
-      currency: o.currency || o.prices?.[0]?.currency || '',
+      currency: o.currency ?? o.prices?.[0]?.currency ?? undefined,
       faceValue: o.faceValue ?? o.prices?.[0]?.value ?? null,
       totalPrice: o.totalPrice ?? o.prices?.[0]?.total ?? null,
       fees: (o.charges || o.fees || []).map((f: any) => ({
-        label: f.reason || f.label || f.type || '',
-        type: f.type || '',
-        value: String(f.amount ?? f.value ?? '')
+        label: f.reason ?? f.label ?? f.type ?? undefined,
+        type: f.type ?? undefined,
+        value: f.amount == null && f.value == null ? undefined : String(f.amount ?? f.value)
       })),
       limit: {
         min: o.limit?.min ?? o.limits?.min ?? null,
         max: o.limit?.max ?? o.limits?.max ?? null
       },
-      protected: o.protected || false
+      protected: o.protected ?? undefined
     }));
 
     let rawAreas = response?.areas || [];
     let areas = (Array.isArray(rawAreas) ? rawAreas : []).map((a: any) => ({
-      areaId: a.id || a.areaId || '',
-      name: a.name || '',
+      areaId: a.id ?? a.areaId ?? undefined,
+      name: a.name ?? undefined,
       rank: a.rank ?? null,
-      offers: (a.offers || []).map((o: any) => (typeof o === 'string' ? o : o.id || ''))
+      offers: (a.offers || [])
+        .map((o: any) => (typeof o === 'string' ? o : o.id))
+        .filter((id: unknown): id is string => typeof id === 'string')
     }));
 
     let rawLimits = response?.limits || {};
@@ -110,8 +115,8 @@ export let getEventOffersTool = SlateTool.create(spec, {
 
     let rawPrices = response?.prices?.priceRange || response?.priceRanges || [];
     let prices = (Array.isArray(rawPrices) ? rawPrices : []).map((p: any) => ({
-      type: p.type || '',
-      currency: p.currency || '',
+      type: p.type ?? undefined,
+      currency: p.currency ?? undefined,
       min: p.min ?? null,
       max: p.max ?? null
     }));

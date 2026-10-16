@@ -4,12 +4,14 @@ import {
   createCalibration,
   createGage,
   createManufacturer,
+  deleteAttachment,
   deleteCalibration,
   deleteGage,
   deleteManufacturer,
   generateCalibrationCertificate,
   getAccountSettings,
   getAccountStatus,
+  getAttachment,
   getCalibration,
   getCustomFields,
   getCustomFieldValues,
@@ -26,6 +28,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getAttachment,
+    deleteAttachment,
     createGage,
     getGage,
     updateGage,

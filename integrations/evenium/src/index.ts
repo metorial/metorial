@@ -4,10 +4,14 @@ import {
   addParticipant,
   createEvent,
   getEvent,
+  getParticipant,
+  listContactEvents,
   listContacts,
+  listEventParts,
   listEvents,
   listParticipants,
   manageContact,
+  updateParticipant,
   updateParticipantStatus
 } from './tools';
 export let provider = Slate.create({
@@ -15,6 +19,10 @@ export let provider = Slate.create({
   tools: [
     listEvents,
     getEvent,
+    getParticipant,
+    updateParticipant,
+    listContactEvents,
+    listEventParts,
     createEvent,
     listParticipants,
     addParticipant,

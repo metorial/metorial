@@ -13,6 +13,11 @@ export let listMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      messageUuid: z.string().optional().describe('Filter by UUID.'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       folder: z
         .enum(['inbox', 'flows', 'archived', 'outbox', 'sent', 'failed'])
         .optional()
@@ -47,6 +52,8 @@ export let listMessages = SlateTool.create(spec, {
           sentOn: z.string().nullable()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -54,6 +61,8 @@ export let listMessages = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listMessages({
+      cursor: ctx.input.cursor,
+      uuid: ctx.input.messageUuid,
       folder: ctx.input.folder,
       contact: ctx.input.contactUuid,
       label: ctx.input.labelUuidOrName,
@@ -66,11 +75,12 @@ export let listMessages = SlateTool.create(spec, {
       contactUuid: m.contact.uuid,
       contactName: m.contact.name,
       urn: m.urn,
-      direction: m.direction,
+      direction:
+        m.direction === 'in' ? 'incoming' : m.direction === 'out' ? 'outgoing' : m.direction,
       type: m.type,
       status: m.status,
       text: m.text,
-      attachments: m.attachments,
+      attachments: m.attachments.map(a => (typeof a === 'string' ? a : a.url)),
       labels: m.labels.map(l => ({ labelUuid: l.uuid, name: l.name })),
       createdOn: m.created_on,
       sentOn: m.sent_on
@@ -79,6 +89,8 @@ export let listMessages = SlateTool.create(spec, {
     return {
       output: {
         messages,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${messages.length}** message(s)${result.next ? ' (more results available)' : ''}.`

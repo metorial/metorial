@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Sidetracker
 
-Track and analyze marketing performance with cookie-free website analytics. Retrieve and manage conversion lists and their rows. Attach custom metadata to visitor sessions for cross-domain tracking enrichment. Add revenue data to sessions for marketing attribution. Update sales status on customer sessions to track pipeline progress. Track call-to-action events programmatically via the API.
+Track and analyze marketing performance with cookie-free website analytics. Discover the connected account, create and delete conversion lists, and retrieve or manage their rows. Search converted sessions by status, tags, date range, and update time. Attach custom metadata to visitor sessions for cross-domain tracking enrichment. Add revenue data to sessions for marketing attribution. Update sales status on customer sessions to track pipeline progress. Track call-to-action events programmatically via the API.
 
 ## License
 

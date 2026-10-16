@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSourceFileTool = SlateTool.create(spec, {
@@ -17,7 +18,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       action: z
         .enum(['upload', 'update', 'delete', 'create_directory', 'create_branch'])
         .describe('Action to perform'),
@@ -36,6 +37,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       resourceId: z.number().optional().describe('Created/updated resource ID'),
       name: z.string().optional().describe('Resource name'),
       type: z.string().optional().describe('Resource type'),
@@ -47,8 +49,8 @@ export let manageSourceFileTool = SlateTool.create(spec, {
     let { action, projectId } = ctx.input;
 
     if (action === 'upload') {
-      if (!ctx.input.fileName || !ctx.input.fileContent) {
-        throw new Error('fileName and fileContent are required for upload');
+      if (!ctx.input.fileName || ctx.input.fileContent === undefined) {
+        throw createApiServiceError('fileName and fileContent are required for upload');
       }
 
       let storage = await client.addStorage(ctx.input.fileName, ctx.input.fileContent);
@@ -62,6 +64,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           resourceId: file.id,
           name: file.name,
           type: 'file'
@@ -71,11 +74,12 @@ export let manageSourceFileTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.fileId || !ctx.input.fileContent) {
-        throw new Error('fileId and fileContent are required for update');
+      if (!ctx.input.fileId || ctx.input.fileContent === undefined) {
+        throw createApiServiceError('fileId and fileContent are required for update');
       }
 
-      let fileName = ctx.input.fileName || `update_${ctx.input.fileId}`;
+      let fileName =
+        ctx.input.fileName ?? (await client.getFile(projectId, ctx.input.fileId)).name;
       let storage = await client.addStorage(fileName, ctx.input.fileContent);
       let file = await client.updateFile(projectId, ctx.input.fileId, {
         storageId: storage.id
@@ -83,6 +87,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           resourceId: file.id,
           name: file.name,
           type: 'file'
@@ -93,13 +98,14 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.fileId) {
-        throw new Error('fileId is required for delete');
+        throw createApiServiceError('fileId is required for delete');
       }
 
       await client.deleteFile(projectId, ctx.input.fileId);
 
       return {
         output: {
+          raw: client.lastResponse,
           resourceId: ctx.input.fileId,
           deleted: true,
           type: 'file'
@@ -110,7 +116,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
     if (action === 'create_directory') {
       if (!ctx.input.directoryName) {
-        throw new Error('directoryName is required for create_directory');
+        throw createApiServiceError('directoryName is required for create_directory');
       }
 
       let dir = await client.createDirectory(projectId, {
@@ -122,6 +128,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           resourceId: dir.id,
           name: dir.name,
           type: 'directory'
@@ -132,7 +139,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
     if (action === 'create_branch') {
       if (!ctx.input.branchName) {
-        throw new Error('branchName is required for create_branch');
+        throw createApiServiceError('branchName is required for create_branch');
       }
 
       let branch = await client.createBranch(projectId, {
@@ -142,6 +149,7 @@ export let manageSourceFileTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           resourceId: branch.id,
           name: branch.name,
           type: 'branch'
@@ -150,6 +158,6 @@ export let manageSourceFileTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

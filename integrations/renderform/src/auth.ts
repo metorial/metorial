@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,8 @@ export let auth = SlateAuth.create()
         .describe('RenderForm API Key from the API Keys tab in your account settings')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A RenderForm API key is required.');
       return {
         output: {
           token: ctx.input.token

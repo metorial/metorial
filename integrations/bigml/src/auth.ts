@@ -1,5 +1,6 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { validateResourceId } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,6 +30,13 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.username.trim() || !ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide your BigML username and API key.');
+      }
+      if (ctx.input.organizationId !== undefined)
+        validateResourceId(ctx.input.organizationId, 'organization');
+      if (ctx.input.projectId !== undefined)
+        validateResourceId(ctx.input.projectId, 'project');
       return {
         output: {
           username: ctx.input.username,

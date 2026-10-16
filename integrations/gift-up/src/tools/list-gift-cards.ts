@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -66,6 +66,17 @@ export let listGiftCards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !Number.isInteger(ctx.input.limit) ||
+      ctx.input.limit < 1 ||
+      ctx.input.limit > 100 ||
+      !Number.isInteger(ctx.input.offset) ||
+      ctx.input.offset < 0
+    ) {
+      throw createApiServiceError(
+        'limit must be an integer from 1 to 100 and offset a nonnegative integer.'
+      );
+    }
     let client = new Client({
       token: ctx.auth.token,
       testMode: ctx.config.testMode

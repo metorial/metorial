@@ -4,7 +4,11 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let npsResponseSchema = z.object({
-  npsId: z.number().describe('Unique NPS response ID'),
+  npsId: z
+    .number()
+    .optional()
+    .describe('Numeric NPS response ID, when the provider returns a numeric identifier'),
+  responseId: z.string().describe('Complete NPS response identifier'),
   date: z.string().describe('Response date (ISO-8601)'),
   score: z.number().describe('NPS score (0-10)'),
   feedback: z.string().nullable().describe('Optional feedback text'),
@@ -56,7 +60,11 @@ export let listNpsResponsesTool = SlateTool.create(spec, {
     });
 
     let output = responses.map(r => ({
-      npsId: r.id,
+      npsId:
+        /^\d+$/.test(String(r.id)) && Number.isSafeInteger(Number(r.id))
+          ? Number(r.id)
+          : undefined,
+      responseId: String(r.id),
       date: r.date,
       score: r.score,
       feedback: r.feedback,

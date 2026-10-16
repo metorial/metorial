@@ -5,6 +5,10 @@ import { spec } from '../spec';
 
 let lineItemSchema = z.object({
   name: z.string().describe('Product name used to match against available items'),
+  lineItemMeasurements: z
+    .array(z.object({ quantity: z.number().optional(), unit: z.string().optional() }))
+    .optional()
+    .describe('Current quantity and unit measurements; preferred over quantity and unit'),
   quantity: z.number().optional().describe('Quantity of the item (defaults to 1.0)'),
   unit: z.string().optional().describe('Unit of measurement (defaults to "each")'),
   displayText: z.string().optional().describe('Display name shown to the user'),
@@ -16,6 +20,14 @@ let lineItemSchema = z.object({
   filters: z
     .object({
       brandName: z.string().optional().describe('Filter by brand name'),
+      brandFilters: z
+        .array(z.string())
+        .optional()
+        .describe('Case-sensitive brand names for product matching'),
+      healthFilters: z
+        .array(z.string())
+        .optional()
+        .describe('Health filters such as ORGANIC, GLUTEN_FREE, or VEGAN'),
       healthAttributes: z.array(z.string()).optional().describe('Filter by health attributes')
     })
     .optional()
@@ -71,6 +83,7 @@ Requires **Developer Platform API key** authentication.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       productsLinkUrl: z.string().describe('URL to the hosted Instacart shopping list page')
     })
   )

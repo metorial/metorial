@@ -19,6 +19,10 @@ export let deletePodcast = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       status: z.string().describe('Deletion status (e.g., "deleted" or "in review").'),
       podcastId: z.string().describe('ID of the podcast being deleted.')
     })
@@ -36,8 +40,9 @@ export let deletePodcast = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         status: data.status,
-        podcastId: data.podcast_id
+        podcastId: ctx.input.podcastId
       },
       message: `Podcast deletion request submitted. Status: **${data.status}**.`
     };

@@ -37,7 +37,8 @@ export let convertTool = SlateTool.create(spec, {
       fromSymbol: z.string().describe('Symbol for source type'),
       toType: z.string().describe('Target type code'),
       toName: z.string().describe('Full name of target type'),
-      toSymbol: z.string().describe('Symbol for target type')
+      toSymbol: z.string().describe('Symbol for target type'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,16 +56,17 @@ export let convertTool = SlateTool.create(spec, {
 
     return {
       output: {
-        valid: result.valid ?? false,
-        result: result.result ?? '',
-        resultFloat: result.resultFloat ?? 0,
-        fromValue: result.fromValue ?? ctx.input.fromValue,
-        fromType: result.fromType ?? ctx.input.fromType,
-        fromName: result.fromName ?? '',
-        fromSymbol: result.fromSymbol ?? '',
-        toType: result.toType ?? ctx.input.toType,
-        toName: result.toName ?? '',
-        toSymbol: result.toSymbol ?? ''
+        raw: result.raw,
+        valid: result.valid,
+        result: result.result,
+        resultFloat: result.resultFloat,
+        fromValue: result.fromValue,
+        fromType: result.fromType,
+        fromName: result.fromName,
+        fromSymbol: result.fromSymbol,
+        toType: result.toType,
+        toName: result.toName,
+        toSymbol: result.toSymbol
       },
       message: result.valid
         ? `${result.fromValue} ${result.fromName} = **${result.result} ${result.toName}**`

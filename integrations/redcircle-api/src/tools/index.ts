@@ -4,6 +4,7 @@ export * from './get-account';
 export * from './get-collection-results';
 export * from './get-product-details';
 export * from './get-reviews';
+export * from './manage-collection-requests';
 export * from './manage-collections';
 export * from './manage-destinations';
 export * from './manage-zipcodes';

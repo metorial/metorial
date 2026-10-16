@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteRow = SlateTool.create(spec, {
@@ -17,7 +17,11 @@ export let deleteRow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table'),
       primaryKey: z
         .record(z.string(), z.unknown())
@@ -35,36 +39,46 @@ export let deleteRow = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deletedCount: z.number().describe('Number of rows deleted')
+      deletedCount: z
+        .number()
+        .optional()
+        .describe(
+          'Number of rows confirmed deleted; omitted for bulk operations because the API does not return an affected-row count'
+        ),
+      success: z.boolean().optional().describe('Whether Rocketadmin confirmed deletion'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      masterPassword: ctx.input.masterPassword
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
+    if (ctx.input.primaryKey && ctx.input.bulkPrimaryKeys) {
+      throw createApiServiceError('Provide either primaryKey or bulkPrimaryKeys, not both.');
+    }
     if (ctx.input.bulkPrimaryKeys && ctx.input.bulkPrimaryKeys.length > 0) {
-      await client.bulkDeleteRows(
+      let result = await client.bulkDeleteRows(
         ctx.input.connectionId,
         ctx.input.tableName,
         ctx.input.bulkPrimaryKeys
       );
       return {
-        output: { deletedCount: ctx.input.bulkPrimaryKeys.length },
-        message: `Deleted **${ctx.input.bulkPrimaryKeys.length}** row(s) from **${ctx.input.tableName}**.`
+        output: { success: true, raw: result },
+        message: `Rocketadmin confirmed the bulk deletion in **${ctx.input.tableName}**. The API does not return an affected-row count.`
       };
     }
 
     if (!ctx.input.primaryKey) {
-      throw new Error('Either primaryKey or bulkPrimaryKeys must be provided');
+      throw createApiServiceError('Either primaryKey or bulkPrimaryKeys must be provided');
     }
 
-    await client.deleteRow(ctx.input.connectionId, ctx.input.tableName, ctx.input.primaryKey);
+    let result = await client.deleteRow(
+      ctx.input.connectionId,
+      ctx.input.tableName,
+      ctx.input.primaryKey
+    );
 
     return {
-      output: { deletedCount: 1 },
+      output: { deletedCount: 1, success: true, raw: result },
       message: `Deleted 1 row from **${ctx.input.tableName}**.`
     };
   })

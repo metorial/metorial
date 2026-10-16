@@ -12,8 +12,11 @@ import {
   deleteProduct,
   deleteSaleInvoice,
   deleteSaleQuote,
+  downloadSaleDocument,
   finalizeSaleInvoice,
+  getCurrentUser,
   getCustomer,
+  getRecord,
   getSettings,
   listContacts,
   listCustomers,
@@ -39,6 +42,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getRecord,
+    downloadSaleDocument,
     listCustomers,
     getCustomer,
     createCustomer,

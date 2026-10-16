@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let companySuggestionSchema = z.object({
-  value: z.string().describe('Short company name'),
+  value: z.string().optional().describe('Short company name'),
   inn: z.string().nullable().describe('INN (taxpayer identification number)'),
   kpp: z.string().nullable().describe('KPP (tax registration reason code)'),
   ogrn: z.string().nullable().describe('OGRN (primary state registration number)'),
@@ -52,6 +53,10 @@ Returns company details including INN, OGRN, address, management info, OKVED cod
         .array(z.enum(['ACTIVE', 'LIQUIDATED', 'LIQUIDATING', 'BANKRUPT', 'REORGANIZING']))
         .optional()
         .describe('Filter by company status'),
+      branchType: z
+        .array(z.enum(['MAIN', 'BRANCH']))
+        .optional()
+        .describe('Filter by main offices or branches'),
       okved: z.array(z.string()).optional().describe('Filter by OKVED activity codes'),
       locations: z
         .array(z.record(z.string(), z.unknown()))
@@ -65,6 +70,7 @@ Returns company details including INN, OGRN, address, management info, OKVED cod
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       suggestions: z.array(companySuggestionSchema).describe('List of company suggestions')
     })
   )
@@ -80,12 +86,13 @@ Returns company details including INN, OGRN, address, management info, OKVED cod
       type: ctx.input.type,
       status: ctx.input.status,
       okved: ctx.input.okved,
+      branchType: ctx.input.branchType,
       locations: ctx.input.locations,
       locationsBoost: ctx.input.locationsBoost
     });
 
-    let suggestions = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let suggestions = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       inn: s.data?.inn ?? null,
       kpp: s.data?.kpp ?? null,
       ogrn: s.data?.ogrn ?? null,
@@ -108,7 +115,10 @@ Returns company details including INN, OGRN, address, management info, OKVED cod
     }));
 
     return {
-      output: { suggestions },
+      output: {
+        rawData: data,
+        suggestions
+      },
       message: `Found **${suggestions.length}** company suggestion(s) for "${ctx.input.query}".`
     };
   })

@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Npm
+# <img src="logo.svg" height="20"> npm
 
-Query and manage JavaScript packages on the npm registry. Retrieve package metadata (full or abbreviated), search packages by text query with quality/popularity/maintenance weightings, and get download statistics by package, version, and time range. Publish and unpublish packages, deprecate versions, and manage distribution tags. Create, list, and delete access tokens with granular permissions, CIDR restrictions, and expiration settings. Configure trusted publishers for CI/CD platforms (GitHub Actions, GitLab CI, CircleCI) to enable OIDC-based publishing without long-lived tokens. Bulk query download counts for up to 128 packages at a time.
+Search npm packages, retrieve full or abbreviated metadata, inspect download statistics and security advisories, manage distribution tags and deprecation messages, manage access tokens and trusted publishers, and retrieve the authenticated user profile.
+
+Public metadata, search, download counts, and security advisory checks can be used without authentication. Private packages and account operations require an npm token with suitable permissions. Token creation verifies an OTP; accounts without 2FA can omit it initially to trigger an email code, then retry with that code. Trusted-publisher operations require an account with 2FA and an OTP.
 
 ## License
 

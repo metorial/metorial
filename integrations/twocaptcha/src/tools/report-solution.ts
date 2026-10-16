@@ -26,7 +26,8 @@ export let reportSolution = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Report submission status')
+      status: z.string().describe('Report submission status'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,13 +37,10 @@ export let reportSolution = SlateTool.create(spec, {
       ? await client.reportCorrect(ctx.input.taskId)
       : await client.reportIncorrect(ctx.input.taskId);
 
-    if (result.errorId !== 0) {
-      throw new Error(`2Captcha error: ${result.errorCode} - ${result.errorDescription}`);
-    }
-
     return {
       output: {
-        status: result.status ?? 'ok'
+        status: result.status,
+        raw: result
       },
       message: `Solution for task **${ctx.input.taskId}** reported as **${ctx.input.isCorrect ? 'correct' : 'incorrect'}**.`
     };

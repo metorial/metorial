@@ -20,7 +20,7 @@ export let listBooleanVariables = SlateTool.create(spec, {
             variableId: z.string().describe('Unique identifier of the boolean variable'),
             name: z.string().describe('Name of the boolean variable'),
             value: z.boolean().describe('Current value of the variable'),
-            createdAt: z.string().describe('When the variable was created'),
+            createdAt: z.string().optional().describe('When the variable was created'),
             updatedAt: z.string().describe('When the variable was last updated')
           })
         )

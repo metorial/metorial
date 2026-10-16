@@ -1,9 +1,5 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://user-management-service.platform.moretrees.eco'
-});
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,11 +24,15 @@ export let auth = SlateAuth.create()
       publicValidationKey: z
         .string()
         .describe(
-          'Your Public Validation Key. Found under Integration > API on the More Trees platform.'
+          'Your Public Validation Key. Found under Settings > Account Settings > API Key or Integration > API on the More Trees platform.'
         )
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || !ctx.input.publicValidationKey.trim()) {
+        throw createApiServiceError('Provide both your API Key and Public Validation Key.');
+      }
+
       return {
         output: {
           token: ctx.input.apiKey,
@@ -41,23 +41,5 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; publicValidationKey: string };
-      input: { apiKey: string; publicValidationKey: string };
-    }) => {
-      let response = await http
-        .get('/user-management-api/external/accounts/profile', {
-          headers: {
-            'X-API-KEY': ctx.output.token,
-            Accept: 'application/json'
-          }
-        })
-        .catch(() => null);
-
-      return {
-        profile: {
-          name: response?.data?.account_name
-        }
-      };
-    }
+    getProfile: async () => ({ profile: { name: 'More Trees' } })
   });

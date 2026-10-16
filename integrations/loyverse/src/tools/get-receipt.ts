@@ -22,7 +22,7 @@ export let getReceipt = SlateTool.create(spec, {
 
     return {
       output: mapReceipt(r),
-      message: `Retrieved receipt **${r.receipt_number}** (${r.receipt_type ?? 'SALE'}) for **${r.total_money}**.`
+      message: `Retrieved receipt **${r.receipt_number}**${r.receipt_type ? ` (${r.receipt_type})` : ''}${r.total_money !== undefined ? ` for **${r.total_money}**` : ''}.`
     };
   })
   .build();

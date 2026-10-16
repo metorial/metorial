@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AbstractClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,10 @@ let holidaySchema = z.object({
   country: z.string().optional().describe('Country code'),
   location: z.string().optional().describe('Specific location/region for the holiday'),
   type: z.string().optional().describe('Type of holiday (e.g. national, local, observance)'),
-  date: z.string().optional().describe('Date of the holiday in YYYY-MM-DD format'),
+  date: z
+    .string()
+    .optional()
+    .describe('Date of the holiday as returned by the provider (MM/DD/YYYY)'),
   dateYear: z.string().optional().describe('Year'),
   dateMonth: z.string().optional().describe('Month'),
   dateDay: z.string().optional().describe('Day'),
@@ -24,7 +27,7 @@ export let publicHolidays = SlateTool.create(spec, {
   description: `Retrieves public holidays for any country. Filter by year, month, or specific day to find national holidays, observances, and local celebrations.`,
   instructions: [
     'Use 2-letter ISO country codes (e.g. US, GB, DE, FR).',
-    'If year is omitted, the current year is used.'
+    'Paid plans allow omitted date filters. Free plans require year, month, and day. A month filter requires a year; a day filter requires month and year.'
   ],
   tags: {
     destructive: false,
@@ -49,6 +52,15 @@ export let publicHolidays = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.month !== undefined && ctx.input.year === undefined) {
+      throw createApiServiceError('year is required when month is provided.');
+    }
+    if (
+      ctx.input.day !== undefined &&
+      (ctx.input.month === undefined || ctx.input.year === undefined)
+    ) {
+      throw createApiServiceError('month and year are required when day is provided.');
+    }
     let client = new AbstractClient(ctx.auth);
 
     let result = await client.getHolidays({
@@ -58,7 +70,9 @@ export let publicHolidays = SlateTool.create(spec, {
       day: ctx.input.day
     });
 
-    let holidays = Array.isArray(result) ? result : [];
+    if (!Array.isArray(result))
+      throw createApiServiceError('Abstract returned an unexpected holiday response.');
+    let holidays = result;
 
     let mappedHolidays = holidays.map((h: any) => ({
       name: h.name ?? undefined,

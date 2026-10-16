@@ -1,7 +1,11 @@
 export { createTransaction } from './create-transaction';
+export { getItem } from './get-item';
 export { getTeam } from './get-team';
+export { getTransaction } from './get-transaction';
 export { listAttributes } from './list-attributes';
 export { listItems } from './list-items';
 export { listLocations } from './list-locations';
 export { listPartners } from './list-partners';
 export { listTransactions } from './list-transactions';
+export { manageItem } from './manage-item';
+export { manageTransaction } from './manage-transaction';

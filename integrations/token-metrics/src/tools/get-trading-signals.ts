@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTradingSignals = SlateTool.create(spec, {
@@ -34,6 +34,10 @@ export let getTradingSignals = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       signals: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of trading signal records')
@@ -61,10 +65,10 @@ export let getTradingSignals = SlateTool.create(spec, {
         ? await client.getTradingSignals(params)
         : await client.getHourlyTradingSignals(params);
 
-    let signals = result?.data ?? [];
+    let signals = getRecords(result);
 
     return {
-      output: { signals },
+      output: { signals, raw: result },
       message: `Retrieved **${signals.length}** ${ctx.input.interval} trading signal(s).`
     };
   })

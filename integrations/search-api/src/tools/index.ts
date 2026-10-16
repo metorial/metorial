@@ -2,6 +2,7 @@ export * from './autocomplete';
 export * from './get-account';
 export * from './image-search';
 export * from './jobs-search';
+export * from './list-search-history';
 export * from './lookup-locations';
 export * from './maps-search';
 export * from './news-search';

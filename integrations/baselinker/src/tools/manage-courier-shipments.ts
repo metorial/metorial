@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,13 +36,23 @@ export let manageCourierShipments = SlateTool.create(spec, {
         )
         .optional()
         .describe('Courier-specific form fields'),
+      returnShipment: z
+        .boolean()
+        .optional()
+        .describe('Mark a manual package as a return shipment'),
       packages: z
         .array(
           z.object({
             weight: z.number().describe('Package weight in kg'),
             sizeX: z.number().optional().describe('Package width in cm'),
             sizeY: z.number().optional().describe('Package height in cm'),
-            sizeZ: z.number().optional().describe('Package length in cm')
+            sizeZ: z.number().optional().describe('Package length in cm'),
+            fields: z
+              .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+              .optional()
+              .describe(
+                'Courier package field IDs and values from get_couriers courierFields.package_fields. Use exact IDs, such as size_length; these override legacy sizeX/sizeY/sizeZ fields.'
+              )
           })
         )
         .optional()
@@ -68,35 +78,44 @@ export let manageCourierShipments = SlateTool.create(spec, {
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
     if (ctx.input.manual) {
+      if (!ctx.input.packageNumber?.trim()) {
+        throw createApiServiceError('packageNumber is required for manual shipments.');
+      }
       let result = await client.createPackageManual({
         orderId: ctx.input.orderId,
         courierCode: ctx.input.courierCode,
         packageNumber: ctx.input.packageNumber!,
-        pickupDate: ctx.input.pickupDate
+        pickupDate: ctx.input.pickupDate,
+        returnShipment: ctx.input.returnShipment
       });
 
       return {
         output: {
           packageId: result.package_id,
-          packageNumber: ctx.input.packageNumber
+          packageNumber: result.package_number
         },
         message: `Manually added shipment **${ctx.input.packageNumber}** (${ctx.input.courierCode}) to order **#${ctx.input.orderId}**.`
       };
     }
 
+    if (!ctx.input.packages?.length) {
+      throw createApiServiceError(
+        'Provide at least one weighted package for a courier API shipment.'
+      );
+    }
     let result = await client.createPackage({
       orderId: ctx.input.orderId,
       courierCode: ctx.input.courierCode,
       accountId: ctx.input.accountId,
       fields: ctx.input.fields?.map(f => ({ id: f.fieldId, value: f.fieldValue })),
-      packages: ctx.input.packages || []
+      packages: ctx.input.packages
     });
 
     return {
       output: {
         packageId: result.package_id,
-        packageNumber: result.package_number || '',
-        courierInnerNumber: result.courier_inner_number || ''
+        packageNumber: result.package_number,
+        courierInnerNumber: result.courier_inner_number
       },
       message: `Created shipment via **${ctx.input.courierCode}** for order **#${ctx.input.orderId}**. Tracking: ${result.package_number || 'N/A'}.`
     };

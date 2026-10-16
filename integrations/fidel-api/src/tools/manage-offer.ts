@@ -1,9 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { programIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
-let offerSchema = z.object({
+export let offerSchema = z.object({
+  raw: z.record(z.string(), z.any()).optional().describe('Complete provider resource'),
   offerId: z.string().describe('Unique identifier of the offer'),
   programId: z.string().optional().describe('ID of the program'),
   brandId: z.string().optional().describe('ID of the brand'),
@@ -26,6 +28,7 @@ let offerSchema = z.object({
 });
 
 let mapOffer = (offer: any) => ({
+  raw: offer,
   offerId: offer.id,
   programId: offer.programId,
   brandId: offer.brandId,
@@ -37,17 +40,17 @@ let mapOffer = (offer: any) => ({
   offerType: offer.type?.name ?? offer.type,
   offerValue: offer.type?.value ?? offer.value,
   startDate: offer.startDate,
-  endDate: offer.endDate,
-  maxReward: offer.maxReward,
+  endDate: offer.endDate ?? undefined,
+  maxReward: offer.type?.maxRewardAmount ?? offer.maxReward,
   created: offer.created,
   updated: offer.updated,
-  metadata: offer.metadata
+  metadata: offer.metadata ?? undefined
 });
 
 export let createOffer = SlateTool.create(spec, {
   name: 'Create Offer',
   key: 'create_offer',
-  description: `Creates a card-linked Offer for a specific Brand and Program. Offers can be fixed-amount cashback or percentage-based discounts. When a qualifying transaction occurs at a linked location, the offer is applied automatically.`,
+  description: `Creates a card-linked Offer for a Brand. Link locations with manage_offer_locations or link_all_offer_locations to make it eligible in a Program. Offers can be fixed-amount cashback or percentage-based discounts. When a qualifying transaction occurs at a linked location, the offer is applied automatically.`,
   instructions: [
     'Offer type "amount" provides a fixed cashback value per transaction.',
     'Offer type "discount" provides a percentage-based discount on the transaction amount.',
@@ -60,7 +63,7 @@ export let createOffer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program'),
+      programId: programIdInput,
       brandId: z.string().describe('ID of the brand'),
       name: z.string().describe('Name of the offer'),
       countryCode: z.string().describe('ISO 3166-1 alpha-3 country code'),
@@ -73,20 +76,49 @@ export let createOffer = SlateTool.create(spec, {
       startDate: z.string().optional().describe('ISO 8601 start date for the offer'),
       endDate: z.string().optional().describe('ISO 8601 end date for the offer'),
       maxReward: z.number().optional().describe('Maximum reward amount per transaction'),
+      activation: z
+        .object({
+          enabled: z.boolean().optional(),
+          qualifiedTransactionsLimit: z.number().optional()
+        })
+        .optional()
+        .describe('Require card activation and optionally limit qualifying transactions'),
+      daysOfWeek: z.array(z.number()).optional().describe('Days 0 to 6, starting with Sunday'),
+      minTransactionAmount: z
+        .number()
+        .optional()
+        .describe('Minimum transaction amount to qualify'),
+      returnPeriod: z.number().optional().describe('Days before a transaction qualifies'),
+      schemes: z
+        .array(z.enum(['visa', 'mastercard', 'amex']))
+        .optional()
+        .describe('Card networks where the offer qualifies'),
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata')
     })
   )
   .output(offerSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (!ctx.input.startDate)
+      throw createApiServiceError(
+        'Provide startDate when creating an offer; Fidel requires its start date.'
+      );
     let offer = await client.createOffer(ctx.input.programId, {
       brandId: ctx.input.brandId,
       countryCode: ctx.input.countryCode,
       name: ctx.input.name,
-      type: { name: ctx.input.offerType, value: ctx.input.offerValue },
+      type: {
+        name: ctx.input.offerType,
+        value: ctx.input.offerValue,
+        maxRewardAmount: ctx.input.maxReward
+      },
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
-      maxReward: ctx.input.maxReward,
+      activation: ctx.input.activation,
+      daysOfWeek: ctx.input.daysOfWeek,
+      minTransactionAmount: ctx.input.minTransactionAmount,
+      returnPeriod: ctx.input.returnPeriod,
+      schemes: ctx.input.schemes,
       metadata: ctx.input.metadata
     });
 
@@ -134,7 +166,15 @@ export let listOffers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program to list offers for'),
+      programId: programIdInput,
+      cursor: z
+        .string()
+        .optional()
+        .describe('JSON.stringify(last) from the previous page. Do not URL-encode it.'),
+      order: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
+      status: z.string().optional().describe('Filter offers by status'),
+      brandId: z.string().optional().describe('Filter offers by brand'),
+      countryCode: z.string().optional().describe('Filter offers by country'),
       start: z.number().optional().describe('Offset for pagination'),
       limit: z.number().optional().describe('Maximum number of offers to return')
     })
@@ -142,13 +182,23 @@ export let listOffers = SlateTool.create(spec, {
   .output(
     z.object({
       offers: z.array(offerSchema).describe('List of offers'),
-      count: z.number().optional().describe('Total number of offers')
+      last: z
+        .any()
+        .optional()
+        .describe('Provider continuation key; serialize it as JSON for cursor'),
+      raw: z.record(z.string(), z.any()).optional().describe('Complete provider response'),
+      count: z.number().optional().describe('Number of offers returned by Fidel')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listOffers(ctx.input.programId, {
       start: ctx.input.start,
+      cursor: ctx.input.cursor,
+      order: ctx.input.order,
+      status: ctx.input.status,
+      brandId: ctx.input.brandId,
+      countryCode: ctx.input.countryCode,
       limit: ctx.input.limit
     });
 
@@ -158,7 +208,9 @@ export let listOffers = SlateTool.create(spec, {
     return {
       output: {
         offers,
-        count: data?.resource?.total ?? offers.length
+        count: data?.count,
+        last: data?.last,
+        raw: data.rawResponse ?? data
       },
       message: `Found **${offers.length}** offer(s) in program \`${ctx.input.programId}\`.`
     };
@@ -181,6 +233,23 @@ export let updateOffer = SlateTool.create(spec, {
       startDate: z.string().optional().describe('New ISO 8601 start date'),
       endDate: z.string().optional().describe('New ISO 8601 end date'),
       maxReward: z.number().optional().describe('New maximum reward amount'),
+      activation: z
+        .object({
+          enabled: z.boolean().optional(),
+          qualifiedTransactionsLimit: z.number().optional()
+        })
+        .optional()
+        .describe('Require card activation and optionally limit qualifying transactions'),
+      daysOfWeek: z.array(z.number()).optional().describe('Days 0 to 6, starting with Sunday'),
+      minTransactionAmount: z
+        .number()
+        .optional()
+        .describe('Minimum transaction amount to qualify'),
+      returnPeriod: z.number().optional().describe('Days before a transaction qualifies'),
+      schemes: z
+        .array(z.enum(['visa', 'mastercard', 'amex']))
+        .optional()
+        .describe('Card networks where the offer qualifies'),
       metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata')
     })
   )
@@ -192,6 +261,11 @@ export let updateOffer = SlateTool.create(spec, {
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
       maxReward: ctx.input.maxReward,
+      activation: ctx.input.activation,
+      daysOfWeek: ctx.input.daysOfWeek,
+      minTransactionAmount: ctx.input.minTransactionAmount,
+      returnPeriod: ctx.input.returnPeriod,
+      schemes: ctx.input.schemes,
       metadata: ctx.input.metadata
     });
 

@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let cardSchema = z.object({
   cardId: z.string().describe('Unique ID of the card'),
-  name: z.string().describe('Name of the card design'),
+  name: z.string().optional().describe('Name of the card design'),
   coverImageUrl: z.string().optional().describe('URL of the card cover image'),
   price: z.string().optional().describe('Price of the card'),
   categoryName: z.string().optional().describe('Category the card belongs to'),
@@ -33,13 +34,15 @@ export let browseCards = SlateTool.create(spec, {
         .describe(
           'Filter cards by category ID. Use List Card Categories to find category IDs.'
         ),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)')
+      page: z.number().optional().describe('Page number for pagination (starts at 0)')
     })
   )
   .output(
     z.object({
       cards: z.array(cardSchema).describe('List of available card designs'),
-      totalCards: z.number().optional().describe('Total number of cards available')
+      totalCards: z.number().optional().describe('Total number of cards available'),
+      nextPage: z.number().optional().describe('Next page number when more cards exist'),
+      isLastPage: z.boolean().optional().describe('Whether this is the final page')
     })
   )
   .handleInvocation(async ctx => {
@@ -53,7 +56,7 @@ export let browseCards = SlateTool.create(spec, {
     let rawCards = result.cards ?? [];
     let cards = rawCards.map((c: any) => ({
       cardId: String(c.id),
-      name: c.name ?? '',
+      name: responseString(c.name, 'card name', true),
       coverImageUrl: c.cover ?? c.image_url ?? undefined,
       price: c.price != null ? String(c.price) : undefined,
       categoryName: c.category_name ?? undefined,
@@ -64,7 +67,12 @@ export let browseCards = SlateTool.create(spec, {
     return {
       output: {
         cards,
-        totalCards: result.total != null ? Number(result.total) : undefined
+        totalCards: result.total != null ? Number(result.total) : undefined,
+        nextPage:
+          result.pagination?.is_last === false && result.pagination?.next != null
+            ? Number(result.pagination.next)
+            : undefined,
+        isLastPage: result.pagination?.is_last
       },
       message: `Found **${cards.length}** card designs${ctx.input.categoryId ? ` in category \`${ctx.input.categoryId}\`` : ''}.`
     };

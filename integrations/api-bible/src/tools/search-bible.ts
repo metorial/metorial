@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scriptureContent } from '../lib/content';
 import { spec } from '../spec';
 
 let searchVerseSchema = z.object({
@@ -51,6 +52,26 @@ export let searchBible = SlateTool.create(spec, {
   .output(
     z.object({
       query: z.string().describe('The search query used'),
+      passages: z
+        .array(
+          z.object({
+            passageId: z.string(),
+            bibleId: z.string(),
+            orgId: z.string(),
+            content: z.string(),
+            reference: z.string(),
+            verseCount: z.number(),
+            copyright: z.string()
+          })
+        )
+        .optional()
+        .describe('Passage results returned for reference queries'),
+      fumsToken: z.string().optional().describe('FUMS token for scripture engagement'),
+      fumsId: z.string().optional().describe('Legacy FUMS token when supplied'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original scripture response metadata'),
       total: z.number().describe('Total number of matching results'),
       verseCount: z.number().describe('Number of matching verses returned'),
       verses: z.array(searchVerseSchema).describe('Matching verses'),
@@ -59,6 +80,14 @@ export let searchBible = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    for (let [name, value] of [
+      ['limit', ctx.input.limit],
+      ['offset', ctx.input.offset]
+    ] as const) {
+      if (value !== undefined && !Number.isInteger(value)) {
+        throw createApiServiceError(`${name} must be a whole number.`);
+      }
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.search(ctx.input.bibleId, {
@@ -73,22 +102,34 @@ export let searchBible = SlateTool.create(spec, {
     let sr = result.data;
     return {
       output: {
-        query: sr.query || ctx.input.query,
-        total: sr.total || 0,
-        verseCount: sr.verseCount || 0,
-        verses: (sr.verses || []).map(v => ({
-          verseId: v.verseId,
-          orgId: v.orgId || '',
+        query: sr.query,
+        passages: sr.passages?.map(p => ({
+          passageId: p.id,
+          bibleId: p.bibleId,
+          orgId: p.orgId,
+          content: scriptureContent(p.content),
+          reference: p.reference,
+          verseCount: p.verseCount,
+          copyright: p.copyright
+        })),
+        fumsToken: result.meta?.fumsToken,
+        fumsId: result.meta?.fumsId,
+        meta: result.meta,
+        total: sr.total,
+        verseCount: sr.verseCount,
+        verses: sr.verses.map(v => ({
+          verseId: v.id,
+          orgId: v.orgId,
           bibleId: v.bibleId,
           bookId: v.bookId,
           chapterId: v.chapterId,
-          reference: v.reference || '',
-          text: v.text || ''
+          reference: v.reference,
+          text: v.text
         })),
-        limit: sr.limit || 10,
-        offset: sr.offset || 0
+        limit: sr.limit,
+        offset: sr.offset
       },
-      message: `Found **${sr.total || 0}** result(s) for "${ctx.input.query}". Returned ${(sr.verses || []).length} verse(s).`
+      message: `Found **${sr.total}** result(s) for "${ctx.input.query}". Returned ${sr.verses.length} verse(s).`
     };
   })
   .build();

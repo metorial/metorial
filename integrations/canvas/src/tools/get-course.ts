@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCourseTool = SlateTool.create(spec, {
@@ -21,6 +21,7 @@ export let getCourseTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       courseId: z.string().describe('Canvas course ID'),
       name: z.string().describe('Course name'),
       courseCode: z.string().optional().describe('Course code'),
@@ -41,15 +42,13 @@ export let getCourseTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
     if (ctx.input.includeSyllabus) include.push('syllabus_body');
     if (ctx.input.includeTerm) include.push('term');
     if (ctx.input.includeTotalStudents) include.push('total_students');
+    include.push('public_description');
 
     let c = await client.getCourse(
       ctx.input.courseId,
@@ -58,6 +57,7 @@ export let getCourseTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: c,
         courseId: String(c.id),
         name: c.name,
         courseCode: c.course_code,

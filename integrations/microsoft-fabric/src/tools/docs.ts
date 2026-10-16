@@ -1,4 +1,4 @@
-import { createTextAttachment, SlateTool } from '@slates/provider';
+import { type SlateAddAttachmentInput, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
   bestPracticesResource,
@@ -16,29 +16,39 @@ import { stringifyAttachment } from './common';
 let docsOutputSchema = z.object({
   title: z.string().describe('Title of the returned documentation resource.'),
   sourceUrls: z.array(z.string()).describe('Microsoft source URLs used for this resource.'),
-  attachmentCount: z.number().describe('Number of documentation attachments returned.')
+  attachmentCount: z.number().describe('Number of downloadable documentation files prepared.')
 });
 
-let returnDocsResource = (resource: {
-  title: string;
-  sourceUrls: string[];
-  generatedAt: string;
-  payload: unknown;
-}) => ({
-  output: {
-    title: resource.title,
-    sourceUrls: resource.sourceUrls,
-    attachmentCount: 1
-  },
-  attachments: [createTextAttachment(stringifyAttachment(resource), 'application/json')],
-  message: `Returned **${resource.title}** as a documentation attachment.`
-});
+let returnDocsResource = async (
+  ctx: { addAttachment: (input: SlateAddAttachmentInput) => Promise<void> },
+  resource: {
+    title: string;
+    sourceUrls: string[];
+    generatedAt: string;
+    payload: unknown;
+  }
+) => {
+  await ctx.addAttachment({
+    type: 'content',
+    content: new Response(stringifyAttachment(resource)),
+    mimeType: 'application/json',
+    filename: 'fabric-documentation.json'
+  });
+  return {
+    output: {
+      title: resource.title,
+      sourceUrls: resource.sourceUrls,
+      attachmentCount: 1
+    },
+    message: `Prepared **${resource.title}** for download.`
+  };
+};
 
 export let docsWorkloads = SlateTool.create(spec, {
   name: 'Docs Workloads',
   key: 'docs_workloads',
   description:
-    'Official upstream MCP name: docs_workloads. List Microsoft Fabric workloads known to the docs resource index and return the compact resource as an attachment.',
+    'Official upstream MCP name: docs_workloads. List Microsoft Fabric workloads known to the docs resource index and prepare the compact resource for download.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -50,7 +60,7 @@ export let docsWorkloads = SlateTool.create(spec, {
       includeExamples: z
         .boolean()
         .optional()
-        .describe('Include example/spec URLs for each workload in the attachment.')
+        .describe('Include example/spec URLs for each workload in the downloadable resource.')
     })
   )
   .output(
@@ -79,7 +89,7 @@ export let docsWorkloads = SlateTool.create(spec, {
       }
     });
 
-    let result = returnDocsResource(resource);
+    let result = await returnDocsResource(ctx, resource);
     return {
       ...result,
       output: {
@@ -94,7 +104,7 @@ export let docsWorkloadApiSpec = SlateTool.create(spec, {
   name: 'Docs Workload API Spec',
   key: 'docs_workload_api_spec',
   description:
-    'Official upstream MCP name: docs_workload-api-spec. Return compact API-spec metadata for a Fabric workload as an attachment.',
+    'Official upstream MCP name: docs_workload-api-spec. Return compact API-spec metadata for a Fabric workload as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -104,7 +114,7 @@ export let docsWorkloadApiSpec = SlateTool.create(spec, {
   )
   .output(docsOutputSchema)
   .handleInvocation(async ctx => {
-    return returnDocsResource(workloadApiResource(ctx.input.workloadType));
+    return returnDocsResource(ctx, workloadApiResource(ctx.input.workloadType));
   })
   .build();
 
@@ -112,7 +122,7 @@ export let docsPlatformApiSpec = SlateTool.create(spec, {
   name: 'Docs Platform API Spec',
   key: 'docs_platform_api_spec',
   description:
-    'Official upstream MCP name: docs_platform-api-spec. Return compact Fabric platform API metadata, scopes, pagination, and LRO conventions as an attachment.',
+    'Official upstream MCP name: docs_platform-api-spec. Return compact Fabric platform API metadata, scopes, pagination, and LRO conventions as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -124,14 +134,14 @@ export let docsPlatformApiSpec = SlateTool.create(spec, {
     })
   )
   .output(docsOutputSchema)
-  .handleInvocation(async ctx => returnDocsResource(platformApiResource(ctx.input.area)))
+  .handleInvocation(async ctx => returnDocsResource(ctx, platformApiResource(ctx.input.area)))
   .build();
 
 export let docsItemDefinitions = SlateTool.create(spec, {
   name: 'Docs Item Definitions',
   key: 'docs_item_definitions',
   description:
-    'Official upstream MCP name: docs_item-definitions. Return Fabric item definition shape and item-type notes as an attachment.',
+    'Official upstream MCP name: docs_item-definitions. Return Fabric item definition shape and item-type notes as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -141,7 +151,7 @@ export let docsItemDefinitions = SlateTool.create(spec, {
   )
   .output(docsOutputSchema)
   .handleInvocation(async ctx =>
-    returnDocsResource(itemDefinitionsResource(ctx.input.itemType))
+    returnDocsResource(ctx, itemDefinitionsResource(ctx.input.itemType))
   )
   .build();
 
@@ -149,7 +159,7 @@ export let docsBestPractices = SlateTool.create(spec, {
   name: 'Docs Best Practices',
   key: 'docs_best_practices',
   description:
-    'Official upstream MCP name: docs_best-practices. Return compact Microsoft Fabric implementation best practices as an attachment.',
+    'Official upstream MCP name: docs_best-practices. Return compact Microsoft Fabric implementation best practices as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -158,14 +168,16 @@ export let docsBestPractices = SlateTool.create(spec, {
     })
   )
   .output(docsOutputSchema)
-  .handleInvocation(async ctx => returnDocsResource(bestPracticesResource(ctx.input.topic)))
+  .handleInvocation(async ctx =>
+    returnDocsResource(ctx, bestPracticesResource(ctx.input.topic))
+  )
   .build();
 
 export let docsApiExamples = SlateTool.create(spec, {
   name: 'Docs API Examples',
   key: 'docs_api_examples',
   description:
-    'Official upstream MCP name: docs_api-examples. Return compact Fabric API examples and source links as an attachment.',
+    'Official upstream MCP name: docs_api-examples. Return compact Fabric API examples and source links as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -179,6 +191,6 @@ export let docsApiExamples = SlateTool.create(spec, {
   )
   .output(docsOutputSchema)
   .handleInvocation(async ctx =>
-    returnDocsResource(examplesResource(ctx.input.workloadType, ctx.input.operation))
+    returnDocsResource(ctx, examplesResource(ctx.input.workloadType, ctx.input.operation))
   )
   .build();

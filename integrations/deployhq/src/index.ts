@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelScheduledDeployment,
   createConfigFile,
   createDeployment,
   createProject,
@@ -11,7 +12,9 @@ import {
   deleteServer,
   deleteSshCommand,
   getDeployment,
+  getProfile,
   getProject,
+  getServer,
   listConfigFiles,
   listDeployments,
   listProjects,
@@ -19,11 +22,24 @@ import {
   listServerGroups,
   listServers,
   listSshCommands,
-  updateConfigFile
+  listZones,
+  manageDeployment,
+  updateConfigFile,
+  updateProject,
+  updateServer,
+  updateSshCommand
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    getProfile,
+    listZones,
+    updateProject,
+    getServer,
+    updateServer,
+    manageDeployment,
+    cancelScheduledDeployment,
+    updateSshCommand,
     listProjects,
     getProject,
     createProject,

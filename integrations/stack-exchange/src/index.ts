@@ -1,9 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  acceptAnswer,
   browseTags,
+  editAnswer,
+  editQuestion,
   getAnswers,
   getInbox,
+  getNotifications,
   getPostRevisions,
   getQuestion,
   getUser,
@@ -17,6 +21,10 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    acceptAnswer,
+    editAnswer,
+    editQuestion,
+    getNotifications,
     searchQuestions,
     getQuestion,
     getAnswers,

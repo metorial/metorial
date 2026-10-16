@@ -1,0 +1,556 @@
+{
+  "take_screenshot": {
+    "handlerSha256": "97b904cebcf1f6b47bcba5ca2c82d0b079b7a2c33cf2ae944e2023e8421c5cba",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "URL of the web page to capture",
+          "type": "string"
+        },
+        "html": {
+          "description": "HTML content to render as an image",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Markdown content to render as an image",
+          "type": "string"
+        },
+        "format": {
+          "description": "Output image format. Default: jpg",
+          "type": "string",
+          "enum": ["png", "jpeg", "jpg", "webp", "gif", "jp2", "tiff", "avif", "heif"]
+        },
+        "imageQuality": {
+          "description": "Image quality (0-100). Default: 80",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "omitBackground": {
+          "description": "Make background transparent (PNG/WebP only)",
+          "type": "boolean"
+        },
+        "viewportWidth": {
+          "description": "Browser viewport width in pixels. Default: 1280",
+          "type": "number"
+        },
+        "viewportHeight": {
+          "description": "Browser viewport height in pixels. Default: 1024",
+          "type": "number"
+        },
+        "viewportDevice": {
+          "description": "Device preset for emulation (e.g., \"iphone_13_pro_max\"). Sets viewport dimensions, scale factor, and user agent automatically",
+          "type": "string"
+        },
+        "deviceScaleFactor": {
+          "description": "Device pixel ratio (1-5). Default: 1",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "viewportMobile": {
+          "description": "Enable mobile viewport mode",
+          "type": "boolean"
+        },
+        "viewportLandscape": {
+          "description": "Landscape orientation",
+          "type": "boolean"
+        },
+        "fullPage": {
+          "description": "Capture the entire page including below-the-fold content",
+          "type": "boolean"
+        },
+        "fullPageScroll": {
+          "description": "Scroll to bottom before capturing (auto-enabled when fullPage=true)",
+          "type": "boolean"
+        },
+        "fullPageScrollDelay": {
+          "description": "Delay between scroll increments in microseconds. Default: 400",
+          "type": "number"
+        },
+        "fullPageMaxHeight": {
+          "description": "Maximum page height limit in pixels",
+          "type": "number"
+        },
+        "fullPageAlgorithm": {
+          "description": "Rendering method. \"by_sections\" captures section by section for complex pages",
+          "type": "string",
+          "enum": ["default", "by_sections"]
+        },
+        "selector": {
+          "description": "CSS selector to capture a specific element",
+          "type": "string"
+        },
+        "clipX": {
+          "description": "X coordinate for clip region",
+          "type": "number"
+        },
+        "clipY": {
+          "description": "Y coordinate for clip region",
+          "type": "number"
+        },
+        "clipWidth": {
+          "description": "Width of clip region",
+          "type": "number"
+        },
+        "clipHeight": {
+          "description": "Height of clip region",
+          "type": "number"
+        },
+        "blockAds": {
+          "description": "Block advertisements",
+          "type": "boolean"
+        },
+        "blockCookieBanners": {
+          "description": "Block cookie/GDPR consent banners",
+          "type": "boolean"
+        },
+        "blockBannersByHeuristics": {
+          "description": "Use heuristic-based banner blocking",
+          "type": "boolean"
+        },
+        "blockChats": {
+          "description": "Block chat widgets (Crisp, Intercom, Drift, etc.)",
+          "type": "boolean"
+        },
+        "blockTrackers": {
+          "description": "Disable analytics trackers",
+          "type": "boolean"
+        },
+        "blockRequests": {
+          "description": "Block requests matching URL patterns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockResources": {
+          "description": "Block specific resource types",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "document",
+              "stylesheet",
+              "image",
+              "media",
+              "font",
+              "script",
+              "texttrack",
+              "xhr",
+              "fetch",
+              "eventsource",
+              "websocket",
+              "manifest",
+              "other"
+            ]
+          }
+        },
+        "hideSelectors": {
+          "description": "CSS selectors of elements to hide",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scripts": {
+          "description": "JavaScript to inject and execute on the page",
+          "type": "string"
+        },
+        "styles": {
+          "description": "CSS to inject on the page",
+          "type": "string"
+        },
+        "click": {
+          "description": "CSS selector of element to click before capture",
+          "type": "string"
+        },
+        "hover": {
+          "description": "CSS selector of element to hover before capture",
+          "type": "string"
+        },
+        "darkMode": {
+          "description": "Render in dark mode",
+          "type": "boolean"
+        },
+        "reducedMotion": {
+          "description": "Enable prefers-reduced-motion",
+          "type": "boolean"
+        },
+        "mediaType": {
+          "description": "Media type for rendering",
+          "type": "string",
+          "enum": ["print", "screen"]
+        },
+        "geolocationLatitude": {
+          "description": "Geolocation latitude",
+          "type": "number"
+        },
+        "geolocationLongitude": {
+          "description": "Geolocation longitude",
+          "type": "number"
+        },
+        "geolocationAccuracy": {
+          "description": "Geolocation accuracy in meters",
+          "type": "number"
+        },
+        "ipCountryCode": {
+          "description": "Route through proxy in specified country",
+          "type": "string",
+          "enum": [
+            "us",
+            "gb",
+            "de",
+            "it",
+            "fr",
+            "cn",
+            "ca",
+            "es",
+            "jp",
+            "kr",
+            "in",
+            "au",
+            "br",
+            "mx",
+            "nz",
+            "pe",
+            "is",
+            "ie"
+          ]
+        },
+        "userAgent": {
+          "description": "Custom user agent string",
+          "type": "string"
+        },
+        "authorization": {
+          "description": "HTTP Authorization header value for authenticated pages",
+          "type": "string"
+        },
+        "cookies": {
+          "description": "Cookies to set (format: \"name=value; Domain=example.com\")",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "description": "Custom HTTP headers (format: \"Header-Name:Value\")",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeZone": {
+          "description": "Timezone for rendering (e.g., \"America/New_York\")",
+          "type": "string"
+        },
+        "waitUntil": {
+          "description": "Page load event to wait for. Default: load",
+          "type": "string",
+          "enum": ["load", "domcontentloaded", "networkidle0", "networkidle2"]
+        },
+        "delay": {
+          "description": "Additional wait time in seconds before capture",
+          "type": "number"
+        },
+        "timeout": {
+          "description": "Max request duration in seconds. Default: 60, max: 90",
+          "type": "number"
+        },
+        "waitForSelector": {
+          "description": "CSS selector to wait for before capture",
+          "type": "string"
+        },
+        "imageWidth": {
+          "description": "Resize/thumbnail width in pixels",
+          "type": "number"
+        },
+        "imageHeight": {
+          "description": "Resize/thumbnail height in pixels",
+          "type": "number"
+        },
+        "cache": {
+          "description": "Enable CDN caching for this screenshot",
+          "type": "boolean"
+        },
+        "cacheTtl": {
+          "description": "Cache TTL in seconds (14400 to 2592000)",
+          "type": "number"
+        },
+        "cacheKey": {
+          "description": "Custom cache key for multiple cached versions",
+          "type": "string"
+        },
+        "store": {
+          "description": "Upload screenshot to S3 storage",
+          "type": "boolean"
+        },
+        "storagePath": {
+          "description": "S3 object key/path",
+          "type": "string"
+        },
+        "storageBucket": {
+          "description": "Override default S3 bucket name",
+          "type": "string"
+        },
+        "ignoreHostErrors": {
+          "description": "Continue despite HTTP errors from target site",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "screenshotUrl": {
+          "description": "URL of the rendered screenshot",
+          "type": "string"
+        },
+        "storeLocation": {
+          "description": "S3 storage location if uploaded",
+          "type": "string"
+        },
+        "cacheUrl": {
+          "description": "Direct CDN cache URL for the screenshot",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "generate_pdf": {
+    "handlerSha256": "762521946a2222572d7d0c8b0fe37ffdb4bb19801b6a2fc1cd6b2b809d89946a",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "URL of the web page to render as PDF",
+          "type": "string"
+        },
+        "html": {
+          "description": "HTML content to render as PDF",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Markdown content to render as PDF",
+          "type": "string"
+        },
+        "pdfPrintBackground": {
+          "description": "Include background colors and graphics. Default: false",
+          "type": "boolean"
+        },
+        "pdfFitOnePage": {
+          "description": "Fit all content onto a single page. Default: false",
+          "type": "boolean"
+        },
+        "pdfLandscape": {
+          "description": "Use landscape orientation. Default: false (portrait)",
+          "type": "boolean"
+        },
+        "pdfPaperFormat": {
+          "description": "Paper size. Default: letter",
+          "type": "string",
+          "enum": ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "legal", "letter", "tabloid"]
+        },
+        "pdfMargin": {
+          "description": "Uniform margin for all sides (e.g., \"20px\")",
+          "type": "string"
+        },
+        "pdfMarginTop": {
+          "description": "Top margin",
+          "type": "string"
+        },
+        "pdfMarginRight": {
+          "description": "Right margin",
+          "type": "string"
+        },
+        "pdfMarginBottom": {
+          "description": "Bottom margin",
+          "type": "string"
+        },
+        "pdfMarginLeft": {
+          "description": "Left margin",
+          "type": "string"
+        },
+        "viewportWidth": {
+          "description": "Browser viewport width in pixels",
+          "type": "number"
+        },
+        "viewportHeight": {
+          "description": "Browser viewport height in pixels",
+          "type": "number"
+        },
+        "viewportDevice": {
+          "description": "Device preset for emulation",
+          "type": "string"
+        },
+        "deviceScaleFactor": {
+          "description": "Device pixel ratio (1-5)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "blockAds": {
+          "description": "Block advertisements",
+          "type": "boolean"
+        },
+        "blockCookieBanners": {
+          "description": "Block cookie/GDPR consent banners",
+          "type": "boolean"
+        },
+        "blockChats": {
+          "description": "Block chat widgets",
+          "type": "boolean"
+        },
+        "blockTrackers": {
+          "description": "Disable analytics trackers",
+          "type": "boolean"
+        },
+        "hideSelectors": {
+          "description": "CSS selectors of elements to hide",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scripts": {
+          "description": "JavaScript to inject and execute on the page",
+          "type": "string"
+        },
+        "styles": {
+          "description": "CSS to inject on the page",
+          "type": "string"
+        },
+        "click": {
+          "description": "CSS selector of element to click before capture",
+          "type": "string"
+        },
+        "darkMode": {
+          "description": "Render in dark mode",
+          "type": "boolean"
+        },
+        "mediaType": {
+          "description": "Media type for rendering",
+          "type": "string",
+          "enum": ["print", "screen"]
+        },
+        "ipCountryCode": {
+          "description": "Route through proxy in specified country",
+          "type": "string",
+          "enum": [
+            "us",
+            "gb",
+            "de",
+            "it",
+            "fr",
+            "cn",
+            "ca",
+            "es",
+            "jp",
+            "kr",
+            "in",
+            "au",
+            "br",
+            "mx",
+            "nz",
+            "pe",
+            "is",
+            "ie"
+          ]
+        },
+        "userAgent": {
+          "description": "Custom user agent string",
+          "type": "string"
+        },
+        "authorization": {
+          "description": "HTTP Authorization header for authenticated pages",
+          "type": "string"
+        },
+        "cookies": {
+          "description": "Cookies to set",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "description": "Custom HTTP headers",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeZone": {
+          "description": "Timezone for rendering",
+          "type": "string"
+        },
+        "waitUntil": {
+          "description": "Page load event to wait for",
+          "type": "string",
+          "enum": ["load", "domcontentloaded", "networkidle0", "networkidle2"]
+        },
+        "delay": {
+          "description": "Additional wait time in seconds before capture",
+          "type": "number"
+        },
+        "timeout": {
+          "description": "Max request duration in seconds",
+          "type": "number"
+        },
+        "waitForSelector": {
+          "description": "CSS selector to wait for before capture",
+          "type": "string"
+        },
+        "cache": {
+          "description": "Enable CDN caching for this PDF",
+          "type": "boolean"
+        },
+        "cacheTtl": {
+          "description": "Cache TTL in seconds",
+          "type": "number"
+        },
+        "store": {
+          "description": "Upload PDF to S3 storage",
+          "type": "boolean"
+        },
+        "storagePath": {
+          "description": "S3 object key/path",
+          "type": "string"
+        },
+        "storageBucket": {
+          "description": "Override default S3 bucket name",
+          "type": "string"
+        },
+        "ignoreHostErrors": {
+          "description": "Continue despite HTTP errors from target site",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pdfUrl": {
+          "description": "URL of the generated PDF",
+          "type": "string"
+        },
+        "storeLocation": {
+          "description": "S3 storage location if uploaded",
+          "type": "string"
+        },
+        "cacheUrl": {
+          "description": "Direct CDN cache URL for the PDF",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

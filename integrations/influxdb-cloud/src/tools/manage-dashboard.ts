@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let dashboardSchema = z.object({
+export let dashboardSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   dashboardId: z.string().describe('Unique dashboard ID'),
   name: z.string().describe('Dashboard name'),
   description: z.string().optional().describe('Dashboard description'),
@@ -17,19 +19,24 @@ let dashboardSchema = z.object({
 export let listDashboards = SlateTool.create(spec, {
   name: 'List Dashboards',
   key: 'list_dashboards',
-  description: `List all dashboards in the organization. Dashboards contain cells with configurable queries and visualization types for monitoring time-series data.`,
+  description: `List a page of dashboards in the organization. Dashboards contain cells with configurable queries and visualization types for monitoring time-series data.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z.number().optional().describe('Maximum number of dashboards to return'),
       offset: z.number().optional().describe('Number of dashboards to skip for pagination')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       dashboards: z.array(dashboardSchema).describe('List of dashboards')
     })
   )
@@ -40,19 +47,20 @@ export let listDashboards = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let dashboards = (result.dashboards || []).map((d: any) => ({
-      dashboardId: d.id,
+    let dashboards = requireArray(result, 'dashboards').map((d: any) => ({
+      raw: d,
+      dashboardId: resource(d, ['id', 'name']).id,
       name: d.name,
-      description: d.description,
-      orgId: d.orgID,
-      createdAt: d.meta?.createdAt,
-      updatedAt: d.meta?.updatedAt,
-      cells: d.cells,
+      description: optionalString(d.description),
+      orgId: optionalString(d.orgID),
+      createdAt: optionalString(d.meta?.createdAt),
+      updatedAt: optionalString(d.meta?.updatedAt),
+      cells: Array.isArray(d.cells) ? d.cells : undefined,
       labels: d.labels
     }));
 
     return {
-      output: { dashboards },
+      output: { dashboards, raw: result },
       message: `Found **${dashboards.length}** dashboard(s).`
     };
   })
@@ -62,12 +70,16 @@ export let createDashboard = SlateTool.create(spec, {
   name: 'Create Dashboard',
   key: 'create_dashboard',
   description: `Create a new dashboard for visualizing time-series data.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       name: z.string().describe('Dashboard name'),
       description: z.string().optional().describe('Dashboard description')
     })
@@ -82,13 +94,14 @@ export let createDashboard = SlateTool.create(spec, {
 
     return {
       output: {
-        dashboardId: d.id,
+        raw: d,
+        dashboardId: resource(d, ['id', 'name']).id,
         name: d.name,
-        description: d.description,
-        orgId: d.orgID,
-        createdAt: d.meta?.createdAt,
-        updatedAt: d.meta?.updatedAt,
-        cells: d.cells,
+        description: optionalString(d.description),
+        orgId: optionalString(d.orgID),
+        createdAt: optionalString(d.meta?.createdAt),
+        updatedAt: optionalString(d.meta?.updatedAt),
+        cells: Array.isArray(d.cells) ? d.cells : undefined,
         labels: d.labels
       },
       message: `Created dashboard **${d.name}** (ID: ${d.id}).`
@@ -121,13 +134,14 @@ export let updateDashboard = SlateTool.create(spec, {
 
     return {
       output: {
-        dashboardId: d.id,
+        raw: d,
+        dashboardId: resource(d, ['id', 'name']).id,
         name: d.name,
-        description: d.description,
-        orgId: d.orgID,
-        createdAt: d.meta?.createdAt,
-        updatedAt: d.meta?.updatedAt,
-        cells: d.cells,
+        description: optionalString(d.description),
+        orgId: optionalString(d.orgID),
+        createdAt: optionalString(d.meta?.createdAt),
+        updatedAt: optionalString(d.meta?.updatedAt),
+        cells: Array.isArray(d.cells) ? d.cells : undefined,
         labels: d.labels
       },
       message: `Updated dashboard **${d.name}** (ID: ${d.id}).`

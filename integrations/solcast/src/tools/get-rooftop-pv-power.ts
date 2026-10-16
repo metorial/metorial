@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getDataPoints } from '../lib/client';
 import { spec } from '../spec';
 
 let dataPointSchema = z
@@ -18,7 +18,7 @@ Supports three temporal modes:
 - **Historic**: Historical power output from 2007 to 7 days ago`,
   instructions: [
     'Provide the system capacity in kW along with the location.',
-    'Tilt and azimuth define the panel orientation. Azimuth: north=0, east=90.',
+    'Tilt and azimuth define the panel orientation. Azimuth: north=0, east=-90.',
     'For historic mode, the "start" parameter is required. Duration must be within 31 days.'
   ],
   tags: {
@@ -44,7 +44,7 @@ Supports three temporal modes:
         .min(-180)
         .max(180)
         .optional()
-        .describe('Panel azimuth angle (-180 to 180, north=0, east=90)'),
+        .describe('Panel azimuth angle (-180 to 180, north=0, east=-90)'),
       installDate: z
         .string()
         .optional()
@@ -60,7 +60,7 @@ Supports three temporal modes:
         .optional()
         .describe('Specific output parameters to include'),
       period: z
-        .enum(['PT5M', 'PT10M', 'PT15M', 'PT30M', 'PT60M'])
+        .enum(['PT5M', 'PT10M', 'PT15M', 'PT20M', 'PT30M', 'PT60M'])
         .optional()
         .describe('Time resolution'),
       hours: z.number().optional().describe('Number of hours of data to return'),
@@ -124,7 +124,7 @@ Supports three temporal modes:
       result = await client.getLiveRooftopPvPower(baseParams);
     } else {
       if (!start) {
-        throw new Error('The "start" parameter is required for historic mode.');
+        throw createApiServiceError('The "start" parameter is required for historic mode.');
       }
       result = await client.getHistoricRooftopPvPower({
         ...baseParams,
@@ -136,7 +136,7 @@ Supports three temporal modes:
     }
 
     let dataKey = mode === 'forecast' ? 'forecasts' : 'estimated_actuals';
-    let dataPoints = result[dataKey] ?? result.estimated_actuals ?? result.forecasts ?? [];
+    let dataPoints = getDataPoints(result, dataKey);
 
     return {
       output: {

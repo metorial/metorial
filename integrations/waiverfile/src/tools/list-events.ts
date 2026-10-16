@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaiverFileClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let listEvents = SlateTool.create(spec, {
   instructions: [
     'Dates should be in ISO 8601 / UTC format (e.g. "2024-01-01T00:00:00Z").',
     'Use eventCategoryId to filter results to a specific category.',
-    'Set upcomingOnly to true to only return future events in the range.'
+    'Set upcomingOnly to true to only return future events in the range. Choose upcomingOnly or eventCategoryId in one call.'
   ],
   tags: {
     readOnly: true
@@ -30,7 +30,7 @@ export let listEvents = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      events: z.any().describe('Array of event records')
+      events: z.any().describe('Complete event response')
     })
   )
   .handleInvocation(async ctx => {
@@ -39,7 +39,13 @@ export let listEvents = SlateTool.create(spec, {
       siteId: ctx.auth.siteId
     });
 
-    let events: any;
+    if (ctx.input.upcomingOnly && ctx.input.eventCategoryId) {
+      throw createApiServiceError(
+        'Choose upcomingOnly or eventCategoryId. The upcoming-events endpoint cannot filter by category.'
+      );
+    }
+
+    let events: unknown;
     if (ctx.input.upcomingOnly) {
       events = await client.getUpcomingEvents({
         startDate: ctx.input.startDate,
@@ -58,11 +64,9 @@ export let listEvents = SlateTool.create(spec, {
       });
     }
 
-    let results = Array.isArray(events) ? events : [events];
-
     return {
-      output: { events: results },
-      message: `Found **${results.length}** event(s) between ${ctx.input.startDate} and ${ctx.input.endDate}.`
+      output: { events },
+      message: 'Retrieved the event response.'
     };
   })
   .build();

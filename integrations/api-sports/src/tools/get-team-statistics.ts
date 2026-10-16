@@ -30,6 +30,12 @@ export let getTeamStatisticsTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe(
+          'Exact basketball season identifier from get_seasons; use instead of season'
+        ),
       league: z.number().describe('League ID'),
       season: z.number().describe('Season year'),
       team: z.number().describe('Team ID'),
@@ -38,6 +44,10 @@ export let getTeamStatisticsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       teamName: z.string().nullable().describe('Team name'),
       teamLogo: z.string().nullable().describe('Team logo URL'),
       leagueName: z.string().nullable().describe('League name'),
@@ -67,25 +77,26 @@ export let getTeamStatisticsTool = SlateTool.create(spec, {
 
     let data = await client.getTeamStatistics({
       league: ctx.input.league,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
       team: ctx.input.team,
       date: ctx.input.date
     });
 
     let r = data.response ?? {};
-    let fixtures = r.fixtures ?? {};
+    let fixtures = r.fixtures ?? r.games ?? {};
     let goals = r.goals ?? {};
     let biggest = r.biggest ?? {};
 
     let output = {
+      raw: data,
       teamName: r.team?.name ?? null,
       teamLogo: r.team?.logo ?? null,
       leagueName: r.league?.name ?? null,
       form: r.form ?? null,
       fixturesPlayed: fixtures.played?.total ?? null,
-      fixturesWins: fixtures.wins?.total ?? null,
+      fixturesWins: fixtures.wins?.total ?? fixtures.win?.total ?? null,
       fixturesDraws: fixtures.draws?.total ?? null,
-      fixturesLosses: fixtures.loses?.total ?? null,
+      fixturesLosses: fixtures.loses?.total ?? fixtures.lose?.total ?? null,
       goalsFor: goals.for?.total?.total ?? null,
       goalsAgainst: goals.against?.total?.total ?? null,
       cleanSheets: r.clean_sheet?.total ?? null,
@@ -103,7 +114,7 @@ export let getTeamStatisticsTool = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Team stats for **${output.teamName ?? 'team'}** in ${output.leagueName ?? 'league'} (${ctx.input.season}): ${output.fixturesWins ?? 0}W ${output.fixturesDraws ?? 0}D ${output.fixturesLosses ?? 0}L, GF: ${output.goalsFor ?? 0}, GA: ${output.goalsAgainst ?? 0}.`
+      message: `Team stats for **${output.teamName ?? 'team'}** in ${output.leagueName ?? 'league'} (${ctx.input.season}): ${output.fixturesWins ?? 'unavailable'}W ${output.fixturesDraws ?? 'unavailable'}D ${output.fixturesLosses ?? 'unavailable'}L, GF: ${output.goalsFor ?? 'unavailable'}, GA: ${output.goalsAgainst ?? 'unavailable'}.`
     };
   })
   .build();

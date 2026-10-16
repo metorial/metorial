@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  getAttributes,
+  getResource,
+  keywordRank,
+  nullableNumber,
+  requireRecord
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getKeywordRankings = SlateTool.create(spec, {
@@ -40,7 +47,12 @@ export let getKeywordRankings = SlateTool.create(spec, {
         .object({
           keywordId: z.string().nullable().describe('Keyword identifier'),
           keyword: z.string().nullable().describe('Keyword text'),
-          currentRank: z.number().nullable().describe('Current ranking position'),
+          currentRank: z
+            .number()
+            .nullable()
+            .describe(
+              'Numeric ranking position; null when unavailable or out of range. See rawResponse for the original state.'
+            ),
           bestRank: z.number().nullable().describe('Best ever ranking position'),
           url: z.string().nullable().describe('Tracked URL'),
           rankingUrl: z.string().nullable().describe('URL currently ranking'),
@@ -56,7 +68,8 @@ export let getKeywordRankings = SlateTool.create(spec, {
       rankingHistory: z
         .any()
         .nullable()
-        .describe('Ranking history chart data (when using keywordIds)')
+        .describe('Ranking history chart data (when using keywordIds)'),
+      rawResponse: z.any().describe('Original keyword or ranking history response')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,10 +81,12 @@ export let getKeywordRankings = SlateTool.create(spec, {
         limit: ctx.input.historyDays
       });
 
+      requireRecord(history, 'ranking history');
       return {
         output: {
           keyword: null,
-          rankingHistory: history
+          rankingHistory: history,
+          rawResponse: history
         },
         message: `Retrieved ranking history for **${ctx.input.keywordIds.length}** keyword(s).`
       };
@@ -84,34 +99,33 @@ export let getKeywordRankings = SlateTool.create(spec, {
         date: ctx.input.date
       });
 
-      let kw = data?.keyword ?? data;
+      let resource = getResource(data, 'keyword');
+      let kw = getAttributes(resource);
 
       return {
         output: {
           keyword: {
-            keywordId: kw.id ? String(kw.id) : null,
+            keywordId: resource.id == null ? null : String(resource.id),
             keyword: kw.kw ?? kw.keyword ?? null,
-            currentRank: kw.grank ?? kw.rank ?? null,
-            bestRank: kw.best ?? null,
+            currentRank: keywordRank(kw.grank ?? kw.rank),
+            bestRank: nullableNumber(kw.best, 'best rank'),
             url: kw.url ?? null,
             rankingUrl: kw.rankingurl ?? null,
-            searchVolume: kw.ms ?? null,
-            cpc: kw.cpc ?? null,
-            competition: kw.competition ?? null,
+            searchVolume: nullableNumber(kw.ms ?? kw.search_volume, 'search volume'),
+            cpc: nullableNumber(kw.cpc, 'cost per click'),
+            competition: nullableNumber(kw.competition, 'competition'),
             serpFeatures: kw.serp_features ?? null,
-            rankHistory: kw.grank_history ?? null,
+            rankHistory: kw.grankhistory ?? kw.grank_history ?? null,
             trends: kw.trends ?? null
           },
-          rankingHistory: null
+          rankingHistory: null,
+          rawResponse: data
         },
-        message:
-          kw.grank != null
-            ? `Keyword **"${kw.kw ?? kw.keyword}"** is ranked **#${kw.grank}** (best: #${kw.best ?? 'N/A'}).`
-            : `Retrieved details for keyword **"${kw.kw ?? kw.keyword}"**.`
+        message: `Retrieved keyword details for **${ctx.input.keywordId}**.`
       };
     }
 
-    throw new Error(
+    throw createApiServiceError(
       'Provide either projectName + keywordId for a single keyword, or keywordIds for ranking history.'
     );
   })

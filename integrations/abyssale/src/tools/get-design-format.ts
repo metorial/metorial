@@ -23,15 +23,18 @@ export let getDesignFormat = SlateTool.create(spec, {
       formatUid: z.string().describe('Unique ID for format instance'),
       width: z.number().describe('Format width'),
       height: z.number().describe('Format height'),
-      unit: z.string().describe('Measurement unit for dimensions'),
-      previewUrl: z.string().describe('Preview image URL'),
-      dynamicImageUrl: z.string().describe('Dynamic image URL for this format'),
+      unit: z.string().optional().describe('Measurement unit for dimensions'),
+      previewUrl: z.string().optional().describe('Preview image URL'),
+      dynamicImageUrl: z.string().optional().describe('Dynamic image URL for this format'),
       elements: z
         .array(z.record(z.string(), z.any()))
+        .optional()
         .describe('Customizable design elements with names, types, and properties'),
       variables: z
         .record(z.string(), z.any())
-        .describe('Text layer variables as key-value pairs')
+        .optional()
+        .describe('Text layer variables as key-value pairs'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -52,9 +55,10 @@ export let getDesignFormat = SlateTool.create(spec, {
         previewUrl: format.preview_url,
         dynamicImageUrl: format.dynamic_image_url,
         elements: format.elements,
-        variables: format.variables
+        variables: format.variables,
+        raw: format
       },
-      message: `Retrieved format **${format.id}** (${format.width}x${format.height} ${format.unit}) with **${format.elements.length}** customizable element(s).`
+      message: `Retrieved format **${format.id}** (${format.width}x${format.height}${format.unit ? ` ${format.unit}` : ''})${format.elements ? ` with **${format.elements.length}** customizable element(s)` : ''}.`
     };
   })
   .build();

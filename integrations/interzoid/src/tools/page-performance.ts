@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let pagePerformance = SlateTool.create(spec, {
   name: 'Global Page Performance',
   key: 'global_page_performance',
-  description: `Measure page load or API response time from a specified global geographic location. Simulates a browser page load from 20+ locations worldwide and returns the round-trip performance measurement in seconds.`,
+  description: `Measure page load or API response time from a specified global geographic location. Returns the round-trip performance measurement in seconds. Available geographic origins depend on provider support.`,
   instructions: [
     'Choose an origin location like "Singapore", "Tokyo", "London", "New York", "Sydney", "Frankfurt", etc.'
   ],

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,7 +17,7 @@ Each entry includes delivery status (sent, opened, responded, bounced, opted-out
       email: z.string().optional().describe('Filter by recipient email'),
       campaignId: z.string().optional().describe('Filter by campaign ID'),
       channel: z
-        .enum(['email', 'link', 'inapp', 'intercom'])
+        .enum(['email', 'link', 'inapp', 'intercom', 'embed'])
         .optional()
         .describe('Filter by delivery channel'),
       sentBy: z
@@ -37,18 +37,48 @@ Each entry includes delivery status (sent, opened, responded, bounced, opted-out
       endDate: z
         .string()
         .optional()
-        .describe('Filter surveys sent before this date (ISO 8601 or UNIX timestamp)')
+        .describe(
+          'Filter surveys sent before this date (ISO 8601 or UNIX seconds; includes the final day in the account timezone)'
+        ),
+      attributes: z
+        .array(
+          z.object({
+            name: z.string().describe('Customer property name'),
+            operator: z.string().describe('Filter operator'),
+            value: z
+              .union([z.string(), z.number(), z.boolean()])
+              .optional()
+              .describe('Filter value')
+          })
+        )
+        .optional()
+        .describe('Filter by customer properties'),
+      match: z.enum(['all', 'any']).optional().describe('Match all or any attribute filters')
     })
   )
   .output(
-    z.object({
-      surveys: z.array(z.any()).optional().describe('List of sent survey records'),
-      page: z.number().optional().describe('Current page number'),
-      pages: z.number().optional().describe('Total pages'),
-      total: z.number().optional().describe('Total matching outbox entries')
-    })
+    z
+      .object({
+        surveys: z.array(z.any()).optional().describe('List of sent survey records'),
+        page: z.number().optional().describe('Current page number'),
+        pages: z.number().optional().describe('Total pages'),
+        total: z.number().optional().describe('Total matching outbox entries')
+      })
+      .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('Page must be a positive whole number.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 1000)
+    ) {
+      throw createApiServiceError('Limit must be a whole number between 1 and 1,000.');
+    }
     let client = new Client(ctx.auth.token);
 
     let data = await client.getOutbox({
@@ -60,7 +90,9 @@ Each entry includes delivery status (sent, opened, responded, bounced, opted-out
       limit: ctx.input.limit,
       sort: ctx.input.sort,
       startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate
+      endDate: ctx.input.endDate,
+      attributes: ctx.input.attributes,
+      match: ctx.input.match
     });
 
     let total = data.total ?? data.surveys?.length ?? 0;

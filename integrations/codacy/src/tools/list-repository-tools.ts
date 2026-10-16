@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listRepositoryTools = SlateTool.create(spec, {
@@ -19,6 +19,10 @@ export let listRepositoryTools = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       tools: z
         .array(
           z.object({
@@ -44,17 +48,21 @@ export let listRepositoryTools = SlateTool.create(spec, {
     let response = await client.listRepositoryTools(ctx.input.repositoryName);
 
     let tools = (response.data ?? []).map((tool: any) => ({
-      toolUuid: tool.uuid ?? tool.toolUuid ?? '',
+      toolUuid: requireCodacyString(tool.uuid ?? tool.toolUuid, 'tool.uuid'),
       toolName: tool.name ?? tool.toolName ?? undefined,
-      isEnabled: tool.isEnabled ?? undefined,
-      usesConfigurationFile: tool.usesConfigurationFile ?? undefined,
+      isEnabled: tool.settings?.isEnabled ?? tool.isEnabled ?? undefined,
+      usesConfigurationFile:
+        tool.settings?.usesConfigurationFile ?? tool.usesConfigurationFile ?? undefined,
       languages: tool.languages ?? undefined
     }));
 
     let enabledCount = tools.filter((t: any) => t.isEnabled).length;
 
     return {
-      output: { tools },
+      output: {
+        raw: response,
+        tools
+      },
       message: `**${tools.length}** tool(s) configured for **${ctx.input.repositoryName}** (${enabledCount} enabled).`
     };
   })

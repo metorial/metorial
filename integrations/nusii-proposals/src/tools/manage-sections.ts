@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let sectionSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   sectionId: z.string(),
   currency: z.string(),
   accountId: z.number(),
@@ -29,7 +30,7 @@ let sectionSchema = z.object({
 export let listSections = SlateTool.create(spec, {
   name: 'List Sections',
   key: 'list_sections',
-  description: `Retrieve sections for a specific proposal or template. Sections are the building blocks of proposals and can be either text content or cost sections with line items.`,
+  description: `Retrieve reusable sections, or filter sections by proposal or template. Sections are the building blocks of proposals and can be either text content or cost sections with line items.`,
   tags: {
     readOnly: true
   }
@@ -41,13 +42,16 @@ export let listSections = SlateTool.create(spec, {
       includeLineItems: z
         .boolean()
         .optional()
-        .describe('Include line item data in the response'),
+        .describe(
+          'Retained compatibility option; current section responses include line-item data in raw.included'
+        ),
       page: z.number().optional().describe('Page number (defaults to 1)'),
       perPage: z.number().optional().describe('Number of sections per page (defaults to 25)')
     })
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       sections: z.array(sectionSchema),
       currentPage: z.number(),
       totalPages: z.number(),
@@ -55,12 +59,13 @@ export let listSections = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listSections(ctx.input);
 
     return {
       output: {
         sections: result.items,
+        raw: result.raw,
         currentPage: result.pagination.currentPage,
         totalPages: result.pagination.totalPages,
         totalCount: result.pagination.totalCount
@@ -85,7 +90,7 @@ export let getSection = SlateTool.create(spec, {
   )
   .output(sectionSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.getSection(ctx.input.sectionId);
 
     return {
@@ -130,7 +135,7 @@ export let createSection = SlateTool.create(spec, {
   )
   .output(sectionSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.createSection(ctx.input);
 
     return {
@@ -158,10 +163,10 @@ export let updateSection = SlateTool.create(spec, {
       includeTotal: z.boolean().optional().describe('Update subtotal visibility')
     })
   )
-  .output(sectionSchema)
+  .output(sectionSchema.partial({ lineItemIds: true }))
   .handleInvocation(async ctx => {
     let { sectionId, ...updateData } = ctx.input;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.updateSection(sectionId, updateData);
 
     return {
@@ -186,11 +191,12 @@ export let deleteSection = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteSection(ctx.input.sectionId);
 
     return {

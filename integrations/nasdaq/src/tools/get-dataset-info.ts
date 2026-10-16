@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TablesClient } from '../lib/client';
+import { mapRows, TablesClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getDatasetInfo = SlateTool.create(spec, {
@@ -36,7 +36,7 @@ Use this to explore a specific dataset before querying it in detail.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.getTimeSeries({
       databaseCode: ctx.input.databaseCode,
@@ -44,13 +44,7 @@ Use this to explore a specific dataset before querying it in detail.`,
     });
 
     let ds = response.dataset;
-    let recentRows = (ds.data || []).slice(0, 10).map(row => {
-      let obj: Record<string, any> = {};
-      ds.column_names.forEach((col, i) => {
-        obj[col] = row[i];
-      });
-      return obj;
-    });
+    let recentRows = mapRows(ds.column_names, ds.data.slice(0, 10));
 
     return {
       output: {
@@ -58,13 +52,13 @@ Use this to explore a specific dataset before querying it in detail.`,
         datasetCode: ds.dataset_code,
         databaseCode: ds.database_code,
         name: ds.name,
-        description: ds.description || '',
-        refreshedAt: ds.refreshed_at || '',
-        newestDate: ds.newest_available_date || '',
-        oldestDate: ds.oldest_available_date || '',
-        columnNames: ds.column_names || [],
-        frequency: ds.frequency || '',
-        type: ds.type || '',
+        description: ds.description,
+        refreshedAt: ds.refreshed_at,
+        newestDate: ds.newest_available_date,
+        oldestDate: ds.oldest_available_date,
+        columnNames: ds.column_names,
+        frequency: ds.frequency,
+        type: ds.type,
         premium: ds.premium,
         recentRows
       },

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'twelve-data',
   name: 'Twelve Data',
   description:
-    'Financial market data provider offering real-time and historical data for stocks, forex, cryptocurrencies, ETFs, indices, mutual funds, and commodities across 50+ global exchanges.',
+    'Financial market data for stocks, forex, cryptocurrencies, ETFs, indices, and mutual funds. Retrieve available prices, history, fundamentals, and indicators; coverage, freshness, and access depend on the instrument, exchange, and subscription.',
   metadata: {},
   config,
   auth

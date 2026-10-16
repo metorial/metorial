@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Happy Scribe organization ID. Required for listing transcriptions, glossaries, style guides, and creating orders.'
+        'Optional saved organization ID for existing connections. Call list_organizations to discover IDs and pass organizationId on each tool.'
       )
   })
 );

@@ -1,3 +1,4 @@
+export * from './discovery';
 export * from './execute-query';
 export * from './get-actor';
 export * from './get-workspace';

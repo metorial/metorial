@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listMetadata, readList } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageDataBreach = SlateTool.create(spec, {
@@ -8,17 +9,27 @@ export let manageDataBreach = SlateTool.create(spec, {
   key: 'manage_data_breach',
   description: `Create, retrieve, update, list, or delete data breach evaluation records. Also supports evaluating breach impact for compliance and risk management. Use this for all data breach lifecycle operations.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete', 'evaluate'])
         .describe('Action to perform'),
-      breachId: z.string().optional().describe('Breach ID (required for get, update, delete)'),
-      name: z.string().optional().describe('Name of the breach'),
+      breachId: z
+        .string()
+        .optional()
+        .describe('Breach ID (required for get, update, delete, evaluate)'),
+      name: z
+        .string()
+        .optional()
+        .describe('Name of the breach; required for create and update'),
       description: z.string().optional().describe('Description of the breach'),
       status: z.string().optional().describe('Status of the breach'),
       severity: z.string().optional().describe('Severity level'),
@@ -37,8 +48,19 @@ export let manageDataBreach = SlateTool.create(spec, {
       isDraft: z
         .boolean()
         .optional()
-        .describe('Save evaluation as draft (for evaluate action)'),
-      page: z.number().optional().describe('Page number for listing'),
+        .describe('Draft flag: required for update; creation and evaluation default to false'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation token returned by the previous list response. Omit page when using this token.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Zero-based page number. Later pages follow provider continuation tokens; prefer nextToken for efficient paging.'
+        ),
       size: z.number().optional().describe('Page size for listing'),
       sortBy: z.string().optional().describe('Field to sort by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction')
@@ -56,7 +78,8 @@ export let manageDataBreach = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let { action, breachId } = ctx.input;
@@ -73,18 +96,19 @@ export let manageDataBreach = SlateTool.create(spec, {
           notificationDate: ctx.input.notificationDate,
           affectedDataSubjects: ctx.input.affectedDataSubjects,
           affectedDataTypes: ctx.input.affectedDataTypes,
-          breachType: ctx.input.breachType
+          breachType: ctx.input.breachType,
+          isDraft: ctx.input.isDraft
         });
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { breach: data, success: true },
           message: `Data breach record created${data?.id ? ` with ID **${data.id}**` : ''}.`
         };
       }
       case 'get': {
-        if (!breachId) throw new Error('breachId is required for get action');
+        if (!breachId) throw createApiServiceError('breachId is required for get action');
         let result = await client.getDataBreach(breachId);
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { breach: data, success: true },
           message: `Retrieved data breach **${breachId}**.`
@@ -93,21 +117,23 @@ export let manageDataBreach = SlateTool.create(spec, {
       case 'list': {
         let result = await client.listDataBreaches({
           page: ctx.input.page,
+          nextToken: ctx.input.nextToken,
           size: ctx.input.size,
           sortBy: ctx.input.sortBy,
           sortOrder: ctx.input.sortOrder,
           status: ctx.input.status
         });
-        let data = result?.data ?? result;
-        let breaches = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+        let data = result;
+        let breaches = readList(data, 'dataBreaches');
         return {
-          output: { breaches, success: true },
+          output: { breaches, success: true, ...listMetadata(data) },
           message: `Found **${breaches.length}** data breach record(s).`
         };
       }
       case 'update': {
-        if (!breachId) throw new Error('breachId is required for update action');
+        if (!breachId) throw createApiServiceError('breachId is required for update action');
         let updatePayload: Record<string, any> = {};
+        if (ctx.input.isDraft !== undefined) updatePayload.isDraft = ctx.input.isDraft;
         if (ctx.input.name !== undefined) updatePayload.name = ctx.input.name;
         if (ctx.input.description !== undefined)
           updatePayload.description = ctx.input.description;
@@ -127,14 +153,14 @@ export let manageDataBreach = SlateTool.create(spec, {
           updatePayload.breachType = ctx.input.breachType;
 
         let result = await client.updateDataBreach(breachId, updatePayload);
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { breach: data, success: true },
           message: `Data breach **${breachId}** updated.`
         };
       }
       case 'delete': {
-        if (!breachId) throw new Error('breachId is required for delete action');
+        if (!breachId) throw createApiServiceError('breachId is required for delete action');
         await client.deleteDataBreach(breachId);
         return {
           output: { success: true },
@@ -148,7 +174,7 @@ export let manageDataBreach = SlateTool.create(spec, {
           description: ctx.input.description,
           isDraft: ctx.input.isDraft
         });
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { breach: data, success: true },
           message: `Breach impact evaluation ${ctx.input.isDraft ? 'saved as draft' : 'completed'}.`

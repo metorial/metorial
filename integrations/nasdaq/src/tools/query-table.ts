@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TablesClient } from '../lib/client';
+import { mapRows, TablesClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let queryTable = SlateTool.create(spec, {
@@ -71,7 +71,7 @@ Provide the table path in the format \`PUBLISHER/TABLE_CODE\` (e.g., \`ZACKS/FC\
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.queryTable({
       tablePath: ctx.input.tablePath,
@@ -82,13 +82,10 @@ Provide the table path in the format \`PUBLISHER/TABLE_CODE\` (e.g., \`ZACKS/FC\
     });
 
     let columns = response.datatable.columns;
-    let rows = response.datatable.data.map(row => {
-      let obj: Record<string, any> = {};
-      columns.forEach((col, i) => {
-        obj[col.name] = row[i];
-      });
-      return obj;
-    });
+    let rows = mapRows(
+      columns.map(column => column.name),
+      response.datatable.data
+    );
 
     return {
       output: {

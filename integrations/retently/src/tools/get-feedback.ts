@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,14 +55,28 @@ Each response includes score, text feedback, sentiment, topics, tags, and additi
     })
   )
   .output(
-    z.object({
-      responses: z.array(z.any()).optional().describe('List of feedback responses'),
-      page: z.number().optional().describe('Current page number'),
-      pages: z.number().optional().describe('Total pages'),
-      total: z.number().optional().describe('Total matching responses')
-    })
+    z
+      .object({
+        responses: z.array(z.any()).optional().describe('List of feedback responses'),
+        page: z.number().optional().describe('Current page number'),
+        pages: z.number().optional().describe('Total pages'),
+        total: z.number().optional().describe('Total matching responses')
+      })
+      .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('Page must be a positive whole number.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 1000)
+    ) {
+      throw createApiServiceError('Limit must be a whole number between 1 and 1,000.');
+    }
     let client = new Client(ctx.auth.token);
 
     if (ctx.input.feedbackId) {

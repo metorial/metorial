@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,8 +9,9 @@ export let manageScanner = SlateTool.create(spec, {
   description: `Create, update, or delete a scanner configuration for pass verification and redemption. Scanners work with the PassSlot Pass Verifier app to scan, validate, and redeem passes.`,
   instructions: [
     'Set action to "create" to create a new scanner, "update" to modify an existing one, or "delete" to remove one.',
-    'Scanner type can be "PassVerifier" (for the mobile app) or "Browser" (for browser-based scanning).',
-    'If fullAccess is false, you must provide allowedTemplates to restrict which templates the scanner can access.'
+    'Scanner type can be "PassVerifier" (for the mobile app) or "Browser" (for browser-based scanning). Type can only be set during creation.',
+    'If fullAccess is false, you must provide allowedTemplates to restrict which templates the scanner can access.',
+    'Scanner management requires an App Key with full access.'
   ]
 })
   .input(
@@ -53,9 +54,19 @@ export let manageScanner = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
+    if (
+      ctx.input.action !== 'delete' &&
+      ctx.input.fullAccess === false &&
+      ctx.input.allowedTemplates === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide allowedTemplates when fullAccess is false. Call list_templates to discover template IDs.'
+      );
+    }
+
     if (ctx.input.action === 'create') {
       if (!ctx.input.name || !ctx.input.type) {
-        throw new Error('name and type are required for creating a scanner.');
+        throw createApiServiceError('name and type are required for creating a scanner.');
       }
       let result = await client.createScanner({
         name: ctx.input.name,
@@ -80,14 +91,23 @@ export let manageScanner = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.scannerId) {
-        throw new Error('scannerId is required for updating a scanner.');
+        throw createApiServiceError('scannerId is required for updating a scanner.');
       }
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-      if (ctx.input.type !== undefined) updateData.type = ctx.input.type;
-      if (ctx.input.fullAccess !== undefined) updateData.fullAccess = ctx.input.fullAccess;
-      if (ctx.input.allowedTemplates !== undefined)
-        updateData.allowedTemplates = ctx.input.allowedTemplates;
+      if (ctx.input.type !== undefined) {
+        throw createApiServiceError(
+          'Scanner type cannot be changed. Omit type when updating a scanner.'
+        );
+      }
+      let updateData = pickDefined({
+        name: ctx.input.name,
+        fullAccess: ctx.input.fullAccess,
+        allowedTemplates: ctx.input.allowedTemplates
+      });
+      if (Object.keys(updateData).length === 0) {
+        throw createApiServiceError(
+          'Provide name, fullAccess, or allowedTemplates to update.'
+        );
+      }
 
       let result = await client.updateScanner(ctx.input.scannerId, updateData);
 
@@ -107,7 +127,7 @@ export let manageScanner = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.scannerId) {
-        throw new Error('scannerId is required for deleting a scanner.');
+        throw createApiServiceError('scannerId is required for deleting a scanner.');
       }
       await client.deleteScanner(ctx.input.scannerId);
 
@@ -120,6 +140,6 @@ export let manageScanner = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

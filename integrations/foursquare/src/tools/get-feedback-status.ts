@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getFeedbackStatus = SlateTool.create(spec, {
   name: 'Get Feedback Status',
   key: 'get_feedback_status',
-  description: `Check the status of a previously submitted place feedback (edit proposal or flag). Use the feedback ID returned from the Submit Place Feedback tool.`,
+  description: `DEPRECATED — use \`get_suggestion_status\` instead. Check the status of a previously submitted place feedback (edit proposal or flag). Use the feedback ID returned from the Submit Place Feedback tool.`,
+  instructions: [
+    'Use get_suggestion_status with a Places Service API Key. This legacy V3 tool retains its original request and schema.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

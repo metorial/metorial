@@ -3,11 +3,21 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let createContactOutputSchema = z.object({
+  contactId: z.number().describe('ID of the created contact'),
+  firstName: z.string().nullable().describe('First name'),
+  lastName: z.string().nullable().describe('Last name'),
+  primaryEmail: z.string().nullable().describe('Primary email'),
+  primaryPhone: z.string().nullable().describe('Primary phone'),
+  createdAt: z.string().nullable().describe('When created')
+});
+
 export let createContact = SlateTool.create(spec, {
   name: 'Create Contact',
   key: 'create_contact',
   description: `Create a new donor/supporter contact. Givebutter automatically deduplicates contacts with the same first name, last name, and email or phone. Use **forceCreate** to bypass deduplication.`,
   instructions: [
+    'Email and phone type labels are retained for compatibility, but this create endpoint only accepts their values.',
     'If address fields are provided, all required address fields (address1, city, state, zipcode, country) must have values. Incomplete addresses will be discarded.'
   ],
   tags: {
@@ -60,16 +70,7 @@ export let createContact = SlateTool.create(spec, {
       forceCreate: z.boolean().optional().describe('Force create even if a duplicate exists')
     })
   )
-  .output(
-    z.object({
-      contactId: z.number().describe('ID of the created contact'),
-      firstName: z.string().nullable().describe('First name'),
-      lastName: z.string().nullable().describe('Last name'),
-      primaryEmail: z.string().nullable().describe('Primary email'),
-      primaryPhone: z.string().nullable().describe('Primary phone'),
-      createdAt: z.string().nullable().describe('When created')
-    })
-  )
+  .output(createContactOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -100,15 +101,17 @@ export let createContact = SlateTool.create(spec, {
     });
 
     return {
-      output: {
+      output: client.output(createContactOutputSchema, {
         contactId: c.id,
-        firstName: c.first_name ?? null,
-        lastName: c.last_name ?? null,
-        primaryEmail: c.primary_email ?? null,
-        primaryPhone: c.primary_phone ?? null,
-        createdAt: c.created_at ?? null
-      },
-      message: `Created contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+        firstName: c.first_name,
+        lastName: c.last_name,
+        primaryEmail: c.primary_email,
+        primaryPhone: c.primary_phone,
+        createdAt: c.created_at
+      }),
+      message: client.publicData(
+        `Created contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+      )
     };
   })
   .build();

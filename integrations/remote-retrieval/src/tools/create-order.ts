@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type CreateOrderPayload } from '../lib/client';
 import { spec } from '../spec';
 
 let employeeInfoSchema = z.object({
@@ -111,6 +111,26 @@ When using "Return To Company", you can optionally add data destruction with ret
     let client = new Client({ token: ctx.auth.token });
 
     let payloadOrders = ctx.input.orders.map(order => {
+      if (order.additionalService && order.orderType !== 'Return To Company') {
+        throw createApiServiceError(
+          'additionalService requires orderType "Return To Company".'
+        );
+      }
+      if (order.additionalService === 'data_destruction_forward' && !order.newEmployeeInfo) {
+        throw createApiServiceError(
+          'newEmployeeInfo is required when additionalService is "data_destruction_forward".'
+        );
+      }
+      if (
+        order.insuranceActive &&
+        (order.insuranceAmount === undefined ||
+          !Number.isFinite(order.insuranceAmount) ||
+          order.insuranceAmount <= 0)
+      ) {
+        throw createApiServiceError(
+          'Provide a positive insuranceAmount when insuranceActive is true.'
+        );
+      }
       let additionalServiceValue: 1 | 2 | undefined;
       if (order.additionalService === 'data_destruction_return') {
         additionalServiceValue = 1;
@@ -118,14 +138,14 @@ When using "Return To Company", you can optionally add data destruction with ret
         additionalServiceValue = 2;
       }
 
-      let payload: Record<string, unknown> = {
+      let payload: CreateOrderPayload = {
         type_of_equipment: order.equipmentType,
         order_type: order.orderType,
         employee_info: {
           email: order.employeeInfo.email,
           name: order.employeeInfo.name,
           address_line_1: order.employeeInfo.addressLine1,
-          address_line_2: order.employeeInfo.addressLine2 || '',
+          ...pickDefined({ address_line_2: order.employeeInfo.addressLine2 }),
           address_city: order.employeeInfo.city,
           address_state: order.employeeInfo.state,
           address_country: order.employeeInfo.country,
@@ -136,7 +156,7 @@ When using "Return To Company", you can optionally add data destruction with ret
           return_person_name: order.companyInfo.returnPersonName,
           return_company_name: order.companyInfo.returnCompanyName,
           return_address_line_1: order.companyInfo.returnAddressLine1,
-          return_address_line_2: order.companyInfo.returnAddressLine2 || '',
+          ...pickDefined({ return_address_line_2: order.companyInfo.returnAddressLine2 }),
           return_address_city: order.companyInfo.returnCity,
           return_address_state: order.companyInfo.returnState,
           return_address_country: order.companyInfo.returnCountry,
@@ -150,9 +170,9 @@ When using "Return To Company", you can optionally add data destruction with ret
         payload.return_add_srv = additionalServiceValue;
       }
 
-      if (order.insuranceActive) {
-        payload.ins_active = 1;
-        if (order.insuranceAmount !== undefined) {
+      if (order.insuranceActive !== undefined) {
+        payload.ins_active = order.insuranceActive ? 1 : 0;
+        if (order.insuranceActive && order.insuranceAmount !== undefined) {
           payload.ins_amount = order.insuranceAmount;
         }
       }
@@ -168,14 +188,14 @@ When using "Return To Company", you can optionally add data destruction with ret
           address_state: order.newEmployeeInfo.state,
           address_zip: order.newEmployeeInfo.zip,
           address_country: order.newEmployeeInfo.country,
-          newemp_msg: order.newEmployeeInfo.welcomeMessage || ''
+          ...pickDefined({ newemp_msg: order.newEmployeeInfo.welcomeMessage })
         };
       }
 
       return payload;
     });
 
-    let result = await client.createOrder(payloadOrders as any);
+    let result = await client.createOrder(payloadOrders);
 
     return {
       output: {

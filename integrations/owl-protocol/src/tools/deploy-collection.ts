@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { OwlClient } from '../lib/client';
+import {
+  OwlClient,
+  owlObject,
+  owlString,
+  requireChainId,
+  requireInput,
+  requireOwlString
+} from '../lib/client';
+import { rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deployCollection = SlateTool.create(spec, {
@@ -46,6 +54,8 @@ Returns the deployed contract address and transaction details.`,
         .string()
         .optional()
         .describe('Base64-encoded image for the contract metadata'),
+      description: z.string().optional().describe('Collection description.'),
+      contractUri: z.string().optional().describe('URI for contract-level metadata.'),
       contractImageSuffix: z
         .string()
         .optional()
@@ -54,13 +64,17 @@ Returns the deployed contract address and transaction details.`,
   )
   .output(
     z.object({
+      raw: rawSchema,
       contractAddress: z.string().describe('Deployed contract address'),
       name: z.string().optional().describe('Collection name'),
       symbol: z.string().optional().describe('Collection symbol'),
       baseUri: z.string().optional().describe('Token metadata base URI'),
       royaltyReceiver: z.string().optional().describe('Royalty receiver address'),
       feeNumerator: z.string().optional().describe('Royalty fee in basis points'),
-      userOpHash: z.string().optional().describe('Transaction hash for the deployment'),
+      userOpHash: z
+        .string()
+        .optional()
+        .describe('ERC4337 user operation hash for the deployment'),
       contractUri: z.string().optional().describe('Contract metadata URI'),
       deployParams: z
         .record(z.string(), z.unknown())
@@ -71,12 +85,9 @@ Returns the deployed contract address and transaction details.`,
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let chainId = ctx.input.chainId ?? ctx.config.chainId;
-    if (!chainId) {
-      throw new Error(
-        'chainId is required. Provide it in the input or set a default in the configuration.'
-      );
-    }
+    let chainId = requireChainId(ctx.input.chainId ?? ctx.config.chainId);
+    requireInput(ctx.input.name, 'name');
+    requireInput(ctx.input.symbol, 'symbol');
 
     ctx.info({
       message: 'Deploying collection',
@@ -93,22 +104,27 @@ Returns the deployed contract address and transaction details.`,
       royaltyReceiver: ctx.input.royaltyReceiver,
       feeNumerator: ctx.input.feeNumerator,
       contractImage: ctx.input.contractImage,
-      contractImageSuffix: ctx.input.contractImageSuffix
+      contractImageSuffix: ctx.input.contractImageSuffix,
+      description: ctx.input.description,
+      contractUri: ctx.input.contractUri
     });
+
+    let contractAddress = requireOwlString(result.contractAddress, 'contract address');
 
     return {
       output: {
-        contractAddress: result.contractAddress,
-        name: result.name,
-        symbol: result.symbol,
-        baseUri: result.baseUri,
-        royaltyReceiver: result.royaltyReceiver,
-        feeNumerator: result.feeNumerator,
-        userOpHash: result.userOpHash,
-        contractUri: result.contractUri,
-        deployParams: result.deployParams
+        raw: result,
+        contractAddress,
+        name: owlString(result.name),
+        symbol: owlString(result.symbol),
+        baseUri: owlString(result.baseUri),
+        royaltyReceiver: owlString(result.royaltyReceiver),
+        feeNumerator: owlString(result.feeNumerator),
+        userOpHash: requireOwlString(result.userOpHash, 'deployment user operation hash'),
+        contractUri: owlString(result.contractUri),
+        deployParams: owlObject(result.deployParams)
       },
-      message: `Deployed collection **${ctx.input.name}** (${ctx.input.symbol}) on chain ${chainId}. Contract address: \`${result.contractAddress}\``
+      message: `Submitted deployment for collection **${ctx.input.name}** (${ctx.input.symbol}) on chain ${chainId}. Contract address: \`${contractAddress}\``
     };
   })
   .build();

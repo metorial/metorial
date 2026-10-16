@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, expectArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getNotifications = SlateTool.create(spec, {
@@ -32,7 +32,13 @@ export let getNotifications = SlateTool.create(spec, {
       end: ctx.input.end
     });
 
-    let notifications = Array.isArray(results) ? results : [];
+    let notifications = expectArray(results, 'notifications');
+
+    for (let file of notifications) {
+      if (isApiErrorRecord(file) && typeof file.url === 'string') {
+        await ctx.addAttachment({ type: 'url', url: file.url });
+      }
+    }
 
     return {
       output: {

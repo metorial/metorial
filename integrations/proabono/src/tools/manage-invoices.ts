@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -67,12 +67,13 @@ Use "bill" to generate an invoice from a customer's outstanding balance.`,
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (ctx.input.invoiceId == null) throw new Error('invoiceId is required for get');
+      if (ctx.input.invoiceId == null)
+        throw createApiServiceError('invoiceId is required for get');
       let result = await client.getInvoice(ctx.input.invoiceId);
       let invoice = mapInvoice(result);
       return {
         output: { invoice },
-        message: `Retrieved invoice **#${invoice.invoiceId}** — status: ${invoice.status}, amount: ${invoice.amountTotal ?? 0} cents`
+        message: `Retrieved invoice **#${invoice.invoiceId}** — status: ${invoice.status}, amount: ${invoice.amountTotal ?? 'not returned'} cents`
       };
     }
 
@@ -91,13 +92,13 @@ Use "bill" to generate an invoice from a customer's outstanding balance.`,
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${invoices.length}** invoices (total: ${result?.TotalItems || 0})`
+        message: `Found **${invoices.length}** invoices on this page`
       };
     }
 
     if (action === 'bill') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for bill');
+        throw createApiServiceError('referenceCustomer is required for bill');
       let result = await client.billCustomer(ctx.input.referenceCustomer);
       let invoice = mapInvoice(result);
       return {
@@ -106,7 +107,7 @@ Use "bill" to generate an invoice from a customer's outstanding balance.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -119,8 +120,8 @@ let mapInvoice = (raw: any) => ({
   amountSubtotal: raw?.AmountSubtotal,
   amountDue: raw?.AmountDue,
   currency: raw?.Currency,
-  dateGenerated: raw?.DateGenerated,
-  datePaid: raw?.DatePaid,
+  dateGenerated: raw?.DateGenerated ?? raw?.DateIssue,
+  datePaid: raw?.DatePaid ?? raw?.DatePayment,
   typePayment: raw?.TypePayment,
   links: raw?.Links
 });

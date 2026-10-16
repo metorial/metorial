@@ -1,5 +1,8 @@
+export * from './download-catalog';
+export * from './get-accounts-payable-frames';
 export * from './get-analyst-ratings';
 export * from './get-commodities';
+export * from './get-company-ratings';
 export * from './get-eod-prices';
 export * from './get-etf-holdings';
 export * from './get-government-bonds';
@@ -9,5 +12,6 @@ export * from './get-sec-financial-data';
 export * from './get-splits-and-dividends';
 export * from './get-ticker-details';
 export * from './list-exchanges';
+export * from './reference-data';
 export * from './search-sec-filings';
 export * from './search-tickers';

@@ -8,6 +8,9 @@ export let getGasDistribution = SlateTool.create(spec, {
   key: 'get_gas_distribution',
   description: `Retrieves the current distribution and breakdown of gas prices in the Ethereum mempool. Shows the gas prices of the top N transactions eligible for inclusion in the next block. Useful for understanding current mempool pressure and transaction pricing dynamics.`,
   constraints: ['Only available for Ethereum mainnet.', 'A valid API key is required.'],
+  instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.'
+  ],
   tags: {
     readOnly: true
   }
@@ -36,7 +39,7 @@ export let getGasDistribution = SlateTool.create(spec, {
 
     let result = await client.getGasDistribution();
 
-    let bucketCount = result.topNDistribution?.distribution?.length ?? 0;
+    let bucketCount = result.topNDistribution.distribution.length;
 
     return {
       output: result,

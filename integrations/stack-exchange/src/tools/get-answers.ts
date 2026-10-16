@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate, providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 let answerSchema = z.object({
@@ -58,7 +59,12 @@ export let getAnswers = SlateTool.create(spec, {
 
     let result: any;
     if (ctx.input.answerIds && ctx.input.answerIds.length > 0) {
-      result = await client.getAnswersByIds(ctx.input.answerIds);
+      result = await client.getAnswersByIds(ctx.input.answerIds, {
+        sort: ctx.input.sort,
+        order: ctx.input.order,
+        page: ctx.input.page,
+        pageSize: ctx.input.pageSize
+      });
     } else if (ctx.input.questionId) {
       result = await client.getQuestionAnswers(ctx.input.questionId, {
         sort: ctx.input.sort,
@@ -67,19 +73,17 @@ export let getAnswers = SlateTool.create(spec, {
         pageSize: ctx.input.pageSize
       });
     } else {
-      throw new Error('Either questionId or answerIds must be provided.');
+      throw createApiServiceError('Either questionId or answerIds must be provided.');
     }
 
     let answers = result.items.map((a: any) => ({
       answerId: a.answer_id,
       questionId: a.question_id,
       score: a.score,
-      isAccepted: a.is_accepted ?? false,
+      isAccepted: a.is_accepted,
       body: a.body,
-      creationDate: new Date(a.creation_date * 1000).toISOString(),
-      lastActivityDate: a.last_activity_date
-        ? new Date(a.last_activity_date * 1000).toISOString()
-        : undefined,
+      creationDate: providerDate(a.creation_date),
+      lastActivityDate: optionalProviderDate(a.last_activity_date),
       ownerDisplayName: a.owner?.display_name,
       ownerUserId: a.owner?.user_id,
       link: a.link

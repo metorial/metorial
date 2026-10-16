@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecords, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let advisorySchema = z.object({
@@ -51,74 +52,56 @@ export let getServiceAdvisories = SlateTool.create(spec, {
       elevatorOutages: z
         .array(elevatorOutageSchema)
         .optional()
-        .describe('Current elevator outages (when includeElevatorStatus is true)')
+        .describe(
+          'Elevator status bulletins, which can summarize multiple outages or normal service (when includeElevatorStatus is true)'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
     let result = await client.getAdvisories();
-
-    let extractCdata = (data: any): string => {
-      if (!data) return '';
-      if (typeof data === 'string') return data;
-      if (typeof data === 'object' && data['#cdata-section'] !== undefined)
-        return data['#cdata-section'];
-      return '';
-    };
-
-    let bsaData = result?.bsa;
-    let bsaList = Array.isArray(bsaData) ? bsaData : bsaData ? [bsaData] : [];
-
-    // Filter out "No delays reported" placeholder entries
-    let advisories = bsaList
-      .filter((bsa: any) => {
-        let desc = extractCdata(bsa?.description);
-        return desc && !desc.toLowerCase().includes('no delays reported');
+    let advisories = bartRecords(result.bsa)
+      .filter(bsa => {
+        let description = bartText(bsa.description).trim();
+        return (
+          description && !/^(?:no advisories issued|no delays reported)\.?$/i.test(description)
+        );
       })
-      .map((bsa: any) => ({
-        station: bsa.station || '',
-        advisoryType: bsa.type || '',
-        description: extractCdata(bsa.description),
-        smsText: extractCdata(bsa.sms_text),
-        posted: bsa.posted || '',
-        expires: bsa.expires || ''
+      .map(bsa => ({
+        station: bartText(bsa.station),
+        advisoryType: bartText(bsa.type),
+        description: bartText(bsa.description),
+        smsText: bartText(bsa.sms_text),
+        posted: bartText(bsa.posted),
+        expires: bartText(bsa.expires)
       }));
-
-    let output: any = {
-      date: result?.date || '',
-      time: result?.time || '',
-      advisories
-    };
-
+    let elevatorOutages: z.infer<typeof elevatorOutageSchema>[] | undefined;
     if (ctx.input.includeElevatorStatus) {
-      let elevResult = await client.getElevatorStatus();
-      let elevData = elevResult?.bsa;
-      let elevList = Array.isArray(elevData) ? elevData : elevData ? [elevData] : [];
-
-      output.elevatorOutages = elevList.map((elev: any) => ({
-        outageId: elev['@id'] || '',
-        station: elev.station || '',
-        outageType: elev.type || '',
-        description: extractCdata(elev.description),
-        smsText: extractCdata(elev.sms_text),
-        posted: elev.posted || '',
-        expires: elev.expires || ''
+      let result = await client.getElevatorStatus();
+      elevatorOutages = bartRecords(result.bsa).map(elev => ({
+        outageId: bartText(elev['@id']),
+        station: bartText(elev.station),
+        outageType: bartText(elev.type),
+        description: bartText(elev.description),
+        smsText: bartText(elev.sms_text),
+        posted: bartText(elev.posted),
+        expires: bartText(elev.expires)
       }));
     }
-
-    let advisoryCount = advisories.length;
-    let elevMsg =
-      ctx.input.includeElevatorStatus && output.elevatorOutages
-        ? ` and **${output.elevatorOutages.length}** elevator outage(s)`
-        : '';
-
+    let elevatorMessage = elevatorOutages
+      ? ` Retrieved **${elevatorOutages.length}** elevator status bulletin(s).`
+      : '';
     return {
-      output,
+      output: {
+        date: bartText(result.date),
+        time: bartText(result.time),
+        advisories,
+        ...(elevatorOutages ? { elevatorOutages } : {})
+      },
       message:
-        advisoryCount > 0
-          ? `Found **${advisoryCount}** active advisory(ies)${elevMsg}.`
-          : `No active service advisories${elevMsg}.`
+        (advisories.length > 0
+          ? `Found **${advisories.length}** active advisory(ies).`
+          : 'No active service advisories.') + elevatorMessage
     };
   })
   .build();

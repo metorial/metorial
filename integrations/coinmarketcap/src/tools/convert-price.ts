@@ -9,6 +9,7 @@ let conversionResultSchema = z.object({
   name: z.string().describe('Name of the source currency'),
   amount: z.number().describe('Original amount being converted'),
   lastUpdated: z.string().describe('Last updated timestamp for the conversion rate'),
+  raw: z.unknown().optional().describe('Unmodified provider response'),
   quote: z
     .record(
       z.string(),
@@ -78,6 +79,7 @@ export let convertPrice = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: client.rawResponse,
         cryptocurrencyId: result.id,
         symbol: result.symbol,
         name: result.name,

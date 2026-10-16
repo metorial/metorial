@@ -1,49 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEventWithOdds, sportOddsSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let outcomeSchema = z.object({
-  name: z.string().describe('Outcome name (team name, "Over", "Under", "Draw", etc.)'),
-  price: z.number().describe('Odds price in the requested format'),
-  point: z.number().optional().describe('Point spread or total value, if applicable')
-});
-
-let marketSchema = z.object({
-  marketKey: z.string().describe('Market type key (e.g. h2h, spreads, totals)'),
-  lastUpdate: z
-    .string()
-    .optional()
-    .describe('ISO timestamp of the last odds update for this market'),
-  outcomes: z.array(outcomeSchema)
-});
-
-let bookmakerSchema = z.object({
-  bookmakerKey: z.string().describe('Bookmaker identifier'),
-  title: z.string().describe('Bookmaker display name'),
-  lastUpdate: z.string().describe('ISO timestamp of the last update from this bookmaker'),
-  markets: z.array(marketSchema)
-});
-
-let eventWithOddsSchema = z.object({
-  eventId: z.string().describe('Unique event identifier'),
-  sportKey: z.string().describe('Sport key'),
-  sportTitle: z.string().describe('Sport display name'),
-  commenceTime: z.string().describe('ISO timestamp of event start time'),
-  homeTeam: z.string().nullable().describe('Home team name'),
-  awayTeam: z.string().nullable().describe('Away team name'),
-  bookmakers: z.array(bookmakerSchema)
-});
 
 export let getOddsTool = SlateTool.create(spec, {
   name: 'Get Odds',
   key: 'get_odds',
   description: `Retrieve live and upcoming betting odds for a given sport. Returns events with bookmaker odds for the specified regions and markets.
-Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
+Use \`"upcoming"\` as the sport to get live games and the next eight upcoming games across all sports.`,
   instructions: [
     'Use sport keys from the List Sports tool (e.g. "americanfootball_nfl", "soccer_epl").',
     'Specify at least one region. Multiple regions can be comma-separated (e.g. "us,uk").',
-    'Markets default to "h2h" (moneyline). Available: h2h, spreads, totals, outrights.'
+    'Markets default to "h2h" (moneyline), or "outrights" for futures sports. Available: h2h, spreads, totals, outrights.'
   ],
   constraints: ['Costs 1 API credit per region per market.'],
   tags: {
@@ -54,7 +23,9 @@ Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
     z.object({
       sport: z
         .string()
-        .describe('Sport key (e.g. "americanfootball_nfl") or "upcoming" for all sports'),
+        .describe(
+          'Sport key from list_sports (e.g. "americanfootball_nfl") or "upcoming" for all sports'
+        ),
       regions: z.string().describe('Comma-separated bookmaker regions: us, us2, uk, au, eu'),
       markets: z
         .string()
@@ -65,7 +36,26 @@ Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
         .optional()
         .describe('Odds format (default: decimal)'),
       eventIds: z.string().optional().describe('Comma-separated event IDs to filter'),
-      bookmakers: z.string().optional().describe('Comma-separated bookmaker keys to filter'),
+      includeLinks: z
+        .boolean()
+        .optional()
+        .describe('Include bookmaker event, market and selection links when available'),
+      includeSids: z
+        .boolean()
+        .optional()
+        .describe('Include bookmaker source identifiers when available'),
+      includeBetLimits: z
+        .boolean()
+        .optional()
+        .describe('Include selection bet limits when available'),
+      includeRotationNumbers: z
+        .boolean()
+        .optional()
+        .describe('Include home and away rotation numbers when available'),
+      bookmakers: z
+        .string()
+        .optional()
+        .describe('Comma-separated bookmaker keys to filter; takes priority over regions'),
       commenceTimeFrom: z
         .string()
         .optional()
@@ -78,7 +68,7 @@ Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
   )
   .output(
     z.object({
-      events: z.array(eventWithOddsSchema)
+      events: z.array(sportOddsSchema)
     })
   )
   .handleInvocation(async ctx => {
@@ -95,6 +85,10 @@ Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
     } = ctx.input;
 
     let data = await client.getOdds({
+      includeLinks: ctx.input.includeLinks,
+      includeSids: ctx.input.includeSids,
+      includeBetLimits: ctx.input.includeBetLimits,
+      includeRotationNumbers: ctx.input.includeRotationNumbers,
       sport,
       regions,
       markets,
@@ -105,28 +99,7 @@ Use \`"upcoming"\` as the sport to get odds across all in-season sports.`,
       commenceTimeTo
     });
 
-    let events = data.map(e => ({
-      eventId: e.id,
-      sportKey: e.sport_key,
-      sportTitle: e.sport_title,
-      commenceTime: e.commence_time,
-      homeTeam: e.home_team,
-      awayTeam: e.away_team,
-      bookmakers: e.bookmakers.map(b => ({
-        bookmakerKey: b.key,
-        title: b.title,
-        lastUpdate: b.last_update,
-        markets: b.markets.map(m => ({
-          marketKey: m.key,
-          lastUpdate: m.last_update,
-          outcomes: m.outcomes.map(o => ({
-            name: o.name,
-            price: o.price,
-            point: o.point
-          }))
-        }))
-      }))
-    }));
+    let events = data.map(event => mapEventWithOdds(event));
 
     return {
       output: { events },

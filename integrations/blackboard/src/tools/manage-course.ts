@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let courseAvailabilitySchema = z
@@ -16,7 +16,13 @@ let courseAvailabilitySchema = z
           .optional()
           .describe('Duration type'),
         start: z.string().optional().describe('Start date (ISO 8601)'),
-        end: z.string().optional().describe('End date (ISO 8601)')
+        end: z.string().optional().describe('End date (ISO 8601)'),
+        daysOfUse: z
+          .number()
+          .optional()
+          .describe(
+            'Positive whole number of days; required when creating a FixedNumDays course'
+          )
       })
       .optional()
       .describe('Duration settings')
@@ -51,7 +57,10 @@ export let createCourse = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('If true, creates an organization instead of a course'),
-      termId: z.string().optional().describe('Term ID to associate with the course'),
+      termId: z
+        .string()
+        .optional()
+        .describe('Term ID to associate with the course. Call list_terms to discover IDs.'),
       availability: courseAvailabilitySchema,
       enrollment: courseEnrollmentSchema,
       allowGuests: z.boolean().optional().describe('Whether guests can access the course')
@@ -68,7 +77,7 @@ export let createCourse = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let course = await client.createCourse({
       courseId: ctx.input.courseId,
@@ -125,7 +134,7 @@ export let getCourse = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let course = await client.getCourse(ctx.input.courseId);
 
     return {
@@ -162,7 +171,7 @@ export let updateCourse = SlateTool.create(spec, {
         .describe('Course identifier — internal ID, "externalId:XXX", or "courseId:XXX"'),
       name: z.string().optional().describe('New display name'),
       description: z.string().optional().describe('New description (HTML supported)'),
-      termId: z.string().optional().describe('New term ID'),
+      termId: z.string().optional().describe('New term ID. Call list_terms to discover IDs.'),
       availability: courseAvailabilitySchema,
       enrollment: courseEnrollmentSchema,
       allowGuests: z.boolean().optional().describe('Whether guests can access the course')
@@ -177,7 +186,7 @@ export let updateCourse = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let { courseId, ...updateData } = ctx.input;
     let course = await client.updateCourse(courseId, updateData);
 
@@ -215,7 +224,7 @@ export let deleteCourse = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteCourse(ctx.input.courseId);
 
     return {
@@ -236,13 +245,16 @@ export let listCourses = SlateTool.create(spec, {
   .input(
     z.object({
       offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of results to return (max 200)'),
+      limit: z.number().optional().describe('Maximum number of results to return'),
       availability: z
         .enum(['Yes', 'No', 'Disabled', 'Term'])
         .optional()
         .describe('Filter by availability status'),
       termId: z.string().optional().describe('Filter by term ID'),
-      dataSourceId: z.string().optional().describe('Filter by data source ID'),
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Filter by data source ID. Call list_data_sources to discover IDs.'),
       sort: z.string().optional().describe('Sort field (e.g., "courseId", "name", "created")')
     })
   )
@@ -263,7 +275,7 @@ export let listCourses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listCourses({
       offset: ctx.input.offset,
       limit: ctx.input.limit,

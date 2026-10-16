@@ -1,5 +1,8 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash } from 'node:crypto';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ShortPixelClient } from './lib/client';
+import { readOptionalNumber } from './lib/responses';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,22 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.shortpixel.com'
-      });
-
-      let response = await axios.get('/v2/api-status.php', {
-        params: {
-          key: ctx.output.token
-        }
-      });
-
-      let data = response.data;
+      let data = await new ShortPixelClient({ token: ctx.output.token }).getApiStatus();
+      let calls = readOptionalNumber(data.APICallsMade, 'monthly calls made');
 
       return {
         profile: {
-          id: ctx.output.token,
-          name: `ShortPixel (${data.APICallsMade ?? 0} calls made)`
+          id: createHash('sha256').update(ctx.output.token).digest('hex'),
+          name: calls === undefined ? 'ShortPixel' : `ShortPixel (${calls} calls made)`
         }
       };
     }

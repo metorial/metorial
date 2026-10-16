@@ -28,14 +28,14 @@ export let deleteCredential = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment ?? (ctx.config as { environment?: string }).environment
     });
 
     let credential = await client.deleteCredential(ctx.input.credentialId);
 
     return {
       output: {
-        credentialId: String(credential?.id || ctx.input.credentialId),
+        credentialId: String(credential.id),
         credentialName: credential?.name,
         recipientName: credential?.recipient?.name,
         recipientEmail: credential?.recipient?.email

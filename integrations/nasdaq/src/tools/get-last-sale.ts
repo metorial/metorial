@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RealtimeClient } from '../lib/realtime-client';
+import { createRealtimeClient, realtimeRecords } from '../lib/realtime-client';
 import { spec } from '../spec';
 
 export let getLastSale = SlateTool.create(spec, {
@@ -45,29 +45,9 @@ Also supports fetching the latest bid/ask quote or most recent trade. Requires O
     })
   )
   .handleInvocation(async ctx => {
-    if (
-      ctx.auth.authMethod !== 'oauth' ||
-      !ctx.auth.baseUrl ||
-      !ctx.auth.oauthToken ||
-      !ctx.auth.tokenEndpoint ||
-      !ctx.auth.clientId ||
-      !ctx.auth.clientSecret
-    ) {
-      throw new Error(
-        'This tool requires OAuth2 Client Credentials authentication. Please use the OAuth2 authentication method.'
-      );
-    }
+    let client = createRealtimeClient(ctx.auth);
 
-    let client = new RealtimeClient({
-      baseUrl: ctx.auth.baseUrl,
-      oauthToken: ctx.auth.oauthToken,
-      tokenEndpoint: ctx.auth.tokenEndpoint,
-      clientId: ctx.auth.clientId,
-      clientSecret: ctx.auth.clientSecret,
-      oauthTokenExpiresAt: ctx.auth.oauthTokenExpiresAt || ''
-    });
-
-    let result: any;
+    let result: unknown;
     let params = {
       symbols: ctx.input.symbols,
       source: ctx.input.source,
@@ -82,7 +62,7 @@ Also supports fetching the latest bid/ask quote or most recent trade. Requires O
       result = await client.getLastSale(params);
     }
 
-    let quotes = Array.isArray(result) ? result : [result];
+    let quotes = realtimeRecords(result, 'quotes');
 
     return {
       output: {

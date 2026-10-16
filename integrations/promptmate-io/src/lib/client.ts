@@ -1,4 +1,77 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
+
+let rowSchema = z.record(z.string(), z.unknown());
+let appSummarySchema = z
+  .object({
+    appId: z.string(),
+    appName: z.string(),
+    creditEstimate: z.number().optional()
+  })
+  .passthrough();
+let appDetailSchema = appSummarySchema.extend({
+  dataFields: z.array(z.string()).optional(),
+  responseFields: z
+    .array(
+      z
+        .object({
+          name: z.string().optional(),
+          type: z.string().optional(),
+          description: z.string().optional()
+        })
+        .passthrough()
+    )
+    .optional()
+});
+let jobCreatedSchema = z.object({ jobId: z.string(), jobStatus: z.string() }).passthrough();
+let jobStatusSchema = jobCreatedSchema.extend({
+  result: z.array(rowSchema).optional(),
+  responseFields: z
+    .array(
+      z
+        .object({
+          name: z.string(),
+          type: z.string().optional(),
+          description: z.string().optional()
+        })
+        .passthrough()
+    )
+    .optional()
+});
+export let webhookSchema = z
+  .object({
+    webhookId: z.string().optional(),
+    webhookName: z.string().optional(),
+    restrictedAppIds: z.array(z.string()).optional(),
+    webhookType: z.enum(['job', 'row']).optional(),
+    endpointUrl: z.string().optional(),
+    webhookReference: z.string().optional()
+  })
+  .passthrough();
+export let createdWebhookSchema = webhookSchema.extend({
+  webhookId: z.string(),
+  webhookType: z.enum(['job', 'row']),
+  endpointUrl: z.string()
+});
+
+function parseResponse<T>(schema: z.ZodType<T>, value: unknown, operation: string): T {
+  let result = schema.safeParse(value);
+  if (!result.success) {
+    throw createApiServiceError(
+      `Promptmate.io returned an invalid response for ${operation}.`,
+      {
+        reason: 'promptmate_invalid_response'
+      }
+    );
+  }
+  return result.data;
+}
+
+function requireIdentifier(value: string, label: string) {
+  if (!value.trim()) {
+    throw createApiServiceError(`${label} must not be empty.`);
+  }
+}
 
 export interface AppSummary {
   appId: string;
@@ -6,13 +79,7 @@ export interface AppSummary {
   creditEstimate?: number;
 }
 
-export interface AppDetail {
-  appId: string;
-  appName: string;
-  creditEstimate?: number;
-  dataFields?: string[];
-  responseFields?: Array<{ name: string; type?: string; description?: string }>;
-}
+export type AppDetail = z.infer<typeof appDetailSchema>;
 
 export interface CreateJobParams {
   appId: string;
@@ -48,14 +115,7 @@ export interface UseTemplateParams {
   templateId: string;
 }
 
-export interface WebhookSummary {
-  webhookId: string;
-  webhookName?: string;
-  restrictedAppIds?: string[];
-  webhookType: 'job' | 'row';
-  endpointUrl: string;
-  webhookReference?: string;
-}
+export type WebhookSummary = z.infer<typeof webhookSchema>;
 
 export interface CreateWebhookParams {
   webhookName?: string;
@@ -93,59 +153,120 @@ export class Client {
     });
   }
 
+  private async request<T>(
+    operation: string,
+    request: () => Promise<{ data: unknown }>,
+    schema: z.ZodType<T>
+  ): Promise<T> {
+    try {
+      let response = await request();
+      return parseResponse(schema, response.data, operation);
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Promptmate.io',
+        reason: 'promptmate_request_failed',
+        operation,
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      });
+    }
+  }
+
   // ── Apps ──────────────────────────────────────────────
 
   async listApps(): Promise<AppSummary[]> {
-    let response = await this.http.get('/apps');
-    return response.data;
+    return this.request('list apps', () => this.http.get('/apps'), z.array(appSummarySchema));
   }
 
   async getApp(appId: string): Promise<AppDetail> {
-    let response = await this.http.get('/app', {
-      params: { appId }
-    });
-    return response.data;
+    requireIdentifier(appId, 'App ID');
+    return this.request(
+      'get app',
+      () =>
+        this.http.get('/app', {
+          params: { appId }
+        }),
+      appDetailSchema
+    );
   }
 
   // ── App Jobs ──────────────────────────────────────────
 
   async createJob(params: CreateJobParams): Promise<JobCreateResponse> {
-    let response = await this.http.post('/app-jobs', params);
-    return response.data;
+    requireIdentifier(params.appId, 'App ID');
+    return this.request(
+      'create app job',
+      () => this.http.post('/app-jobs', params),
+      jobCreatedSchema
+    );
   }
 
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
-    let response = await this.http.get('/app-jobs', {
-      params: { jobId }
-    });
-    return response.data;
+    requireIdentifier(jobId, 'Job ID');
+    return this.request(
+      'get job status',
+      () =>
+        this.http.get('/app-jobs', {
+          params: { jobId }
+        }),
+      jobStatusSchema
+    );
   }
 
   // ── App Results ───────────────────────────────────────
 
-  async getAppResults(
-    appId: string,
-    onlyDefaultResultFields?: boolean
-  ): Promise<Record<string, unknown>[]> {
-    let response = await this.http.get('/app-results', {
-      params: {
-        appId,
-        ...(onlyDefaultResultFields !== undefined ? { onlyDefaultResultFields } : {})
-      }
-    });
-    return response.data;
+  async getAppResults(appId: string, onlyDefaultResultFields?: boolean) {
+    requireIdentifier(appId, 'App ID');
+    let raw = await this.request(
+      'get app results',
+      () =>
+        this.http.get('/app-results', {
+          params: {
+            appId,
+            ...(onlyDefaultResultFields !== undefined ? { onlyDefaultResultFields } : {})
+          }
+        }),
+      z.union([
+        z.array(rowSchema),
+        z
+          .object({
+            appId: z.string(),
+            resultData: z.array(rowSchema),
+            responseFields: z.array(rowSchema).optional()
+          })
+          .passthrough()
+      ])
+    );
+    return Array.isArray(raw)
+      ? { rows: raw, raw }
+      : { rows: raw.resultData, appId: raw.appId, responseFields: raw.responseFields, raw };
   }
 
   // ── Templates ─────────────────────────────────────────
 
   async listTemplates(): Promise<TemplateSummary[]> {
-    let response = await this.http.get('/templates');
-    return response.data;
+    return this.request(
+      'list templates',
+      () => this.http.get('/templates'),
+      z.array(
+        z
+          .object({
+            templateId: z.string(),
+            templateName: z.string(),
+            description: z.string().optional(),
+            category: z.string().optional()
+          })
+          .passthrough()
+      )
+    );
   }
 
   async useTemplate(templateId: string): Promise<Record<string, unknown>> {
-    let response = await this.http.post('/templates', { templateId });
-    return response.data;
+    requireIdentifier(templateId, 'Template ID');
+    return this.request(
+      'use template',
+      () => this.http.post('/templates', { templateId }),
+      rowSchema
+    );
   }
 
   // ── Reference Data ────────────────────────────────────
@@ -160,35 +281,62 @@ export class Client {
     return response.data;
   }
 
+  async listLanguageValues(): Promise<string[]> {
+    return this.request(
+      'list languages',
+      () => this.http.get('/reference/languages'),
+      z.array(z.string())
+    );
+  }
+
   // ── Projects ──────────────────────────────────────────
 
   async listProjects(): Promise<ProjectSummary[]> {
-    let response = await this.http.get('/projects');
-    return response.data;
+    return this.request(
+      'list projects',
+      () => this.http.get('/projects'),
+      z.array(
+        z
+          .object({
+            projectId: z.string(),
+            projectName: z.string()
+          })
+          .passthrough()
+      )
+    );
   }
 
   // ── User Info ─────────────────────────────────────────
 
   async getUserInfo(): Promise<Record<string, unknown>> {
-    let response = await this.http.get('/userInfo');
-    return response.data;
+    return this.request('get user information', () => this.http.get('/userInfo'), rowSchema);
   }
 
   // ── Webhooks ──────────────────────────────────────────
 
   async listWebhooks(): Promise<WebhookSummary[]> {
-    let response = await this.http.get('/webhooks');
-    return response.data;
+    return this.request(
+      'list webhooks',
+      () => this.http.get('/webhooks'),
+      z.array(webhookSchema)
+    );
   }
 
-  async createWebhook(params: CreateWebhookParams): Promise<WebhookSummary> {
-    let response = await this.http.post('/webhooks', params);
-    let data = response.data;
-    // The API returns an array; return the first element
-    return Array.isArray(data) ? data[0] : data;
+  async createWebhook(params: CreateWebhookParams) {
+    let data = await this.request(
+      'create webhook',
+      () => this.http.post('/webhooks', params),
+      z.union([createdWebhookSchema, z.array(createdWebhookSchema).min(1)])
+    );
+    return Array.isArray(data) ? data : [data];
   }
 
   async deleteWebhook(webhookReference: string): Promise<void> {
-    await this.http.delete(`/webhooks/${webhookReference}`);
+    requireIdentifier(webhookReference, 'Webhook reference');
+    await this.request(
+      'delete webhook',
+      () => this.http.delete(`/webhooks/${encodeURIComponent(webhookReference)}`),
+      z.unknown()
+    );
   }
 }

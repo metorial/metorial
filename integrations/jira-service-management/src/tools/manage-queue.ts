@@ -48,14 +48,11 @@ export let manageQueueTool = SlateTool.create(spec, {
         )
         .optional()
         .describe('Issues in the specified queue'),
-      total: z.number().describe('Total count')
+      total: z.number().describe('Number of items on this page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     if (ctx.input.queueId) {
       let result = await client.getQueueIssues(

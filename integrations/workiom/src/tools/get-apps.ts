@@ -14,7 +14,8 @@ export let getApps = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      apps: z.array(z.any()).describe('Array of app objects in the workspace')
+      apps: z.array(z.any()).describe('Array of app objects in the workspace'),
+      raw: z.any().optional().describe('Complete app response, including provider metadata')
     })
   )
   .handleInvocation(async ctx => {
@@ -25,7 +26,8 @@ export let getApps = SlateTool.create(spec, {
 
     return {
       output: {
-        apps: appList
+        apps: appList,
+        raw: apps
       },
       message: `Found **${appList.length}** app(s) in the workspace.`
     };

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { CurrentClient } from './lib/current-client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +16,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your Timelink API token. Generate one from your Timelink account settings.')
+        .describe(
+          'Your Timelink API token. Create one under My Account > API Tokens in Timelink.'
+        )
     }),
 
     getOutput: async ctx => {
@@ -27,21 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.timelink.io/api/v1/',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/users/me');
-      let user = response.data;
+      const token = await new CurrentClient({ token: ctx.output.token }).getCurrentToken();
 
       return {
         profile: {
-          id: user.id?.toString(),
-          name: user.name,
-          email: user.email
+          id: String(token.id),
+          name: `API token: ${token.name}`
         }
       };
     }

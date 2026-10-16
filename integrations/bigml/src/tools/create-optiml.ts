@@ -30,6 +30,7 @@ Supports classification and regression tasks.`,
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the OptiML'),
       name: z.string().optional().describe('Name of the OptiML'),
       statusCode: z.number().describe('Status code'),
@@ -40,28 +41,29 @@ Supports classification and regression tasks.`,
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       dataset: ctx.input.datasetId
     };
 
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.metric) body.metric = ctx.input.metric;
     if (ctx.input.maxTrainingTime !== undefined)
       body.max_training_time = ctx.input.maxTrainingTime;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let result = await client.createResource('optiml', body);
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `OptiML **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}. OptiML runs asynchronously and may take significant time as it evaluates many model configurations.`
+      message: `OptiML **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}. OptiML runs asynchronously and may take significant time as it evaluates many model configurations.`
     };
   })
   .build();

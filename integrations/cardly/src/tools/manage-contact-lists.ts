@@ -4,38 +4,43 @@ import { CardlyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contactListOutputSchema = z.object({
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete contact list record returned by Cardly'),
   listId: z.string().describe('Unique contact list ID'),
   name: z.string().describe('List name'),
-  slug: z.string().describe('URL-friendly slug'),
+  slug: z.string().optional().describe('URL-friendly slug, when returned by Cardly'),
   customFields: z
     .array(
       z.object({
         fieldId: z.string().describe('Custom field ID'),
         name: z.string().describe('Field name'),
-        slug: z.string().describe('Field slug'),
+        slug: z.string().describe('Stable field code used for contact custom values'),
         type: z.string().describe('Field type (text, date, number, url)')
       })
     )
     .describe('Custom fields defined for this list'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
+  createdAt: z.string().optional().describe('Creation timestamp, when returned by Cardly'),
+  updatedAt: z.string().optional().describe('Last update timestamp, when returned by Cardly')
 });
 
 let mapList = (l: Record<string, unknown>) => {
   let customFields =
     (l.customFields as Array<{ id: string; name: string; slug: string; type: string }>) || [];
   return {
+    raw: l.raw as Record<string, unknown> | undefined,
     listId: l.id as string,
     name: l.name as string,
-    slug: l.slug as string,
+    slug: l.slug as string | undefined,
     customFields: customFields.map(f => ({
       fieldId: f.id,
       name: f.name,
       slug: f.slug,
       type: f.type
     })),
-    createdAt: l.createdAt as string,
-    updatedAt: l.updatedAt as string
+    createdAt: l.createdAt as string | undefined,
+    updatedAt: l.updatedAt as string | undefined
   };
 };
 

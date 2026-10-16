@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface LinklyAuth {
   token: string;
@@ -85,24 +85,47 @@ export interface ClickCountersParams {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-  private apiKey: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private workspaceId: number;
 
   constructor(auth: LinklyAuth) {
-    this.apiKey = auth.token;
+    if (!auth.token.trim()) {
+      throw createApiServiceError('Enter a Linkly API key from Settings → API Keys.');
+    }
+    if (!Number.isSafeInteger(auth.workspaceId) || auth.workspaceId <= 0) {
+      throw createApiServiceError(
+        'workspaceId must be a positive integer from Linkly settings.'
+      );
+    }
     this.workspaceId = auth.workspaceId;
-    this.axios = createAxios({
-      baseURL: 'https://app.linklyhq.com/api/v1',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.linklyhq.com/api/v1',
+      authHeader: { value: `Bearer ${auth.token}` },
+      timeout: 65000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Linkly',
+          reason: 'linkly_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          extractUpstreamCode: (_error, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        })
     });
   }
 
-  async createOrUpdateLink(params: CreateOrUpdateLinkParams): Promise<any> {
-    let body: Record<string, any> = {
-      api_key: this.apiKey,
+  private linkBody(params: CreateOrUpdateLinkParams) {
+    if (!params.url.trim()) {
+      throw createApiServiceError('Provide a non-empty destination URL.');
+    }
+    if (
+      params.linkId !== undefined &&
+      (!Number.isSafeInteger(params.linkId) || params.linkId <= 0)
+    ) {
+      throw createApiServiceError('linkId must be a positive integer.');
+    }
+    let body: Record<string, unknown> = {
       workspace_id: this.workspaceId,
       url: params.url
     };
@@ -136,30 +159,51 @@ export class Client {
       body.expiry_destination = params.expiryDestination;
     if (params.expiryClicks !== undefined) body.expiry_clicks = params.expiryClicks;
     if (params.password !== undefined) body.password = params.password;
-    if (params.rules !== undefined) body.rules = params.rules;
+    if (params.rules !== undefined)
+      body.rules = params.rules.map(rule => ({
+        ...rule,
+        what:
+          rule.what === 'geo' ? 'country' : rule.what === 'device' ? 'platform' : rule.what,
+        ...(rule.percentage === undefined ? {} : { percentage: String(rule.percentage) })
+      }));
     if (params.webhooks !== undefined) body.webhooks = params.webhooks;
 
-    let response = await this.axios.post('/link', body);
+    return body;
+  }
+
+  async createOrUpdateLink(params: CreateOrUpdateLinkParams): Promise<any> {
+    let response = await this.axios.post('/link', this.linkBody(params));
     return response.data;
   }
 
   async getLink(linkId: number): Promise<any> {
-    let response = await this.axios.get(`/get_link/${linkId}`, {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    if (!Number.isSafeInteger(linkId) || linkId <= 0) {
+      throw createApiServiceError('linkId must be a positive integer.');
+    }
+    let response = await this.axios.get(`/get_link/${linkId}`);
     return response.data;
   }
 
   async listLinks(params?: ListLinksParams): Promise<any> {
-    let queryParams: Record<string, any> = {
-      api_key: this.apiKey
-    };
+    let queryParams: Record<string, string | number | boolean> = {};
 
     if (params?.search) queryParams.search = params.search;
-    if (params?.page) queryParams.page = params.page;
-    if (params?.pageSize) queryParams.page_size = params.pageSize;
+    if (params?.page !== undefined) {
+      if (!Number.isSafeInteger(params.page) || params.page < 1) {
+        throw createApiServiceError('page must be a positive integer.');
+      }
+      queryParams.page = params.page;
+    }
+    if (params?.pageSize !== undefined) {
+      if (
+        !Number.isSafeInteger(params.pageSize) ||
+        params.pageSize < 1 ||
+        params.pageSize > 1000
+      ) {
+        throw createApiServiceError('pageSize must be an integer from 1 to 1000.');
+      }
+      queryParams.page_size = params.pageSize;
+    }
     if (params?.sortBy) queryParams.sort_by = params.sortBy;
     if (params?.sortDir) queryParams.sort_dir = params.sortDir;
 
@@ -170,33 +214,25 @@ export class Client {
   }
 
   async deleteLink(linkId: number): Promise<any> {
-    let response = await this.axios.delete(`/workspace/${this.workspaceId}/links/${linkId}`, {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.delete(`/workspace/${this.workspaceId}/links/${linkId}`);
     return response.data;
   }
 
-  async deleteLinks(linkIds: number[]): Promise<any> {
-    let response = await this.axios.delete(`/workspace/${this.workspaceId}/links`, {
-      params: {
-        api_key: this.apiKey
-      },
-      data: {
-        ids: linkIds
-      }
-    });
-    return response.data;
+  private analyticsLinkIds(value: string) {
+    let ids = value.split(/[,\s-]+/).filter(Boolean);
+    if (ids.length === 0 || ids.some(id => !/^\d+$/.test(id) || Number(id) <= 0)) {
+      throw createApiServiceError(
+        'linkIds must contain positive link IDs separated by commas or hyphens.'
+      );
+    }
+    return ids.join('-');
   }
 
-  async getClickAnalytics(params?: ClickAnalyticsParams): Promise<any> {
-    let queryParams: Record<string, any> = {
-      api_key: this.apiKey
-    };
+  private analyticsQuery(params?: ClickAnalyticsParams) {
+    let queryParams: Record<string, string | number | boolean> = {};
 
     if (params?.linkId !== undefined) queryParams.link_id = params.linkId;
-    if (params?.linkIds) queryParams.link_ids = params.linkIds;
+    if (params?.linkIds) queryParams.link_ids = this.analyticsLinkIds(params.linkIds);
     if (params?.start) queryParams.start = params.start;
     if (params?.end) queryParams.end = params.end;
     if (params?.country) queryParams.country = params.country;
@@ -207,23 +243,47 @@ export class Client {
     if (params?.bots !== undefined) queryParams.bots = params.bots;
     if (params?.unique !== undefined) queryParams.unique = params.unique;
     if (params?.format) queryParams.format = params.format;
-    if (params?.pivot) queryParams.pivot = params.pivot;
+    if (params?.pivot !== undefined) {
+      if (params.pivot !== 'link_id') {
+        throw createApiServiceError('The supported pivot value is "link_id".');
+      }
+      queryParams.pivot = params.pivot;
+    }
     if (params?.timezone) queryParams.timezone = params.timezone;
     if (params?.frequency) queryParams.frequency = params.frequency;
 
+    return queryParams;
+  }
+
+  async getClickAnalytics(params?: ClickAnalyticsParams): Promise<any> {
     let response = await this.axios.get(`/workspace/${this.workspaceId}/clicks`, {
-      params: queryParams
+      params: this.analyticsQuery(params)
     });
     return response.data;
   }
 
-  async getClickCounters(params: ClickCountersParams): Promise<any> {
-    let queryParams: Record<string, any> = {
-      api_key: this.apiKey
+  getAnalyticsDownload(params: ClickAnalyticsParams & { format: 'csv' | 'tsv' }) {
+    return {
+      url: `https://api.linklyhq.com/api/v1/workspace/${this.workspaceId}/clicks`,
+      query: Object.fromEntries(
+        Object.entries(this.analyticsQuery(params)).map(([key, value]) => [key, String(value)])
+      )
     };
+  }
+
+  async bulkUpsertLinks(links: CreateOrUpdateLinkParams[]): Promise<unknown> {
+    let response = await this.axios.post(
+      '/links',
+      links.map(link => this.linkBody(link))
+    );
+    return response.data;
+  }
+
+  async getClickCounters(params: ClickCountersParams): Promise<any> {
+    let queryParams: Record<string, string | number | boolean> = {};
 
     if (params.linkId !== undefined) queryParams.link_id = params.linkId;
-    if (params.linkIds) queryParams.link_ids = params.linkIds;
+    if (params.linkIds) queryParams.link_ids = this.analyticsLinkIds(params.linkIds);
     if (params.start) queryParams.start = params.start;
     if (params.end) queryParams.end = params.end;
     if (params.country) queryParams.country = params.country;
@@ -242,17 +302,12 @@ export class Client {
 
   // Webhook management - Link level
   async listLinkWebhooks(linkId: number): Promise<any> {
-    let response = await this.axios.get(`/link/${linkId}/webhooks`, {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.get(`/link/${linkId}/webhooks`);
     return response.data;
   }
 
   async createLinkWebhook(linkId: number, url: string): Promise<any> {
     let response = await this.axios.post(`/link/${linkId}/webhooks`, {
-      api_key: this.apiKey,
       url
     });
     return response.data;
@@ -260,29 +315,19 @@ export class Client {
 
   async deleteLinkWebhook(linkId: number, hookId: string): Promise<any> {
     let response = await this.axios.delete(
-      `/link/${linkId}/webhooks/${encodeURIComponent(hookId)}`,
-      {
-        params: {
-          api_key: this.apiKey
-        }
-      }
+      `/link/${linkId}/webhooks/${encodeURIComponent(hookId)}`
     );
     return response.data;
   }
 
   // Webhook management - Workspace level
   async listWorkspaceWebhooks(): Promise<any> {
-    let response = await this.axios.get(`/workspace/${this.workspaceId}/webhooks`, {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.get(`/workspace/${this.workspaceId}/webhooks`);
     return response.data;
   }
 
   async createWorkspaceWebhook(url: string): Promise<any> {
     let response = await this.axios.post(`/workspace/${this.workspaceId}/webhooks`, {
-      api_key: this.apiKey,
       url
     });
     return response.data;
@@ -290,33 +335,20 @@ export class Client {
 
   async deleteWorkspaceWebhook(hookId: string): Promise<any> {
     let response = await this.axios.delete(
-      `/workspace/${this.workspaceId}/webhooks/${encodeURIComponent(hookId)}`,
-      {
-        params: {
-          api_key: this.apiKey
-        }
-      }
+      `/workspace/${this.workspaceId}/webhooks/${encodeURIComponent(hookId)}`
     );
     return response.data;
   }
 
   // Domains
   async listDomains(): Promise<any> {
-    let response = await this.axios.get(`/workspace/${this.workspaceId}/domains`, {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.get(`/workspace/${this.workspaceId}/domains`);
     return response.data;
   }
 
   // Workspaces
   async listWorkspaces(): Promise<any> {
-    let response = await this.axios.get('/workspaces', {
-      params: {
-        api_key: this.apiKey
-      }
-    });
+    let response = await this.axios.get('/workspaces');
     return response.data;
   }
 }

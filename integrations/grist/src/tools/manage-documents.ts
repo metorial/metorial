@@ -46,7 +46,7 @@ export let getDocument = SlateTool.create(spec, {
         documentId: doc.id,
         name: doc.name,
         isPinned: doc.isPinned,
-        urlId: doc.urlId ?? null,
+        urlId: doc.urlId,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
         workspace: doc.workspace
@@ -58,6 +58,29 @@ export let getDocument = SlateTool.create(spec, {
       },
       message: `Document **${doc.name}** (ID: ${doc.id}).`
     };
+  })
+  .build();
+
+export let restoreDocument = SlateTool.create(spec, {
+  name: 'Restore Document',
+  key: 'restore_document',
+  description:
+    'Restore a document that was moved to trash. Permanently deleted documents cannot be restored.',
+  tags: { destructive: false }
+})
+  .input(z.object({ documentId: z.string().describe('ID of the document in trash') }))
+  .output(
+    z.object({
+      document: z
+        .record(z.string(), z.any())
+        .describe('Provider document metadata after restoration')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GristClient(ctx.auth);
+    await client.restoreDocument(ctx.input.documentId);
+    let document = await client.getDocument(ctx.input.documentId);
+    return { output: { document }, message: 'Restored the document.' };
   })
   .build();
 

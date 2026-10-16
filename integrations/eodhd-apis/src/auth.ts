@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { EodhdClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,18 +26,8 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://eodhd.com/api'
-      });
-
-      let response = await client.get('/user', {
-        params: {
-          api_token: ctx.output.token,
-          fmt: 'json'
-        }
-      });
-
-      let user = response.data;
+      let client = new EodhdClient({ token: ctx.output.token });
+      let user = await client.getUserInfo();
 
       return {
         profile: {

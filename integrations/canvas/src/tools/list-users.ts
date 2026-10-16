@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsersTool = SlateTool.create(spec, {
@@ -29,6 +29,7 @@ export let listUsersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       users: z.array(
         z.object({
           userId: z.string().describe('Canvas user ID'),
@@ -43,10 +44,7 @@ export let listUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
     if (ctx.input.includeEmail) include.push('email');
@@ -70,7 +68,7 @@ export let listUsersTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { users },
+      output: { raw: raw, users },
       message: `Found **${users.length}** user(s) in course ${ctx.input.courseId}.`
     };
   })

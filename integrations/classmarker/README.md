@@ -1,6 +1,10 @@
-# Classmarker
+# ClassMarker
 
-Retrieve exam and quiz results, manage questions and categories, and control exam access for online assessments. Read test scores, user responses, and grading details. Add, edit, and organize questions with categories and point values. Manage access lists to control who can take exams. Discover available groups, links, and tests.
+Discover exam assignments, retrieve recent scores, manage question-bank content and categories, and add or remove exam access codes. Validate question and category changes before saving, and download certificate PDFs supplied with results.
+
+Connect with an API key and secret from **My Account > Webhooks / API Keys**. Keys only expose their authorized groups and links. Use `list_groups_and_links` to discover assignment and access-list IDs, and `list_categories` to discover category IDs.
+
+See the [API specification](docs/SPEC.md) and [official API reference](https://www.classmarker.com/online-testing/docs/api/).
 
 ## License
 

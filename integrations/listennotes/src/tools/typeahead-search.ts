@@ -7,7 +7,7 @@ export let typeaheadSearch = SlateTool.create(spec, {
   name: 'Typeahead Search',
   key: 'typeahead_search',
   description: `Search-as-you-type suggestions for podcast search. Returns autocomplete term suggestions and optionally matching podcasts and genres.
-Also provides access to trending search terms and related search suggestions.`,
+Omit the query to retrieve trending search terms.`,
   tags: {
     readOnly: true
   }
@@ -30,6 +30,10 @@ Also provides access to trending search terms and related search suggestions.`,
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       terms: z.array(z.string()).describe('Suggested search terms.'),
       genres: z
         .array(
@@ -57,6 +61,7 @@ Also provides access to trending search terms and related search suggestions.`,
       let data = await client.getTrendingSearches();
       return {
         output: {
+          raw: data,
           terms: data.terms
         },
         message: `Retrieved **${data.terms.length}** trending search terms.`
@@ -65,13 +70,16 @@ Also provides access to trending search terms and related search suggestions.`,
 
     let data = await client.typeahead({
       q: ctx.input.query,
-      showPodcasts: ctx.input.showPodcasts ? 1 : undefined,
-      showGenres: ctx.input.showGenres ? 1 : undefined,
-      safeMode: ctx.input.safeMode ? 1 : undefined
+      showPodcasts:
+        ctx.input.showPodcasts === undefined ? undefined : Number(ctx.input.showPodcasts),
+      showGenres:
+        ctx.input.showGenres === undefined ? undefined : Number(ctx.input.showGenres),
+      safeMode: ctx.input.safeMode === undefined ? undefined : Number(ctx.input.safeMode)
     });
 
     return {
       output: {
+        raw: data,
         terms: data.terms,
         genres: data.genres?.map(g => ({
           genreId: g.id,

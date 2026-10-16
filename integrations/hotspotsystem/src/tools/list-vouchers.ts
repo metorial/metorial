@@ -31,10 +31,15 @@ export let listVouchers = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter vouchers by a specific location ID. Omit to retrieve across all locations.'
+          'Filter vouchers by a location ID from list_locations. Omit to retrieve across all locations.'
         ),
       limit: z.number().optional().describe('Maximum number of vouchers to return per page'),
-      offset: z.number().optional().describe('Zero-based page offset for pagination'),
+      offset: z
+        .number()
+        .optional()
+        .describe(
+          'Zero-based starting item offset; use the provider Link header to continue pagination'
+        ),
       sort: z
         .string()
         .optional()
@@ -43,6 +48,13 @@ export let listVouchers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete original provider response'),
+      linkHeader: z
+        .string()
+        .optional()
+        .describe(
+          'Provider Link header with self, next, and previous page URLs when available'
+        ),
       totalCount: z.number().describe('Total number of vouchers matching the query'),
       vouchers: z.array(voucherSchema).describe('List of voucher records')
     })
@@ -50,24 +62,28 @@ export let listVouchers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getVouchers({
+    let {
+      data: result,
+      raw,
+      linkHeader
+    } = await client.getVouchers({
       locationId: ctx.input.locationId,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort
     });
 
-    let vouchers = (result.items ?? []).map(v => ({
-      serial: v.serial ?? '',
-      voucherCode: v.voucher_code ?? '',
-      trafficLimitTotal: v.limit_tl ?? '',
-      trafficLimitDownload: v.limit_dl ?? '',
-      trafficLimitUpload: v.limit_ul ?? '',
-      simultaneousUse: v.simultaneous_use ?? '',
-      usageExpiration: v.usage_exp ?? '',
-      validity: v.validity ?? '',
-      price: v.price_enduser ?? '',
-      currency: v.currency ?? ''
+    let vouchers = result.items.map(v => ({
+      serial: v.serial,
+      voucherCode: v.voucher_code,
+      trafficLimitTotal: String(v.limit_tl),
+      trafficLimitDownload: String(v.limit_dl),
+      trafficLimitUpload: String(v.limit_ul),
+      simultaneousUse: String(v.simultaneous_use),
+      usageExpiration: v.usage_exp,
+      validity: String(v.validity),
+      price: String(v.price_enduser),
+      currency: v.currency
     }));
 
     let locationLabel = ctx.input.locationId
@@ -75,6 +91,8 @@ export let listVouchers = SlateTool.create(spec, {
       : ' across all locations';
     return {
       output: {
+        raw,
+        linkHeader,
         totalCount: result.metadata.total_count,
         vouchers
       },

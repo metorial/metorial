@@ -13,6 +13,11 @@ export let getSession = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      visitsPage: z.number().optional().describe('Page number when includeVisits is true'),
+      visitsPageSize: z
+        .number()
+        .optional()
+        .describe('Visits per page when includeVisits is true'),
       sessionId: z.string().describe('Unique session ID of the visitor session to retrieve'),
       includeVisits: z
         .boolean()
@@ -50,7 +55,11 @@ export let getSession = SlateTool.create(spec, {
     let notes: Record<string, unknown>[] | undefined;
 
     if (includeVisits) {
-      let visitsResult = await client.getSessionVisits(sessionId);
+      let visitsResult = await client.getSessionVisits(
+        sessionId,
+        ctx.input.visitsPage,
+        ctx.input.visitsPageSize
+      );
       visits = visitsResult.results;
     }
 

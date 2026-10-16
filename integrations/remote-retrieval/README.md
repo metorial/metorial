@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Remote Retrieval
 
-Manage IT equipment return and recovery logistics for remote employees. Create single or bulk orders to retrieve laptops, monitors, tablets, and cell phones via prepaid shipping boxes. Track order status through the full lifecycle — from shipping label creation to device delivery. Supports "Return To Company" and "Recycle with Data Destruction" order types, with optional data destruction services. Retrieve device pricing, order details, payment status, shipment tracking, and company profile information. Upload CSV files for bulk order creation.
+Manage IT equipment return and recovery logistics for remote employees. Create single or bulk orders to retrieve laptops, monitors, tablets, and cell phones via prepaid shipping boxes. Track order status through the full lifecycle — from shipping label creation to device delivery. Supports "Return To Company" and "Recycle with Data Destruction" order types, with optional data destruction services. Retrieve device pricing, order details, payment status, shipment tracking, and company profile information. Create bulk orders from CSV content and check the connected user's email address.
 
 ## License
 

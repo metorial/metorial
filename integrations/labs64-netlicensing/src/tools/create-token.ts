@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,7 @@ export let createToken = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Role for APIKEY tokens (Licensee, Analytics, Operation, Maintenance, Admin)'
+          'RoleID for APIKEY tokens, such as ROLE_APIKEY_LICENSEE, ROLE_APIKEY_ANALYTICS, ROLE_APIKEY_OPERATION, ROLE_APIKEY_MAINTENANCE, or ROLE_APIKEY_ADMIN'
         ),
       expirationTime: z.string().optional().describe('Token expiration timestamp (ISO 8601)')
     })
@@ -58,7 +58,8 @@ export let createToken = SlateTool.create(spec, {
     if (ctx.input.expirationTime) params.expirationTime = ctx.input.expirationTime;
 
     let result = await client.createToken(params);
-    if (!result) throw new Error('Failed to create token');
+    if (!result)
+      throw createApiServiceError('Failed to create token', { reason: 'invalid_response' });
 
     return {
       output: {

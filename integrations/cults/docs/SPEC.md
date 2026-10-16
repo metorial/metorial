@@ -1,53 +1,29 @@
-# Slates Specification for Cults
+# Cults Integration Specification
 
-## Overview
-
-Cults (Cults3D) is a marketplace for 3D printing designs where creators can publish, sell, and share downloadable 3D model files. It provides a GraphQL API that allows querying the catalog, managing creations, tracking sales, and accessing account data.
+Cults3D is a marketplace for 3D printing designs. This integration uses the provider's GraphQL API at `https://cults3d.com/graphql`, sending POST requests with a query and variables.
 
 ## Authentication
 
-All API calls are made using HTTP Basic Auth.
+Connect with your Cults3D username and a secret API key generated at <https://cults3d.com/en/api/keys>. The documented method is HTTP Basic authentication, with the username and API key as the credentials. The connection is verified through `myself.user`; a missing profile or GraphQL error fails authentication. There is no OAuth refresh flow or additional connection configuration.
 
-To authenticate:
+## Tools
 
-1. Create a Cults account or connect to your existing account, then go to the API page in your settings to generate an API key. The key generation page is at `https://cults3d.com/en/api/keys`.
-2. Set the header `Authorization: Basic <base64(username:api_key)>`, where `username` is your Cults username and `api_key` is the key generated from settings.
-3. There is only one endpoint URL: `https://cults3d.com/graphql`. All requests are POST requests with a JSON body containing a `query` field in GraphQL format.
+- Catalog: `search_creations`, `browse_creations`, `get_creation`.
+- Identity and account reads: `get_my_profile`, `get_user`, `get_my_creations`, `get_my_liked_creations`, `get_my_sales`, `get_my_orders`.
+- Discovery: `get_categories`, `get_licenses`. Use category IDs and license codes returned by these tools when publishing designs.
+- Publishing: `create_creation`, `update_creation`. Hosted image/model URLs are supplied when creating a design; updating a creation changes its exposed metadata fields.
+- Collections: `get_my_printlists`, `create_printlist`, `update_printlist`, `delete_printlist`, `add_to_printlist`, `remove_from_printlist`.
+- Promotion and updates: `create_discount`, `notify_downloaders`.
 
-Discord also mentions `Bearer` and `X-Api-Key` headers as alternative authentication methods, but HTTP Basic Auth is the primary documented approach.
+Pagination uses limit and offset. Catalog names and URLs use English, and the existing monetary outputs use USD except sales income, where USD and EUR are selectable. The liked-design list returns names and creation page URLs without an invented total count. The license catalog includes applicability to free and paid designs.
 
-No OAuth2 flow or scopes are involved. Each API key is tied to the user account that generated it.
+Creation details and orders retain their provider file/download links. These are metadata reads; they do not transfer file bytes. Cults3D restricts access to other users' 3D model files, and links remain subject to provider authorization.
 
-## Features
+No triggers are registered by this integration.
 
-### Browse and Search Creations
+## Provider References
 
-You can retrieve model data, search for designs, or get information about designers and makes. The API supports querying the catalog of 3D designs with filters such as category, price range, date, sorting options, trending lists, and the `madeWithAi` flag. The API will not give you access to the 3D files (they will remain hosted on Cults for legal reasons) but it will give you access to everything else: photos, titles, descriptions, tags, etc.
-
-### Create and Manage Designs
-
-Creators can publish new designs and update existing ones via mutations. This includes setting titles, descriptions, tags, meta tags, and categories. Assets are provided as URLs: respect the `fileUrls`/`imageUrls` limits of at most 10 links per field. Host assets using HTTPS links that expose the filename extension.
-
-### Sales and Revenue Tracking
-
-The API provides access to sales data (with applied discount, sale-time `creationViewsCount`/`creationLikesCount` snapshots), creator stats (`viewsCount`, `totalSalesAmount`, visibility), and user snapshots. You can query income per sale with currency conversion support.
-
-### Orders and Downloads
-
-Orders are accessible with `downloadUrl` for purchased items. This allows buyers to retrieve their order history and access links to files they have purchased.
-
-### Account Data
-
-Account data includes printlists (with nested creations), likes, orders, and user snapshots. You can query your own profile data, followers, and engagement metrics through the `myself` query root.
-
-### Categories
-
-The API provides access to the platform's category structure with localized names. Categories can be queried and used when creating or filtering designs.
-
-### Upload Sharing Links
-
-You can create links in the format `https://cults3d.com/en/creations/new?file_url=...&origin=...` to let users share 3D files to Cults from external sites in one click.
-
-## Events
-
-The provider does not support events. Cults3D does not offer webhooks, event subscriptions, or any built-in push notification mechanism through its API.
+- [API overview](https://cults3d.com/en/api)
+- [GraphQL API details and authentication](https://cults3d.com/en/pages/graphql)
+- [Provider-linked GraphQL examples](https://gist.github.com/sunny/07db54478ac030bd277c19cfe734648b)
+- [Provider feature log](https://cults3d.com/en/pages/logbook-updates-new-features-cults)

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCompany = SlateTool.create(spec, {
   name: 'Get Company',
   key: 'get_company',
-  description: `Retrieve basic company/account information including name, currency, and onboarding status.`,
+  description: `Identify the company/account authorized by the API key, including its ID, name, currency, and onboarding status.`,
   tags: {
     readOnly: true
   }

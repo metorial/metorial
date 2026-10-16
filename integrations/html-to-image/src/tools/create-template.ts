@@ -9,7 +9,7 @@ export let createTemplate = SlateTool.create(spec, {
   description: `Create a reusable image template with Handlebars variable placeholders. Templates allow you to define HTML that includes variables like \`{{title_text}}\` which can be substituted with dynamic values when generating images. Useful for creating consistent image layouts for social sharing, certificates, and other dynamic visuals.`,
   instructions: [
     'Use Handlebars syntax (e.g., `{{variable_name}}`) in the HTML to define dynamic placeholders.',
-    'Free plans are limited to 1 template. Paid plans support up to 1,000 templates.'
+    'Template limits depend on the account plan; check the provider dashboard.'
   ],
   tags: {
     destructive: false,
@@ -54,7 +54,10 @@ export let createTemplate = SlateTool.create(spec, {
   .output(
     z.object({
       templateId: z.string().describe('Unique identifier for the created template'),
-      templateVersion: z.number().describe('Version number of the template')
+      templateVersion: z.number().describe('Version number of the template'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {

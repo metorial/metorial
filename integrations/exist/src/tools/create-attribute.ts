@@ -8,10 +8,10 @@ export let createAttributeTool = SlateTool.create(spec, {
   key: 'create_attribute',
   description: `Create new attributes in Exist, either from existing templates or as fully custom attributes. Custom attributes require a label, group, and value type. The service automatically gets ownership of created attributes.`,
   instructions: [
-    'To create from a template, provide only the templateName.',
+    'Discover template names and groups using get_attribute_templates. To create from a template, provide templateName.',
     'For custom attributes, provide label, group, and valueType.',
-    'The attribute name is auto-generated from the label and returned in the response.',
-    'Value types: 0=quantity (integer), 1=decimal, 2=string, 3=duration, 4=time of day, 5=percentage, 7=boolean, 8=scale (1-5/1-9).',
+    'Use the name in each successful record for later value updates; it may differ from the label.',
+    'Value types: 0=quantity (integer), 1=decimal, 2=string, 3=duration, 4=time of day, 5=percentage, 7=boolean, 8=scale (1-9).',
     'Groups must match one of the existing Exist groups: activity, productivity, mood, sleep, workouts, events, finance, food, health, location, media, social, weather, symptoms, medication, custom.'
   ],
   constraints: [
@@ -58,11 +58,19 @@ export let createAttributeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      successful: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Successful provider records, including returned names or current totals when supplied'
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       successCount: z.number().describe('Number of successfully created attributes'),
       failedCount: z.number().describe('Number of failed creations'),
       failures: z
         .array(
           z.object({
+            errorCode: z.string().optional().describe('Provider error code'),
             error: z.string().describe('Error message')
           })
         )
@@ -83,11 +91,14 @@ export let createAttributeTool = SlateTool.create(spec, {
     let result = await client.createAttributes(payload);
 
     let failures = result.failed.map(f => ({
+      errorCode: f.error_code,
       error: f.error
     }));
 
     return {
       output: {
+        raw: result,
+        successful: result.success,
         successCount: result.success.length,
         failedCount: result.failed.length,
         failures

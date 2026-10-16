@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import { finageNumber, finageRecord, finageString, finageSymbol } from '../lib/response';
 import { spec } from '../spec';
 
 export let getStockSignals = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let getStockSignals = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Stock ticker symbol'),
       interval: z.string().describe('Signal interval'),
       signal: z.string().optional().describe('Overall signal (buy/sell/hold)'),
@@ -43,34 +45,46 @@ export let getStockSignals = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let { symbol, interval } = ctx.input;
-    let upperSymbol = symbol.toUpperCase();
-
-    let data = await client.getStockSignals(upperSymbol, interval);
-
-    let output = {
-      symbol: upperSymbol,
+    let { interval } = ctx.input;
+    let symbol = finageSymbol(ctx.input.symbol);
+    let data = await client.getStockSignals(symbol, interval);
+    let response = finageRecord(data);
+    let indicators =
+      response.indicators == null ? response : finageRecord(response.indicators, 'indicators');
+    let confidence = finageNumber(response.confidence);
+    if (confidence !== undefined && (confidence < 0 || confidence > 1))
+      throw createApiServiceError(
+        'Finage returned a confidence score outside its documented 0 to 1 range.'
+      );
+    if (!finageString(response.signal))
+      throw createApiServiceError('Finage returned no trading signal.');
+    let crossover = (value: unknown) =>
+      typeof value === 'boolean' ? String(value) : finageString(value);
+    let output = pickDefined({
+      symbol,
       interval,
-      signal: data.signal,
-      confidence: data.confidence,
-      currentPrice: data.current_price ?? data.currentPrice ?? data.price,
-      indicators: {
-        sma20: data.sma_20 ?? data.sma20,
-        sma50: data.sma_50 ?? data.sma50,
-        rsi: data.rsi,
-        macd: data.macd,
-        macdSignal: data.macd_signal ?? data.macdSignal,
-        macdDiff: data.macd_diff ?? data.macdDiff,
-        bollingerHigh: data.bollinger_high ?? data.bollingerHigh,
-        bollingerLow: data.bollinger_low ?? data.bollingerLow,
-        maCrossover: data.ma_crossover ?? data.maCrossover,
-        macdCross: data.macd_cross ?? data.macdCross
-      }
-    };
-
+      signal: finageString(response.signal),
+      confidence: confidence === undefined ? undefined : confidence * 100,
+      currentPrice: finageNumber(
+        response.current_price ?? response.currentPrice ?? response.price
+      ),
+      indicators: pickDefined({
+        sma20: finageNumber(indicators.sma_20 ?? indicators.sma20),
+        sma50: finageNumber(indicators.sma_50 ?? indicators.sma50),
+        rsi: finageNumber(indicators.rsi),
+        macd: finageNumber(indicators.macd),
+        macdSignal: finageNumber(indicators.macd_signal ?? indicators.macdSignal),
+        macdDiff: finageNumber(indicators.macd_diff ?? indicators.macdDiff),
+        bollingerHigh: finageNumber(indicators.bollinger_high ?? indicators.bollingerHigh),
+        bollingerLow: finageNumber(indicators.bollinger_low ?? indicators.bollingerLow),
+        maCrossover: crossover(indicators.ma_crossover ?? indicators.maCrossover),
+        macdCross: crossover(indicators.macd_cross ?? indicators.macdCross)
+      }),
+      raw: data
+    });
     return {
-      output,
-      message: `**${upperSymbol}** ${interval} signal: **${output.signal ?? 'N/A'}** (confidence: ${output.confidence ?? 'N/A'}%)${output.currentPrice ? `, price: $${output.currentPrice}` : ''}`
+      output: { ...output, symbol, interval },
+      message: `Retrieved **${symbol}** ${interval} trading signals.`
     };
   })
   .build();

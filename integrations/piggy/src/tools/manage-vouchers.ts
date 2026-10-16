@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let voucherSchema = z
@@ -56,7 +57,7 @@ export let manageVouchers = SlateTool.create(spec, {
       // Update params
       voucherUuid: z.string().optional().describe('UUID of the voucher to update'),
       // Redeem params
-      shopUuid: z.string().optional().describe('Shop UUID for redemption')
+      shopUuid: z.string().optional().describe('Shop UUID from list_shops for redemption')
     })
   )
   .output(
@@ -78,17 +79,18 @@ export let manageVouchers = SlateTool.create(spec, {
         limit: ctx.input.limit,
         page: ctx.input.page
       });
-      let vouchers = (result.data || []).map((v: any) => ({
-        voucherUuid: v.uuid,
-        code: v.code,
-        status: v.status,
-        promotionUuid: v.promotion?.uuid,
-        contactUuid: v.contact?.uuid,
-        expirationDate: v.expiration_date,
-        activationDate: v.activation_date,
-        createdAt: v.created_at,
-        ...v
-      }));
+      let vouchers = result.data.map((v: any) =>
+        mapEntity(v, {
+          voucherUuid: requiredString(v.uuid, 'voucher UUID'),
+          code: v.code,
+          status: v.status,
+          promotionUuid: v.promotion?.uuid,
+          contactUuid: v.contact?.uuid,
+          expirationDate: v.expiration_date,
+          activationDate: v.activation_date,
+          createdAt: v.created_at
+        })
+      );
       return {
         output: { vouchers, totalCount: result.meta?.total },
         message: `Retrieved **${vouchers.length}** voucher(s).`
@@ -96,27 +98,27 @@ export let manageVouchers = SlateTool.create(spec, {
     }
 
     if (action === 'find') {
-      if (!ctx.input.code) throw new Error('code is required for find');
+      if (!ctx.input.code) throw createApiServiceError('code is required for find');
       let result = await client.findVoucher(ctx.input.code);
-      let v = result.data || result;
+      let v = result.data;
       return {
         output: {
-          voucher: {
-            voucherUuid: v.uuid,
+          voucher: mapEntity(v, {
+            voucherUuid: requiredString(v.uuid, 'voucher UUID'),
             code: v.code,
             status: v.status,
             promotionUuid: v.promotion?.uuid,
             contactUuid: v.contact?.uuid,
-            expirationDate: v.expiration_date,
-            ...v
-          }
+            expirationDate: v.expiration_date
+          })
         },
         message: `Found voucher with code **${ctx.input.code}** (status: ${v.status}).`
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.promotionUuid) throw new Error('promotionUuid is required for create');
+      if (!ctx.input.promotionUuid)
+        throw createApiServiceError('promotionUuid is required for create');
       let result = await client.createVoucher({
         promotionUuid: ctx.input.promotionUuid,
         code: ctx.input.code,
@@ -125,62 +127,65 @@ export let manageVouchers = SlateTool.create(spec, {
         activationDate: ctx.input.activationDate,
         totalRedemptionsAllowed: ctx.input.totalRedemptionsAllowed
       });
-      let v = result.data || result;
+      let v = result.data;
       return {
         output: {
-          voucher: {
-            voucherUuid: v.uuid,
+          voucher: mapEntity(v, {
+            voucherUuid: requiredString(v.uuid, 'voucher UUID'),
             code: v.code,
             status: v.status,
-            promotionUuid: v.promotion?.uuid || ctx.input.promotionUuid,
+            promotionUuid: v.promotion?.uuid,
             contactUuid: v.contact?.uuid,
             expirationDate: v.expiration_date,
-            createdAt: v.created_at,
-            ...v
-          }
+            createdAt: v.created_at
+          })
         },
         message: `Created voucher **${v.code}** for promotion ${ctx.input.promotionUuid}.`
       };
     }
 
     if (action === 'update') {
-      if (!ctx.input.voucherUuid) throw new Error('voucherUuid is required for update');
+      if (!ctx.input.voucherUuid)
+        throw createApiServiceError('voucherUuid is required for update');
+      if (ctx.input.status !== 'ACTIVE' && ctx.input.status !== 'DEACTIVATED')
+        throw createApiServiceError('Voucher updates require status ACTIVE or DEACTIVATED.');
       let result = await client.updateVoucher(ctx.input.voucherUuid, {
-        status: ctx.input.status as 'ACTIVE' | 'DEACTIVATED' | undefined,
+        status:
+          ctx.input.status === 'ACTIVE' || ctx.input.status === 'DEACTIVATED'
+            ? ctx.input.status
+            : undefined,
         expirationDate: ctx.input.expirationDate
       });
-      let v = result.data || result;
+      let v = result.data;
       return {
         output: {
-          voucher: {
-            voucherUuid: v.uuid || ctx.input.voucherUuid,
+          voucher: mapEntity(v, {
+            voucherUuid: requiredString(v.uuid, 'voucher UUID'),
             code: v.code,
-            status: v.status,
-            ...v
-          }
+            status: v.status
+          })
         },
         message: `Updated voucher **${ctx.input.voucherUuid}**.`
       };
     }
 
     // redeem
-    if (!ctx.input.code) throw new Error('code is required for redeem');
+    if (!ctx.input.code) throw createApiServiceError('code is required for redeem');
     let shopUuid = ctx.input.shopUuid || ctx.config.shopUuid;
-    if (!shopUuid) throw new Error('shopUuid is required for redeem');
+    if (!shopUuid) throw createApiServiceError('shopUuid is required for redeem');
     let result = await client.redeemVoucher({
       code: ctx.input.code,
       shopUuid,
       contactUuid: ctx.input.contactUuid
     });
-    let v = result.data || result;
+    let v = result.data;
     return {
       output: {
-        voucher: {
-          voucherUuid: v.uuid,
-          code: v.code || ctx.input.code,
-          status: v.status || 'REDEEMED',
-          ...v
-        }
+        voucher: mapEntity(v, {
+          voucherUuid: requiredString(v.uuid, 'voucher UUID'),
+          code: v.code,
+          status: v.status ?? undefined
+        })
       },
       message: `Redeemed voucher **${ctx.input.code}** at shop ${shopUuid}.`
     };

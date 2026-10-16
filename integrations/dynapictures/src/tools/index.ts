@@ -1,3 +1,4 @@
+export * from './ai-generation';
 export * from './delete-image';
 export * from './generate-batch-pdf';
 export * from './generate-image';

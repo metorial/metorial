@@ -16,7 +16,16 @@ export let registerAttendee = SlateTool.create(spec, {
       roomId: z.string().describe('ID of the conference room'),
       firstName: z.string().describe('First name of the attendee'),
       lastName: z.string().describe('Last name of the attendee'),
-      email: z.string().describe('Email address of the attendee')
+      email: z.string().describe('Email address of the attendee'),
+      company: z.string().optional().describe('Company name'),
+      confirmationEmailEnabled: z
+        .boolean()
+        .optional()
+        .describe('Whether to send a confirmation email'),
+      confirmationEmailLanguage: z
+        .string()
+        .optional()
+        .describe('Confirmation language: en, pl, ru, es, de, fr, it, pt')
     })
   )
   .output(
@@ -28,11 +37,19 @@ export let registerAttendee = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.registerAttendee(ctx.input.roomId, {
-      firstName: ctx.input.firstName,
-      lastName: ctx.input.lastName,
-      email: ctx.input.email
-    });
+    let result = await client.registerAttendee(
+      ctx.input.roomId,
+      {
+        firstName: ctx.input.firstName,
+        lastName: ctx.input.lastName,
+        email: ctx.input.email,
+        company: ctx.input.company
+      },
+      {
+        enabled: ctx.input.confirmationEmailEnabled,
+        language: ctx.input.confirmationEmailLanguage
+      }
+    );
 
     return {
       output: { registration: result },

@@ -1,11 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    environment: z
-      .enum(['production_us', 'production_eu', 'sandbox'])
-      .default('production_us')
-      .describe('Accredible API environment to use')
-  })
-);
+// Retain legacy stored environment values while new connections select the region during auth.
+export let config = SlateConfig.create(z.object({}).passthrough());

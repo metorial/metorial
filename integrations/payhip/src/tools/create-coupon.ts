@@ -10,7 +10,7 @@ export let createCoupon = SlateTool.create(spec, {
 Coupons can be scoped to a single product, a collection of products, or all products in your store.
 Optionally configure start/end dates, minimum purchase amount, usage limits, and internal notes.`,
   instructions: [
-    'Provide either **percentOff** (0-100) or **amountOff** (in cents), not both.',
+    'Provide either **percentOff** (greater than 0 and at most 100) or **amountOff** (in cents), not both.',
     'If couponType is "single", you must provide a **productKey**.',
     'If couponType is "collection", you must provide a **collectionId**.',
     'If couponType is "multi", the coupon applies to all products.'
@@ -36,7 +36,9 @@ Optionally configure start/end dates, minimum purchase amount, usage limits, and
         .min(0)
         .max(100)
         .optional()
-        .describe('Percentage discount (0-100). Mutually exclusive with amountOff.'),
+        .describe(
+          'Percentage discount (greater than 0 and at most 100). Mutually exclusive with amountOff.'
+        ),
       amountOff: z
         .number()
         .optional()
@@ -49,8 +51,13 @@ Optionally configure start/end dates, minimum purchase amount, usage limits, and
         .string()
         .optional()
         .describe('Unique collection ID, required when couponType is "collection"'),
-      startDate: z.string().optional().describe('Start date for the coupon validity period'),
-      endDate: z.string().optional().describe('End date for the coupon validity period'),
+      startDate: z
+        .string()
+        .optional()
+        .describe(
+          'RFC 3339 start date and time with a timezone, such as 2026-12-01T00:00:00Z'
+        ),
+      endDate: z.string().optional().describe('RFC 3339 end date and time with a timezone'),
       minimumPurchaseAmount: z
         .number()
         .optional()
@@ -90,7 +97,8 @@ Optionally configure start/end dates, minimum purchase amount, usage limits, and
         .nullable()
         .describe('Minimum purchase amount required'),
       usageLimit: z.number().nullable().describe('Maximum redemption count'),
-      notes: z.string().nullable().describe('Internal notes')
+      notes: z.string().nullable().describe('Internal notes'),
+      raw: z.record(z.string(), z.unknown()).describe('Original coupon details')
     })
   )
   .handleInvocation(async ctx => {
@@ -110,9 +118,10 @@ Optionally configure start/end dates, minimum purchase amount, usage limits, and
       notes: ctx.input.notes
     });
 
-    let discountDesc = coupon.percentOff
-      ? `${coupon.percentOff}% off`
-      : `${(coupon.amountOff ?? 0) / 100} off (fixed)`;
+    let discountDesc =
+      coupon.percentOff !== null
+        ? `${coupon.percentOff}% off`
+        : `${(coupon.amountOff ?? 0) / 100} off (fixed)`;
 
     return {
       output: coupon,

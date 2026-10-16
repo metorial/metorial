@@ -1,10 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { resolveBaseUrl } from './lib/settings';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      baseUrl: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -15,33 +18,41 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Ninox Personal Access Token. Generate one from the Ninox web app under Actions (gear icon) > Integrations > Generate.'
+          'Ninox Personal Access Token. Create one in Ninox Settings > Integrations > New API Key.'
+        ),
+      baseUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Ninox instance URL. Defaults to https://api.ninox.com for Public Cloud. For Private Cloud or On-Premises, enter your instance URL, including its port or path when needed.'
         )
     }),
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          baseUrl: resolveBaseUrl(ctx.input.baseUrl)
         }
       };
     },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://api.ninox.com/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
+    getProfile: async (ctx: {
+      output: { token: string; baseUrl?: string };
+      input: { token: string; baseUrl?: string };
+    }) => {
+      let baseUrl = ctx.output.baseUrl ?? ctx.input.baseUrl;
+      // Legacy config is unavailable in auth callbacks; never guess its instance.
+      if (baseUrl === undefined) {
+        return { profile: {} };
+      }
+      let client = new Client({
+        baseUrl: resolveBaseUrl(baseUrl),
+        token: ctx.output.token
       });
-
-      let response = await axiosInstance.get('/teams');
-      let teams = response.data as Array<{ id: string; name: string }>;
+      let teams = await client.listTeams();
 
       return {
         profile: {
-          name:
-            teams.length > 0
-              ? `Ninox User (${teams.length} team${teams.length !== 1 ? 's' : ''})`
-              : 'Ninox User'
+          teamCount: teams.length
         }
       };
     }

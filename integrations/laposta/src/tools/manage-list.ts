@@ -1,25 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listOutputSchema, mapList } from '../lib/maps';
 import { spec } from '../spec';
-
-let listOutputSchema = z.object({
-  listId: z.string().describe('Unique identifier of the list'),
-  name: z.string().describe('Name of the list'),
-  state: z.string().describe('Current state of the list'),
-  remarks: z.string().describe('Notes or remarks on the list'),
-  subscribeNotificationEmail: z.string().describe('Email notified on new subscriptions'),
-  unsubscribeNotificationEmail: z.string().describe('Email notified on unsubscriptions'),
-  created: z.string().describe('Creation timestamp'),
-  modified: z.string().describe('Last modified timestamp'),
-  members: z
-    .object({
-      active: z.number().describe('Number of active subscribers'),
-      unsubscribed: z.number().describe('Number of unsubscribed members'),
-      cleaned: z.number().describe('Number of cleaned (bounced) members')
-    })
-    .describe('Subscriber count breakdown')
-});
 
 export let createList = SlateTool.create(spec, {
   name: 'Create List',
@@ -61,17 +44,7 @@ export let createList = SlateTool.create(spec, {
 
     let list = result.list;
     return {
-      output: {
-        listId: list.list_id,
-        name: list.name,
-        state: list.state,
-        remarks: list.remarks,
-        subscribeNotificationEmail: list.subscribe_notification_email,
-        unsubscribeNotificationEmail: list.unsubscribe_notification_email,
-        created: list.created,
-        modified: list.modified,
-        members: list.members
-      },
+      output: mapList(list),
       message: `Created mailing list **${list.name}** (${list.list_id}).`
     };
   })
@@ -104,17 +77,7 @@ export let getList = SlateTool.create(spec, {
     if (ctx.input.listId) {
       let result = await client.getList(ctx.input.listId);
       let list = result.list;
-      let output = {
-        listId: list.list_id,
-        name: list.name,
-        state: list.state,
-        remarks: list.remarks,
-        subscribeNotificationEmail: list.subscribe_notification_email,
-        unsubscribeNotificationEmail: list.unsubscribe_notification_email,
-        created: list.created,
-        modified: list.modified,
-        members: list.members
-      };
+      let output = mapList(list);
       return {
         output: { lists: [output] },
         message: `Retrieved list **${list.name}** with ${list.members.active} active subscribers.`
@@ -124,17 +87,7 @@ export let getList = SlateTool.create(spec, {
     let results = await client.getLists();
     let lists = results.map(r => {
       let list = r.list;
-      return {
-        listId: list.list_id,
-        name: list.name,
-        state: list.state,
-        remarks: list.remarks,
-        subscribeNotificationEmail: list.subscribe_notification_email,
-        unsubscribeNotificationEmail: list.unsubscribe_notification_email,
-        created: list.created,
-        modified: list.modified,
-        members: list.members
-      };
+      return mapList(list);
     });
 
     return {
@@ -185,17 +138,7 @@ export let updateList = SlateTool.create(spec, {
 
     let list = result.list;
     return {
-      output: {
-        listId: list.list_id,
-        name: list.name,
-        state: list.state,
-        remarks: list.remarks,
-        subscribeNotificationEmail: list.subscribe_notification_email,
-        unsubscribeNotificationEmail: list.unsubscribe_notification_email,
-        created: list.created,
-        modified: list.modified,
-        members: list.members
-      },
+      output: mapList(list),
       message: `Updated list **${list.name}** (${list.list_id}).`
     };
   })
@@ -236,17 +179,7 @@ export let deleteList = SlateTool.create(spec, {
     let list = result.list;
     let action = ctx.input.purgeOnly ? 'Purged all active subscribers from' : 'Deleted';
     return {
-      output: {
-        listId: list.list_id,
-        name: list.name,
-        state: list.state,
-        remarks: list.remarks,
-        subscribeNotificationEmail: list.subscribe_notification_email,
-        unsubscribeNotificationEmail: list.unsubscribe_notification_email,
-        created: list.created,
-        modified: list.modified,
-        members: list.members
-      },
+      output: mapList(list),
       message: `${action} list **${list.name}** (${list.list_id}).`
     };
   })

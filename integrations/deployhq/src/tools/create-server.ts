@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 export let createServer = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createServer = SlateTool.create(spec, {
   key: 'create_server',
   description: `Add a new deployment server to a DeployHQ project. Supports SSH/SFTP, FTP, FTPS, Amazon S3, S3-compatible storage, Shopify, Netlify, Elastic Beanstalk, and other protocols. Provide the common parameters along with protocol-specific fields.`,
   instructions: [
-    'SSH/SFTP and FTP require hostname, username, and password.',
+    'SSH/SFTP requires hostname and username; provide password unless useSshKeys is enabled. FTP and FTPS also require a password.',
     'Amazon S3 requires bucketName, accessKeyId, and secretAccessKey.',
     'S3-compatible (Cloudflare R2, Wasabi, etc.) also requires customEndpoint.',
     'Shopify requires storeUrl and accessToken.'
@@ -16,7 +16,9 @@ export let createServer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       name: z.string().describe('Display name for the server'),
       protocolType: z
         .enum([
@@ -27,6 +29,7 @@ export let createServer = SlateTool.create(spec, {
           's3_compatible',
           'rackspace',
           'digitalocean',
+          'digital_ocean',
           'shopify',
           'netlify',
           'heroku',
@@ -67,7 +70,25 @@ export let createServer = SlateTool.create(spec, {
         .describe('Custom S3 endpoint (for S3-compatible storage)'),
       storeUrl: z.string().optional().describe('Shopify store URL'),
       accessToken: z.string().optional().describe('Access token (Shopify/Netlify)'),
-      siteId: z.string().optional().describe('Netlify site ID')
+      siteId: z.string().optional().describe('Netlify site ID'),
+      rackspaceApiKey: z.string().optional().describe('Rackspace API key'),
+      region: z.string().optional().describe('Rackspace or AWS Elastic Beanstalk region'),
+      containerName: z.string().optional().describe('Rackspace container name'),
+      personalAccessToken: z
+        .string()
+        .optional()
+        .describe('DigitalOcean personal access token'),
+      dropletId: z.string().optional().describe('DigitalOcean droplet ID'),
+      dropletName: z.string().optional().describe('DigitalOcean droplet name'),
+      shellCommand: z.string().optional().describe('Command for a Shell server'),
+      shellTimeout: z
+        .number()
+        .optional()
+        .describe('Shell command timeout in seconds: 300, 600, 1800, 3600, 5400, or 10800'),
+      herokuAppName: z.string().optional().describe('Heroku application name'),
+      herokuApiKey: z.string().optional().describe('Heroku API key'),
+      applicationName: z.string().optional().describe('Elastic Beanstalk application name'),
+      environmentName: z.string().optional().describe('Elastic Beanstalk environment name')
     })
   )
   .output(
@@ -87,9 +108,57 @@ export let createServer = SlateTool.create(spec, {
       accountName: ctx.config.accountName
     });
 
+    validateInteger(ctx.input.port, 'port', 1, 65535);
+    let required: string[] = [];
+    if (['ssh', 'ftp', 'ftps'].includes(ctx.input.protocolType)) {
+      if (!ctx.input.hostname) required.push('hostname');
+      if (!ctx.input.username) required.push('username');
+      if (!ctx.input.password && !(ctx.input.protocolType === 'ssh' && ctx.input.useSshKeys))
+        required.push('password');
+    }
+    if (['s3', 's3_compatible'].includes(ctx.input.protocolType)) {
+      if (!ctx.input.bucketName) required.push('bucketName');
+      if (!ctx.input.accessKeyId) required.push('accessKeyId');
+      if (!ctx.input.secretAccessKey) required.push('secretAccessKey');
+      if (ctx.input.protocolType === 's3_compatible' && !ctx.input.customEndpoint)
+        required.push('customEndpoint');
+    }
+    for (let [protocols, fields] of [
+      [['shopify'], ['storeUrl', 'accessToken']],
+      [['netlify'], ['siteId', 'accessToken']],
+      [['rackspace'], ['username', 'rackspaceApiKey', 'region', 'containerName']],
+      [
+        ['digitalocean', 'digital_ocean'],
+        ['personalAccessToken', 'dropletId', 'dropletName']
+      ],
+      [['shell'], ['shellCommand']],
+      [['heroku'], ['herokuAppName', 'herokuApiKey']],
+      [
+        ['elastic_beanstalk'],
+        ['applicationName', 'environmentName', 'region', 'accessKeyId', 'secretAccessKey']
+      ]
+    ] as const) {
+      if ((protocols as readonly string[]).includes(ctx.input.protocolType)) {
+        for (let field of fields) if (!ctx.input[field]) required.push(field);
+      }
+    }
+    if (
+      ctx.input.shellTimeout !== undefined &&
+      ![300, 600, 1800, 3600, 5400, 10800].includes(ctx.input.shellTimeout)
+    ) {
+      throw createApiServiceError(
+        'shellTimeout must be 300, 600, 1800, 3600, 5400, or 10800 seconds.'
+      );
+    }
+    if (required.length)
+      throw createApiServiceError(
+        `Provide ${required.join(', ')} for ${ctx.input.protocolType} servers.`
+      );
+
     let serverData: Record<string, any> = {
       name: ctx.input.name,
-      protocol_type: ctx.input.protocolType
+      protocol_type:
+        ctx.input.protocolType === 'digitalocean' ? 'digital_ocean' : ctx.input.protocolType
     };
 
     if (ctx.input.serverPath !== undefined) serverData.server_path = ctx.input.serverPath;
@@ -115,6 +184,24 @@ export let createServer = SlateTool.create(spec, {
     if (ctx.input.storeUrl !== undefined) serverData.store_url = ctx.input.storeUrl;
     if (ctx.input.accessToken !== undefined) serverData.access_token = ctx.input.accessToken;
     if (ctx.input.siteId !== undefined) serverData.site_id = ctx.input.siteId;
+
+    Object.assign(
+      serverData,
+      pickDefined({
+        api_key: ctx.input.rackspaceApiKey,
+        region: ctx.input.region,
+        container_name: ctx.input.containerName,
+        personal_access_token: ctx.input.personalAccessToken,
+        droplet_id: ctx.input.dropletId,
+        droplet_name: ctx.input.dropletName,
+        command: ctx.input.shellCommand,
+        timeout: ctx.input.shellTimeout,
+        app_name: ctx.input.herokuAppName,
+        api_key_heroku: ctx.input.herokuApiKey,
+        application_name: ctx.input.applicationName,
+        environment_name: ctx.input.environmentName
+      })
+    );
 
     let s = await client.createServer(ctx.input.projectPermalink, serverData);
 

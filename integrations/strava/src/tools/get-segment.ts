@@ -18,6 +18,7 @@ export let getSegment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       segmentId: z.number().describe('Segment identifier'),
       name: z.string().describe('Segment name'),
       activityType: z.string().describe('Activity type (Ride or Run)'),
@@ -49,6 +50,7 @@ export let getSegment = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: segment,
         segmentId: segment.id,
         name: segment.name,
         activityType: segment.activity_type,

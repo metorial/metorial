@@ -32,6 +32,7 @@ After creation, use anomaly score predictions to evaluate how anomalous new data
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the anomaly detector'),
       name: z.string().optional().describe('Name of the anomaly detector'),
       statusCode: z.number().describe('Status code'),
@@ -42,28 +43,29 @@ After creation, use anomaly score predictions to evaluate how anomalous new data
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       dataset: ctx.input.datasetId
     };
 
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.inputFields) body.input_fields = ctx.input.inputFields;
     if (ctx.input.topN !== undefined) body.top_n = ctx.input.topN;
     if (ctx.input.forestSize !== undefined) body.forest_size = ctx.input.forestSize;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let result = await client.createResource('anomaly', body);
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `Anomaly detector **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}.`
+      message: `Anomaly detector **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}.`
     };
   })
   .build();

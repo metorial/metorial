@@ -1,9 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { configInput, projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let configLogSchema = z.object({
+  raw: z.unknown().optional().describe('Original metadata returned by Doppler'),
   logId: z.string().optional().describe('Log entry identifier'),
   text: z.string().optional().describe('Plain text description of the change'),
   html: z.string().optional().describe('HTML-formatted description'),
@@ -51,8 +53,8 @@ export let configLogs = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug'),
-      config: z.string().describe('Config name'),
+      project: projectInput,
+      config: configInput,
       action: z.enum(['list', 'get', 'rollback']).describe('Action to perform'),
       logId: z.string().optional().describe('Log entry ID (required for get and rollback)'),
       page: z.number().optional().describe('Page number for listing'),
@@ -70,6 +72,7 @@ export let configLogs = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapLog = (l: any) => ({
+      raw: l,
       logId: l.id,
       text: l.text,
       html: l.html,
@@ -108,7 +111,7 @@ export let configLogs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.logId) throw new Error('logId is required for "get" action');
+      if (!ctx.input.logId) throw createApiServiceError('logId is required for "get" action');
 
       let log = await client.getConfigLog(
         ctx.input.project,
@@ -123,7 +126,8 @@ export let configLogs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'rollback') {
-      if (!ctx.input.logId) throw new Error('logId is required for "rollback" action');
+      if (!ctx.input.logId)
+        throw createApiServiceError('logId is required for "rollback" action');
 
       let log = await client.rollbackConfigLog(
         ctx.input.project,
@@ -137,6 +141,6 @@ export let configLogs = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

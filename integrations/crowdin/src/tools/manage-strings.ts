@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageStringsTool = SlateTool.create(spec, {
@@ -8,12 +9,12 @@ export let manageStringsTool = SlateTool.create(spec, {
   key: 'manage_strings',
   description: `List, add, update, or delete source strings in a Crowdin project. Strings are the translatable text units. Use the filter or CroQL query to search for specific strings.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       action: z.enum(['list', 'get', 'add', 'update', 'delete']).describe('Action to perform'),
       stringId: z.number().optional().describe('String ID (required for get/update/delete)'),
       text: z.string().optional().describe('String text (required for add)'),
@@ -41,11 +42,19 @@ export let manageStringsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       strings: z
         .array(
           z.object({
             stringId: z.number().describe('String ID'),
-            text: z.string().describe('String text'),
+            text: z
+              .string()
+              .optional()
+              .describe('String text when the provider returns scalar text'),
+            pluralText: z
+              .record(z.string(), z.string())
+              .optional()
+              .describe('Exact plural forms returned by Crowdin'),
             identifier: z.string().describe('String key/identifier'),
             fileId: z.number().optional().describe('File ID'),
             context: z.string().optional().describe('String context'),
@@ -70,6 +79,15 @@ export let manageStringsTool = SlateTool.create(spec, {
     let { action, projectId } = ctx.input;
 
     if (action === 'list') {
+      if (
+        ctx.input.croql &&
+        [ctx.input.fileId, ctx.input.branchId, ctx.input.directoryId, ctx.input.filter].some(
+          value => value !== undefined
+        )
+      )
+        throw createApiServiceError(
+          'croql cannot be combined with file, branch, directory, or text filters.'
+        );
       let result = await client.listStrings(projectId, {
         fileId: ctx.input.fileId,
         branchId: ctx.input.branchId,
@@ -82,40 +100,47 @@ export let manageStringsTool = SlateTool.create(spec, {
 
       let strings = result.data.map((item: any) => ({
         stringId: item.data.id,
-        text: item.data.text,
+        text: typeof item.data.text === 'string' ? item.data.text : undefined,
+        pluralText:
+          item.data.text !== null && typeof item.data.text === 'object'
+            ? item.data.text
+            : undefined,
         identifier: item.data.identifier,
-        fileId: item.data.fileId || undefined,
-        context: item.data.context || undefined,
+        fileId: item.data.fileId ?? undefined,
+        context: item.data.context ?? undefined,
         isHidden: item.data.isHidden,
-        maxLength: item.data.maxLength || undefined,
+        maxLength: item.data.maxLength ?? undefined,
         revision: item.data.revision,
-        createdAt: item.data.createdAt
+        createdAt: item.data.createdAt ?? undefined
       }));
 
       return {
-        output: { strings, pagination: result.pagination },
+        output: { raw: client.lastResponse, strings, pagination: result.pagination },
         message: `Found **${strings.length}** source strings.`
       };
     }
 
     if (action === 'get') {
-      if (!ctx.input.stringId) throw new Error('stringId is required for get');
+      if (!ctx.input.stringId) throw createApiServiceError('stringId is required for get');
 
       let str = await client.getString(projectId, ctx.input.stringId);
 
       return {
         output: {
+          raw: client.lastResponse,
           strings: [
             {
               stringId: str.id,
-              text: str.text,
+              text: typeof str.text === 'string' ? str.text : undefined,
+              pluralText:
+                str.text !== null && typeof str.text === 'object' ? str.text : undefined,
               identifier: str.identifier,
-              fileId: str.fileId || undefined,
-              context: str.context || undefined,
+              fileId: str.fileId ?? undefined,
+              context: str.context ?? undefined,
               isHidden: str.isHidden,
-              maxLength: str.maxLength || undefined,
+              maxLength: str.maxLength ?? undefined,
               revision: str.revision,
-              createdAt: str.createdAt
+              createdAt: str.createdAt ?? undefined
             }
           ]
         },
@@ -125,7 +150,7 @@ export let manageStringsTool = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!ctx.input.text || !ctx.input.identifier) {
-        throw new Error('text and identifier are required for add');
+        throw createApiServiceError('text and identifier are required for add');
       }
 
       let str = await client.addString(projectId, {
@@ -141,17 +166,20 @@ export let manageStringsTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           strings: [
             {
               stringId: str.id,
-              text: str.text,
+              text: typeof str.text === 'string' ? str.text : undefined,
+              pluralText:
+                str.text !== null && typeof str.text === 'object' ? str.text : undefined,
               identifier: str.identifier,
-              fileId: str.fileId || undefined,
-              context: str.context || undefined,
+              fileId: str.fileId ?? undefined,
+              context: str.context ?? undefined,
               isHidden: str.isHidden,
-              maxLength: str.maxLength || undefined,
+              maxLength: str.maxLength ?? undefined,
               revision: str.revision,
-              createdAt: str.createdAt
+              createdAt: str.createdAt ?? undefined
             }
           ]
         },
@@ -160,7 +188,7 @@ export let manageStringsTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.stringId) throw new Error('stringId is required for update');
+      if (!ctx.input.stringId) throw createApiServiceError('stringId is required for update');
 
       let patches: Array<{ op: string; path: string; value: any }> = [];
       if (ctx.input.text !== undefined)
@@ -174,21 +202,26 @@ export let manageStringsTool = SlateTool.create(spec, {
       if (ctx.input.labelIds !== undefined)
         patches.push({ op: 'replace', path: '/labelIds', value: ctx.input.labelIds });
 
+      if (!patches.length)
+        throw createApiServiceError('Provide at least one string field to update.');
       let str = await client.updateString(projectId, ctx.input.stringId, patches);
 
       return {
         output: {
+          raw: client.lastResponse,
           strings: [
             {
               stringId: str.id,
-              text: str.text,
+              text: typeof str.text === 'string' ? str.text : undefined,
+              pluralText:
+                str.text !== null && typeof str.text === 'object' ? str.text : undefined,
               identifier: str.identifier,
-              fileId: str.fileId || undefined,
-              context: str.context || undefined,
+              fileId: str.fileId ?? undefined,
+              context: str.context ?? undefined,
               isHidden: str.isHidden,
-              maxLength: str.maxLength || undefined,
+              maxLength: str.maxLength ?? undefined,
               revision: str.revision,
-              createdAt: str.createdAt
+              createdAt: str.createdAt ?? undefined
             }
           ]
         },
@@ -197,16 +230,16 @@ export let manageStringsTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.stringId) throw new Error('stringId is required for delete');
+      if (!ctx.input.stringId) throw createApiServiceError('stringId is required for delete');
 
       await client.deleteString(projectId, ctx.input.stringId);
 
       return {
-        output: { deleted: true },
+        output: { raw: client.lastResponse, deleted: true },
         message: `Deleted string with ID **${ctx.input.stringId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

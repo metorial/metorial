@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let messageSchema = z.object({
+export let messageSchema = z.object({
   messageId: z.number().describe('Unique message ID'),
   senderId: z.number().describe('User ID of the sender'),
   senderFullName: z.string().describe('Full name of the sender'),
@@ -16,7 +16,9 @@ let messageSchema = z.object({
       'Channel name (string) for channel messages, or array of recipients for direct messages'
     ),
   subject: z.string().describe('Topic name for the message'),
-  content: z.string().describe('Rendered HTML content of the message'),
+  content: z
+    .string()
+    .describe('Message content in HTML or Markdown, according to applyMarkdown'),
   timestamp: z.number().describe('Unix timestamp when the message was sent'),
   isMeMessage: z.boolean().optional().describe('Whether the message is a /me status message'),
   reactions: z
@@ -24,7 +26,8 @@ let messageSchema = z.object({
       z.object({
         emojiName: z.string(),
         emojiCode: z.string(),
-        userIds: z.array(z.number())
+        userIds: z.array(z.number()),
+        reactionType: z.string().optional()
       })
     )
     .optional()
@@ -52,6 +55,22 @@ export let getMessages = SlateTool.create(spec, {
         .describe(
           'Message ID to anchor around, or "newest"/"oldest"/"first_unread". Defaults to "newest"'
         ),
+      applyMarkdown: z
+        .boolean()
+        .optional()
+        .describe(
+          'Return rendered HTML when true, or original Markdown when false. Defaults to true'
+        ),
+      includeAnchor: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to include the anchor message. Set false when continuing pagination to avoid duplicates'
+        ),
+      allowEmptyTopicName: z
+        .boolean()
+        .optional()
+        .describe('Return empty topics as empty strings instead of the server display label'),
       numBefore: z
         .number()
         .optional()
@@ -70,7 +89,8 @@ export let getMessages = SlateTool.create(spec, {
               ),
             operand: z
               .union([z.string(), z.number()])
-              .describe('Value for the filter operator')
+              .describe('Value for the filter operator'),
+            negated: z.boolean().optional().describe('Exclude messages matching this filter')
           })
         )
         .optional()
@@ -80,6 +100,15 @@ export let getMessages = SlateTool.create(spec, {
   .output(
     z.object({
       messages: z.array(messageSchema).describe('Retrieved messages'),
+      raw: z
+        .any()
+        .optional()
+        .describe('Complete provider response, including pagination metadata'),
+      anchor: z.number().optional().describe('Anchor message ID computed by the server'),
+      historyLimited: z
+        .boolean()
+        .optional()
+        .describe('Whether available message history was limited by the plan'),
       foundAnchor: z.boolean().optional().describe('Whether the anchor message was found'),
       foundNewest: z
         .boolean()
@@ -101,38 +130,28 @@ export let getMessages = SlateTool.create(spec, {
       ?.filter(item => item.operand !== undefined)
       .map(item => ({
         operator: item.operator,
-        operand: item.operand as string | number
+        operand: item.operand as string | number,
+        ...(item.negated !== undefined ? { negated: item.negated } : {})
       }));
 
     let result = await client.getMessages({
       anchor: ctx.input.anchor,
       numBefore: ctx.input.numBefore ?? 20,
       numAfter: ctx.input.numAfter ?? 0,
-      narrow
+      narrow,
+      applyMarkdown: ctx.input.applyMarkdown,
+      includeAnchor: ctx.input.includeAnchor,
+      allowEmptyTopicName: ctx.input.allowEmptyTopicName
     });
 
-    let messages = (result.messages || []).map((m: any) => ({
-      messageId: m.id,
-      senderId: m.sender_id,
-      senderFullName: m.sender_full_name,
-      senderEmail: m.sender_email,
-      type: m.type,
-      channelId: m.stream_id,
-      displayRecipient: m.display_recipient,
-      subject: m.subject,
-      content: m.content,
-      timestamp: m.timestamp,
-      isMeMessage: m.is_me_message,
-      reactions: m.reactions?.map((r: any) => ({
-        emojiName: r.emoji_name,
-        emojiCode: r.emoji_code,
-        userIds: r.user?.user_id ? [r.user.user_id] : []
-      }))
-    }));
+    let messages = (result.messages || []).map(mapMessage);
 
     return {
       output: {
         messages,
+        raw: result,
+        anchor: result.anchor,
+        historyLimited: result.history_limited,
         foundAnchor: result.found_anchor,
         foundNewest: result.found_newest,
         foundOldest: result.found_oldest
@@ -141,3 +160,26 @@ export let getMessages = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let mapMessage = (m: any) => ({
+  messageId: m.id,
+  senderId: m.sender_id,
+  senderFullName: m.sender_full_name,
+  senderEmail: m.sender_email,
+  type: m.type,
+  channelId: m.stream_id,
+  displayRecipient: m.display_recipient,
+  subject: m.subject,
+  content: m.content,
+  timestamp: m.timestamp,
+  isMeMessage: m.is_me_message,
+  reactions: m.reactions?.map((r: any) => {
+    let userId = r.user_id ?? r.user?.id ?? r.user?.user_id;
+    return {
+      emojiName: r.emoji_name,
+      emojiCode: r.emoji_code,
+      userIds: userId !== undefined ? [userId] : [],
+      reactionType: r.reaction_type
+    };
+  })
+});

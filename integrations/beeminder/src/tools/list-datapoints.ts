@@ -1,16 +1,20 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { BeeminderClient } from '../lib/client';
-import { datapointSchema, mapDatapoint } from '../lib/schemas';
+import { BeeminderClient, validateWholeNumber } from '../lib/client';
+import { datapointSchema, mapDatapoint, responseArray, responseRecord } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDatapoints = SlateTool.create(spec, {
   name: 'List Datapoints',
   key: 'list_datapoints',
-  description: `Retrieve datapoints for a specific goal. Supports pagination and sorting. Returns the datapoint values, timestamps, comments, and metadata.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Retrieve goal datapoints with pagination and sorting. Includes values, dates, comments, identifiers, and provider metadata.',
+  instructions: [
+    'sortBy names the provider attribute to sort by, descending by default. The provider defaults to id when neither sort nor sortBy is supplied.',
+    'sort asc fetches all datapoints and sorts locally before pagination; use descending order for large goals when possible.',
+    'count is ignored when page is supplied. per is ignored without page.'
+  ],
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -18,10 +22,14 @@ export let listDatapoints = SlateTool.create(spec, {
       sort: z
         .enum(['asc', 'desc'])
         .optional()
-        .describe('Sort order by timestamp (default: desc)'),
+        .describe('Sort direction, using timestamp unless sortBy is supplied'),
       count: z.number().optional().describe('Limit on the number of datapoints returned'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      per: z.number().optional().describe('Number of results per page')
+      per: z.number().optional().describe('Number of results per page'),
+      sortBy: z
+        .string()
+        .optional()
+        .describe('Datapoint attribute to sort by, such as id, timestamp, or updated_at')
     })
   )
   .output(
@@ -30,15 +38,46 @@ export let listDatapoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BeeminderClient({
-      token: ctx.auth.token,
-      username: ctx.auth.username
-    });
-
-    let { goalSlug, ...params } = ctx.input;
-    let raw = await client.getDatapoints(goalSlug, params);
-    let datapoints = (raw as any[]).map(mapDatapoint);
-
+    let client = new BeeminderClient(ctx.auth);
+    let { goalSlug, sort, sortBy, ...params } = ctx.input;
+    validateWholeNumber(params.count, 'count');
+    validateWholeNumber(params.page, 'page', 1);
+    validateWholeNumber(params.per, 'per');
+    if (sortBy !== undefined && !/^[a-z_]+$/.test(sortBy)) {
+      throw createApiServiceError(
+        'sortBy must name a datapoint attribute, such as timestamp or updated_at.'
+      );
+    }
+    let attribute = sortBy ?? (sort ? 'timestamp' : undefined);
+    let raw = responseArray(
+      await client.getDatapoints(goalSlug, {
+        sort: attribute,
+        ...(sort === 'asc' ? {} : params)
+      })
+    );
+    if (sort === 'asc') {
+      let field = attribute ?? 'timestamp';
+      let values = raw.map(item => {
+        let record = responseRecord(item);
+        let value = record[field];
+        if (typeof value !== 'number' && typeof value !== 'string') {
+          throw createApiServiceError(
+            `Beeminder did not return a sortable ${field} on every datapoint.`,
+            { reason: 'beeminder_invalid_response' }
+          );
+        }
+        return { record, value };
+      });
+      values.sort((left, right) =>
+        left.value < right.value ? -1 : left.value > right.value ? 1 : 0
+      );
+      raw = values.map(item => item.record);
+      if (params.page !== undefined) {
+        let per = params.per ?? 25;
+        raw = raw.slice((params.page - 1) * per, params.page * per);
+      } else if (params.count !== undefined) raw = raw.slice(0, params.count);
+    }
+    let datapoints = raw.map(mapDatapoint);
     return {
       output: { datapoints },
       message: `Retrieved **${datapoints.length}** datapoint(s) for goal **${goalSlug}**.`

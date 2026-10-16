@@ -1,17 +1,17 @@
 {
   "name": "@metorial/altoviz",
-  "description": "Create, manage, and send sales invoices, quotes, and credits for small businesses and freelancers. Manage customers, contacts, suppliers, products, and receipts. Finalize and download invoices, mark invoices as paid, and send invoices or quotes by email. Create purchase invoices from PDF files. Search customers by email and products by product number. Store custom metadata on entities. Retrieve account settings, VAT rates, and classifications. Register webhooks to receive notifications on changes to contacts, customers, invoices, quotes, and products.",
+  "description": "Manage customers, contacts, products, suppliers, customer receipts, sales invoices, quotes, and credits. Finalize invoices, record payments, send invoices or quotes by email, retrieve complete records, and download sales documents as PDFs. Search customers by email and products by number. Retrieve the connected user, account settings, VAT rates, classifications, and units.",
   "categories": ["crm-and-sales-tools", "financial-data-and-stock-market"],
   "skills": [
     "manage sales invoices",
     "create and send quotes",
     "manage customers and contacts",
-    "manage products and images",
-    "mark invoices as paid",
-    "create purchase invoices",
-    "manage suppliers and receipts",
-    "send invoices by email",
-    "register webhooks",
+    "manage products",
+    "record invoice payments",
+    "manage suppliers and customer receipts",
+    "send documents by email",
+    "download sales documents",
+    "retrieve current user",
     "retrieve VAT rates and settings"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/altoviz.jpeg"

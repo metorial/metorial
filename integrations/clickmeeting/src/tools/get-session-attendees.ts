@@ -27,7 +27,7 @@ export let getSessionAttendees = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getSessionAttendees(ctx.input.roomId, ctx.input.sessionId);
-    let attendees = Array.isArray(result) ? result : [];
+    let attendees = result;
 
     return {
       output: { attendees },

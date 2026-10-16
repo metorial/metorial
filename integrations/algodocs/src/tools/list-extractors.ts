@@ -18,7 +18,11 @@ export let listExtractors = SlateTool.create(spec, {
         .array(
           z.object({
             extractorId: z.string().describe('Unique identifier of the extractor'),
-            name: z.string().describe('Name of the extractor')
+            name: z.string().describe('Name of the extractor'),
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete extractor metadata')
           })
         )
         .describe('List of extractors in the account')
@@ -34,7 +38,8 @@ export let listExtractors = SlateTool.create(spec, {
 
     let mapped = extractors.map(e => ({
       extractorId: e.id,
-      name: e.name
+      name: e.name,
+      raw: e
     }));
 
     return {

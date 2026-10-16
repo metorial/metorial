@@ -1,12 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BTCPayClient } from '../lib/client';
+import { storeIdSchema } from '../lib/schemas';
+import {
+  nullableTimestamp,
+  providerAmount,
+  providerTimestamp,
+  requireFields
+} from '../lib/values';
 import { spec } from '../spec';
 
 let paymentRequestSchema = z.object({
   paymentRequestId: z.string().describe('Payment request ID'),
   title: z.string().describe('Payment request title'),
-  amount: z.number().describe('Requested amount'),
+  amount: z
+    .number()
+    .describe('Requested amount as a number; amountExact retains the provider decimal.'),
+  amountExact: z.string().optional().describe('Exact requested amount'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete payment request data'),
   currency: z.string().optional().nullable().describe('Currency code'),
   description: z.string().optional().nullable().describe('Payment request description'),
   status: z.string().optional().describe('Payment request status'),
@@ -19,6 +30,9 @@ export let managePaymentRequests = SlateTool.create(spec, {
   name: 'Manage Payment Requests',
   key: 'manage_payment_requests',
   description: `Create, list, update, or archive shareable payment requests. Payment requests are pages where customers can pay on their own schedule with automatic exchange rate updates. Useful for freelancers, invoicing, or requesting money.`,
+  constraints: [
+    'Current servers require title and amount for update. PUT replaces optional settings; omitted optional fields may reset.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -29,7 +43,7 @@ export let managePaymentRequests = SlateTool.create(spec, {
       action: z
         .enum(['list', 'get', 'create', 'update', 'archive'])
         .describe('Action to perform'),
-      storeId: z.string().describe('Store ID'),
+      storeId: storeIdSchema,
       paymentRequestId: z
         .string()
         .optional()
@@ -37,13 +51,13 @@ export let managePaymentRequests = SlateTool.create(spec, {
       title: z
         .string()
         .optional()
-        .describe('Title (required for create, optional for update)'),
+        .describe('Title (required for create and update on current servers)'),
       amount: z
         .number()
         .optional()
-        .describe('Amount (required for create, optional for update)'),
+        .describe('Amount (required for create and update on current servers)'),
       currency: z.string().optional().describe('Currency code'),
-      description: z.string().optional().describe('Markdown description'),
+      description: z.string().optional().describe('HTML description'),
       email: z.string().optional().describe('Requester email'),
       expiryDate: z.string().optional().describe('Expiry date (ISO format)'),
       allowCustomPaymentAmounts: z
@@ -70,15 +84,21 @@ export let managePaymentRequests = SlateTool.create(spec, {
 
     let { action, storeId } = ctx.input;
 
+    if (['get', 'update', 'archive'].includes(action))
+      requireFields(ctx.input, ['paymentRequestId'], action);
+    if (action === 'create') requireFields(ctx.input, ['title', 'amount'], action);
+
     let mapRequest = (pr: Record<string, unknown>) => ({
       paymentRequestId: pr.id as string,
       title: pr.title as string,
-      amount: pr.amount as number,
+      amount: providerAmount(pr.amount, 'paymentRequest.amount')!,
+      amountExact: typeof pr.amount === 'string' ? pr.amount : undefined,
+      raw: pr,
       currency: pr.currency as string | undefined,
       description: pr.description as string | undefined,
       status: pr.status as string | undefined,
       email: pr.email as string | undefined,
-      expiryDate: pr.expiryDate !== undefined ? String(pr.expiryDate) : undefined,
+      expiryDate: nullableTimestamp(pr.expiryDate),
       createdTime: pr.createdTime !== undefined ? String(pr.createdTime) : undefined
     });
 
@@ -118,11 +138,12 @@ export let managePaymentRequests = SlateTool.create(spec, {
     if (action === 'update') {
       let updateData: Record<string, unknown> = {};
       if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
-      if (ctx.input.amount !== undefined) updateData.amount = ctx.input.amount;
+      if (ctx.input.amount !== undefined) updateData.amount = String(ctx.input.amount);
       if (ctx.input.currency !== undefined) updateData.currency = ctx.input.currency;
       if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
       if (ctx.input.email !== undefined) updateData.email = ctx.input.email;
-      if (ctx.input.expiryDate !== undefined) updateData.expiryDate = ctx.input.expiryDate;
+      if (ctx.input.expiryDate !== undefined)
+        updateData.expiryDate = providerTimestamp(ctx.input.expiryDate);
       if (ctx.input.allowCustomPaymentAmounts !== undefined)
         updateData.allowCustomPaymentAmounts = ctx.input.allowCustomPaymentAmounts;
       let pr = await client.updatePaymentRequest(

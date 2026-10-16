@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, recordsFrom } from '../lib/client';
 import { spec } from '../spec';
 
 let logoResultSchema = z.object({
@@ -59,6 +59,7 @@ export let getCorporateLogosTool = SlateTool.create(spec, {
   .output(
     z.object({
       logos: z.array(logoResultSchema).describe('Logo results for requested companies'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of logo results')
     })
   )
@@ -70,7 +71,7 @@ export let getCorporateLogosTool = SlateTool.create(spec, {
       searchKeysType: ctx.input.searchKeysType
     });
 
-    let results = data?.data || (Array.isArray(data) ? data : []);
+    let results = recordsFrom(data);
     let logos = results.map((item: any) => ({
       searchKey: item.search_key,
       createdAt: item.created_at,
@@ -92,6 +93,7 @@ export let getCorporateLogosTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         logos,
         count: logos.length
       },

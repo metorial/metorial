@@ -1,18 +1,18 @@
 {
   "name": "@metorial/instacart",
-  "description": "Create shoppable recipe pages and shopping lists with ingredient-to-product matching on Instacart Marketplace. Discover nearby retailers by postal code. Manage grocery delivery and pickup order fulfillment including creating, updating, and canceling orders. Query available stores, delivery time slots, and pickup windows. Track order status through lifecycle events (picking, delivering, delivered, canceled).  Retrieve order and delivery status. Serve and track Carrot Ads (sponsored products, banner ads, brand pages) across storefronts. Ingest and manage product catalog data. Handle post-checkout order status pages. Collect order feedback and ratings. Manage customer data for privacy compliance. Link retailer customer accounts to Instacart accounts. Simulate order workflows in a sandbox environment.",
+  "description": "Create shoppable recipe and shopping-list pages, discover nearby retailers, and manage retailer delivery and pickup fulfillment with Instacart Developer Platform and Connect.",
   "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
   "skills": [
     "create shoppable recipe pages",
-    "generate smart shopping lists",
+    "generate shopping lists",
     "discover nearby retailers",
-    "manage delivery and pickup orders",
-    "track order status events",
-    "serve and track ads",
-    "ingest product catalog data",
-    "monitor item-level updates",
-    "collect order ratings",
-    "manage customer compliance data"
+    "look up fulfillment customers",
+    "validate customer addresses",
+    "find fulfillment stores",
+    "list and reserve time slots",
+    "create delivery and pickup orders",
+    "retrieve and cancel orders",
+    "simulate sandbox order workflows"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/instacart.png"
 }

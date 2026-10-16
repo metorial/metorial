@@ -1,4 +1,4 @@
-# Slates Specification for Shortpixel
+# ShortPixel Integration Specification
 
 ## Overview
 
@@ -57,3 +57,15 @@ If you use ShortPixel Adaptive Images or other partner plugins and want to assoc
 ## Events
 
 The provider does not support events. ShortPixel's API is a request-response image processing service and does not offer webhooks, event subscriptions, or any built-in push notification mechanism for API consumers.
+
+## Implemented tool surface
+
+- `optimize_image`: Reducer URL optimization, retaining the original result URLs for completed variants. This batch tool does not prepare downloadable files; temporary links must be downloaded promptly. No upload tool is registered.
+- `optimize_image_file`: single-image synchronous processing via `POST /v2/reducer-sync.php`, returning actual image content and MIME/byte-size metadata. One processing request only; no pending-result retry, URL renewal or second optimization. Choose this tool before starting single-image processing; do not call it after batch processing as a download step.
+- `check_api_status`: account credit usage; numeric strings are converted to numbers. Legacy numeric-total fields are returned only when the provider supplies them.
+- `manage_domain`: add/register, associate an existing domain, revoke, status, CDN usage, storage purge and CDN cache purge.
+- `generate_cdn_url`: construct an Adaptive Images URL without making a processing request.
+
+The upload API remains a provider capability without an implemented tool. The synchronous single-image endpoint is implemented by `optimize_image_file`. Optimized files are retained for approximately two hours according to the [FAQ](https://shortpixel.com/faq). No read-only URL renewal API is documented; the integration does not silently restart a paid optimization.
+
+Official references: [Reducer API](https://shortpixel.com/api-docs), [CDN API endpoints](https://shortpixel.com/knowledge-base/article/shortpixels-cdn-api-endpoints/), [Adaptive Images](https://shortpixel.com/adaptive-images-api).

@@ -1,24 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapReport, reportOutputSchema } from '../lib/maps';
 import { spec } from '../spec';
-
-let reportOutputSchema = z.object({
-  campaignId: z.string().describe('Campaign this report belongs to'),
-  sent: z.number().describe('Total emails sent'),
-  accepted: z.number().describe('Emails accepted by mail servers'),
-  cleaned: z.number().describe('Addresses cleaned (removed)'),
-  complained: z.number().describe('Spam complaints'),
-  hardbounced: z.number().describe('Hard bounces'),
-  softbounced: z.number().describe('Soft bounces'),
-  unsubscribed: z.number().describe('Unsubscribes from the campaign'),
-  openedUnique: z.number().describe('Unique opens'),
-  clickedUnique: z.number().describe('Unique clicks'),
-  webversionUnique: z.number().describe('Unique web version views'),
-  acceptedRatio: z.number().describe('Acceptance ratio (0-1)'),
-  openedRatio: z.number().describe('Open ratio (0-1)'),
-  clickedRatio: z.number().describe('Click ratio (0-1)')
-});
 
 export let getReport = SlateTool.create(spec, {
   name: 'Get Campaign Report',
@@ -43,23 +27,6 @@ export let getReport = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-
-    let mapReport = (r: any) => ({
-      campaignId: r.campaign_id,
-      sent: r.sent,
-      accepted: r.accepted,
-      cleaned: r.cleaned,
-      complained: r.complained,
-      hardbounced: r.hardbounced,
-      softbounced: r.softbounced,
-      unsubscribed: r.unsubscribed,
-      openedUnique: r.opened_unique,
-      clickedUnique: r.clicked_unique,
-      webversionUnique: r.webversion_unique,
-      acceptedRatio: r.accepted_ratio,
-      openedRatio: r.opened_ratio,
-      clickedRatio: r.clicked_ratio
-    });
 
     if (ctx.input.campaignId) {
       let result = await client.getReport(ctx.input.campaignId);

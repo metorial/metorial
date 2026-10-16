@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let searchSecurityItems = SlateTool.create(spec, {
@@ -59,6 +59,10 @@ export let searchSecurityItems = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       securityItems: z
         .array(
           z.object({
@@ -103,7 +107,7 @@ export let searchSecurityItems = SlateTool.create(spec, {
     });
 
     let securityItems = (response.data ?? []).map((item: any) => ({
-      srmItemId: item.id ?? '',
+      srmItemId: requireCodacyString(item.id, 'securityItem.id'),
       title: item.title ?? undefined,
       priority: item.priority ?? undefined,
       status: item.status ?? undefined,
@@ -120,6 +124,7 @@ export let searchSecurityItems = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         securityItems,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

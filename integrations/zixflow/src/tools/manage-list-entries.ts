@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, providerId, providerRecords, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageListEntries = SlateTool.create(spec, {
@@ -15,7 +16,7 @@ export let manageListEntries = SlateTool.create(spec, {
     'For "delete": provide listId and entryId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -24,7 +25,7 @@ export let manageListEntries = SlateTool.create(spec, {
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete'])
         .describe('Operation to perform'),
-      listId: z.string().describe('List ID'),
+      listId: z.string().describe('List ID. Discover IDs with list_lists.'),
       entryId: z
         .string()
         .optional()
@@ -42,12 +43,20 @@ export let manageListEntries = SlateTool.create(spec, {
         .optional()
         .describe('Number of entries to return (for list, default: 10)'),
       offset: z.number().optional().describe('Pagination offset (for list, default: 0)'),
-      filter: z.array(z.any()).optional().describe('Filter criteria array (for list)'),
+      filter: z
+        .array(z.any())
+        .optional()
+        .describe('Filter criteria combined with AND (for list)'),
+      filterObject: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Documented filter object for list; use this or filter, not both'),
       sort: z.array(z.any()).optional().describe('Sort criteria array (for list)')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       success: z.boolean().describe('Whether the operation was successful'),
       responseMessage: z.string().describe('Response message from the API'),
       entryId: z.string().optional().describe('ID of the created/affected entry'),
@@ -61,77 +70,47 @@ export let manageListEntries = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
     let { action, listId } = ctx.input;
+    requireInput(listId, 'listId');
+    if (['get', 'update', 'delete'].includes(action))
+      requireInput(ctx.input.entryId, 'entryId');
+    if (ctx.input.filter !== undefined && ctx.input.filterObject !== undefined) {
+      throw createApiServiceError('Provide filter or filterObject, not both.', {
+        reason: 'zixflow_invalid_input'
+      });
+    }
+    if (action === 'create') requireInput(ctx.input.recordId, 'recordId');
+    if (action === 'update' && ctx.input.entryData === undefined) {
+      throw createApiServiceError('entryData is required for update.', {
+        reason: 'zixflow_invalid_input'
+      });
+    }
     let result: any;
-
-    if (action === 'create') {
+    if (action === 'create')
       result = await client.createListEntry(listId, ctx.input.recordId!, ctx.input.entryData);
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          entryId: result.data?._id,
-          entry: result.data
-        },
-        message: `Created list entry in list ${listId}.`
-      };
-    }
-
-    if (action === 'get') {
-      result = await client.getListEntry(listId, ctx.input.entryId!);
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          entryId: ctx.input.entryId,
-          entry: result.data
-        },
-        message: `Fetched list entry ${ctx.input.entryId}.`
-      };
-    }
-
-    if (action === 'list') {
+    else if (action === 'get') result = await client.getListEntry(listId, ctx.input.entryId!);
+    else if (action === 'list')
       result = await client.getListEntries(listId, {
         limit: ctx.input.limit ?? 10,
         offset: ctx.input.offset ?? 0,
         filter: ctx.input.filter,
+        filterObject: ctx.input.filterObject,
         sort: ctx.input.sort
       });
-      let entries = Array.isArray(result.data) ? result.data : [];
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          entries
-        },
-        message: `Fetched ${entries.length} entry(ies) from list ${listId}.`
-      };
-    }
+    else if (action === 'update')
+      result = await client.updateListEntry(listId, ctx.input.entryId!, ctx.input.entryData!);
+    else result = await client.deleteListEntry(listId, ctx.input.entryId!);
 
-    if (action === 'update') {
-      result = await client.updateListEntry(
-        listId,
-        ctx.input.entryId!,
-        ctx.input.entryData ?? {}
-      );
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          entryId: ctx.input.entryId
-        },
-        message: `Updated list entry ${ctx.input.entryId}.`
-      };
-    }
-
-    // delete
-    result = await client.deleteListEntry(listId, ctx.input.entryId!);
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response',
-        entryId: ctx.input.entryId
+        ...operationOutput(result),
+        entryId: providerId(result),
+        entry:
+          ['create', 'get'].includes(action) && isApiErrorRecord(result.data)
+            ? result.data
+            : undefined,
+        entries: action === 'list' ? providerRecords(result.data) : undefined
       },
-      message: `Deleted list entry ${ctx.input.entryId}.`
+      message: `Zixflow ${action} operation confirmed.`
     };
   })
   .build();

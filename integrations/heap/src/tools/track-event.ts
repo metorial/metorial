@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HeapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -102,7 +102,22 @@ Use this for events that need to exactly match your backend data, such as comple
       datacenter: ctx.config.datacenter
     });
 
-    if (ctx.input.events && ctx.input.events.length > 0) {
+    if (ctx.input.events !== undefined) {
+      if (
+        [
+          ctx.input.identity,
+          ctx.input.userId,
+          ctx.input.event,
+          ctx.input.properties,
+          ctx.input.timestamp,
+          ctx.input.idempotencyKey,
+          ctx.input.sessionId
+        ].some(value => value !== undefined)
+      ) {
+        throw createApiServiceError(
+          'Provide events for bulk tracking or top-level fields for a single event, not both.'
+        );
+      }
       ctx.info(`Bulk tracking ${ctx.input.events.length} events`);
       await client.bulkTrackEvents(ctx.input.events);
 
@@ -116,7 +131,7 @@ Use this for events that need to exactly match your backend data, such as comple
     }
 
     if (!ctx.input.event) {
-      throw new Error(
+      throw createApiServiceError(
         'Either "event" (for single tracking) or "events" (for bulk tracking) must be provided.'
       );
     }

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,24 +20,16 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://www.remoteretrieval.com'
-      });
-
-      let response = await axios.get('/api/v1/validate/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let result = await new Client({ token: ctx.output.token }).validateUser();
 
       return {
         profile: {
-          email: response.data.email
+          email: result.email
         }
       };
     }

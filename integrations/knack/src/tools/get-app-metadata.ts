@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { KnackClient } from '../lib/client';
+import { array, KnackClient, resolveApplicationId, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAppMetadata = SlateTool.create(spec, {
@@ -11,7 +11,20 @@ export let getAppMetadata = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      objectKey: z
+        .string()
+        .optional()
+        .describe(
+          'Return only this object in the objects summary; omit to discover all objects'
+        ),
+      sceneKey: z
+        .string()
+        .optional()
+        .describe('Return only this scene in the scenes summary; omit to discover all scenes')
+    })
+  )
   .output(
     z.object({
       name: z.string().describe('Application name'),
@@ -55,48 +68,74 @@ export let getAppMetadata = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Scenes (pages) in the application')
+        .describe('Scenes (pages) in the application'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Complete application metadata, including field settings and relationship definitions'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new KnackClient({
-      applicationId: ctx.config.applicationId,
+      applicationId: resolveApplicationId(ctx.auth, ctx.config),
       token: ctx.auth.token,
       authMode: ctx.auth.authMode
     });
 
     let metadata = await client.getApplicationMetadata();
 
-    let objects = (metadata.objects || []).map((obj: any) => ({
-      objectKey: obj.key,
-      name: obj.name,
-      fields: (obj.fields || []).map((field: any) => ({
-        fieldKey: field.key,
-        name: field.name,
-        fieldType: field.type,
-        required: field.required || false
+    let sourceObjects = array(metadata.objects, 'application objects');
+    if (ctx.input.objectKey) {
+      sourceObjects = sourceObjects.filter(item => item.key === ctx.input.objectKey);
+      if (!sourceObjects.length)
+        throw createApiServiceError(
+          'The application metadata does not contain that objectKey.'
+        );
+    }
+    let objects = sourceObjects.map(obj => ({
+      objectKey: text(obj.key, 'object key'),
+      name: text(obj.name, 'object name'),
+      fields: array(obj.fields, 'object fields').map(field => ({
+        fieldKey: text(field.key, 'field key'),
+        name: text(field.name, 'field name'),
+        fieldType: text(field.type, 'field type'),
+        required: typeof field.required === 'boolean' ? field.required : undefined
       }))
     }));
-
-    let scenes = (metadata.scenes || []).map((scene: any) => ({
-      sceneKey: scene.key,
-      name: scene.name,
-      slug: scene.slug,
-      views: (scene.views || []).map((view: any) => ({
-        viewKey: view.key,
-        name: view.name,
-        viewType: view.type
-      }))
+    let sourceScenes =
+      metadata.scenes == null ? undefined : array(metadata.scenes, 'application scenes');
+    if (ctx.input.sceneKey) {
+      sourceScenes = sourceScenes?.filter(item => item.key === ctx.input.sceneKey);
+      if (!sourceScenes?.length)
+        throw createApiServiceError(
+          'The application metadata does not contain that sceneKey.'
+        );
+    }
+    let scenes = sourceScenes?.map(scene => ({
+      sceneKey: text(scene.key, 'scene key'),
+      name: text(scene.name, 'scene name'),
+      slug: typeof scene.slug === 'string' ? scene.slug : undefined,
+      views:
+        scene.views == null
+          ? undefined
+          : array(scene.views, 'scene views').map(view => ({
+              viewKey: text(view.key, 'view key'),
+              name: text(view.name, 'view name'),
+              viewType: text(view.type, 'view type')
+            }))
     }));
 
     return {
       output: {
-        name: metadata.name || '',
-        slug: metadata.slug,
+        name: text(metadata.name, 'application name'),
+        slug: typeof metadata.slug === 'string' ? metadata.slug : undefined,
         objects,
-        scenes
+        scenes,
+        raw: metadata
       },
-      message: `Retrieved metadata for **${metadata.name || 'app'}** — **${objects.length}** objects and **${scenes.length}** scenes.`
+      message: `Retrieved metadata for **${text(metadata.name, 'application name')}** — **${objects.length}** objects${scenes === undefined ? '' : ` and **${scenes.length}** scenes`}.`
     };
   })
   .build();

@@ -17,6 +17,12 @@ You can also customize the login screen text for username and password prompts.`
   .input(
     z.object({
       flipbookId: z.string().describe('Unique identifier of the flipbook to protect.'),
+      resourceType: z
+        .enum(['flipbook', 'bookshelf'])
+        .optional()
+        .describe(
+          'Target resource type. Omit for a flipbook; use bookshelf with the shelf ID in flipbookId.'
+        ),
       mode: z
         .enum(['users', 'everyone', 'disabled'])
         .describe(
@@ -52,7 +58,8 @@ You can also customize the login screen text for username and password prompts.`
       mode: ctx.input.mode,
       password: ctx.input.password,
       usernameLabel: ctx.input.usernameLabel,
-      passwordLabel: ctx.input.passwordLabel
+      passwordLabel: ctx.input.passwordLabel,
+      resourceType: ctx.input.resourceType
     });
 
     let modeDescription =

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse, threatEnrichmentShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 let ipResultSchema = z
@@ -35,7 +36,10 @@ let ipResultSchema = z
         isKnownAttacker: z.boolean().describe('Known attacker'),
         isKnownAbuser: z.boolean().describe('Known abuser'),
         isThreat: z.boolean().describe('Considered a threat'),
-        isBogon: z.boolean().describe('Bogon address')
+        isBogon: z.boolean().describe('Bogon address'),
+        isIcloudRelay: z.boolean().optional().describe('iCloud Private Relay address'),
+        isDatacenter: z.boolean().optional().describe('Datacenter address'),
+        ...threatEnrichmentShape
       })
       .optional(),
     company: z
@@ -64,6 +68,12 @@ let ipResultSchema = z
       })
       .optional()
   })
+  .extend({
+    raw: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe('Complete original provider response')
+  })
   .passthrough();
 
 export let bulkLookupIps = SlateTool.create(spec, {
@@ -72,7 +82,7 @@ export let bulkLookupIps = SlateTool.create(spec, {
   description: `Look up geolocation and enrichment data for multiple IP addresses in a single request. Supports up to 100 IPv4 or IPv6 addresses at once. Returns the same comprehensive data as a single IP lookup for each address.`,
   constraints: [
     'Maximum of 100 IP addresses per request.',
-    'Free API keys are limited to 1,500 requests per day.'
+    'Requires a paid API key. Each IP counts as one request against the API quota.'
   ],
   tags: {
     readOnly: true
@@ -116,7 +126,7 @@ export let bulkLookupIps = SlateTool.create(spec, {
 
     return {
       output: {
-        results,
+        results: results.map(result => parseResponse(ipResultSchema, result)),
         totalLookedUp: results.length
       },
       message: `Looked up **${results.length}** IP addresses across **${countrySummary}**.`

@@ -10,7 +10,7 @@ export let listFunctions = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/functions/v1/functions', { params });
   return response.data;
@@ -56,7 +56,7 @@ export let listFunctionVersions = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { functionId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/functions/v1/versions', { params });
   return response.data;
@@ -91,7 +91,7 @@ export let listTriggers = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/triggers/v1/triggers', { params });
   return response.data;

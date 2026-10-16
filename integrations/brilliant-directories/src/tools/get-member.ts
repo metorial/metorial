@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,16 +30,20 @@ Returns member profile data including contact information, subscription details,
       limit: z
         .number()
         .optional()
-        .describe('Number of results per page (20-100). Defaults to 100.'),
+        .describe('Number of results per page (1-100). The provider defaults to 25.'),
       page: z
         .string()
         .optional()
-        .describe('Pagination token from a previous response (next_page or last_page value).')
+        .describe('Pagination token from a previous response (next_page or prev_page value).')
     })
   )
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       member: z.any().describe('The member record(s) returned by the API.')
     })
   )
@@ -52,18 +56,21 @@ Returns member profile data including contact information, subscription details,
     let result: any;
     if (ctx.input.userId) {
       result = await client.getUser(ctx.input.userId);
-    } else if (ctx.input.property && ctx.input.propertyValue) {
+    } else if (ctx.input.property && ctx.input.propertyValue !== undefined) {
       result = await client.getUserByProperty(ctx.input.property, ctx.input.propertyValue, {
         limit: ctx.input.limit,
         page: ctx.input.page
       });
     } else {
-      throw new Error('Either userId or both property and propertyValue must be provided.');
+      throw createApiServiceError(
+        'Either userId or both property and propertyValue must be provided.'
+      );
     }
 
     return {
       output: {
         status: result.status,
+        raw: result,
         member: result.message
       },
       message: `Retrieved member data successfully.`

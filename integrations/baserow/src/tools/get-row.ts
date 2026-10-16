@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRow = SlateTool.create(spec, {
@@ -13,7 +13,11 @@ export let getRow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table containing the row'),
+      tableId: z
+        .number()
+        .describe(
+          'The ID of the table containing the row. Discover with list_token_tables, or list_databases then list_tables for JWT connections.'
+        ),
       rowId: z.number().describe('The ID of the row to retrieve'),
       userFieldNames: z
         .boolean()
@@ -28,11 +32,7 @@ export let getRow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     let row = await client.getRow(
       ctx.input.tableId,

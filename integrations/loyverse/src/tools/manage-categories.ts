@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
@@ -30,6 +30,10 @@ export let listCategories = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      categoryIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return categories with these IDs'),
       limit: z
         .number()
         .min(1)
@@ -49,6 +53,7 @@ export let listCategories = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listCategories({
+      categoryIds: joinIds(ctx.input.categoryIds),
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted

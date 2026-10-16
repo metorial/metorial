@@ -18,6 +18,7 @@ export let getEventDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       eventId: z.number().describe('Unique event ID'),
       title: z.string().describe('Full event title'),
       shortTitle: z.string().describe('Abbreviated event title'),
@@ -36,8 +37,8 @@ export let getEventDetails = SlateTool.create(spec, {
         .object({
           venueId: z.number().describe('Venue ID'),
           name: z.string().describe('Venue name'),
-          address: z.string().describe('Street address'),
-          extendedAddress: z.string().describe('Extended address'),
+          address: z.string().optional().describe('Street address'),
+          extendedAddress: z.string().optional().describe('Extended address'),
           city: z.string().describe('City'),
           state: z.string().describe('State'),
           country: z.string().describe('Country'),
@@ -95,6 +96,7 @@ export let getEventDetails = SlateTool.create(spec, {
     let e = await client.getEvent(ctx.input.eventId);
 
     let output = {
+      raw: e,
       eventId: e.id,
       title: e.title,
       shortTitle: e.short_title,
@@ -112,8 +114,8 @@ export let getEventDetails = SlateTool.create(spec, {
       venue: {
         venueId: e.venue.id,
         name: e.venue.name,
-        address: e.venue.address,
-        extendedAddress: e.venue.extended_address,
+        address: e.venue.address ?? undefined,
+        extendedAddress: e.venue.extended_address ?? undefined,
         city: e.venue.city,
         state: e.venue.state,
         country: e.venue.country,
@@ -145,7 +147,7 @@ export let getEventDetails = SlateTool.create(spec, {
         averagePrice: e.stats.average_price,
         lowestPrice: e.stats.lowest_price,
         highestPrice: e.stats.highest_price,
-        medianPrice: e.stats.median_price
+        medianPrice: e.stats.median_price ?? null
       }
     };
 

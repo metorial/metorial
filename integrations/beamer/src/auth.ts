@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,7 @@ export let auth = SlateAuth.create()
         .describe('Your Beamer API key. Found in Settings > API in your Beamer dashboard.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) throw createApiServiceError('Enter your Beamer API key.');
       return {
         output: {
           token: ctx.input.apiKey

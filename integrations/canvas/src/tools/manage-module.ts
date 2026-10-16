@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageModuleTool = SlateTool.create(spec, {
@@ -68,6 +68,7 @@ export let manageModuleTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       moduleId: z.string().describe('Module ID'),
       name: z.string().optional().describe('Module name'),
       position: z.number().optional().nullable().describe('Module position'),
@@ -80,17 +81,23 @@ export let manageModuleTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
+    if (
+      ctx.input.position !== undefined &&
+      (!Number.isInteger(ctx.input.position) || ctx.input.position < 1)
+    ) {
+      throw createApiServiceError('position must be a positive integer.');
+    }
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('name is required when creating a module.');
+    }
     let result: any;
     let actionDesc: string;
 
     if (ctx.input.action === 'create') {
       let moduleData: Record<string, any> = {};
-      if (ctx.input.name) moduleData.name = ctx.input.name;
+      if (ctx.input.name !== undefined) moduleData.name = ctx.input.name;
       if (ctx.input.position !== undefined) moduleData.position = ctx.input.position;
       if (ctx.input.unlockAt !== undefined) moduleData.unlock_at = ctx.input.unlockAt;
       if (ctx.input.requireSequentialProgress !== undefined)
@@ -99,10 +106,26 @@ export let manageModuleTool = SlateTool.create(spec, {
         moduleData.prerequisite_module_ids = ctx.input.prerequisiteModuleIds;
       }
       result = await client.createModule(ctx.input.courseId, moduleData);
+      if (ctx.input.published !== undefined) {
+        try {
+          result = await client.updateModule(ctx.input.courseId, String(result.id), {
+            published: ctx.input.published
+          });
+        } catch (error) {
+          let failure = buildApiServiceError(error, {
+            providerLabel: 'Canvas',
+            reason: 'canvas_module_publication_error'
+          });
+          failure.data.createdModuleId = String(result.id);
+          failure.data.recovery = `Module ${result.id} was created. Use action update with this moduleId to change publication state instead of creating another module.`;
+          throw failure;
+        }
+      }
       actionDesc = 'Created module';
 
       return {
         output: {
+          raw: result,
           moduleId: String(result.id),
           name: result.name,
           position: result.position,
@@ -112,9 +135,9 @@ export let manageModuleTool = SlateTool.create(spec, {
         message: `${actionDesc} **${result.name}** (ID: ${result.id}).`
       };
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.moduleId) throw new Error('moduleId is required for update');
+      if (!ctx.input.moduleId) throw createApiServiceError('moduleId is required for update');
       let moduleData: Record<string, any> = {};
-      if (ctx.input.name) moduleData.name = ctx.input.name;
+      if (ctx.input.name !== undefined) moduleData.name = ctx.input.name;
       if (ctx.input.position !== undefined) moduleData.position = ctx.input.position;
       if (ctx.input.published !== undefined) moduleData.published = ctx.input.published;
       if (ctx.input.unlockAt !== undefined) moduleData.unlock_at = ctx.input.unlockAt;
@@ -128,6 +151,7 @@ export let manageModuleTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: result,
           moduleId: String(result.id),
           name: result.name,
           position: result.position,
@@ -137,12 +161,13 @@ export let manageModuleTool = SlateTool.create(spec, {
         message: `${actionDesc} **${result.name}** (ID: ${result.id}).`
       };
     } else if (ctx.input.action === 'delete') {
-      if (!ctx.input.moduleId) throw new Error('moduleId is required for delete');
+      if (!ctx.input.moduleId) throw createApiServiceError('moduleId is required for delete');
       result = await client.deleteModule(ctx.input.courseId, ctx.input.moduleId);
       actionDesc = 'Deleted module';
 
       return {
         output: {
+          raw: result,
           moduleId: String(result.id),
           name: result.name,
           position: result.position,
@@ -152,9 +177,29 @@ export let manageModuleTool = SlateTool.create(spec, {
       };
     } else {
       // add_item
-      if (!ctx.input.moduleId) throw new Error('moduleId is required for add_item');
-      if (!ctx.input.itemType) throw new Error('itemType is required for add_item');
+      if (!ctx.input.moduleId)
+        throw createApiServiceError('moduleId is required for add_item');
+      if (!ctx.input.itemType)
+        throw createApiServiceError('itemType is required for add_item');
 
+      if (
+        ['File', 'Discussion', 'Assignment', 'Quiz', 'ExternalTool', 'Page'].includes(
+          ctx.input.itemType
+        ) &&
+        !ctx.input.itemContentId
+      ) {
+        throw createApiServiceError(
+          'itemContentId is required for this item type. For Page, provide the page URL slug.'
+        );
+      }
+      if (
+        ['ExternalUrl', 'ExternalTool'].includes(ctx.input.itemType) &&
+        !ctx.input.itemExternalUrl
+      ) {
+        throw createApiServiceError(
+          'itemExternalUrl is required for ExternalUrl and ExternalTool items.'
+        );
+      }
       let itemData: Record<string, any> = {
         type: ctx.input.itemType
       };
@@ -171,10 +216,7 @@ export let manageModuleTool = SlateTool.create(spec, {
       actionDesc = 'Added item to module';
 
       return {
-        output: {
-          moduleId: ctx.input.moduleId,
-          addedItemId: String(result.id)
-        },
+        output: { raw: result, moduleId: ctx.input.moduleId, addedItemId: String(result.id) },
         message: `${actionDesc} ${ctx.input.moduleId}: **${result.title}** (${ctx.input.itemType}).`
       };
     }

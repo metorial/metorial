@@ -29,7 +29,8 @@ export let getProduct = SlateTool.create(spec, {
 
     let response = await client.getProductGroup(ctx.input.productGroupId, [
       'products',
-      'photos'
+      'photo',
+      'price_structure.price_tiles'
     ]);
     let productGroup = flattenSingleResource(response);
 

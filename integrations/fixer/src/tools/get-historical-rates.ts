@@ -12,7 +12,9 @@ export let getHistoricalRates = SlateTool.create(spec, {
     'Currency codes must be 3-letter ISO 4217 codes.',
     'Historical data is available from 1999-01-01 onwards.'
   ],
-  constraints: ['Changing the base currency from EUR requires a paid Fixer plan.'],
+  constraints: [
+    'Endpoint availability and permitted base currencies depend on the subscription for the selected API host.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -42,7 +44,7 @@ export let getHistoricalRates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiHost: ctx.auth.apiHost });
 
     let base = ctx.input.baseCurrency || ctx.config.baseCurrency;
 

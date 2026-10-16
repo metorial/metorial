@@ -1,4 +1,6 @@
+export * from './browse-records';
 export * from './get-recommendations';
+export * from './get-task-status';
 export * from './index-settings';
 export * from './manage-ab-tests';
 export * from './manage-api-keys';

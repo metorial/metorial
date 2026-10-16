@@ -1,5 +1,8 @@
 export * from './get-block-details';
+export * from './get-epoch-info';
 export * from './get-execution-address';
+export * from './get-gas-prices';
+export * from './get-machine-metrics';
 export * from './get-network-state';
 export * from './get-slot-details';
 export * from './get-staking-entities';
@@ -7,5 +10,7 @@ export * from './get-sync-committee';
 export * from './get-validator-duties';
 export * from './get-validator-info';
 export * from './get-validator-performance';
+export * from './get-validator-queues';
 export * from './get-validator-rewards';
+export * from './list-machines';
 export * from './manage-dashboard-validators';

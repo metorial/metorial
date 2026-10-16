@@ -1,8 +1,27 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { rejectMergeResponse } from './files';
 
 let axios = createAxios({
   baseURL: 'https://api.templated.io/v1'
 });
+
+axios.interceptors.response.use(
+  response => response,
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, {
+        providerLabel: 'Templated',
+        reason: 'templated_api_error',
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      })
+    )
+);
+
+let expectArray = (value: unknown): any[] => {
+  if (!Array.isArray(value))
+    throw createApiServiceError('Templated returned an unexpected list response.');
+  return value;
+};
 
 export class Client {
   constructor(private token: string) {}
@@ -37,7 +56,7 @@ export class Client {
       headers: this.headers,
       params
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async getTemplate(
@@ -47,7 +66,7 @@ export class Client {
       includePages?: boolean;
     }
   ) {
-    let response = await axios.get(`/template/${templateId}`, {
+    let response = await axios.get(`/template/${encodeURIComponent(templateId)}`, {
       headers: this.headers,
       params
     });
@@ -75,12 +94,14 @@ export class Client {
       width?: number;
       height?: number;
       description?: string;
+      externalId?: string;
+      safeZoneWidth?: number;
       layers?: any[];
       pages?: any[];
     },
     replaceLayers?: boolean
   ) {
-    let response = await axios.put(`/template/${templateId}`, body, {
+    let response = await axios.put(`/template/${encodeURIComponent(templateId)}`, body, {
       headers: { ...this.headers, 'Content-Type': 'application/json' },
       params: replaceLayers !== undefined ? { replaceLayers } : undefined
     });
@@ -88,14 +109,17 @@ export class Client {
   }
 
   async deleteTemplate(templateId: string) {
-    await axios.delete(`/template/${templateId}`, { headers: this.headers });
+    await axios.delete(`/template/${encodeURIComponent(templateId)}`, {
+      headers: this.headers
+    });
   }
 
   async duplicateTemplate(templateId: string, name?: string) {
     let response = await axios.post(
-      `/template/${templateId}/duplicate`,
-      name ? { name } : {},
+      `/template/${encodeURIComponent(templateId)}/duplicate`,
+      {},
       {
+        params: name ? { name } : undefined,
         headers: { ...this.headers, 'Content-Type': 'application/json' }
       }
     );
@@ -104,7 +128,7 @@ export class Client {
 
   async cloneTemplate(templateId: string) {
     let response = await axios.post(
-      `/template/${templateId}/clone`,
+      `/template/${encodeURIComponent(templateId)}/clone`,
       {},
       {
         headers: this.headers
@@ -114,22 +138,22 @@ export class Client {
   }
 
   async getTemplateLayers(templateId: string, includeLockedLayers?: boolean) {
-    let response = await axios.get(`/template/${templateId}/layers`, {
+    let response = await axios.get(`/template/${encodeURIComponent(templateId)}/layers`, {
       headers: this.headers,
       params: includeLockedLayers !== undefined ? { includeLockedLayers } : undefined
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async addTemplateTags(templateId: string, tags: string[]) {
-    let response = await axios.post(`/template/${templateId}/tags`, tags, {
+    let response = await axios.post(`/template/${encodeURIComponent(templateId)}/tags`, tags, {
       headers: { ...this.headers, 'Content-Type': 'application/json' }
     });
     return response.data;
   }
 
   async removeTemplateTags(templateId: string, tags: string[]) {
-    let response = await axios.delete(`/template/${templateId}/tags`, {
+    let response = await axios.delete(`/template/${encodeURIComponent(templateId)}/tags`, {
       headers: { ...this.headers, 'Content-Type': 'application/json' },
       data: tags
     });
@@ -150,6 +174,25 @@ export class Client {
       headers: this.headers,
       params
     });
+    return expectArray(response.data);
+  }
+
+  async getTemplatePages(templateId: string, includeLockedLayers?: boolean) {
+    let response = await axios.get(`/template/${encodeURIComponent(templateId)}/pages`, {
+      headers: this.headers,
+      params: includeLockedLayers !== undefined ? { includeLockedLayers } : undefined
+    });
+    return expectArray(response.data);
+  }
+
+  async createTemplateFromRender(renderId: string) {
+    let response = await axios.post(
+      `/template/from-render/${encodeURIComponent(renderId)}`,
+      {},
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -175,6 +218,7 @@ export class Client {
     layers?: Record<string, any>;
     pages?: any[];
     merge?: boolean;
+    zip?: boolean;
   }) {
     // Convert camelCase to snake_case for API compatibility
     let apiBody: Record<string, any> = {};
@@ -197,6 +241,7 @@ export class Client {
     if (body.layers) apiBody.layers = body.layers;
     if (body.pages) apiBody.pages = body.pages;
     if (body.merge !== undefined) apiBody.merge = body.merge;
+    if (body.zip !== undefined) apiBody.zip = body.zip;
 
     let response = await axios.post('/render', apiBody, {
       headers: { ...this.headers, 'Content-Type': 'application/json' }
@@ -206,21 +251,23 @@ export class Client {
 
   async listRenders() {
     let response = await axios.get('/renders', { headers: this.headers });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async getRender(renderId: string) {
-    let response = await axios.get(`/render/${renderId}`, { headers: this.headers });
+    let response = await axios.get(`/render/${encodeURIComponent(renderId)}`, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async deleteRender(renderId: string) {
-    await axios.delete(`/render/${renderId}`, { headers: this.headers });
+    await axios.delete(`/render/${encodeURIComponent(renderId)}`, { headers: this.headers });
   }
 
   async duplicateRender(renderId: string) {
     let response = await axios.post(
-      `/render/${renderId}/duplicate`,
+      `/render/${encodeURIComponent(renderId)}/duplicate`,
       {},
       {
         headers: this.headers
@@ -229,11 +276,18 @@ export class Client {
     return response.data;
   }
 
-  async mergeRenders(body: { ids: string[]; urls?: string[]; host?: boolean }) {
+  async mergeRenders(body: { ids: string[]; urls?: string[]; host?: boolean; name?: string }) {
     let response = await axios.post('/render/merge', body, {
-      headers: { ...this.headers, 'Content-Type': 'application/json' }
+      headers: { ...this.headers, 'Content-Type': 'application/json' },
+      responseType: body.host === true ? 'json' : 'stream',
+      // Direct PDF limits are enforced while consuming the stream, after observing status.
+      maxContentLength: body.host === true ? 50 * 1024 * 1024 : -1,
+      ...(body.host === true ? {} : { validateStatus: () => true })
     });
-    return response.data;
+    if (body.host !== true && (response.status < 200 || response.status >= 300)) {
+      await rejectMergeResponse(response.data, response.status, response.statusText);
+    }
+    return response;
   }
 
   // ==================== Folders ====================
@@ -243,7 +297,7 @@ export class Client {
       headers: this.headers,
       params
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async createFolder(name: string) {
@@ -259,7 +313,7 @@ export class Client {
 
   async updateFolder(folderId: string, name: string) {
     let response = await axios.put(
-      `/folder/${folderId}`,
+      `/folder/${encodeURIComponent(folderId)}`,
       { name },
       {
         headers: { ...this.headers, 'Content-Type': 'application/json' }
@@ -269,12 +323,12 @@ export class Client {
   }
 
   async deleteFolder(folderId: string) {
-    await axios.delete(`/folder/${folderId}`, { headers: this.headers });
+    await axios.delete(`/folder/${encodeURIComponent(folderId)}`, { headers: this.headers });
   }
 
   async moveTemplateToFolder(folderId: string, templateId: string) {
     await axios.put(
-      `/folder/${folderId}/template/${templateId}`,
+      `/folder/${encodeURIComponent(folderId)}/template/${encodeURIComponent(templateId)}`,
       {},
       {
         headers: this.headers
@@ -284,7 +338,7 @@ export class Client {
 
   async moveRenderToFolder(folderId: string, renderId: string) {
     await axios.put(
-      `/folder/${folderId}/render/${renderId}`,
+      `/folder/${encodeURIComponent(folderId)}/render/${encodeURIComponent(renderId)}`,
       {},
       {
         headers: this.headers
@@ -304,11 +358,11 @@ export class Client {
       includeLayers?: boolean;
     }
   ) {
-    let response = await axios.get(`/folder/${folderId}/templates`, {
+    let response = await axios.get(`/folder/${encodeURIComponent(folderId)}/templates`, {
       headers: this.headers,
       params
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async listFolderRenders(
@@ -318,11 +372,11 @@ export class Client {
       limit?: number;
     }
   ) {
-    let response = await axios.get(`/folder/${folderId}/renders`, {
+    let response = await axios.get(`/folder/${encodeURIComponent(folderId)}/renders`, {
       headers: this.headers,
       params
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   // ==================== Uploads ====================
@@ -337,7 +391,7 @@ export class Client {
       headers: this.headers,
       params
     });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async deleteUploads(ids: string[]) {
@@ -352,7 +406,7 @@ export class Client {
 
   async listFonts() {
     let response = await axios.get('/fonts', { headers: this.headers });
-    return response.data;
+    return expectArray(response.data);
   }
 
   async deleteFonts(fontNames: string[]) {

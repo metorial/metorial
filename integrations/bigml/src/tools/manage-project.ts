@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { type BigMLResource, validateResourceId } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -27,6 +28,7 @@ export let manageProject = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the project'),
       name: z.string().optional().describe('Project name'),
       created: z.string().optional().describe('Creation timestamp')
@@ -35,18 +37,20 @@ export let manageProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    let body: Record<string, unknown> = {};
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
     if (ctx.input.category !== undefined) body.category = ctx.input.category;
 
-    let result: any;
+    let result: BigMLResource;
 
-    if (ctx.input.projectId) {
+    if (ctx.input.projectId !== undefined) {
+      validateResourceId(ctx.input.projectId, 'project');
       result = await client.updateResource(ctx.input.projectId, body);
       return {
         output: {
+          raw: result,
           resourceId: result.resource ?? ctx.input.projectId,
           name: result.name ?? ctx.input.name,
           created: result.created
@@ -57,6 +61,7 @@ export let manageProject = SlateTool.create(spec, {
       result = await client.createResource('project', body);
       return {
         output: {
+          raw: result,
           resourceId: result.resource,
           name: result.name,
           created: result.created

@@ -4,6 +4,8 @@ import {
   cancelEmergency,
   checkAppLimits,
   checkReceipt,
+  getGroup,
+  listGroups,
   listSounds,
   manageGroup,
   manageGroupMembers,
@@ -17,6 +19,8 @@ export let provider = Slate.create({
   tools: [
     sendNotification,
     checkReceipt,
+    getGroup,
+    listGroups,
     cancelEmergency,
     manageGroup,
     manageGroupMembers,

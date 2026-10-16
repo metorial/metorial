@@ -32,13 +32,14 @@ export let manageForum = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let forum: any;
     let action: string;
 
-    if (ctx.input.forumId) {
+    if (ctx.input.forumId !== undefined) {
       forum = await client.updateForum(ctx.input.forumId, {
         name: ctx.input.name,
         welcomeMessage: ctx.input.welcomeMessage,
@@ -60,7 +61,7 @@ export let manageForum = SlateTool.create(spec, {
       output: {
         forumId: forum.id,
         name: forum.name,
-        isPublic: forum.is_public ?? true,
+        isPublic: forum.is_public,
         createdAt: forum.created_at,
         updatedAt: forum.updated_at
       },

@@ -28,13 +28,15 @@ let scheduleOutputSchema = z.object({
 export let manageScheduleTool = SlateTool.create(spec, {
   name: 'Manage Schedule',
   key: 'manage_schedule',
-  description: `Create, list, update, or delete recurring schedules for a Sensibo device. Schedules apply an AC state at a specific time on selected days of the week.`,
+  description: `DEPRECATED — use manage_recurring_schedule instead. Create, list, update, or delete recurring schedules for a Sensibo device. Schedules apply an AC state at a specific time on selected days of the week.`,
   instructions: [
+    'Use manage_recurring_schedule for the documented API contract; this legacy tool retains its original request format.',
     'Use action "list" to see all schedules, "create" to add a new one, "update" to modify, or "delete" to remove.',
     'Days of week use full names: Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday.',
     'Time must be in HH:MM format (24-hour).'
   ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

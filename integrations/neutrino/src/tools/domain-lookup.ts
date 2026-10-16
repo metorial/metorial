@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let domainLookupTool = SlateTool.create(spec, {
   name: 'Domain Lookup',
   key: 'domain_lookup',
-  description: `Retrieve DNS, WHOIS, and threat intelligence for a domain. Returns registration details, domain age, registrar info, mail/web configuration, and malicious domain detection.`,
+  description: `DEPRECATED — use \`get_domain_details\` instead. Retrieve DNS, WHOIS, and threat intelligence for a domain. Returns registration details, domain age, registrar info, mail/web configuration, and malicious domain detection.`,
+  instructions: [
+    'Use get_domain_details for documented domain registration, DNS, mail, website, and threat details.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

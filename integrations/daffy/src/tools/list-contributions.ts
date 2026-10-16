@@ -37,9 +37,10 @@ export let listContributions = SlateTool.create(spec, {
               .describe('Status (pending, success, waiting_for_funds, failed)'),
             valuation: z.number().describe('Unit price in USD'),
             currency: z.string().describe('Currency or asset type'),
+            frequency: z.string().optional().describe('Contribution frequency, when included'),
             createdAt: z.string().describe('Creation timestamp'),
-            receivedAt: z.string().describe('Receipt timestamp'),
-            completedAt: z.string().describe('Completion timestamp')
+            receivedAt: z.string().optional().describe('Receipt timestamp, if received'),
+            completedAt: z.string().optional().describe('Completion timestamp, if completed')
           })
         )
         .describe('List of contributions'),
@@ -61,9 +62,10 @@ export let listContributions = SlateTool.create(spec, {
           status: c.status,
           valuation: c.valuation,
           currency: c.currency,
+          frequency: c.frequency,
           createdAt: c.created_at,
-          receivedAt: c.received_at,
-          completedAt: c.completed_at
+          receivedAt: c.received_at ?? undefined,
+          completedAt: c.completed_at ?? undefined
         })),
         totalCount: result.meta.count,
         currentPage: result.meta.page,

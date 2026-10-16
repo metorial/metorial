@@ -1,4 +1,4 @@
-# Slates Specification for Push by Techulus
+# Push by Techulus integration reference
 
 ## Overview
 
@@ -32,9 +32,13 @@ Send push notifications to all devices connected to your account or to a specifi
 
 Send push notifications to a group of devices in your account. This only works with the account API key. A group ID is required to target specific device groups. The same notification options (title, body, sound, channel, link, image, time sensitive) are available.
 
-### Async Notifications
+### Delivery Results and Async Notifications
 
-Notifications can be sent asynchronously, which returns immediately without waiting for delivery confirmation. This supports the same parameters as synchronous notifications.
+Both notification tools expose the provider's optional `responses` array, retaining each device result's `success`, `message`, and additional provider fields. A successful overall request can include unsuccessful device results, so inspect this array when available.
+
+The `send_notification` tool accepts `async: true` for an acknowledgement without per-device delivery results. This supports the same notification options. The provider recommends async delivery for teams or more than ten devices. Requests have a 30-second timeout and are not retried automatically; a timeout does not prove that no notification was delivered.
+
+The documented API does not expose device-group discovery. Copy `groupId` from your Push account when using `send_group_notification`.
 
 ### Team Management (Beta)
 
@@ -43,6 +47,21 @@ Manage team membership through the API:
 - **Invite User**: Add a user to a team. Once the user has accepted the invite, all future notifications will be received by the user. Requires the account API key, a team API key, and the invitee's email.
 - **Remove User/Revoke Invite**: Remove a user from a team or revoke a pending invite. Requires the same parameters as inviting.
 
-## Events
+## API Errors
 
-The provider does not support events. Push by Techulus is a notification delivery service — it sends notifications outbound but does not offer webhooks or event subscription mechanisms.
+Transport failures, HTTP failures, and responses without `success: true` are reported as errors. Provider error codes and messages are retained when available. A successful asynchronous acknowledgement is not proof of delivery.
+
+## API Coverage
+
+The integration covers all distinct operations in the documented notification and beta management APIs. URL-key webhook variants duplicate notification sending and are unnecessary because the integration sends API keys in headers. No read-only identity, account profile, group-list, or team-list endpoint is documented, so no discovery or identity tool is included.
+
+No inbound event subscription API is documented.
+
+## Official Documentation
+
+- [API quickstart](https://docs.push.techulus.com/api-integration)
+- [Account and team notifications](https://docs.push.techulus.com/api-documentation)
+- [Synchronous request and response fields](https://docs.push.techulus.com/reference/notify)
+- [Asynchronous acknowledgements](https://docs.push.techulus.com/reference/notify-async)
+- [Device group notifications](https://docs.push.techulus.com/api-documentation-1)
+- [Beta team membership API](https://docs.push.techulus.com/management-api-beta)

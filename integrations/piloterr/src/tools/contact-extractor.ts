@@ -1,7 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let extractContactsOutputSchema = z.object({
+  emails: z.array(z.string()).optional().describe('Extracted email addresses'),
+  phoneNumbers: z
+    .array(
+      z.object({
+        e164: z.string().optional(),
+        local: z.string().optional(),
+        valid: z.boolean().optional(),
+        country: z.string().optional(),
+        countryCode: z.string().optional(),
+        international: z.string().optional()
+      })
+    )
+    .optional()
+    .describe('Extracted phone numbers with formatting'),
+  contactPages: z.array(z.string()).optional().describe('Discovered contact pages'),
+  linkedinProfiles: z.array(z.string()).optional(),
+  twitterProfiles: z.array(z.string()).optional(),
+  instagramProfiles: z.array(z.string()).optional(),
+  facebookProfiles: z.array(z.string()).optional(),
+  tiktokProfiles: z.array(z.string()).optional(),
+  youtubeChannels: z.array(z.string()).optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let extractContacts = SlateTool.create(spec, {
   name: 'Extract Website Contacts',
@@ -20,32 +46,7 @@ export let extractContacts = SlateTool.create(spec, {
         .describe('Country code for phone number formatting (e.g., "FR", "US")')
     })
   )
-  .output(
-    z.object({
-      emails: z.array(z.string()).optional().describe('Extracted email addresses'),
-      phoneNumbers: z
-        .array(
-          z.object({
-            e164: z.string().optional(),
-            local: z.string().optional(),
-            valid: z.boolean().optional(),
-            country: z.string().optional(),
-            countryCode: z.string().optional(),
-            international: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Extracted phone numbers with formatting'),
-      contactPages: z.array(z.string()).optional().describe('Discovered contact pages'),
-      linkedinProfiles: z.array(z.string()).optional(),
-      twitterProfiles: z.array(z.string()).optional(),
-      instagramProfiles: z.array(z.string()).optional(),
-      facebookProfiles: z.array(z.string()).optional(),
-      tiktokProfiles: z.array(z.string()).optional(),
-      youtubeChannels: z.array(z.string()).optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(extractContactsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.extractContactInfo({
@@ -53,11 +54,8 @@ export let extractContacts = SlateTool.create(spec, {
       countryCode: ctx.input.countryCode
     });
 
-    let emailCount = result.emails?.length ?? 0;
-    let phoneCount = result.phone_numbers?.length ?? 0;
-
     return {
-      output: {
+      output: normalizeOutput(extractContactsOutputSchema, {
         emails: result.emails,
         phoneNumbers: result.phone_numbers,
         contactPages: result.contact_pages,
@@ -68,8 +66,8 @@ export let extractContacts = SlateTool.create(spec, {
         tiktokProfiles: result.tiktok_profiles,
         youtubeChannels: result.youtube_channels,
         raw: result
-      },
-      message: `Extracted **${emailCount} emails** and **${phoneCount} phone numbers** from **${ctx.input.url}**.`
+      }),
+      message: 'Retrieved website contact information.'
     };
   })
   .build();

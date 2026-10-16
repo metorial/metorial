@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,6 +55,20 @@ export let listNfts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let targets = [
+      ctx.input.collectionSlug,
+      ctx.input.contractAddress,
+      ctx.input.ownerAddress
+    ];
+    if (targets.filter(value => value !== undefined).length !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one of collectionSlug, contractAddress, or ownerAddress.'
+      );
+    }
+    if (ctx.input.filterCollection !== undefined && !ctx.input.ownerAddress) {
+      throw createApiServiceError('filterCollection is only supported with ownerAddress.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let chain = ctx.input.chain || ctx.config.chain || 'ethereum';
     let data: any;
@@ -76,7 +90,7 @@ export let listNfts = SlateTool.create(spec, {
         collection: ctx.input.filterCollection
       });
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide at least one of collectionSlug, contractAddress, or ownerAddress.'
       );
     }
@@ -86,9 +100,9 @@ export let listNfts = SlateTool.create(spec, {
       name: nft.name ?? null,
       description: nft.description ?? null,
       imageUrl: nft.image_url ?? null,
-      collection: nft.collection ?? '',
-      contract: nft.contract ?? '',
-      tokenStandard: nft.token_standard ?? 'unknown',
+      collection: nft.collection,
+      contract: nft.contract,
+      tokenStandard: nft.token_standard,
       opensea_url: nft.opensea_url ?? null
     }));
 

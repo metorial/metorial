@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCoursesTool = SlateTool.create(spec, {
@@ -38,6 +38,7 @@ export let listCoursesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       courses: z.array(
         z.object({
           courseId: z.string().describe('Canvas course ID'),
@@ -57,10 +58,7 @@ export let listCoursesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
     if (ctx.input.includeTerms) include.push('term');
@@ -74,7 +72,17 @@ export let listCoursesTool = SlateTool.create(spec, {
       include: include.length > 0 ? include : undefined
     });
 
-    let courses = raw.map((c: any) => ({
+    let search = ctx.input.searchTerm?.toLocaleLowerCase();
+    let matching = search
+      ? raw.filter(
+          (course: any) =>
+            String(course.id) === ctx.input.searchTerm ||
+            [course.name, course.course_code].some(
+              value => typeof value === 'string' && value.toLocaleLowerCase().includes(search)
+            )
+        )
+      : raw;
+    let courses = matching.map((c: any) => ({
       courseId: String(c.id),
       name: c.name,
       courseCode: c.course_code,
@@ -87,7 +95,7 @@ export let listCoursesTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { courses },
+      output: { raw: raw, courses },
       message: `Found **${courses.length}** course(s).`
     };
   })

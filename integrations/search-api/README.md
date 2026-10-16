@@ -1,6 +1,6 @@
 # Search API
 
-Perform real-time web searches across multiple search engines (Google, Bing, Baidu, Yahoo, Yandex, DuckDuckGo, Naver) and retrieve structured JSON results. Search Google verticals including Images, Videos, News, Shopping, Maps, Scholar, Trends, Flights, Hotels, Jobs, Finance, Patents, and Autocomplete. Scrape results from YouTube, Amazon, Walmart, eBay, Airbnb, Tripadvisor, and app stores. Access ad transparency libraries for Meta, LinkedIn, Reddit, and TikTok. Track keyword rankings for SEO, look up geo-targeting locations, retrieve search history, and check account usage. Supports localization by language, country, and device targeting.
+Search Google, Google Light, Bing, Baidu, Yahoo, Yandex, DuckDuckGo, and Naver. Query Google Images, Videos, News, Shopping, Maps, Scholar, Trends, Jobs, and Autocomplete, or search YouTube. Look up canonical geographic locations, retrieve saved search history, and inspect account usage. Search controls and pagination depend on the selected engine. Every tool also returns the complete provider response.
 
 ## License
 

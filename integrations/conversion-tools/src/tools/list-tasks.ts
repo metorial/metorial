@@ -11,12 +11,16 @@ let taskDetailSchema = z.object({
   dateCreated: z.string().describe('ISO timestamp when the task was created'),
   dateFinished: z.string().nullable().describe('ISO timestamp when the task finished'),
   conversionProgress: z.number().describe('Progress percentage (0-100)'),
-  sourceFileName: z.string().describe('Name of the source file'),
-  sourceFileSize: z.number().describe('Size of the source file in bytes'),
-  resultFileName: z.string().nullable().describe('Name of the result file'),
-  resultFileId: z.string().nullable().describe('File ID of the result file'),
+  sourceFileName: z.string().optional().describe('Name of the source file, when supplied'),
+  sourceFileSize: z
+    .number()
+    .optional()
+    .describe('Size of the source file in bytes, when supplied'),
+  resultFileName: z.string().nullable().optional().describe('Name of the result file'),
+  resultFileId: z.string().nullable().optional().describe('File ID of the result file'),
   retentionMode: z.string().describe('File retention mode (standard_24h or ttl_15m)'),
-  dateExpires: z.string().nullable().describe('ISO timestamp when the task files expire')
+  dateExpires: z.string().nullable().describe('ISO timestamp when the task files expire'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Original task details')
 });
 
 export let listTasks = SlateTool.create(spec, {
@@ -54,12 +58,13 @@ export let listTasks = SlateTool.create(spec, {
       dateCreated: t.dateCreated,
       dateFinished: t.dateFinished,
       conversionProgress: t.conversionProgress,
-      sourceFileName: t.fileSource.name,
-      sourceFileSize: t.fileSource.size,
-      resultFileName: t.fileResult?.name ?? null,
-      resultFileId: t.fileResult?.id ?? null,
+      sourceFileName: t.fileSource?.name,
+      sourceFileSize: t.fileSource?.size,
+      resultFileName: t.fileResult === null ? null : t.fileResult?.name,
+      resultFileId: t.fileResult === null ? null : t.fileResult?.id,
       retentionMode: t.retentionMode,
-      dateExpires: t.dateExpires
+      dateExpires: t.dateExpires,
+      raw: t
     }));
 
     let statusFilter = ctx.input.status ? ` with status **${ctx.input.status}**` : '';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 export let updateProposal = SlateTool.create(spec, {
@@ -90,12 +91,12 @@ export let updateProposal = SlateTool.create(spec, {
 
     return {
       output: {
-        proposalId: p.id,
-        name: p.name,
-        status: p.status,
-        url: p.url,
-        appUrl: p.app_url,
-        updatedAt: p.updated_at
+        proposalId: readBidsketchNumber(p.id, 'id'),
+        name: readBidsketchString(p.name, 'name'),
+        status: readBidsketchString(p.status, 'status'),
+        url: readBidsketchString(p.url, 'url'),
+        appUrl: readBidsketchString(p.app_url, 'app_url'),
+        updatedAt: readBidsketchString(p.updated_at, 'updated_at')
       },
       message: `Updated proposal **${p.name}** (ID: ${p.id}).`
     };

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let paymentMethodSchema = z.object({
@@ -9,7 +9,14 @@ let paymentMethodSchema = z.object({
   last4: z.string().nullable().describe('Last 4 digits of the card'),
   brandName: z.string().nullable().describe('Card brand (e.g. Visa, Mastercard)'),
   expMonth: z.number().nullable().describe('Card expiration month'),
-  expYear: z.number().nullable().describe('Card expiration year')
+  expYear: z.number().nullable().describe('Card expiration year'),
+  name: z.string().optional().describe('Payment method display name'),
+  cardholderName: z.string().nullable().optional().describe('Cardholder name when available'),
+  balance: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Available balance in cents for payment methods that hold a balance')
 });
 
 export let listPaymentMethods = SlateTool.create(spec, {
@@ -27,21 +34,21 @@ export let listPaymentMethods = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let result = await client.listPaymentMethods();
 
     let paymentMethods = (Array.isArray(result) ? result : result.data || []).map(
       (pm: any) => ({
         paymentMethodId: pm.id,
-        type: pm.type,
-        last4: pm.last4 || pm.last_4,
-        brandName: pm.brand || pm.brand_name,
-        expMonth: pm.exp_month,
-        expYear: pm.exp_year
+        type: pm.type ?? null,
+        last4: pm.last4 ?? pm.last_4 ?? null,
+        brandName: pm.brand ?? pm.brand_name ?? null,
+        expMonth: pm.exp_month ?? null,
+        expYear: pm.exp_year ?? null,
+        name: pm.name,
+        cardholderName: pm.cardholder_name ?? null,
+        balance: pm.balance ?? null
       })
     );
 

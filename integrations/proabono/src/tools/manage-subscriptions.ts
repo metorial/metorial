@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,6 +26,7 @@ let subscriptionSchema = z.object({
   stateSubscription: z.string().optional().describe('Technical state'),
   dateStart: z.string().optional().describe('Subscription start date'),
   dateRenewal: z.string().optional().describe('Next renewal date'),
+  dateTerm: z.string().optional().describe('Subscription term date'),
   dateTermination: z.string().optional().describe('Termination date if set'),
   currency: z.string().optional().describe('Billing currency'),
   amountRecurrence: z.number().optional().describe('Recurring amount in cents'),
@@ -71,8 +72,35 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
         .string()
         .optional()
         .describe('Offer reference (required for create and upgrade)'),
-      referenceSubscription: z.string().optional().describe('Subscription reference'),
-      subscriptionId: z.number().optional().describe('ProAbono subscription ID'),
+      referenceSubscription: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy subscription reference field. The Live API requires subscriptionId or referenceCustomer instead.'
+        ),
+      subscriptionId: z
+        .number()
+        .optional()
+        .describe(
+          'ProAbono subscription ID. Use the list action to discover IDs; preferred for lifecycle actions.'
+        ),
+      ensureBillable: z
+        .boolean()
+        .optional()
+        .describe('For create/start: require valid payment information.'),
+      billNow: z.boolean().optional().describe('For create/start/upgrade: bill immediately.'),
+      immediate: z
+        .boolean()
+        .optional()
+        .describe('For upgrade: false schedules the upgrade at the current term end.'),
+      ignoreEngagement: z
+        .boolean()
+        .optional()
+        .describe('For upgrade: ignore the minimum commitment.'),
+      tryStart: z
+        .boolean()
+        .optional()
+        .describe('For create: control whether the subscription starts immediately.'),
       referenceSegment: z.string().optional().describe('Segment reference'),
       dateStart: z.string().optional().describe('Subscription start date (ISO 8601)'),
       dateTerm: z
@@ -111,21 +139,25 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
 
     if (action === 'create') {
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for create');
-      if (!ctx.input.referenceOffer) throw new Error('referenceOffer is required for create');
+        throw createApiServiceError('referenceCustomer is required for create');
+      if (!ctx.input.referenceOffer)
+        throw createApiServiceError('referenceOffer is required for create');
       let data: Record<string, any> = {
         ReferenceCustomer: ctx.input.referenceCustomer,
         ReferenceOffer: ctx.input.referenceOffer,
         ReferenceSegment: ctx.input.referenceSegment || ctx.config.defaultSegment,
         DateStart: ctx.input.dateStart,
         Metadata: ctx.input.metadata,
+        EnsureBillable: ctx.input.ensureBillable,
+        BillNow: ctx.input.billNow,
+        TryStart: ctx.input.tryStart,
         ...(ctx.input.overrides || {})
       };
       let result = await client.createSubscription(data);
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Created subscription **${subscription.referenceSubscription || subscription.subscriptionId}** for customer **${ctx.input.referenceCustomer}**`
+        message: `Created subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}** for customer **${ctx.input.referenceCustomer}**`
       };
     }
 
@@ -138,7 +170,7 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Retrieved subscription **${subscription.referenceSubscription || subscription.subscriptionId}** (status: ${subscription.status})`
+        message: `Retrieved subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}** (status: ${subscription.status})`
       };
     }
 
@@ -158,7 +190,7 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${subscriptions.length}** subscriptions (total: ${result?.TotalItems || 0})`
+        message: `Found **${subscriptions.length}** subscriptions on this page`
       };
     }
 
@@ -166,12 +198,14 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
       let result = await client.startSubscription({
         ReferenceSubscription: ctx.input.referenceSubscription,
         IdSubscription: ctx.input.subscriptionId,
-        ReferenceCustomer: ctx.input.referenceCustomer
+        ReferenceCustomer: ctx.input.referenceCustomer,
+        EnsureBillable: ctx.input.ensureBillable,
+        BillNow: ctx.input.billNow
       });
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Started subscription **${subscription.referenceSubscription || subscription.subscriptionId}**`
+        message: `Started subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}**`
       };
     }
 
@@ -184,18 +218,21 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Suspended subscription **${subscription.referenceSubscription || subscription.subscriptionId}**`
+        message: `Suspended subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}**`
       };
     }
 
     if (action === 'upgrade') {
-      if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for upgrade');
-      if (!ctx.input.referenceOffer) throw new Error('referenceOffer is required for upgrade');
+      if (!ctx.input.referenceOffer)
+        throw createApiServiceError('referenceOffer is required for upgrade');
       let data: Record<string, any> = {
         ReferenceCustomer: ctx.input.referenceCustomer,
+        ReferenceSubscription: ctx.input.referenceSubscription,
+        IdSubscription: ctx.input.subscriptionId,
         ReferenceOffer: ctx.input.referenceOffer,
-        ReferenceSegment: ctx.input.referenceSegment || ctx.config.defaultSegment,
+        BillNow: ctx.input.billNow,
+        Immediate: ctx.input.immediate,
+        IgnoreEngagement: ctx.input.ignoreEngagement,
         ...(ctx.input.overrides || {})
       };
       let result = await client.upgradeSubscription(data);
@@ -216,7 +253,7 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Terminated subscription **${subscription.referenceSubscription || subscription.subscriptionId}**${ctx.input.atRenewal ? ' (effective at renewal)' : ' (immediate)'}`
+        message: `Terminated subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}**${ctx.input.atRenewal === false ? ' (immediate)' : ' (effective at renewal)'}`
       };
     }
 
@@ -224,16 +261,17 @@ Supports overriding trial periods, pricing, features, and scheduling future or b
       let result = await client.updateSubscriptionTermDate({
         ReferenceSubscription: ctx.input.referenceSubscription,
         IdSubscription: ctx.input.subscriptionId,
+        ReferenceCustomer: ctx.input.referenceCustomer,
         DateTerm: ctx.input.dateTerm
       });
       let subscription = mapSubscription(result);
       return {
         output: { subscription },
-        message: `Updated term date for subscription **${subscription.referenceSubscription || subscription.subscriptionId}**`
+        message: `Updated term date for subscription **${subscription.referenceSubscription ?? subscription.subscriptionId ?? ctx.input.subscriptionId ?? ctx.input.referenceCustomer ?? 'requested subscription'}**`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -246,6 +284,7 @@ let mapSubscription = (raw: any) => ({
   stateSubscription: raw?.StateSubscription,
   dateStart: raw?.DateStart,
   dateRenewal: raw?.DateRenewal,
+  dateTerm: raw?.DateTerm,
   dateTermination: raw?.DateTermination,
   currency: raw?.Currency,
   amountRecurrence: raw?.AmountRecurrence,

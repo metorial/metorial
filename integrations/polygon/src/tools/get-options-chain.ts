@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getOptionsChain = SlateTool.create(spec, {
@@ -17,6 +24,17 @@ export let getOptionsChain = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
+      sort: z
+        .string()
+        .optional()
+        .describe(
+          'Sort field; use ticker for snapshots, or a documented contract field such as expiration_date for contracts.'
+        ),
+      expired: z
+        .boolean()
+        .optional()
+        .describe('Include expired contracts. Applies only when includeSnapshots is false.'),
       underlyingTicker: z.string().describe('Underlying stock ticker symbol (e.g., AAPL)'),
       contractType: z
         .enum(['call', 'put'])
@@ -40,12 +58,13 @@ export let getOptionsChain = SlateTool.create(spec, {
         .number()
         .int()
         .optional()
-        .describe('Max number of results to return (default 10, max 1000)'),
+        .describe('Max results: 250 for snapshots, 1000 for contracts; provider default 10'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order')
     })
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       contracts: z
         .array(
           z.object({
@@ -100,10 +119,16 @@ export let getOptionsChain = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, ctx.input.includeSnapshots ? 250 : 1000);
+    if (ctx.input.includeSnapshots && ctx.input.expired !== undefined)
+      throw createApiServiceError(
+        'expired applies only to contract listings, without snapshots.'
+      );
     let client = new PolygonClient(ctx.auth.token);
 
     if (ctx.input.includeSnapshots) {
       let response = await client.getOptionsChainSnapshot({
+        cursor: ctx.input.cursor,
         underlyingAsset: ctx.input.underlyingTicker,
         contractType: ctx.input.contractType,
         expirationDate: ctx.input.expirationDate,
@@ -112,10 +137,11 @@ export let getOptionsChain = SlateTool.create(spec, {
         strikePriceGte: ctx.input.strikePriceFrom,
         strikePriceLte: ctx.input.strikePriceTo,
         limit: ctx.input.limit,
-        order: ctx.input.order
+        order: ctx.input.order,
+        sort: ctx.input.sort
       });
 
-      let contracts = (response.results || []).map((r: any) => ({
+      let contracts = polygonRecords(response.results).map((r: any) => ({
         contractTicker: r.details?.ticker,
         underlyingTicker: r.underlying_asset?.ticker,
         contractType: r.details?.contract_type,
@@ -156,13 +182,15 @@ export let getOptionsChain = SlateTool.create(spec, {
       }));
 
       return {
-        output: { contracts },
+        output: polygonOutput({ contracts }, response),
         message: `Retrieved **${contracts.length}** options snapshots for **${ctx.input.underlyingTicker}** with Greeks and IV.`
       };
     }
 
     let response = await client.getOptionsContracts({
+      cursor: ctx.input.cursor,
       underlyingTicker: ctx.input.underlyingTicker,
+      expired: ctx.input.expired,
       contractType: ctx.input.contractType,
       expirationDate: ctx.input.expirationDate,
       expirationDateGte: ctx.input.expirationDateFrom,
@@ -170,10 +198,11 @@ export let getOptionsChain = SlateTool.create(spec, {
       strikePriceGte: ctx.input.strikePriceFrom,
       strikePriceLte: ctx.input.strikePriceTo,
       limit: ctx.input.limit,
-      order: ctx.input.order
+      order: ctx.input.order,
+      sort: ctx.input.sort
     });
 
-    let contracts = (response.results || []).map((r: any) => ({
+    let contracts = polygonRecords(response.results).map((r: any) => ({
       contractTicker: r.ticker,
       underlyingTicker: r.underlying_ticker,
       contractType: r.contract_type,
@@ -185,7 +214,7 @@ export let getOptionsChain = SlateTool.create(spec, {
     }));
 
     return {
-      output: { contracts },
+      output: polygonOutput({ contracts }, response),
       message: `Retrieved **${contracts.length}** options contracts for **${ctx.input.underlyingTicker}**.`
     };
   })

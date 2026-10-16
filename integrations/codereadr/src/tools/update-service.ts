@@ -6,7 +6,10 @@ import { spec } from '../spec';
 export let updateService = SlateTool.create(spec, {
   name: 'Update Service',
   key: 'update_service',
-  description: `Update an existing scanning service's configuration. Only provided fields will be updated; omitted fields remain unchanged. Supports changing name, validation method, postback settings, scheduling, and duplicate handling.`,
+  description: `Update an existing scanning service's configuration. Supports changing name, validation method, postback settings, scheduling, and duplicate handling. Omitted symbologies reset to the provider default, even when changing another setting. Other omitted fields remain unchanged.`,
+  instructions: [
+    'To preserve a custom barcode format selection, provide its current comma-separated IDs in symbologies. The provider resets the selection to default when symbologies is omitted. Obtain the current selection from your CodeREADr service settings.'
+  ],
   tags: {
     destructive: false
   }
@@ -15,6 +18,12 @@ export let updateService = SlateTool.create(spec, {
     z.object({
       serviceId: z.string().describe('ID of the service to update'),
       name: z.string().optional().describe('New name for the service'),
+      symbologies: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated barcode symbology IDs, such as 33,34,12. Supply the current selection to preserve it; omission resets the provider default.'
+        ),
       description: z.string().optional().describe('New description or URL'),
       validationMethod: z
         .enum([
@@ -48,6 +57,19 @@ export let updateService = SlateTool.create(spec, {
         .optional()
         .describe('Service deactivation end time (HH:mm:ss)'),
       uploadEmail: z.string().optional().describe('Email address for scan delivery'),
+      uploadEmailFormat: z.string().optional().describe('CSV format: regular or properties'),
+      postbackRealTimeScans: z
+        .string()
+        .optional()
+        .describe(
+          'Set to 1 or 0 for forwarding online scans from non-postback services. Requires postbackUrl.'
+        ),
+      postbackUploadedScans: z
+        .string()
+        .optional()
+        .describe(
+          'Set to 1 or 0 for forwarding uploaded scans from non-postback services. Requires postbackUrl.'
+        ),
       postbackReceiverOnly: z.string().optional().describe('Set to "1" for receiver-only mode')
     })
   )
@@ -60,6 +82,7 @@ export let updateService = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     await client.updateService(ctx.input.serviceId, {
       name: ctx.input.name,
+      symbologies: ctx.input.symbologies,
       description: ctx.input.description,
       validationMethod: ctx.input.validationMethod,
       databaseId: ctx.input.databaseId,
@@ -71,12 +94,15 @@ export let updateService = SlateTool.create(spec, {
       periodEndDate: ctx.input.periodEndDate,
       periodEndTime: ctx.input.periodEndTime,
       uploadEmail: ctx.input.uploadEmail,
+      uploadEmailFormat: ctx.input.uploadEmailFormat,
+      postbackRealTimeScans: ctx.input.postbackRealTimeScans,
+      postbackUploadedScans: ctx.input.postbackUploadedScans,
       postbackReceiverOnly: ctx.input.postbackReceiverOnly
     });
 
     return {
       output: { serviceId: ctx.input.serviceId },
-      message: `Updated service **${ctx.input.serviceId}** successfully.`
+      message: `Updated service **${ctx.input.serviceId}** successfully.${ctx.input.symbologies === undefined ? ' Omitted symbologies reset to the provider default.' : ''}`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,11 +30,11 @@ export let manageAccessTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: Record<string, unknown>;
 
     if (ctx.input.scope === 'offer') {
       if (!ctx.input.offerId) {
-        throw new Error('offerId is required when scope is "offer"');
+        throw createApiServiceError('offerId is required when scope is "offer"');
       }
       result = await client.setOfferState({
         email: ctx.input.email,
@@ -43,7 +43,7 @@ export let manageAccessTool = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.orderId) {
-        throw new Error('orderId is required when scope is "order"');
+        throw createApiServiceError('orderId is required when scope is "order"');
       }
       result = await client.setOrderState({
         email: ctx.input.email,

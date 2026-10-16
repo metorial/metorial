@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { responseItems } from '../lib/response';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -48,12 +49,12 @@ export let getUser = SlateTool.create(spec, {
       return {
         output: {
           userId: String(user.UserId),
-          userName: user.UserName,
-          firstName: user.FirstName,
-          lastName: user.LastName,
-          externalEmail: user.ExternalEmail,
-          orgDefinedId: user.OrgDefinedId,
-          isActive: user.Activation?.IsActive
+          userName: user.UserName ?? undefined,
+          firstName: user.FirstName ?? undefined,
+          lastName: user.LastName ?? undefined,
+          externalEmail: user.ExternalEmail ?? undefined,
+          orgDefinedId: user.OrgDefinedId ?? undefined,
+          isActive: user.Activation?.IsActive ?? undefined
         },
         message: `Retrieved user **${user.FirstName} ${user.LastName}** (ID: ${user.UserId}).`
       };
@@ -66,7 +67,7 @@ export let getUser = SlateTool.create(spec, {
         orgDefinedId: ctx.input.orgDefinedId
       });
 
-      let items = Array.isArray(result) ? result : result?.Items || [result];
+      let items = responseItems(result);
       let user = items[0];
 
       if (!user) {
@@ -79,12 +80,12 @@ export let getUser = SlateTool.create(spec, {
       return {
         output: {
           userId: String(user.UserId),
-          userName: user.UserName,
-          firstName: user.FirstName,
-          lastName: user.LastName,
-          externalEmail: user.ExternalEmail,
-          orgDefinedId: user.OrgDefinedId,
-          isActive: user.Activation?.IsActive
+          userName: user.UserName ?? undefined,
+          firstName: user.FirstName ?? undefined,
+          lastName: user.LastName ?? undefined,
+          externalEmail: user.ExternalEmail ?? undefined,
+          orgDefinedId: user.OrgDefinedId ?? undefined,
+          isActive: user.Activation?.IsActive ?? undefined
         },
         message: `Found user **${user.FirstName} ${user.LastName}** (ID: ${user.UserId}).`
       };
@@ -94,9 +95,9 @@ export let getUser = SlateTool.create(spec, {
     return {
       output: {
         userId: String(whoami.Identifier),
-        firstName: whoami.FirstName,
-        lastName: whoami.LastName,
-        uniqueName: whoami.UniqueName
+        firstName: whoami.FirstName ?? undefined,
+        lastName: whoami.LastName ?? undefined,
+        uniqueName: whoami.UniqueName ?? undefined
       },
       message: `Current user: **${whoami.FirstName} ${whoami.LastName}** (ID: ${whoami.Identifier}).`
     };

@@ -41,6 +41,10 @@ export let getCoachesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       coaches: z.array(coachSchema),
       count: z.number().describe('Number of coaches returned')
     })
@@ -75,6 +79,7 @@ export let getCoachesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         coaches: results,
         count: results.length
       },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseList, validatePagination } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listRecords = SlateTool.create(spec, {
@@ -36,7 +37,7 @@ Use the \`sort\` parameter to order results; prefix with \`-\` for descending.`,
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of records to return (default 25, max 1000)'),
+        .describe('Positive integer page size. Deployment limits may apply.'),
       offset: z.number().optional().describe('Number of records to skip for pagination'),
       viewId: z.string().optional().describe('View ID to scope the query to a specific view')
     })
@@ -53,10 +54,12 @@ Use the \`sort\` parameter to order results; prefix with \`-\` for descending.`,
           isLastPage: z.boolean().optional()
         })
         .optional()
-        .describe('Pagination metadata')
+        .describe('Pagination metadata'),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination(ctx.input.limit, ctx.input.offset);
     let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
 
     let result = await client.listRecords(ctx.input.tableId, {
@@ -68,11 +71,11 @@ Use the \`sort\` parameter to order results; prefix with \`-\` for descending.`,
       viewId: ctx.input.viewId
     });
 
-    let records = result?.list ?? [];
+    let records = responseList(result, 'records');
     let pageInfo = result?.pageInfo;
 
     return {
-      output: { records, pageInfo },
+      output: { records, pageInfo, raw: result },
       message: `Retrieved **${records.length}** record(s) from table \`${ctx.input.tableId}\`.${pageInfo?.totalRows != null ? ` Total: ${pageInfo.totalRows}.` : ''}`
     };
   })

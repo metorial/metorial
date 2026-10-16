@@ -1,60 +1,76 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PerigonClient } from '../lib/client';
+import { formatArticle } from '../lib/responses';
 import { spec } from '../spec';
 
-let sentimentSchema = z.object({
-  positive: z.number().describe('Positive sentiment score (0-1)'),
-  negative: z.number().describe('Negative sentiment score (0-1)'),
-  neutral: z.number().describe('Neutral sentiment score (0-1)')
-});
+let sentimentSchema = z
+  .object({
+    positive: z.number().describe('Positive sentiment score (0-1)'),
+    negative: z.number().describe('Negative sentiment score (0-1)'),
+    neutral: z.number().describe('Neutral sentiment score (0-1)')
+  })
+  .partial();
 
-let articleSchema = z.object({
-  articleId: z.string().describe('Unique article identifier'),
-  title: z.string().describe('Article headline'),
-  description: z.string().describe('Article description or subtitle'),
-  url: z.string().describe('URL to the original article'),
-  imageUrl: z.string().describe('URL to the article image'),
-  authorsByline: z.string().describe('Author byline as published'),
-  pubDate: z.string().describe('Publication date (ISO 8601)'),
-  addDate: z.string().describe('Date added to Perigon index (ISO 8601)'),
-  sourceDomain: z.string().describe('Source website domain'),
-  country: z.string().describe('Country code of the source'),
-  language: z.string().describe('Language code of the article'),
-  clusterId: z.string().describe('Story cluster ID for grouping related articles'),
-  reprint: z.boolean().describe('Whether this is a reprint'),
-  categories: z.array(z.string()).describe('Article categories'),
-  topics: z.array(z.string()).describe('Article topics'),
-  sentiment: sentimentSchema.describe('Sentiment analysis scores'),
-  labels: z.array(z.string()).describe('Smart labels (e.g. Opinion, Paid News, Review)'),
-  summary: z.string().describe('AI-generated article summary'),
-  people: z
-    .array(
-      z.object({
-        wikidataId: z.string(),
-        name: z.string(),
-        mentions: z.number()
-      })
-    )
-    .describe('People mentioned in the article'),
-  companies: z
-    .array(
-      z.object({
-        companyId: z.string(),
-        name: z.string(),
-        mentions: z.number()
-      })
-    )
-    .describe('Companies mentioned in the article'),
-  keywords: z
-    .array(
-      z.object({
-        name: z.string(),
-        weight: z.number()
-      })
-    )
-    .describe('Extracted keywords with relevance weights')
-});
+let articleSchema = z
+  .object({
+    articleId: z.string().describe('Unique article identifier'),
+    title: z.string().describe('Article headline'),
+    description: z.string().describe('Article description or subtitle'),
+    url: z.string().describe('URL to the original article'),
+    imageUrl: z.string().describe('URL to the article image'),
+    authorsByline: z.string().describe('Author byline as published'),
+    pubDate: z.string().describe('Publication date (ISO 8601)'),
+    addDate: z.string().describe('Date added to Perigon index (ISO 8601)'),
+    sourceDomain: z.string().describe('Source website domain'),
+    country: z.string().describe('Country code of the source'),
+    language: z.string().describe('Language code of the article'),
+    clusterId: z.string().describe('Story cluster ID for grouping related articles'),
+    reprint: z.boolean().describe('Whether this is a reprint'),
+    categories: z.array(z.string()).describe('Article categories'),
+    topics: z.array(z.string()).describe('Article topics'),
+    sentiment: sentimentSchema.describe('Sentiment analysis scores'),
+    labels: z.array(z.string()).describe('Smart labels (e.g. Opinion, Paid News, Review)'),
+    summary: z.string().describe('AI-generated article summary'),
+    content: z.string().optional().describe('Article body available to the connected account'),
+    matchedAuthors: z
+      .array(z.object({ id: z.string().optional(), name: z.string().optional() }))
+      .optional()
+      .describe('Matched journalists; use id with Search Journalists'),
+    people: z
+      .array(
+        z
+          .object({
+            wikidataId: z.string(),
+            name: z.string(),
+            mentions: z.number()
+          })
+          .partial()
+      )
+      .describe('People mentioned in the article'),
+    companies: z
+      .array(
+        z
+          .object({
+            companyId: z.string(),
+            name: z.string(),
+            mentions: z.number()
+          })
+          .partial()
+      )
+      .describe('Companies mentioned in the article'),
+    keywords: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            weight: z.number()
+          })
+          .partial()
+      )
+      .describe('Extracted keywords with relevance weights')
+  })
+  .partial();
 
 export let searchArticles = SlateTool.create(spec, {
   name: 'Search Articles',
@@ -76,6 +92,33 @@ export let searchArticles = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      articleId: z
+        .string()
+        .optional()
+        .describe('Retrieve an article by its unique identifier'),
+      companyDomain: z
+        .string()
+        .optional()
+        .describe('Filter by a mentioned company website domain'),
+      personWikidataId: z
+        .string()
+        .optional()
+        .describe('Filter by a person ID returned by Search People'),
+      companyId: z
+        .string()
+        .optional()
+        .describe('Filter by a company ID returned by Search Companies'),
+      excludeCategory: z.string().optional().describe('Exclude a content category'),
+      excludeTopic: z.string().optional().describe('Exclude a topic'),
+      excludeCountry: z.string().optional().describe('Exclude a source country code'),
+      positiveSentimentFrom: z
+        .number()
+        .optional()
+        .describe('Minimum positive sentiment score, from 0 to 1'),
+      negativeSentimentFrom: z
+        .number()
+        .optional()
+        .describe('Minimum negative sentiment score, from 0 to 1'),
       query: z
         .string()
         .optional()
@@ -134,6 +177,9 @@ export let searchArticles = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Complete provider response, including unavailable enrichment values'),
       numResults: z.number().describe('Total number of matching articles'),
       articles: z.array(articleSchema).describe('List of matching articles')
     })
@@ -142,6 +188,15 @@ export let searchArticles = SlateTool.create(spec, {
     let client = new PerigonClient(ctx.auth.token);
 
     let result = await client.searchArticles({
+      articleId: ctx.input.articleId,
+      companyDomain: ctx.input.companyDomain,
+      personWikidataId: ctx.input.personWikidataId,
+      companyId: ctx.input.companyId,
+      excludeCategory: ctx.input.excludeCategory,
+      excludeTopic: ctx.input.excludeTopic,
+      excludeCountry: ctx.input.excludeCountry,
+      positiveSentimentFrom: ctx.input.positiveSentimentFrom,
+      negativeSentimentFrom: ctx.input.negativeSentimentFrom,
       q: ctx.input.query,
       title: ctx.input.title,
       source: ctx.input.source,
@@ -166,46 +221,14 @@ export let searchArticles = SlateTool.create(spec, {
       size: ctx.input.size
     });
 
-    let articles = (result.articles || []).map(a => ({
-      articleId: a.articleId || '',
-      title: a.title || '',
-      description: a.description || '',
-      url: a.url || '',
-      imageUrl: a.imageUrl || '',
-      authorsByline: a.authorsByline || '',
-      pubDate: a.pubDate || '',
-      addDate: a.addDate || '',
-      sourceDomain: a.source?.domain || '',
-      country: a.country || '',
-      language: a.language || '',
-      clusterId: a.clusterId || '',
-      reprint: a.reprint || false,
-      categories: (a.categories || []).map(c => c.name),
-      topics: (a.topics || []).map(t => t.name),
-      sentiment: a.sentiment || { positive: 0, negative: 0, neutral: 0 },
-      labels: a.labels || [],
-      summary: a.summary || '',
-      people: (a.people || []).map(p => ({
-        wikidataId: p.wikidataId || '',
-        name: p.name || '',
-        mentions: p.mentions || 0
-      })),
-      companies: (a.companies || []).map(c => ({
-        companyId: c.id || '',
-        name: c.name || '',
-        mentions: c.mentions || 0
-      })),
-      keywords: (a.keywords || []).map(k => ({
-        name: k.name || '',
-        weight: k.weight || 0
-      }))
-    }));
+    let articles = result.articles.map(formatArticle);
 
     let articleCount = articles.length;
-    let totalCount = result.numResults || 0;
+    let totalCount = result.numResults;
 
     return {
       output: {
+        raw: result,
         numResults: totalCount,
         articles
       },

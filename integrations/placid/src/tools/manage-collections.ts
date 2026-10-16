@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlacidClient } from '../lib/client';
 import { spec } from '../spec';
@@ -55,7 +55,12 @@ export let manageCollections = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Template UUIDs to remove from the collection (for update)'),
-      perPage: z.number().optional().describe('Results per page (max 100; for list)')
+      replaceTemplateUuids: z
+        .array(z.string())
+        .optional()
+        .describe('Replace the complete template membership for update; max 500 templates'),
+      perPage: z.number().optional().describe('Results per page (max 100; for list)'),
+      cursor: z.string().optional().describe('Cursor from the previous nextPageUrl (for list)')
     })
   )
   .output(
@@ -67,6 +72,11 @@ export let manageCollections = SlateTool.create(spec, {
         .array(collectionOutputSchema)
         .optional()
         .describe('List of collections (for list)'),
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, if pagination was requested'),
       deleted: z
         .boolean()
         .optional()
@@ -90,17 +100,20 @@ export let manageCollections = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'list': {
-        let result = await client.listCollections({ perPage: ctx.input.perPage });
+        let result = await client.listCollections({
+          perPage: ctx.input.perPage,
+          cursor: ctx.input.cursor
+        });
         let collections = result.data.map(mapCollection);
         return {
-          output: { collections },
+          output: { collections, nextPageUrl: result.links?.next },
           message: `Found **${collections.length}** collection(s).`
         };
       }
 
       case 'get': {
         if (ctx.input.collectionId === undefined)
-          throw new Error('collectionId is required for "get" action');
+          throw createApiServiceError('collectionId is required for "get" action');
         let collection = await client.getCollection(ctx.input.collectionId);
         return {
           output: { collection: mapCollection(collection) },
@@ -109,7 +122,8 @@ export let manageCollections = SlateTool.create(spec, {
       }
 
       case 'create': {
-        if (!ctx.input.title) throw new Error('title is required for "create" action');
+        if (!ctx.input.title)
+          throw createApiServiceError('title is required for "create" action');
         let collection = await client.createCollection({
           title: ctx.input.title,
           templateUuids: ctx.input.templateUuids,
@@ -123,10 +137,11 @@ export let manageCollections = SlateTool.create(spec, {
 
       case 'update': {
         if (ctx.input.collectionId === undefined)
-          throw new Error('collectionId is required for "update" action');
+          throw createApiServiceError('collectionId is required for "update" action');
         let collection = await client.updateCollection(ctx.input.collectionId, {
           title: ctx.input.title,
           customData: ctx.input.customData,
+          templateUuids: ctx.input.replaceTemplateUuids,
           addTemplateUuids: ctx.input.addTemplateUuids,
           removeTemplateUuids: ctx.input.removeTemplateUuids
         });
@@ -138,7 +153,7 @@ export let manageCollections = SlateTool.create(spec, {
 
       case 'delete': {
         if (ctx.input.collectionId === undefined)
-          throw new Error('collectionId is required for "delete" action');
+          throw createApiServiceError('collectionId is required for "delete" action');
         await client.deleteCollection(ctx.input.collectionId);
         return {
           output: { deleted: true },

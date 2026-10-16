@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredArray, requiredNumber, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 export let getPrices = SlateTool.create(spec, {
@@ -28,6 +28,7 @@ export let getPrices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       prices: z
         .array(
           z.object({
@@ -59,26 +60,22 @@ export let getPrices = SlateTool.create(spec, {
 
     let data = await client.getPrices(ctx.input.items);
 
-    if (!data.status?.success) {
-      throw new Error(data.status?.message || 'Failed to fetch prices');
-    }
-
-    let prices = (data.prices ?? []).map((p: any) => ({
-      productSku: p.product_sku ?? '',
-      productCode: p.product_code || undefined,
-      productQty: p.product_qty ?? 0,
-      productPrice: p.product_price ?? 0,
-      addFramePrice: p.add_frame_price || undefined,
-      addMat1Price: p.add_mat_1_price || undefined,
-      addMat2Price: p.add_mat_2_price || undefined,
-      addGlazingPrice: p.add_glazing_price || undefined,
-      addColorCorrectPrice: p.add_color_correct_price || undefined,
-      totalPrice: p.total_price ?? 0,
-      info: p.info || undefined
+    let prices = requiredArray(data.prices, 'prices').map((p: any) => ({
+      productSku: requiredString(p.product_sku, 'product_sku'),
+      productCode: p.product_code ?? undefined,
+      productQty: requiredNumber(p.product_qty, 'product_qty'),
+      productPrice: requiredNumber(p.product_price, 'product_price'),
+      addFramePrice: p.add_frame_price ?? undefined,
+      addMat1Price: p.add_mat_1_price ?? undefined,
+      addMat2Price: p.add_mat_2_price ?? undefined,
+      addGlazingPrice: p.add_glazing_price ?? undefined,
+      addColorCorrectPrice: p.add_color_correct_price ?? undefined,
+      totalPrice: requiredNumber(p.total_price, 'total_price'),
+      info: p.info ?? undefined
     }));
 
     return {
-      output: { prices },
+      output: { prices, raw: data },
       message: `Priced **${prices.length}** item(s). ${prices.map((p: any) => `\`${p.productSku}\` × ${p.productQty}: $${p.totalPrice.toFixed(2)}`).join(', ')}`
     };
   })

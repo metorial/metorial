@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassMarkerClient } from '../lib/client';
+import { readNumber, validateWholeNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageAccessList = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ export let manageAccessList = SlateTool.create(spec, {
     'Each code can be up to 255 characters long.'
   ],
   constraints: [
-    'Maximum 100 codes can be removed per request.',
+    'Maximum 100 codes can be added or removed per request.',
     'Maximum 20,000 total codes per access list.',
     'Access list operations are exempt from the 30 requests/hour rate limit.'
   ],
@@ -23,7 +24,11 @@ export let manageAccessList = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      accessListId: z.number().describe('ID of the access list to modify'),
+      accessListId: z
+        .number()
+        .describe(
+          'Access list ID. Call list_groups_and_links to discover assigned access lists.'
+        ),
       action: z.enum(['add', 'remove']).describe('Whether to add or remove access codes'),
       codes: z.array(z.string()).describe('Array of access codes to add or remove')
     })
@@ -35,7 +40,8 @@ export let manageAccessList = SlateTool.create(spec, {
       codesChanged: z.number().describe('Number of codes added or removed'),
       codesTotal: z
         .number()
-        .describe('Total number of codes in the access list after the operation')
+        .describe('Total number of codes in the access list after the operation'),
+      response: z.any().describe('Complete ClassMarker response')
     })
   )
   .handleInvocation(async ctx => {
@@ -45,23 +51,36 @@ export let manageAccessList = SlateTool.create(spec, {
     });
 
     let { accessListId, action, codes } = ctx.input;
-    let data: any;
+    validateWholeNumber(accessListId, 'accessListId');
+    if (codes.length === 0 || codes.length > 100) {
+      throw createApiServiceError('Provide between 1 and 100 access codes per request.');
+    }
+    if (codes.some(code => !code.trim() || code.length > 255)) {
+      throw createApiServiceError(
+        'Each access code must contain between 1 and 255 characters.'
+      );
+    }
+    let response: Awaited<ReturnType<ClassMarkerClient['addAccessCodes']>>;
 
     if (action === 'add') {
-      data = await client.addAccessCodes(accessListId, codes);
+      response = await client.addAccessCodes(accessListId, codes);
     } else {
-      data = await client.removeAccessCodes(accessListId, codes);
+      response = await client.removeAccessCodes(accessListId, codes);
     }
 
-    let codesChanged =
-      action === 'add' ? data.num_codes_added || 0 : data.num_codes_deleted || 0;
+    let data = response.access_lists?.access_list ?? response;
+    let codesChanged = readNumber(
+      action === 'add' ? data.num_codes_added : data.num_codes_deleted,
+      'changed access code count'
+    );
 
     return {
       output: {
-        accessListId: data.access_list_id || accessListId,
-        accessListName: data.access_list_name || '',
+        accessListId: readNumber(data.access_list_id, 'access_list_id'),
+        accessListName: data.access_list_name,
         codesChanged,
-        codesTotal: data.num_codes_total || 0
+        codesTotal: readNumber(data.num_codes_total, 'total access code count'),
+        response
       },
       message: `Successfully ${action === 'add' ? 'added' : 'removed'} **${codesChanged}** code(s) ${action === 'add' ? 'to' : 'from'} access list "${data.access_list_name}". Total codes: **${data.num_codes_total}**.`
     };

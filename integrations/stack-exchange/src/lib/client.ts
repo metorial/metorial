@@ -1,8 +1,22 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+import {
+  decodeResponse,
+  pagination,
+  pathIds,
+  requireOAuth,
+  stackExchangeError,
+  tagPath
+} from './response';
 
 let api = createAxios({
   baseURL: 'https://api.stackexchange.com/2.3'
 });
+let backoffs = new Map<string, number>();
+let methodKey = (path: string) =>
+  path
+    .replace(/^\/me(?=\/|$)/, '/users/{ids}')
+    .replace(/\/-?\d+(?:;-?\d+)*(?=\/|$)/g, '/{ids}')
+    .replace(/^\/tags\/[^/]+/, '/tags/{tags}');
 
 export interface ClientConfig {
   token: string;
@@ -59,6 +73,12 @@ export class Client {
   private buildParams(
     extra: Record<string, string | number | boolean | undefined> = {}
   ): Record<string, string> {
+    pagination(extra.page as number | undefined, extra.pagesize as number | undefined);
+    for (let field of ['answers', 'views', 'user']) {
+      let value = extra[field];
+      if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value)))
+        throw createApiServiceError(`${field} must be an integer.`);
+    }
     let params = this.baseParams();
     for (let [k, v] of Object.entries(extra)) {
       if (v !== undefined && v !== null && v !== '') {
@@ -71,22 +91,56 @@ export class Client {
   private toUnixTimestamp(dateStr: string | undefined): number | undefined {
     if (!dateStr) return undefined;
     let d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return undefined;
+    if (Number.isNaN(d.getTime()))
+      throw createApiServiceError('Provide a valid ISO 8601 date.');
     return Math.floor(d.getTime() / 1000);
+  }
+
+  private checkBackoff(path: string) {
+    let until = backoffs.get(methodKey(path));
+    if (until && until > Date.now())
+      throw createApiServiceError(
+        `Stack Exchange requires a backoff. Retry this method in ${Math.ceil((until - Date.now()) / 1000)} seconds.`
+      );
+  }
+
+  private recordBackoff(value: unknown, path: string) {
+    if (value && typeof value === 'object' && 'backoff' in value) {
+      let backoff = value.backoff;
+      if (typeof backoff === 'number' && Number.isSafeInteger(backoff) && backoff >= 0) {
+        let key = methodKey(path);
+        backoffs.set(key, Math.max(backoffs.get(key) ?? 0, Date.now() + backoff * 1000));
+      }
+    }
+  }
+
+  private decode<T>(value: unknown, path: string): ApiResponse<T> {
+    this.recordBackoff(value, path);
+    let data = decodeResponse(value, path);
+    if (
+      data.backoff !== undefined &&
+      (!Number.isSafeInteger(data.backoff) || data.backoff < 0)
+    )
+      throw createApiServiceError('Stack Exchange returned an invalid backoff.');
+    return {
+      items: data.items as T[],
+      hasMore: data.has_more,
+      quotaMax: data.quota_max,
+      quotaRemaining: data.quota_remaining
+    };
   }
 
   private async get<T>(
     path: string,
     params: Record<string, string> = {}
   ): Promise<ApiResponse<T>> {
-    let response = await api.get(path, { params });
-    let data = response.data;
-    return {
-      items: data.items ?? [],
-      hasMore: data.has_more ?? false,
-      quotaMax: data.quota_max ?? 0,
-      quotaRemaining: data.quota_remaining ?? 0
-    };
+    this.checkBackoff(path);
+    try {
+      let response = await api.get(path, { params });
+      return this.decode<T>(response.data, path);
+    } catch (error) {
+      throw stackExchangeError(error, body => this.recordBackoff(body, path));
+    }
   }
 
   private async post<T>(
@@ -94,18 +148,21 @@ export class Client {
     body: Record<string, string> = {},
     params: Record<string, string> = {}
   ): Promise<ApiResponse<T>> {
-    let allParams = { ...this.baseParams(), ...params };
-    let formBody = new URLSearchParams({ ...allParams, ...body }).toString();
-    let response = await api.post(path, formBody, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-    let data = response.data;
-    return {
-      items: data.items ?? [],
-      hasMore: data.has_more ?? false,
-      quotaMax: data.quota_max ?? 0,
-      quotaRemaining: data.quota_remaining ?? 0
-    };
+    requireOAuth(this.token);
+    this.checkBackoff(path);
+    let formBody = new URLSearchParams({
+      ...this.baseParams(),
+      ...params,
+      ...body
+    }).toString();
+    try {
+      let response = await api.post(path, formBody, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      return this.decode<T>(response.data, path);
+    } catch (error) {
+      throw stackExchangeError(error, body => this.recordBackoff(body, path));
+    }
   }
 
   // Questions
@@ -128,7 +185,7 @@ export class Client {
         fromdate: this.toUnixTimestamp(options.fromDate),
         todate: this.toUnixTimestamp(options.toDate),
         tagged: options.tagged,
-        filter: options.filter ?? '!nNPvSNe7ya'
+        filter: options.filter ?? 'withbody'
       })
     );
   }
@@ -139,11 +196,11 @@ export class Client {
       filter?: string;
     } = {}
   ): Promise<ApiResponse<any>> {
-    let ids = questionIds.join(';');
+    let ids = pathIds(questionIds, 'questionIds');
     return this.get(
       `/questions/${ids}`,
       this.buildParams({
-        filter: options.filter ?? '!nNPvSNe7ya'
+        filter: options.filter ?? 'withbody'
       })
     );
   }
@@ -156,13 +213,13 @@ export class Client {
       } = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/questions/${questionId}/answers`,
+      `/questions/${pathIds([questionId], 'questionId')}/answers`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
         sort: options.sort ?? 'votes',
         order: options.order ?? 'desc',
-        filter: options.filter ?? '!nNPvSNdWme'
+        filter: options.filter ?? 'withbody'
       })
     );
   }
@@ -175,7 +232,7 @@ export class Client {
       } = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/questions/${questionId}/comments`,
+      `/questions/${pathIds([questionId], 'questionId')}/comments`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
@@ -191,7 +248,7 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/questions/${questionId}/linked`,
+      `/questions/${pathIds([questionId], 'questionId')}/linked`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
@@ -206,7 +263,7 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/questions/${questionId}/related`,
+      `/questions/${pathIds([questionId], 'questionId')}/related`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
@@ -237,7 +294,7 @@ export class Client {
         pagesize: options.pageSize,
         sort: options.sort ?? 'relevance',
         order: options.order ?? 'desc',
-        filter: options.filter ?? '!nNPvSNe7ya'
+        filter: options.filter ?? 'withbody'
       })
     );
   }
@@ -278,7 +335,7 @@ export class Client {
         order: options.order ?? 'desc',
         fromdate: this.toUnixTimestamp(options.fromDate),
         todate: this.toUnixTimestamp(options.toDate),
-        filter: options.filter ?? '!nNPvSNe7ya'
+        filter: options.filter ?? 'withbody'
       })
     );
   }
@@ -287,15 +344,20 @@ export class Client {
 
   async getAnswersByIds(
     answerIds: string[],
-    options: {
-      filter?: string;
-    } = {}
+    options: PaginationParams &
+      SortParams & {
+        filter?: string;
+      } = {}
   ): Promise<ApiResponse<any>> {
-    let ids = answerIds.join(';');
+    let ids = pathIds(answerIds, 'answerIds');
     return this.get(
       `/answers/${ids}`,
       this.buildParams({
-        filter: options.filter ?? '!nNPvSNdWme'
+        filter: options.filter ?? 'withbody',
+        page: options.page,
+        pagesize: options.pageSize,
+        sort: options.sort,
+        order: options.order
       })
     );
   }
@@ -305,7 +367,7 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/answers/${answerId}/comments`,
+      `/answers/${pathIds([answerId], 'answerId')}/comments`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
@@ -323,7 +385,7 @@ export class Client {
       filter?: string;
     } = {}
   ): Promise<ApiResponse<any>> {
-    let ids = commentIds.join(';');
+    let ids = pathIds(commentIds, 'commentIds');
     return this.get(
       `/comments/${ids}`,
       this.buildParams({
@@ -333,15 +395,15 @@ export class Client {
   }
 
   async addComment(postId: string, body: string): Promise<ApiResponse<any>> {
-    return this.post(`/posts/${postId}/comments/add`, { body });
+    return this.post(`/posts/${pathIds([postId], 'postId')}/comments/add`, { body });
   }
 
   async editComment(commentId: string, body: string): Promise<ApiResponse<any>> {
-    return this.post(`/comments/${commentId}/edit`, { body });
+    return this.post(`/comments/${pathIds([commentId], 'commentId')}/edit`, { body });
   }
 
   async deleteComment(commentId: string): Promise<ApiResponse<any>> {
-    return this.post(`/comments/${commentId}/delete`);
+    return this.post(`/comments/${pathIds([commentId], 'commentId')}/delete`);
   }
 
   // Users
@@ -372,7 +434,7 @@ export class Client {
       filter?: string;
     } = {}
   ): Promise<ApiResponse<any>> {
-    let ids = userIds.join(';');
+    let ids = pathIds(userIds, 'userIds');
     return this.get(
       `/users/${ids}`,
       this.buildParams({
@@ -382,6 +444,7 @@ export class Client {
   }
 
   async getMe(options: { filter?: string } = {}): Promise<ApiResponse<any>> {
+    requireOAuth(this.token);
     return this.get(
       '/me',
       this.buildParams({
@@ -395,13 +458,13 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/users/${userId}/questions`,
+      `/users/${pathIds([userId], 'userId')}/questions`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
         sort: options.sort ?? 'activity',
         order: options.order ?? 'desc',
-        filter: '!nNPvSNe7ya'
+        filter: 'withbody'
       })
     );
   }
@@ -411,13 +474,13 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/users/${userId}/answers`,
+      `/users/${pathIds([userId], 'userId')}/answers`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
         sort: options.sort ?? 'activity',
         order: options.order ?? 'desc',
-        filter: '!nNPvSNdWme'
+        filter: 'withbody'
       })
     );
   }
@@ -427,7 +490,7 @@ export class Client {
     options: PaginationParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/users/${userId}/reputation`,
+      `/users/${pathIds([userId], 'userId')}/reputation`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize
@@ -440,18 +503,21 @@ export class Client {
     options: PaginationParams & SortParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/users/${userId}/badges`,
+      `/users/${pathIds([userId], 'userId')}/badges`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
-        sort: options.sort ?? 'awarded',
+        sort: options.sort ?? 'rank',
         order: options.order ?? 'desc'
       })
     );
   }
 
   async getUserTopTags(userId: string): Promise<ApiResponse<any>> {
-    return this.get(`/users/${userId}/top-answer-tags`, this.buildParams());
+    return this.get(
+      `/users/${pathIds([userId], 'userId')}/top-answer-tags`,
+      this.buildParams()
+    );
   }
 
   async getUserTimeline(
@@ -459,7 +525,7 @@ export class Client {
     options: PaginationParams & DateRangeParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/users/${userId}/timeline`,
+      `/users/${pathIds([userId], 'userId')}/timeline`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize,
@@ -472,6 +538,7 @@ export class Client {
   // Inbox & Notifications (requires auth)
 
   async getInbox(options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    requireOAuth(this.token);
     return this.get(
       '/me/inbox',
       this.buildParams({
@@ -482,6 +549,7 @@ export class Client {
   }
 
   async getInboxUnread(options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    requireOAuth(this.token);
     return this.get(
       '/me/inbox/unread',
       this.buildParams({
@@ -492,6 +560,7 @@ export class Client {
   }
 
   async getNotifications(options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    requireOAuth(this.token);
     return this.get(
       '/me/notifications',
       this.buildParams({
@@ -502,6 +571,7 @@ export class Client {
   }
 
   async getNotificationsUnread(options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    requireOAuth(this.token);
     return this.get(
       '/me/notifications/unread',
       this.buildParams({
@@ -533,13 +603,16 @@ export class Client {
     );
   }
 
-  async getTagInfo(tags: string[]): Promise<ApiResponse<any>> {
-    let tagStr = tags.join(';');
-    return this.get(`/tags/${tagStr}/info`, this.buildParams());
+  async getTagInfo(tags: string[], options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    let tagStr = tagPath(tags);
+    return this.get(
+      `/tags/${tagStr}/info`,
+      this.buildParams({ page: options.page, pagesize: options.pageSize })
+    );
   }
 
   async getTagFaq(tags: string[], options: PaginationParams = {}): Promise<ApiResponse<any>> {
-    let tagStr = tags.join(';');
+    let tagStr = tagPath(tags, 5);
     return this.get(
       `/tags/${tagStr}/faq`,
       this.buildParams({
@@ -553,7 +626,7 @@ export class Client {
     tags: string[],
     options: PaginationParams = {}
   ): Promise<ApiResponse<any>> {
-    let tagStr = tags.join(';');
+    let tagStr = tagPath(tags, 20);
     return this.get(
       `/tags/${tagStr}/synonyms`,
       this.buildParams({
@@ -563,16 +636,22 @@ export class Client {
     );
   }
 
-  async getRelatedTags(tags: string[]): Promise<ApiResponse<any>> {
-    let tagStr = tags.join(';');
-    return this.get(`/tags/${tagStr}/related`, this.buildParams());
+  async getRelatedTags(
+    tags: string[],
+    options: PaginationParams = {}
+  ): Promise<ApiResponse<any>> {
+    let tagStr = tagPath(tags, 4);
+    return this.get(
+      `/tags/${tagStr}/related`,
+      this.buildParams({ page: options.page, pagesize: options.pageSize })
+    );
   }
 
   async getTagTopAnswerers(
     tag: string,
     period: 'all_time' | 'month' = 'all_time'
   ): Promise<ApiResponse<any>> {
-    return this.get(`/tags/${tag}/top-answerers/${period}`, this.buildParams());
+    return this.get(`/tags/${tagPath([tag], 1)}/top-answerers/${period}`, this.buildParams());
   }
 
   // Badges
@@ -604,7 +683,7 @@ export class Client {
     options: PaginationParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/posts/${postId}/revisions`,
+      `/posts/${pathIds([postId], 'postId')}/revisions`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize
@@ -617,7 +696,7 @@ export class Client {
     options: PaginationParams = {}
   ): Promise<ApiResponse<any>> {
     return this.get(
-      `/posts/${postId}/suggested-edits`,
+      `/posts/${pathIds([postId], 'postId')}/suggested-edits`,
       this.buildParams({
         page: options.page,
         pagesize: options.pageSize
@@ -628,6 +707,7 @@ export class Client {
   // Network
 
   async getSites(options: PaginationParams = {}): Promise<ApiResponse<any>> {
+    pagination(options.page, options.pageSize, true);
     return this.get('/sites', {
       page: String(options.page ?? 1),
       pagesize: String(options.pageSize ?? 100),
@@ -654,7 +734,9 @@ export class Client {
   }
 
   async createAnswer(questionId: string, body: string): Promise<ApiResponse<any>> {
-    return this.post(`/questions/${questionId}/answers/add`, { body });
+    return this.post(`/questions/${pathIds([questionId], 'questionId')}/answers/add`, {
+      body
+    });
   }
 
   async editQuestion(
@@ -663,7 +745,7 @@ export class Client {
     body: string,
     tags: string[]
   ): Promise<ApiResponse<any>> {
-    return this.post(`/questions/${questionId}/edit`, {
+    return this.post(`/questions/${pathIds([questionId], 'questionId')}/edit`, {
       title,
       body,
       tags: tags.join(';')
@@ -671,10 +753,12 @@ export class Client {
   }
 
   async editAnswer(answerId: string, body: string): Promise<ApiResponse<any>> {
-    return this.post(`/answers/${answerId}/edit`, { body });
+    return this.post(`/answers/${pathIds([answerId], 'answerId')}/edit`, { body });
   }
 
-  async acceptAnswer(answerId: string): Promise<ApiResponse<any>> {
-    return this.post(`/answers/${answerId}/accept`);
+  async acceptAnswer(answerId: string, undo = false): Promise<ApiResponse<any>> {
+    return this.post(
+      `/answers/${pathIds([answerId], 'answerId')}/accept${undo ? '/undo' : ''}`
+    );
   }
 }

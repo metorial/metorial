@@ -1,54 +1,45 @@
-Now I have enough information to write the specification. Let me also quickly check the API reference for the specific endpoints available.Based on all the research gathered, here is the specification:
+# Typless integration specification
 
-# Slates Specification for Typless
+Typless extracts structured data from configured document types and learns from verified examples. Authentication uses `Authorization: Token <API key>`, with the key stored on the connection. No additional configuration is required.
 
-## Overview
+## Current JSON API workflow
 
-Typless is an AI-powered intelligent document processing (IDP) platform that automates data extraction from documents such as invoices, receipts, purchase orders, and other business documents. It uses OCR combined with machine learning and incremental learning to extract structured data fields from uploaded files (PDF, JPG, BMP, PNG, TIFF), improving accuracy over time through human validation feedback.
+The base URL is `https://developers.typless.com/api/`. These operations follow the current official OpenAPI reference:
 
-## Authentication
+| Tool | Endpoint | Purpose |
+| --- | --- | --- |
+| `extract_document_async` | `POST /v1/extract-data-async` | Send base64 file content, file name, document type, optional customer, and optional text block parsing. |
+| `get_extraction_data` | `GET /v1/get-extraction-data` | Retrieve status and the provider's original result and error objects by `extraction_id`, optionally including text blocks. |
+| `list_pending_extractions` | `GET /v1/awaiting-poll` | Discover completed extraction IDs, optionally filtered by the same customer identifier used at submission. |
+| `add_training_document` | `POST /v1/add-document` | Add an original file with verified metadata, line item, and VAT rate value blocks to a dataset. |
 
-Typless uses **API Key** authentication. To use the Typless API you need to authorize your requests with an API key. The API key is passed via the `Authorization` header.
+Only poll again for `IN_PROGRESS`. `SUCCESS`, `ERROR`, and `EXPIRED` are terminal states. The guide documents result expiry 48 hours after processing completes. The reference schema omits `EXPIRED` from its enum, so status is preserved as a string rather than narrowed to an incomplete list. Pending result/error objects can be empty or null; returned values are preserved. A provider-supplied adjusted document URL is offered for download without assuming a URL expiry or regenerating the extraction.
 
-- **Obtaining the API key:** The API key can be found in your profile view on the Settings page of the Typless hub/dashboard.
-- **Usage:** Include the API key in the `Authorization` header of every request:
-  ```
-  Authorization: Token <your_api_key>
-  ```
-- **Base URL:** `https://developers.typless.com/api/`
+Dataset value blocks use optional `value`, `x`, `y`, `width`, `height`, and `page_number`; value may be null. Positional values must be whole numbers. The provider supplies its defaults when optional values are omitted.
 
-No OAuth or additional scopes are required. A single API key provides access to all API features associated with your account.
+## Legacy compatibility
 
-## Features
+The following tools retain their existing route and request formats:
 
-### Document Type Management
+| Tool | Endpoint |
+| --- | --- |
+| `extract_document` | `POST /document-types/extract-data/` (multipart) |
+| `add_document_feedback` | `POST /document-types/learn/` (multipart) |
+| `start_training` | `POST /start-training/` with `document_type_name` query |
+| `list_document_types` | `GET /document-types/` |
+| `manage_user_profile` | `GET` or `PATCH /user-profile/` |
+| `get_extraction_result` | `GET /receive-result/{extractionId}/` |
+| `get_current_user` | `GET /user-profile/` (read only) |
 
-A document type is your configuration for data extraction of a single type of document. A single document type covers all of your suppliers providing you the same type of document. For example, you would use one document type for all incoming invoices. You define which fields (metadata and line items) should be extracted for each document type. A document type is not limited to a single language or charset — it can extract data from more than 170+ languages and character sets. Pre-built templates (e.g., simple invoice, VAT invoice, line-item invoice) are available as starting points.
+The current OpenAPI files do not specify these legacy routes. Their continued runtime support, complete profile fields, and document type counts require provider verification. They are not automatically redirected to a different API. Missing names, counts, IDs, and statuses are not replaced with invented values; an incompatible legacy response produces a service error.
 
-### Data Extraction
+For legacy synchronous extraction, the provider's exact-route tutorial explicitly allows a null recognized value. The normalized `value` remains a string when known and is omitted when null; the added `raw` response preserves the original null. Confidence strings are converted to numbers for the established numeric output. Existing line item values are preserved unchanged.
 
-Extract all types of documents with just one API call — whether you have invoices, financial, freight, or packing lists, and more. You submit a document file along with a document type slug, and Typless returns structured extracted data. For each of the defined fields, you get an object inside `extracted_fields`. Every field has up to 5 best-predicted value blocks with coordinates, recognized value, and confidence score. The values are always in a string format.
+## Sources
 
-- **Supported formats:** PDF, JPG, BMP, PNG, TIFF (with various compression options).
-- Maximum file size is 30 MB. Documents must be portrait oriented.
-- Dates are normalized to `YYYY-MM-DD` format; numbers are normalized to decimal format.
-
-### Dataset Building and Training
-
-Typless is a tool for automation — you need to fill the data set and train it first. You add documents with their correct field values to a dataset using the add-document endpoint. For simple layouts, one document in the dataset is enough, but for more complex ones you may need around 5 from the same supplier. Training can be triggered from the dashboard.
-
-### Continuous Learning via Feedback
-
-Typless embraces the fact that the world is changing all the time. You can improve models on the fly by providing correct data after extraction. To send feedback, use the add-document-feedback endpoint with the `object_id` returned from extraction. This enables incremental learning where Typless takes full advantage of every human validation, and as a result, the need for human involvement declines over time.
-
-### Model Management
-
-Typless provides detailed information and management of supplier models in your document types. You can check details for every separate document type. This includes viewing confidence scores for metadata and line item extraction, triggering model training, and deleting models.
-
-### User Profile
-
-You can retrieve and update user profile details, keeping account information current. The profile includes information such as the API key and email address.
-
-## Events
-
-The provider does not support events. Typless does not offer webhooks, event subscriptions, or built-in polling mechanisms through its API. Interaction is strictly request-response based: you submit documents for extraction and receive results synchronously.
+- [Authorization](https://typless.gitbook.io/typlessapi/authorization)
+- [API schema and linked OpenAPI files](https://typless.gitbook.io/typlessapi/api-docs/api-schema)
+- [Asynchronous processing and queue retrieval](https://typless.gitbook.io/typlessapi/typless/data-extraction/asynchronous-extraction)
+- [Dataset building](https://typless.gitbook.io/typlessapi/typless/training/building-a-dataset)
+- [Data extraction](https://typless.gitbook.io/typlessapi/typless/data-extraction)
+- [Legacy exact-route extraction and feedback tutorial](https://typless.com/blog/start-with-typless-invoice-ocr/)

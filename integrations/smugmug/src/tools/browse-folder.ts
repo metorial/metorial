@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let browseFolderTool = SlateTool.create(spec, {
   name: 'Browse Folder',
   key: 'browse_folder',
-  description: `Browse a SmugMug user's folder structure by path. Returns folder details and its contents (sub-folders, albums, pages). Use this to navigate the content hierarchy starting from the root.`,
+  description: `Browse a SmugMug user's folder structure by path. Returns folder details and its node ID. Use get_node with includeChildren to retrieve a page of child folders, albums, and pages.`,
   instructions: [
     'Omit folderPath or leave it empty to browse the root folder.',
     'Use folder path segments separated by "/" (e.g., "Travel/Europe").'
@@ -61,14 +61,14 @@ export let browseFolderTool = SlateTool.create(spec, {
 
     return {
       output: {
-        name: folder?.Name || undefined,
-        urlName: folder?.UrlName || undefined,
-        description: folder?.Description || undefined,
-        webUri: folder?.WebUri || undefined,
-        privacy: folder?.Privacy || undefined,
+        name: folder?.Name ?? undefined,
+        urlName: folder?.UrlName ?? undefined,
+        description: folder?.Description ?? undefined,
+        webUri: folder?.WebUri ?? undefined,
+        privacy: folder?.Privacy ?? undefined,
         nodeId,
-        dateAdded: folder?.DateAdded || undefined,
-        dateModified: folder?.DateModified || undefined
+        dateAdded: folder?.DateAdded ?? undefined,
+        dateModified: folder?.DateModified ?? undefined
       },
       message: `Browsed folder **${ctx.input.folderPath || '(root)'}** for user **${ctx.input.nickname}**`
     };

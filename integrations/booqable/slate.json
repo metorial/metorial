@@ -1,6 +1,6 @@
 {
   "name": "@metorial/booqable",
-  "description": "Manage equipment and product rentals through a cloud-based rental platform. Create and manage customers, products, inventory, and rental orders through their full lifecycle (draft, reserved, started, stopped, archived). Track real-time inventory availability across multiple locations and clusters. Process payments, authorizations, and refunds via Stripe or manual methods. Generate and manage invoices, quotes, and contracts with digital signatures. Configure flexible pricing with tiered structures, tax regions, coupons, and discounts. Manage stock items with barcodes and unique identifiers. Send customizable emails to customers with dynamic templates. Organize products into bundles and collections for an online store. Register webhooks for real-time notifications on order, customer, product, payment, and document events.",
+  "description": "Manage rental customers, product groups and variations, stock items, orders, and booking availability in Booqable. Book products, record pickups and returns, manage coupons, create payment records, review invoices and contracts, and queue customer emails from templates.",
   "categories": [
     "crm-and-sales-tools",
     "e-commerce-and-retail",
@@ -8,15 +8,15 @@
   ],
   "skills": [
     "manage rental orders",
-    "track inventory availability",
-    "process payments and refunds",
+    "book products and record returns",
+    "check booking availability",
     "manage customer records",
-    "generate invoices and quotes",
-    "configure product pricing",
-    "manage stock across locations",
-    "send customer emails",
-    "create product bundles",
-    "handle webhook events"
+    "manage product groups and variations",
+    "manage stock items",
+    "create payment records and refunds",
+    "review document metadata",
+    "manage coupons",
+    "send templated customer emails"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/booqable.png"
 }

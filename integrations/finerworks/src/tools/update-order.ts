@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,6 +38,7 @@ export let updateOrder = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the update was successful'),
       statusUpdated: z.boolean().describe('Whether the order status was changed'),
       noteAdded: z.boolean().describe('Whether a note was added'),
@@ -51,23 +52,33 @@ export let updateOrder = SlateTool.create(spec, {
       testMode: ctx.config.testMode
     });
 
+    if (!ctx.input.updateCommand && !ctx.input.note)
+      throw createApiServiceError('Provide updateCommand, note, or both.');
+    let raw: Record<string, unknown> = {};
     let statusUpdated = false;
     let noteAdded = false;
     let messages: string[] = [];
 
     if (ctx.input.updateCommand) {
       let result = await client.updateOrder(ctx.input.orderId, ctx.input.updateCommand);
-      statusUpdated = result.success ?? false;
+      raw.statusUpdate = result;
+      statusUpdated = result.success;
       if (result.message) messages.push(result.message);
     }
 
     if (ctx.input.note) {
-      let result = await client.submitNote(
-        ctx.input.orderId,
-        ctx.input.note.subject,
-        ctx.input.note.body
-      );
-      noteAdded = result.success ?? false;
+      let result = await client
+        .submitNote(ctx.input.orderId, ctx.input.note.subject, ctx.input.note.body)
+        .catch(error => {
+          if (statusUpdated)
+            throw createApiServiceError(
+              `Order ${ctx.input.orderId} status was changed to ${ctx.input.updateCommand}, but adding the note failed. Retry the note alone. ${error.message}`,
+              { parent: error }
+            );
+          throw error;
+        });
+      raw.note = result;
+      noteAdded = result.success;
       if (result.message) messages.push(result.message);
     }
 
@@ -80,10 +91,11 @@ export let updateOrder = SlateTool.create(spec, {
 
     return {
       output: {
+        raw,
         success,
         statusUpdated,
         noteAdded,
-        message: messages.filter(Boolean).join('; ') || undefined
+        message: messages.filter(Boolean).join('; ') ?? undefined
       },
       message: success
         ? `Order **${ctx.input.orderId}**: ${parts.join(' and ')}`

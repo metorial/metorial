@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import {
+  readBidsketchBoolean,
+  readBidsketchNumber,
+  readBidsketchString
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let createProposal = SlateTool.create(spec, {
@@ -94,19 +99,20 @@ export let createProposal = SlateTool.create(spec, {
       body.settings = s;
     }
 
-    let p = ctx.input.templateId
-      ? await client.createProposalFromTemplate(ctx.input.templateId, body)
-      : await client.createProposal(body);
+    let p =
+      ctx.input.templateId !== undefined
+        ? await client.createProposalFromTemplate(ctx.input.templateId, body)
+        : await client.createProposal(body);
 
     return {
       output: {
-        proposalId: p.id,
-        name: p.name,
-        status: p.status,
-        isDraft: p.is_draft,
-        url: p.url,
-        appUrl: p.app_url,
-        createdAt: p.created_at
+        proposalId: readBidsketchNumber(p.id, 'id'),
+        name: readBidsketchString(p.name, 'name'),
+        status: readBidsketchString(p.status, 'status'),
+        isDraft: readBidsketchBoolean(p.is_draft, 'is_draft'),
+        url: readBidsketchString(p.url, 'url'),
+        appUrl: readBidsketchString(p.app_url, 'app_url'),
+        createdAt: readBidsketchString(p.created_at, 'created_at')
       },
       message: `Created proposal **${p.name}** (ID: ${p.id})${ctx.input.templateId ? ' from template' : ''}.`
     };

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { GristClient } from '../lib/client';
+import { GristClient, getGristItems } from '../lib/client';
 import { spec } from '../spec';
 
 let webhookSchema = z.object({
@@ -13,7 +13,11 @@ let webhookSchema = z.object({
   memo: z.string().optional().describe('Webhook memo/description'),
   readyColId: z.string().optional().describe('Ready column ID'),
   isReadyColumn: z.boolean().optional().describe('Whether the webhook uses a ready column'),
-  fields: z.record(z.string(), z.any()).optional().describe('All webhook fields')
+  readyColumnId: z.string().optional().describe('Boolean column ID that gates delivery'),
+  fields: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Webhook metadata excluding subscription secrets')
 });
 
 export let listWebhooks = SlateTool.create(spec, {
@@ -41,17 +45,24 @@ export let listWebhooks = SlateTool.create(spec, {
     });
 
     let result = await client.listWebhooks(ctx.input.documentId);
-    let webhooks = (result.webhooks || []).map((w: any) => ({
+    let webhooks = getGristItems(result, 'webhooks').map((w: any) => ({
       webhookId: w.id,
       url: w.fields?.url,
       tableId: w.fields?.tableId,
       eventTypes: w.fields?.eventTypes,
       enabled: w.fields?.enabled,
-      name: w.fields?.name,
-      memo: w.fields?.memo,
+      name: typeof w.fields?.name === 'string' ? w.fields.name : undefined,
+      memo: typeof w.fields?.memo === 'string' ? w.fields.memo : undefined,
       readyColId: w.fields?.readyColId,
-      isReadyColumn: w.fields?.isReadyColumn,
+      isReadyColumn:
+        typeof w.fields?.isReadyColumn === 'boolean' ? w.fields.isReadyColumn : undefined,
+      readyColumnId:
+        typeof w.fields?.isReadyColumn === 'string' ? w.fields.isReadyColumn : undefined,
       fields: w.fields
+        ? Object.fromEntries(
+            Object.entries(w.fields).filter(([key]) => key !== 'unsubscribeKey')
+          )
+        : undefined
     }));
 
     return {
@@ -84,7 +95,14 @@ export let createWebhook = SlateTool.create(spec, {
       readyColId: z
         .string()
         .optional()
-        .describe('Boolean column ID that gates when the webhook fires')
+        .describe(
+          'Legacy ready-column setting; use readyColumnId for the documented API field'
+        ),
+      readyColumnId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Boolean column ID that gates delivery, or null to remove the gate')
     })
   )
   .output(
@@ -107,9 +125,13 @@ export let createWebhook = SlateTool.create(spec, {
     if (ctx.input.memo !== undefined) fields.memo = ctx.input.memo;
     if (ctx.input.enabled !== undefined) fields.enabled = ctx.input.enabled;
     if (ctx.input.readyColId !== undefined) fields.readyColId = ctx.input.readyColId;
+    if (ctx.input.readyColumnId !== undefined) fields.isReadyColumn = ctx.input.readyColumnId;
 
     let result = await client.createWebhooks(ctx.input.documentId, [{ fields }]);
-    let webhookId = result.webhooks?.[0]?.id || '';
+    let webhookId = getGristItems(result, 'webhooks')[0]?.id;
+    if (typeof webhookId !== 'string' || !webhookId) {
+      throw createApiServiceError('Grist did not return the ID of the created webhook.');
+    }
 
     return {
       output: { webhookId },
@@ -139,7 +161,17 @@ export let updateWebhook = SlateTool.create(spec, {
       name: z.string().optional().describe('New webhook name'),
       memo: z.string().optional().describe('New webhook memo'),
       enabled: z.boolean().optional().describe('Enable or disable the webhook'),
-      readyColId: z.string().optional().describe('New ready column ID')
+      readyColId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy ready-column setting; use readyColumnId for the documented API field'
+        ),
+      readyColumnId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Boolean column ID that gates delivery, or null to remove the gate')
     })
   )
   .output(
@@ -161,6 +193,7 @@ export let updateWebhook = SlateTool.create(spec, {
     if (ctx.input.memo !== undefined) fields.memo = ctx.input.memo;
     if (ctx.input.enabled !== undefined) fields.enabled = ctx.input.enabled;
     if (ctx.input.readyColId !== undefined) fields.readyColId = ctx.input.readyColId;
+    if (ctx.input.readyColumnId !== undefined) fields.isReadyColumn = ctx.input.readyColumnId;
 
     await client.updateWebhook(ctx.input.documentId, ctx.input.webhookId, fields);
 

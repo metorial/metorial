@@ -4,9 +4,9 @@ import { OpenWeatherClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getWeatherMapTile = SlateTool.create(spec, {
-  name: 'Get Weather Map Tile URL',
+  name: 'Get Weather Map Tile',
   key: 'get_weather_map_tile',
-  description: `Generate a URL for an OpenWeatherMap weather map tile. Supports 15+ weather layers including temperature, precipitation, clouds, pressure, and wind. Tiles follow the standard slippy map tile format (z/x/y) for integration with mapping libraries like Leaflet or OpenLayers.`,
+  description: `Get a downloadable OpenWeatherMap weather map tile. Supports the five Weather Maps 1.0 layers: temperature, precipitation, clouds, pressure, and wind. Tiles follow the standard slippy map tile format (z/x/y) for integration with mapping libraries like Leaflet or OpenLayers.`,
   instructions: [
     'The tile coordinates (z/x/y) follow the standard slippy map tile naming convention',
     'Zoom level 0 shows the whole world, higher zoom levels show more detail (up to ~18)'
@@ -27,7 +27,11 @@ export let getWeatherMapTile = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      tileUrl: z.string().describe('URL of the weather map tile image'),
+      tileUrl: z
+        .string()
+        .describe(
+          'Weather tile endpoint without credentials; use the downloadable image to view the tile'
+        ),
       layer: z.string().describe('Weather layer name'),
       zoom: z.number().describe('Zoom level'),
       tileX: z.number().describe('Tile X coordinate'),
@@ -46,6 +50,14 @@ export let getWeatherMapTile = SlateTool.create(spec, {
       ctx.input.tileY
     );
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: tileUrl,
+      query: { appid: ctx.auth.token },
+      mimeType: 'image/png',
+      filename: `${ctx.input.layer}-${ctx.input.zoom}-${ctx.input.tileX}-${ctx.input.tileY}.png`
+    });
+
     let output = {
       tileUrl,
       layer: ctx.input.layer,
@@ -56,7 +68,7 @@ export let getWeatherMapTile = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Generated **${ctx.input.layer}** tile URL at zoom ${ctx.input.zoom} (${ctx.input.tileX}, ${ctx.input.tileY}).`
+      message: `Retrieved a downloadable **${ctx.input.layer}** tile at zoom ${ctx.input.zoom} (${ctx.input.tileX}, ${ctx.input.tileY}).`
     };
   })
   .build();

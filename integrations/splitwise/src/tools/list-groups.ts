@@ -57,7 +57,7 @@ export let listGroups = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let groups = await client.getGroups();
 
-    let mapped = (groups || []).map((g: any) => ({
+    let mapped = groups.map((g: any) => ({
       groupId: g.id,
       name: g.name,
       groupType: g.group_type,

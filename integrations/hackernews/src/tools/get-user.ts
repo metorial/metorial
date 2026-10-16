@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HNClient } from '../lib/client';
+import { toIsoTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -38,16 +39,10 @@ Usernames are case-sensitive.`,
     let user = await client.getUser(ctx.input.username);
 
     if (!user) {
-      return {
-        output: {
-          username: ctx.input.username,
-          karma: 0
-        },
-        message: `User **${ctx.input.username}** was not found.`
-      };
+      throw createApiServiceError(`Hacker News user ${ctx.input.username} was not found.`);
     }
 
-    let createdAt = user.created ? new Date(user.created * 1000).toISOString() : undefined;
+    let createdAt = toIsoTimestamp(user.created);
 
     return {
       output: {

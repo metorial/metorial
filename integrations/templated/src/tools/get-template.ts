@@ -30,6 +30,7 @@ export let getTemplate = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       templateId: z.string().optional(),
       name: z.string().optional(),
       description: z.string().optional(),
@@ -69,6 +70,7 @@ export let getTemplate = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: template,
         templateId: template.id,
         name: template.name,
         description: template.description,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 let feeSchema = z.object({
@@ -23,7 +24,7 @@ let feeSchema = z.object({
 export let listFees = SlateTool.create(spec, {
   name: 'List Fees',
   key: 'list_fees',
-  description: `Retrieve reusable fee items saved to the Bidsketch account library. These are template fees that can be added to proposals. Supports pagination.`,
+  description: `Retrieve reusable fee summaries saved to the Bidsketch account library. These are template fees that can be added to proposals. Supports pagination. Use get_fee for per-unit amounts and full details omitted from summaries.`,
   tags: {
     readOnly: true
   }
@@ -36,28 +37,30 @@ export let listFees = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      fees: z.array(feeSchema).describe('List of reusable fees')
+      fees: z
+        .array(feeSchema.extend({ amount: feeSchema.shape.amount.optional() }))
+        .describe('List of reusable fees')
     })
   )
   .handleInvocation(async ctx => {
     let client = new BidsketchClient(ctx.auth.token);
     let data = await client.listFees(ctx.input.page, ctx.input.perPage);
 
-    let fees = (Array.isArray(data) ? data : []).map((f: any) => ({
-      feeId: f.id,
-      name: f.name,
-      feeType: f.feetype,
-      amount: f.amount,
+    let fees = data.map((f: any) => ({
+      feeId: readBidsketchNumber(f.id, 'id'),
+      name: readBidsketchString(f.name, 'name'),
+      feeType: readBidsketchString(f.feetype, 'feetype'),
+      ...(f.amount === undefined ? {} : { amount: readBidsketchNumber(f.amount, 'amount') }),
       quantity: f.quantity ?? null,
       total: f.total ?? null,
       unit: f.unit ?? null,
       category: f.category ?? null,
       description: f.description ?? null,
       currency: f.currency ?? null,
-      url: f.url,
-      appUrl: f.app_url,
-      createdAt: f.created_at,
-      updatedAt: f.updated_at
+      url: readBidsketchString(f.url, 'url'),
+      appUrl: readBidsketchString(f.app_url, 'app_url'),
+      createdAt: readBidsketchString(f.created_at, 'created_at'),
+      updatedAt: readBidsketchString(f.updated_at, 'updated_at')
     }));
 
     return {
@@ -106,20 +109,20 @@ export let createFee = SlateTool.create(spec, {
 
     return {
       output: {
-        feeId: f.id,
-        name: f.name,
-        feeType: f.feetype,
-        amount: f.amount,
+        feeId: readBidsketchNumber(f.id, 'id'),
+        name: readBidsketchString(f.name, 'name'),
+        feeType: readBidsketchString(f.feetype, 'feetype'),
+        amount: readBidsketchNumber(f.amount, 'amount'),
         quantity: f.quantity ?? null,
         total: f.total ?? null,
         unit: f.unit ?? null,
         category: f.category ?? null,
         description: f.description ?? null,
         currency: f.currency ?? null,
-        url: f.url,
-        appUrl: f.app_url,
-        createdAt: f.created_at,
-        updatedAt: f.updated_at
+        url: readBidsketchString(f.url, 'url'),
+        appUrl: readBidsketchString(f.app_url, 'app_url'),
+        createdAt: readBidsketchString(f.created_at, 'created_at'),
+        updatedAt: readBidsketchString(f.updated_at, 'updated_at')
       },
       message: `Created fee **${f.name}** (${f.feetype}, ID: ${f.id}).`
     };
@@ -166,20 +169,20 @@ export let updateFee = SlateTool.create(spec, {
 
     return {
       output: {
-        feeId: f.id,
-        name: f.name,
-        feeType: f.feetype,
-        amount: f.amount,
+        feeId: readBidsketchNumber(f.id, 'id'),
+        name: readBidsketchString(f.name, 'name'),
+        feeType: readBidsketchString(f.feetype, 'feetype'),
+        amount: readBidsketchNumber(f.amount, 'amount'),
         quantity: f.quantity ?? null,
         total: f.total ?? null,
         unit: f.unit ?? null,
         category: f.category ?? null,
         description: f.description ?? null,
         currency: f.currency ?? null,
-        url: f.url,
-        appUrl: f.app_url,
-        createdAt: f.created_at,
-        updatedAt: f.updated_at
+        url: readBidsketchString(f.url, 'url'),
+        appUrl: readBidsketchString(f.app_url, 'app_url'),
+        createdAt: readBidsketchString(f.created_at, 'created_at'),
+        updatedAt: readBidsketchString(f.updated_at, 'updated_at')
       },
       message: `Updated fee **${f.name}** (ID: ${f.id}).`
     };

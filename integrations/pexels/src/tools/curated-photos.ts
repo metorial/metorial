@@ -22,7 +22,11 @@ export let curatedPhotos = SlateTool.create(spec, {
   .output(
     z.object({
       photos: z.array(photoSchema).describe('List of curated photos'),
-      pagination: paginationSchema.describe('Pagination information')
+      pagination: paginationSchema
+        .extend({ totalResults: paginationSchema.shape.totalResults.optional() })
+        .describe(
+          'Pagination information; the total is omitted when Pexels does not return it'
+        )
     })
   )
   .handleInvocation(async ctx => {

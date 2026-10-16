@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -47,10 +47,21 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (
+      !ctx.input.organisationName?.trim() &&
+      (!ctx.input.firstName?.trim() || !ctx.input.lastName?.trim())
+    ) {
+      throw createApiServiceError(
+        'Provide an organisation name or both a first name and last name.'
+      );
+    }
+    if (ctx.input.accountBalance !== undefined) {
+      throw createApiServiceError(
+        'FreeAgent does not document an opening balance on contact creation. Omit accountBalance and manage balances in FreeAgent.'
+      );
+    }
+
+    let client = createClient(ctx);
 
     let contactData: Record<string, any> = {};
     if (ctx.input.organisationName) contactData.organisation_name = ctx.input.organisationName;
@@ -73,7 +84,7 @@ export let createContact = SlateTool.create(spec, {
       contactData.contact_name_on_invoices = ctx.input.contactNameOnInvoices;
     if (ctx.input.chargeSalesTax) contactData.charge_sales_tax = ctx.input.chargeSalesTax;
     if (ctx.input.paymentTermsInDays !== undefined)
-      contactData.payment_terms_in_days = ctx.input.paymentTermsInDays;
+      contactData.default_payment_terms_in_days = ctx.input.paymentTermsInDays;
     if (ctx.input.billingEmail) contactData.billing_email = ctx.input.billingEmail;
 
     let contact = await client.createContact(contactData);

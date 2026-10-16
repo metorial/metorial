@@ -1,11 +1,16 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       apiKey: z.string().describe('Sendspark API Key (x-api-key)'),
-      apiSecret: z.string().describe('Sendspark API Secret (x-api-secret)')
+      apiSecret: z.string().describe('Sendspark API Secret (x-api-secret)'),
+      workspaceId: z
+        .string()
+        .optional()
+        .describe('Workspace identified by the API credentials')
     })
   )
   .addCustomAuth({
@@ -27,32 +32,25 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let workspace = await new Client(ctx.input).getWorkspace();
       return {
         output: {
           apiKey: ctx.input.apiKey,
-          apiSecret: ctx.input.apiSecret
+          apiSecret: ctx.input.apiSecret,
+          workspaceId: workspace.workspaceId
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { apiKey: string; apiSecret: string };
+      output: { apiKey: string; apiSecret: string; workspaceId?: string };
       input: { apiKey: string; apiSecret: string };
     }) => {
-      let client = createAxios({
-        baseURL: 'https://api-gw.sendspark.com/v1',
-        headers: {
-          'x-api-key': ctx.output.apiKey,
-          'x-api-secret': ctx.output.apiSecret,
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await client.get('/auth/health');
+      let workspace = await new Client(ctx.output).getWorkspace();
 
       return {
         profile: {
-          status: response.data?.message || 'connected'
+          workspaceId: workspace.workspaceId
         }
       };
     }

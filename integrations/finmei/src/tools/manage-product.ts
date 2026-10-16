@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import { FinmeiClient, readEntity, requireId } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageProduct = SlateTool.create(spec, {
@@ -41,7 +41,7 @@ export let manageProduct = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.productId) {
-        throw new Error('productId is required for delete action');
+        throw createApiServiceError('productId is required for delete action');
       }
       await client.deleteProduct(ctx.input.productId);
 
@@ -56,7 +56,7 @@ export let manageProduct = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required to create a product');
+        throw createApiServiceError('name is required to create a product');
       }
 
       let result = await client.createProduct({
@@ -66,8 +66,8 @@ export let manageProduct = SlateTool.create(spec, {
         description: ctx.input.description
       });
 
-      let product = result?.data ?? result;
-      let productId = String(product?.id ?? '');
+      let product = readEntity(result, 'product');
+      let productId = requireId(product.id, 'product ID');
 
       return {
         output: {
@@ -81,7 +81,7 @@ export let manageProduct = SlateTool.create(spec, {
 
     // update
     if (!ctx.input.productId) {
-      throw new Error('productId is required for update action');
+      throw createApiServiceError('productId is required for update action');
     }
 
     let updateData: Record<string, any> = {};
@@ -90,8 +90,10 @@ export let manageProduct = SlateTool.create(spec, {
     if (ctx.input.currency !== undefined) updateData.currency = ctx.input.currency;
     if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
 
+    if (!Object.keys(updateData).length)
+      throw createApiServiceError('Provide at least one product field to update.');
     let result = await client.updateProduct(ctx.input.productId, updateData);
-    let product = result?.data ?? result;
+    let product = readEntity(result, 'product');
 
     return {
       output: {

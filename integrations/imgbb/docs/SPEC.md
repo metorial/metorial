@@ -1,8 +1,8 @@
-# Slates Specification for ImgBB
+# ImgBB API specification
 
 ## Overview
 
-ImgBB is a free image hosting and sharing platform. Its API (v1) provides a single capability: uploading images to ImgBB's servers and receiving hosted URLs in return. Supported image formats include JPG, PNG, BMP, and GIF.
+ImgBB is an image hosting and sharing platform. Its [API v1](https://api.imgbb.com/) documents image uploads and hosted URLs.
 
 ## Authentication
 
@@ -19,12 +19,13 @@ ImgBB uses **API key** authentication.
 
 Upload images to ImgBB and receive publicly accessible hosted URLs (direct URL, viewer URL, display URL, and thumbnail URL).
 
-- **Image source**: Accepts a binary file (via multipart/form-data), base64-encoded data, or a URL pointing to an image. Maximum file size is 32 MB.
+- **Image source**: The tool accepts base64-encoded data or an image URL. The provider also supports binary multipart files; encode local files as base64 for this tool. Maximum file size is 32 MB.
 - **Custom filename**: Optionally specify a filename for the uploaded image. Automatically detected when uploading via multipart/form-data.
-- **Auto-expiration**: Optionally set an expiration time (in seconds, between 60 and 15,552,000) after which the image is automatically deleted.
-- The API response includes multiple image variants: original, thumbnail, and medium-sized versions, along with a delete URL for manual removal.
-- The API is upload-only; there are no endpoints to list, search, update, or delete previously uploaded images programmatically.
+- **Auto-expiration**: Optionally set a whole number of seconds from 60 to 15,552,000, after which the image is automatically deleted.
+- The tool provides a downloadable original image and preserves the hosted URLs: original, thumbnail, medium-sized when available, viewer, display, and the delete URL for manual removal. Keep the delete URL secure.
+- The documented upload response represents dimensions, size, time, and expiration as numeric strings; the tool preserves its numeric output contract by validating and converting dimensions, size, and expiration.
+- The public API documentation exposes no identity, listing, search, update, or API deletion endpoints. The returned delete URL is for manual removal. Automatic image deletion removes the content; the API documents no renewal endpoint.
 
 ## Events
 
-The provider does not support events.
+The public API documentation does not expose events or webhook registration.

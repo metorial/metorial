@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -67,6 +67,17 @@ export let updatePass = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => key !== 'passId' && key !== 'customFields' && value !== undefined
+      ) &&
+      Object.keys(ctx.input.customFields ?? {}).length === 0
+    ) {
+      throw createApiServiceError(
+        'Provide at least one pass field, voided, or targetTemplateId to update.'
+      );
+    }
+
     // Handle voiding separately since it uses PUT
     if (ctx.input.voided !== undefined) {
       await client.voidPass(ctx.input.passId, ctx.input.voided);
@@ -81,12 +92,14 @@ export let updatePass = SlateTool.create(spec, {
 
     // Build update body from remaining fields
     let body: Record<string, any> = {};
-    if (ctx.input.expirationDate) body.expirationDate = ctx.input.expirationDate;
-    if (ctx.input.relevantDate) body.relevantDate = ctx.input.relevantDate;
+    if (ctx.input.expirationDate !== undefined) body.expirationDate = ctx.input.expirationDate;
+    if (ctx.input.relevantDate !== undefined) body.relevantDate = ctx.input.relevantDate;
     if (ctx.input.storedValue !== undefined) body.storedValue = ctx.input.storedValue;
-    if (ctx.input.labelColor) body.labelColor = ctx.input.labelColor;
-    if (ctx.input.foregroundColor) body.foregroundColor = ctx.input.foregroundColor;
-    if (ctx.input.backgroundColor) body.backgroundColor = ctx.input.backgroundColor;
+    if (ctx.input.labelColor !== undefined) body.labelColor = ctx.input.labelColor;
+    if (ctx.input.foregroundColor !== undefined)
+      body.foregroundColor = ctx.input.foregroundColor;
+    if (ctx.input.backgroundColor !== undefined)
+      body.backgroundColor = ctx.input.backgroundColor;
     if (ctx.input.locations) body.locations = ctx.input.locations;
 
     if (ctx.input.customFields) {

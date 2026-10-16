@@ -26,7 +26,10 @@ export let listSites = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number (1-indexed)'),
-      pageSize: z.number().optional().describe('Number of results per page (max 100)')
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of results per page (no provider maximum; defaults to 100)')
     })
   )
   .output(

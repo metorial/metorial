@@ -6,6 +6,10 @@ import { spec } from '../spec';
 let fieldSchema = z
   .object({
     key: z.string().describe('Unique key for the field'),
+    type: z
+      .enum(['text', 'number', 'currency', 'date', 'dateTime'])
+      .optional()
+      .describe('Field data type; defaults to text'),
     label: z.string().optional().describe('Display label for the field'),
     value: z.string().optional().describe('Default value for the field'),
     changeMessage: z
@@ -103,11 +107,26 @@ export let createTemplate = SlateTool.create(spec, {
       passTypeId: ctx.input.passTypeId,
       barcode: ctx.input.barcode,
       fields: {
-        headerFields: ctx.input.headerFields || [],
-        primaryFields: ctx.input.primaryFields || [],
-        secondaryFields: ctx.input.secondaryFields || [],
-        auxiliaryFields: ctx.input.auxiliaryFields || [],
-        backFields: ctx.input.backFields || []
+        headerFields: (ctx.input.headerFields ?? []).map(field => ({
+          ...field,
+          type: field.type ?? 'text'
+        })),
+        primaryFields: (ctx.input.primaryFields ?? []).map(field => ({
+          ...field,
+          type: field.type ?? 'text'
+        })),
+        secondaryFields: (ctx.input.secondaryFields ?? []).map(field => ({
+          ...field,
+          type: field.type ?? 'text'
+        })),
+        auxiliaryFields: (ctx.input.auxiliaryFields ?? []).map(field => ({
+          ...field,
+          type: field.type ?? 'text'
+        })),
+        backFields: (ctx.input.backFields ?? []).map(field => ({
+          ...field,
+          type: field.type ?? 'text'
+        }))
       }
     };
 

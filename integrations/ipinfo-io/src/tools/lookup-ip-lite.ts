@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let lookupIpLite = SlateTool.create(spec, {
   name: 'Lookup IP (Lite)',
   key: 'lookup_ip_lite',
-  description: `Quick country-level geolocation and basic ASN lookup for an IP address using the free Lite API tier. Returns country, continent, and ASN information. Omit the IP to look up the caller's own address.`,
+  description: `Quick country-level geolocation and basic ASN lookup for an IP address using the free Lite API tier. Returns country, continent, and ASN information. Omit the IP to look up the invoking server's public IP address.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -18,7 +18,7 @@ export let lookupIpLite = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          "IPv4 or IPv6 address to look up. Omit to look up the caller's own IP address."
+          "IPv4 or IPv6 address to look up. Omit to look up the invoking server's public IP address."
         )
     })
   )

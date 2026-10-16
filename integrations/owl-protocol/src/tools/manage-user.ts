@@ -1,9 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { OwlClient } from '../lib/client';
+import {
+  OwlClient,
+  owlNumber,
+  owlString,
+  requireChainId,
+  requireInput,
+  requireOwlString,
+  userLookup
+} from '../lib/client';
+import { listInputSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
+  raw: rawSchema,
   userId: z.string().optional().describe('Owl Protocol user ID'),
   email: z.string().optional().describe('User email address'),
   fullName: z.string().optional().describe('User full name'),
@@ -14,10 +24,9 @@ let userOutputSchema = z.object({
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new project user who receives a universal wallet for interacting with your project's digital assets.
-Users can be identified by email, and each user gets a single universal wallet that works across all blockchains.`,
+  description: `Create or update a project user profile by email. Use get_user to retrieve the user's Safe wallet address for a particular blockchain.`,
   instructions: [
-    'Each user gets a universal wallet automatically - no private keys or crypto needed.',
+    'Call get_user with a chain ID to retrieve the user wallet address.',
     'Users can be referenced by email when minting tokens.'
   ],
   tags: {
@@ -41,6 +50,7 @@ Users can be identified by email, and each user gets a single universal wallet t
 
     ctx.info({ message: 'Creating user', email: ctx.input.email });
 
+    requireInput(ctx.input.email, 'email');
     let result = await client.createUser({
       email: ctx.input.email,
       fullName: ctx.input.fullName,
@@ -49,13 +59,17 @@ Users can be identified by email, and each user gets a single universal wallet t
 
     return {
       output: {
-        userId: result.userId ?? result.id,
-        email: result.email,
-        fullName: result.fullName,
-        externalId: result.externalId,
-        walletAddress: result.walletAddress ?? result.safeAddress
+        raw: result,
+        userId: requireOwlString(
+          result.userId === undefined ? result.id : result.userId,
+          'user ID'
+        ),
+        email: requireOwlString(result.email, 'user email'),
+        fullName: owlString(result.fullName),
+        externalId: owlString(result.externalId),
+        walletAddress: owlString(result.walletAddress) ?? owlString(result.safeAddress)
       },
-      message: `Created user **${ctx.input.email}**${result.userId ? ` (ID: \`${result.userId}\`)` : ''}.`
+      message: `Saved project user **${ctx.input.email}**${owlString(result.userId) ? ` (ID: \`${owlString(result.userId)}\`)` : ''}.`
     };
   })
   .build();
@@ -78,29 +92,39 @@ If multiple query parameters are provided, only the first one in order (email, e
       chainId: z
         .number()
         .optional()
-        .describe('Chain ID to include chain-specific wallet information')
+        .describe(
+          'Chain ID for the user wallet. Defaults to the connection setting or the current project default from get_project.'
+        )
     })
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
+    let lookup = userLookup(ctx.input);
+    let chainId = ctx.input.chainId ?? ctx.config.chainId;
+    if (chainId === undefined) {
+      let project = await client.getProject();
+      chainId = owlNumber(project.defaultChainId);
+    }
     let result = await client.getUser({
-      email: ctx.input.email,
-      externalId: ctx.input.externalId,
-      userId: ctx.input.userId,
-      chainId: ctx.input.chainId ?? ctx.config.chainId
+      ...lookup,
+      chainId: requireChainId(chainId)
     });
 
     return {
       output: {
-        userId: result.userId ?? result.id,
-        email: result.email,
-        fullName: result.fullName,
-        externalId: result.externalId,
-        walletAddress: result.walletAddress ?? result.safeAddress
+        raw: result,
+        userId: requireOwlString(
+          result.userId === undefined ? result.id : result.userId,
+          'user ID'
+        ),
+        email: requireOwlString(result.email, 'user email'),
+        fullName: owlString(result.fullName),
+        externalId: owlString(result.externalId),
+        walletAddress: owlString(result.walletAddress) ?? owlString(result.safeAddress)
       },
-      message: `Retrieved user **${result.email ?? result.userId ?? result.id}**.`
+      message: 'Retrieved project user profile.'
     };
   })
   .build();
@@ -108,15 +132,16 @@ If multiple query parameters are provided, only the first one in order (email, e
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List all project users. Returns user profiles and wallet information for each user in the project.`,
+  description: `List a page of project user profiles. Call get_user with a chain ID to retrieve a user wallet address.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(listInputSchema)
   .output(
     z.object({
+      raw: rawSchema,
       users: z
         .array(
           z.object({
@@ -133,29 +158,18 @@ export let listUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let result = await client.listUsers();
-    let users = Array.isArray(result) ? result : (result.items ?? []);
+    let users = await client.listUsers(ctx.input);
 
-    let mapped = users.map(
-      (u: {
-        userId?: string;
-        id?: string;
-        email?: string;
-        fullName?: string;
-        externalId?: string;
-        walletAddress?: string;
-        safeAddress?: string;
-      }) => ({
-        userId: u.userId ?? u.id,
-        email: u.email,
-        fullName: u.fullName,
-        externalId: u.externalId,
-        walletAddress: u.walletAddress ?? u.safeAddress
-      })
-    );
+    let mapped = users.map(u => ({
+      userId: requireOwlString(u.userId === undefined ? u.id : u.userId, 'user ID'),
+      email: requireOwlString(u.email, 'user email'),
+      fullName: owlString(u.fullName),
+      externalId: owlString(u.externalId),
+      walletAddress: owlString(u.walletAddress) ?? owlString(u.safeAddress)
+    }));
 
     return {
-      output: { users: mapped },
+      output: { users: mapped, raw: users },
       message: `Found **${mapped.length}** project user(s).`
     };
   })

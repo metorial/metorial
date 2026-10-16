@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList, validatePagination } from '../lib/response';
 import { spec } from '../spec';
 
 export let listTeams = SlateTool.create(spec, {
@@ -11,6 +12,8 @@ export let listTeams = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z.number().optional(),
+      perPage: z.number().optional().describe('Results per page, at most 60'),
       includeTeammates: z
         .boolean()
         .optional()
@@ -19,6 +22,8 @@ export let listTeams = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pages: z.any().optional(),
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       teams: z.array(
         z.object({
           teamId: z.string(),
@@ -40,20 +45,27 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination({ page: ctx.input.page, perPage: ctx.input.perPage });
     let client = new GistClient({ token: ctx.auth.token });
 
-    let teamsData = await client.listTeams();
-    let teams = (teamsData.teams || []).map((t: any) => ({
-      teamId: String(t.id),
+    let teamsData = await client.listTeams({
+      page: ctx.input.page,
+      per_page: ctx.input.perPage
+    });
+    let teams = responseList(teamsData.teams).map((t: any) => ({
+      teamId: requiredId(t.id),
       teamName: t.name,
-      createdAt: t.created_at ? String(t.created_at) : undefined
+      createdAt: t.created_at !== undefined ? String(t.created_at) : undefined
     }));
 
     let teammates: any[] | undefined;
     if (ctx.input.includeTeammates !== false) {
-      let teammatesData = await client.listTeammates();
-      teammates = (teammatesData.teammates || []).map((t: any) => ({
-        teammateId: String(t.id),
+      let teammatesData = await client.listTeammates({
+        page: ctx.input.page,
+        per_page: ctx.input.perPage
+      });
+      teammates = responseList(teammatesData.teammates).map((t: any) => ({
+        teammateId: requiredId(t.id),
         name: t.name,
         email: t.email,
         avatar: t.avatar,
@@ -62,7 +74,7 @@ export let listTeams = SlateTool.create(spec, {
     }
 
     return {
-      output: { teams, teammates },
+      output: { rawResponse: client.responses, teams, teammates, pages: teamsData.pages },
       message: `Found **${teams.length}** teams${teammates ? ` and **${teammates.length}** teammates` : ''}.`
     };
   })

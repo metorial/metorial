@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let findNearbyPlaces = SlateTool.create(spec, {
   name: 'Find Nearby Places',
   key: 'find_nearby_places',
-  description: `Find places closest to a specific geographic coordinate. Unlike search, this endpoint focuses on immediate proximity and is designed for identifying what's around a precise location. Ideal for "what's near me" use cases.`,
+  description: `DEPRECATED — use \`get_geotagging_candidates\` instead. Find places closest to a specific geographic coordinate. Unlike search, this endpoint focuses on immediate proximity and is designed for identifying what's around a precise location. Ideal for "what's near me" use cases.`,
+  instructions: [
+    'Use get_geotagging_candidates with a Places Service API Key. This legacy V3 tool retains its original request and schema.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

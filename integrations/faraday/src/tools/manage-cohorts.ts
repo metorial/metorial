@@ -1,9 +1,53 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
+let comparisonSchema = z.object({
+  _eq: z.string().optional(),
+  _gt: z.number().optional(),
+  _gte: z.number().optional(),
+  _in: z.array(z.string()).optional(),
+  _lt: z.number().optional(),
+  _lte: z.number().optional(),
+  _matches: z.string().optional(),
+  _nin: z.array(z.string()).optional(),
+  _nnull: z.boolean().optional(),
+  _null: z.boolean().optional(),
+  optional: z.boolean().optional()
+});
+let streamConditionSchema = comparisonSchema.extend({
+  property: z.string(),
+  _on_or_after: z.string().optional(),
+  _on_or_before: z.string().optional()
+});
+let traitConditionSchema = comparisonSchema.extend({ name: z.string() });
+
+// Older callers supplied a single condition object. Retain it and send the API's array form.
+let conditionList = (
+  legacy: Record<string, unknown> | undefined,
+  list: Record<string, unknown>[] | undefined,
+  field: string
+) => {
+  if (legacy !== undefined && list !== undefined) {
+    throw createApiServiceError(`Use either ${field} or ${field}List, not both.`);
+  }
+  return list ?? (legacy === undefined ? undefined : [legacy]);
+};
+
+let validateRecency = (recency: Record<string, unknown> | undefined) => {
+  for (let field of ['min_days', 'max_days']) {
+    if (recency?.[field] !== undefined && !Number.isInteger(recency[field])) {
+      throw createApiServiceError(`recency.${field} must be an integer number of days.`);
+    }
+  }
+};
+
 let cohortSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   cohortId: z.string().describe('Unique identifier of the cohort'),
   name: z.string().describe('Human-readable name of the cohort'),
   status: z
@@ -36,6 +80,7 @@ export let listCohorts = SlateTool.create(spec, {
     let cohorts = await client.listCohorts();
 
     let mapped = cohorts.map((c: any) => ({
+      raw: c,
       cohortId: c.id,
       name: c.name,
       status: c.status,
@@ -69,6 +114,7 @@ export let getCohort = SlateTool.create(spec, {
     let c = await client.getCohort(ctx.input.cohortId);
 
     let output = {
+      raw: c,
       cohortId: c.id,
       name: c.name,
       status: c.status,
@@ -94,6 +140,30 @@ export let createCohort = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Human-readable name for the cohort (max 64 characters)'),
+      streamName: z
+        .string()
+        .optional()
+        .describe('Event stream name. Call list_streams to discover stream names.'),
+      streamConditionsList: z
+        .array(streamConditionSchema)
+        .optional()
+        .describe(
+          'Event property conditions. Use instead of the single streamConditions object.'
+        ),
+      traitsList: z
+        .array(traitConditionSchema)
+        .optional()
+        .describe('Trait conditions. Use instead of the single traits object.'),
+      placeConditionsList: z
+        .array(
+          z.object({
+            place_id: z.string(),
+            distance: z.number().optional(),
+            invert: z.boolean().optional()
+          })
+        )
+        .optional()
+        .describe('Spatial conditions. Use instead of the single placeConditions object.'),
       streamConditions: z
         .record(z.string(), z.any())
         .optional()
@@ -125,9 +195,29 @@ export let createCohort = SlateTool.create(spec, {
     let client = new FaradayClient({ token: ctx.auth.token });
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.streamConditions) body.stream_conditions = ctx.input.streamConditions;
-    if (ctx.input.traits) body.traits = ctx.input.traits;
-    if (ctx.input.placeConditions) body.place_conditions = ctx.input.placeConditions;
+    let streams = conditionList(
+      ctx.input.streamConditions,
+      ctx.input.streamConditionsList,
+      'streamConditions'
+    );
+    let traits = conditionList(ctx.input.traits, ctx.input.traitsList, 'traits');
+    let places = conditionList(
+      ctx.input.placeConditions,
+      ctx.input.placeConditionsList,
+      'placeConditions'
+    );
+    validateRecency(ctx.input.recency);
+    for (let condition of places ?? []) {
+      if (condition.distance !== undefined && !Number.isInteger(condition.distance)) {
+        throw createApiServiceError(
+          'Each place condition distance must be an integer number of meters.'
+        );
+      }
+    }
+    if (ctx.input.streamName !== undefined) body.stream_name = ctx.input.streamName;
+    if (streams !== undefined) body.stream_conditions = streams;
+    if (traits !== undefined) body.traits = traits;
+    if (places !== undefined) body.place_conditions = places;
     if (ctx.input.recency) body.recency = ctx.input.recency;
     if (ctx.input.explore !== undefined) body.explore = ctx.input.explore;
     if (ctx.input.minCount !== undefined) body.min_count = ctx.input.minCount;
@@ -139,6 +229,7 @@ export let createCohort = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: c,
         cohortId: c.id,
         name: c.name,
         status: c.status,
@@ -162,6 +253,30 @@ export let updateCohort = SlateTool.create(spec, {
     z.object({
       cohortId: z.string().describe('UUID of the cohort to update'),
       name: z.string().optional().describe('New name for the cohort'),
+      streamName: z
+        .string()
+        .optional()
+        .describe('Event stream name. Call list_streams to discover stream names.'),
+      streamConditionsList: z
+        .array(streamConditionSchema)
+        .optional()
+        .describe(
+          'Event property conditions. Use instead of the single streamConditions object.'
+        ),
+      traitsList: z
+        .array(traitConditionSchema)
+        .optional()
+        .describe('Trait conditions. Use instead of the single traits object.'),
+      placeConditionsList: z
+        .array(
+          z.object({
+            place_id: z.string(),
+            distance: z.number().optional(),
+            invert: z.boolean().optional()
+          })
+        )
+        .optional()
+        .describe('Spatial conditions. Use instead of the single placeConditions object.'),
       streamConditions: z
         .record(z.string(), z.any())
         .optional()
@@ -180,15 +295,40 @@ export let updateCohort = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
     if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.streamConditions) body.stream_conditions = ctx.input.streamConditions;
-    if (ctx.input.traits) body.traits = ctx.input.traits;
-    if (ctx.input.placeConditions) body.place_conditions = ctx.input.placeConditions;
+    let streams = conditionList(
+      ctx.input.streamConditions,
+      ctx.input.streamConditionsList,
+      'streamConditions'
+    );
+    let traits = conditionList(ctx.input.traits, ctx.input.traitsList, 'traits');
+    let places = conditionList(
+      ctx.input.placeConditions,
+      ctx.input.placeConditionsList,
+      'placeConditions'
+    );
+    validateRecency(ctx.input.recency);
+    for (let condition of places ?? []) {
+      if (condition.distance !== undefined && !Number.isInteger(condition.distance)) {
+        throw createApiServiceError(
+          'Each place condition distance must be an integer number of meters.'
+        );
+      }
+    }
+    if (ctx.input.streamName !== undefined) body.stream_name = ctx.input.streamName;
+    if (streams !== undefined) body.stream_conditions = streams;
+    if (traits !== undefined) body.traits = traits;
+    if (places !== undefined) body.place_conditions = places;
     if (ctx.input.recency) body.recency = ctx.input.recency;
+
+    if (Object.keys(body).length === 0) {
+      throw createApiServiceError('Provide at least one cohort field to update.');
+    }
 
     let c = await client.updateCohort(ctx.input.cohortId, body);
 
     return {
       output: {
+        raw: c,
         cohortId: c.id,
         name: c.name,
         status: c.status,

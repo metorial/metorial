@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,10 @@ export let manageLicense = SlateTool.create(spec, {
     let { action, licenseNumber, ...params } = ctx.input;
 
     if (action === 'delete') {
-      if (!licenseNumber) throw new Error('licenseNumber is required for delete');
+      if (!licenseNumber)
+        throw createApiServiceError('licenseNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteLicense(licenseNumber);
       return {
         output: { licenseNumber, deleted: true },
@@ -65,9 +68,15 @@ export let manageLicense = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!licenseNumber) throw new Error('licenseNumber is required for update');
+      if (!licenseNumber)
+        throw createApiServiceError('licenseNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateLicense(licenseNumber, params);
-      if (!result) throw new Error('Failed to update license');
+      if (!result)
+        throw createApiServiceError('Failed to update license', {
+          reason: 'invalid_response'
+        });
       return {
         output: {
           licenseNumber: result.number,
@@ -87,7 +96,8 @@ export let manageLicense = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (licenseNumber) createParams.number = licenseNumber;
     let result = await client.createLicense(createParams);
-    if (!result) throw new Error('Failed to create license');
+    if (!result)
+      throw createApiServiceError('Failed to create license', { reason: 'invalid_response' });
     return {
       output: {
         licenseNumber: result.number,

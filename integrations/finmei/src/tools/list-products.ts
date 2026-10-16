@@ -1,6 +1,14 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalNumber,
+  optionalString,
+  optionalTimestamp,
+  pagination,
+  readList,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listProducts = SlateTool.create(spec, {
@@ -14,11 +22,11 @@ export let listProducts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
+      page: z.number().optional().describe('Page number for pagination (1-based)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of products per page (default: 20, max: 100)'),
+        .describe('Number of products per page (the provider may use a fixed page size)'),
       name: z.string().optional().describe('Filter products by name (substring match)'),
       status: z.enum(['active', 'inactive']).optional().describe('Filter products by status')
     })
@@ -37,6 +45,7 @@ export let listProducts = SlateTool.create(spec, {
           })
         )
         .describe('List of products'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       total: z.number().optional().describe('Total number of products'),
       page: z.number().optional().describe('Current page number'),
       totalPages: z.number().optional().describe('Total number of pages')
@@ -52,30 +61,25 @@ export let listProducts = SlateTool.create(spec, {
       status: ctx.input.status
     });
 
-    let rawProducts = result?.data ?? result?.products ?? result ?? [];
-    let productsArray = Array.isArray(rawProducts) ? rawProducts : [];
-
-    let products = productsArray.map((p: any) => ({
-      productId: String(p.id),
-      name: p.name,
-      price: p.price,
-      currency: p.currency,
-      description: p.description,
-      createdAt: p.created_at
+    let products = readList(result, 'products').map(p => ({
+      productId: requireId(p.id, 'product ID'),
+      ...pickDefined({
+        name: optionalString(p.name, 'product name'),
+        price: optionalNumber(p.price, 'product price'),
+        currency: optionalString(p.currency, 'product currency'),
+        description: optionalString(p.description, 'product description'),
+        createdAt: optionalTimestamp(p.created_at, 'product creation time')
+      })
     }));
 
-    let total = result?.total ?? result?.meta?.total;
-    let page = result?.page ?? result?.meta?.current_page ?? ctx.input.page;
-    let totalPages = result?.total_pages ?? result?.meta?.last_page;
-
+    let metadata = pagination(result);
     return {
       output: {
         products,
-        total,
-        page,
-        totalPages
+        ...metadata,
+        rawResponse: result
       },
-      message: `Found **${products.length}** product(s)${total ? ` out of ${total} total` : ''}.`
+      message: `Found **${products.length}** product(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
     };
   })
   .build();

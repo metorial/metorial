@@ -1,6 +1,7 @@
 export interface PaginationParams {
   limit?: number;
   nextToken?: string;
+  where?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -37,6 +38,7 @@ export interface Connection {
   parentId?: string;
   config?: Record<string, unknown>;
   credentialSource?: string;
+  status?: string;
   state?: string;
   createdAt: string;
   updatedAt: string;
@@ -57,7 +59,7 @@ export interface Organization {
 export interface OrgMember {
   userId: string;
   orgId: string;
-  role: string;
+  role?: string;
   status: string;
   displayName?: string;
   handle?: string;
@@ -154,6 +156,7 @@ export interface DatatankTable {
 export interface QueryResult {
   items: Record<string, unknown>[];
   columns?: QueryColumn[];
+  rawResult?: Record<string, unknown>;
 }
 
 export interface QueryColumn {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTechnicalIndicators = SlateTool.create(spec, {
@@ -69,7 +69,7 @@ Returns time-series data with the indicator values alongside date.`,
       order: ctx.input.order
     });
 
-    let valuesArray = Array.isArray(values) ? values : [];
+    let valuesArray = eodhdArray(values, 'get-technical-indicators');
 
     return {
       output: {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prooflyBoolean, prooflyId, prooflyNumber, prooflyString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCampaignNotifications = SlateTool.create(spec, {
@@ -14,7 +15,9 @@ export let getCampaignNotifications = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      campaignId: z.string().describe('The ID of the campaign to retrieve notifications for')
+      campaignId: z
+        .string()
+        .describe('Campaign ID. Call list_campaigns to discover campaign IDs.')
     })
   )
   .output(
@@ -33,7 +36,14 @@ export let getCampaignNotifications = SlateTool.create(spec, {
               .describe('Number of times the notification was displayed'),
             hovers: z.number().optional().describe('Number of hover interactions'),
             clicks: z.number().optional().describe('Number of click interactions'),
-            leads: z.number().optional().describe('Number of leads collected')
+            leads: z.number().optional().describe('Number of leads collected'),
+            name: z.string().optional().describe('Notification name'),
+            enabled: z.boolean().optional().describe('Whether the notification is enabled'),
+            createdAt: z.string().optional().describe('Notification creation timestamp'),
+            settings: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Notification display and targeting settings')
           })
         )
         .describe('Notifications within the campaign')
@@ -41,20 +51,25 @@ export let getCampaignNotifications = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.getCampaignNotifications(ctx.input.campaignId);
-
-    let notifications = Array.isArray(data) ? data : (data.notifications ?? []);
+    let notifications = await client.getCampaignNotifications(ctx.input.campaignId);
 
     return {
       output: {
-        notifications: notifications.map((n: any) => ({
-          notificationId: String(n.id ?? n._id ?? n.notificationId),
-          notificationType: n.type ?? n.notificationType ?? n.notification_type,
-          impressions: n.impressions ?? n.stats?.impressions,
-          hovers: n.hovers ?? n.stats?.hovers,
-          clicks: n.clicks ?? n.stats?.clicks,
-          leads: n.leads ?? n.stats?.leads
-        }))
+        notifications: notifications.map(n => {
+          let stats = isApiErrorRecord(n.stats) ? n.stats : {};
+          return {
+            notificationId: prooflyId(n.id ?? n._id ?? n.notificationId, 'notification'),
+            notificationType: prooflyString(n.type, n.notificationType, n.notification_type),
+            impressions: prooflyNumber(n.impressions, stats.impressions),
+            hovers: prooflyNumber(n.hovers, stats.hovers),
+            clicks: prooflyNumber(n.clicks, stats.clicks),
+            leads: prooflyNumber(n.leads, stats.leads),
+            name: prooflyString(n.name),
+            enabled: prooflyBoolean(n.enabled),
+            createdAt: prooflyString(n.created),
+            settings: isApiErrorRecord(n.settings) ? n.settings : undefined
+          };
+        })
       },
       message: `Retrieved **${notifications.length}** notification(s) for campaign \`${ctx.input.campaignId}\`.`
     };

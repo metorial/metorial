@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { NpmRegistryClient } from './lib/client';
+import { record, text } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -16,7 +18,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'An npm access token (session token, granular token, or automation token). Used for authenticated operations like publishing, token management, and accessing private packages.'
+          'An npm access token (session token or granular access token). Used for authenticated operations like token management and accessing private packages. Token creation/listing requires a session token; governance writes reject bypass-2FA tokens.'
         )
     }),
     getOutput: async ctx => {
@@ -27,20 +29,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://registry.npmjs.org',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let res = await http.get('/-/npm/v1/user');
-      let user = res.data;
+      let client = new NpmRegistryClient({ token: ctx.output.token });
+      let user = record(await client.getUserProfile(), 'user profile');
 
       return {
         profile: {
-          name: user.name,
-          email: user.email
+          name: text(user.name, 'username'),
+          email: text(user.email, 'profile email')
         }
       };
     }

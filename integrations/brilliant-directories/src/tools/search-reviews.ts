@@ -26,6 +26,10 @@ Returns matching reviews with pagination.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       reviews: z.any().describe('The search results.')
     })
   )
@@ -50,6 +54,7 @@ Returns matching reviews with pagination.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         reviews: result.message
       },
       message: `Found reviews matching the search criteria.`

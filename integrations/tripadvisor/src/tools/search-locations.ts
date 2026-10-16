@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ContentClient } from '../lib/client';
+import { ContentClient, providerId, providerList } from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -29,7 +29,7 @@ export let searchLocations = SlateTool.create(spec, {
   description: `Search for hotels, restaurants, attractions, and geographic locations on Tripadvisor by keyword. Returns up to 10 matching locations with basic info including name, address, and location ID. Optionally filter by category or refine with coordinates, phone number, or address. Use the returned location IDs with other tools to get details, reviews, or photos.`,
   constraints: [
     'Returns a maximum of 10 results per search.',
-    'Up to 10,000 search calls per day.'
+    'Request quotas depend on the API key subscription.'
   ],
   tags: {
     readOnly: true
@@ -89,8 +89,8 @@ export let searchLocations = SlateTool.create(spec, {
       language: ctx.input.language
     });
 
-    let locations = (result.data || []).map((loc: any) => ({
-      locationId: String(loc.location_id),
+    let locations = providerList(result.data).map((loc: any) => ({
+      locationId: providerId(loc.location_id),
       name: loc.name,
       distance: loc.distance,
       bearing: loc.bearing,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getDataPoints } from '../lib/client';
 import { spec } from '../spec';
 
 let dataPointSchema = z.record(z.string(), z.any()).describe('Grid aggregation data point');
@@ -12,16 +12,16 @@ export let getGridAggregations = SlateTool.create(spec, {
 
 Supports two modes:
 - **Live**: Estimated actual aggregated power for up to 7 days
-- **Forecast**: Forecasted aggregated power for up to 7 days
+- **Forecast**: Forecasted aggregated power for up to 14 days
 
 Outputs include total power (MW) or performance units (% of capacity), with probabilistic outputs (P10/P50/P90). Used for grid management, load forecasting, VPP management, and energy trading.`,
   instructions: [
-    'Aggregations must be pre-configured by the Solcast team. Provide the collectionId or aggregationId.',
+    'Aggregations must be pre-configured by the Solcast team. Provide the collectionId and optionally aggregationId.',
     'Contact Solcast to set up custom grid aggregations based on your PV fleet metadata.'
   ],
   constraints: [
     'Grid aggregation setup is not self-service — it requires contacting Solcast directly.',
-    'Data is available for up to 7 days in both live and forecast modes.'
+    'Live data is available for up to 7 days and forecast data for up to 14 days.'
   ],
   tags: {
     readOnly: true
@@ -32,7 +32,10 @@ Outputs include total power (MW) or performance units (% of capacity), with prob
       mode: z
         .enum(['live', 'forecast'])
         .describe('Live (estimated actuals) or forecast (future projections)'),
-      collectionId: z.string().optional().describe('Collection ID for the grid aggregation'),
+      collectionId: z
+        .string()
+        .optional()
+        .describe('Required collection ID supplied by Solcast for the grid aggregation'),
       aggregationId: z
         .string()
         .optional()
@@ -43,7 +46,7 @@ Outputs include total power (MW) or performance units (% of capacity), with prob
         .describe('Specific output parameters to include'),
       hours: z.number().optional().describe('Number of hours of data to return'),
       period: z
-        .enum(['PT5M', 'PT10M', 'PT15M', 'PT30M', 'PT60M'])
+        .enum(['PT5M', 'PT10M', 'PT15M', 'PT20M', 'PT30M', 'PT60M'])
         .optional()
         .describe('Time resolution')
     })
@@ -67,7 +70,10 @@ Outputs include total power (MW) or performance units (% of capacity), with prob
       result = await client.getForecastAggregations(params);
     }
 
-    let dataPoints = result.forecasts ?? result.estimated_actuals ?? [];
+    let dataPoints = getDataPoints(
+      result,
+      mode === 'forecast' ? 'forecasts' : 'estimated_actuals'
+    );
 
     return {
       output: {

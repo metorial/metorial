@@ -23,12 +23,14 @@ export let sendTestInvitation = SlateTool.create(spec, {
       externalId: z
         .string()
         .optional()
-        .describe('Optional external identifier for mapping to your CRM or internal system'),
+        .describe(
+          'External candidate identifier for your CRM or internal system, at most 500 characters'
+        ),
       sendEmail: z
         .boolean()
         .optional()
         .describe(
-          'Whether Linguapop should send the invitation email to the candidate. If false, use the returned test URL to deliver the test yourself'
+          'Whether Linguapop should send the invitation email to the candidate. Defaults to false; use the returned test URL to deliver the test yourself'
         ),
       kioskMode: z
         .boolean()
@@ -39,21 +41,27 @@ export let sendTestInvitation = SlateTool.create(spec, {
       includeReading: z
         .boolean()
         .optional()
-        .describe('Whether to include a reading section in addition to the core grammar test'),
+        .describe(
+          'Whether to include a reading section. Omit to use your customization settings'
+        ),
       includeListening: z
         .boolean()
         .optional()
         .describe(
-          'Whether to include a listening section in addition to the core grammar test'
+          'Whether to include a listening section. Omit to use your customization settings'
         ),
       returnUrl: z
         .string()
         .optional()
-        .describe('URL to redirect the candidate to after completing the test'),
+        .describe(
+          'URL opened by the results-page return button after the test, at most 1000 characters'
+        ),
       callbackUrl: z
         .string()
         .optional()
-        .describe('URL to receive test results via webhook when the test is completed')
+        .describe(
+          'URL to receive test results when the test is completed, at most 1000 characters'
+        )
     })
   )
   .output(
@@ -65,6 +73,18 @@ export let sendTestInvitation = SlateTool.create(spec, {
         .optional()
         .describe(
           'Kiosk code for accessing the test through a configured kiosk (only present if kiosk mode was enabled)'
+        ),
+      emailSent: z
+        .boolean()
+        .describe('Whether Linguapop confirmed that an invitation email was sent'),
+      externalIdentifier: z
+        .string()
+        .optional()
+        .describe('External candidate identifier returned by Linguapop, when provided'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Full invitation response, including numeric identifiers and nullable values'
         )
     })
   )
@@ -89,11 +109,14 @@ export let sendTestInvitation = SlateTool.create(spec, {
       `Invitation ID: \`${result.invitationId}\``
     ];
 
-    if (ctx.input.sendEmail) {
+    if (result.emailSent) {
       messageParts.push('Invitation email sent by Linguapop.');
-    } else {
-      messageParts.push(`Test URL: ${result.testUrl}`);
+    } else if (ctx.input.sendEmail) {
+      messageParts.push(
+        'Linguapop did not confirm email delivery; use the test URL to deliver the invitation.'
+      );
     }
+    messageParts.push(`Test URL: ${result.url}`);
 
     if (result.kioskCode) {
       messageParts.push(`Kiosk code: \`${result.kioskCode}\``);
@@ -101,9 +124,14 @@ export let sendTestInvitation = SlateTool.create(spec, {
 
     return {
       output: {
-        invitationId: result.invitationId,
-        testUrl: result.testUrl,
-        kioskCode: result.kioskCode
+        invitationId: String(result.invitationId),
+        testUrl: result.url,
+        ...(result.kioskCode == null ? {} : { kioskCode: result.kioskCode }),
+        emailSent: result.emailSent,
+        ...(result.externalIdentifier == null
+          ? {}
+          : { externalIdentifier: result.externalIdentifier }),
+        raw: result
       },
       message: messageParts.join('\n')
     };

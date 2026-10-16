@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaiverFileClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,7 @@ export let searchWaivers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      waivers: z.any().describe('Array of matching waiver records')
+      waivers: z.any().describe('Complete waiver search response')
     })
   )
   .handleInvocation(async ctx => {
@@ -39,7 +39,13 @@ export let searchWaivers = SlateTool.create(spec, {
     let hasRefId =
       ctx.input.refId1 || ctx.input.refId2 || ctx.input.refId3 || ctx.input.refIdAny;
 
-    let waivers: any;
+    if (hasRefId && ctx.input.terms) {
+      throw createApiServiceError(
+        'Provide search terms or reference IDs in one call, not both.'
+      );
+    }
+
+    let waivers: unknown;
     if (hasRefId) {
       waivers = await client.getWaiversByReferenceID({
         refId1: ctx.input.refId1,
@@ -50,16 +56,14 @@ export let searchWaivers = SlateTool.create(spec, {
     } else if (ctx.input.terms) {
       waivers = await client.searchWaivers(ctx.input.terms);
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide either search terms or at least one reference ID to search for waivers.'
       );
     }
 
-    let results = Array.isArray(waivers) ? waivers : [waivers];
-
     return {
-      output: { waivers: results },
-      message: `Found **${results.length}** matching waiver(s).`
+      output: { waivers },
+      message: 'Retrieved the waiver search response.'
     };
   })
   .build();

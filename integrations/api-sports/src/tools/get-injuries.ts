@@ -41,6 +41,10 @@ export let getInjuriesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       injuries: z.array(injurySchema),
       count: z.number().describe('Number of injuries returned')
     })
@@ -74,6 +78,7 @@ export let getInjuriesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         injuries: results,
         count: results.length
       },

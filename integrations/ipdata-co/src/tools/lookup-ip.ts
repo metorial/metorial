@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse, threatEnrichmentShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 let asnSchema = z
@@ -16,7 +17,7 @@ let asnSchema = z
 let languageSchema = z.object({
   name: z.string().describe('Language name'),
   native: z.string().describe('Language name in native script'),
-  code: z.string().describe('ISO 639-1 language code')
+  code: z.string().optional().describe('ISO 639-1 language code, when supplied')
 });
 
 let currencySchema = z.object({
@@ -37,14 +38,18 @@ let timezoneSchema = z.object({
 
 let threatSchema = z.object({
   isTor: z.boolean().describe('Whether the IP is a known Tor exit node'),
-  isIcloudRelay: z.boolean().describe('Whether the IP is an iCloud Private Relay address'),
+  isIcloudRelay: z
+    .boolean()
+    .optional()
+    .describe('Whether the IP is an iCloud Private Relay address'),
   isProxy: z.boolean().describe('Whether the IP is a known proxy'),
-  isDatacenter: z.boolean().describe('Whether the IP belongs to a datacenter'),
+  isDatacenter: z.boolean().optional().describe('Whether the IP belongs to a datacenter'),
   isAnonymous: z.boolean().describe('Whether the IP is used for anonymous access'),
   isKnownAttacker: z.boolean().describe('Whether the IP is a known attacker'),
   isKnownAbuser: z.boolean().describe('Whether the IP is a known abuser'),
   isThreat: z.boolean().describe('Whether the IP is considered a threat'),
-  isBogon: z.boolean().describe('Whether the IP is a bogon (unallocated) address')
+  isBogon: z.boolean().describe('Whether the IP is a bogon (unallocated) address'),
+  ...threatEnrichmentShape
 });
 
 let carrierSchema = z.object({
@@ -56,13 +61,46 @@ let carrierSchema = z.object({
 let companySchema = z.object({
   name: z.string().describe('Company or organization name'),
   domain: z.string().describe('Company domain'),
-  type: z.string().describe('Organization type (e.g. isp, business, hosting, education)')
+  type: z.string().describe('Organization type (e.g. isp, business, hosting, education)'),
+  network: z.string().optional().describe('Network prefix assigned to the organization')
+});
+
+let ipOutputSchema = z.object({
+  ip: z.string().describe('The looked-up IP address'),
+  isEu: z.boolean().optional().describe('Whether the IP is located in an EU country'),
+  city: z.string().optional().describe('City name'),
+  region: z.string().optional().describe('Region or state name'),
+  regionCode: z.string().optional().describe('Region code'),
+  countryName: z.string().optional().describe('Country name'),
+  countryCode: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
+  continentName: z.string().optional().describe('Continent name'),
+  continentCode: z.string().optional().describe('Continent code'),
+  latitude: z.number().optional().describe('Latitude coordinate'),
+  longitude: z.number().optional().describe('Longitude coordinate'),
+  postalCode: z.string().optional().describe('Postal or ZIP code'),
+  callingCode: z.string().optional().describe('International calling code'),
+  flag: z.string().optional().describe('URL to the country flag image'),
+  emojiFlag: z.string().optional().describe('Country flag emoji'),
+  asn: asnSchema.optional(),
+  languages: z.array(languageSchema).optional().describe('Languages spoken in the country'),
+  currency: currencySchema.optional(),
+  timezone: timezoneSchema.optional(),
+  threat: threatSchema.optional(),
+  carrier: carrierSchema.optional(),
+  company: companySchema.optional(),
+  regionType: z.string().optional().describe('Administrative region type'),
+  emojiUnicode: z.string().optional().describe('Unicode country flag representation'),
+  count: z.string().optional().describe('Requests made by this API key in the last 24 hours'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete original provider response')
 });
 
 export let lookupIp = SlateTool.create(spec, {
   name: 'Lookup IP',
   key: 'lookup_ip',
-  description: `Look up comprehensive geolocation and enrichment data for any IPv4 or IPv6 address. Returns location (country, region, city, coordinates, postal code), threat intelligence, ASN, company/organization, timezone, currency, languages, and mobile carrier data. Omit the IP address to look up the caller's own IP.`,
+  description: `Look up comprehensive geolocation and enrichment data for any IPv4 or IPv6 address. Returns location (country, region, city, coordinates, postal code), threat intelligence, ASN, company/organization, timezone, currency, languages, and mobile carrier data. Omit the IP address to look up the server making this request.`,
   constraints: ['Free API keys are limited to 1,500 requests per day.'],
   tags: {
     readOnly: true
@@ -73,7 +111,9 @@ export let lookupIp = SlateTool.create(spec, {
       ipAddress: z
         .string()
         .optional()
-        .describe("IPv4 or IPv6 address to look up. Omit to look up the caller's own IP."),
+        .describe(
+          'IPv4 or IPv6 address to look up. Omit to look up the server making this request.'
+        ),
       fields: z
         .array(z.string())
         .optional()
@@ -82,35 +122,7 @@ export let lookupIp = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      ip: z.string().describe('The looked-up IP address'),
-      isEu: z.boolean().optional().describe('Whether the IP is located in an EU country'),
-      city: z.string().optional().describe('City name'),
-      region: z.string().optional().describe('Region or state name'),
-      regionCode: z.string().optional().describe('Region code'),
-      countryName: z.string().optional().describe('Country name'),
-      countryCode: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
-      continentName: z.string().optional().describe('Continent name'),
-      continentCode: z.string().optional().describe('Continent code'),
-      latitude: z.number().optional().describe('Latitude coordinate'),
-      longitude: z.number().optional().describe('Longitude coordinate'),
-      postalCode: z.string().optional().describe('Postal or ZIP code'),
-      callingCode: z.string().optional().describe('International calling code'),
-      flag: z.string().optional().describe('URL to the country flag image'),
-      emojiFlag: z.string().optional().describe('Country flag emoji'),
-      asn: asnSchema.optional(),
-      languages: z
-        .array(languageSchema)
-        .optional()
-        .describe('Languages spoken in the country'),
-      currency: currencySchema.optional(),
-      timezone: timezoneSchema.optional(),
-      threat: threatSchema.optional(),
-      carrier: carrierSchema.optional(),
-      company: companySchema.optional()
-    })
-  )
+  .output(ipOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
@@ -123,7 +135,7 @@ export let lookupIp = SlateTool.create(spec, {
     let locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'unknown location';
 
     return {
-      output: result,
+      output: parseResponse(ipOutputSchema, result),
       message: `Looked up IP **${result.ip}** — located in **${locationStr}**${result.threat?.isThreat ? ' (flagged as threat)' : ''}.`
     };
   })

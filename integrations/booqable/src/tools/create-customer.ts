@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateNumber } from '../lib/client';
 import { buildClientConfig, flattenSingleResource } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -47,6 +47,12 @@ export let createCustomer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(buildClientConfig(ctx));
 
+    validateNumber(ctx.input.discountPercentage, 'Discount percentage', { min: 0, max: 100 });
+    validateNumber(ctx.input.depositValue, 'Deposit value', {
+      min: 0,
+      ...(ctx.input.depositType?.startsWith('percentage') ? { max: 100 } : {})
+    });
+
     let attributes: Record<string, any> = {
       name: ctx.input.name
     };
@@ -58,7 +64,7 @@ export let createCustomer = SlateTool.create(spec, {
     if (ctx.input.depositValue !== undefined)
       attributes.deposit_value = ctx.input.depositValue;
     if (ctx.input.taxRegionId) attributes.tax_region_id = ctx.input.taxRegionId;
-    if (ctx.input.tags) attributes.tags = ctx.input.tags;
+    if (ctx.input.tags) attributes.tag_list = ctx.input.tags;
     if (ctx.input.properties) attributes.properties_attributes = ctx.input.properties;
 
     let response = await client.createCustomer(attributes);

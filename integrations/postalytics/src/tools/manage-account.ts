@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ export let manageAccount = SlateTool.create(spec, {
     'Use action "integrations" to list active integrations.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -51,7 +51,7 @@ export let manageAccount = SlateTool.create(spec, {
       integrations: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Active integrations'),
+        .describe('Active integrations; array responses are preserved under data'),
       result: z.record(z.string(), z.unknown()).optional().describe('Operation result')
     })
   )
@@ -72,7 +72,8 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.accountId) throw new Error('accountId is required for get action');
+      if (!ctx.input.accountId)
+        throw createApiServiceError('accountId is required for get action');
       let account = await client.getAccount(ctx.input.accountId);
       return {
         output: { account },
@@ -81,10 +82,14 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.username) throw new Error('username is required for create action');
-      if (!ctx.input.password) throw new Error('password is required for create action');
-      if (!ctx.input.firstName) throw new Error('firstName is required for create action');
-      if (!ctx.input.lastName) throw new Error('lastName is required for create action');
+      if (!ctx.input.username)
+        throw createApiServiceError('username is required for create action');
+      if (!ctx.input.password)
+        throw createApiServiceError('password is required for create action');
+      if (!ctx.input.firstName)
+        throw createApiServiceError('firstName is required for create action');
+      if (!ctx.input.lastName)
+        throw createApiServiceError('lastName is required for create action');
       let result = await client.createAccount({
         username: ctx.input.username,
         password: ctx.input.password,
@@ -106,6 +111,7 @@ export let manageAccount = SlateTool.create(spec, {
 
     if (action === 'update') {
       let updateParams: Record<string, unknown> = {};
+      if (ctx.input.username !== undefined) updateParams.username = ctx.input.username;
       if (ctx.input.password !== undefined) updateParams.password = ctx.input.password;
       if (ctx.input.firstName !== undefined) updateParams.first_name = ctx.input.firstName;
       if (ctx.input.lastName !== undefined) updateParams.last_name = ctx.input.lastName;
@@ -113,6 +119,11 @@ export let manageAccount = SlateTool.create(spec, {
         updateParams.email_address = ctx.input.emailAddress;
       if (ctx.input.company !== undefined) updateParams.company = ctx.input.company;
       if (ctx.input.phone !== undefined) updateParams.phone = ctx.input.phone;
+
+      if (ctx.input.address !== undefined) updateParams.address_street = ctx.input.address;
+      if (ctx.input.city !== undefined) updateParams.address_city = ctx.input.city;
+      if (ctx.input.state !== undefined) updateParams.address_state = ctx.input.state;
+      if (ctx.input.zip !== undefined) updateParams.address_zip = ctx.input.zip;
 
       let result = await client.updateAccount(updateParams);
       return {
@@ -122,7 +133,8 @@ export let manageAccount = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.accountId) throw new Error('accountId is required for delete action');
+      if (!ctx.input.accountId)
+        throw createApiServiceError('accountId is required for delete action');
       let result = await client.deleteAccount(ctx.input.accountId);
       return {
         output: { result },
@@ -138,6 +150,6 @@ export let manageAccount = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

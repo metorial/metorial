@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Pilvio
 
-Manage cloud infrastructure on the Pilvio platform. Create, start, stop, modify, clone, and delete virtual machines with configurable CPU, RAM, disk, and OS images. Manage block storage disks (create, attach, detach, resize). Create and restore snapshots and automatic backups. Manage S3-compatible object storage buckets and access credentials. Configure private networks, floating IPs, firewalls with inbound/outbound rules, and layer-4 network load balancers. Store and manage SSH keys. View billing accounts, invoices, usage costs, and manage payments. List available datacenter locations, OS images, and platform configuration options.
+Manage Pilvio virtual machines, block storage, snapshots, object storage, private networks, floating IPs, firewalls, load balancers, SSH keys, and S3 credentials. Discover the current user, authorized billing accounts, datacenter locations, resource pools, OS images, bootable media, and VM parameter constraints.
+
+Use `list_billing_accounts` to discover account IDs and `list_platform_config` to discover valid locations, images, pools, and VM limits. Resource inventories apply to the configured location; query each datacenter separately for a complete inventory.
+
+API reference: [Pilvio](https://api.pilvio.com/).
 
 ## License
 

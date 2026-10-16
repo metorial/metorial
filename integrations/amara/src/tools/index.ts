@@ -9,6 +9,7 @@ export * from './list-languages';
 export * from './list-projects';
 export * from './list-subtitle-languages';
 export * from './list-subtitle-requests';
+export * from './list-subtitle-versions';
 export * from './list-team-members';
 export * from './list-teams';
 export * from './list-videos';

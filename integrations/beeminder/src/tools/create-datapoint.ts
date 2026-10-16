@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeeminderClient } from '../lib/client';
-import { datapointSchema, mapDatapoint } from '../lib/schemas';
+import { datapointSchema, mapDatapoint, responseArray } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createDatapoint = SlateTool.create(spec, {
@@ -35,27 +35,38 @@ export let createDatapoint = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      datapoints: z.array(datapointSchema).describe('Created datapoint(s)')
+      datapoints: z
+        .array(datapointSchema)
+        .describe('Successfully created or updated datapoints'),
+      errors: z
+        .array(z.unknown())
+        .optional()
+        .describe('Provider batch errors when some submissions failed'),
+      partialSuccess: z
+        .boolean()
+        .optional()
+        .describe('Whether the batch contains provider-reported errors'),
+      raw: z.unknown().optional().describe('Complete provider creation response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
-    let results: any[];
+    let raw: unknown;
 
     if (ctx.input.datapoints.length === 1) {
       let dp = ctx.input.datapoints[0]!;
-      let raw = await client.createDatapoint(ctx.input.goalSlug, {
+      raw = await client.createDatapoint(ctx.input.goalSlug, {
         value: dp.value,
         timestamp: dp.timestamp,
         daystamp: dp.daystamp,
         comment: dp.comment,
         requestid: dp.requestId
       });
-      results = [raw];
     } else {
       let mapped = ctx.input.datapoints.map(dp => ({
         value: dp.value,
@@ -64,14 +75,30 @@ export let createDatapoint = SlateTool.create(spec, {
         comment: dp.comment,
         requestid: dp.requestId
       }));
-      results = await client.createDatapoints(ctx.input.goalSlug, mapped);
+      raw = await client.createDatapoints(ctx.input.goalSlug, mapped);
     }
 
+    let errors: unknown[] | undefined;
+    let results: unknown[];
+    if (isApiErrorRecord(raw) && Array.isArray(raw.successes)) {
+      if (!Array.isArray(raw.errors)) {
+        throw createApiServiceError('Beeminder returned an invalid batch error list.', {
+          reason: 'beeminder_invalid_response'
+        });
+      }
+      errors = raw.errors;
+      results = raw.successes;
+    } else results = ctx.input.datapoints.length === 1 ? [raw] : responseArray(raw);
     let datapoints = results.map(mapDatapoint);
 
     return {
-      output: { datapoints },
-      message: `Added **${datapoints.length}** datapoint(s) to goal **${ctx.input.goalSlug}**.`
+      output: {
+        datapoints,
+        errors,
+        partialSuccess: errors ? errors.length > 0 : undefined,
+        raw
+      },
+      message: `Added **${datapoints.length}** datapoint(s) to goal **${ctx.input.goalSlug}**.${errors?.length ? ` ${errors.length} submission(s) failed; inspect errors before retrying.` : ''}`
     };
   })
   .build();

@@ -1,4 +1,5 @@
-import { createBase64Attachment, createTextAttachment, SlateTool } from '@slates/provider';
+import { Buffer } from 'node:buffer';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
@@ -37,7 +38,7 @@ export let callEndpoint = SlateTool.create(spec, {
       instanceId: z
         .string()
         .describe(
-          'Metorial instance ID or slug used for :instanceId and metorial-instance-id.'
+          'Metorial instance ID or slug from list_instances, used for :instanceId and metorial-instance-id.'
         ),
       pathParams: z
         .record(z.string(), z.string())
@@ -63,7 +64,7 @@ export let callEndpoint = SlateTool.create(spec, {
         .optional()
         .describe('Inline JSON response data, present only for JSON responses.'),
       size: z.number().describe('Response body size in bytes.'),
-      attachmentCount: z.number().describe('Number of Slate attachments returned.')
+      attachmentCount: z.number().describe('Number of response files prepared for download.')
     })
   )
   .handleInvocation(async ctx => {
@@ -120,10 +121,17 @@ export let callEndpoint = SlateTool.create(spec, {
       };
     }
 
-    let attachment =
-      response.kind === 'text'
-        ? createTextAttachment(response.text, response.contentType)
-        : createBase64Attachment(response.base64, response.contentType);
+    // The dynamic request may use POST or other methods, so reuse the retrieved bytes.
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(
+        response.kind === 'text' ? response.text : Buffer.from(response.base64, 'base64'),
+        response.contentType
+          ? { headers: { 'Content-Type': response.contentType } }
+          : undefined
+      ),
+      mimeType: response.contentType
+    });
 
     return {
       output: {
@@ -134,8 +142,7 @@ export let callEndpoint = SlateTool.create(spec, {
         size: response.size,
         attachmentCount: 1
       },
-      attachments: [attachment],
-      message: `Called **${ctx.input.method.toUpperCase()} ${ctx.input.endpointPath}** and returned the non-JSON response as a Slate attachment.`
+      message: `Called **${ctx.input.method.toUpperCase()} ${ctx.input.endpointPath}** and prepared the non-JSON response for download.`
     };
   })
   .build();

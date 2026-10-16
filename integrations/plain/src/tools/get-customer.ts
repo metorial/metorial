@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,6 +36,13 @@ export let getCustomer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (
+      [ctx.input.customerId, ctx.input.email, ctx.input.externalId].filter(
+        value => value !== undefined
+      ).length !== 1
+    ) {
+      throw createApiServiceError('Provide exactly one of customerId, email, or externalId');
+    }
 
     let customer: any;
     if (ctx.input.customerId) {
@@ -45,11 +52,11 @@ export let getCustomer = SlateTool.create(spec, {
     } else if (ctx.input.externalId) {
       customer = await client.getCustomerByExternalId(ctx.input.externalId);
     } else {
-      throw new Error('Provide one of customerId, email, or externalId');
+      throw createApiServiceError('Provide one of customerId, email, or externalId');
     }
 
     if (!customer) {
-      throw new Error('Customer not found');
+      throw createApiServiceError('Customer not found');
     }
 
     return {

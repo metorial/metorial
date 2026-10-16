@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageMetadata, pageMetadataSchema, participantSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listParticipants = SlateTool.create(spec, {
@@ -24,13 +25,16 @@ export let listParticipants = SlateTool.create(spec, {
           'OVERBOOKED',
           'EXTRA',
           'VALID',
-          'PENDING'
+          'PENDING',
+          'DELETED',
+          'REPLACED'
         ])
         .optional()
         .describe('Filter by registration status'),
       firstName: z.string().optional().describe('Filter by first name'),
       lastName: z.string().optional().describe('Filter by last name'),
       company: z.string().optional().describe('Filter by company'),
+      email: z.string().optional().describe('Filter by exact email address'),
       since: z
         .string()
         .optional()
@@ -43,25 +47,7 @@ export let listParticipants = SlateTool.create(spec, {
       maxResults: z.number().optional().describe('Maximum number of results to return')
     })
   )
-  .output(
-    z.object({
-      participants: z.array(
-        z.object({
-          contactId: z.string().describe('Contact ID of the participant'),
-          eventId: z.string().describe('Event ID'),
-          firstName: z.string().describe('First name'),
-          lastName: z.string().describe('Last name'),
-          email: z.string().describe('Email address'),
-          company: z.string().optional().describe('Company name'),
-          gender: z.string().optional().describe('Gender'),
-          status: z.string().optional().describe('Registration status'),
-          lastUpdate: z.string().optional().describe('Last update timestamp'),
-          categoryLabel: z.string().optional().describe('Category label')
-        })
-      ),
-      totalCount: z.string().describe('Total number of matching participants')
-    })
-  )
+  .output(z.object({ participants: z.array(participantSchema), ...pageMetadataSchema }))
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -70,6 +56,7 @@ export let listParticipants = SlateTool.create(spec, {
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
       company: ctx.input.company,
+      email: ctx.input.email,
       since: ctx.input.since,
       until: ctx.input.until,
       firstResult: ctx.input.firstResult,
@@ -86,14 +73,14 @@ export let listParticipants = SlateTool.create(spec, {
       gender: g.gender,
       status: g.status,
       lastUpdate: g.lastUpdate,
-      categoryLabel:
-        g.categoryLabel ?? (typeof g.category === 'object' ? g.category?.label : g.category)
+      categoryLabel: g.categoryLabel,
+      raw: g.raw
     }));
 
     return {
       output: {
         participants,
-        totalCount: result.totalCount
+        ...pageMetadata(result)
       },
       message: `Found **${participants.length}** participant(s) for event \`${ctx.input.eventId}\`.`
     };

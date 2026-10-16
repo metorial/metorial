@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Ragic
 
-Create, read, update, and delete records in Ragic no-code database sheets. Query records with filters, full-text search, and sorting. Upload and retrieve files and images attached to records. Export records as HTML, PDF, Excel, or Mail Merge formats. Add comments to records, lock and unlock records, and trigger pre-configured action buttons programmatically. Import data from external URLs into sheets.
+Manage records in Ragic database sheets with filters, full-text search, sorting, and pagination. Discover field definitions with manager permissions, upload files and images, prepare downloads and record exports, add comments, lock or unlock records, and execute configured action buttons.
 
 ## License
 

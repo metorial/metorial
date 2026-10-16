@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   curatedPhotos,
+  downloadPhoto,
+  downloadVideo,
   getCollectionMedia,
   getPhoto,
   getVideo,
@@ -21,7 +23,9 @@ export let provider = Slate.create({
     getVideo,
     popularVideos,
     listCollections,
-    getCollectionMedia
+    getCollectionMedia,
+    downloadPhoto,
+    downloadVideo
   ],
   triggers: []
 });

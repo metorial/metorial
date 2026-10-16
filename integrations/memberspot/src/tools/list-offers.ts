@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getMemberspotList } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listOffersTool = SlateTool.create(spec, {
@@ -14,17 +15,18 @@ export let listOffersTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      offers: z.array(z.record(z.string(), z.any())).describe('List of offer objects')
+      offers: z.array(z.record(z.string(), z.any())).describe('List of offer objects'),
+      raw: z.any().optional().describe('Unmodified provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listOffers();
-    let offers = Array.isArray(result) ? result : (result?.offers ?? [result]);
+    let offers = getMemberspotList(result, ['offers', 'data']);
 
     return {
-      output: { offers },
+      output: { offers, raw: result },
       message: `Retrieved **${offers.length}** offer(s) from Memberspot.`
     };
   })

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate } from '../lib/response';
 import { spec } from '../spec';
 
 let tagSchema = z.object({
@@ -85,8 +86,13 @@ export let browseTags = SlateTool.create(spec, {
 
     let { include, tagNames, search, sort, order, page, pageSize } = ctx.input;
 
+    if (include !== 'list' && !tagNames?.length)
+      throw createApiServiceError(
+        'tagNames is required for info, synonyms, related, and faq modes.'
+      );
+
     if (include === 'info' && tagNames?.length) {
-      let result = await client.getTagInfo(tagNames);
+      let result = await client.getTagInfo(tagNames, { page, pageSize });
       let tags = result.items.map((t: any) => ({
         name: t.name,
         count: t.count,
@@ -95,7 +101,7 @@ export let browseTags = SlateTool.create(spec, {
         isRequired: t.is_required
       }));
       return {
-        output: { tags, hasMore: false },
+        output: { tags, hasMore: result.hasMore },
         message: `Retrieved info for **${tags.length}** tag(s).`
       };
     }
@@ -105,9 +111,7 @@ export let browseTags = SlateTool.create(spec, {
       let synonyms = result.items.map((s: any) => ({
         fromTag: s.from_tag,
         toTag: s.to_tag,
-        creationDate: s.creation_date
-          ? new Date(s.creation_date * 1000).toISOString()
-          : undefined
+        creationDate: optionalProviderDate(s.creation_date)
       }));
       return {
         output: { synonyms, hasMore: result.hasMore },
@@ -116,7 +120,7 @@ export let browseTags = SlateTool.create(spec, {
     }
 
     if (include === 'related' && tagNames?.length) {
-      let result = await client.getRelatedTags(tagNames);
+      let result = await client.getRelatedTags(tagNames, { page, pageSize });
       let tags = result.items.map((t: any) => ({
         name: t.name,
         count: t.count,
@@ -125,7 +129,7 @@ export let browseTags = SlateTool.create(spec, {
         isRequired: t.is_required
       }));
       return {
-        output: { tags, hasMore: false },
+        output: { tags, hasMore: result.hasMore },
         message: `Found **${tags.length}** related tag(s).`
       };
     }

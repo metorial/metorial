@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -69,6 +69,14 @@ export let updateModel = SlateTool.create(spec, {
       authType: ctx.auth.authType
     });
 
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => key !== 'modelId' && value !== undefined
+      )
+    ) {
+      throw createApiServiceError('Provide at least one model field to update.');
+    }
+
     let result: Record<string, any> = { modelId: ctx.input.modelId };
     let actions: string[] = [];
 
@@ -98,10 +106,10 @@ export let updateModel = SlateTool.create(spec, {
     if (ctx.input.description !== undefined) patch.description = ctx.input.description;
     if (ctx.input.publication) patch.publication = ctx.input.publication;
     if (ctx.input.mls) {
-      patch.mls = {
+      patch.mls = pickDefined({
         id: ctx.input.mls.mlsId,
         name: ctx.input.mls.mlsName
-      };
+      });
     }
 
     if (Object.keys(patch).length > 0) {

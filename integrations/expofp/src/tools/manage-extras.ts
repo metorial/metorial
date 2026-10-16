@@ -40,8 +40,8 @@ export let listExtras = SlateTool.create(spec, {
         extras: extras.map(e => ({
           extraId: e.id,
           name: e.name,
-          price: e.price ?? 0,
-          type: e.type ?? ''
+          price: e.price,
+          type: e.type
         }))
       },
       message: `Found **${extras.length}** extra(s) for event ${ctx.input.eventId}.`
@@ -107,7 +107,7 @@ export let manageExhibitorExtra = SlateTool.create(spec, {
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the extra'),
       exhibitorId: z.number().describe('ID of the exhibitor'),
       extraId: z.number().describe('ID of the extra'),
-      quantity: z.number().optional().describe('Quantity to assign (required when adding)')
+      quantity: z.number().optional().describe('Quantity to assign when adding; defaults to 1')
     })
   )
   .output(

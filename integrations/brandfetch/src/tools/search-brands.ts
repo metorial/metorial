@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SearchClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,18 +31,27 @@ Returns lightweight results with brand IDs, names, domains, and icon URLs. Use *
         .array(
           z.object({
             brandId: z.string().describe('Unique brand identifier'),
-            brandName: z.string().describe('Brand name'),
+            brandName: z.string().optional().describe('Brand name when provided'),
             domain: z.string().describe('Brand domain'),
-            iconUrl: z.string().describe('URL to the brand icon (expires after 24 hours)'),
+            iconUrl: z
+              .string()
+              .optional()
+              .describe('URL to the brand icon when provided (expires after 24 hours)'),
             claimed: z.boolean().describe('Whether the brand has been claimed by its owner')
           })
         )
-        .describe('Matching brand results')
+        .describe('Matching brand results'),
+      raw: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Complete original search results, preserving provider metadata and null values'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.clientId) {
-      throw new Error(
+    if (!ctx.auth.clientId?.trim()) {
+      throw createApiServiceError(
         'Client ID is required for Brand Search. Please configure your Brandfetch Client ID in the authentication settings.'
       );
     }
@@ -54,13 +63,14 @@ Returns lightweight results with brand IDs, names, domains, and icon URLs. Use *
       output: {
         results: results.map(r => ({
           brandId: r.brandId,
-          brandName: r.name,
+          brandName: r.name ?? undefined,
           domain: r.domain,
-          iconUrl: r.icon,
+          iconUrl: r.icon ?? undefined,
           claimed: r.claimed
-        }))
+        })),
+        raw: results
       },
-      message: `Found **${results.length}** brand(s) matching "${ctx.input.query}".${results.length > 0 ? ` Top result: **${results[0]!.name}** (${results[0]!.domain}).` : ''}`
+      message: `Found **${results.length}** brand(s) matching "${ctx.input.query}".${results.length > 0 ? ` Top result: **${results[0]!.name ?? results[0]!.domain}** (${results[0]!.domain}).` : ''}`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCalendarItems = SlateTool.create(spec, {
@@ -40,7 +40,7 @@ export let listCalendarItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.listCalendarItems({
       courseId: ctx.input.courseId,
@@ -78,12 +78,75 @@ export let createCalendarItem = SlateTool.create(spec, {
   .input(
     z.object({
       type: z.string().describe('Calendar type (e.g., "Course", "Personal", "Institution")'),
-      calendarId: z.string().describe('Calendar ID (e.g., course ID for course calendars)'),
+      calendarId: z
+        .string()
+        .describe(
+          'Calendar ID. Call list_calendars to discover IDs; PERSONAL and INSTITUTION identify those calendars.'
+        ),
       title: z.string().describe('Event title'),
       description: z.string().optional().describe('Event description'),
       location: z.string().optional().describe('Event location'),
       start: z.string().describe('Start date/time (ISO 8601)'),
-      end: z.string().describe('End date/time (ISO 8601)')
+      end: z.string().describe('End date/time (ISO 8601)'),
+      recurrence: z
+        .object({
+          frequency: z
+            .enum(['Monthly', 'Weekly', 'Daily'])
+            .describe('How often the item repeats'),
+          count: z
+            .number()
+            .optional()
+            .describe('Number of occurrences (positive whole number); use count or until'),
+          until: z
+            .string()
+            .optional()
+            .describe('Last recurrence date (ISO 8601); use count or until'),
+          interval: z
+            .number()
+            .optional()
+            .describe('Interval between occurrences (whole number, 1 through 100)'),
+          monthRepeatDay: z.number().optional().describe('Day of the month, 1 through 31'),
+          monthPosition: z
+            .number()
+            .optional()
+            .describe('Monthly weekday occurrence: -1 for last, or 1 through 4'),
+          repeatDay: z
+            .enum([
+              'Sunday',
+              'Monday',
+              'Tuesday',
+              'Wednesday',
+              'Thursday',
+              'Friday',
+              'Saturday'
+            ])
+            .optional(),
+          weekDays: z
+            .array(
+              z.enum([
+                'Sunday',
+                'Monday',
+                'Tuesday',
+                'Wednesday',
+                'Thursday',
+                'Friday',
+                'Saturday'
+              ])
+            )
+            .optional()
+        })
+        .optional()
+        .describe('Recurrence settings; required for OfficeHours calendar items'),
+      ltiLaunchDeepLink: z
+        .object({
+          placementHandle: z.string().optional(),
+          uuid: z.string().optional(),
+          url: z.string().optional(),
+          title: z.string().optional(),
+          customParameters: z.record(z.string(), z.string()).optional()
+        })
+        .optional()
+        .describe('Optional LTI launch deep-link details for calendar items')
     })
   )
   .output(
@@ -96,7 +159,7 @@ export let createCalendarItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let item = await client.createCalendarItem({
       type: ctx.input.type,
@@ -105,7 +168,9 @@ export let createCalendarItem = SlateTool.create(spec, {
       description: ctx.input.description,
       location: ctx.input.location,
       start: ctx.input.start,
-      end: ctx.input.end
+      end: ctx.input.end,
+      recurrence: ctx.input.recurrence,
+      ltiLaunchDeepLink: ctx.input.ltiLaunchDeepLink
     });
 
     return {

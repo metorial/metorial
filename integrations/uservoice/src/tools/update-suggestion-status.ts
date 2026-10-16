@@ -34,7 +34,8 @@ export let updateSuggestionStatus = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let statusUpdate = await client.createStatusUpdate(ctx.input.suggestionId, {
@@ -46,12 +47,12 @@ export let updateSuggestionStatus = SlateTool.create(spec, {
     return {
       output: {
         statusUpdateId: statusUpdate.id,
-        suggestionId: ctx.input.suggestionId,
-        newStatusId: ctx.input.statusId,
-        body: statusUpdate.body || null,
+        suggestionId: statusUpdate.links?.suggestion,
+        newStatusId: statusUpdate.links?.new_status,
+        body: statusUpdate.body ?? null,
         createdAt: statusUpdate.created_at
       },
-      message: `Updated status of suggestion ${ctx.input.suggestionId} to status ${ctx.input.statusId}.${ctx.input.notifySupporters ? ' Supporters were notified.' : ''}`
+      message: `Updated status of suggestion ${ctx.input.suggestionId} to status ${ctx.input.statusId}.${statusUpdate.supporters_notified === true ? ' Supporters were notified.' : ''}`
     };
   })
   .build();

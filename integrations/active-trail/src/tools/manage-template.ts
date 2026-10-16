@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readId, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `List all reusable email templates from "My Templates" with pagination.`,
+  description: `List all reusable email templates from "My Templates". ActiveTrail returns the full list.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
@@ -23,11 +23,14 @@ export let listTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.listTemplates({ page: ctx.input.page, limit: ctx.input.limit });
-    let templates = Array.isArray(result) ? result : [];
-    return {
-      output: { templates },
-      message: `Found **${templates.length}** template(s).`
-    };
+    let templates = readList(result);
+    return redactProviderData(
+      {
+        output: { templates },
+        message: `Found **${templates.length}** template(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -58,10 +61,13 @@ export let getTemplate = SlateTool.create(spec, {
       output.content = await client.getTemplateContent(ctx.input.templateId);
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved template **${ctx.input.templateId}**.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved template **${ctx.input.templateId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -76,12 +82,19 @@ export let createTemplate = SlateTool.create(spec, {
       name: z.string().describe('Template name'),
       subject: z.string().optional().describe('Default email subject'),
       content: z.string().optional().describe('HTML content of the template'),
-      categoryId: z.number().optional().describe('Template category ID')
+      categoryId: z
+        .number()
+        .optional()
+        .describe('Template category ID. Call list_template_categories to discover IDs.')
     })
   )
   .output(
     z.object({
-      templateId: z.number().describe('Created template ID'),
+      templateId: z
+        .number()
+        .optional()
+        .describe('Created template ID when returned by ActiveTrail'),
+      raw: z.any().describe('Original template response'),
       name: z.string().nullable().optional().describe('Template name')
     })
   )
@@ -90,18 +103,22 @@ export let createTemplate = SlateTool.create(spec, {
     let data: Record<string, any> = {
       name: ctx.input.name,
       subject: ctx.input.subject,
-      category_id: ctx.input.categoryId
+      template_category_id: ctx.input.categoryId,
+      content: ctx.input.content
     };
     let result = await client.createTemplate(data);
 
-    if (ctx.input.content && result.id) {
-      await client.updateTemplateContent(result.id, { content: ctx.input.content });
-    }
-
-    return {
-      output: { templateId: result.id, name: result.name },
-      message: `Template **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+    return redactProviderData(
+      {
+        output: {
+          templateId: result.id === undefined ? undefined : readId(result),
+          name: result.name,
+          raw: result
+        },
+        message: `Template **${ctx.input.name}** created.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -124,10 +141,13 @@ export let deleteTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteTemplate(ctx.input.templateId);
-    return {
-      output: { success: true },
-      message: `Template **${ctx.input.templateId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Template **${ctx.input.templateId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -160,25 +180,31 @@ export let createCampaignFromTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let data: Record<string, any> = {
-      details: {
+      campaign_details: {
         name: ctx.input.name,
         subject: ctx.input.subject,
         user_profile_id: ctx.input.userProfileId
-      },
-      scheduling: {
-        is_sent: ctx.input.isSent ?? false,
-        scheduled_date_utc: ctx.input.scheduledDateUtc
-      },
-      segment: {
-        group_ids: ctx.input.groupIds,
-        mailing_list_id: ctx.input.mailingListId
       }
     };
 
     let result = await client.createCampaignFromTemplate(ctx.input.templateId, data);
-    return {
-      output: { campaignId: result.id },
-      message: `Campaign created from template **${ctx.input.templateId}** with ID **${result.id}**.`
-    };
+    let campaignId = readId(result);
+    if (ctx.input.groupIds !== undefined || ctx.input.mailingListId !== undefined)
+      await client.updateCampaignSegment(campaignId, {
+        group_ids: ctx.input.groupIds,
+        mailing_list_id: ctx.input.mailingListId
+      });
+    if (ctx.input.isSent !== undefined || ctx.input.scheduledDateUtc !== undefined)
+      await client.updateCampaignScheduling(campaignId, {
+        is_sent: ctx.input.isSent ?? false,
+        scheduled_date_utc: ctx.input.scheduledDateUtc
+      });
+    return redactProviderData(
+      {
+        output: { campaignId },
+        message: `Campaign created from template **${ctx.input.templateId}** with ID **${result.id}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

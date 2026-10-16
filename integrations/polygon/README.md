@@ -1,6 +1,28 @@
 # <img src="logo.svg" height="20"> Polygon
 
-Retrieve real-time and historical financial market data across stocks, options, forex, crypto, and indices. Access trades, quotes, OHLCV aggregate bars, and snapshots at configurable time intervals. Look up technical indicators (SMA, EMA, RSI, MACD) for stocks and indices. Query reference data including ticker details, company information, stock splits, dividends, SEC filings, exchanges, and market status. Retrieve market news articles with sentiment analysis. Stream real-time trades, quotes, and aggregate bars via WebSocket for stocks, options, forex, crypto, and indices. Query options chains by underlying ticker, expiration, strike price, and contract type with Greeks and implied volatility. Perform currency conversions for forex pairs. Access Level 2 order book data for cryptocurrencies. This integration is read-only and does not support placing trades.
+Read financial market data from Massive (formerly Polygon.io) across stocks,
+options, forex, crypto, and indices. Existing Polygon.io API keys remain valid.
+
+The 23 read-only tools cover historical OHLCV bars, market snapshots, stock trades
+and quotes, options contracts and chains, technical indicators, ticker discovery
+and details, news, market status and holidays, current financial statements and
+ratios, corporate actions, exchange and condition-code reference data, and daily
+US stock market bars. Data availability and delay depend on your subscription.
+
+Use `search_tickers` to find instruments, then pass their symbols to data tools.
+Use `get_reference_data` to discover exchange, ticker-type, and trade/quote
+condition codes. Paginated tools return `nextCursor`; pass it back to the same
+tool with the same selection to continue. Current tools expose the complete
+provider response alongside summaries so plan-dependent fields and per-ticker
+errors remain available.
+
+Use `get_financial_statements` and `get_corporate_actions` for current provider
+APIs. The deprecated `get_stock_financials` and `get_splits_dividends` tools retain
+their original contracts for compatibility; the experimental financials endpoint
+has been sunset by the provider.
+
+These tools use REST requests. WebSocket streaming, trading, and flat-file
+exports are not implemented.
 
 ## License
 

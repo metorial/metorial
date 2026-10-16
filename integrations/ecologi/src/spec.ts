@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'ecologi',
   name: 'Ecologi',
   description:
-    'Ecologi is a climate action platform for funding tree planting and carbon avoidance projects worldwide. Purchase trees and carbon offsets programmatically, and retrieve public impact statistics for any user.',
+    'Fund tree planting, carbon avoidance, carbon removal, and habitat restoration through Ecologi, and retrieve public impact totals by username.',
   metadata: {},
   config,
   auth

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/coinmarketcal",
-  "description": "Search and retrieve cryptocurrency market events from an evidence-based, community-driven economic calendar. Filter events by date range, specific coins, and event categories such as hard forks, exchange listings, airdrops, and partnerships. Sort results by creation date or trending status. List available cryptocurrencies and event categories tracked in the system. Useful for market sentiment analysis, trading signals, and investment research.",
+  "description": "Search the CoinMarketCal V2 cryptocurrency event catalog by coin, date range, category, keyword, or impact. Retrieve event details, discover coins and categories, reconcile cancelled events, and read the authenticated API plan and monthly usage. Requires a V2 API key; data access depends on the plan.",
   "categories": ["financial-data-and-stock-market", "news-and-media"],
   "skills": [
     "search cryptocurrency events",
@@ -9,8 +9,10 @@
     "filter events by category",
     "list available cryptocurrencies",
     "list event categories",
-    "sort trending crypto events",
-    "retrieve event view counts"
+    "retrieve cryptocurrency event details",
+    "search cryptocurrency names and symbols",
+    "track cancelled cryptocurrency events",
+    "read API plan and quota usage"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/coinmarketcal.png"
 }

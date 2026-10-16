@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let floatingIpSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   address: z.string().describe('Public IPv4 address'),
   name: z.string().optional().describe('IP label/name'),
   assignedTo: z.string().optional().describe('UUID of the resource this IP is assigned to'),
@@ -34,7 +35,9 @@ export let manageFloatingIps = SlateTool.create(spec, {
       billingAccountId: z
         .number()
         .optional()
-        .describe('Billing account ID (required for "create")'),
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID (required for "create")'
+        ),
       name: z
         .string()
         .optional()
@@ -58,9 +61,10 @@ export let manageFloatingIps = SlateTool.create(spec, {
 
     let mapIp = (ip: any) => ({
       address: ip.address || ip.ip_address,
-      name: ip.name,
-      assignedTo: ip.assigned_to,
-      assignedToResourceType: ip.assigned_to_resource_type
+      name: ip.name ?? undefined,
+      assignedTo: ip.assigned_to ?? undefined,
+      assignedToResourceType: ip.assigned_to_resource_type ?? undefined,
+      raw: ip
     });
 
     switch (action) {
@@ -69,7 +73,7 @@ export let manageFloatingIps = SlateTool.create(spec, {
           billingAccountId: ctx.input.billingAccountId,
           vmUuid: ctx.input.vmUuid
         });
-        let mapped = (Array.isArray(ips) ? ips : []).map(mapIp);
+        let mapped = ips.map(mapIp);
         return {
           output: { floatingIps: mapped, success: true },
           message: `Found **${mapped.length}** floating IP(s).`
@@ -77,7 +81,8 @@ export let manageFloatingIps = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.ipAddress) throw new Error('ipAddress is required for get action');
+        if (!ctx.input.ipAddress)
+          throw createApiServiceError('ipAddress is required for get action');
         let ip = await client.getFloatingIp(ctx.input.ipAddress);
         return {
           output: { floatingIp: mapIp(ip), success: true },
@@ -87,7 +92,7 @@ export let manageFloatingIps = SlateTool.create(spec, {
 
       case 'create': {
         if (ctx.input.billingAccountId === undefined)
-          throw new Error('billingAccountId is required for create action');
+          throw createApiServiceError('billingAccountId is required for create action');
         let ip = await client.createFloatingIp({
           billingAccountId: ctx.input.billingAccountId,
           name: ctx.input.name
@@ -99,7 +104,8 @@ export let manageFloatingIps = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!ctx.input.ipAddress) throw new Error('ipAddress is required for update action');
+        if (!ctx.input.ipAddress)
+          throw createApiServiceError('ipAddress is required for update action');
         let ip = await client.updateFloatingIp(ctx.input.ipAddress, {
           billingAccountId: ctx.input.billingAccountId,
           name: ctx.input.name
@@ -112,7 +118,7 @@ export let manageFloatingIps = SlateTool.create(spec, {
 
       case 'assign': {
         if (!ctx.input.ipAddress || !ctx.input.vmUuid)
-          throw new Error('ipAddress and vmUuid are required for assign action');
+          throw createApiServiceError('ipAddress and vmUuid are required for assign action');
         let ip = await client.assignFloatingIp(ctx.input.ipAddress, ctx.input.vmUuid);
         return {
           output: { floatingIp: mapIp(ip), success: true },
@@ -121,7 +127,8 @@ export let manageFloatingIps = SlateTool.create(spec, {
       }
 
       case 'unassign': {
-        if (!ctx.input.ipAddress) throw new Error('ipAddress is required for unassign action');
+        if (!ctx.input.ipAddress)
+          throw createApiServiceError('ipAddress is required for unassign action');
         let ip = await client.unassignFloatingIp(ctx.input.ipAddress);
         return {
           output: { floatingIp: mapIp(ip), success: true },
@@ -130,7 +137,8 @@ export let manageFloatingIps = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.ipAddress) throw new Error('ipAddress is required for delete action');
+        if (!ctx.input.ipAddress)
+          throw createApiServiceError('ipAddress is required for delete action');
         await client.deleteFloatingIp(ctx.input.ipAddress);
         return {
           output: { success: true },

@@ -43,7 +43,7 @@ export let listCustomers = SlateTool.create(spec, {
 
     let res = await client.getCustomers(undefined, ctx.input.first, ctx.input.after);
 
-    let customers = (res.edges || []).map((edge: any) => ({
+    let customers = res.edges.map((edge: any) => ({
       customerId: edge.node.id,
       fullName: edge.node.fullName,
       email: edge.node.email?.email ?? null,
@@ -55,8 +55,8 @@ export let listCustomers = SlateTool.create(spec, {
       output: {
         customers,
         totalCount: res.totalCount,
-        hasNextPage: res.pageInfo?.hasNextPage ?? false,
-        endCursor: res.pageInfo?.endCursor ?? null
+        hasNextPage: res.pageInfo.hasNextPage,
+        endCursor: res.pageInfo.endCursor
       },
       message: `Found **${res.totalCount}** customers, returning ${customers.length}`
     };

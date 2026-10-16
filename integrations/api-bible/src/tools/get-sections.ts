@@ -1,13 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scriptureContent } from '../lib/content';
 import { spec } from '../spec';
 
 let sectionSchema = z.object({
   sectionId: z.string().describe('Unique section identifier'),
   bibleId: z.string().describe('Bible version ID'),
   bookId: z.string().describe('Book ID'),
-  chapterId: z.string().describe('Chapter ID'),
+  chapterId: z.string().optional().describe('Chapter ID when supplied by the provider'),
+  firstVerseId: z.string().optional().describe('First verse in the section'),
+  lastVerseId: z.string().optional().describe('Last verse in the section'),
+  firstVerseOrgId: z.string().optional().describe('Original first verse ID'),
+  lastVerseOrgId: z.string().optional().describe('Original last verse ID'),
   title: z.string().describe('Section title (e.g., "The Birth of Jesus Christ")')
 });
 
@@ -28,10 +33,15 @@ export let getSections = SlateTool.create(spec, {
       bookId: z.string().optional().describe('Book ID to list all sections in that book'),
       chapterId: z.string().optional().describe('Chapter ID to list sections in that chapter'),
       sectionId: z.string().optional().describe('Specific section ID to retrieve content'),
+      parallels: z
+        .string()
+        .optional()
+        .describe('Comma-separated Bible IDs to return parallel scripture from'),
       contentType: z
         .enum(['html', 'json', 'text'])
         .optional()
         .describe('Content format when retrieving a specific section'),
+      includeVerseSpans: z.boolean().optional().describe('Include verse spans in content'),
       includeNotes: z.boolean().optional().describe('Include footnotes'),
       includeTitles: z.boolean().optional().describe('Include section titles'),
       includeChapterNumbers: z.boolean().optional().describe('Include chapter numbers'),
@@ -45,6 +55,11 @@ export let getSections = SlateTool.create(spec, {
       title: z.string().optional().describe('Section title'),
       content: z.string().optional().describe('Section scripture content'),
       copyright: z.string().optional().describe('Copyright information'),
+      fumsToken: z.string().optional().describe('Current FUMS token for scripture engagement'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original scripture response metadata'),
       fumsId: z.string().optional().describe('FUMS tracking token')
     })
   )
@@ -54,7 +69,9 @@ export let getSections = SlateTool.create(spec, {
     if (ctx.input.sectionId) {
       let result = await client.getSection(ctx.input.bibleId, ctx.input.sectionId, {
         contentType: ctx.input.contentType,
+        parallels: ctx.input.parallels,
         includeNotes: ctx.input.includeNotes,
+        includeVerseSpans: ctx.input.includeVerseSpans,
         includeTitles: ctx.input.includeTitles,
         includeChapterNumbers: ctx.input.includeChapterNumbers,
         includeVerseNumbers: ctx.input.includeVerseNumbers
@@ -62,11 +79,13 @@ export let getSections = SlateTool.create(spec, {
       let s = result.data;
       return {
         output: {
-          sectionId: s.sectionId,
-          title: s.title || '',
-          content: s.content || '',
-          copyright: s.copyright || '',
-          fumsId: result.meta?.fumsId || ''
+          sectionId: s.id,
+          title: s.title,
+          content: scriptureContent(s.content),
+          copyright: s.copyright,
+          fumsToken: result.meta?.fumsToken,
+          meta: result.meta,
+          fumsId: result.meta?.fumsId
         },
         message: `Retrieved section: **${s.title}**`
       };
@@ -74,12 +93,16 @@ export let getSections = SlateTool.create(spec, {
 
     if (ctx.input.chapterId) {
       let result = await client.getChapterSections(ctx.input.bibleId, ctx.input.chapterId);
-      let sections = (result.data || []).map(s => ({
-        sectionId: s.sectionId,
+      let sections = result.data.map(s => ({
+        sectionId: s.id,
         bibleId: s.bibleId,
         bookId: s.bookId,
         chapterId: s.chapterId,
-        title: s.title || ''
+        firstVerseId: s.firstVerseId,
+        lastVerseId: s.lastVerseId,
+        firstVerseOrgId: s.firstVerseOrgId,
+        lastVerseOrgId: s.lastVerseOrgId,
+        title: s.title
       }));
       return {
         output: { sections },
@@ -89,12 +112,16 @@ export let getSections = SlateTool.create(spec, {
 
     if (ctx.input.bookId) {
       let result = await client.getSections(ctx.input.bibleId, ctx.input.bookId);
-      let sections = (result.data || []).map(s => ({
-        sectionId: s.sectionId,
+      let sections = result.data.map(s => ({
+        sectionId: s.id,
         bibleId: s.bibleId,
         bookId: s.bookId,
         chapterId: s.chapterId,
-        title: s.title || ''
+        firstVerseId: s.firstVerseId,
+        lastVerseId: s.lastVerseId,
+        firstVerseOrgId: s.firstVerseOrgId,
+        lastVerseOrgId: s.lastVerseOrgId,
+        title: s.title
       }));
       return {
         output: { sections },
@@ -102,6 +129,8 @@ export let getSections = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('At least one of bookId, chapterId, or sectionId must be provided.');
+    throw createApiServiceError(
+      'At least one of bookId, chapterId, or sectionId must be provided.'
+    );
   })
   .build();

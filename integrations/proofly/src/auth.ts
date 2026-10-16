@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { prooflyString } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +21,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a Proofly API key, then reconnect.', {
+          reason: 'proofly_missing_api_key'
+        });
+      }
       return {
         output: {
           token: ctx.input.apiKey
@@ -27,20 +34,19 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://proofly.io/api',
-        headers: {
-          'X-Api-Key': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/user');
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getUser();
+      let name = prooflyString(user.name);
+      let email = prooflyString(user.email);
+      if (!name && !email) {
+        throw createApiServiceError('Proofly did not return an account name or email.', {
+          reason: 'proofly_invalid_profile'
+        });
+      }
 
       return {
         profile: {
-          name: user.name,
-          email: user.email
+          name,
+          email
         }
       };
     }

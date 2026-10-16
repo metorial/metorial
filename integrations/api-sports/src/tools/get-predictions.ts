@@ -40,6 +40,10 @@ export let getPredictionsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       predictions: z.array(predictionSchema),
       count: z.number().describe('Number of predictions returned')
     })
@@ -78,6 +82,7 @@ export let getPredictionsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         predictions: results,
         count: results.length
       },

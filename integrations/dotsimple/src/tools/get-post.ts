@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPost = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let getPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       postUuid: z.string().describe('UUID of the post to retrieve')
     })
   )
@@ -69,7 +71,7 @@ export let getPost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.getPost(ctx.input.postUuid);
@@ -79,7 +81,7 @@ export let getPost = SlateTool.create(spec, {
         postId: result?.id,
         postUuid: result?.uuid,
         status: result?.status,
-        scheduledAt: result?.scheduled_at,
+        scheduledAt: result?.scheduled_at ?? undefined,
         createdAt: result?.created_at,
         accounts: result?.accounts?.map((a: any) => ({
           accountId: a.id,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let shipmentSchema = z.object({
@@ -24,7 +24,12 @@ let cartItemSchema = z.object({
   productName: z.string().describe('Product name'),
   brandName: z.string().describe('Brand name'),
   quantity: z.number().describe('Item quantity'),
-  price: z.number().describe('Item price in USD cents')
+  price: z
+    .number()
+    .optional()
+    .describe(
+      'Item price in USD cents, when Goody supplies an item price; aggregate costs are returned in amounts'
+    )
 });
 
 let eventTimesSchema = z.object({
@@ -73,14 +78,17 @@ export let getOrder = SlateTool.create(spec, {
       expiresAt: z.string().nullable().describe('Gift expiration timestamp'),
       paymentLink: z.string().nullable().describe('Hosted payment form link'),
       workspaceId: z.string().nullable().describe('Workspace ID'),
-      workspaceName: z.string().nullable().describe('Workspace name')
+      workspaceName: z.string().nullable().describe('Workspace name'),
+      rawCart: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Complete cart returned by Goody, including available product and item identifiers'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let o = await client.getOrder(ctx.input.orderId);
 
@@ -93,10 +101,10 @@ export let getOrder = SlateTool.create(spec, {
     }));
 
     let shipments = (o.shipments || []).map((s: any) => ({
-      carrier: s.carrier,
-      trackingNumber: s.tracking_number,
-      trackingUrl: s.tracking_url,
-      status: s.status
+      carrier: s.tracking_carrier ?? s.carrier ?? null,
+      trackingNumber: s.tracking_number ?? null,
+      trackingUrl: s.tracking_url ?? null,
+      status: s.status ?? null
     }));
 
     return {
@@ -106,10 +114,10 @@ export let getOrder = SlateTool.create(spec, {
         referenceId: o.reference_id,
         giftLink: o.individual_gift_link,
         recipientFirstName: o.recipient_first_name,
-        recipientLastName: o.recipient_last_name,
-        recipientEmail: o.recipient_email,
-        message: o.message,
-        thankYouNote: o.thank_you_note,
+        recipientLastName: o.recipient_last_name ?? null,
+        recipientEmail: o.recipient_email ?? null,
+        message: o.message ?? null,
+        thankYouNote: o.thank_you_note ?? null,
         isSwapped: o.is_swapped,
         viewCountRecipient: o.view_count_recipient,
         orderBatchId: o.order_batch_id,
@@ -118,26 +126,27 @@ export let getOrder = SlateTool.create(spec, {
         amounts: {
           amountProduct: o.amounts?.amount_product,
           amountShipping: o.amounts?.amount_shipping,
-          amountProcessingFee: o.amounts?.amount_processing_fee,
+          amountProcessingFee: o.amounts?.amount_processing_fee ?? null,
           amountPreTaxTotal: o.amounts?.amount_pre_tax_total,
-          amountTax: o.amounts?.amount_tax,
-          amountTotal: o.amounts?.amount_total
+          amountTax: o.amounts?.amount_tax ?? null,
+          amountTotal: o.amounts?.amount_total ?? null
         },
-        senderEmail: o.sender?.email,
-        senderFirstName: o.sender?.first_name,
-        senderLastName: o.sender?.last_name,
+        senderEmail: o.sender?.email ?? null,
+        senderFirstName: o.sender?.first_name ?? null,
+        senderLastName: o.sender?.last_name ?? null,
         eventTimes: {
-          createdAt: o.event_times?.created_at,
-          notifiedAt: o.event_times?.notified_at,
-          openedAt: o.event_times?.opened_at,
-          acceptedAt: o.event_times?.accepted_at,
-          shippedAt: o.event_times?.shipped_at,
-          deliveredAt: o.event_times?.delivered_at
+          createdAt: o.event_times?.created_at ?? null,
+          notifiedAt: o.event_times?.notified_at ?? null,
+          openedAt: o.event_times?.opened_at ?? null,
+          acceptedAt: o.event_times?.accepted_at ?? null,
+          shippedAt: o.event_times?.shipped_at ?? null,
+          deliveredAt: o.event_times?.delivered_at ?? null
         },
-        expiresAt: o.expires_at,
-        paymentLink: o.payment_link,
-        workspaceId: o.workspace_id,
-        workspaceName: o.workspace_name
+        expiresAt: o.expires_at ?? null,
+        paymentLink: o.payment_link ?? null,
+        workspaceId: o.workspace_id ?? null,
+        workspaceName: o.workspace_name ?? null,
+        rawCart: o.cart
       },
       message: `Order **${o.reference_id}** for **${o.recipient_first_name}${o.recipient_last_name ? ` ${o.recipient_last_name}` : ''}** — status: **${o.status}**.`
     };

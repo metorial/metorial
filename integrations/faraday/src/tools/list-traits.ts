@@ -15,6 +15,10 @@ export let listTraits = SlateTool.create(spec, {
       traits: z
         .array(
           z.object({
+            raw: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Complete provider trait metadata'),
             traitName: z.string().describe('Name/identifier of the trait'),
             traitType: z
               .string()
@@ -32,7 +36,8 @@ export let listTraits = SlateTool.create(spec, {
     let traits = await client.listTraits();
 
     let mapped = traits.map((t: any) => ({
-      traitName: t.name || t.id,
+      raw: t,
+      traitName: t.name ?? t.id,
       traitType: t.type,
       category: t.category,
       description: t.description

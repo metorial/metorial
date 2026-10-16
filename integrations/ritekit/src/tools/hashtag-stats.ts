@@ -11,7 +11,7 @@ let statsSchema = z.object({
   images: z.number().describe('Percentage of tweets with images'),
   links: z.number().describe('Percentage of tweets with links'),
   mentions: z.number().describe('Percentage of tweets with mentions'),
-  color: z.number().describe('Color grade: 1=unused, 2=overused, 3=good, 4=great/trending')
+  color: z.number().describe('Color grade: 0=unused, 1=overused, 2=good, 3=great')
 });
 
 export let hashtagStats = SlateTool.create(spec, {
@@ -36,6 +36,7 @@ Use this to evaluate which hashtags to use in your content strategy based on cur
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       stats: z.array(statsSchema).describe('Real-time statistics for each requested hashtag')
     })
   )
@@ -45,9 +46,10 @@ Use this to evaluate which hashtags to use in your content strategy based on cur
 
     return {
       output: {
+        raw: { ...result },
         stats: result.stats || []
       },
-      message: `Retrieved stats for **${(result.stats || []).length}** hashtags. ${(result.stats || []).filter(s => s.color >= 3).length} are trending or performing well.`
+      message: `Retrieved stats for **${(result.stats || []).length}** hashtags. ${(result.stats || []).filter(s => s.color >= 3).length} are graded great.`
     };
   })
   .build();

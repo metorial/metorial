@@ -69,13 +69,13 @@ export let getWeatherForecast = SlateTool.create(spec, {
       units,
       ctx.input.filter
     );
-    let forecasts = result.data?.forecast || [];
+    let forecasts = Array.isArray(result.data) ? result.data : (result.data?.forecast ?? []);
 
     return {
       output: {
         message: result.message,
-        lat: result.data?.lat,
-        lng: result.data?.lng,
+        lat: result.data?.lat ?? result.lat,
+        lng: result.data?.lng ?? result.lng,
         forecasts
       },
       message: `Retrieved **${forecasts.length}** weather forecast entries for (${ctx.input.lat}, ${ctx.input.lng})${ctx.input.filter ? ` with ${ctx.input.filter} granularity` : ''}.`

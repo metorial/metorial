@@ -56,7 +56,8 @@ export let geocodeAddressTool = SlateTool.create(spec, {
   .output(
     z.object({
       found: z.number().describe('Number of matching locations found'),
-      locations: z.array(locationSchema).describe('Matched locations')
+      locations: z.array(locationSchema).describe('Matched locations'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,23 +68,23 @@ export let geocodeAddressTool = SlateTool.create(spec, {
 
     let result = await client.geocodeAddress(ctx.input);
 
-    let locations = (result.locations ?? []).map((loc: any) => ({
-      latitude: loc.latitude ?? 0,
-      longitude: loc.longitude ?? 0,
-      address: loc.address ?? '',
-      city: loc.city ?? '',
-      state: loc.state ?? '',
-      postalCode: loc.postalCode ?? '',
-      country: loc.country ?? '',
-      countryCode: loc.countryCode ?? '',
-      locationType: loc.locationType ?? '',
-      buildingType: loc.buildingType ?? ''
+    let locations = result.locations.map(loc => ({
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      address: loc.address,
+      city: loc.city,
+      state: loc.state,
+      postalCode: loc.postalCode,
+      country: loc.country,
+      countryCode: loc.countryCode,
+      locationType: loc.locationType,
+      buildingType: loc.buildingType
     }));
 
-    let found = result.found ?? locations.length;
+    let found = result.found;
 
     return {
-      output: { found, locations },
+      output: { found, locations, raw: result.raw },
       message:
         found > 0
           ? `Found **${found}** location(s). Top result: **${locations[0]?.address}** (${locations[0]?.latitude}, ${locations[0]?.longitude}).`

@@ -6,17 +6,20 @@ import { spec } from '../spec';
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Render a web page (by URL), HTML, or Markdown content as a PDF document. Returns a URL to the generated PDF.
+  description: ` DEPRECATED — use \`render_file\` instead. Render a web page (by URL), HTML, or Markdown content as a PDF document. Returns a URL to the generated PDF.
 
 Supports configurable paper size, orientation, margins, background printing, and single-page fitting. Includes all page customization features such as content blocking, script injection, dark mode, and device emulation.`,
   instructions: [
+    'Use render_file to receive a downloadable PDF from one capture. This compatibility tool returns the original temporary provider links.',
+    'Do not call both tools for the same file: each capture can consume provider quota.',
     'Exactly one of **url**, **html**, or **markdown** must be provided.',
     'Default paper format is "letter". Use **pdfPaperFormat** to change it.',
     'Set **pdfPrintBackground** to true to include background colors and graphics.',
     'Use **pdfFitOnePage** to fit all content onto a single PDF page.'
   ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/sensibo",
-  "description": "Control and monitor smart climate devices including air conditioners and air purifiers. Set AC states (power, mode, temperature, fan level, swing), read environmental sensor data (temperature, humidity, air quality), and retrieve historical measurements. Create and manage schedules and timers for automated AC control. Configure Climate React automations that adjust AC based on temperature or humidity thresholds. Retrieve door/window sensor events. Manage devices, users, and bulk operations across commercial organizations via Airbend.",
+  "description": "Discover and monitor Sensibo climate devices, inspect supported AC capabilities, control air conditioners, read measurements and device events, manage timers and schedules, and configure Climate React automation.",
   "categories": ["apis-and-http-requests", "iot-and-device-control"],
   "skills": [
     "control AC state",
@@ -9,9 +9,7 @@
     "configure climate automations",
     "retrieve historical measurements",
     "manage device settings",
-    "read door/window sensor events",
-    "bulk control devices",
-    "manage organization users"
+    "read door/window sensor events"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/sensibo.png"
 }

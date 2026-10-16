@@ -1,155 +1,66 @@
-Let me get more details on the Boomerang API (v4) resources and check for webhook support.Let me get more details on the Boomerang API documentation and the webhook specifics.Now I have comprehensive information. Let me compile the specification.
+# Booqable
 
-# Slates Specification for Booqable
+Booqable manages rental customers, catalog entries, stock, orders, documents,
+payments, and customer communication through its company-specific API v4.
 
-## Overview
+## Connection
 
-Booqable is a cloud-based rental software platform for managing equipment and product rentals, including inventory tracking, order management, customer management, online bookings, billing/invoicing, and payment processing. It provides a RESTful JSON API (currently v4, also known as the Boomerang API) that enables programmatic access to all core rental business operations. The API is still in beta and may introduce non-backwards-compatible changes.
+Create an access token in your Booqable account profile under Authentication
+Methods. Enter the token and the company slug from your account URL. Company
+identity is verified through `GET /companies/current`. Tokens inherit employee
+permissions; access also depends on the account's plan. No OAuth refresh is used.
 
-## Authentication
+## Tools
 
-Booqable supports two authentication methods, both using the `Authorization: Bearer` header:
+| Area | Tools |
+| --- | --- |
+| Account | `get_account` |
+| Customers | `list_customers`, `get_customer`, `create_customer`, `update_customer`, `archive_customer` |
+| Orders | `list_orders`, `get_order`, `create_order`, `update_order`, `manage_order_items` |
+| Catalog | `list_products`, `get_product`, `create_product`, `update_product`, `list_product_variations` |
+| Inventory | `check_inventory`, `get_inventory_availability`, `manage_stock`, `list_locations` |
+| Documents | `list_documents`, `get_document` |
+| Payments | `list_payments`, `get_payment`, `create_payment`, `list_payment_methods` |
+| Coupons | `manage_coupons` |
+| Communication | `list_email_templates`, `send_email` |
 
-### 1. Access Token (Recommended for integrations)
+## Behavior
 
-A persistent token used to authenticate API requests.
+- List results preserve provider IDs, attributes, relationships, and returned
+  related resources. Lists accept page numbers starting at 1 and page sizes
+  from 1 to 100. Total counts are returned only when provided by the API.
+- Rental dates represent company-local wall times written using a `Z` suffix;
+  do not convert them into actual UTC instants.
+- `update_order` saves provided details, then performs a status transition.
+  The detail update can succeed even if a later transition fails. Use
+  `manage_order_items` for pickups and returns, including partial fulfillment.
+  Transitions back to `started` or `stopped` require explicit `revert: true`.
+- `list_products` and `get_product` expose product groups. Discover individual
+  product IDs with `list_product_variations` for booking and stock operations.
+  Historical `priceType: flat_fee` selects the API's `fixed` pricing type.
+- `check_inventory` is deprecated in favor of `get_inventory_availability`.
+  It retains the inventory-level endpoint's raw
+  reporting snapshots. `from` and `till` are required at invocation time.
+  `productGroupId` is resolved to its variations. Use
+  `get_inventory_availability` for quantities that can actually be booked.
+- Payment creation returns the provider's payment record. Check status with
+  `get_payment`; creating a record alone does not establish payment success.
+  Connected refunds need an original charge ID, and captures need an
+  authorization ID. `list_payments.filterStatus` filters only the selected
+  page because the common Payments API does not document a status filter;
+  totalCount is omitted in that mode.
+- Coupon identifiers and discount types are immutable. Create a new coupon
+  to change them. Percentage values must be in the range 0–100; cents and
+  coupon values must be whole numbers.
+- Emails are queued asynchronously. Returned `sent` and `has_error` values
+  describe delivery state; the tool does not claim immediate delivery.
+- Document tools return metadata and related records. They do not download
+  or generate PDF files. No triggers are registered.
 
-- **How to obtain:** Navigate to your Booqable account settings page at `{company_slug}.booqable.com/employees/current`, name your new token, and click "Create new authentication method." Choose "Token" as the kind.
-- **Usage:** Include the token in the `Authorization` header:
-  ```
-  Authorization: Bearer {your_access_token}
-  ```
-- Multiple tokens can be active simultaneously.
-- Tokens carry full privileges of the associated employee account.
+## Official reference
 
-### 2. Request Signing (Single-Use Tokens)
-
-Generates a JWT token per request for enhanced security. Supports `ES256`, `RS256`, and `HS256` signing algorithms.
-
-- **How to obtain:** Create a new authentication method at `{company_slug}.booqable.com/employees/current` with kind `single_use`. For `ES256`/`RS256`, supply your public key. For `HS256`, a secret is generated for you.
-- **Usage:** Sign each request by including request method, path, and body hash in the JWT payload. The resulting JWT is sent in the `Authorization: Bearer` header.
-- Tokens expire after a maximum of 10 minutes and can only be used once.
-
-### Company-Specific Endpoint
-
-All API requests must target the company-specific base URL:
-
-```
-https://{company_slug}.booqable.com/api/4/
-```
-
-The `company_slug` is your Booqable subdomain (the part before `.booqable.com` in your account URL).
-
-## Features
-
-### Customer Management
-
-Manage customer records including contact information, addresses, custom properties, tax profiles, default discounts, and deposit settings. Customers can be searched, tagged, and archived. Customer settings (discount percentage, deposit type, tax region) are automatically applied when assigned to orders.
-
-### Product & Inventory Management
-
-Manage rental products organized into product groups, with support for product variations (e.g., size, color), bulk and trackable inventory types, and sales items. Products support barcodes (QR, EAN, Code 128, etc.), photos, custom properties, and configurable pricing. Bundles allow grouping multiple products into a single bookable package. Collections organize products into hierarchical categories for the online store.
-
-- **Stock management:** Add or remove stock at specific locations, track individual stock items with unique identifiers, and manage temporary/expected stock with date ranges.
-- **Availability:** Query real-time inventory levels and breakdowns by location, product, and date range.
-
-### Order Management
-
-Create and manage rental orders through their full lifecycle: new → draft → reserved → started → stopped → archived. Orders support customer assignment, rental period configuration, pickup/delivery fulfillment, discounts (percentage or fixed), deposits, coupons, tax regions, custom line items, and tags.
-
-- **Order fulfillment:** Book products, bundles, or specific stock items onto orders. Start (pick up) and stop (return) items individually or in bulk. Supports partial pickups and returns.
-- **Shortage handling:** The system tracks inventory shortages at both location and cluster levels, with configurable warnings and overrides.
-
-### Pricing & Tax
-
-Configure flexible pricing through simple per-period rates, tiered price structures with tiles, or advanced price rulesets with date-based and day-of-week rules. Tax categories and tax regions with multiple rates support both inclusive and exclusive tax strategies. Coupons provide percentage or fixed-amount discounts redeemable online or in the back office.
-
-### Documents (Invoices, Quotes, Contracts)
-
-Generate and manage invoices, quotes, and contracts linked to orders. Invoices auto-generate and update with order changes; they can be finalized and revised. Quotes and contracts can be confirmed and signed with digital signatures. All document types support custom prefixes, numbering, footers, and body content.
-
-### Payments
-
-Process payments through multiple providers (Stripe, third-party apps, or manual). Supports three payment types:
-
-- **Payment Charges:** Direct charges with multiple modes (manual, off-session, request, terminal, capture).
-- **Payment Authorizations:** Pre-authorize funds for later capture, with tracking of capturable/captured amounts.
-- **Payment Refunds:** Full or partial refunds against previous charges, with provider or manual processing.
-
-Payment methods can be saved per customer for recurring use.
-
-### Locations & Clusters
-
-Manage multiple pickup/return locations and warehouses. Locations can be grouped into clusters that share inventory, enabling cross-location availability and automatic transfer suggestions when shortages occur at specific locations.
-
-### Email & Communication
-
-Send emails to customers using customizable templates with dynamic variables (order data, customer data, document data). Track email history per order and customer. Attach documents as PDF attachments.
-
-### Employee & User Management
-
-Manage team member accounts with configurable permissions (reports, products, settings, exports, etc.). Invite employees via email. Manage customer-facing user accounts for the online store, with support for invitations, email verification, and account disabling.
-
-### Settings & Configuration
-
-Configure global settings including currency, date formats, default pricing/deposit/tax behavior, order time defaults, online store options (availability display, payment strategies, checkout scripts), document formatting, and security settings (SSO, IP restrictions).
-
-### Custom Properties
-
-Define custom fields (text, email, phone, address, date, select) for customers, orders, and product groups. Properties can be linked to default property templates for consistent configuration across resources.
-
-## Events
-
-Booqable supports webhooks for real-time event notifications. Webhook endpoints can be registered via the API to receive HTTP POST notifications when specific events occur. Payloads are available in v1 (form-encoded) or v4 (JSON) format.
-
-### Order Events
-
-- `order.saved_as_draft` — Order saved as draft
-- `order.reserved` — Order reserved (items become unavailable)
-- `order.started` — Order started (items picked up/delivered)
-- `order.stopped` — Order stopped (items returned)
-- `order.updated` — Order details updated
-- `order.canceled` — Order canceled
-- `order.archived` — Order archived
-
-### Customer Events
-
-- `customer.created` — New customer created
-- `customer.updated` — Customer details updated
-- `customer.archived` — Customer archived
-
-### Product Events
-
-- `product_group.created` — Product group created
-- `product_group.updated` — Product group updated
-- `product_group.archived` — Product group archived
-- `product.created` — Product variation created
-
-### Bundle Events
-
-- `bundle.created` — Bundle created
-- `bundle.updated` — Bundle updated
-- `bundle.archived` — Bundle archived
-- `bundle_item.created` — Bundle item created
-- `bundle_item.updated` — Bundle item updated
-- `bundle_item.archived` — Bundle item archived
-
-### Document Events
-
-- `invoice.created` — Invoice created
-- `invoice.updated` — Invoice updated
-- `invoice.finalized` — Invoice finalized
-- `invoice.revised` — Invoice revised
-- `invoice.archived` — Invoice archived
-- `quote.created` / `quote.updated` / `quote.confirmed` / `quote.signed` / `quote.archived`
-- `contract.created` / `contract.updated` / `contract.confirmed` / `contract.signed` / `contract.archived`
-
-### Payment Events
-
-- `payment.completed` — Payment completed
-
-### Other Events
-
-- `app.installed` / `app.uninstalled` / `app.configured` / `app.plan_changed` — App lifecycle events
-- `cart.completed_checkout` — Cart checkout completed
-- `company.destroyed` — Company account destroyed
+[Booqable API v4](https://developers.booqable.com/v4), especially Authentication,
+Companies, Customers, Orders, Order Status Transitions, Order Fulfillments,
+Product Groups, Products, Inventory Levels, Inventory Availabilities, Stock
+Items, Documents, Payments, Payment Charges, Payment Authorizations, Payment
+Refunds, Coupons, Email Templates, and Emails.

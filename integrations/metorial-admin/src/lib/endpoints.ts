@@ -68,6 +68,7 @@ export type ListMetorialEndpointsOptions = {
   limit?: number;
   offset?: number;
   includeSchemas?: boolean;
+  includeResponseSchema?: boolean;
 };
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -109,7 +110,7 @@ let selectDashboardInstancePath = (endpoint: MetorialIntrospectionEndpoint) =>
 
 export let buildMetorialEndpoints = (
   docs: MetorialIntrospectionDocs,
-  options: { includeSchemas?: boolean } = {}
+  options: { includeSchemas?: boolean; includeResponseSchema?: boolean } = {}
 ) => {
   let controllerMap = new Map(
     (docs.controllers ?? []).map(controller => [controller.id, controller] as const)
@@ -155,6 +156,11 @@ export let buildMetorialEndpoints = (
       if (cleanBody) output.body = cleanBody;
     }
 
+    if (options.includeResponseSchema && endpoint.outputId) {
+      let response = asTypeRecord(typesMap.get(endpoint.outputId));
+      if (response) output.response = response;
+    }
+
     endpoints.push(output);
   }
 
@@ -188,7 +194,8 @@ export let listMetorialEndpoints = (
   let offset = Math.max(0, options.offset ?? 0);
   let limit = Math.min(200, Math.max(1, options.limit ?? 50));
   let endpoints = buildMetorialEndpoints(docs, {
-    includeSchemas: options.includeSchemas
+    includeSchemas: options.includeSchemas,
+    includeResponseSchema: options.includeResponseSchema
   }).filter(endpoint => {
     if (options.method && endpoint.method !== options.method) return false;
     if (options.search && !endpointMatchesSearch(endpoint, options.search)) return false;

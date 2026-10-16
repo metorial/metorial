@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'piloterr',
   name: 'Piloterr',
   description:
-    'Web scraping API platform with 50+ pre-built endpoints for extracting structured data from websites.',
+    'Website extraction, public profiles, search results, commerce data, company intelligence, and downloadable screenshots.',
   metadata: {},
   config,
   auth

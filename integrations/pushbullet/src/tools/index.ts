@@ -1,4 +1,6 @@
+export * from './create-channel';
 export * from './get-channel-info';
+export * from './get-current-user';
 export * from './list-chats';
 export * from './list-devices';
 export * from './list-pushes';

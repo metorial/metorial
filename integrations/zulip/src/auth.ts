@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, normalizeServerUrl } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -30,7 +31,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let serverUrl = ctx.input.serverUrl.replace(/\/+$/, '');
+      let serverUrl = normalizeServerUrl(ctx.input.serverUrl);
       return {
         output: {
           serverUrl,
@@ -44,18 +45,8 @@ export let auth = SlateAuth.create()
       output: { serverUrl: string; email: string; token: string };
       input: { serverUrl: string; email: string; apiKey: string };
     }) => {
-      let axios = createAxios({
-        baseURL: ctx.output.serverUrl
-      });
-
-      let response = await axios.get('/api/v1/users/me', {
-        auth: {
-          username: ctx.output.email,
-          password: ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let client = new Client(ctx.output);
+      let user = await client.getOwnUser();
       return {
         profile: {
           id: String(user.user_id),

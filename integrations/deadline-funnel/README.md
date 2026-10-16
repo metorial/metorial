@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Deadline Funnel
 
-Start personalized deadline countdowns and countdown timers for individual subscribers in evergreen and launch campaigns. Track sales via webhooks with email, purchase date, amount, and currency. Integrate with email service providers to automatically trigger deadlines from automation rules. Create custom events for social proof displays and analytics. Manage ConvertHub portals with opt-in forms, microsurveys, and social proof widgets. Monitor new portal creations, custom events, and opt-in form submissions.
+Discover campaigns, start personalized deadlines, record purchases, and submit custom events. The **Start Deadline via Custom Webhook** tool uses the campaign-specific webhook documented in Deadline Funnel's [Custom Webhook Integration guide](https://docs.deadlinefunnel.com/en/articles/4429309-custom-webhook-integration).
+
+Copy the custom webhook from the campaign editor under **Emails → Custom API**. Use Deadline Funnel email links in your campaign emails and confirm new tracking records in campaign Analytics.
+
+The existing campaign, deadline, purchase, and custom-event REST operations retain their earlier API-key configuration. The public help center describes these workflows but does not provide a reference for their REST endpoints or response fields; provider acceptance of those routes has not been verified.
 
 ## License
 

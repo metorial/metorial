@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'uniqode',
   name: 'Uniqode',
-  description: undefined,
+  description:
+    'Manage Uniqode QR codes, digital business cards, campaigns, and scan analytics.',
   metadata: {},
   config,
   auth

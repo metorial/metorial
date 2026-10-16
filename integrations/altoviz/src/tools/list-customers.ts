@@ -16,6 +16,7 @@ let addressSchema = z
   .nullable();
 
 let customerSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   customerId: z.number().describe('Altoviz customer ID'),
   number: z.string().nullable().optional().describe('Customer number'),
   companyName: z.string().nullable().optional().describe('Company name'),
@@ -40,12 +41,19 @@ export let listCustomers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      email: z.string().optional().describe('Filter customers by email address'),
-      pageIndex: z.number().optional().describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
+      email: z
+        .string()
         .optional()
-        .describe('Number of results per page (1-100, default 10)')
+        .describe(
+          'Find customers by email using the provider search endpoint; pagination does not apply to email matches'
+        ),
+      query: z.string().optional().describe('Full-text search query when email is omitted'),
+      orderBy: z
+        .string()
+        .optional()
+        .describe('Provider ordering expression when email is omitted'),
+      pageIndex: z.number().optional().describe('Page index (starts at 1)'),
+      pageSize: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
@@ -58,11 +66,14 @@ export let listCustomers = SlateTool.create(spec, {
 
     let customers = await client.listCustomers({
       email: ctx.input.email,
+      query: ctx.input.query,
+      orderBy: ctx.input.orderBy,
       pageIndex: ctx.input.pageIndex,
       pageSize: ctx.input.pageSize
     });
 
     let mapped = customers.map((c: any) => ({
+      raw: c,
       customerId: c.id,
       number: c.number,
       companyName: c.companyName,

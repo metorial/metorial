@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrandApiClient } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,7 @@ Returns the merchant's brand data including name, domain, logos, industry, and o
   )
   .output(
     z.object({
-      brandName: z.string().describe('Resolved merchant brand name'),
+      brandName: z.string().optional().describe('Resolved merchant brand name when provided'),
       domain: z.string().describe('Merchant brand domain'),
       claimed: z.boolean().describe('Whether the brand has been claimed'),
       description: z.string().nullable().describe('Brand description'),
@@ -81,15 +81,30 @@ Returns the merchant's brand data including name, domain, logos, industry, and o
             .describe('Industry classifications')
         })
         .nullable()
-        .describe('Company firmographic data')
+        .describe('Company firmographic data'),
+      brandId: z.string().optional().describe('Stable Brandfetch brand identifier'),
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete original transaction enrichment response, including all brand assets and metadata'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.transactionLabel.trim()) {
+      throw createApiServiceError('Provide a nonempty transaction descriptor.');
+    }
+    if (!/^[A-Za-z]{2}$/.test(ctx.input.countryCode)) {
+      throw createApiServiceError(
+        'countryCode must be an ISO 3166-1 alpha-2 country code, such as US or GB.'
+      );
+    }
     let client = new BrandApiClient(ctx.auth.token);
 
     let brand = await client.enrichTransaction({
       transactionLabel: ctx.input.transactionLabel,
-      countryCode: ctx.input.countryCode
+      countryCode: ctx.input.countryCode.toUpperCase()
     });
 
     let company = brand.company
@@ -97,7 +112,7 @@ Returns the merchant's brand data including name, domain, logos, industry, and o
           employees: brand.company.employees,
           foundedYear: brand.company.foundedYear,
           kind: brand.company.kind,
-          industries: (brand.company.industries || []).map(ind => ({
+          industries: brand.company.industries.map(ind => ({
             name: ind.name,
             slug: ind.slug
           }))
@@ -106,7 +121,7 @@ Returns the merchant's brand data including name, domain, logos, industry, and o
 
     return {
       output: {
-        brandName: brand.name,
+        brandName: brand.name ?? undefined,
         domain: brand.domain,
         claimed: brand.claimed,
         description: brand.description,
@@ -119,15 +134,17 @@ Returns the merchant's brand data including name, domain, logos, industry, and o
             src: f.src,
             background: f.background,
             format: f.format,
-            height: f.height,
-            width: f.width,
+            height: f.height ?? undefined,
+            width: f.width ?? undefined,
             size: f.size
           }))
         })),
         colors: brand.colors,
-        company
+        company,
+        brandId: brand.id,
+        raw: brand
       },
-      message: `Resolved transaction "${ctx.input.transactionLabel}" to **${brand.name}** (${brand.domain}).`
+      message: `Resolved transaction "${ctx.input.transactionLabel}" to **${brand.name ?? brand.domain}** (${brand.domain}).`
     };
   })
   .build();

@@ -19,6 +19,7 @@ export let starSegment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       segmentId: z.number().describe('Segment identifier'),
       name: z.string().describe('Segment name'),
       starred: z.boolean().describe('New star status')
@@ -31,6 +32,7 @@ export let starSegment = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: segment,
         segmentId: segment.id,
         name: segment.name,
         starred: segment.starred

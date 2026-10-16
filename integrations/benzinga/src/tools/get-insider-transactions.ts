@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, numericValue, recordsFrom, stringValue } from '../lib/client';
 import { spec } from '../spec';
 
 let transactionSchema = z.object({
@@ -53,6 +53,10 @@ export let getInsiderTransactionsTool = SlateTool.create(spec, {
       date: z.string().optional().describe('Specific date (YYYY-MM-DD)'),
       dateFrom: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      updatedSince: z
+        .number()
+        .optional()
+        .describe('Return records updated since this Unix timestamp in seconds'),
       page: z.number().optional().default(0).describe('Page offset'),
       pageSize: z.number().optional().default(50).describe('Results per page (max 1000)')
     })
@@ -60,6 +64,7 @@ export let getInsiderTransactionsTool = SlateTool.create(spec, {
   .output(
     z.object({
       filings: z.array(filingSchema).describe('Insider transaction filings'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of filings returned')
     })
   )
@@ -71,11 +76,12 @@ export let getInsiderTransactionsTool = SlateTool.create(spec, {
       date: ctx.input.date,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
+      updatedSince: ctx.input.updatedSince,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
 
-    let items = data?.data || (Array.isArray(data) ? data : []);
+    let items = recordsFrom(data);
     let filings = items.map((item: any) => ({
       filingId: item.id,
       accessionNumber: item.accession_number,
@@ -94,19 +100,18 @@ export let getInsiderTransactionsTool = SlateTool.create(spec, {
         isDeriviative: t.is_derivative,
         acquiredOrDisposed: t.acquired_or_disposed,
         transactionDate: t.date_transaction,
-        shares: t.shares ? Number(t.shares) : undefined,
-        pricePerShare: t.price_per_share ? Number(t.price_per_share) : undefined,
+        shares: numericValue(t.shares),
+        pricePerShare: numericValue(t.price_per_share),
         securityTitle: t.security_title,
         transactionCode: t.transaction_code,
-        postTransactionQuantity: t.post_transaction_quantity
-          ? Number(t.post_transaction_quantity)
-          : undefined
+        postTransactionQuantity: numericValue(t.post_transaction_quantity)
       })),
-      updated: item.updated
+      updated: stringValue(item.updated)
     }));
 
     return {
       output: {
+        raw: data,
         filings,
         count: filings.length
       },

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getBulkEod = SlateTool.create(spec, {
@@ -52,7 +52,7 @@ export let getBulkEod = SlateTool.create(spec, {
       filter: ctx.input.extended ? 'extended' : undefined
     });
 
-    let records = Array.isArray(data) ? data : [];
+    let records = eodhdArray(data, 'get-bulk-eod');
 
     return {
       output: {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CreateClient } from '../lib/client';
+import { CreateClient, record, text } from '../lib/client';
+import { attachUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let generateAssetTool = SlateTool.create(spec, {
@@ -54,15 +55,15 @@ export let generateAssetTool = SlateTool.create(spec, {
     let client = new CreateClient(ctx.auth.token, ctx.config.environment);
     let result = await client.generateAsset(ctx.input.provider, ctx.input.options);
 
-    let attrs = result.data?.attributes || {};
+    let attrs = record(result.data.attributes, 'generated asset attributes');
 
     return {
       output: {
-        generatedAssetId: result.data?.id || attrs.id,
-        status: attrs.status || 'queued',
+        generatedAssetId: text(result.data.id ?? attrs.id, 'generated asset ID'),
+        status: text(attrs.status, 'generation status'),
         created: attrs.created
       },
-      message: `AI asset generation queued with ID **${result.data?.id || attrs.id}**. Use "Get Generated Asset" to check progress.`
+      message: `AI asset generation queued with ID **${text(result.data.id ?? attrs.id, 'generated asset ID')}**. Use "Get Generated Asset" to check progress.`
     };
   })
   .build();
@@ -98,11 +99,17 @@ export let getGeneratedAssetTool = SlateTool.create(spec, {
     let client = new CreateClient(ctx.auth.token, ctx.config.environment);
     let result = await client.getGeneratedAsset(ctx.input.generatedAssetId);
 
-    let attrs = result.data?.attributes || {};
+    let attrs = record(result.data.attributes, 'generated asset attributes');
+    if (!['queued', 'processing', 'done', 'failed'].includes(attrs.status))
+      throw createApiServiceError(
+        `Shotstack returned generation status "${attrs.status}", which this tool does not support yet. Check the asset again later.`
+      );
+    if (attrs.status === 'done' && typeof attrs.url === 'string')
+      await attachUrl(ctx, attrs.url);
 
     return {
       output: {
-        generatedAssetId: result.data?.id || attrs.id,
+        generatedAssetId: text(result.data.id ?? attrs.id, 'generated asset ID'),
         provider: attrs.provider,
         type: attrs.type,
         status: attrs.status,

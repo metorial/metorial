@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -75,7 +75,7 @@ export let updateCustomFieldValues = SlateTool.create(spec, {
   name: 'Update Custom Field Values',
   key: 'update_custom_field_values',
   description: `Update custom field values for a record in GageList.
-Provide the record ID and a map of custom field names to their new values.`,
+Provide the record ID and a map of custom field names to their new values. Specify Calibration for calibration records. Supply existing custom-value IDs when updating saved values; omitted value IDs create new values.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -84,9 +84,21 @@ Provide the record ID and a map of custom field names to their new values.`,
   .input(
     z.object({
       recordId: z.number().describe('ID of the gage or calibration record'),
+      recordType: z
+        .enum(['Gage', 'Calibration'])
+        .optional()
+        .describe('Record type; defaults to Gage. Use Calibration for a calibration record.'),
+      valueIds: z
+        .record(z.string(), z.number())
+        .optional()
+        .describe(
+          'Map of custom field names to existing custom-value record IDs. Omit a name to create its value.'
+        ),
       fields: z
         .record(z.string(), z.any())
-        .describe('Map of custom field names to their new values')
+        .describe(
+          'Map of custom field names from get_custom_fields to their new values. Non-string values are serialized as JSON text.'
+        )
     })
   )
   .output(
@@ -98,10 +110,33 @@ Provide the record ID and a map of custom field names to their new values.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.updateCustomFieldValues({
-      Id: ctx.input.recordId,
-      ...ctx.input.fields
+    let entries = Object.entries(ctx.input.fields);
+    if (entries.length === 0) {
+      throw createApiServiceError('Provide at least one custom field value.');
+    }
+    let definitions = await client.getCustomFields();
+    let values = entries.map(([name, value]) => {
+      let matches = definitions.data.filter(
+        (field: { FieldName?: unknown; Id?: unknown }) => field.FieldName === name
+      );
+      if (matches.length !== 1 || typeof matches[0].Id !== 'number') {
+        throw createApiServiceError(
+          `Custom field "${name}" was not found uniquely. Call get_custom_fields and use an exact field name.`
+        );
+      }
+      let fieldValue = typeof value === 'string' ? value : JSON.stringify(value);
+      if (fieldValue === undefined) {
+        throw createApiServiceError(`Provide a JSON value for custom field "${name}".`);
+      }
+      return {
+        Id: ctx.input.valueIds?.[name] ?? 0,
+        FieldId: matches[0].Id,
+        RefID: ctx.input.recordId,
+        RefType: ctx.input.recordType === 'Calibration' ? 2 : 1,
+        FieldValue: fieldValue
+      };
     });
+    let result = await client.updateCustomFieldValues(values);
 
     return {
       output: {

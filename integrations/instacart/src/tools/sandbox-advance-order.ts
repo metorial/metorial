@@ -24,6 +24,10 @@ Only available in the **development** environment.`,
 })
   .input(
     z.object({
+      batchType: z
+        .enum(['delivery', 'pickup', 'delivery_only', 'runner_customer'])
+        .optional()
+        .describe('Workflow for a newly created batch; omit to keep the provider default'),
       orderId: z.string().describe('Order ID to advance in the sandbox'),
       batchId: z
         .string()
@@ -35,6 +39,7 @@ Only available in the **development** environment.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete batch advancement result'),
       shopperId: z
         .string()
         .optional()
@@ -46,7 +51,8 @@ Only available in the **development** environment.`,
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
     let batchId = ctx.input.batchId;
@@ -56,7 +62,11 @@ Only available in the **development** environment.`,
       let shopperResult = await client.createSandboxShopper();
       shopperId = shopperResult.shopperId;
 
-      let batchResult = await client.createSandboxBatch(ctx.input.orderId, shopperId);
+      let batchResult = await client.createSandboxBatch(
+        ctx.input.orderId,
+        shopperId,
+        ctx.input.batchType
+      );
       batchId = batchResult.batchId;
     }
 
@@ -64,6 +74,7 @@ Only available in the **development** environment.`,
 
     return {
       output: {
+        raw: advanceResult.raw,
         shopperId,
         batchId,
         status: advanceResult.status

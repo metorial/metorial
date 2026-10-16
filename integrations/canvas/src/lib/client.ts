@@ -1,4 +1,56 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue
+} from 'slates';
+
+export function normalizeCanvasDomain(value: string | undefined): string {
+  if (!value?.trim()) {
+    throw createApiServiceError('Enter your Canvas instance domain to connect.');
+  }
+  let url: URL;
+  try {
+    url = new URL(`https://${value.trim().replace(/^https?:\/\//i, '')}`);
+  } catch {
+    throw createApiServiceError(
+      'Enter a valid Canvas instance domain, such as school.instructure.com.'
+    );
+  }
+  if (url.pathname !== '/' || url.search || url.hash || url.username || url.password) {
+    throw createApiServiceError(
+      'Enter only the Canvas instance domain, without a path, query, or credentials.'
+    );
+  }
+  return url.host;
+}
+
+export function createCanvasHttp(domain: string, token?: string) {
+  return createAuthenticatedAxios({
+    baseURL: `https://${normalizeCanvasDomain(domain)}`,
+    ...(token ? { authHeader: { value: `Bearer ${token}` } } : {}),
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Canvas',
+        reason: 'canvas_api_error',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        detailKeys: ['message', 'error_description', 'error'],
+        nestedKeys: ['errors', 'error_report', 'details']
+      })
+  });
+}
+
+export function createCanvasClient(
+  auth: { token: string; canvasDomain?: string },
+  legacyConfig?: object
+) {
+  return new CanvasClient({
+    token: auth.token,
+    canvasDomain:
+      auth.canvasDomain ||
+      (legacyConfig as { canvasDomain?: string } | undefined)?.canvasDomain
+  });
+}
 
 export interface PaginatedResponse<T> {
   items: T[];
@@ -6,47 +58,77 @@ export interface PaginatedResponse<T> {
 }
 
 export class CanvasClient {
-  private http: ReturnType<typeof createAxios>;
-  private domain: string;
+  private http: ReturnType<typeof createCanvasHttp>;
+  readonly domain: string;
 
-  constructor(config: { token: string; canvasDomain: string }) {
-    this.domain = config.canvasDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    this.http = createAxios({
-      baseURL: `https://${this.domain}/api/v1`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+  constructor(config: { token: string; canvasDomain?: string }) {
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Canvas access token is required. Reconnect your Canvas account.'
+      );
+    }
+    this.domain = normalizeCanvasDomain(config.canvasDomain);
+    this.http = createCanvasHttp(this.domain, config.token);
+    this.http.defaults.baseURL = `https://${this.domain}/api/v1`;
   }
-
-  // ─── Pagination helpers ──────────────────────────────────
 
   private parseLinkHeader(linkHeader: string | undefined): string | undefined {
-    if (!linkHeader) return undefined;
-    let match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-    return match ? match[1] : undefined;
-  }
-
-  private async fetchPaginated<T>(path: string, params?: Record<string, any>): Promise<T[]> {
-    let allItems: T[] = [];
-    let url: string | undefined = path;
-    let queryParams = { per_page: 100, ...params };
-
-    while (url) {
-      let response = await this.http.get(url, {
-        params: url === path ? queryParams : undefined
-      });
-      let items = Array.isArray(response.data) ? response.data : [];
-      allItems.push(...items);
-      url = this.parseLinkHeader(response.headers?.link);
-      if (url) {
-        // For subsequent pages, use full URL
-        url = url.replace(`https://${this.domain}/api/v1`, '');
+    for (let match of linkHeader?.matchAll(/<([^>]+)>([^,]*)/g) ?? []) {
+      let relations = match[2]?.match(/\brel\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
+      if ((relations?.[1] ?? relations?.[2])?.split(/\s+/).includes('next')) {
+        return match[1];
       }
     }
+    return undefined;
+  }
 
+  private async fetchPaginated<T>(
+    path: string,
+    params?: Record<string, unknown>
+  ): Promise<T[]> {
+    let allItems: T[] = [];
+    let url: string | undefined = path;
+    let visited = new Set<string>();
+    while (url) {
+      let absolute: URL;
+      try {
+        absolute = new URL(
+          url.startsWith('/api/v1/') ? url : url.startsWith('/') ? `/api/v1${url}` : url,
+          `https://${this.domain}`
+        );
+      } catch {
+        throw createApiServiceError('Canvas returned an invalid pagination link.');
+      }
+      if (
+        absolute.origin !== `https://${this.domain}` ||
+        !absolute.pathname.startsWith('/api/v1/') ||
+        absolute.username ||
+        absolute.password
+      ) {
+        throw createApiServiceError('Canvas returned an invalid pagination link.');
+      }
+      if (visited.has(absolute.href)) {
+        throw createApiServiceError(
+          'Canvas returned a repeated pagination link. Retry the request.'
+        );
+      }
+      visited.add(absolute.href);
+      let response = await this.http.get(absolute.href, {
+        params: visited.size === 1 ? { per_page: 100, ...params } : undefined
+      });
+      if (!Array.isArray(response.data)) {
+        throw createApiServiceError(
+          'Canvas returned an unexpected list response. Retry the request.'
+        );
+      }
+      allItems.push(...response.data);
+      url = this.parseLinkHeader(getResponseHeaderValue(response.headers, 'link'));
+    }
     return allItems;
+  }
+
+  async listCourseCreationAccounts(): Promise<any[]> {
+    return this.fetchPaginated('/course_creation_accounts');
   }
 
   // ─── Courses ─────────────────────────────────────────────
@@ -63,7 +145,6 @@ export class CanvasClient {
     if (params?.enrollmentType) queryParams.enrollment_type = params.enrollmentType;
     if (params?.enrollmentState) queryParams.enrollment_state = params.enrollmentState;
     if (params?.state) queryParams['state[]'] = params.state;
-    if (params?.searchTerm) queryParams.search_term = params.searchTerm;
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.perPage) queryParams.per_page = params.perPage;
     return this.fetchPaginated('/courses', queryParams);
@@ -72,22 +153,24 @@ export class CanvasClient {
   async getCourse(courseId: string, include?: string[]): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/courses/${courseId}`, { params });
+    let response = await this.http.get(`/courses/${encodeURIComponent(courseId)}`, { params });
     return response.data;
   }
 
   async createCourse(accountId: string, course: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/accounts/${accountId}/courses`, { course });
+    let response = await this.http.post(`/accounts/${encodeURIComponent(accountId)}/courses`, {
+      course
+    });
     return response.data;
   }
 
   async updateCourse(courseId: string, course: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/courses/${courseId}`, { course });
+    let response = await this.http.put(`/courses/${encodeURIComponent(courseId)}`, { course });
     return response.data;
   }
 
   async deleteCourse(courseId: string, event: 'delete' | 'conclude'): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}`, {
+    let response = await this.http.delete(`/courses/${encodeURIComponent(courseId)}`, {
       params: { event }
     });
     return response.data;
@@ -101,7 +184,7 @@ export class CanvasClient {
   }
 
   async getUser(userId: string): Promise<any> {
-    let response = await this.http.get(`/users/${userId}/profile`);
+    let response = await this.http.get(`/users/${encodeURIComponent(userId)}/profile`);
     return response.data;
   }
 
@@ -119,7 +202,7 @@ export class CanvasClient {
     if (params?.enrollmentType) queryParams['enrollment_type[]'] = params.enrollmentType;
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.perPage) queryParams.per_page = params.perPage;
-    return this.fetchPaginated(`/courses/${courseId}/users`, queryParams);
+    return this.fetchPaginated(`/courses/${encodeURIComponent(courseId)}/users`, queryParams);
   }
 
   // ─── Enrollments ─────────────────────────────────────────
@@ -138,7 +221,10 @@ export class CanvasClient {
     if (params?.state) queryParams['state[]'] = params.state;
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.userId) queryParams.user_id = params.userId;
-    return this.fetchPaginated(`/courses/${courseId}/enrollments`, queryParams);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/enrollments`,
+      queryParams
+    );
   }
 
   async enrollUser(
@@ -154,18 +240,21 @@ export class CanvasClient {
       role?: string;
     }
   ): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/enrollments`, {
-      enrollment: {
-        user_id: enrollment.userId,
-        type: enrollment.type,
-        enrollment_state: enrollment.enrollmentState,
-        course_section_id: enrollment.courseSectionId,
-        limit_privileges_to_course_section: enrollment.limitPrivilegesToCourseSection,
-        notify: enrollment.notify,
-        self_enrollment_code: enrollment.selfEnrollmentCode,
-        role: enrollment.role
+    let response = await this.http.post(
+      `/courses/${encodeURIComponent(courseId)}/enrollments`,
+      {
+        enrollment: {
+          user_id: enrollment.userId,
+          type: enrollment.type,
+          enrollment_state: enrollment.enrollmentState,
+          course_section_id: enrollment.courseSectionId,
+          limit_privileges_to_course_section: enrollment.limitPrivilegesToCourseSection,
+          notify: enrollment.notify,
+          self_enrollment_code: enrollment.selfEnrollmentCode,
+          role: enrollment.role
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -174,9 +263,12 @@ export class CanvasClient {
     enrollmentId: string,
     task: 'conclude' | 'delete' | 'inactivate' | 'deactivate'
   ): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}/enrollments/${enrollmentId}`, {
-      params: { task }
-    });
+    let response = await this.http.delete(
+      `/courses/${encodeURIComponent(courseId)}/enrollments/${encodeURIComponent(enrollmentId)}`,
+      {
+        params: { task }
+      }
+    );
     return response.data;
   }
 
@@ -198,7 +290,10 @@ export class CanvasClient {
     if (params?.orderBy) queryParams.order_by = params.orderBy;
     if (params?.bucket) queryParams.bucket = params.bucket;
     if (params?.perPage) queryParams.per_page = params.perPage;
-    return this.fetchPaginated(`/courses/${courseId}/assignments`, queryParams);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/assignments`,
+      queryParams
+    );
   }
 
   async getAssignment(
@@ -208,14 +303,20 @@ export class CanvasClient {
   ): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/courses/${courseId}/assignments/${assignmentId}`, {
-      params
-    });
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
   async createAssignment(courseId: string, assignment: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/assignments`, { assignment });
+    let response = await this.http.post(
+      `/courses/${encodeURIComponent(courseId)}/assignments`,
+      { assignment }
+    );
     return response.data;
   }
 
@@ -224,14 +325,19 @@ export class CanvasClient {
     assignmentId: string,
     assignment: Record<string, any>
   ): Promise<any> {
-    let response = await this.http.put(`/courses/${courseId}/assignments/${assignmentId}`, {
-      assignment
-    });
+    let response = await this.http.put(
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}`,
+      {
+        assignment
+      }
+    );
     return response.data;
   }
 
   async deleteAssignment(courseId: string, assignmentId: string): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}/assignments/${assignmentId}`);
+    let response = await this.http.delete(
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}`
+    );
     return response.data;
   }
 
@@ -249,7 +355,7 @@ export class CanvasClient {
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.perPage) queryParams.per_page = params.perPage;
     return this.fetchPaginated(
-      `/courses/${courseId}/assignments/${assignmentId}/submissions`,
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}/submissions`,
       queryParams
     );
   }
@@ -263,7 +369,7 @@ export class CanvasClient {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
     let response = await this.http.get(
-      `/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}/submissions/${encodeURIComponent(userId)}`,
       { params }
     );
     return response.data;
@@ -283,9 +389,9 @@ export class CanvasClient {
     if (data.postedGrade !== undefined) body.submission = { posted_grade: data.postedGrade };
     if (data.excuse !== undefined)
       body.submission = { ...body.submission, excuse: data.excuse };
-    if (data.comment) body.comment = { text_comment: data.comment };
+    if (data.comment !== undefined) body.comment = { text_comment: data.comment };
     let response = await this.http.put(
-      `/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
+      `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}/submissions/${encodeURIComponent(userId)}`,
       body
     );
     return response.data;
@@ -305,18 +411,26 @@ export class CanvasClient {
     if (params?.searchTerm) queryParams.search_term = params.searchTerm;
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.studentId) queryParams.student_id = params.studentId;
-    return this.fetchPaginated(`/courses/${courseId}/modules`, queryParams);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/modules`,
+      queryParams
+    );
   }
 
   async getModule(courseId: string, moduleId: string, include?: string[]): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/courses/${courseId}/modules/${moduleId}`, { params });
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}`,
+      { params }
+    );
     return response.data;
   }
 
   async createModule(courseId: string, module: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/modules`, { module });
+    let response = await this.http.post(`/courses/${encodeURIComponent(courseId)}/modules`, {
+      module
+    });
     return response.data;
   }
 
@@ -325,12 +439,17 @@ export class CanvasClient {
     moduleId: string,
     module: Record<string, any>
   ): Promise<any> {
-    let response = await this.http.put(`/courses/${courseId}/modules/${moduleId}`, { module });
+    let response = await this.http.put(
+      `/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}`,
+      { module }
+    );
     return response.data;
   }
 
   async deleteModule(courseId: string, moduleId: string): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}/modules/${moduleId}`);
+    let response = await this.http.delete(
+      `/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}`
+    );
     return response.data;
   }
 
@@ -341,7 +460,10 @@ export class CanvasClient {
   ): Promise<any[]> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    return this.fetchPaginated(`/courses/${courseId}/modules/${moduleId}/items`, params);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/items`,
+      params
+    );
   }
 
   async createModuleItem(
@@ -349,9 +471,12 @@ export class CanvasClient {
     moduleId: string,
     moduleItem: Record<string, any>
   ): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/modules/${moduleId}/items`, {
-      module_item: moduleItem
-    });
+    let response = await this.http.post(
+      `/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/items`,
+      {
+        module_item: moduleItem
+      }
+    );
     return response.data;
   }
 
@@ -363,6 +488,7 @@ export class CanvasClient {
       orderBy?: string;
       searchTerm?: string;
       filterBy?: string;
+      onlyAnnouncements?: boolean;
       include?: string[];
     }
   ): Promise<any[]> {
@@ -370,8 +496,13 @@ export class CanvasClient {
     if (params?.orderBy) queryParams.order_by = params.orderBy;
     if (params?.searchTerm) queryParams.search_term = params.searchTerm;
     if (params?.filterBy) queryParams.filter_by = params.filterBy;
+    if (params?.onlyAnnouncements !== undefined)
+      queryParams.only_announcements = params.onlyAnnouncements;
     if (params?.include) queryParams['include[]'] = params.include;
-    return this.fetchPaginated(`/courses/${courseId}/discussion_topics`, queryParams);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/discussion_topics`,
+      queryParams
+    );
   }
 
   async getDiscussionTopic(
@@ -381,14 +512,20 @@ export class CanvasClient {
   ): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/courses/${courseId}/discussion_topics/${topicId}`, {
-      params
-    });
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/discussion_topics/${encodeURIComponent(topicId)}`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
   async createDiscussionTopic(courseId: string, topic: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/discussion_topics`, topic);
+    let response = await this.http.post(
+      `/courses/${encodeURIComponent(courseId)}/discussion_topics`,
+      topic
+    );
     return response.data;
   }
 
@@ -398,14 +535,16 @@ export class CanvasClient {
     topic: Record<string, any>
   ): Promise<any> {
     let response = await this.http.put(
-      `/courses/${courseId}/discussion_topics/${topicId}`,
+      `/courses/${encodeURIComponent(courseId)}/discussion_topics/${encodeURIComponent(topicId)}`,
       topic
     );
     return response.data;
   }
 
   async deleteDiscussionTopic(courseId: string, topicId: string): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}/discussion_topics/${topicId}`);
+    let response = await this.http.delete(
+      `/courses/${encodeURIComponent(courseId)}/discussion_topics/${encodeURIComponent(topicId)}`
+    );
     return response.data;
   }
 
@@ -425,16 +564,20 @@ export class CanvasClient {
     if (params?.order) queryParams.order = params.order;
     if (params?.searchTerm) queryParams.search_term = params.searchTerm;
     if (params?.published !== undefined) queryParams.published = params.published;
-    return this.fetchPaginated(`/courses/${courseId}/pages`, queryParams);
+    return this.fetchPaginated(`/courses/${encodeURIComponent(courseId)}/pages`, queryParams);
   }
 
   async getPage(courseId: string, pageUrl: string): Promise<any> {
-    let response = await this.http.get(`/courses/${courseId}/pages/${pageUrl}`);
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/pages/${encodeURIComponent(pageUrl)}`
+    );
     return response.data;
   }
 
   async createPage(courseId: string, wikiPage: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/courses/${courseId}/pages`, { wiki_page: wikiPage });
+    let response = await this.http.post(`/courses/${encodeURIComponent(courseId)}/pages`, {
+      wiki_page: wikiPage
+    });
     return response.data;
   }
 
@@ -443,14 +586,19 @@ export class CanvasClient {
     pageUrl: string,
     wikiPage: Record<string, any>
   ): Promise<any> {
-    let response = await this.http.put(`/courses/${courseId}/pages/${pageUrl}`, {
-      wiki_page: wikiPage
-    });
+    let response = await this.http.put(
+      `/courses/${encodeURIComponent(courseId)}/pages/${encodeURIComponent(pageUrl)}`,
+      {
+        wiki_page: wikiPage
+      }
+    );
     return response.data;
   }
 
   async deletePage(courseId: string, pageUrl: string): Promise<any> {
-    let response = await this.http.delete(`/courses/${courseId}/pages/${pageUrl}`);
+    let response = await this.http.delete(
+      `/courses/${encodeURIComponent(courseId)}/pages/${encodeURIComponent(pageUrl)}`
+    );
     return response.data;
   }
 
@@ -470,13 +618,13 @@ export class CanvasClient {
     if (params?.contentTypes) queryParams['content_types[]'] = params.contentTypes;
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.order) queryParams.order = params.order;
-    return this.fetchPaginated(`/courses/${courseId}/files`, queryParams);
+    return this.fetchPaginated(`/courses/${encodeURIComponent(courseId)}/files`, queryParams);
   }
 
   async getFile(fileId: string, include?: string[]): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/files/${fileId}`, { params });
+    let response = await this.http.get(`/files/${encodeURIComponent(fileId)}`, { params });
     return response.data;
   }
 
@@ -507,7 +655,7 @@ export class CanvasClient {
     eventId: string,
     calendarEvent: Record<string, any>
   ): Promise<any> {
-    let response = await this.http.put(`/calendar_events/${eventId}`, {
+    let response = await this.http.put(`/calendar_events/${encodeURIComponent(eventId)}`, {
       calendar_event: calendarEvent
     });
     return response.data;
@@ -516,7 +664,9 @@ export class CanvasClient {
   async deleteCalendarEvent(eventId: string, cancelReason?: string): Promise<any> {
     let params: Record<string, any> = {};
     if (cancelReason) params.cancel_reason = cancelReason;
-    let response = await this.http.delete(`/calendar_events/${eventId}`, { params });
+    let response = await this.http.delete(`/calendar_events/${encodeURIComponent(eventId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -535,7 +685,12 @@ export class CanvasClient {
   }
 
   async getConversation(conversationId: string): Promise<any> {
-    let response = await this.http.get(`/conversations/${conversationId}`);
+    let response = await this.http.get(
+      `/conversations/${encodeURIComponent(conversationId)}`,
+      {
+        params: { auto_mark_as_read: false }
+      }
+    );
     return response.data;
   }
 
@@ -547,6 +702,8 @@ export class CanvasClient {
     contextCode?: string;
     mediaCommentId?: string;
     mediaCommentType?: string;
+    bulkMessage?: boolean;
+    attachmentIds?: string[];
   }): Promise<any> {
     let response = await this.http.post('/conversations', {
       recipients: conversation.recipients,
@@ -555,7 +712,9 @@ export class CanvasClient {
       group_conversation: conversation.groupConversation,
       context_code: conversation.contextCode,
       media_comment_id: conversation.mediaCommentId,
-      media_comment_type: conversation.mediaCommentType
+      media_comment_type: conversation.mediaCommentType,
+      bulk_message: conversation.bulkMessage,
+      attachment_ids: conversation.attachmentIds
     });
     return response.data;
   }
@@ -572,11 +731,16 @@ export class CanvasClient {
     let queryParams: Record<string, any> = {};
     if (params?.searchTerm) queryParams.search_term = params.searchTerm;
     if (params?.perPage) queryParams.per_page = params.perPage;
-    return this.fetchPaginated(`/courses/${courseId}/quizzes`, queryParams);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/quizzes`,
+      queryParams
+    );
   }
 
   async getQuiz(courseId: string, quizId: string): Promise<any> {
-    let response = await this.http.get(`/courses/${courseId}/quizzes/${quizId}`);
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/quizzes/${encodeURIComponent(quizId)}`
+    );
     return response.data;
   }
 
@@ -593,22 +757,22 @@ export class CanvasClient {
     if (params?.include) queryParams['include[]'] = params.include;
     let path =
       contextType === 'course'
-        ? `/courses/${contextId}/groups`
-        : `/accounts/${contextId}/groups`;
+        ? `/courses/${encodeURIComponent(contextId)}/groups`
+        : `/accounts/${encodeURIComponent(contextId)}/groups`;
     return this.fetchPaginated(path, queryParams);
   }
 
   async getGroup(groupId: string, include?: string[]): Promise<any> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    let response = await this.http.get(`/groups/${groupId}`, { params });
+    let response = await this.http.get(`/groups/${encodeURIComponent(groupId)}`, { params });
     return response.data;
   }
 
   // ─── Rubrics ─────────────────────────────────────────────
 
   async listRubrics(courseId: string): Promise<any[]> {
-    return this.fetchPaginated(`/courses/${courseId}/rubrics`);
+    return this.fetchPaginated(`/courses/${encodeURIComponent(courseId)}/rubrics`);
   }
 
   async getRubric(
@@ -622,9 +786,12 @@ export class CanvasClient {
     let queryParams: Record<string, any> = {};
     if (params?.include) queryParams['include[]'] = params.include;
     if (params?.style) queryParams.style = params.style;
-    let response = await this.http.get(`/courses/${courseId}/rubrics/${rubricId}`, {
-      params: queryParams
-    });
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/rubrics/${encodeURIComponent(rubricId)}`,
+      {
+        params: queryParams
+      }
+    );
     return response.data;
   }
 
@@ -633,14 +800,17 @@ export class CanvasClient {
   async listAssignmentGroups(courseId: string, include?: string[]): Promise<any[]> {
     let params: Record<string, any> = {};
     if (include) params['include[]'] = include;
-    return this.fetchPaginated(`/courses/${courseId}/assignment_groups`, params);
+    return this.fetchPaginated(
+      `/courses/${encodeURIComponent(courseId)}/assignment_groups`,
+      params
+    );
   }
 
   // ─── Grading ─────────────────────────────────────────────
 
   async getCourseTotalGrades(courseId: string): Promise<any[]> {
     return this.listEnrollments(courseId, {
-      include: ['current_points', 'total_scores']
+      include: ['current_points']
     });
   }
 
@@ -668,10 +838,7 @@ export class CanvasClient {
   // ─── Activity Stream ─────────────────────────────────────
 
   async getActivityStream(): Promise<any[]> {
-    let response = await this.http.get('/users/self/activity_stream', {
-      params: { per_page: 50 }
-    });
-    return Array.isArray(response.data) ? response.data : [];
+    return this.fetchPaginated('/users/self/activity_stream');
   }
 
   // ─── Course Analytics ────────────────────────────────────
@@ -680,7 +847,12 @@ export class CanvasClient {
     courseId: string,
     type: 'activity' | 'assignments' | 'student_summaries'
   ): Promise<any> {
-    let response = await this.http.get(`/courses/${courseId}/analytics/${type}`);
+    if (type === 'student_summaries') {
+      return this.fetchPaginated(`/courses/${encodeURIComponent(courseId)}/analytics/${type}`);
+    }
+    let response = await this.http.get(
+      `/courses/${encodeURIComponent(courseId)}/analytics/${type}`
+    );
     return response.data;
   }
 }

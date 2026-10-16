@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchSymbol = SlateTool.create(spec, {
@@ -40,18 +41,18 @@ export let searchSymbol = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let data = await client.symbolSearch({ keywords: ctx.input.keywords });
-    let bestMatches = data.bestMatches || [];
+    let bestMatches = responseRows(data.bestMatches, 'bestMatches');
 
     let matches = bestMatches.map((m: any) => ({
-      symbol: m['1. symbol'] || '',
-      name: m['2. name'] || '',
-      type: m['3. type'] || '',
-      region: m['4. region'] || '',
-      marketOpen: m['5. marketOpen'] || '',
-      marketClose: m['6. marketClose'] || '',
-      timezone: m['7. timezone'] || '',
-      currency: m['8. currency'] || '',
-      matchScore: m['9. matchScore'] || ''
+      symbol: responseText(m['1. symbol'], ' symbol'),
+      name: responseText(m['2. name'], ' name'),
+      type: responseText(m['3. type'], ' type'),
+      region: responseText(m['4. region'], ' region'),
+      marketOpen: responseText(m['5. marketOpen'], ' marketOpen'),
+      marketClose: responseText(m['6. marketClose'], ' marketClose'),
+      timezone: responseText(m['7. timezone'], ' timezone'),
+      currency: responseText(m['8. currency'], ' currency'),
+      matchScore: responseText(m['9. matchScore'], ' matchScore')
     }));
 
     return {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SensiboClient } from '../lib/client';
+import { checked, deviceIdSchema, SensiboClient } from '../lib/client';
+import { validateAcState } from '../lib/state';
 import { spec } from '../spec';
 
 let climateReactAcStateSchema = z.object({
@@ -10,6 +11,20 @@ let climateReactAcStateSchema = z.object({
   temperatureUnit: z.enum(['C', 'F']).optional(),
   fanLevel: z.string().optional(),
   swing: z.string().optional()
+});
+
+let outputSchema = z.object({
+  deviceId: z.string().describe('The device Climate React belongs to'),
+  enabled: z.boolean().describe('Whether Climate React is enabled'),
+  triggerType: z.string().optional().describe('What triggers the automation'),
+  highThreshold: z.number().optional().describe('Upper threshold value'),
+  lowThreshold: z.number().optional().describe('Lower threshold value'),
+  aboveThresholdAcState: climateReactAcStateSchema
+    .optional()
+    .describe('AC state for above-threshold'),
+  belowThresholdAcState: climateReactAcStateSchema
+    .optional()
+    .describe('AC state for below-threshold')
 });
 
 export let manageClimateReactTool = SlateTool.create(spec, {
@@ -26,7 +41,7 @@ export let manageClimateReactTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deviceId: z.string().describe('The unique ID of the Sensibo device'),
+      deviceId: deviceIdSchema,
       action: z.enum(['get', 'enable', 'disable', 'configure']).describe('Action to perform'),
       triggerType: z
         .enum(['temperature', 'feelsLike', 'humidity'])
@@ -48,107 +63,123 @@ export let manageClimateReactTool = SlateTool.create(spec, {
         .describe('AC state to apply when value drops below low threshold')
     })
   )
-  .output(
-    z.object({
-      deviceId: z.string().describe('The device Climate React belongs to'),
-      enabled: z.boolean().describe('Whether Climate React is enabled'),
-      triggerType: z.string().optional().describe('What triggers the automation'),
-      highThreshold: z.number().optional().describe('Upper threshold value'),
-      lowThreshold: z.number().optional().describe('Lower threshold value'),
-      aboveThresholdAcState: climateReactAcStateSchema
-        .optional()
-        .describe('AC state for above-threshold'),
-      belowThresholdAcState: climateReactAcStateSchema
-        .optional()
-        .describe('AC state for below-threshold')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new SensiboClient(ctx.auth.token);
-    let { deviceId, action } = ctx.input;
+    let result = await (async () => {
+      let { deviceId, action } = ctx.input;
 
-    if (action === 'get') {
-      let smartMode = await client.getClimateReact(deviceId);
+      if (action === 'get') {
+        let smartMode = await client.getClimateReact(deviceId);
+        return {
+          output: {
+            deviceId,
+            enabled: smartMode.enabled,
+            triggerType: smartMode?.type,
+            highThreshold: smartMode?.highTemperatureThreshold ?? smartMode?.highThreshold,
+            lowThreshold: smartMode?.lowTemperatureThreshold ?? smartMode?.lowThreshold,
+            aboveThresholdAcState:
+              smartMode?.highTemperatureState ?? smartMode?.aboveThresholdState,
+            belowThresholdAcState:
+              smartMode?.lowTemperatureState ?? smartMode?.belowThresholdState
+          },
+          message: smartMode?.enabled
+            ? `Climate React is **enabled** on device **${deviceId}** (trigger: ${smartMode.type}).`
+            : `Climate React is **disabled** on device **${deviceId}**.`
+        };
+      }
+
+      if (action === 'enable') {
+        let result = await client.updateClimateReact(deviceId, { enabled: true });
+        return {
+          output: {
+            deviceId,
+            enabled: result.enabled,
+            triggerType: result?.type,
+            highThreshold: result?.highTemperatureThreshold ?? result?.highThreshold,
+            lowThreshold: result?.lowTemperatureThreshold ?? result?.lowThreshold,
+            aboveThresholdAcState: result?.highTemperatureState ?? result?.aboveThresholdState,
+            belowThresholdAcState: result?.lowTemperatureState ?? result?.belowThresholdState
+          },
+          message: `Climate React **enabled** on device **${deviceId}**.`
+        };
+      }
+
+      if (action === 'disable') {
+        let result = await client.updateClimateReact(deviceId, { enabled: false });
+        return {
+          output: {
+            deviceId,
+            enabled: result.enabled,
+            triggerType: result?.type,
+            highThreshold: result?.highTemperatureThreshold ?? result?.highThreshold,
+            lowThreshold: result?.lowTemperatureThreshold ?? result?.lowThreshold,
+            aboveThresholdAcState: result?.highTemperatureState ?? result?.aboveThresholdState,
+            belowThresholdAcState: result?.lowTemperatureState ?? result?.belowThresholdState
+          },
+          message: `Climate React **disabled** on device **${deviceId}**.`
+        };
+      }
+
+      // The public schema retains the existing trigger enum; validate values without inventing thresholds.
+      if (
+        ctx.input.lowThreshold !== undefined &&
+        ctx.input.highThreshold !== undefined &&
+        ctx.input.lowThreshold >= ctx.input.highThreshold
+      )
+        throw createApiServiceError('lowThreshold must be less than highThreshold.');
+      if (
+        [
+          ctx.input.triggerType,
+          ctx.input.lowThreshold,
+          ctx.input.highThreshold,
+          ctx.input.aboveThresholdAcState,
+          ctx.input.belowThresholdAcState
+        ].every(value => value === undefined)
+      )
+        throw createApiServiceError('Provide at least one Climate React configuration field.');
+      if (ctx.input.aboveThresholdAcState || ctx.input.belowThresholdAcState) {
+        let device = await client.getDevice(deviceId);
+        if (ctx.input.aboveThresholdAcState)
+          validateAcState(ctx.input.aboveThresholdAcState, device);
+        if (ctx.input.belowThresholdAcState)
+          validateAcState(ctx.input.belowThresholdAcState, device);
+      }
+      let configData: Record<string, any> = {
+        enabled: true
+      };
+      if (ctx.input.triggerType) configData.type = ctx.input.triggerType;
+      if (ctx.input.highThreshold !== undefined) {
+        configData.highTemperatureThreshold = ctx.input.highThreshold;
+      }
+      if (ctx.input.lowThreshold !== undefined) {
+        configData.lowTemperatureThreshold = ctx.input.lowThreshold;
+      }
+      if (ctx.input.aboveThresholdAcState) {
+        configData.highTemperatureState = ctx.input.aboveThresholdAcState;
+      }
+      if (ctx.input.belowThresholdAcState) {
+        configData.lowTemperatureState = ctx.input.belowThresholdAcState;
+      }
+
+      let result = await client.configureClimateReact(deviceId, configData);
       return {
         output: {
           deviceId,
-          enabled: smartMode?.enabled ?? false,
-          triggerType: smartMode?.type,
-          highThreshold: smartMode?.highTemperatureThreshold ?? smartMode?.highThreshold,
-          lowThreshold: smartMode?.lowTemperatureThreshold ?? smartMode?.lowThreshold,
-          aboveThresholdAcState:
-            smartMode?.highTemperatureState ?? smartMode?.aboveThresholdState,
-          belowThresholdAcState:
-            smartMode?.lowTemperatureState ?? smartMode?.belowThresholdState
+          enabled: result.enabled,
+          triggerType: result.type,
+          highThreshold: result.highTemperatureThreshold,
+          lowThreshold: result.lowTemperatureThreshold,
+          aboveThresholdAcState: result.highTemperatureState,
+          belowThresholdAcState: result.lowTemperatureState
         },
-        message: smartMode?.enabled
-          ? `Climate React is **enabled** on device **${deviceId}** (trigger: ${smartMode.type}).`
-          : `Climate React is **disabled** on device **${deviceId}**.`
+        message: `Climate React **configured** on device **${deviceId}** with trigger type "${ctx.input.triggerType}" (thresholds: ${ctx.input.lowThreshold}-${ctx.input.highThreshold}).`
       };
-    }
-
-    if (action === 'enable') {
-      let result = await client.updateClimateReact(deviceId, { enabled: true });
-      return {
-        output: {
-          deviceId,
-          enabled: true,
-          triggerType: result?.type,
-          highThreshold: result?.highTemperatureThreshold ?? result?.highThreshold,
-          lowThreshold: result?.lowTemperatureThreshold ?? result?.lowThreshold,
-          aboveThresholdAcState: result?.highTemperatureState ?? result?.aboveThresholdState,
-          belowThresholdAcState: result?.lowTemperatureState ?? result?.belowThresholdState
-        },
-        message: `Climate React **enabled** on device **${deviceId}**.`
-      };
-    }
-
-    if (action === 'disable') {
-      let result = await client.updateClimateReact(deviceId, { enabled: false });
-      return {
-        output: {
-          deviceId,
-          enabled: false,
-          triggerType: result?.type,
-          highThreshold: result?.highTemperatureThreshold ?? result?.highThreshold,
-          lowThreshold: result?.lowTemperatureThreshold ?? result?.lowThreshold,
-          aboveThresholdAcState: result?.highTemperatureState ?? result?.aboveThresholdState,
-          belowThresholdAcState: result?.lowTemperatureState ?? result?.belowThresholdState
-        },
-        message: `Climate React **disabled** on device **${deviceId}**.`
-      };
-    }
-
-    // action === 'configure'
-    let configData: Record<string, any> = {
-      enabled: true
-    };
-    if (ctx.input.triggerType) configData.type = ctx.input.triggerType;
-    if (ctx.input.highThreshold !== undefined) {
-      configData.highTemperatureThreshold = ctx.input.highThreshold;
-    }
-    if (ctx.input.lowThreshold !== undefined) {
-      configData.lowTemperatureThreshold = ctx.input.lowThreshold;
-    }
-    if (ctx.input.aboveThresholdAcState) {
-      configData.highTemperatureState = ctx.input.aboveThresholdAcState;
-    }
-    if (ctx.input.belowThresholdAcState) {
-      configData.lowTemperatureState = ctx.input.belowThresholdAcState;
-    }
-
-    let result = await client.configureClimateReact(deviceId, configData);
+    })();
     return {
-      output: {
-        deviceId,
-        enabled: result?.enabled ?? true,
-        triggerType: result?.type ?? ctx.input.triggerType,
-        highThreshold: result?.highTemperatureThreshold ?? ctx.input.highThreshold,
-        lowThreshold: result?.lowTemperatureThreshold ?? ctx.input.lowThreshold,
-        aboveThresholdAcState: result?.highTemperatureState ?? ctx.input.aboveThresholdAcState,
-        belowThresholdAcState: result?.lowTemperatureState ?? ctx.input.belowThresholdAcState
-      },
-      message: `Climate React **configured** on device **${deviceId}** with trigger type "${ctx.input.triggerType}" (thresholds: ${ctx.input.lowThreshold}-${ctx.input.highThreshold}).`
+      ...result,
+      output: checked(outputSchema, client.sanitize(result.output), 'tool output'),
+      message: client.sanitize(result.message)
     };
   })
   .build();

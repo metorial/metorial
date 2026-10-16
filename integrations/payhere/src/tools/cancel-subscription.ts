@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let cancelSubscription = SlateTool.create(spec, {
   name: 'Cancel Subscription',
   key: 'cancel_subscription',
-  description: `Cancel an active subscription. This stops future billing for the customer on the associated plan.`,
+  description: `Stop future billing for a subscription. The subscription remains active until the current billing period ends.`,
   constraints: [
     'This action cannot be undone. The customer will need to re-subscribe if they want to resume.'
   ],

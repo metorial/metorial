@@ -19,7 +19,7 @@ export let listServiceDesksTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of service desks'),
+      total: z.number().describe('Number of service desks on this page'),
       serviceDesks: z
         .array(
           z.object({
@@ -33,10 +33,7 @@ export let listServiceDesksTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let result = await client.getServiceDesks(ctx.input.start, ctx.input.limit);
 

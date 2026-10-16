@@ -24,7 +24,11 @@ export let subtitleNotes = SlateTool.create(spec, {
       notes: z
         .array(
           z.object({
-            username: z.string().describe('Username of the note author'),
+            username: z
+              .string()
+              .optional()
+              .describe('Username of the note author, when returned'),
+            userId: z.string().optional().describe('Stable ID of the note author'),
             datetime: z.string().describe('When the note was created (ISO 8601)'),
             body: z.string().describe('Note content')
           })
@@ -49,8 +53,9 @@ export let subtitleNotes = SlateTool.create(spec, {
           added: true,
           notes: [
             {
-              username: note.user?.username ?? '',
-              datetime: note.datetime,
+              username: note.user.username,
+              userId: note.user.id,
+              datetime: note.created ?? note.datetime,
               body: note.body
             }
           ]
@@ -61,8 +66,9 @@ export let subtitleNotes = SlateTool.create(spec, {
 
     let result = await client.listSubtitleNotes(ctx.input.videoId, ctx.input.languageCode);
     let notes = result.objects.map(n => ({
-      username: n.user?.username ?? '',
-      datetime: n.datetime,
+      username: n.user.username,
+      userId: n.user.id,
+      datetime: n.created ?? n.datetime,
       body: n.body
     }));
 

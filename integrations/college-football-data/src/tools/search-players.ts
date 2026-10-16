@@ -15,8 +15,15 @@ export let searchPlayers = SlateTool.create(spec, {
     z.object({
       searchTerm: z.string().describe('Player name or partial name to search for'),
       year: z.number().optional().describe('Filter by season year'),
+      position: z.string().optional().describe('Player position abbreviation'),
       team: z.string().optional().describe('Filter by team name'),
-      limit: z.number().optional().default(25).describe('Maximum number of results to return')
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe(
+          'Maximum results to return locally; the provider returns at most 100 matches'
+        )
     })
   )
   .output(

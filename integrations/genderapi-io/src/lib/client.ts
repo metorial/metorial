@@ -1,128 +1,102 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
+import {
+  type PredictionInput,
+  predictionBatchResponseSchema,
+  predictionResponseSchema
+} from './schemas';
 
-export interface GenderResult {
-  name: string;
-  q: string;
-  gender: string | null;
-  country: string;
-  totalNames: number;
-  probability: number;
-}
+let genderResultSchema = z.object({
+  name: z.string(),
+  q: z.string(),
+  gender: z.string().nullable(),
+  country: z.string(),
+  total_names: z.number().int(),
+  probability: z.number().int(),
+  id: z.string().optional()
+});
+let singleResponseSchema = genderResultSchema.extend({
+  status: z.literal(true),
+  used_credits: z.number().int(),
+  remaining_credits: z.number().int()
+});
+let bulkResponseSchema = z.object({
+  status: z.literal(true),
+  used_credits: z.number().int(),
+  remaining_credits: z.number().int(),
+  names: z.array(genderResultSchema)
+});
+let phoneResponseSchema = z.object({
+  status: z.literal(true),
+  regionCode: z.string(),
+  countryCode: z.number().int(),
+  country: z.string(),
+  national: z.string(),
+  international: z.string(),
+  e164: z.string(),
+  isValid: z.boolean(),
+  isPossible: z.boolean(),
+  numberType: z.string(),
+  nationalSignificantNumber: z.string(),
+  rawInput: z.string(),
+  isGeographical: z.boolean(),
+  areaCode: z.string(),
+  location: z.string()
+});
+let usageResponseSchema = z.object({
+  status: z.literal(true),
+  remaining: z.number().int(),
+  expiresAt: z.number().int().nonnegative()
+});
 
-export interface GenderSingleResponse {
-  status: boolean;
-  usedCredits: number;
-  remainingCredits: number;
-  expires: number;
-  q: string;
-  name: string;
-  gender: string | null;
-  country: string;
-  totalNames: number;
-  probability: number;
-  duration: string;
-}
-
-export interface GenderBulkResponse {
-  status: boolean;
-  usedCredits: number;
-  remainingCredits: number;
-  expires: number;
-  names: Array<{
-    name: string;
-    q: string;
-    gender: string | null;
-    country: string;
-    totalNames: number;
-    probability: number;
-    id?: string;
-  }>;
-  duration: string;
-}
-
-export interface PhoneValidationResponse {
-  status: boolean;
-  remainingCredits: number;
-  expires: number;
-  duration: string;
-  regionCode: string;
-  countryCode: number;
-  country: string;
-  national: string;
-  international: string;
-  e164: string;
-  isValid: boolean;
-  isPossible: boolean;
-  numberType: string;
-  nationalSignificantNumber: string;
-  rawInput: string;
-  isGeographical: boolean;
-  areaCode: string;
-  location: string;
-}
-
-export interface UsageResponse {
-  status: boolean;
-  remaining: number;
-  expiresAt: number;
-}
-
-let mapGenderSingleResponse = (data: any): GenderSingleResponse => ({
-  status: data.status,
-  usedCredits: data.used_credits,
-  remainingCredits: data.remaining_credits,
-  expires: data.expires,
-  q: data.q,
+let mapGenderResult = (data: z.infer<typeof genderResultSchema>) => ({
   name: data.name,
-  gender: data.gender ?? null,
+  q: data.q,
+  gender: data.gender,
   country: data.country,
   totalNames: data.total_names,
   probability: data.probability,
-  duration: data.duration
+  id: data.id
 });
-
-let mapGenderBulkResponse = (data: any): GenderBulkResponse => ({
-  status: data.status,
+let mapSingleResponse = (data: z.infer<typeof singleResponseSchema>) => ({
+  ...mapGenderResult(data),
   usedCredits: data.used_credits,
-  remainingCredits: data.remaining_credits,
-  expires: data.expires,
-  names: (data.names || []).map((n: any) => ({
-    name: n.name,
-    q: n.q,
-    gender: n.gender ?? null,
-    country: n.country,
-    totalNames: n.total_names,
-    probability: n.probability,
-    id: n.id
-  })),
-  duration: data.duration
+  remainingCredits: data.remaining_credits
+});
+let mapBulkResponse = (data: z.infer<typeof bulkResponseSchema>) => ({
+  names: data.names.map(mapGenderResult),
+  usedCredits: data.used_credits,
+  remainingCredits: data.remaining_credits
 });
 
-let mapPhoneResponse = (data: any): PhoneValidationResponse => ({
-  status: data.status,
-  remainingCredits: data.remaining_credits,
-  expires: data.expires,
-  duration: data.duration,
-  regionCode: data.regionCode,
-  countryCode: data.countryCode,
-  country: data.country,
-  national: data.national,
-  international: data.international,
-  e164: data.e164,
-  isValid: data.isValid,
-  isPossible: data.isPossible,
-  numberType: data.numberType,
-  nationalSignificantNumber: data.nationalSignificantNumber,
-  rawInput: data.rawInput,
-  isGeographical: data.isGeographical,
-  areaCode: data.areaCode,
-  location: data.location
-});
+export type GenderSingleResponse = ReturnType<typeof mapSingleResponse>;
+export type GenderBulkResponse = ReturnType<typeof mapBulkResponse>;
+
+export let requireText = (value: string, field: string) => {
+  if (!value.trim()) throw createApiServiceError(`${field} must not be empty.`);
+};
+
+let toPredictionRequest = (input: PredictionInput, batch: boolean) => {
+  let mode = input.aiMode ?? (batch ? 'off' : 'fallback');
+  if (input.forceToGenderize && mode !== 'fallback') {
+    throw createApiServiceError('forceToGenderize requires aiMode "fallback".');
+  }
+  return {
+    type: input.type,
+    value: input.value,
+    ...(input.country !== undefined ? { country: input.country } : {}),
+    ...(input.forceToGenderize !== undefined
+      ? { forceToGenderize: input.forceToGenderize }
+      : {}),
+    ...(input.aiMode !== undefined ? { options: { ai_mode: input.aiMode } } : {})
+  };
+};
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
+    requireText(config.token, 'API key');
     this.axios = createAxios({
       baseURL: 'https://api.genderapi.io',
       headers: {
@@ -132,19 +106,75 @@ export class Client {
     });
   }
 
+  private async request<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    schema: z.ZodType<T>,
+    data?: unknown
+  ): Promise<T> {
+    try {
+      let response = await this.axios.request<unknown>({ method, url: path, data });
+      let body = response.data;
+      if (body && typeof body === 'object' && 'status' in body && body.status === false) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'GenderAPI.io',
+            reason: 'genderapi_request_failed',
+            operation: path,
+            detailKeys: ['errmsg', 'detail', 'message', 'title'],
+            extractUpstreamCode: (_error, result) => {
+              let value = result?.data;
+              return value && typeof value === 'object' && 'errno' in value
+                ? String(value.errno)
+                : undefined;
+            }
+          }
+        );
+      }
+      let result = schema.safeParse(body);
+      if (!result.success) {
+        throw createApiServiceError(`GenderAPI.io returned an invalid response for ${path}.`, {
+          reason: 'genderapi_invalid_response'
+        });
+      }
+      if (
+        path.startsWith('/api/v2/') &&
+        body &&
+        typeof body === 'object' &&
+        'meta' in body &&
+        body.meta &&
+        typeof body.meta === 'object' &&
+        'access' in body.meta &&
+        body.meta.access &&
+        typeof body.meta.access === 'object' &&
+        'mode' in body.meta.access &&
+        body.meta.access.mode !== 'api_key'
+      ) {
+        throw createApiServiceError(
+          'GenderAPI.io did not accept the saved API key. Reconnect with a valid API key. The request used trial access; inspect your balance before retrying.',
+          { reason: 'genderapi_api_key_not_accepted' }
+        );
+      }
+      return result.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'GenderAPI.io',
+        reason: 'genderapi_request_failed',
+        operation: path,
+        detailKeys: ['errmsg', 'detail', 'message', 'title'],
+        extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure)
+      });
+    }
+  }
+
   async detectGenderFromName(params: {
     name: string;
     country?: string;
     askToAI?: boolean;
     forceToGenderize?: boolean;
   }): Promise<GenderSingleResponse> {
-    let body: Record<string, any> = { name: params.name };
-    if (params.country) body.country = params.country;
-    if (params.askToAI !== undefined) body.askToAI = params.askToAI;
-    if (params.forceToGenderize !== undefined) body.forceToGenderize = params.forceToGenderize;
-
-    let response = await this.axios.post('/api', body);
-    return mapGenderSingleResponse(response.data);
+    return mapSingleResponse(await this.request('POST', '/api', singleResponseSchema, params));
   }
 
   async detectGenderFromEmail(params: {
@@ -152,12 +182,9 @@ export class Client {
     country?: string;
     askToAI?: boolean;
   }): Promise<GenderSingleResponse> {
-    let body: Record<string, any> = { email: params.email };
-    if (params.country) body.country = params.country;
-    if (params.askToAI !== undefined) body.askToAI = params.askToAI;
-
-    let response = await this.axios.post('/api/email', body);
-    return mapGenderSingleResponse(response.data);
+    return mapSingleResponse(
+      await this.request('POST', '/api/email', singleResponseSchema, params)
+    );
   }
 
   async detectGenderFromUsername(params: {
@@ -166,59 +193,72 @@ export class Client {
     askToAI?: boolean;
     forceToGenderize?: boolean;
   }): Promise<GenderSingleResponse> {
-    let body: Record<string, any> = { username: params.username };
-    if (params.country) body.country = params.country;
-    if (params.askToAI !== undefined) body.askToAI = params.askToAI;
-    if (params.forceToGenderize !== undefined) body.forceToGenderize = params.forceToGenderize;
-
-    let response = await this.axios.post('/api/username', body);
-    return mapGenderSingleResponse(response.data);
+    return mapSingleResponse(
+      await this.request('POST', '/api/username', singleResponseSchema, params)
+    );
   }
 
   async detectGenderFromNamesBulk(params: {
     data: Array<{ name: string; country?: string; id?: string }>;
   }): Promise<GenderBulkResponse> {
-    let response = await this.axios.post('/api/name/multi/country', {
-      data: params.data
-    });
-    return mapGenderBulkResponse(response.data);
+    return mapBulkResponse(
+      await this.request('POST', '/api/name/multi/country', bulkResponseSchema, params)
+    );
   }
 
   async detectGenderFromEmailsBulk(params: {
     data: Array<{ email: string; country?: string; id?: string }>;
   }): Promise<GenderBulkResponse> {
-    let response = await this.axios.post('/api/email/multi/country', {
-      data: params.data
-    });
-    return mapGenderBulkResponse(response.data);
+    return mapBulkResponse(
+      await this.request('POST', '/api/email/multi/country', bulkResponseSchema, params)
+    );
   }
 
   async detectGenderFromUsernamesBulk(params: {
     data: Array<{ username: string; country?: string; id?: string }>;
   }): Promise<GenderBulkResponse> {
-    let response = await this.axios.post('/api/username/multi/country', {
-      data: params.data
-    });
-    return mapGenderBulkResponse(response.data);
+    return mapBulkResponse(
+      await this.request('POST', '/api/username/multi/country', bulkResponseSchema, params)
+    );
   }
 
-  async validatePhoneNumber(params: {
-    number: string;
-    address?: string;
-  }): Promise<PhoneValidationResponse> {
-    let body: Record<string, any> = { number: params.number };
-    if (params.address) body.address = params.address;
-
-    let response = await this.axios.post('/api/phone', body);
-    return mapPhoneResponse(response.data);
+  async validatePhoneNumber(params: { number: string; address?: string }) {
+    return this.request('POST', '/api/phone', phoneResponseSchema, params);
   }
 
-  async getUsage(): Promise<UsageResponse> {
-    let response = await this.axios.get('/api/remaining');
-    return {
-      status: response.data.status,
-      remaining: response.data.remaining,
-      expiresAt: response.data.expiresAt
-    };
+  async getUsage() {
+    return this.request('GET', '/api/remaining', usageResponseSchema);
+  }
+
+  async predictGender(input: PredictionInput) {
+    return this.request(
+      'POST',
+      '/api/v2/gender',
+      predictionResponseSchema,
+      toPredictionRequest(input, false)
+    );
+  }
+
+  async predictGenderBatch(items: Array<PredictionInput & { id?: string }>) {
+    let result = await this.request(
+      'POST',
+      '/api/v2/gender/batch',
+      predictionBatchResponseSchema,
+      {
+        items: items.map(item => ({
+          ...toPredictionRequest(item, true),
+          ...(item.id !== undefined ? { id: item.id } : {})
+        }))
+      }
+    );
+    if (
+      result.data.length !== items.length ||
+      result.data.some((item, index) => item.index !== index)
+    ) {
+      throw createApiServiceError('GenderAPI.io returned an invalid ordered batch response.', {
+        reason: 'genderapi_invalid_response'
+      });
+    }
+    return result;
   }
 }

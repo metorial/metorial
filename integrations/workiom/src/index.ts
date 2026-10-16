@@ -7,9 +7,11 @@ import {
   deleteWebhookSubscription,
   getApps,
   getListMetadata,
+  getWebhookSubscription,
   listWebhookSubscriptions,
   queryRecords,
-  updateRecord
+  updateRecord,
+  updateWebhookSubscription
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -22,7 +24,9 @@ export let provider = Slate.create({
     deleteRecord,
     listWebhookSubscriptions,
     createWebhookSubscription,
-    deleteWebhookSubscription
+    deleteWebhookSubscription,
+    getWebhookSubscription,
+    updateWebhookSubscription
   ],
   triggers: []
 });

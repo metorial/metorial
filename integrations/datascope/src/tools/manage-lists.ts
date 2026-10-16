@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, expectArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getListElements = SlateTool.create(spec, {
@@ -31,7 +31,10 @@ export let getListElements = SlateTool.create(spec, {
 
     if (ctx.input.elementId) {
       let result = await client.getListElement(ctx.input.listName, ctx.input.elementId);
-      let elements = result ? [result] : [];
+      if (!isApiErrorRecord(result)) {
+        throw createApiServiceError('DataScope returned an invalid list element response.');
+      }
+      let elements = [result];
       return {
         output: { elements, count: elements.length },
         message: `Retrieved element **${ctx.input.elementId}** from list **"${ctx.input.listName}"**.`
@@ -39,7 +42,7 @@ export let getListElements = SlateTool.create(spec, {
     }
 
     let results = await client.getListElements(ctx.input.listName);
-    let elements = Array.isArray(results) ? results : [];
+    let elements = expectArray(results, 'list elements');
 
     return {
       output: { elements, count: elements.length },
@@ -199,12 +202,42 @@ Use this for syncing or resetting list contents. Does **not** apply to locations
       elements: ctx.input.elements
     });
 
+    if (!isApiErrorRecord(result) || typeof result.length !== 'number') {
+      throw createApiServiceError('DataScope did not return the resulting list length.');
+    }
+
     return {
       output: {
         response: result,
-        elementCount: ctx.input.elements.length
+        elementCount: result.length
       },
-      message: `Replaced all elements in list **"${ctx.input.listName}"** with **${ctx.input.elements.length}** element(s).`
+      message: `Replaced all elements in list **"${ctx.input.listName}"** with **${result.length}** active element(s).`
     };
+  })
+  .build();
+
+export let updateList = SlateTool.create(spec, {
+  name: 'Update List',
+  key: 'update_list',
+  description:
+    'Update the name, description, code, or type of an existing custom list without replacing its elements.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      listId: z
+        .string()
+        .describe('Internal list ID returned when creating a list or by list element records'),
+      name: z.string().optional().describe('New list name'),
+      description: z.string().optional().describe('New list description'),
+      code: z.string().optional().describe('New list code'),
+      listType: z.enum(['standard', 'percent', 'price']).optional().describe('New list type')
+    })
+  )
+  .output(z.object({ list: z.any().describe('Unmodified updated list record') }))
+  .handleInvocation(async ctx => {
+    let { listId, ...fields } = ctx.input;
+    let list = await new Client(ctx.auth).updateList(listId, fields);
+    return { output: { list }, message: 'Updated the custom list.' };
   })
   .build();

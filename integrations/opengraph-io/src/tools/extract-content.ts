@@ -46,6 +46,7 @@ Use this for content analysis, text extraction, or preparing webpage content for
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       tags: z
         .array(
           z.object({
@@ -81,15 +82,20 @@ Use this for content analysis, text extraction, or preparing webpage content for
       acceptLang: ctx.input.acceptLang
     });
 
-    let tagCount = result.tags?.length ?? 0;
-    let textLength = result.concatenatedText?.length ?? 0;
+    let tagCount = result.tags.length;
+    let textInfo =
+      result.concatenatedText !== undefined
+        ? ` with **${result.concatenatedText.length.toLocaleString()}** characters of concatenated text`
+        : '';
 
     return {
       output: {
-        tags: result.tags ?? [],
+        raw: result,
+        tags: result.tags,
         concatenatedText: result.concatenatedText,
         requestInfo: result.requestInfo
       },
-      message: `Extracted **${tagCount}** elements from \`${ctx.input.url}\` with **${textLength.toLocaleString()}** characters of concatenated text.`
+      message: `Extracted **${tagCount}** elements from \`${ctx.input.url}\`${textInfo}.`
     };
-  });
+  })
+  .build();

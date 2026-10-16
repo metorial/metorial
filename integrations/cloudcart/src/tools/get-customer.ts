@@ -22,6 +22,7 @@ export let getCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       customerId: z.string(),
       firstName: z.string().optional(),
       lastName: z.string().optional(),
@@ -50,21 +51,22 @@ export let getCustomer = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         customerId: c.id,
-        firstName: c.attributes.first_name,
-        lastName: c.attributes.last_name,
-        email: c.attributes.email,
-        groupId: c.attributes.group_id,
+        firstName: c.attributes.first_name ?? undefined,
+        lastName: c.attributes.last_name ?? undefined,
+        email: c.attributes.email ?? undefined,
+        groupId: c.attributes.group_id == null ? undefined : String(c.attributes.group_id),
         active: c.attributes.active,
         isActivated: c.attributes.is_activated,
         emailConfirmed: c.attributes.email_confirmed,
         banned: c.attributes.banned,
-        bannedReason: c.attributes.banned_reason,
+        bannedReason: c.attributes.banned_reason ?? undefined,
         newsletter: c.attributes.newsletter,
         marketing: c.attributes.marketing,
-        note: c.attributes.note,
-        dateAdded: c.attributes.date_added,
-        updatedAt: c.attributes.updated_at,
+        note: c.attributes.note ?? undefined,
+        dateAdded: c.attributes.date_added ?? undefined,
+        updatedAt: c.attributes.updated_at ?? undefined,
         relationships: c.relationships,
         included: res.included
       },

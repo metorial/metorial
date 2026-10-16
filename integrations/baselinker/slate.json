@@ -1,16 +1,15 @@
 {
   "name": "@metorial/baselinker",
-  "description": "Manage e-commerce operations across multiple sales channels. Create, update, and retrieve orders with filtering by date, status, email, or phone. Manage product catalogs including variants, images, prices, and descriptions. Track and update inventory stock levels across warehouses and external storages. Create courier shipments, generate shipping labels, and request parcel pickups. Process order returns and refunds. Manage purchase orders, suppliers, and inventory documents for stock movements. Poll order event journals to track order creation, status changes, and removals.",
+  "description": "Manage BaseLinker orders, products, inventory stock and prices, courier shipments, shipping label downloads, and order returns. Discover catalogs, warehouses, price groups, statuses and courier accounts, read external storage products, and retrieve recent order journal events.",
   "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
   "skills": [
     "manage orders",
     "manage product catalog",
     "track inventory stock levels",
     "create courier shipments",
-    "generate shipping labels",
+    "download shipping labels",
     "process order returns",
-    "manage purchase orders",
-    "poll order event journals",
+    "read order event journals",
     "manage external storages",
     "update order statuses"
   ],

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,23 +41,23 @@ export let manageSubscription = SlateTool.create(spec, {
 
     if (ctx.input.action === 'subscribe') {
       if (!ctx.input.channelTag) {
-        throw new Error('channelTag is required for subscribing');
+        throw createApiServiceError('channelTag is required for subscribing');
       }
       let sub = await client.createSubscription(ctx.input.channelTag);
       return {
         output: {
           subscriptionIden: sub.iden,
           action: 'subscribe',
-          channelTag: sub.channel.tag,
-          channelName: sub.channel.name,
+          channelTag: sub.channel?.tag,
+          channelName: sub.channel?.name,
           muted: sub.muted
         },
-        message: `Subscribed to channel **${sub.channel.name}** (#${sub.channel.tag}).`
+        message: `Subscribed to channel **${sub.channel?.name ?? sub.iden}** (#${sub.channel?.tag ?? ctx.input.channelTag}).`
       };
     }
 
     if (!ctx.input.subscriptionIden) {
-      throw new Error(
+      throw createApiServiceError(
         'subscriptionIden is required for mute, unmute, and unsubscribe actions'
       );
     }
@@ -69,11 +69,11 @@ export let manageSubscription = SlateTool.create(spec, {
         output: {
           subscriptionIden: sub.iden,
           action: ctx.input.action,
-          channelTag: sub.channel.tag,
-          channelName: sub.channel.name,
+          channelTag: sub.channel?.tag,
+          channelName: sub.channel?.name,
           muted: sub.muted
         },
-        message: `Subscription to **${sub.channel.name}** has been **${ctx.input.action}d**.`
+        message: `Subscription to **${sub.channel?.name ?? sub.iden}** has been **${ctx.input.action}d**.`
       };
     }
 

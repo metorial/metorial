@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSubscriber = SlateTool.create(spec, {
@@ -19,16 +19,23 @@ export let getSubscriber = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       email: z.string().describe('Subscriber email address'),
-      status: z.string().describe('Subscriber status (active, pending, or unsubscribed)'),
-      score: z.number().describe('Subscriber engagement score'),
+      status: z
+        .string()
+        .optional()
+        .describe('Subscriber status (active, pending, or unsubscribed)'),
+      score: z.number().optional().describe('Subscriber engagement score'),
       fields: z
         .array(
           z.object({
             name: z.string().describe('Field name'),
-            value: z.string().describe('Field value')
+            value: z.string().optional().describe('Field value')
           })
         )
+        .optional()
         .describe('Custom field values for the subscriber'),
       unsubscriptionDate: z
         .string()
@@ -50,14 +57,15 @@ export let getSubscriber = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: subscriber.raw,
         email: subscriber.email,
         status: subscriber.status,
         score: subscriber.score,
-        fields: subscriber.fields ?? [],
+        fields: subscriber.fields,
         unsubscriptionDate: subscriber.unsubscriptionDate,
         unsubscriptionType: subscriber.unsubscriptionType
       },
-      message: `Subscriber **${subscriber.email}** is **${subscriber.status}** with a score of ${subscriber.score}.`
+      message: `Retrieved subscriber **${subscriber.email}**.`
     };
   })
   .build();

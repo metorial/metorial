@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listDatabases = SlateTool.create(spec, {
@@ -64,20 +64,16 @@ export let listDatabases = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
-    if (!ctx.input.workspaceId) {
+    if (ctx.input.workspaceId === undefined) {
       let workspaces = await client.listWorkspaces();
       return {
         output: {
           workspaces: workspaces.map((w: any) => ({
+            ...w,
             workspaceId: w.id,
-            name: w.name,
-            ...w
+            name: w.name
           }))
         },
         message: `Found **${workspaces.length}** workspace(s). Provide a workspace ID to list its databases.`
@@ -87,18 +83,23 @@ export let listDatabases = SlateTool.create(spec, {
     let apps = await client.listApplications(ctx.input.workspaceId);
     let databases = apps
       .filter((a: any) => a.type === 'database')
-      .map((a: any) => ({
-        databaseId: a.id,
-        name: a.name,
-        type: a.type,
-        workspaceId: a.workspace?.id ?? a.group?.id ?? ctx.input.workspaceId,
-        tables: (a.tables || []).map((t: any) => ({
-          tableId: t.id,
-          name: t.name,
-          ...t
-        })),
-        ...a
-      }));
+      .map((a: any) => {
+        let workspaceId = a.workspace?.id ?? a.group?.id;
+        if (typeof workspaceId !== 'number' || !Array.isArray(a.tables))
+          throw createApiServiceError('Baserow returned a malformed database response.');
+        return {
+          ...a,
+          databaseId: a.id,
+          workspaceId,
+          tables: a.tables.map((t: any) => {
+            if (typeof t.id !== 'number' || typeof t.name !== 'string')
+              throw createApiServiceError(
+                'Baserow returned a malformed database table response.'
+              );
+            return { ...t, tableId: t.id, name: t.name };
+          })
+        };
+      });
 
     return {
       output: { databases },

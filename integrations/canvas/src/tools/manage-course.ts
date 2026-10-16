@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCourseTool = SlateTool.create(spec, {
@@ -22,7 +22,9 @@ export let manageCourseTool = SlateTool.create(spec, {
       accountId: z
         .string()
         .optional()
-        .describe('Account ID (required for creating a new course)'),
+        .describe(
+          'Account ID for creation. Call list_course_creation_accounts to discover permitted accounts.'
+        ),
       action: z.enum(['create', 'update', 'delete', 'conclude']).describe('Action to perform'),
       name: z.string().optional().describe('Course name'),
       courseCode: z.string().optional().describe('Course code / short name'),
@@ -59,6 +61,7 @@ export let manageCourseTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       courseId: z.string().describe('Canvas course ID'),
       name: z.string().describe('Course name'),
       courseCode: z.string().optional().describe('Course code'),
@@ -66,23 +69,20 @@ export let manageCourseTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let courseData: Record<string, any> = {};
-    if (ctx.input.name) courseData.name = ctx.input.name;
-    if (ctx.input.courseCode) courseData.course_code = ctx.input.courseCode;
-    if (ctx.input.startAt) courseData.start_at = ctx.input.startAt;
-    if (ctx.input.endAt) courseData.end_at = ctx.input.endAt;
-    if (ctx.input.license) courseData.license = ctx.input.license;
+    if (ctx.input.name !== undefined) courseData.name = ctx.input.name;
+    if (ctx.input.courseCode !== undefined) courseData.course_code = ctx.input.courseCode;
+    if (ctx.input.startAt !== undefined) courseData.start_at = ctx.input.startAt;
+    if (ctx.input.endAt !== undefined) courseData.end_at = ctx.input.endAt;
+    if (ctx.input.license !== undefined) courseData.license = ctx.input.license;
     if (ctx.input.isPublic !== undefined) courseData.is_public = ctx.input.isPublic;
     if (ctx.input.isPublicToAuthUsers !== undefined)
       courseData.is_public_to_auth_users = ctx.input.isPublicToAuthUsers;
     if (ctx.input.publicSyllabus !== undefined)
       courseData.public_syllabus = ctx.input.publicSyllabus;
-    if (ctx.input.publicDescription)
+    if (ctx.input.publicDescription !== undefined)
       courseData.public_description = ctx.input.publicDescription;
     if (ctx.input.allowStudentWikiEdits !== undefined)
       courseData.allow_student_wiki_edits = ctx.input.allowStudentWikiEdits;
@@ -91,7 +91,8 @@ export let manageCourseTool = SlateTool.create(spec, {
     if (ctx.input.allowStudentForumAttachments !== undefined)
       courseData.allow_student_forum_attachments = ctx.input.allowStudentForumAttachments;
     if (ctx.input.defaultView) courseData.default_view = ctx.input.defaultView;
-    if (ctx.input.syllabusBody) courseData.syllabus_body = ctx.input.syllabusBody;
+    if (ctx.input.syllabusBody !== undefined)
+      courseData.syllabus_body = ctx.input.syllabusBody;
     if (ctx.input.termId) courseData.term_id = ctx.input.termId;
     if (ctx.input.restrictEnrollmentsToCourseDates !== undefined)
       courseData.restrict_enrollments_to_course_dates =
@@ -102,24 +103,34 @@ export let manageCourseTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.accountId)
-        throw new Error('accountId is required when creating a course');
+        throw createApiServiceError('accountId is required when creating a course');
       result = await client.createCourse(ctx.input.accountId, courseData);
       actionDesc = 'Created';
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.courseId) throw new Error('courseId is required when updating a course');
+      if (!ctx.input.courseId)
+        throw createApiServiceError('courseId is required when updating a course');
       result = await client.updateCourse(ctx.input.courseId, courseData);
       actionDesc = 'Updated';
     } else if (ctx.input.action === 'delete' || ctx.input.action === 'conclude') {
       if (!ctx.input.courseId)
-        throw new Error('courseId is required when deleting/concluding a course');
-      result = await client.deleteCourse(ctx.input.courseId, ctx.input.action);
+        throw createApiServiceError('courseId is required when deleting/concluding a course');
+      let course = await client.getCourse(ctx.input.courseId);
+      let confirmation = await client.deleteCourse(ctx.input.courseId, ctx.input.action);
+      result = {
+        id: course.id,
+        name: course.name,
+        course_code: course.course_code,
+        previousCourse: course,
+        confirmation
+      };
       actionDesc = ctx.input.action === 'delete' ? 'Deleted' : 'Concluded';
     } else {
-      throw new Error(`Unknown action: ${ctx.input.action}`);
+      throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
 
     return {
       output: {
+        raw: result,
         courseId: String(result.id),
         name: result.name,
         courseCode: result.course_code,

@@ -52,7 +52,11 @@ export let executeView = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      viewId: z.string().uuid().describe('Executed view UUID'),
+      viewId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe('Executed view UUID when returned by item'),
       viewName: z.string().optional().describe('Executed view name'),
       objectRecords: z
         .array(z.record(z.string(), z.any()))
@@ -71,7 +75,7 @@ export let executeView = SlateTool.create(spec, {
 
     return {
       output: {
-        viewId: result.view?.id ?? ctx.input.viewId,
+        viewId: result.view?.id,
         viewName: result.view?.name,
         objectRecords: result.data,
         pagination: result.pagination

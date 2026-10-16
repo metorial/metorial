@@ -1,11 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BTCPayClient } from '../lib/client';
+import { storeIdSchema } from '../lib/schemas';
+import { requireFields } from '../lib/values';
 import { spec } from '../spec';
 
 let storeSchema = z.object({
-  storeId: z.string().describe('Store ID'),
+  storeId: storeIdSchema,
   name: z.string().describe('Store name'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete store data'),
   defaultCurrency: z.string().optional().describe('Default currency (e.g., USD, BTC)'),
   networkFeeMode: z.string().optional().describe('Network fee mode'),
   speedPolicy: z.string().optional().describe('Transaction speed policy'),
@@ -60,11 +63,15 @@ export let manageStores = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+    if (['get', 'update', 'delete'].includes(action))
+      requireFields(ctx.input, ['storeId'], action);
+    if (action === 'create') requireFields(ctx.input, ['name'], action);
 
     if (action === 'list') {
       let stores = await client.getStores();
       let mapped = stores.map(s => ({
         storeId: s.id as string,
+        raw: s,
         name: s.name as string,
         defaultCurrency: s.defaultCurrency as string | undefined,
         networkFeeMode: s.networkFeeMode as string | undefined,
@@ -83,6 +90,7 @@ export let manageStores = SlateTool.create(spec, {
         output: {
           store: {
             storeId: store.id as string,
+            raw: store,
             name: store.name as string,
             defaultCurrency: store.defaultCurrency as string | undefined,
             networkFeeMode: store.networkFeeMode as string | undefined,
@@ -99,12 +107,14 @@ export let manageStores = SlateTool.create(spec, {
         name: ctx.input.name!,
         defaultCurrency: ctx.input.defaultCurrency,
         networkFeeMode: ctx.input.networkFeeMode,
-        speedPolicy: ctx.input.speedPolicy
+        speedPolicy: ctx.input.speedPolicy,
+        website: ctx.input.website
       });
       return {
         output: {
           store: {
             storeId: store.id as string,
+            raw: store,
             name: store.name as string,
             defaultCurrency: store.defaultCurrency as string | undefined,
             networkFeeMode: store.networkFeeMode as string | undefined,
@@ -130,6 +140,7 @@ export let manageStores = SlateTool.create(spec, {
         output: {
           store: {
             storeId: store.id as string,
+            raw: store,
             name: store.name as string,
             defaultCurrency: store.defaultCurrency as string | undefined,
             networkFeeMode: store.networkFeeMode as string | undefined,

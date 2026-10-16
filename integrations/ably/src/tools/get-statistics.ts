@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
+import { nextPageOutput, pageInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getStatistics = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let getStatistics = SlateTool.create(spec, {
   key: 'get_statistics',
   description: `Retrieve application-level usage statistics from Ably, including message counts, connections, API requests, and more. Statistics can be aggregated by minute, hour, day, or month.`,
   instructions: [
-    'Requires API Key authentication with the "statistics" capability.',
+    'Requires API Key authentication with the "stats" capability on the wildcard resource "*" (or a resource that includes it).',
     'Times are specified as milliseconds since Unix epoch.'
   ],
   tags: {
@@ -17,6 +18,7 @@ export let getStatistics = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: pageInput,
       start: z
         .string()
         .optional()
@@ -43,6 +45,7 @@ export let getStatistics = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: nextPageOutput,
       statistics: z
         .array(z.any())
         .describe(
@@ -51,19 +54,22 @@ export let getStatistics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
-    let stats = await client.getStatistics({
-      start: ctx.input.start,
-      end: ctx.input.end,
-      limit: ctx.input.limit,
-      direction: ctx.input.direction,
-      unit: ctx.input.unit
-    });
+    let page = await client.getStatistics(
+      {
+        start: ctx.input.start,
+        end: ctx.input.end,
+        limit: ctx.input.limit,
+        direction: ctx.input.direction,
+        unit: ctx.input.unit
+      },
+      ctx.input.page
+    );
 
     return {
-      output: { statistics: stats || [] },
-      message: `Retrieved **${(stats || []).length}** statistics record(s)${ctx.input.unit ? ` aggregated by ${ctx.input.unit}` : ''}.`
+      output: { statistics: page.items, nextPageUrl: page.nextPageUrl },
+      message: `Retrieved **${page.items.length}** statistics record(s)${ctx.input.unit ? ` aggregated by ${ctx.input.unit}` : ''}.`
     };
   })
   .build();

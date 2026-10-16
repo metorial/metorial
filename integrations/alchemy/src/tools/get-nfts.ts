@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlchemyClient } from '../lib/client';
+import { mapNft } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getNFTs = SlateTool.create(spec, {
@@ -44,6 +45,7 @@ Use this to list all NFTs in a wallet, look up a specific NFT's metadata and att
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Provider response with original metadata values'),
       nfts: z
         .array(
           z.object({
@@ -78,28 +80,24 @@ Use this to list all NFTs in a wallet, look up a specific NFT's metadata and att
       network: ctx.config.network
     });
 
+    if (
+      ctx.input.pageSize !== undefined &&
+      (!Number.isInteger(ctx.input.pageSize) ||
+        ctx.input.pageSize < 1 ||
+        ctx.input.pageSize > 100)
+    ) {
+      throw createApiServiceError('pageSize must be an integer between 1 and 100.');
+    }
+
     // Fetch single NFT metadata
     if (ctx.input.contractAddress && ctx.input.tokenId && !ctx.input.ownerAddress) {
       let nft = await client.getNFTMetadata(ctx.input.contractAddress, ctx.input.tokenId);
 
-      let nftResult = {
-        contractAddress: nft.contract?.address || ctx.input.contractAddress,
-        tokenId: nft.tokenId || ctx.input.tokenId,
-        tokenType: nft.tokenType,
-        name: nft.name || nft.raw?.metadata?.name,
-        description: nft.description || nft.raw?.metadata?.description,
-        imageUrl: nft.image?.cachedUrl || nft.image?.originalUrl,
-        collectionName: nft.collection?.name || nft.contract?.name,
-        floorPrice: nft.collection?.floorPrice,
-        isSpam: nft.contract?.isSpam,
-        attributes: (nft.raw?.metadata?.attributes || []).map((a: any) => ({
-          traitType: a.trait_type,
-          value: a.value
-        }))
-      };
+      let nftResult = mapNft(nft);
 
       return {
         output: {
+          raw: nft,
           nfts: [nftResult],
           totalCount: 1
         },
@@ -109,7 +107,7 @@ Use this to list all NFTs in a wallet, look up a specific NFT's metadata and att
 
     // Fetch NFTs for owner
     if (!ctx.input.ownerAddress) {
-      throw new Error(
+      throw createApiServiceError(
         'Either ownerAddress or both contractAddress and tokenId must be provided.'
       );
     }
@@ -128,27 +126,14 @@ Use this to list all NFTs in a wallet, look up a specific NFT's metadata and att
       orderBy: ctx.input.orderBy
     });
 
-    let nfts = (result.ownedNfts || []).map((nft: any) => ({
-      contractAddress: nft.contract?.address,
-      tokenId: nft.tokenId,
-      tokenType: nft.tokenType,
-      name: nft.name || nft.raw?.metadata?.name,
-      description: nft.description || nft.raw?.metadata?.description,
-      imageUrl: nft.image?.cachedUrl || nft.image?.originalUrl,
-      collectionName: nft.collection?.name || nft.contract?.name,
-      floorPrice: nft.collection?.floorPrice,
-      isSpam: nft.contract?.isSpam,
-      attributes: (nft.raw?.metadata?.attributes || []).map((a: any) => ({
-        traitType: a.trait_type,
-        value: a.value
-      }))
-    }));
+    let nfts = result.ownedNfts.map(mapNft);
 
     return {
       output: {
+        raw: result,
         nfts,
         totalCount: result.totalCount,
-        pageKey: result.pageKey || undefined
+        pageKey: result.pageKey ?? undefined
       },
       message: `Found **${result.totalCount ?? nfts.length}** NFT(s) for \`${ctx.input.ownerAddress}\`.${nfts.length > 0 ? ` Showing ${nfts.length} results.` : ''}${result.pageKey ? ' More results available.' : ''}`
     };

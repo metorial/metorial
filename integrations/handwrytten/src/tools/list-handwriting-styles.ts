@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let fontSchema = z.object({
   fontId: z.string().describe('Unique ID of the handwriting style'),
-  label: z.string().describe('Display label/name of the handwriting style'),
+  label: z.string().optional().describe('Display label/name of the handwriting style'),
   previewImageUrl: z
     .string()
     .optional()
@@ -35,7 +36,7 @@ export let listHandwritingStyles = SlateTool.create(spec, {
 
     let fonts = rawFonts.map((f: any) => ({
       fontId: String(f.id),
-      label: f.label ?? f.name ?? '',
+      label: responseString(f.label, 'font label', true),
       previewImageUrl: f.image ?? f.preview_url ?? undefined
     }));
 

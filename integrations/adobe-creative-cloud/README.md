@@ -1,8 +1,29 @@
 # <img src="https://provider-logos.metorial-cdn.com/adobe.svg" height="20"> Adobe Creative Cloud
 
-Manage Creative Cloud Libraries, assets, and elements including colors, images, logos, and graphics. Edit PSD files programmatically by manipulating layers, applying smart object edits, removing backgrounds, and using Generative Fill. Generate images from text prompts via Firefly AI, apply Lightroom presets and auto-adjustments, and merge data into InDesign templates to export as PDF, JPEG, or PNG. Search, license, and download Adobe Stock assets. Manage user accounts, product entitlements, and administrative roles. Upload and organize photos and videos in Lightroom cloud catalogs. Perform generative expand, object compositing, content tagging, and video localization with translate and lip-sync capabilities.
+Manage Creative Cloud Libraries and elements, edit PSD files, remove backgrounds, generate and expand images with Firefly, browse Lightroom catalogs, apply Lightroom edits, search and license Adobe Stock assets, manage enterprise users, and submit InDesign data merge jobs.
+
+## Authentication
+
+Choose personal OAuth, enterprise OAuth, or server-to-server client credentials. API access depends on the APIs and scopes enabled in the Adobe Developer Console project. The current-user tool requires user OAuth. Existing connections without a refresh token need to reconnect with offline access.
 
 ## Tools
+
+### Get Current User
+
+Retrieve the Adobe identity associated with a user OAuth connection.
+
+### Get Library
+
+Retrieve complete library metadata using an ID discovered with List Libraries.
+
+### Get Library Element
+
+Retrieve complete element metadata, including representations and renditions.
+
+### Get Stock Asset
+
+Retrieve metadata for a content ID discovered with Search Stock.
+
 
 ### Apply Lightroom Edits
 
@@ -63,6 +84,12 @@ Remove the background from an image using Adobe Photoshop AI. Accepts images fro
 ### Search Stock
 
 Search Adobe Stock for images, videos, vectors, templates, and other creative assets. Filter by content type, orientation, and other criteria. Returns thumbnails, metadata, and licensing information.
+
+## API compatibility
+
+Job submission and completion are separate steps. Use Check Job Status with the returned Adobe status URL. Some submission responses provide a status URL without a status value; the tool preserves that distinction. Completed Photoshop renditions, Firefly images, and licensed Stock assets are available for download while Adobe or the storage provider retains them.
+
+The existing InDesign data-merge route and inline Lightroom preset input remain available for compatibility. Adobe's current documentation uses a different InDesign v3 request and references Lightroom preset files in cloud storage; those newer formats are not implemented here. Provider entitlements and legacy-route availability require verification with a permitted account.
 
 ## License
 

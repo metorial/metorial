@@ -17,7 +17,7 @@ let embedSchema = z
 export let editMessage = SlateTool.create(spec, {
   name: 'Edit Message',
   key: 'edit_message',
-  description: `Edit an existing message in a Revolt channel. Can update the text content and embeds. Only messages authored by the authenticated user/bot can be edited.`,
+  description: `Edit an existing message in a Stoat channel. Can update the text content and embeds. Only messages authored by the authenticated user/bot can be edited.`,
   tags: {
     destructive: false,
     readOnly: false

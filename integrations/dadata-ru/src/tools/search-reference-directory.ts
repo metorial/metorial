@@ -1,10 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let directorySuggestionSchema = z.object({
-  value: z.string().describe('Display value'),
+  value: z.string().optional().describe('Display value'),
   rawData: z
     .record(z.string(), z.unknown())
     .nullable()
@@ -59,6 +60,7 @@ Available directories include: tax offices (FNS), passport offices (FMS), postal
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       suggestions: z
         .array(directorySuggestionSchema)
         .describe('Directory entries matching the query')
@@ -72,6 +74,12 @@ Available directories include: tax offices (FNS), passport offices (FMS), postal
 
     let data: any;
     if (ctx.input.mode === 'findById') {
+      if (ctx.input.filters !== undefined) {
+        throw createApiServiceError(
+          'Directory filters are supported in suggest mode. Omit filters for a direct ID lookup.',
+          { reason: 'dadata_unsupported_filters' }
+        );
+      }
       data = await client.findById(ctx.input.directory, {
         query: ctx.input.query,
         count: ctx.input.count
@@ -84,13 +92,16 @@ Available directories include: tax offices (FNS), passport offices (FMS), postal
       });
     }
 
-    let suggestions = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let suggestions = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       rawData: s.data ?? null
     }));
 
     return {
-      output: { suggestions },
+      output: {
+        rawData: data,
+        suggestions
+      },
       message: `Found **${suggestions.length}** result(s) in "${ctx.input.directory}" directory for "${ctx.input.query}".`
     };
   })

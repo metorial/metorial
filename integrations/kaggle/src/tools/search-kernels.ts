@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let kernelSchema = z
@@ -89,9 +90,12 @@ export let searchKernels = SlateTool.create(spec, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
+    kernels = kaggleList(kernels, ['kernels'], 'kernels').map(item =>
+      kaggleSummary(item, 'kernels item', ['ref', 'title'])
+    );
     return {
-      output: { kernels: kernels ?? [] },
-      message: `Found ${(kernels ?? []).length} notebook(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
+      output: { kernels },
+      message: `Found ${kernels.length} notebook(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

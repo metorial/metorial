@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,6 +21,12 @@ export let manageCategory = SlateTool.create(spec, {
         .optional()
         .describe('ID of the category (required for update/delete)'),
       name: z.string().optional().describe('Category name (required for create)'),
+      clearParent: z
+        .boolean()
+        .optional()
+        .describe(
+          'Remove the parent category when updating; cannot be combined with parentId'
+        ),
       parentId: z.string().optional().describe('Parent category ID for building hierarchy'),
       description: z.string().optional().describe('Category description'),
       urlHandle: z.string().optional().describe('URL-friendly slug'),
@@ -33,6 +39,7 @@ export let manageCategory = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       categoryId: z.string().optional(),
       name: z.string().optional(),
       deleted: z.boolean().optional()
@@ -41,8 +48,23 @@ export let manageCategory = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, domain: ctx.config.domain });
 
+    if (ctx.input.parentId !== undefined && ctx.input.clearParent) {
+      throw createApiServiceError('Provide parentId or clearParent, not both.');
+    }
+    if (ctx.input.clearParent && ctx.input.action !== 'update') {
+      throw createApiServiceError('clearParent is supported only when updating a category.');
+    }
+    if (ctx.input.parentId !== undefined && !ctx.input.parentId.trim()) {
+      throw createApiServiceError(
+        'Parent category ID cannot be empty. Use clearParent to remove it.'
+      );
+    }
+    if (ctx.input.order !== undefined && !Number.isSafeInteger(ctx.input.order)) {
+      throw createApiServiceError('Category display order must be an integer.');
+    }
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a category.');
+      if (!ctx.input.name?.trim())
+        throw createApiServiceError('Name is required to create a category.');
 
       let attributes: Record<string, any> = { name: ctx.input.name };
       if (ctx.input.description !== undefined) attributes.description = ctx.input.description;
@@ -53,7 +75,6 @@ export let manageCategory = SlateTool.create(spec, {
       if (ctx.input.order !== undefined) attributes.order = ctx.input.order;
       if (ctx.input.color !== undefined) attributes.color = ctx.input.color;
       if (ctx.input.icon !== undefined) attributes.icon = ctx.input.icon;
-      if (ctx.input.parentId !== undefined) attributes.parent_id = ctx.input.parentId;
 
       let relationships: Record<string, any> | undefined;
       if (ctx.input.parentId) {
@@ -67,13 +88,14 @@ export let manageCategory = SlateTool.create(spec, {
       let res = await client.createCategory(attributes, relationships);
       let c = res.data;
       return {
-        output: { categoryId: c.id, name: c.attributes.name },
+        output: { categoryId: c.id, name: c.attributes.name ?? undefined, raw: res },
         message: `Created category **${c.attributes.name}** (ID: ${c.id}).`
       };
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.categoryId) throw new Error('Category ID is required for update.');
+      if (!ctx.input.categoryId)
+        throw createApiServiceError('Category ID is required for update.');
 
       let attributes: Record<string, any> = {};
       if (ctx.input.name !== undefined) attributes.name = ctx.input.name;
@@ -85,18 +107,23 @@ export let manageCategory = SlateTool.create(spec, {
       if (ctx.input.order !== undefined) attributes.order = ctx.input.order;
       if (ctx.input.color !== undefined) attributes.color = ctx.input.color;
       if (ctx.input.icon !== undefined) attributes.icon = ctx.input.icon;
-      if (ctx.input.parentId !== undefined) attributes.parent_id = ctx.input.parentId;
 
-      let res = await client.updateCategory(ctx.input.categoryId, attributes);
+      let relationships = ctx.input.clearParent
+        ? { parent: { data: null } }
+        : ctx.input.parentId !== undefined
+          ? { parent: { data: { type: 'categories', id: ctx.input.parentId } } }
+          : undefined;
+      let res = await client.updateCategory(ctx.input.categoryId, attributes, relationships);
       let c = res.data;
       return {
-        output: { categoryId: c.id, name: c.attributes.name },
+        output: { categoryId: c.id, name: c.attributes.name ?? undefined, raw: res },
         message: `Updated category **${c.attributes.name || c.id}**.`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.categoryId) throw new Error('Category ID is required for delete.');
+      if (!ctx.input.categoryId)
+        throw createApiServiceError('Category ID is required for delete.');
       await client.deleteCategory(ctx.input.categoryId);
       return {
         output: { deleted: true },
@@ -104,6 +131,6 @@ export let manageCategory = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

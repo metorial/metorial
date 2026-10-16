@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PoofClient } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,16 @@ export let manageWallet = SlateTool.create(spec, {
       };
     } else {
       let result = await client.getBalance({ crypto: ctx.input.currency });
-      let balance = result?.balance?.toString() || '0';
+      let value: unknown = result?.balance;
+      if (
+        (typeof value !== 'string' && typeof value !== 'number') ||
+        (typeof value === 'string' && !value.trim())
+      ) {
+        throw createApiServiceError('Poof did not return a wallet balance.', {
+          reason: 'poof_invalid_response'
+        });
+      }
+      let balance = value.toString();
       return {
         output: {
           balance,

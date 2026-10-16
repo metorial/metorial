@@ -1,13 +1,19 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  addressAndFullNameMatch,
   businessIntelligence,
   classifyData,
+  companyAndAddressMatch,
+  companyAndFullNameMatch,
   companyInsights,
   contactIntelligence,
   customDataEnrichment,
   generateSimilarityKey,
+  getCountryInfo,
   getCurrencyRate,
+  getOrganizationStandard,
+  getParentCompanyInfo,
   getRemainingCredits,
   getWeather,
   matchScore,
@@ -35,7 +41,13 @@ export let provider = Slate.create({
     getCurrencyRate,
     pagePerformance,
     getRemainingCredits,
-    stockAnalysis
+    stockAnalysis,
+    addressAndFullNameMatch,
+    companyAndAddressMatch,
+    companyAndFullNameMatch,
+    getCountryInfo,
+    getOrganizationStandard,
+    getParentCompanyInfo
   ],
   triggers: []
 });

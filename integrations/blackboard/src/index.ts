@@ -12,6 +12,7 @@ import {
   deleteAnnouncement,
   deleteContent,
   deleteCourse,
+  deleteGradeColumn,
   deleteGroup,
   deleteUser,
   enrollUser,
@@ -20,6 +21,7 @@ import {
   getCourse,
   getEnrollment,
   getGrade,
+  getGradeColumn,
   getUser,
   gradeAttempt,
   listAnnouncements,
@@ -27,8 +29,10 @@ import {
   listAttendanceMeetings,
   listAttendanceRecords,
   listCalendarItems,
+  listCalendars,
   listContent,
   listCourses,
+  listDataSources,
   listEnrollments,
   listGradeColumns,
   listGrades,
@@ -45,11 +49,17 @@ import {
   updateEnrollment,
   updateGradeColumn,
   updateGroup,
-  updateUser
+  updateUser,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
+    listDataSources,
+    listCalendars,
+    getGradeColumn,
+    deleteGradeColumn,
     createCourse,
     getCourse,
     updateCourse,

@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { buildClientConfig, flattenResourceList } from '../lib/helpers';
+import { buildClientConfig, flattenResourceList, getTotalCount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listOrders = SlateTool.create(spec, {
   name: 'List Orders',
   key: 'list_orders',
-  description: `Search and list rental orders. Supports filtering by status, customer, date range, and tags. Returns paginated results with order details including rental period, pricing, and status.`,
+  description: `Search and list rental orders. Supports filtering by status, customer, and date range. Returns paginated results with order details including rental period, pricing, and status.`,
   tags: {
     readOnly: true
   }
@@ -81,7 +81,7 @@ export let listOrders = SlateTool.create(spec, {
     return {
       output: {
         orders,
-        totalCount: response?.meta?.total_count
+        totalCount: getTotalCount(response)
       },
       message: `Found ${orders.length} order(s).`
     };

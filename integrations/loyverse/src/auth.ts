@@ -1,19 +1,21 @@
 import {
   createApiServiceError,
-  createAxios,
+  createAuthenticatedAxios,
   normalizeOAuthTokenResponse,
   SlateAuth
 } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { loyverseApiError } from './lib/errors';
 
-let oauthAxios = createAxios({ baseURL: 'https://api.loyverse.com' });
+let oauthAxios = createAuthenticatedAxios({
+  baseURL: 'https://api.loyverse.com',
+  timeout: 30_000,
+  errorAdapter: loyverseApiError
+});
 
 let getMerchantProfile = async (token: string) => {
-  let response = await oauthAxios.get('/v1.0/merchant/', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  let merchant = response.data;
+  let merchant = await new Client({ token }).getMerchant();
 
   return {
     profile: {
@@ -88,11 +90,6 @@ export let auth = SlateAuth.create()
         title: 'POS Devices Read',
         description: 'Read POS device configurations',
         scope: 'POS_DEVICES_READ'
-      },
-      {
-        title: 'POS Devices Write',
-        description: 'Create, update, and delete POS devices',
-        scope: 'POS_DEVICES_WRITE'
       },
       { title: 'Receipts Read', description: 'Read sales receipts', scope: 'RECEIPTS_READ' },
       {
@@ -208,9 +205,15 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token) {
+        throw createApiServiceError('A Loyverse personal access token is required.', {
+          reason: 'loyverse_missing_token'
+        });
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     },

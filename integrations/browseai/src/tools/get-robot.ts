@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapRobot, rawSchema, robotParameterSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let getRobot = SlateTool.create(spec, {
@@ -13,38 +14,28 @@ export let getRobot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot to retrieve')
+      robotId: z
+        .string()
+        .describe('ID of the robot to retrieve. Call list_robots to discover robot IDs.')
     })
   )
   .output(
     z.object({
-      robotId: z.string().describe('Unique identifier of the robot'),
-      name: z.string().describe('Name of the robot'),
+      robotId: z
+        .string()
+        .describe('Unique identifier of the robot. Call list_robots to discover robot IDs.'),
+      name: z.string().optional().describe('Name of the robot when supplied by Browse AI'),
       createdAt: z.number().optional().describe('Unix timestamp when the robot was created'),
       inputParameters: z
-        .array(
-          z.object({
-            name: z.string().describe('Parameter name'),
-            type: z.string().describe('Parameter type'),
-            required: z.boolean().describe('Whether the parameter is required')
-          })
-        )
+        .array(robotParameterSchema)
         .optional()
-        .describe('Input parameters accepted by the robot')
+        .describe('Input parameters accepted by the robot'),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let robot = await client.getRobot(ctx.input.robotId);
-
-    return {
-      output: {
-        robotId: robot.id,
-        name: robot.name,
-        createdAt: robot.createdAt,
-        inputParameters: robot.inputParameters
-      },
-      message: `Retrieved robot **${robot.name}** (\`${robot.id}\`).`
-    };
+    let robot = await new Client(ctx.auth).getRobot(ctx.input.robotId);
+    let output = mapRobot(robot);
+    return { output, message: `Retrieved robot \`${output.robotId}\`.` };
   })
   .build();

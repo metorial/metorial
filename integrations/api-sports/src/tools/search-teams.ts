@@ -44,6 +44,16 @@ export let searchTeamsTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      nbaLeague: z
+        .string()
+        .optional()
+        .describe('NBA league name from get_nba_leagues; use instead of numeric league'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe(
+          'Exact string season from get_seasons, for split-year basketball seasons; use instead of season'
+        ),
       teamId: z.number().optional().describe('Get a specific team by ID'),
       name: z.string().optional().describe('Exact team name to search for'),
       league: z.number().optional().describe('League ID to filter teams by'),
@@ -54,6 +64,10 @@ export let searchTeamsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       teams: z.array(teamSchema),
       count: z.number().describe('Total number of teams returned')
     })
@@ -66,19 +80,21 @@ export let searchTeamsTool = SlateTool.create(spec, {
       teamId: ctx.input.teamId,
       name: ctx.input.name,
       league: ctx.input.league,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
+      nbaLeague: ctx.input.nbaLeague,
       country: ctx.input.country,
       search: ctx.input.search
     });
 
     let results = (data.response ?? []).map((item: any) => {
       let team = item.team ?? item;
-      let venue = item.venue ?? {};
+      let venue = item.venue ?? item.stadium ?? {};
       return {
         teamId: team.id,
         name: team.name,
         code: team.code ?? null,
-        country: team.country ?? null,
+        country:
+          typeof team.country === 'string' ? team.country : (team.country?.name ?? null),
         founded: team.founded ?? null,
         national: team.national ?? null,
         logo: team.logo ?? null,
@@ -91,6 +107,7 @@ export let searchTeamsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         teams: results,
         count: results.length
       },

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -14,9 +14,13 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Your Givebutter API key. Found in Settings > Developers > API.')
+        .describe(
+          'Your Givebutter API key. Create it under Settings > Integrations > API Keys.'
+        )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('A Givebutter API key is required.');
       return {
         output: {
           token: ctx.input.apiKey

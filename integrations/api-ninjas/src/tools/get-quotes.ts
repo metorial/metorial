@@ -13,6 +13,16 @@ export let getQuotes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      work: z.string().optional().describe('Filter by source work title'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page; premium only'),
+      offset: z.number().int().min(0).optional().describe('Results to skip; premium only'),
+      safe: z.boolean().optional().describe('Restrict to safe quotes; premium only'),
       categories: z
         .string()
         .optional()
@@ -26,6 +36,7 @@ export let getQuotes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       quotes: z
         .array(
           z.object({
@@ -40,7 +51,11 @@ export let getQuotes = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let params: Record<string, string | number> = {};
+    let params: Record<string, string | number | boolean> = {};
+    if (ctx.input.work !== undefined) params.work = ctx.input.work;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
+    if (ctx.input.safe !== undefined) params.safe = ctx.input.safe;
     if (ctx.input.categories) params.categories = ctx.input.categories;
     if (ctx.input.excludeCategories) params.exclude_categories = ctx.input.excludeCategories;
     if (ctx.input.author) params.author = ctx.input.author;
@@ -50,11 +65,12 @@ export let getQuotes = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         quotes: quotes.map((q: any) => ({
           quote: q.quote,
           author: q.author,
-          work: q.work,
-          categories: q.categories
+          work: q.work ?? undefined,
+          categories: q.categories ?? undefined
         }))
       },
       message:

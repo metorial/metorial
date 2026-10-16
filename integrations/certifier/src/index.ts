@@ -7,6 +7,7 @@ import {
   deleteCredential,
   deleteGroup,
   getCredential,
+  getCredentialDesigns,
   getDesign,
   getGroup,
   issueCredential,
@@ -14,6 +15,7 @@ import {
   listDesigns,
   listGroups,
   searchCredentials,
+  sendCredential,
   updateCredential,
   updateGroup
 } from './tools';
@@ -22,10 +24,12 @@ export let provider = Slate.create({
   tools: [
     createCredential,
     getCredential,
+    getCredentialDesigns,
     updateCredential,
     deleteCredential,
     issueCredential,
     searchCredentials,
+    sendCredential,
     createGroup,
     getGroup,
     updateGroup,

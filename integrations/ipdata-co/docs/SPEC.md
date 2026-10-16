@@ -1,71 +1,54 @@
-# Slates Specification for Ipdata.co
+# Ipdata.co API Specification
 
-## Overview
+Ipdata.co provides a single IP intelligence API for geolocation, network ownership,
+ASN information and threat intelligence. This integration supports the global API
+at `https://api.ipdata.co` and optional EU API at `https://eu-api.ipdata.co`.
+Authenticate with the `api-key` query parameter. An API key is the only required
+credential; the API does not document a current-user or account-profile endpoint.
 
-Ipdata.co is an IP geolocation and threat intelligence API. It provides a simple HTTP-based API that allows you to look up the location, ownership and threat profile of any IP address. It offers a fast, highly-available API to enrich IP Addresses with Location, Company, Threat Intelligence and numerous other data attributes.
+## Tools
 
-## Authentication
+| Tool | Request | Behavior |
+| --- | --- | --- |
+| `lookup_ip` | `GET /{ip}` or `GET /` | IPv4/IPv6 location and enrichment. Omitting the address looks up the requesting server, which may differ from the end user's device. |
+| `bulk_lookup_ips` | `POST /bulk` | JSON array of 1–100 IP addresses; paid keys only, with each IP counting against quota. |
+| `lookup_asn` | `GET /AS{number}/` | Advanced ASN ownership, CIDR prefixes, assignment metadata and upstream/downstream/peer ASNs; paid keys only. |
+| `check_threat` | `GET /{ip}?fields=ip,threat` | Actual threat flags, matching blocklists, and VPN/reputation details when included by the API plan. Missing flags produce an actionable error. |
+| `get_usage` | `GET /?fields=ip,count` | Request count for the connected API key in the last 24 hours, updated by the provider once a minute. |
 
-Authentication requires an `api-key` query parameter to be passed with all requests made to the API. For example: `https://api.ipdata.co?api-key=YOUR_API_KEY`.
+`lookup_ip` and bulk lookups accept a `fields` list of provider field names.
+The response always requests `ip` to retain the actual result identifier. Empty
+field lists request the full response. `postal` maps to `postalCode` and
+`time_zone` maps to `timezone`. Provider nulls are omitted from normalized optional
+fields; entirely unavailable objects are omitted. Every lookup exposes `raw` with
+the complete original provider response, including nulls and unmodeled fields.
+The documented empty-string ASN sentinel is omitted from the normalized optional
+ASN object while remaining unchanged in `raw.asn`.
 
-The API handles authentication via API keys passed in as a query string parameter called `api-key` or a header of the same name.
+Advanced ASN responses use `usage`, `country`, `ipv4_prefixes` and
+`ipv6_prefixes`. These map to the existing `type`, `countryCode`, `prefixes` and
+`prefixes6` output fields. Each prefix object derives its `prefix`, `ip` and
+numeric `cidr` from the original CIDR, and retains the requested ASN. The API
+provides no per-prefix name/country or single route; those fields are optional and
+are never invented from the ASN's organization or country. Original CIDR arrays
+and assignment/relationship metadata are also available.
 
-You need an API Key to use the API. You can get a free one with a 1,500 daily request limit by signing up on the ipdata website.
+Threat lookups expose optional `isVpn`, `blocklists` and `scores` when returned.
+`isIcloudRelay` and `isDatacenter` are also optional because documented successful
+responses can omit these flags; missing flags remain absent rather than false.
+VPN detection and reputation scores require eligible Business/Enterprise plans.
+The API is read-only and has no documented webhook lifecycle.
 
-Paid users can secure their API Key by whitelisting domains and server IPs, restricting where the key can be used from.
+## Official references
 
-## Features
-
-### IP Geolocation Lookup
-
-Look up the geographic location of any IPv4 or IPv6 address. Locate visitors by IP address with city and postal code granularity. Returns data including continent, country, region, city, latitude, longitude, and postal code. You can look up the calling IP (no parameter needed) or any specific IP address.
-
-- Responses can be filtered to return only specific fields.
-- A dedicated EU endpoint (`https://eu-api.ipdata.co`) is available to ensure that end user data stays in the EU, routing requests through EU servers (Paris, Ireland and Frankfurt) only.
-
-### Bulk IP Lookup
-
-The API provides a bulk endpoint that allows you to look up up to 100 IP addresses at a time. Results can be filtered to specific fields.
-
-### Threat Intelligence
-
-Check if an IP address is listed in any of 100+ Threat Feeds instantaneously. The API detects Proxy and Tor users, as well as known spammers and bad bots. Returns flags such as `is_tor`, `is_proxy`, `is_anonymous`, `is_known_attacker`, `is_known_abuser`, `is_threat`, and `is_bogon`.
-
-- Machine learning generated reputation scores are available for advanced threat detection.
-
-### Company / Organization Data
-
-Get the name and domain of the organization that owns any IP address. Determine whether an IP address belongs to an ISP, Datacenter or Business.
-
-- Company data may only be available on higher-tier plans.
-
-### ASN Data
-
-Detailed ASN data is provided for all IP addresses with the following fields: AS Name, AS Number, AS Route, the AS Organization's domain and the usage type. Coverage includes ~100K ASNs.
-
-- A basic ASN lookup is available as a sub-field of any IP lookup.
-- A dedicated endpoint is available to query detailed ASN information by passing an ASN directly (e.g., `AS2`).
-
-### Mobile Carrier Detection
-
-Detect the mobile carrier associated with an IP address, including carrier name, MCC (Mobile Country Code), and MNC (Mobile Network Code).
-
-### Timezone Detection
-
-Returns timezone information for an IP address, including the timezone name, abbreviation, UTC offset, and whether daylight saving time is active.
-
-### Currency Detection
-
-Returns the local currency for the IP address's country, including currency name, code, symbol, and plural name.
-
-### Language Detection
-
-Returns the languages spoken in the country associated with the IP address.
-
-### Response Field Filtering
-
-Any lookup can be filtered to return only specific fields, reducing response size and improving efficiency. Pass the desired field names as query parameters.
-
-## Events
-
-The provider does not support events. Ipdata.co is a lookup-only API with no webhook or event subscription mechanism.
+- [Quick start and EU endpoint](https://docs.ipdata.co/docs/getting-started)
+- [Authentication](https://docs.ipdata.co/reference/authentication)
+- [Bulk lookup and quota accounting](https://docs.ipdata.co/docs/bulk-lookup)
+- [Response filtering](https://docs.ipdata.co/docs/filtering-response-fields)
+- [All response fields](https://docs.ipdata.co/docs/all-response-fields)
+- [Advanced ASN API](https://docs.ipdata.co/docs/asn-api)
+- [JSONP response with unavailable ASN and seven threat flags](https://docs.ipdata.co/docs/jsonp)
+- [Threat intelligence](https://docs.ipdata.co/docs/proxy-tor-and-threat-detection)
+- [Reputation scores](https://docs.ipdata.co/docs/ip-reputation-scores)
+- [Quota and usage FAQ](https://docs.ipdata.co/docs/frequently-asked-questions)
+- [API errors](https://docs.ipdata.co/docs/api-status-codes)

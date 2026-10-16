@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import { finageRecords, finageSymbol, validateFinageLimit } from '../lib/response';
 import { spec } from '../spec';
 
 export let getFinancialStatements = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let getFinancialStatements = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Company ticker symbol'),
       statementType: z.string().describe('Type of financial statement returned'),
       statements: z
@@ -34,26 +36,19 @@ export let getFinancialStatements = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let { symbol, statementType, period, limit } = ctx.input;
-
-    let data: any;
-    if (statementType === 'income_statement') {
-      data = await client.getIncomeStatement(symbol, { limit, period });
-    } else if (statementType === 'balance_sheet') {
-      data = await client.getBalanceSheet(symbol, { limit, period });
-    } else {
-      data = await client.getCashFlow(symbol, { limit, period });
-    }
-
-    let statements = Array.isArray(data) ? data : data?.results || data?.financials || [data];
-
+    let { statementType, period, limit } = ctx.input;
+    let symbol = finageSymbol(ctx.input.symbol);
+    validateFinageLimit(limit, 'Limit');
+    let data =
+      statementType === 'income_statement'
+        ? await client.getIncomeStatement(symbol, { limit, period })
+        : statementType === 'balance_sheet'
+          ? await client.getBalanceSheet(symbol, { limit, period })
+          : await client.getCashFlow(symbol, { limit, period });
+    let statements = finageRecords(data, ['results', 'financials']);
     return {
-      output: {
-        symbol: symbol.toUpperCase(),
-        statementType,
-        statements
-      },
-      message: `Retrieved **${statements.length}** ${period} ${statementType.replace('_', ' ')} records for **${symbol.toUpperCase()}**.`
+      output: { symbol, statementType, statements, raw: data },
+      message: `Retrieved **${statements.length}** ${period} ${statementType.replaceAll('_', ' ')} records for **${symbol}**.`
     };
   })
   .build();

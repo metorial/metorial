@@ -22,6 +22,12 @@ export let listRiskModels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z.string().optional().describe('OData $filter expression'),
       select: z.string().optional().describe('Comma-separated list of fields to return'),
       expand: z
@@ -29,32 +35,45 @@ export let listRiskModels = SlateTool.create(spec, {
         .optional()
         .describe('Related entities to expand (e.g., "Categories")'),
       orderby: z.string().optional().describe('Sort order'),
-      top: z.number().optional().describe('Maximum number of records to return')
+      top: z.number().optional().describe('Maximum number of records to return'),
+      skip: z.number().optional().describe('Number of records to skip for pagination')
     })
   )
   .output(
     z.object({
       riskModels: z.array(riskModelSchema).describe('List of risk models'),
-      count: z.number().describe('Number of risk models returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of risk models returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let riskModels = await client.getRiskModels({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
       expand: ctx.input.expand,
       orderby: ctx.input.orderby,
-      top: ctx.input.top
+      top: ctx.input.top,
+      skip: ctx.input.skip
     });
 
-    let results = Array.isArray(riskModels) ? riskModels : [riskModels];
+    let results = riskModels.records;
 
     return {
       output: {
         riskModels: results,
-        count: results.length
+        count: results.length,
+        nextLink: riskModels.nextLink,
+        totalCount: riskModels.totalCount
       },
       message: `Retrieved **${results.length}** risk model(s).`
     };

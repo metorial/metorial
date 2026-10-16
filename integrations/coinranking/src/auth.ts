@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,9 @@ export let auth = SlateAuth.create()
         .describe('Coinranking API key. Get one at https://account.coinranking.com/dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a Coinranking API key.');
+      }
       return {
         output: {
           token: ctx.input.apiKey

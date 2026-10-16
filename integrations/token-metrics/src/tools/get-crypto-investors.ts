@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCryptoInvestors = SlateTool.create(spec, {
@@ -19,6 +19,10 @@ export let getCryptoInvestors = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       investors: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of crypto investor records')
@@ -32,10 +36,10 @@ export let getCryptoInvestors = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let investors = result?.data ?? [];
+    let investors = getRecords(result);
 
     return {
-      output: { investors },
+      output: { investors, raw: result },
       message: `Retrieved **${investors.length}** crypto investor(s).`
     };
   })

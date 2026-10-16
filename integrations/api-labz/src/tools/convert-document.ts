@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getModuleFileUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let convertDocument = SlateTool.create(spec, {
@@ -56,6 +57,9 @@ Describe the conversion you need in plain English along with the source document
       fileName: ctx.input.fileName,
       outputFormat: ctx.input.outputFormat
     });
+
+    let fileUrl = getModuleFileUrl(result);
+    if (fileUrl) await ctx.addAttachment({ type: 'url', url: fileUrl });
 
     return {
       output: {

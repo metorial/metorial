@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SearchClient } from '../lib/search-client';
+import { validateInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let search = SlateTool.create(spec, {
@@ -31,14 +32,30 @@ Supports filtering by content type, author, date range, and minimum points. Resu
         .default('relevance')
         .describe('Sort order: relevance (default) or date (newest first)'),
       contentType: z
-        .enum(['story', 'comment', 'ask_hn', 'show_hn', 'job'])
+        .enum([
+          'story',
+          'comment',
+          'ask_hn',
+          'show_hn',
+          'job',
+          'poll',
+          'pollopt',
+          'front_page'
+        ])
         .optional()
         .describe('Filter by content type'),
       author: z.string().optional().describe('Filter by author username'),
       storyId: z.number().optional().describe('Filter comments by parent story ID'),
       minPoints: z.number().optional().describe('Minimum points/score threshold'),
-      dateFrom: z.string().optional().describe('Start of date range (ISO 8601 timestamp)'),
-      dateTo: z.string().optional().describe('End of date range (ISO 8601 timestamp)'),
+      minComments: z.number().optional().describe('Minimum number of story comments'),
+      dateFrom: z
+        .string()
+        .optional()
+        .describe('Exclusive start of date range (ISO 8601 date or timestamp)'),
+      dateTo: z
+        .string()
+        .optional()
+        .describe('Exclusive end of date range (ISO 8601 date or timestamp)'),
       hitsPerPage: z
         .number()
         .optional()
@@ -67,16 +84,47 @@ Supports filtering by content type, author, date range, and minimum points. Resu
             commentText: z.string().optional().describe('Text content of the comment'),
             commentCount: z.number().optional().describe('Number of comments'),
             storyId: z.number().optional().describe('Parent story ID (for comments)'),
+            parentId: z
+              .number()
+              .optional()
+              .describe('Immediate parent item ID (for comments)'),
             storyTitle: z.string().optional().describe('Parent story title (for comments)'),
             storyUrl: z.string().optional().describe('Parent story URL (for comments)'),
             createdAt: z.string().describe('ISO 8601 timestamp of creation'),
             tags: z.array(z.string()).describe('Content tags')
           })
         )
-        .describe('Search result hits')
+        .describe('Search result hits'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original search response')
     })
   )
   .handleInvocation(async ctx => {
+    validateInteger(ctx.input.hitsPerPage, 'hitsPerPage', 1, 1000);
+    validateInteger(ctx.input.page, 'page', 0);
+    if (ctx.input.storyId !== undefined) validateInteger(ctx.input.storyId, 'storyId');
+    if (ctx.input.minComments !== undefined) {
+      validateInteger(ctx.input.minComments, 'minComments', 0);
+    }
+    if (ctx.input.author && /[,()]/.test(ctx.input.author)) {
+      throw createApiServiceError('Provide one author username without tag filter operators.');
+    }
+    let parseDate = (value: string | undefined, field: string) => {
+      if (value === undefined) return undefined;
+      let milliseconds = Date.parse(value);
+      if (
+        (!z.iso.date().safeParse(value).success &&
+          !z.iso.datetime({ offset: true }).safeParse(value).success) ||
+        !Number.isFinite(milliseconds)
+      ) {
+        throw createApiServiceError(`Provide ${field} as an ISO 8601 date or timestamp.`);
+      }
+      return Math.floor(milliseconds / 1000);
+    };
+    let dateFrom = parseDate(ctx.input.dateFrom, 'dateFrom');
+    let dateTo = parseDate(ctx.input.dateTo, 'dateTo');
+    if (dateFrom !== undefined && dateTo !== undefined && dateFrom > dateTo) {
+      throw createApiServiceError('Provide dateFrom before or equal to dateTo.');
+    }
     let client = new SearchClient();
 
     let tagParts: string[] = [];
@@ -92,15 +140,16 @@ Supports filtering by content type, author, date range, and minimum points. Resu
 
     let numericFilterParts: string[] = [];
     if (ctx.input.minPoints !== undefined) {
-      numericFilterParts.push(`points>${ctx.input.minPoints}`);
+      numericFilterParts.push(`points>=${ctx.input.minPoints}`);
     }
-    if (ctx.input.dateFrom) {
-      let timestamp = Math.floor(new Date(ctx.input.dateFrom).getTime() / 1000);
-      numericFilterParts.push(`created_at_i>${timestamp}`);
+    if (ctx.input.minComments !== undefined) {
+      numericFilterParts.push(`num_comments>=${ctx.input.minComments}`);
     }
-    if (ctx.input.dateTo) {
-      let timestamp = Math.floor(new Date(ctx.input.dateTo).getTime() / 1000);
-      numericFilterParts.push(`created_at_i<${timestamp}`);
+    if (dateFrom !== undefined) {
+      numericFilterParts.push(`created_at_i>${dateFrom}`);
+    }
+    if (dateTo !== undefined) {
+      numericFilterParts.push(`created_at_i<${dateTo}`);
     }
 
     let params = {
@@ -118,16 +167,17 @@ Supports filtering by content type, author, date range, and minimum points. Resu
 
     let hits = response.hits.map(hit => ({
       objectId: hit.objectID,
-      title: hit.title,
-      url: hit.url,
+      title: hit.title ?? undefined,
+      url: hit.url ?? undefined,
       author: hit.author,
-      points: hit.points,
-      storyText: hit.story_text,
-      commentText: hit.comment_text,
-      commentCount: hit.num_comments,
-      storyId: hit.story_id,
-      storyTitle: hit.story_title,
-      storyUrl: hit.story_url,
+      points: hit.points ?? undefined,
+      storyText: hit.story_text ?? undefined,
+      commentText: hit.comment_text ?? undefined,
+      commentCount: hit.num_comments ?? undefined,
+      storyId: hit.story_id ?? undefined,
+      parentId: hit.parent_id ?? undefined,
+      storyTitle: hit.story_title ?? undefined,
+      storyUrl: hit.story_url ?? undefined,
       createdAt: hit.created_at,
       tags: hit._tags
     }));
@@ -137,7 +187,8 @@ Supports filtering by content type, author, date range, and minimum points. Resu
         totalHits: response.nbHits,
         currentPage: response.page,
         totalPages: response.nbPages,
-        hits
+        hits,
+        raw: response
       },
       message: `Found **${response.nbHits}** results (showing page ${response.page + 1} of ${response.nbPages}).`
     };

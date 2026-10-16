@@ -36,6 +36,7 @@ export let createInbox = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      email: z.string().optional().describe('Email address of the inbox'),
       inboxId: z.string().describe('Unique identifier for the created inbox'),
       podId: z.string().describe('Pod the inbox belongs to'),
       displayName: z.string().optional().describe('Display name of the inbox'),
@@ -55,6 +56,7 @@ export let createInbox = SlateTool.create(spec, {
     return {
       output: {
         inboxId: inbox.inbox_id,
+        email: inbox.email,
         podId: inbox.pod_id,
         displayName: inbox.display_name,
         createdAt: inbox.created_at

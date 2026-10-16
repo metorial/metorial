@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Plate Recognizer
 
-Recognize and decode license plates from images and video feeds, supporting over 90 countries. Read vehicle details including type, make, model, and color. Extract VINs, shipping container codes, USDOT numbers, trailer IDs, and boat registration numbers from images. Blur license plates and faces in images and videos with configurable intensity. Monitor API usage statistics and receive webhooks for recognition events, including vehicle dwell time tracking from live camera streams.
+Recognize license plates and vehicle attributes in still images. Read VINs, trailer IDs, odometers, shipping container markings, USDOT numbers, and boat registration numbers. Blur plates and faces, download the processed image, inspect recognition confidence and original results, and monitor product usage and account licenses.
+
+See [the integration guide](docs/SPEC.md) for product access, image input compatibility, current OCR support, and pagination.
 
 ## License
 

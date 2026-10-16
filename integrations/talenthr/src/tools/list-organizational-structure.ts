@@ -56,47 +56,62 @@ Select which types to include in the response. Useful for discovering available 
       employmentStatuses: z
         .array(orgItemSchema)
         .optional()
-        .describe('List of employment statuses')
+        .describe('List of employment statuses'),
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Full responses for the requested collections')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: Record<string, any> = {};
+    let result: Partial<
+      Record<
+        'departments' | 'divisions' | 'jobTitles' | 'locations' | 'employmentStatuses',
+        Array<{ itemId: number; name: string }>
+      >
+    > = {};
+    let rawResponse: Record<string, unknown> = {};
     let summaryParts: string[] = [];
 
     if (ctx.input.includeDepartments) {
       let resp = await client.listDepartments();
+      rawResponse.departments = resp;
       result.departments = resp.data.map(d => ({ itemId: d.id, name: d.name }));
       summaryParts.push(`${result.departments.length} department(s)`);
     }
 
     if (ctx.input.includeDivisions) {
       let resp = await client.listDivisions();
+      rawResponse.divisions = resp;
       result.divisions = resp.data.map(d => ({ itemId: d.id, name: d.name }));
       summaryParts.push(`${result.divisions.length} division(s)`);
     }
 
     if (ctx.input.includeJobTitles) {
       let resp = await client.listJobTitles();
+      rawResponse.jobTitles = resp;
       result.jobTitles = resp.data.map(d => ({ itemId: d.id, name: d.name }));
       summaryParts.push(`${result.jobTitles.length} job title(s)`);
     }
 
     if (ctx.input.includeLocations) {
       let resp = await client.listLocations();
+      rawResponse.locations = resp;
       result.locations = resp.data.map(d => ({ itemId: d.id, name: d.name }));
       summaryParts.push(`${result.locations.length} location(s)`);
     }
 
     if (ctx.input.includeEmploymentStatuses) {
       let resp = await client.listEmploymentStatuses();
+      rawResponse.employmentStatuses = resp;
       result.employmentStatuses = resp.data.map(d => ({ itemId: d.id, name: d.name }));
       summaryParts.push(`${result.employmentStatuses.length} employment status(es)`);
     }
 
     return {
-      output: result as any,
+      output: { ...result, rawResponse },
       message: `Retrieved ${summaryParts.join(', ')}.`
     };
   })

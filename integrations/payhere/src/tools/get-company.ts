@@ -22,6 +22,7 @@ export let getCompany = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       companyId: z.number().describe('Company identifier'),
       name: z.string().describe('Company display name'),
       legalName: z.string().nullable().describe('Legal name on receipts'),
@@ -63,7 +64,7 @@ export let getCompany = SlateTool.create(spec, {
         ...company,
         stats
       },
-      message: `Company **${company.name}** (${company.currency.toUpperCase()})${stats ? ` — ${stats.paymentsAllTime} all-time payments, ${stats.subscribersLast30} new subscribers in last 30 days` : ''}.`
+      message: `Company **${company.name}** (${company.currency.toUpperCase()})${stats ? ` — ${stats.paymentsAllTime} all-time payment total, ${stats.subscribersLast30} new subscribers in last 30 days` : ''}.`
     };
   })
   .build();

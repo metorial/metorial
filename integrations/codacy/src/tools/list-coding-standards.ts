@@ -25,6 +25,10 @@ export let listCodingStandards = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       codingStandards: z
         .array(z.any())
         .describe('List of coding standards with their configuration.'),
@@ -44,6 +48,7 @@ export let listCodingStandards = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         codingStandards,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

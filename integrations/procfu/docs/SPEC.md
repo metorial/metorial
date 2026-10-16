@@ -1,73 +1,37 @@
-# Slates Specification for Procfu
+# ProcFu Integration
 
-## Overview
-
-ProcFu is an add-on for Citrix Podio that greatly enhances the abilities of Podio Workflow Automations and the functionality of a Citrix Podio account. Its Functions API offers a comprehensive library of endpoints that enable interaction with services including Podio, InfoLobby, Google, Podio Workflow Automation, MySQL, S3 Compatible Storages, FTP, ShareFile, Notion, OAuth Services, and Web Scraping. It also includes a point-and-click app builder for creating web apps using existing tools as the back-office.
+Use ProcFu’s Functions API to automate Podio, run saved scripts, query connected MySQL databases, and call configured OAuth services.
 
 ## Authentication
 
-ProcFu uses API key-based authentication via HTTP Basic Auth.
+Connect using the API Auth Token from ProcFu’s [Security & Keys](https://help.procfu.com/security--keys.html) page. ProcFu requires the calling server’s IP address to be allowed there. Requests use HTTPS POST to `https://procfu.com/exe/{function}.pf`, an `Authorization: Basic {token}` header, and URL-encoded form parameters.
 
-A ProcFu API Auth Token is required for running scripts or code from outside systems. Users sign up for a ProcFu account, get their API key, and include it in the `Authorization` header as `Authorization: Basic {API_KEY}`.
+The connection profile and `who_am_i` use the documented [Who Am I](https://procfu.com/scripts/?s=whoami.pf) function. ProcFu manages the underlying Podio and third-party OAuth connections; this integration authenticates to ProcFu using the API token.
 
-The API key can be found on the ProcFu account settings page. All requests to ProcFu functions are made as HTTP POST requests to `https://procfu.com/exe/{script_name}.pf`, with the authorization header included and parameters sent as form data.
+## Supported Operations
 
-When calling ProcFu functions from external servers (outside ProcFu's own infrastructure), those server IPs must be added to a whitelist on the Account page of the ProcFu account.
+- **Account:** Get the connected email, account usage and limits, and recent error text. Restrict error lookup by function filename and time window.
+- **Discovery:** List Podio organizations and workspace summaries, then use `get_podio_app_info` with `list_apps` to find apps. Get app definitions, category choices, and recent activity with an optional stopping date.
+- **Items:** Create, retrieve, update, delete, search, and filter Podio items. Preserve complete provider responses for raw item retrieval and filtering. Field-based search supports equals and contains and accepts a whole-number result limit from 1 through 20.
+- **Comments:** Create, retrieve, or delete comments. Creation and deletion support hook and notification flags.
+- **Variables:** Get, set, list, or increment global variables. `incrementBy` defaults to 1 and supports other numeric amounts.
+- **ProcScript:** Run a saved script with an optional JSON object payload, synchronously or in the background. The output contains the provider’s result or acknowledgment.
+- **Workflows:** Trigger a manual PWA/GlobiFlow flow using its flow ID, item ID, and webhook c/p values. ProcFu confirms successful trigger requests with status 200.
+- **MySQL:** Return a single query result, return multiple rows, or execute a command. Use `?` placeholders and an ordered parameter array. A connection name selects among configured databases.
+- **OAuth services:** Send requests through a previously configured ProcFu OAuth service using its service name and internal user reference. Responses remain complete, including a provider-returned `false` value.
+- **Podio API:** Send raw Podio API requests with a relative endpoint path, HTTP method, options object, and attributes object.
 
-## Features
+## Provider Documentation
 
-### Podio Item Management
-
-Create, read, update, and delete Podio items programmatically. This includes getting items, fetching comments, retrieving related items, fetching items from views, filtering items in apps, and searching items by field value. Items can be created or updated with control over whether notifications and webhooks are triggered.
-
-### Podio Workflow Automation (PWA) Integration
-
-ProcFu provides a Flows system — a powerful engine for automated workflows that can watch items, react to changes, run logic, and take action across a Podio workspace. Flows can trigger on item create, update, or any Podio event. You can also trigger manual GlobiFlow/PWA flows on specific items, trigger flows with delays, and list or manage existing flows.
-
-### ProcScript Code Execution
-
-ProcScript is a programming language that lets users write feature-complex code without worrying about authentication or other API constructs. Scripts can be written in the ProcFu editor, scheduled to run automatically, and called from external systems or from within PWA flows.
-
-### Third-Party OAuth API Integration
-
-ProcFu allows users to make API requests to OAuth2 services that have been previously integrated into a ProcFu account. Users can add custom OAuth2 services by providing client ID, client secret, authorize URL, token URL, and scopes. ProcFu manages the OAuth token lifecycle. Functions exist to get login links for users, check token status, list authenticated users, and make authenticated API requests to connected services.
-
-### MySQL Database Operations
-
-ProcFu supports querying MySQL databases, returning single or multi-row results. Users can sync Podio data to their own MySQL database. Data syncs can be created with a click, and ProcFu manages the ongoing synchronization.
-
-### App Builder (Mini Apps / AppFrame)
-
-With the App Builder, teams can launch purpose-built portals and dashboards, using Podio as a secure backend. Users can create interactive customer portals, vendor platforms, employee centers, and internal data dashboards using a point-and-click interface. Apps support code events and behaviors written in ProcScript.
-
-### File Storage Operations
-
-ProcFu provides functions for working with S3-compatible storage and FTP, including listing storage files and retrieving files as Base64-encoded text.
-
-### Data Utilities
-
-ProcFu includes various utility functions for data transformation: JSON key finding and manipulation, Base64 encoding, markdown-to-HTML conversion, XML-to-JSON conversion, and array diff operations.
-
-### Tape Integration
-
-ProcFu supports querying, creating, reading, updating, and deleting records in Tape apps, as well as making raw API calls to the Tape API.
-
-### InfoLobby and Notion Integration
-
-ProcFu enables interaction with InfoLobby and Notion, including raw API calls to InfoLobby endpoints.
-
-### Deployment Manager
-
-Deployment Manager makes it easy to publish, install, and maintain App Packs and PWA/GlobiFlow Flows across multiple Podio Workspaces.
-
-### AI Integration
-
-ProcFu provides ChatGPT integration within Podio workspaces, enabling AI-powered drafting, classification, and reasoning within workflows.
-
-### Podio Workspace Management
-
-Functions are available for managing workspace members, user profiles, subscriptions (follow/unfollow items), and retrieving recent app activity.
+- [Functions API and external access](https://help.procfu.com/functions-api.html)
+- [Function catalog](https://procfu.com/scripts/)
+- [Organizations and workspace discovery](https://procfu.com/scripts/?s=podio_orgs_get_raw.pf)
+- [Account usage](https://procfu.com/scripts/?s=account_get_usage.pf) and [recent errors](https://procfu.com/scripts/?s=account_last_error.pf)
+- [Podio app search](https://procfu.com/scripts/?s=podio_app_search.pf) and [item filtering](https://procfu.com/scripts/?s=podio_item_filter.pf)
+- [Comment deletion](https://procfu.com/scripts/?s=podio_comment_delete.pf) and [variable increments](https://procfu.com/scripts/?s=var_inc.pf)
+- [ProcScript execution](https://help.procfu.com/running-procscript-from-podio-workflows.html)
+- [OAuth service requests](https://procfu.com/scripts/?s=api_request_send.pf)
 
 ## Events
 
-The provider does not support inbound events (webhooks or event subscriptions) in the traditional sense. ProcFu is designed as an outbound Functions API that is called by external systems. ProcFu's Flows system can react to Podio events (item created, item updated, field changes, date triggers), but these are configured within ProcFu's own flow engine rather than exposed as subscribable webhook endpoints for external consumers.
+This integration exposes tools only. ProcFu’s own workflow configuration remains managed in ProcFu.

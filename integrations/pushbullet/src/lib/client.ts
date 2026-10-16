@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export type PushType = 'note' | 'link' | 'file';
 
@@ -7,10 +12,10 @@ export interface Push {
   active: boolean;
   created: number;
   modified: number;
-  type: PushType;
-  dismissed: boolean;
+  type?: PushType;
+  dismissed?: boolean;
   guid?: string;
-  direction: string;
+  direction?: string;
   sender_iden?: string;
   sender_email?: string;
   sender_email_normalized?: string;
@@ -47,7 +52,7 @@ export interface Device {
   fingerprint?: string;
   key_fingerprint?: string;
   push_token?: string;
-  has_sms?: string;
+  has_sms?: string | boolean;
 }
 
 export interface Chat {
@@ -55,8 +60,8 @@ export interface Chat {
   active: boolean;
   created: number;
   modified: number;
-  muted: boolean;
-  with: {
+  muted?: boolean;
+  with?: {
     email: string;
     email_normalized: string;
     iden?: string;
@@ -71,8 +76,8 @@ export interface Subscription {
   active: boolean;
   created: number;
   modified: number;
-  muted: boolean;
-  channel: {
+  muted?: boolean;
+  channel?: {
     iden: string;
     tag: string;
     name: string;
@@ -90,7 +95,7 @@ export interface ChannelInfo {
   image_url?: string;
   website_url?: string;
   subscriber_count?: number;
-  recent_pushes?: Push[];
+  recent_pushes?: (Push & { type: PushType })[];
 }
 
 export interface UserProfile {
@@ -99,7 +104,7 @@ export interface UserProfile {
   modified: number;
   email: string;
   email_normalized: string;
-  name: string;
+  name?: string;
   image_url?: string;
   max_upload_size?: number;
 }
@@ -109,7 +114,7 @@ export interface TextMessage {
   active: boolean;
   created: number;
   modified: number;
-  data: {
+  data?: {
     target_device_iden: string;
     addresses: string[];
     message: string;
@@ -133,14 +138,57 @@ export interface PaginatedResponse<T> {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Pushbullet access token is required. Reconnect your account.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.pushbullet.com',
-      headers: {
-        'Access-Token': config.token
-      }
+      authHeader: { name: 'Access-Token', value: config.token },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Pushbullet',
+          reason: 'pushbullet_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          extractUpstreamCode: (_error, response, helpers) => {
+            if (!helpers.isRecord(response?.data) || !helpers.isRecord(response.data.error))
+              return undefined;
+            return typeof response.data.error.type === 'string'
+              ? response.data.error.type
+              : undefined;
+          }
+        })
+    });
+  }
+
+  private listQuery(params?: {
+    modifiedAfter?: string;
+    active?: boolean;
+    cursor?: string;
+    limit?: number;
+  }) {
+    if (
+      params?.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 500)
+    ) {
+      throw createApiServiceError('limit must be a whole number from 1 to 500.');
+    }
+    if (
+      params?.modifiedAfter !== undefined &&
+      (!params.modifiedAfter.trim() || !Number.isFinite(Number(params.modifiedAfter)))
+    ) {
+      throw createApiServiceError('modifiedAfter must be a valid Unix timestamp in seconds.');
+    }
+    return pickDefined({
+      modified_after: params?.modifiedAfter,
+      active: params?.active,
+      cursor: params?.cursor,
+      limit: params?.limit
     });
   }
 
@@ -158,15 +206,11 @@ export class Client {
     active?: boolean;
     cursor?: string;
     limit?: number;
-  }): Promise<{ pushes: Push[]; cursor?: string }> {
-    let query: Record<string, string> = {};
-    if (params?.modifiedAfter) query.modified_after = params.modifiedAfter;
-    if (params?.active !== undefined) query.active = String(params.active);
-    if (params?.cursor) query.cursor = params.cursor;
-    if (params?.limit) query.limit = String(params.limit);
+  }): Promise<{ pushes?: Push[]; cursor?: string }> {
+    let query = this.listQuery(params);
 
     let response = await this.axios.get('/v2/pushes', { params: query });
-    let data = response.data as { pushes: Push[]; cursor?: string };
+    let data = response.data as { pushes?: Push[]; cursor?: string };
     return data;
   }
 
@@ -184,7 +228,7 @@ export class Client {
     clientIden?: string;
     sourceDeviceIden?: string;
     guid?: string;
-  }): Promise<Push> {
+  }): Promise<Push & { type: PushType }> {
     let body: Record<string, string | undefined> = {
       type: push.type,
       title: push.title,
@@ -201,38 +245,33 @@ export class Client {
       guid: push.guid
     };
 
-    // Remove undefined values
-    let cleanBody = Object.fromEntries(
-      Object.entries(body).filter(([_, v]) => v !== undefined)
-    );
+    let cleanBody = pickDefined(body);
 
     let response = await this.axios.post('/v2/pushes', cleanBody);
-    return response.data as Push;
+    return response.data as Push & { type: PushType };
   }
 
   async updatePush(pushIden: string, params: { dismissed?: boolean }): Promise<Push> {
-    let response = await this.axios.post(`/v2/pushes/${pushIden}`, params);
+    let response = await this.axios.post(`/v2/pushes/${encodeURIComponent(pushIden)}`, params);
     return response.data as Push;
   }
 
   async deletePush(pushIden: string): Promise<void> {
-    await this.axios.delete(`/v2/pushes/${pushIden}`);
+    await this.axios.delete(`/v2/pushes/${encodeURIComponent(pushIden)}`);
   }
 
   // ─── Devices ───────────────────────────────────────────
 
   async listDevices(params?: {
+    modifiedAfter?: string;
     active?: boolean;
     cursor?: string;
     limit?: number;
-  }): Promise<{ devices: Device[]; cursor?: string }> {
-    let query: Record<string, string> = {};
-    if (params?.active !== undefined) query.active = String(params.active);
-    if (params?.cursor) query.cursor = params.cursor;
-    if (params?.limit) query.limit = String(params.limit);
+  }): Promise<{ devices?: Device[]; cursor?: string }> {
+    let query = this.listQuery(params);
 
     let response = await this.axios.get('/v2/devices', { params: query });
-    return response.data as { devices: Device[]; cursor?: string };
+    return response.data as { devices?: Device[]; cursor?: string };
   }
 
   async createDevice(device: {
@@ -254,9 +293,7 @@ export class Client {
       has_sms: device.hasSms
     };
 
-    let cleanBody = Object.fromEntries(
-      Object.entries(body).filter(([_, v]) => v !== undefined)
-    );
+    let cleanBody = pickDefined(body);
 
     let response = await this.axios.post('/v2/devices', cleanBody);
     return response.data as Device;
@@ -284,32 +321,31 @@ export class Client {
       app_version: device.appVersion
     };
 
-    let cleanBody = Object.fromEntries(
-      Object.entries(body).filter(([_, v]) => v !== undefined)
-    );
+    let cleanBody = pickDefined(body);
 
-    let response = await this.axios.post(`/v2/devices/${deviceIden}`, cleanBody);
+    let response = await this.axios.post(
+      `/v2/devices/${encodeURIComponent(deviceIden)}`,
+      cleanBody
+    );
     return response.data as Device;
   }
 
   async deleteDevice(deviceIden: string): Promise<void> {
-    await this.axios.delete(`/v2/devices/${deviceIden}`);
+    await this.axios.delete(`/v2/devices/${encodeURIComponent(deviceIden)}`);
   }
 
   // ─── Chats ─────────────────────────────────────────────
 
   async listChats(params?: {
+    modifiedAfter?: string;
     active?: boolean;
     cursor?: string;
     limit?: number;
-  }): Promise<{ chats: Chat[]; cursor?: string }> {
-    let query: Record<string, string> = {};
-    if (params?.active !== undefined) query.active = String(params.active);
-    if (params?.cursor) query.cursor = params.cursor;
-    if (params?.limit) query.limit = String(params.limit);
+  }): Promise<{ chats?: Chat[]; cursor?: string }> {
+    let query = this.listQuery(params);
 
     let response = await this.axios.get('/v2/chats', { params: query });
-    return response.data as { chats: Chat[]; cursor?: string };
+    return response.data as { chats?: Chat[]; cursor?: string };
   }
 
   async createChat(email: string): Promise<Chat> {
@@ -318,28 +354,26 @@ export class Client {
   }
 
   async updateChat(chatIden: string, params: { muted: boolean }): Promise<Chat> {
-    let response = await this.axios.post(`/v2/chats/${chatIden}`, params);
+    let response = await this.axios.post(`/v2/chats/${encodeURIComponent(chatIden)}`, params);
     return response.data as Chat;
   }
 
   async deleteChat(chatIden: string): Promise<void> {
-    await this.axios.delete(`/v2/chats/${chatIden}`);
+    await this.axios.delete(`/v2/chats/${encodeURIComponent(chatIden)}`);
   }
 
   // ─── Subscriptions ────────────────────────────────────
 
   async listSubscriptions(params?: {
+    modifiedAfter?: string;
     active?: boolean;
     cursor?: string;
     limit?: number;
-  }): Promise<{ subscriptions: Subscription[]; cursor?: string }> {
-    let query: Record<string, string> = {};
-    if (params?.active !== undefined) query.active = String(params.active);
-    if (params?.cursor) query.cursor = params.cursor;
-    if (params?.limit) query.limit = String(params.limit);
+  }): Promise<{ subscriptions?: Subscription[]; cursor?: string }> {
+    let query = this.listQuery(params);
 
     let response = await this.axios.get('/v2/subscriptions', { params: query });
-    return response.data as { subscriptions: Subscription[]; cursor?: string };
+    return response.data as { subscriptions?: Subscription[]; cursor?: string };
   }
 
   async createSubscription(channelTag: string): Promise<Subscription> {
@@ -351,15 +385,42 @@ export class Client {
     subscriptionIden: string,
     params: { muted: boolean }
   ): Promise<Subscription> {
-    let response = await this.axios.post(`/v2/subscriptions/${subscriptionIden}`, params);
+    let response = await this.axios.post(
+      `/v2/subscriptions/${encodeURIComponent(subscriptionIden)}`,
+      params
+    );
     return response.data as Subscription;
   }
 
   async deleteSubscription(subscriptionIden: string): Promise<void> {
-    await this.axios.delete(`/v2/subscriptions/${subscriptionIden}`);
+    await this.axios.delete(`/v2/subscriptions/${encodeURIComponent(subscriptionIden)}`);
   }
 
   // ─── Channels ──────────────────────────────────────────
+
+  async createChannel(params: {
+    tag: string;
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    websiteUrl?: string;
+    feedUrl?: string;
+    subscribe?: boolean;
+  }): Promise<ChannelInfo> {
+    let response = await this.axios.post(
+      '/v2/channels',
+      pickDefined({
+        tag: params.tag,
+        name: params.name,
+        description: params.description,
+        image_url: params.imageUrl,
+        website_url: params.websiteUrl,
+        feed_url: params.feedUrl,
+        subscribe: params.subscribe
+      })
+    );
+    return response.data as ChannelInfo;
+  }
 
   async getChannelInfo(tag: string, noRecentPushes?: boolean): Promise<ChannelInfo> {
     let query: Record<string, string> = { tag };
@@ -394,10 +455,6 @@ export class Client {
     return response.data as TextMessage;
   }
 
-  async deleteText(textIden: string): Promise<void> {
-    await this.axios.delete(`/v2/texts/${textIden}`);
-  }
-
   // ─── Ephemerals ────────────────────────────────────────
 
   async sendEphemeral(push: Record<string, unknown>): Promise<void> {
@@ -408,7 +465,9 @@ export class Client {
   }
 
   async sendClipboard(body: string, sourceDeviceIden?: string): Promise<void> {
+    let user = await this.getMe();
     await this.sendEphemeral({
+      source_user_iden: user.iden,
       type: 'clip',
       body,
       ...(sourceDeviceIden ? { source_device_iden: sourceDeviceIden } : {})

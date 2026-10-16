@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireArray } from '../lib/response';
 import { spec } from '../spec';
 
 export let fetchServerEmoji = SlateTool.create(spec, {
   name: 'Fetch Server Emoji',
   key: 'fetch_server_emoji',
-  description: `List all custom emoji for a Revolt server. Returns emoji IDs, names, and metadata.`,
+  description: `List all custom emoji for a Stoat server. Returns emoji IDs, names, and metadata.`,
   tags: {
     readOnly: true
   }
@@ -24,8 +25,8 @@ export let fetchServerEmoji = SlateTool.create(spec, {
             emojiId: z.string().describe('ID of the emoji'),
             name: z.string().describe('Name of the emoji'),
             creatorId: z.string().describe('ID of the user who created the emoji'),
-            animated: z.boolean().describe('Whether the emoji is animated'),
-            nsfw: z.boolean().describe('Whether the emoji is NSFW')
+            animated: z.boolean().optional().describe('Whether the emoji is animated'),
+            nsfw: z.boolean().optional().describe('Whether the emoji is NSFW')
           })
         )
         .describe('List of custom emoji')
@@ -35,14 +36,14 @@ export let fetchServerEmoji = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let result = await client.fetchServerEmoji(ctx.input.serverId);
-    let emojisArray = Array.isArray(result) ? result : [];
+    let emojisArray = requireArray(result, 'server emoji');
 
     let emojis = emojisArray.map((e: any) => ({
       emojiId: e._id,
       name: e.name,
       creatorId: e.creator_id,
-      animated: e.animated ?? false,
-      nsfw: e.nsfw ?? false
+      animated: e.animated ?? undefined,
+      nsfw: e.nsfw ?? undefined
     }));
 
     return {
@@ -55,7 +56,7 @@ export let fetchServerEmoji = SlateTool.create(spec, {
 export let deleteEmoji = SlateTool.create(spec, {
   name: 'Delete Emoji',
   key: 'delete_emoji',
-  description: `Delete a custom emoji from a Revolt server.`,
+  description: `Delete a custom emoji from a Stoat server.`,
   tags: {
     destructive: true,
     readOnly: false

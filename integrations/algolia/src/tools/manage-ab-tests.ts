@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,8 @@ export let manageAbTests = SlateTool.create(spec, {
     'Use action "create" to create a new A/B test. Provide name, variants (array of at least 2 variants with indexName, trafficPercentage, and optional description), and endAt (ISO 8601 date string).',
     'Use action "stop" with an abTestId to stop a running A/B test.',
     'Use action "delete" with an abTestId to permanently delete an A/B test.',
-    'The trafficPercentage values across all variants must sum to 100.'
+    'Each variant trafficPercentage must be between 0 and 100.',
+    'Uses the legacy A/B Testing v2 API. Algolia recommends v3 for new A/B testing implementations.'
   ],
   tags: {
     destructive: true
@@ -38,9 +39,7 @@ export let manageAbTests = SlateTool.create(spec, {
             indexName: z.string().describe('Name of the Algolia index for this variant'),
             trafficPercentage: z
               .number()
-              .describe(
-                'Percentage of traffic to route to this variant (all variants must sum to 100)'
-              ),
+              .describe('Percentage of traffic to route to this variant (0 to 100)'),
             description: z
               .string()
               .optional()
@@ -81,15 +80,24 @@ export let manageAbTests = SlateTool.create(spec, {
 
       let result = await client.listAbTests(params);
 
+      let count = Array.isArray(result.abtests)
+        ? result.abtests.length
+        : result.abtests === null
+          ? 0
+          : undefined;
+      let summary =
+        count !== undefined ? `Retrieved **${count}** A/B test(s)` : 'Retrieved A/B test list';
+      let total = typeof result.total === 'number' ? ` (total: ${result.total})` : '';
+
       return {
         output: result,
-        message: `Retrieved **${result.abtests?.length ?? 0}** A/B test(s) (total: ${result.count ?? 0}).`
+        message: `${summary}${total}.`
       };
     }
 
     if (action === 'get') {
       if (ctx.input.abTestId === undefined) {
-        throw new Error('abTestId is required for the "get" action.');
+        throw createApiServiceError('abTestId is required for the "get" action.');
       }
 
       let result = await client.getAbTest(ctx.input.abTestId);
@@ -102,18 +110,35 @@ export let manageAbTests = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for the "create" action.');
+        throw createApiServiceError('name is required for the "create" action.');
       }
       if (!ctx.input.variants || ctx.input.variants.length < 2) {
-        throw new Error('At least 2 variants are required for the "create" action.');
+        throw createApiServiceError(
+          'At least 2 variants are required for the "create" action.'
+        );
       }
       if (!ctx.input.endAt) {
-        throw new Error('endAt is required for the "create" action.');
+        throw createApiServiceError('endAt is required for the "create" action.');
+      }
+      if (!Number.isFinite(Date.parse(ctx.input.endAt))) {
+        throw createApiServiceError('endAt must be a valid ISO 8601 date and time.');
+      }
+      if (
+        ctx.input.variants.some(
+          variant => variant.trafficPercentage < 0 || variant.trafficPercentage > 100
+        )
+      ) {
+        throw createApiServiceError(
+          'Variant trafficPercentage values must each be between 0 and 100.'
+        );
       }
 
       let params: Record<string, any> = {
         name: ctx.input.name,
-        variants: ctx.input.variants,
+        variants: ctx.input.variants.map(({ indexName, ...variant }) => ({
+          index: indexName,
+          ...variant
+        })),
         endAt: ctx.input.endAt
       };
 
@@ -127,7 +152,7 @@ export let manageAbTests = SlateTool.create(spec, {
 
     if (action === 'stop') {
       if (ctx.input.abTestId === undefined) {
-        throw new Error('abTestId is required for the "stop" action.');
+        throw createApiServiceError('abTestId is required for the "stop" action.');
       }
 
       let result = await client.stopAbTest(ctx.input.abTestId);
@@ -140,7 +165,7 @@ export let manageAbTests = SlateTool.create(spec, {
 
     // action === 'delete'
     if (ctx.input.abTestId === undefined) {
-      throw new Error('abTestId is required for the "delete" action.');
+      throw createApiServiceError('abTestId is required for the "delete" action.');
     }
 
     let result = await client.deleteAbTest(ctx.input.abTestId);

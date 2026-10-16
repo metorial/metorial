@@ -1,3 +1,4 @@
+export * from './get-features';
 export * from './manage-balance';
 export * from './manage-customer-settings';
 export * from './manage-customers';

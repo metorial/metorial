@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let removeBackground = SlateTool.create(spec, {
     'The crop and cropMargin options work together - cropMargin only applies when crop is true.'
   ],
   constraints: [
-    'Maximum input image size is 50 megapixels and 12 MB.',
+    'Maximum input image size is 50 megapixels and 22 MB.',
     'PNG output is limited to 10 MP; JPG, WebP, and ZIP support up to 50 MP.',
     'Rate limit: 500 megapixel-images per minute.'
   ],
@@ -49,10 +49,13 @@ export let removeBackground = SlateTool.create(spec, {
           'car_part',
           'transportation',
           'graphics',
+          'graphic',
           'other'
         ])
         .optional()
-        .describe('Foreground subject type. Use "auto" to let the API detect automatically.'),
+        .describe(
+          'Foreground subject type. Use "auto" for detection; "graphic" selects graphics.'
+        ),
       typeLevel: z
         .enum(['none', '1', '2', 'latest'])
         .optional()
@@ -127,9 +130,8 @@ export let removeBackground = SlateTool.create(spec, {
       creditsCharged: z.number().describe('Number of API credits charged for this request.'),
       detectedType: z
         .string()
-        .describe(
-          'The foreground type detected by the API (e.g. "person", "product", "car").'
-        ),
+        .optional()
+        .describe('The detected foreground type. Omitted when typeLevel is "none".'),
       imageWidth: z.number().describe('Width of the result image in pixels.'),
       imageHeight: z.number().describe('Height of the result image in pixels.'),
       foregroundTop: z
@@ -143,7 +145,10 @@ export let removeBackground = SlateTool.create(spec, {
         .describe('Width of the detected foreground in the original image (pixels).'),
       foregroundHeight: z
         .number()
-        .describe('Height of the detected foreground in the original image (pixels).')
+        .describe('Height of the detected foreground in the original image (pixels).'),
+      filename: z.string().optional().describe('Name of the downloadable result file.'),
+      mimeType: z.string().optional().describe('MIME type detected from the result file.'),
+      byteSize: z.number().optional().describe('Size of the result file in bytes.')
     })
   )
   .handleInvocation(async ctx => {
@@ -172,6 +177,35 @@ export let removeBackground = SlateTool.create(spec, {
       semitransparency: ctx.input.semitransparency
     });
 
+    let content = Buffer.from(result.resultImageB64, 'base64');
+    if (!content.byteLength) {
+      throw createApiServiceError('Remove.bg returned an empty processed image.');
+    }
+    let fileFormat = content
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      ? { extension: 'png', mimeType: 'image/png' }
+      : content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff
+        ? { extension: 'jpg', mimeType: 'image/jpeg' }
+        : content.toString('ascii', 0, 4) === 'RIFF' &&
+            content.toString('ascii', 8, 12) === 'WEBP'
+          ? { extension: 'webp', mimeType: 'image/webp' }
+          : content[0] === 0x50 &&
+              content[1] === 0x4b &&
+              content[2] === 0x03 &&
+              content[3] === 0x04
+            ? { extension: 'zip', mimeType: 'application/zip' }
+            : { extension: 'bin', mimeType: 'application/octet-stream' };
+    let filename = `background-result.${fileFormat.extension}`;
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(content), {
+        headers: { 'Content-Type': fileFormat.mimeType }
+      }),
+      filename,
+      mimeType: fileFormat.mimeType
+    });
+
     let bgDescription = ctx.input.bgColor
       ? `replaced with color **${ctx.input.bgColor}**`
       : ctx.input.bgImageUrl || ctx.input.bgImageFileB64
@@ -188,9 +222,12 @@ export let removeBackground = SlateTool.create(spec, {
         foregroundTop: result.foregroundTop,
         foregroundLeft: result.foregroundLeft,
         foregroundWidth: result.foregroundWidth,
-        foregroundHeight: result.foregroundHeight
+        foregroundHeight: result.foregroundHeight,
+        filename,
+        mimeType: fileFormat.mimeType,
+        byteSize: content.byteLength
       },
-      message: `Background ${bgDescription}. Detected subject type: **${result.detectedType}**. Output size: **${result.imageWidth}x${result.imageHeight}** px. Credits charged: **${result.creditsCharged}**.`
+      message: `Background ${bgDescription}. ${result.detectedType ? `Detected subject type: **${result.detectedType}**. ` : ''}Output size: **${result.imageWidth}x${result.imageHeight}** px. Credits charged: **${result.creditsCharged}**.`
     };
   })
   .build();

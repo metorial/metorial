@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,13 +38,16 @@ export let listLayers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let layers = await client.listLayers(ctx.input.mapId);
 
-    let mapped = (Array.isArray(layers) ? layers : []).map((l: any) => ({
+    if (!Array.isArray(layers)) {
+      throw createApiServiceError('Felt returned an invalid layers list. Try again.');
+    }
+    let mapped = layers.map((l: any) => ({
       layerId: l.id,
       name: l.name ?? null,
       caption: l.caption ?? null,
       status: l.status ?? null,
       geometryType: l.geometry_type ?? null,
-      orderingKey: l.ordering_key ?? null,
+      orderingKey: l.ordering_key == null ? null : String(l.ordering_key),
       progress: l.progress ?? null,
       refreshPeriod: l.refresh_period ?? null,
       tileUrl: l.tile_url ?? null

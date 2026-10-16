@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Iqair Airvisual
+# <img src="logo.svg" height="20"> IQAir AirVisual
 
-Retrieve real-time, forecast, and historical air quality and weather data from over 30,000 monitoring sensors worldwide. Look up AQI, pollutant concentrations (PM2.5, PM10, NO2, CO, SO2, O3), and weather conditions by city name, GPS coordinates, or IP geolocation. Browse supported countries, states, and cities. Get station-level readings, hourly and daily AQI forecasts, historical air quality data, and global city AQI rankings. Access indoor air quality data from AirVisual Pro devices including PM2.5, PM10, CO2, temperature, and humidity.
+Read outdoor air quality and weather by city, coordinates, or monitoring station. Browse supported locations, compare city AQI rankings, and retrieve pollutant concentrations, forecasts, daily forecasts, and recent history when included in your IQAir API plan.
+
+Concentration units are supplied by the provider and can vary by pollutant. Coordinate lookup requires both latitude and longitude; omitting them uses the API request server's IP location. Station observations require a Startup or Enterprise API plan. This integration uses the outdoor AirVisual v2 API.
 
 ## License
 

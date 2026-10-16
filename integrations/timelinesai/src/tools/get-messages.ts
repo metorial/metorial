@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, numericId, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -32,6 +32,10 @@ export let getMessages = SlateTool.create(spec, {
   .input(
     z.object({
       chatId: z.number().optional().describe('Chat ID to retrieve message history for'),
+      page: z
+        .number()
+        .optional()
+        .describe('Page number starting at 1; up to 50 messages per page'),
       messageUid: z.string().optional().describe('Specific message UID to get details for'),
       fromMe: z
         .boolean()
@@ -90,15 +94,17 @@ export let getMessages = SlateTool.create(spec, {
       let statusHistory: any[] | undefined;
       if (ctx.input.includeStatusHistory) {
         let histResult = await client.getMessageStatusHistory(ctx.input.messageUid);
-        statusHistory = (histResult?.data || []).map((s: any) => ({
-          status: s.status,
-          timestamp: s.timestamp
-        }));
+        statusHistory = requireArray(histResult?.data, 'message status history').map(
+          (s: any) => ({
+            status: s.status,
+            timestamp: s.timestamp
+          })
+        );
       }
 
       let mapped = {
         messageUid: msg.uid,
-        chatId: msg.chat_id,
+        chatId: msg.chat_id == null ? undefined : numericId(msg.chat_id),
         timestamp: msg.timestamp,
         senderPhone: msg.sender_phone,
         senderName: msg.sender_name,
@@ -123,8 +129,8 @@ export let getMessages = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.chatId) {
-      throw new Error('Either chatId or messageUid must be provided');
+    if (ctx.input.chatId === undefined) {
+      throw createApiServiceError('Either chatId or messageUid must be provided');
     }
 
     let result = await client.getChatMessages(ctx.input.chatId, {
@@ -133,12 +139,13 @@ export let getMessages = SlateTool.create(spec, {
       before: ctx.input.before,
       afterMessage: ctx.input.afterMessage,
       beforeMessage: ctx.input.beforeMessage,
-      sortingOrder: ctx.input.sortingOrder
+      sortingOrder: ctx.input.sortingOrder,
+      page: ctx.input.page
     });
 
-    let messages = (result?.data?.messages || []).map((msg: any) => ({
+    let messages = requireArray(result?.data?.messages, 'messages').map((msg: any) => ({
       messageUid: msg.uid,
-      chatId: msg.chat_id,
+      chatId: msg.chat_id == null ? undefined : numericId(msg.chat_id),
       timestamp: msg.timestamp,
       senderPhone: msg.sender_phone,
       senderName: msg.sender_name,
@@ -153,7 +160,7 @@ export let getMessages = SlateTool.create(spec, {
       messageType: msg.message_type
     }));
 
-    let hasMorePages = result?.data?.has_more_pages || false;
+    let hasMorePages = result?.data?.has_more_pages;
 
     return {
       output: { messages, hasMorePages },

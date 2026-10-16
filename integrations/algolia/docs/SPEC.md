@@ -1,4 +1,4 @@
-# Slates Specification for Algolia
+# Algolia Integration Specification
 
 ## Overview
 
@@ -87,3 +87,19 @@ Access infrastructure status and metrics for your Algolia application, including
 ## Events
 
 The provider does not support webhooks or built-in event subscription mechanisms. Algolia does not offer outbound webhooks to notify external systems of changes to indices, records, or other resources. It is primarily a consumer of events (via the Insights API) rather than a producer of them.
+
+## Available tool coverage
+
+The integration exposes search, cursor-based record browsing, asynchronous task status, record/index/settings/rule/synonym management, API keys, analytics, Insights events, Recommend, legacy A/B Testing v2, and Monitoring. Personalization strategy administration, ingestion pipelines, and Crawler APIs described above are product context and are not exposed by the tools.
+
+Search preserves the complete provider response in `raw` in addition to the original normalized fields. The optional `queryId` is omitted when the provider omits it. Raw provider responses remain available unchanged for the management, browsing, task, analytics, and monitoring tools.
+
+Algolia's application-key APIs do not expose a suitable current-user or account-profile endpoint. An identity tool is therefore omitted. The existing A/B test contract remains on the documented legacy v2 endpoints; migrating to v3 requires a separate compatibility review.
+
+## Search response evidence
+
+Algolia's [single-index search response](https://www.algolia.com/doc/rest-api/search/search-single-index) and [responseFields setting](https://www.algolia.com/doc/api-reference/api-parameters/responseFields) permit omitting search metadata. The optional outputs `nbHits`, `page`, `nbPages`, `hitsPerPage`, `processingTimeMs` (provider `processingTimeMS`), `query`, `exhaustiveNbHits` (legacy `exhaustiveNbHits` or modern `exhaustive.nbHits`), and `params` retain their number/string/boolean types when supplied and are omitted when absent. No zero, empty string, input query, or true value is invented for missing metadata. Present null or invalid scalar values raise a service error; no nullable scalar alternatives are added. The complete valid provider response remains in `raw`.
+
+Search requires a hits array to fulfill its result contract. A missing or invalid hits array raises a service error with guidance to include hits in the index responseFields setting. The message uses an actual returned total only when available, otherwise the number of returned hits; page wording requires both page and page-count metadata.
+
+The A/B list response is returned unchanged. Its message uses the actual array length, or zero when the documented `abtests: null` indicates no configured tests; absent lists or totals are described without invented counts. The total is sourced from `total`, not the page's `count` field.

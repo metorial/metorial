@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let updateTemplate = SlateTool.create(spec, {
   name: 'Update Template',
   key: 'update_template',
-  description: `Update an existing image template. Editing a template creates a new version, so previous versions remain available. When generating images, the latest version is used by default unless a specific version is targeted.`,
+  description: `Update an existing image template. Editing a template updates an unused latest version or creates a new version after it has been rendered. When generating images, the latest version is used by default unless a specific version is targeted.`,
   instructions: [
-    'Updates create a new template version rather than modifying the existing one.',
+    'The provider may replace the latest version if it has not rendered; otherwise it creates a new version.',
     'Unlimited edits are supported on all plans.'
   ],
   tags: {
@@ -40,7 +40,10 @@ export let updateTemplate = SlateTool.create(spec, {
   .output(
     z.object({
       templateId: z.string().describe('ID of the updated template'),
-      templateVersion: z.number().describe('New version number after the update')
+      templateVersion: z.number().describe('New version number after the update'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {

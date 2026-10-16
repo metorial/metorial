@@ -35,6 +35,10 @@ Use this to inspect block data, check the current chain head, or retrieve block 
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original block data, including pending null values'),
       latestBlockNumber: z
         .string()
         .optional()
@@ -74,7 +78,7 @@ Use this to inspect block data, check the current chain head, or retrieve block 
       };
     }
 
-    let blockData: any;
+    let blockData: Awaited<ReturnType<AlchemyClient['getBlockByNumber']>> | undefined;
     if (ctx.input.blockHash) {
       blockData = await client.getBlockByHash(
         ctx.input.blockHash,
@@ -89,16 +93,16 @@ Use this to inspect block data, check the current chain head, or retrieve block 
 
     if (!blockData) {
       return {
-        output: {},
+        output: { raw: blockData },
         message: 'Block not found.'
       };
     }
 
     let block = {
-      blockNumber: blockData.number,
-      blockHash: blockData.hash,
+      blockNumber: blockData.number ?? undefined,
+      blockHash: blockData.hash ?? undefined,
       timestamp: blockData.timestamp,
-      miner: blockData.miner,
+      miner: blockData.miner ?? undefined,
       gasUsed: blockData.gasUsed,
       gasLimit: blockData.gasLimit,
       baseFeePerGas: blockData.baseFeePerGas,
@@ -109,7 +113,7 @@ Use this to inspect block data, check the current chain head, or retrieve block 
 
     let blockNum = blockData.number ? Number.parseInt(blockData.number, 16) : 'unknown';
     return {
-      output: { block },
+      output: { block, raw: blockData },
       message: `Block **#${blockNum}** — ${block.transactionCount ?? 0} transaction(s), gas used: ${blockData.gasUsed ? Number.parseInt(blockData.gasUsed, 16).toLocaleString() : 'N/A'}.`
     };
   })

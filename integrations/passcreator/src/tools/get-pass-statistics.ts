@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,10 +39,19 @@ export let getPassStatistics = SlateTool.create(spec, {
       activeHistory: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Daily active/inactive pass counts')
+        .describe('Daily active/inactive pass counts'),
+      activeHistoryEntries: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Raw daily active/inactive history entries returned as an array')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.includeActiveHistory && !ctx.input.activeHistoryStartDay) {
+      throw createApiServiceError(
+        'activeHistoryStartDay is required when includeActiveHistory is true.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let statistics = await client.getPassStatistics(
@@ -51,16 +60,22 @@ export let getPassStatistics = SlateTool.create(spec, {
       ctx.input.day
     );
 
-    let activeHistory: any | undefined;
+    let activeHistory: Record<string, any> | undefined;
+    let activeHistoryEntries: Record<string, any>[] | undefined;
     if (ctx.input.includeActiveHistory && ctx.input.activeHistoryStartDay) {
-      activeHistory = await client.getActiveHistory(
+      let history = await client.getActiveHistory(
         ctx.input.templateId,
         ctx.input.activeHistoryStartDay
       );
+      if (Array.isArray(history)) {
+        activeHistoryEntries = history;
+      } else {
+        activeHistory = history;
+      }
     }
 
     return {
-      output: { statistics, activeHistory },
+      output: { statistics, activeHistory, activeHistoryEntries },
       message: `Retrieved ${ctx.input.timeFrame} statistics for template \`${ctx.input.templateId}\`.`
     };
   })

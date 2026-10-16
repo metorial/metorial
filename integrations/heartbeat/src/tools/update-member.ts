@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let updateMember = SlateTool.create(spec, {
   name: 'Update Member',
   key: 'update_member',
-  description: `Updates an existing user's information in your Heartbeat community. Can update name, email, roles, groups, bio, social links, and other profile fields.`,
+  description: `DEPRECATED — use \`edit_member_profile\` instead. Updates an existing user's information in your Heartbeat community. Can update name, email, roles, groups, bio, social links, and other profile fields.`,
+  instructions: [
+    'Use edit_member_profile instead. The documented update operation identifies the member by existing email. Email, role, and group changes are not documented on this operation.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

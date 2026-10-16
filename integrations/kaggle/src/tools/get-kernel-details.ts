@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleRecord } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getKernelDetails = SlateTool.create(spec, {
@@ -22,6 +23,10 @@ export let getKernelDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      statusDetails: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original notebook status response.'),
       source: z
         .record(z.string(), z.any())
         .optional()
@@ -37,24 +42,32 @@ export let getKernelDetails = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KaggleClient(ctx.auth);
 
-    let source = await client.pullKernel(ctx.input.userName, ctx.input.kernelSlug);
+    let source = kaggleRecord(
+      await client.pullKernel(ctx.input.userName, ctx.input.kernelSlug),
+      'notebook source'
+    );
 
     let output: any;
     let status: any;
     let failureMessage: any;
+    let statusDetails: Record<string, unknown> | undefined;
 
     if (ctx.input.includeOutput) {
-      output = await client
-        .getKernelOutput(ctx.input.userName, ctx.input.kernelSlug)
-        .catch(() => null);
+      output = kaggleRecord(
+        await client.getKernelOutput(ctx.input.userName, ctx.input.kernelSlug),
+        'notebook output'
+      );
     }
 
     if (ctx.input.includeStatus) {
-      let statusData = await client
-        .getKernelStatus(ctx.input.userName, ctx.input.kernelSlug)
-        .catch(() => null);
-      status = statusData?.status;
-      failureMessage = statusData?.failureMessage;
+      let statusData = kaggleRecord(
+        await client.getKernelStatus(ctx.input.userName, ctx.input.kernelSlug),
+        'notebook status'
+      );
+      statusDetails = statusData;
+      status = typeof statusData.status === 'string' ? statusData.status : undefined;
+      failureMessage =
+        typeof statusData.failureMessage === 'string' ? statusData.failureMessage : undefined;
     }
 
     return {
@@ -62,7 +75,8 @@ export let getKernelDetails = SlateTool.create(spec, {
         source: source ?? undefined,
         output: output ?? undefined,
         status,
-        failureMessage
+        failureMessage,
+        statusDetails
       },
       message: `Retrieved notebook **${ctx.input.userName}/${ctx.input.kernelSlug}**${status ? ` (status: ${status})` : ''}.`
     };

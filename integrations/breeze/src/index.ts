@@ -24,12 +24,14 @@ import {
   manageVolunteers,
   queryAccountLog,
   removeFormEntry,
+  searchPeople,
   updatePerson
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     listPeople,
+    searchPeople,
     getPerson,
     createPerson,
     updatePerson,

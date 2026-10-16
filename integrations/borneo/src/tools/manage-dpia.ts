@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,19 +8,23 @@ export let manageDpia = SlateTool.create(spec, {
   key: 'manage_dpia',
   description: `Create, retrieve, update, or delete Data Protection Impact Assessments (DPIAs) for processing activities. Includes comprehensive risk assessments for confidentiality, integrity, and availability compliance.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
       action: z.enum(['create', 'get', 'update', 'delete']).describe('Action to perform'),
       dpiaId: z.string().optional().describe('DPIA ID (required for get, update, delete)'),
       processingActivityId: z
         .string()
         .optional()
         .describe('Processing activity ID (required for create)'),
-      status: z.string().optional().describe('DPIA status'),
+      status: z.string().optional().describe('DPIA status; required for create and update'),
       confidentialityRisk: z
         .string()
         .optional()
@@ -40,7 +44,8 @@ export let manageDpia = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let { action, dpiaId } = ctx.input;
@@ -48,7 +53,9 @@ export let manageDpia = SlateTool.create(spec, {
     switch (action) {
       case 'create': {
         if (!ctx.input.processingActivityId || !ctx.input.status) {
-          throw new Error('processingActivityId and status are required for creating a DPIA');
+          throw createApiServiceError(
+            'processingActivityId and status are required for creating a DPIA'
+          );
         }
         let result = await client.createDpia({
           processingActivityId: ctx.input.processingActivityId,
@@ -57,23 +64,23 @@ export let manageDpia = SlateTool.create(spec, {
           integrityRisk: ctx.input.integrityRisk,
           availabilityRisk: ctx.input.availabilityRisk
         });
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { dpia: data, success: true },
           message: `DPIA created for processing activity **${ctx.input.processingActivityId}**.`
         };
       }
       case 'get': {
-        if (!dpiaId) throw new Error('dpiaId is required for get action');
+        if (!dpiaId) throw createApiServiceError('dpiaId is required for get action');
         let result = await client.getDpia(dpiaId);
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { dpia: data, success: true },
           message: `Retrieved DPIA **${dpiaId}**.`
         };
       }
       case 'update': {
-        if (!dpiaId) throw new Error('dpiaId is required for update action');
+        if (!dpiaId) throw createApiServiceError('dpiaId is required for update action');
         let updatePayload: Record<string, any> = {};
         if (ctx.input.status !== undefined) updatePayload.status = ctx.input.status;
         if (ctx.input.confidentialityRisk !== undefined)
@@ -84,14 +91,14 @@ export let manageDpia = SlateTool.create(spec, {
           updatePayload.availabilityRisk = ctx.input.availabilityRisk;
 
         let result = await client.updateDpia(dpiaId, updatePayload);
-        let data = result?.data ?? result;
+        let data = result;
         return {
           output: { dpia: data, success: true },
           message: `DPIA **${dpiaId}** updated.`
         };
       }
       case 'delete': {
-        if (!dpiaId) throw new Error('dpiaId is required for delete action');
+        if (!dpiaId) throw createApiServiceError('dpiaId is required for delete action');
         await client.deleteDpia(dpiaId);
         return {
           output: { success: true },

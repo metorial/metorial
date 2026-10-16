@@ -10,7 +10,7 @@ export let listServiceAccounts = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/iam/v1/serviceAccounts', { params });
   return response.data;
@@ -49,7 +49,7 @@ export let listApiKeys = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { serviceAccountId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/iam/v1/apiKeys', { params });
   return response.data;
@@ -61,6 +61,7 @@ export let createApiKey = async (
     serviceAccountId: string;
     description?: string;
     scopes?: string[];
+    expiresAt?: string;
   }
 ) => {
   let client = createServiceClient(BASE_URL, auth);
@@ -83,7 +84,7 @@ export let listAccessBindings = async (
 ) => {
   let client = createServiceClient('https://resource-manager.api.cloud.yandex.net', auth);
   let params: Record<string, string | number> = {};
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get(`/${resourceType}/${resourceId}:listAccessBindings`, {
     params

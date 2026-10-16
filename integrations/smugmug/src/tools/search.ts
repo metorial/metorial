@@ -60,48 +60,52 @@ export let searchTool = SlateTool.create(spec, {
 
     let pagination = { start: ctx.input.start, count: ctx.input.count };
     let results: any[] = [];
-    let totalResults = 0;
+    let totalResults: number;
+    let start: number;
 
     if (ctx.input.resourceType === 'albums') {
       let data = await client.searchAlbums(ctx.input.query, ctx.input.scope, pagination);
       results = data.items.map((album: any) => ({
         resourceType: 'album',
-        key: album.AlbumKey || '',
-        name: album.Name || undefined,
-        description: album.Description || undefined,
-        webUri: album.WebUri || undefined,
-        uri: album.Uri || undefined
+        key: album.AlbumKey,
+        name: album.Name ?? undefined,
+        description: album.Description ?? undefined,
+        webUri: album.WebUri ?? undefined,
+        uri: album.Uri ?? undefined
       }));
       totalResults = data.pages.total;
+      start = data.pages.start;
     } else if (ctx.input.resourceType === 'images') {
       let data = await client.searchImages(ctx.input.query, ctx.input.scope, pagination);
       results = data.items.map((image: any) => ({
         resourceType: 'image',
-        key: image.ImageKey || '',
-        name: image.Title || image.FileName || undefined,
-        description: image.Caption || undefined,
-        webUri: image.WebUri || undefined,
-        uri: image.Uri || undefined
+        key: image.ImageKey,
+        name: image.Title ?? image.FileName ?? undefined,
+        description: image.Caption ?? undefined,
+        webUri: image.WebUri ?? undefined,
+        uri: image.Uri ?? undefined
       }));
       totalResults = data.pages.total;
+      start = data.pages.start;
     } else {
       let data = await client.searchNodes(ctx.input.query, ctx.input.scope, pagination);
       results = data.items.map((node: any) => ({
         resourceType: node.Type?.toLowerCase() || 'node',
-        key: node.NodeID || '',
-        name: node.Name || undefined,
-        description: node.Description || undefined,
-        webUri: node.WebUri || undefined,
-        uri: node.Uri || undefined
+        key: node.NodeID,
+        name: node.Name ?? undefined,
+        description: node.Description ?? undefined,
+        webUri: node.WebUri ?? undefined,
+        uri: node.Uri ?? undefined
       }));
       totalResults = data.pages.total;
+      start = data.pages.start;
     }
 
     return {
       output: {
         results,
         totalResults,
-        start: ctx.input.start || 1,
+        start,
         count: results.length
       },
       message: `Found **${totalResults}** ${ctx.input.resourceType} matching "${ctx.input.query}" (showing ${results.length})`

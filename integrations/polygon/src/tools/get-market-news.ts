@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getMarketNews = SlateTool.create(spec, {
@@ -13,6 +20,7 @@ export let getMarketNews = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
       ticker: z.string().optional().describe('Filter news by ticker symbol (e.g., AAPL)'),
       publishedAfter: z
         .string()
@@ -37,6 +45,7 @@ export let getMarketNews = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       articles: z
         .array(
           z.object({
@@ -68,9 +77,11 @@ export let getMarketNews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, 1000);
     let client = new PolygonClient(ctx.auth.token);
 
     let response = await client.getNews({
+      cursor: ctx.input.cursor,
       ticker: ctx.input.ticker,
       publishedUtcGte: ctx.input.publishedAfter,
       publishedUtcLte: ctx.input.publishedBefore,
@@ -79,7 +90,7 @@ export let getMarketNews = SlateTool.create(spec, {
       sort: ctx.input.sort
     });
 
-    let articles = (response.results || []).map((a: any) => ({
+    let articles = polygonRecords(response.results).map((a: any) => ({
       articleId: a.id,
       title: a.title,
       description: a.description,
@@ -92,15 +103,18 @@ export let getMarketNews = SlateTool.create(spec, {
       publisherLogoUrl: a.publisher?.logo_url,
       publisherHomepageUrl: a.publisher?.homepage_url,
       keywords: a.keywords,
-      insights: a.insights?.map((i: any) => ({
-        ticker: i.ticker,
-        sentiment: i.sentiment,
-        sentimentReasoning: i.sentiment_reasoning
-      }))
+      insights:
+        a.insights == null
+          ? undefined
+          : polygonRecords(a.insights, 'news insights').map((i: any) => ({
+              ticker: i.ticker,
+              sentiment: i.sentiment,
+              sentimentReasoning: i.sentiment_reasoning
+            }))
     }));
 
     return {
-      output: { articles },
+      output: polygonOutput({ articles }, response),
       message: `Retrieved **${articles.length}** news articles${ctx.input.ticker ? ` related to **${ctx.input.ticker}**` : ''}.`
     };
   })

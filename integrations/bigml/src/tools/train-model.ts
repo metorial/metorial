@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -66,6 +66,7 @@ Choose the model type based on your task — classification, regression, forecas
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the trained model'),
       name: z.string().optional().describe('Name of the model'),
       modelType: z.string().describe('Type of model created'),
@@ -75,32 +76,49 @@ Choose the model type based on your task — classification, regression, forecas
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.modelType !== 'ensemble' &&
+      [ctx.input.numberOfModels, ctx.input.boosting, ctx.input.randomize].some(
+        value => value !== undefined
+      )
+    ) {
+      throw createApiServiceError(
+        'numberOfModels, boosting, and randomize only apply to ensemble models.'
+      );
+    }
+    if (ctx.input.modelType !== 'deepnet' && ctx.input.numberOfHiddenLayers !== undefined) {
+      throw createApiServiceError('numberOfHiddenLayers only applies to deepnet models.');
+    }
+    if (ctx.input.modelType !== 'timeseries' && ctx.input.horizon !== undefined) {
+      throw createApiServiceError('horizon only applies to timeseries models.');
+    }
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       dataset: ctx.input.datasetId
     };
 
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.objectiveField) body.objective_field = ctx.input.objectiveField;
     if (ctx.input.inputFields) body.input_fields = ctx.input.inputFields;
     if (ctx.input.range) body.range = ctx.input.range;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let modelType = ctx.input.modelType;
 
     if (modelType === 'ensemble') {
-      if (ctx.input.numberOfModels) body.number_of_models = ctx.input.numberOfModels;
+      if (ctx.input.numberOfModels !== undefined)
+        body.number_of_models = ctx.input.numberOfModels;
       if (ctx.input.boosting) body.boosting = ctx.input.boosting;
       if (ctx.input.randomize !== undefined) body.randomize = ctx.input.randomize;
     }
 
-    if (modelType === 'deepnet' && ctx.input.numberOfHiddenLayers) {
+    if (modelType === 'deepnet' && ctx.input.numberOfHiddenLayers !== undefined) {
       body.number_of_hidden_layers = ctx.input.numberOfHiddenLayers;
     }
 
-    if (modelType === 'timeseries' && ctx.input.horizon) {
+    if (modelType === 'timeseries' && ctx.input.horizon !== undefined) {
       body.horizon = ctx.input.horizon;
     }
 
@@ -108,14 +126,15 @@ Choose the model type based on your task — classification, regression, forecas
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
         modelType: modelType,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `${modelType} **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}. Model training is asynchronous — check status with the Get Resource tool.`
+      message: `${modelType} **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}. Model training is asynchronous — check status with the Get Resource tool.`
     };
   })
   .build();

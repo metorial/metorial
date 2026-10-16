@@ -1,6 +1,6 @@
-# Timelines Ai
+# TimelinesAI
 
-Send and receive WhatsApp messages across multiple accounts. Manage chats, groups, and contacts programmatically. Create WhatsApp groups, add or remove members, and send group messages. Upload and attach files (images, videos, voice records, documents) to messages. Retrieve chat history, filter conversations by assignee, label, read status, or search terms. List and monitor connected WhatsApp accounts and their statuses. Configure webhooks for real-time notifications on new messages, new chats, chat renames, and new account events.
+Send WhatsApp messages to contacts and existing chats, retrieve conversation history, manage chat assignments, labels and notes, upload and retrieve files, list connected WhatsApp accounts, inspect workspace usage, and configure webhook subscriptions.
 
 ## License
 

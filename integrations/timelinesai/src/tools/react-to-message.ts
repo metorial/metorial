@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,17 +45,37 @@ export let reactToMessage = SlateTool.create(spec, {
 
     if (getOnly) {
       let result = await client.getMessageReactions(messageUid);
+      let counts = result?.data?.reactions ?? result?.data;
+      let parsedCounts = z
+        .record(z.string(), z.union([z.string(), z.number()]))
+        .safeParse(counts);
+      if (!parsedCounts.success) {
+        throw createApiServiceError('TimelinesAI returned an invalid reaction count map.');
+      }
+      let reactions: Record<string, number> = {};
+      for (let [emoji, count] of Object.entries(parsedCounts.data)) {
+        let numericCount =
+          typeof count === 'string' && /^\d+$/.test(count) ? Number(count) : count;
+        if (
+          typeof numericCount !== 'number' ||
+          !Number.isSafeInteger(numericCount) ||
+          numericCount < 0
+        ) {
+          throw createApiServiceError('TimelinesAI returned an invalid reaction count.');
+        }
+        reactions[emoji] = numericCount;
+      }
       return {
         output: {
           messageUid,
-          reactions: result?.data || {}
+          reactions
         },
         message: `Retrieved reactions for message **${messageUid}**.`
       };
     }
 
     if (reaction === undefined) {
-      throw new Error('reaction is required when getOnly is not true');
+      throw createApiServiceError('reaction is required when getOnly is not true');
     }
 
     let result = await client.setMessageReaction(messageUid, reaction);

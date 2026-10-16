@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteProject = SlateTool.create(spec, {
   name: 'Delete Project',
   key: 'delete_project',
-  description: `Permanently delete a project from the workspace. This action is irreversible and will remove the project and all its associated data.`,
+  description: `Call list_projects to discover project IDs. Permanently delete a project from the workspace. This action is irreversible and will remove the project and all its associated data.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to delete')
+      projectId: projectIdSchema
     })
   )
   .output(

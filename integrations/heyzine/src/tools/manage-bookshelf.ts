@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HeyzineClient } from '../lib/client';
 import { spec } from '../spec';
@@ -74,10 +74,10 @@ Bookshelves are collections of flipbooks displayed on a shared page.`,
 
     if (ctx.input.action === 'list_bookshelves') {
       let bookshelves = await client.listBookshelves();
-      let mapped = (Array.isArray(bookshelves) ? bookshelves : []).map(bs => ({
+      let mapped = bookshelves.map(bs => ({
         bookshelfId: bs.id,
-        title: bs.title || '',
-        url: bs.url || ''
+        title: bs.title,
+        url: bs.links.url
       }));
 
       return {
@@ -88,14 +88,14 @@ Bookshelves are collections of flipbooks displayed on a shared page.`,
 
     if (ctx.input.action === 'list_flipbooks') {
       if (!ctx.input.bookshelfId)
-        throw new Error('bookshelfId is required for list_flipbooks action.');
+        throw createApiServiceError('bookshelfId is required for list_flipbooks action.');
 
       let flipbooks = await client.listBookshelfFlipbooks(ctx.input.bookshelfId);
-      let mapped = (Array.isArray(flipbooks) ? flipbooks : []).map(fb => ({
+      let mapped = flipbooks.map(fb => ({
         flipbookId: fb.id,
-        title: fb.title || '',
-        url: fb.url || '',
-        thumbnailUrl: fb.thumbnail || ''
+        title: fb.title,
+        url: fb.links.base,
+        thumbnailUrl: fb.links.thumbnail
       }));
 
       return {
@@ -106,9 +106,9 @@ Bookshelves are collections of flipbooks displayed on a shared page.`,
 
     if (ctx.input.action === 'add_flipbook') {
       if (!ctx.input.bookshelfId)
-        throw new Error('bookshelfId is required for add_flipbook action.');
+        throw createApiServiceError('bookshelfId is required for add_flipbook action.');
       if (!ctx.input.flipbookId)
-        throw new Error('flipbookId is required for add_flipbook action.');
+        throw createApiServiceError('flipbookId is required for add_flipbook action.');
 
       await client.addFlipbookToBookshelf(
         ctx.input.bookshelfId,
@@ -124,9 +124,9 @@ Bookshelves are collections of flipbooks displayed on a shared page.`,
 
     if (ctx.input.action === 'remove_flipbook') {
       if (!ctx.input.bookshelfId)
-        throw new Error('bookshelfId is required for remove_flipbook action.');
+        throw createApiServiceError('bookshelfId is required for remove_flipbook action.');
       if (!ctx.input.flipbookId)
-        throw new Error('flipbookId is required for remove_flipbook action.');
+        throw createApiServiceError('flipbookId is required for remove_flipbook action.');
 
       await client.removeFlipbookFromBookshelf(ctx.input.bookshelfId, ctx.input.flipbookId);
 
@@ -136,6 +136,6 @@ Bookshelves are collections of flipbooks displayed on a shared page.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

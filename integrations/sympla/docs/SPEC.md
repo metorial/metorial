@@ -1,59 +1,40 @@
-# Slates Specification for Sympla
-
-## Overview
-
-Sympla is a Brazilian event management and ticketing platform that allows organizers to create, promote, sell tickets, and manage participants for both in-person and online events. The Sympla API is the public interface for accessing data on the Sympla platform, providing information related to events created by the user, including tickets, orders, and participants.
+# Sympla API specification
 
 ## Authentication
 
-Sympla uses **API key (token) authentication**. Sympla uses API keys for authentication.
+An organizer API access token is generated in Sympla under **Minha Conta > Integrações**. Every request sends the unchanged token in the `s_token` header. No OAuth flow, refresh token, setup resource ID, or configuration field is required.
 
-The token must be included in all requests sent to the API. To generate an access key, log in to the Sympla platform, go to the "My Account" menu (accessible from your username), and navigate to the "Integrations" tab. Provide a name for identification and click "Create access key." You can generate more than one token for your events if desired.
+## Existing event operations
 
-The token is passed as a header in each API request:
+The existing tools retain `https://api.sympla.com.br/public/v3`, numeric event and ticket identifiers, page/offset pagination, and the original request parameter meanings:
 
-- **Header name:** `s_token`
-- **Header value:** Your generated API token
+- `list_events` and `get_event` read organizer event details.
+- `list_orders` and `get_order` read event purchases; `includeAllStatuses` maps to `status` unchanged, including explicit false.
+- `list_participants` reads participants by event or order.
+- `get_participant` reads by ticket ID or ticket number.
+- `checkin_participant` performs check-in through the existing `/checkIn` routes.
+- `list_affiliates` reads event affiliates.
 
-The base URL is `https://api.sympla.com.br/public/v3`.
+The current official reference covers versioned `v1.5.0`, `v1.5.1`, and `v1.6.0` routes rather than `/v3`. Its linked historical reference returned HTTP 404 during this audit. That does not establish retirement of existing routes. Their endpoint behavior and sparse-response contracts need live verification before any migration.
 
-The API provides access to event information created on the Sympla platform, exclusively those linked to the user who owns the token.
+## Scheduled presentation discovery
 
-## Features
+Three additive read tools use the separately versioned `https://api.sympla.com.br/public/v1.6.0` API and the same `s_token` credential:
 
-### Event Management (Read-Only)
+- `list_current_events`: `GET /events`; returns actual provider event objects, including string `id` hashes needed for the next two tools. Publication filter values are `published`, `not_published`, and `all`; default is published. Default timezone is `America/Sao_Paulo` and default sort is ascending. Continue with the exact returned `pagination.next_cursor`.
+- `list_presentations`: `GET /events/{eventIdHash}/presentations`; reads scheduled sessions, presentation IDs, sectors, dates, and publication state. Supports publication, start-date, timezone, online-sector, page-size, and cursor filters. Explicit false filters are preserved. Default publication is true.
+- `get_presentation`: `GET /events/{eventIdHash}/presentations/{presentationId}`; returns the direct presentation object documented for this endpoint, rather than assuming a data envelope.
 
-The API provides access to events created on the Sympla platform linked to the token owner. It allows customization of results, such as filtering events within a date range or restricting which fields are returned (e.g., only event name and description).
+The new tools retain raw provider objects and metadata, including sparse fields or null values inside records. Their `httpStatus` comes from the actual HTTP response. HTTP 204 omits the resource and metadata fields; it does not manufacture an empty list, total, or next-page state.
 
-- Filter events by date windows.
-- Select specific fields to include in the response.
-- Retrieve details for a specific event by its identifier.
-- The API is read-only; event creation or modification is not supported via the API.
+## Compatibility and limitations
 
-### Order Management
+Legacy tool keys, schemas, enum values, optionalness, and defaults remain unchanged. Version 1.6.0 uses string hash identifiers and cursor pagination; it must not silently replace legacy numeric-ID routes. No self/profile endpoint, affiliate endpoint, or webhook registration API appears in the retrieved current OpenAPI reference. Creation and editing of events are not exposed there. Current order/participant, presentation-scoped order/participant, and QR check-in routes remain unimplemented by the additive presentation tools; the existing legacy tools remain available.
 
-Retrieve orders (ticket purchases) associated with your events. You can list all orders for a given event or retrieve a specific order by its identifier.
+## Official sources
 
-- List all orders for a specific event.
-- Get details of an individual order by order ID.
-
-### Participant Management
-
-Access participant (attendee) information for your events. You can retrieve participants associated with a specific order, or list all participants for a given event. You can also look up an individual participant by their ticket ID.
-
-- List participants by event.
-- List participants by order.
-- Get a specific participant by ticket ID.
-- Participant data includes check-in status.
-
-### Affiliate Management
-
-The API provides access to affiliate information for a given event.
-
-- Retrieve affiliates associated with a specific event.
-
-## Events
-
-The Sympla API does not natively support webhooks or event subscription mechanisms. The API is read-only and designed for polling data about events, orders, and participants. Third-party integration platforms (such as Zapier and Pipedream) implement polling-based triggers on top of the API to detect changes such as new attendees, new orders, and new events, but these are not purpose-built event mechanisms provided by Sympla itself.
-
-The provider does not support events.
+- [Current OpenAPI contract](https://developers.sympla.com.br/api-docs)
+- [Developer reference and authentication guide](https://developers.sympla.com.br/api-doc/)
+- [Breaking changes and compatibility](https://developers.sympla.com.br/docs/breaking-changes.html)
+- [Changelog](https://developers.sympla.com.br/docs/changelog.html)
+- [Historical contract linked by the current reference](https://developers.sympla.com.br/api-docs/v2.0.68) — HTTP 404 when checked on 2026-10-15.

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,8 +32,8 @@ export let sendMessage = SlateTool.create(spec, {
       username: ctx.auth.username
     });
 
-    if (!ctx.input.recipientUser && !ctx.input.recipientTeam) {
-      throw new Error('Provide either recipientUser or recipientTeam');
+    if (Boolean(ctx.input.recipientUser) === Boolean(ctx.input.recipientTeam)) {
+      throw createApiServiceError('Provide exactly one of recipientUser or recipientTeam.');
     }
 
     await client.sendMessage({

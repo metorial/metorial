@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCardDetails = SlateTool.create(spec, {
@@ -20,7 +21,7 @@ export let getCardDetails = SlateTool.create(spec, {
   .output(
     z.object({
       cardId: z.string().describe('Unique ID of the card'),
-      name: z.string().describe('Name of the card design'),
+      name: z.string().optional().describe('Name of the card design'),
       coverImageUrl: z.string().optional().describe('URL of the card cover image'),
       price: z.string().optional().describe('Price of the card'),
       categoryName: z.string().optional().describe('Category the card belongs to'),
@@ -39,22 +40,29 @@ export let getCardDetails = SlateTool.create(spec, {
     let card = result.card ?? result;
 
     let images = card.images ?? {};
+    let imageUrl = (value: unknown): string | undefined => {
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value) && typeof value[0]?.image === 'string') {
+        return value[0].image;
+      }
+      return undefined;
+    };
 
     return {
       output: {
         cardId: String(card.id),
-        name: card.name ?? '',
+        name: responseString(card.name, 'card name', true),
         coverImageUrl: card.cover ?? undefined,
         price: card.price != null ? String(card.price) : undefined,
         categoryName: card.category_name ?? undefined,
         orientation: card.orientation ?? undefined,
         maxCharacters: card.characters != null ? Number(card.characters) : undefined,
-        frontImageUrl: images.front ?? undefined,
-        insideImageUrl: images.inside ?? undefined,
-        envelopeImageUrl: images.envelope ?? undefined,
-        backImageUrl: images.back ?? undefined
+        frontImageUrl: imageUrl(images.front),
+        insideImageUrl: imageUrl(images.inside),
+        envelopeImageUrl: imageUrl(images.envelope),
+        backImageUrl: imageUrl(images.back)
       },
-      message: `Card **${card.name ?? ctx.input.cardId}** — ${card.price ? `$${card.price}` : 'price N/A'}, max ${card.characters ?? '?'} characters.`
+      message: `Retrieved details for card \`${ctx.input.cardId}\`.`
     };
   })
   .build();

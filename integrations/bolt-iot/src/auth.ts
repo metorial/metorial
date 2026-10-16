@@ -22,7 +22,7 @@ export let auth = SlateAuth.create()
       deviceName: z
         .string()
         .describe(
-          'The Device ID of your Bolt module, in the format BOLTXXXXXXX. Found on the Bolt Cloud dashboard.'
+          'The default Device ID of your Bolt module, in the format BOLTXXXXXXX. Found on the Bolt Cloud dashboard. Device tools can override this value after discovery with list_devices.'
         )
     }),
 

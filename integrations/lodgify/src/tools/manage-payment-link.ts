@@ -94,9 +94,22 @@ export let managePaymentLink = SlateTool.create(spec, {
         );
       }
 
+      if (succeeded !== true) {
+        throw createApiServiceError(
+          `Lodgify did not confirm whether a payment link was created for booking #${ctx.input.bookingId}. Use action "get" to check the existing link before submitting another creation request.`
+        );
+      }
+
       // The create endpoint answers with `{ succeeded }` only, so the link itself has
       // to be read back to return something the guest can actually use.
-      paymentLink = await client.getPaymentLink(ctx.input.bookingId);
+      try {
+        paymentLink = await client.getPaymentLink(ctx.input.bookingId);
+      } catch {
+        return {
+          output: { paymentLink: null, succeeded },
+          message: `Lodgify accepted the payment-link creation request for booking **#${ctx.input.bookingId}**, but its URL could not be read back. Use this tool with action "get" to retrieve it; check the existing link before creating another one.`
+        };
+      }
 
       let createdUrl = typeof paymentLink?.url === 'string' ? paymentLink.url : undefined;
       let pending = createdUrl

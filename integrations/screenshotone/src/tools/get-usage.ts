@@ -8,7 +8,7 @@ export let getUsage = SlateTool.create(spec, {
   key: 'get_usage',
   description: `Check current API usage and remaining quota for the ScreenshotOne account.
 
-Returns total allowed requests, used requests, available requests remaining, and current concurrency limits for the billing period.`,
+Returns total allowed requests, used requests, available requests remaining, and request slots in the current one-minute concurrency bucket.`,
   tags: {
     readOnly: true
   }
@@ -19,8 +19,16 @@ Returns total allowed requests, used requests, available requests remaining, and
       total: z.number().describe('Total requests allowed in the current billing period'),
       available: z.number().describe('Available requests remaining in the current period'),
       used: z.number().describe('Number of requests used so far'),
-      concurrencyLimit: z.number().describe('Maximum concurrent requests allowed'),
-      concurrencyRemaining: z.number().describe('Concurrent request slots currently available')
+      concurrencyLimit: z
+        .number()
+        .describe('Screenshot request limit for the current one-minute bucket'),
+      concurrencyRemaining: z
+        .number()
+        .describe('Screenshot request slots remaining in the current one-minute bucket'),
+      concurrencyReset: z
+        .number()
+        .optional()
+        .describe('Provider concurrency bucket reset time as a Unix timestamp in nanoseconds')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,9 +44,10 @@ Returns total allowed requests, used requests, available requests remaining, and
         available: usage.available,
         used: usage.used,
         concurrencyLimit: usage.concurrency.limit,
-        concurrencyRemaining: usage.concurrency.remaining
+        concurrencyRemaining: usage.concurrency.remaining,
+        concurrencyReset: usage.concurrency.reset
       },
-      message: `**Usage**: ${usage.used.toLocaleString()} / ${usage.total.toLocaleString()} requests (${percentUsed}% used). **${usage.available.toLocaleString()}** remaining. Concurrency: ${usage.concurrency.remaining}/${usage.concurrency.limit} slots available.`
+      message: `**Usage**: ${usage.used.toLocaleString()} / ${usage.total.toLocaleString()} requests (${percentUsed}% used). **${usage.available.toLocaleString()}** remaining. Minute bucket: ${usage.concurrency.remaining}/${usage.concurrency.limit} request slots available.`
     };
   })
   .build();

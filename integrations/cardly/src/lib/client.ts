@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -47,24 +47,26 @@ export interface Artwork {
 }
 
 export interface ContactList {
+  raw?: Record<string, unknown>;
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
   customFields: Array<{
     id: string;
     name: string;
-    slug: string;
+    slug?: string;
     type: string;
   }>;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Contact {
+  raw?: Record<string, unknown>;
   id: string;
   externalId?: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   email?: string;
   company?: string;
   address: string;
@@ -74,8 +76,8 @@ export interface Contact {
   country: string;
   postcode?: string;
   customFields?: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Template {
@@ -113,7 +115,7 @@ export interface Webhook {
 export interface MediaType {
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
   dimensions?: Record<string, unknown>;
   creditCost?: number;
 }
@@ -121,14 +123,14 @@ export interface MediaType {
 export interface Font {
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
   category?: string;
 }
 
 export interface WritingStyle {
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
 }
 
 export interface Doodle {
@@ -159,9 +161,10 @@ export interface AccountBalance {
 }
 
 export interface User {
+  raw?: Record<string, unknown>;
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   permissions?: string[];
 }
@@ -215,16 +218,150 @@ export interface PlaceOrderParams {
   idempotencyKey?: string;
 }
 
+type ProviderArtwork = Omit<Artwork, 'artwork'> & { artwork: Array<string | null> };
+type ProviderContact = Omit<
+  Contact,
+  | 'raw'
+  | 'lastName'
+  | 'externalId'
+  | 'email'
+  | 'company'
+  | 'address2'
+  | 'city'
+  | 'region'
+  | 'postcode'
+  | 'customFields'
+  | 'createdAt'
+  | 'updatedAt'
+> & {
+  lastName?: string | null;
+  externalId?: string | null;
+  email?: string | null;
+  company?: string | null;
+  address2?: string | null;
+  locality: string;
+  adminAreaLevel1?: string | null;
+  postcode?: string | null;
+  fields?: Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+type ProviderContactList = ContactList & {
+  fields: Array<{ id: string; name: string; code: string; type: string }>;
+};
+type ProviderOrder = Order & {
+  items: Record<string, unknown>[];
+  costs?: Record<string, unknown>;
+  timings: { created: string; updated: string };
+  customer?: { purchaseOrderNo?: string };
+};
+type ProviderWebhook = Webhook & { targetUrl: string; status: string };
+type ProviderUser = Omit<User, 'permissions' | 'firstName' | 'lastName'> & {
+  firstName?: string | null;
+  lastName?: string | null;
+  permissions?: Record<string, boolean>;
+};
+type ProviderInvitation = Omit<Invitation, 'permissions'> & {
+  permissions: Record<string, boolean>;
+  invited: string;
+};
+
+let normalizeArtwork = (artwork: ProviderArtwork): Artwork => ({
+  ...artwork,
+  artwork: artwork.artwork.map((url, index) => ({ page: index + 1, url: url ?? undefined }))
+});
+
+let normalizeContact = (contact: ProviderContact): Contact => ({
+  ...contact,
+  externalId: contact.externalId ?? undefined,
+  email: contact.email ?? undefined,
+  company: contact.company ?? undefined,
+  address2: contact.address2 ?? undefined,
+  city: contact.locality,
+  region: contact.adminAreaLevel1 ?? undefined,
+  postcode: contact.postcode ?? undefined,
+  customFields: contact.fields ?? undefined,
+  lastName: contact.lastName ?? undefined,
+  createdAt: contact.createdAt ?? undefined,
+  updatedAt: contact.updatedAt ?? undefined,
+  raw: { ...contact }
+});
+
+let normalizeContactList = (list: ProviderContactList): ContactList => ({
+  ...list,
+  slug: list.slug ?? undefined,
+  createdAt: list.createdAt ?? undefined,
+  updatedAt: list.updatedAt ?? undefined,
+  customFields: (list.fields ?? []).map(field => ({ ...field, slug: field.code })),
+  raw: { ...list }
+});
+
+let normalizeOrder = (order: ProviderOrder): Order => ({
+  ...order,
+  lines: order.items,
+  cost: order.costs,
+  purchaseOrderNumber: order.customer?.purchaseOrderNo,
+  createdAt: order.timings.created,
+  updatedAt: order.timings.updated
+});
+
+let normalizeWebhook = (webhook: ProviderWebhook): Webhook => ({
+  ...webhook,
+  url: webhook.targetUrl,
+  enabled: webhook.status === 'active'
+});
+
+let permissionNames = (permissions: Record<string, boolean> = {}) =>
+  Object.entries(permissions)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => name);
+
+let normalizeUser = (user: ProviderUser): User => ({
+  ...user,
+  firstName: user.firstName ?? undefined,
+  lastName: user.lastName ?? undefined,
+  permissions: permissionNames(user.permissions),
+  raw: { ...user }
+});
+
+let normalizeInvitation = (invitation: ProviderInvitation): Invitation => ({
+  ...invitation,
+  permissions: permissionNames(invitation.permissions),
+  createdAt: invitation.invited
+});
+
+let validateSender = (sender?: OrderSender) => {
+  if (sender && (!sender.address || !sender.city || !sender.country)) {
+    throw createApiServiceError(
+      'When supplying sender details, include the street address, city, and country, plus region and postal code when required by that country.'
+    );
+  }
+};
+
 export class CardlyClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.card.ly/v2',
-      headers: {
-        'API-Key': config.token,
-        'Content-type': 'text/json'
+      authHeader: { name: 'API-Key', value: config.token },
+      contentType: 'text/json',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Cardly',
+          reason: 'cardly_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['message', 'messages', 'error', 'validation'],
+          nestedKeys: ['state', 'errors', 'validation', 'messages']
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.state?.status === 'ERROR') {
+        throw createApiServiceError(
+          `Cardly could not complete the request: ${(response.data.state.messages ?? []).join('; ') || 'Unknown provider error'}`
+        );
       }
+      return response;
     });
   }
 
@@ -252,7 +389,7 @@ export class CardlyClient {
     if (params?.effectiveTimeGte) queryParams['effectiveTime.gte'] = params.effectiveTimeGte;
 
     let response = await this.axios.get('/account/credit-history', { params: queryParams });
-    return { records: response.data.data, meta: response.data.meta };
+    return { records: response.data.data.results, meta: response.data.data.meta };
   }
 
   async listGiftCreditHistory(
@@ -274,7 +411,7 @@ export class CardlyClient {
     let response = await this.axios.get('/account/gift-credit-history', {
       params: queryParams
     });
-    return { records: response.data.data, meta: response.data.meta };
+    return { records: response.data.data.results, meta: response.data.data.meta };
   }
 
   // ---- Artwork ----
@@ -288,12 +425,15 @@ export class CardlyClient {
     if (params?.ownOnly !== undefined) queryParams.ownOnly = String(params.ownOnly);
 
     let response = await this.axios.get('/art', { params: queryParams });
-    return { artwork: response.data.data, meta: response.data.meta };
+    return {
+      artwork: response.data.data.results.map(normalizeArtwork),
+      meta: response.data.data.meta
+    };
   }
 
   async getArtwork(artworkId: string): Promise<Artwork> {
-    let response = await this.axios.get(`/art/${artworkId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/art/${encodeURIComponent(artworkId)}`);
+    return normalizeArtwork(response.data.data);
   }
 
   async createArtwork(params: {
@@ -303,7 +443,7 @@ export class CardlyClient {
     artwork: Array<{ page: number; image: string }>;
   }): Promise<Artwork> {
     let response = await this.axios.post('/art', params);
-    return response.data.data;
+    return normalizeArtwork(response.data.data);
   }
 
   async editArtwork(
@@ -314,12 +454,12 @@ export class CardlyClient {
       artwork?: Array<{ page: number; image: string }>;
     }
   ): Promise<Artwork> {
-    let response = await this.axios.post(`/art/${artworkId}`, params);
-    return response.data.data;
+    let response = await this.axios.post(`/art/${encodeURIComponent(artworkId)}`, params);
+    return normalizeArtwork(response.data.data);
   }
 
   async deleteArtwork(artworkId: string): Promise<void> {
-    await this.axios.delete(`/art/${artworkId}`);
+    await this.axios.delete(`/art/${encodeURIComponent(artworkId)}`);
   }
 
   // ---- Contact Lists ----
@@ -332,24 +472,30 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/contact-lists', { params: queryParams });
-    return { lists: response.data.data, meta: response.data.meta };
+    return {
+      lists: response.data.data.results.map(normalizeContactList),
+      meta: response.data.data.meta
+    };
   }
 
   async getContactList(listId: string): Promise<ContactList> {
-    let response = await this.axios.get(`/contact-lists/${listId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/contact-lists/${encodeURIComponent(listId)}`);
+    return normalizeContactList(response.data.data);
   }
 
   async createContactList(params: {
     name: string;
     customFields?: Array<{ name: string; type: string }>;
   }): Promise<ContactList> {
-    let response = await this.axios.post('/contact-lists', params);
-    return response.data.data;
+    let response = await this.axios.post('/contact-lists', {
+      name: params.name,
+      fields: params.customFields
+    });
+    return normalizeContactList(response.data.data);
   }
 
   async deleteContactList(listId: string): Promise<void> {
-    await this.axios.delete(`/contact-lists/${listId}`);
+    await this.axios.delete(`/contact-lists/${encodeURIComponent(listId)}`);
   }
 
   // ---- Contacts ----
@@ -362,29 +508,42 @@ export class CardlyClient {
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
-    let response = await this.axios.get(`/contact-lists/${listId}/contacts`, {
-      params: queryParams
-    });
-    return { contacts: response.data.data, meta: response.data.meta };
+    let response = await this.axios.get(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts`,
+      {
+        params: queryParams
+      }
+    );
+    return {
+      contacts: response.data.data.results.map(normalizeContact),
+      meta: response.data.data.meta
+    };
   }
 
   async getContact(listId: string, contactId: string): Promise<Contact> {
-    let response = await this.axios.get(`/contact-lists/${listId}/contacts/${contactId}`);
-    return response.data.data;
+    let response = await this.axios.get(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts/${encodeURIComponent(contactId)}`
+    );
+    return normalizeContact(response.data.data);
   }
 
   async findContact(
     listId: string,
     params: { email?: string; externalId?: string }
   ): Promise<Contact> {
-    let queryParams: Record<string, string> = {};
-    if (params.email) queryParams.email = params.email;
-    if (params.externalId) queryParams.externalId = params.externalId;
+    let query = params.externalId || params.email;
+    if (!query)
+      throw createApiServiceError(
+        'Provide an email address or external ID to find a contact.'
+      );
 
-    let response = await this.axios.get(`/contact-lists/${listId}/contacts/find`, {
-      params: queryParams
-    });
-    return response.data.data;
+    let response = await this.axios.get(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts/find`,
+      {
+        params: { query }
+      }
+    );
+    return normalizeContact(response.data.data);
   }
 
   async createContact(
@@ -404,8 +563,12 @@ export class CardlyClient {
       customFields?: Record<string, unknown>;
     }
   ): Promise<Contact> {
-    let response = await this.axios.post(`/contact-lists/${listId}/contacts`, params);
-    return response.data.data;
+    let { city, customFields, ...contact } = params;
+    let response = await this.axios.post(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts`,
+      { ...contact, locality: city, fields: customFields }
+    );
+    return normalizeContact(response.data.data);
   }
 
   async editContact(
@@ -426,15 +589,18 @@ export class CardlyClient {
       customFields?: Record<string, unknown>;
     }
   ): Promise<Contact> {
+    let { city, customFields, ...contact } = params;
     let response = await this.axios.post(
-      `/contact-lists/${listId}/contacts/${contactId}`,
-      params
+      `/contact-lists/${encodeURIComponent(listId)}/contacts/${encodeURIComponent(contactId)}`,
+      { ...contact, locality: city, fields: customFields }
     );
-    return response.data.data;
+    return normalizeContact(response.data.data);
   }
 
   async deleteContact(listId: string, contactId: string): Promise<void> {
-    await this.axios.delete(`/contact-lists/${listId}/contacts/${contactId}`);
+    await this.axios.delete(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts/${encodeURIComponent(contactId)}`
+    );
   }
 
   async deleteContactByFilter(
@@ -445,7 +611,13 @@ export class CardlyClient {
     if (params.email) queryParams.email = params.email;
     if (params.externalId) queryParams.externalId = params.externalId;
 
-    await this.axios.delete(`/contact-lists/${listId}/contacts`, { params: queryParams });
+    if (!params.email && !params.externalId)
+      throw createApiServiceError(
+        'Provide a contact ID, email address, or external ID to delete a contact.'
+      );
+    await this.axios.delete(`/contact-lists/${encodeURIComponent(listId)}/contacts`, {
+      data: queryParams
+    });
   }
 
   async syncContact(
@@ -465,8 +637,16 @@ export class CardlyClient {
       customFields?: Record<string, unknown>;
     }
   ): Promise<Contact> {
-    let response = await this.axios.post(`/contact-lists/${listId}/contacts/sync`, params);
-    return response.data.data;
+    let { city, customFields, ...contact } = params;
+    if (!params.email && !params.externalId)
+      throw createApiServiceError(
+        'Provide an email address or external ID to sync a contact.'
+      );
+    let response = await this.axios.post(
+      `/contact-lists/${encodeURIComponent(listId)}/contacts/sync`,
+      { ...contact, locality: city, fields: customFields }
+    );
+    return normalizeContact(response.data.data);
   }
 
   // ---- Templates ----
@@ -479,7 +659,25 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/templates', { params: queryParams });
-    return { templates: response.data.data, meta: response.data.meta };
+    return {
+      templates: response.data.data.results.map(
+        (
+          template: Template & {
+            definition?: {
+              style?: Record<string, unknown>;
+              variables?: Record<string, unknown>;
+            };
+          }
+        ) => ({
+          ...template,
+          style: template.definition?.style,
+          variables: template.definition?.variables
+            ? Object.keys(template.definition.variables)
+            : undefined
+        })
+      ),
+      meta: response.data.data.meta
+    };
   }
 
   // ---- Orders ----
@@ -492,15 +690,29 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/orders', { params: queryParams });
-    return { orders: response.data.data, meta: response.data.meta };
+    return {
+      orders: response.data.data.results.map(normalizeOrder),
+      meta: response.data.data.meta
+    };
   }
 
   async getOrder(orderId: string): Promise<Order> {
-    let response = await this.axios.get(`/orders/${orderId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/orders/${encodeURIComponent(orderId)}`);
+    return normalizeOrder(response.data.data);
   }
 
   async placeOrder(params: PlaceOrderParams): Promise<Order> {
+    if (params.idempotencyKey && params.idempotencyKey.length > 64)
+      throw createApiServiceError('The idempotency key must be at most 64 characters.');
+    for (let line of params.lines) {
+      validateSender(line.sender);
+      if (
+        line.shippingMethod &&
+        !['standard', 'tracked', 'express'].includes(line.shippingMethod)
+      ) {
+        throw createApiServiceError('Shipping method must be standard, tracked, or express.');
+      }
+    }
     let headers: Record<string, string> = {};
     if (params.idempotencyKey) {
       headers['Idempotency-Key'] = params.idempotencyKey;
@@ -517,15 +729,15 @@ export class CardlyClient {
         if (line.variables) mapped.variables = line.variables;
         if (line.shipToMe !== undefined) mapped.shipToMe = line.shipToMe;
         if (line.shippingMethod) mapped.shippingMethod = line.shippingMethod;
+        if (params.requestedArrivalDate) mapped.requestedArrival = params.requestedArrivalDate;
         return mapped;
       })
     };
 
-    if (params.requestedArrivalDate) body.requestedArrivalDate = params.requestedArrivalDate;
     if (params.purchaseOrderNumber) body.purchaseOrderNumber = params.purchaseOrderNumber;
 
     let response = await this.axios.post('/orders/place', body, { headers });
-    return response.data.data;
+    return normalizeOrder(response.data.data.order);
   }
 
   async generatePreview(params: {
@@ -535,6 +747,7 @@ export class CardlyClient {
     sender?: OrderSender;
     variables?: Record<string, string>;
   }): Promise<Record<string, unknown>> {
+    validateSender(params.sender);
     let response = await this.axios.post('/orders/preview', params);
     return response.data.data;
   }
@@ -549,7 +762,13 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/media', { params: queryParams });
-    return { media: response.data.data, meta: response.data.meta };
+    return {
+      media: response.data.data.results.map((media: MediaType) => ({
+        ...media,
+        slug: media.slug ?? undefined
+      })),
+      meta: response.data.data.meta
+    };
   }
 
   async listFonts(
@@ -562,7 +781,13 @@ export class CardlyClient {
       queryParams.organisationOnly = String(params.organisationOnly);
 
     let response = await this.axios.get('/fonts', { params: queryParams });
-    return { fonts: response.data.data, meta: response.data.meta };
+    return {
+      fonts: response.data.data.results.map((font: Font) => ({
+        ...font,
+        slug: font.slug ?? undefined
+      })),
+      meta: response.data.data.meta
+    };
   }
 
   async listWritingStyles(
@@ -573,7 +798,13 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/writing-styles', { params: queryParams });
-    return { styles: response.data.data, meta: response.data.meta };
+    return {
+      styles: response.data.data.results.map((style: WritingStyle) => ({
+        ...style,
+        slug: style.slug ?? undefined
+      })),
+      meta: response.data.data.meta
+    };
   }
 
   async listDoodles(
@@ -586,7 +817,13 @@ export class CardlyClient {
       queryParams.organisationOnly = String(params.organisationOnly);
 
     let response = await this.axios.get('/doodles', { params: queryParams });
-    return { doodles: response.data.data, meta: response.data.meta };
+    return {
+      doodles: response.data.data.results.map((doodle: Doodle & { image?: string }) => ({
+        ...doodle,
+        url: doodle.image
+      })),
+      meta: response.data.data.meta
+    };
   }
 
   // ---- Users ----
@@ -599,39 +836,53 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/users', { params: queryParams });
-    return { users: response.data.data, meta: response.data.meta };
+    return {
+      users: response.data.data.results.map(normalizeUser),
+      meta: response.data.data.meta
+    };
   }
 
   async getUser(userId: string): Promise<User> {
-    let response = await this.axios.get(`/users/${userId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/users/${encodeURIComponent(userId)}`);
+    return normalizeUser(response.data.data);
   }
 
   async removeUser(userId: string): Promise<void> {
-    await this.axios.delete(`/users/${userId}`);
+    await this.axios.delete(`/users/${encodeURIComponent(userId)}`);
   }
 
   // ---- Invitations ----
 
   async listInvitations(
-    params?: PaginationParams
+    params?: PaginationParams & {
+      acceptedOnly?: boolean;
+      expiredOnly?: boolean;
+      includeAccepted?: boolean;
+    }
   ): Promise<{ invitations: Invitation[]; meta: PaginationMeta }> {
     let queryParams: Record<string, string> = {};
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
+    for (let key of ['acceptedOnly', 'expiredOnly', 'includeAccepted'] as const) {
+      if (params?.[key] !== undefined) queryParams[key] = String(params[key]);
+    }
+
     let response = await this.axios.get('/invitations', { params: queryParams });
-    return { invitations: response.data.data, meta: response.data.meta };
+    return {
+      invitations: response.data.data.results.map(normalizeInvitation),
+      meta: response.data.data.meta
+    };
   }
 
   async getInvitation(invitationId: string): Promise<Invitation> {
-    let response = await this.axios.get(`/invitations/${invitationId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/invitations/${encodeURIComponent(invitationId)}`);
+    return normalizeInvitation(response.data.data);
   }
 
   async findInvitation(email: string): Promise<Invitation> {
     let response = await this.axios.get('/invitations/find', { params: { email } });
-    return response.data.data;
+    return normalizeInvitation(response.data.data);
   }
 
   async createInvitation(params: {
@@ -639,11 +890,11 @@ export class CardlyClient {
     permissions: string[];
   }): Promise<Invitation> {
     let response = await this.axios.post('/invitations', params);
-    return response.data.data;
+    return normalizeInvitation(response.data.data);
   }
 
   async resendInvitation(invitationId: string): Promise<void> {
-    await this.axios.post(`/invitations/resend/${invitationId}`);
+    await this.axios.post(`/invitations/resend/${encodeURIComponent(invitationId)}`);
   }
 
   async resendInvitationByEmail(email: string): Promise<void> {
@@ -651,11 +902,11 @@ export class CardlyClient {
   }
 
   async deleteInvitation(invitationId: string): Promise<void> {
-    await this.axios.delete(`/invitations/${invitationId}`);
+    await this.axios.delete(`/invitations/${encodeURIComponent(invitationId)}`);
   }
 
   async deleteInvitationByEmail(email: string): Promise<void> {
-    await this.axios.delete('/invitations', { params: { email } });
+    await this.axios.delete('/invitations', { data: { email } });
   }
 
   // ---- Webhooks ----
@@ -668,12 +919,15 @@ export class CardlyClient {
     if (params?.offset !== undefined) queryParams.offset = String(params.offset);
 
     let response = await this.axios.get('/webhooks', { params: queryParams });
-    return { webhooks: response.data.data, meta: response.data.meta };
+    return {
+      webhooks: response.data.data.results.map(normalizeWebhook),
+      meta: response.data.data.meta
+    };
   }
 
   async getWebhook(webhookId: string): Promise<Webhook> {
-    let response = await this.axios.get(`/webhooks/${webhookId}`);
-    return response.data.data;
+    let response = await this.axios.get(`/webhooks/${encodeURIComponent(webhookId)}`);
+    return normalizeWebhook(response.data.data);
   }
 
   async createWebhook(params: {
@@ -682,8 +936,24 @@ export class CardlyClient {
     enabled?: boolean;
     metadata?: Record<string, unknown>;
   }): Promise<Webhook> {
-    let response = await this.axios.post('/webhooks', params);
-    return response.data.data;
+    let response = await this.axios.post('/webhooks', {
+      targetUrl: params.url,
+      events: params.events,
+      metadata: params.metadata
+    });
+    let webhook = normalizeWebhook(response.data.data);
+    if (params.enabled === false) {
+      try {
+        let updated = await this.updateWebhook(webhook.id, { enabled: false });
+        return { ...updated, secret: webhook.secret };
+      } catch (error) {
+        throw createApiServiceError(
+          `Webhook ${webhook.id} was created but could not be disabled. Use update_webhook with this ID to disable it, or delete_webhook to remove it.`,
+          { parent: error }
+        );
+      }
+    }
+    return webhook;
   }
 
   async updateWebhook(
@@ -695,11 +965,17 @@ export class CardlyClient {
       metadata?: Record<string, unknown>;
     }
   ): Promise<Webhook> {
-    let response = await this.axios.post(`/webhooks/${webhookId}`, params);
-    return response.data.data;
+    let targetUrl = params.url ?? (await this.getWebhook(webhookId)).url;
+    let response = await this.axios.post(`/webhooks/${encodeURIComponent(webhookId)}`, {
+      targetUrl,
+      events: params.events,
+      disabled: params.enabled === undefined ? undefined : !params.enabled,
+      metadata: params.metadata
+    });
+    return normalizeWebhook(response.data.data);
   }
 
   async deleteWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/webhooks/${webhookId}`);
+    await this.axios.delete(`/webhooks/${encodeURIComponent(webhookId)}`);
   }
 }

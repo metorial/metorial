@@ -1,15 +1,14 @@
 {
   "name": "@metorial/twelve-data",
-  "description": "Retrieve real-time and historical market data for stocks, forex, cryptocurrencies, ETFs, indices, mutual funds, and commodities across 50+ global exchanges. Look up price quotes, OHLCV time series, and end-of-day prices. Perform currency exchange rate lookups and conversions. Access fundamental data including income statements, balance sheets, cash flow statements, company profiles, dividends, splits, earnings calendars, and logos. Retrieve analyst estimates, price targets, and revenue forecasts. Get ETF and mutual fund holdings, profiles, and risk assessments. Compute 100+ technical indicators (MACD, RSI, Bollinger Bands, EMA, SMA, etc.) on any time series. Search and look up symbols, exchanges, and instrument types. Stream real-time tick-by-tick price updates via WebSocket subscriptions.",
+  "description": "Retrieve available market prices, OHLCV history, end-of-day closes, currency rates and conversions, company fundamentals, corporate actions, earnings, analyst estimates, and global fund datasets. Discover symbols, exchanges, technical indicators, market session state, and API credit usage. Coverage, data freshness, and access depend on the instrument, exchange, and subscription.",
   "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
   "skills": [
     "retrieve historical price data",
-    "get real-time quotes",
+    "get available market quotes",
     "convert currency amounts",
     "access company fundamentals",
     "compute technical indicators",
     "search financial symbols",
-    "stream live price updates",
     "retrieve ETF fund holdings",
     "look up exchange rates",
     "get analyst price targets"

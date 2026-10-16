@@ -1,11 +1,15 @@
-import { createBase64Attachment, SlateTool } from '@slates/provider';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 import { createFabricClient } from './common';
 import { operationSchema } from './core';
 
 let workspaceInputSchema = {
-  workspaceId: z.string().describe('Fabric workspace ID.')
+  workspaceId: z
+    .string()
+    .describe(
+      'Fabric workspace ID. Call core_list_workspaces to discover authorized workspaces.'
+    )
 };
 
 let listItemsInputSchema = {
@@ -276,7 +280,7 @@ export let datafactoryExecuteQuery = SlateTool.create(spec, {
   name: 'Data Factory Execute Query',
   key: 'datafactory_execute_query',
   description:
-    'Official upstream MCP name: datafactory_execute-query. Execute a Dataflow query and return Arrow stream results as an attachment when Fabric returns query data.',
+    'Official upstream MCP name: datafactory_execute-query. Execute a Dataflow query and prepare downloadable Arrow stream results when Fabric returns query data.',
   tags: { readOnly: false, destructive: false }
 })
   .input(
@@ -299,7 +303,9 @@ export let datafactoryExecuteQuery = SlateTool.create(spec, {
       contentType: z.string().describe('Returned MIME type.'),
       size: z.number().describe('Returned response size in bytes.'),
       operation: operationSchema.describe('HTTP and LRO operation metadata.'),
-      attachmentCount: z.number().describe('Number of attachments returned.')
+      attachmentCount: z
+        .number()
+        .describe('Number of downloadable query result files prepared.')
     })
   )
   .handleInvocation(async ctx => {
@@ -309,9 +315,15 @@ export let datafactoryExecuteQuery = SlateTool.create(spec, {
       queryName: ctx.input.queryName,
       customMashupDocument: ctx.input.query
     });
-    let attachments = result.base64
-      ? [createBase64Attachment(result.base64, result.contentType)]
-      : [];
+    let hasQueryFile = Boolean(result.base64);
+    if (result.base64) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(Buffer.from(result.base64, 'base64'))),
+        mimeType: result.contentType,
+        filename: 'query-results.arrow'
+      });
+    }
 
     return {
       output: {
@@ -322,13 +334,13 @@ export let datafactoryExecuteQuery = SlateTool.create(spec, {
         contentType: result.contentType,
         size: result.size,
         operation: result.operation,
-        attachmentCount: attachments.length
+        attachmentCount: hasQueryFile ? 1 : 0
       },
-      attachments,
-      message:
-        attachments.length > 0
-          ? `Executed Dataflow query **${ctx.input.queryName}** and returned the Arrow stream as an attachment.`
-          : `Started Dataflow query **${ctx.input.queryName}** as a long-running operation.`
+      message: hasQueryFile
+        ? `Executed Dataflow query **${ctx.input.queryName}** and prepared the Arrow stream for download.`
+        : result.status === 202
+          ? `Started Dataflow query **${ctx.input.queryName}** as a long-running operation.`
+          : `Dataflow query **${ctx.input.queryName}** returned no file content.`
     };
   })
   .build();

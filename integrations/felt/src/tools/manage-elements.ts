@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ To **delete** a single element, provide the element ID to remove.`,
     'Maximum payload size is 1MB. Complex geometries may be automatically simplified.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -44,6 +44,10 @@ To **delete** a single element, provide the element ID to remove.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.deleteElementId && ctx.input.featureCollection) {
+      throw createApiServiceError('Choose either featureCollection or deleteElementId.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.deleteElementId) {
@@ -66,9 +70,6 @@ To **delete** a single element, provide the element ID to remove.`,
       };
     }
 
-    return {
-      output: { action: 'none', elements: null },
-      message: 'No action taken — provide featureCollection or deleteElementId.'
-    };
+    throw createApiServiceError('Provide featureCollection or deleteElementId.');
   })
   .build();

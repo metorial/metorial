@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createCredential = SlateTool.create(spec, {
   name: 'Create Credential',
   key: 'create_credential',
-  description: `Create a new digital credential (certificate or badge) for a recipient. Supports three modes:
+  description: `Create a new digital credential (certificate or badge) for a recipient. Supports two modes:
 - **Draft only**: Creates a draft credential that can be issued and sent later.
 - **Issue and send**: Creates, issues, and sends the credential to the recipient via email in one step — ideal for automation upon course completion or event attendance.
 
@@ -23,7 +23,11 @@ Custom attributes must be pre-configured in the Certifier dashboard before use.`
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group to create the credential in'),
+      groupId: z
+        .string()
+        .describe(
+          'Credential template (group) ID. Call list_groups to discover available IDs.'
+        ),
       recipientName: z.string().describe('Full name of the credential recipient'),
       recipientEmail: z.string().optional().describe('Email address of the recipient'),
       issueDate: z

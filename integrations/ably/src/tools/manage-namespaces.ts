@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyControlClient } from '../lib/control-client';
+import { appIdInput } from '../lib/schemas';
+import { validateInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageNamespaces = SlateTool.create(spec, {
@@ -22,13 +24,36 @@ A namespace applies to all channels whose name starts with the namespace ID foll
   .input(
     z.object({
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
-      appId: z.string().optional().describe('App ID. Overrides config value if provided.'),
+      appId: appIdInput,
       namespaceId: z
         .string()
         .optional()
         .describe(
           'Namespace ID (the channel prefix). Required for create, update, and delete.'
         ),
+      authenticated: z
+        .boolean()
+        .optional()
+        .describe('Require identified clients for channels in this namespace'),
+      batchingEnabled: z.boolean().optional().describe('Enable server-side message batching'),
+      batchingInterval: z
+        .number()
+        .optional()
+        .describe('Batching interval in milliseconds, from 20 to 1000'),
+      conflationEnabled: z.boolean().optional().describe('Enable message conflation'),
+      conflationInterval: z
+        .number()
+        .optional()
+        .describe('Conflation interval in milliseconds'),
+      conflationKey: z.string().optional().describe('Message routing key used for conflation'),
+      mutableMessages: z
+        .boolean()
+        .optional()
+        .describe('Allow published messages to be updated or deleted'),
+      populateChannelRegistry: z
+        .boolean()
+        .optional()
+        .describe('Include matching channels in the channel registry'),
       persisted: z
         .boolean()
         .optional()
@@ -59,9 +84,12 @@ A namespace applies to all channels whose name starts with the namespace ID foll
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyControlClient(ctx.auth.token);
+    let client = new AblyControlClient(ctx.auth.token, ctx.auth.authType);
     let appId = ctx.input.appId || ctx.config.appId;
-    if (!appId) throw new Error('appId is required. Set it in config or input.');
+    if (!appId)
+      throw createApiServiceError(
+        'appId is required. Call manage_apps with action list to discover an app ID, then supply appId.'
+      );
 
     if (ctx.input.action === 'list') {
       let namespaces = await client.listNamespaces(appId);
@@ -71,16 +99,29 @@ A namespace applies to all channels whose name starts with the namespace ID foll
       };
     }
 
+    if (ctx.input.action === 'create' || ctx.input.action === 'update') {
+      validateInteger('batchingInterval', ctx.input.batchingInterval, 20, 1000);
+      validateInteger('conflationInterval', ctx.input.conflationInterval, 1);
+    }
+
     if (ctx.input.action === 'create') {
       if (!ctx.input.namespaceId)
-        throw new Error('namespaceId is required for creating a namespace.');
+        throw createApiServiceError('namespaceId is required for creating a namespace.');
       let namespace = await client.createNamespace(appId, {
         id: ctx.input.namespaceId,
         persisted: ctx.input.persisted,
         persistLast: ctx.input.persistLast,
         pushEnabled: ctx.input.pushEnabled,
         tlsOnly: ctx.input.tlsOnly,
-        exposeTimeserial: ctx.input.exposeTimeserial
+        exposeTimeserial: ctx.input.exposeTimeserial,
+        authenticated: ctx.input.authenticated,
+        batchingEnabled: ctx.input.batchingEnabled,
+        batchingInterval: ctx.input.batchingInterval,
+        conflationEnabled: ctx.input.conflationEnabled,
+        conflationInterval: ctx.input.conflationInterval,
+        conflationKey: ctx.input.conflationKey,
+        mutableMessages: ctx.input.mutableMessages,
+        populateChannelRegistry: ctx.input.populateChannelRegistry
       });
       return {
         output: { namespace },
@@ -90,13 +131,21 @@ A namespace applies to all channels whose name starts with the namespace ID foll
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.namespaceId)
-        throw new Error('namespaceId is required for updating a namespace.');
+        throw createApiServiceError('namespaceId is required for updating a namespace.');
       let namespace = await client.updateNamespace(appId, ctx.input.namespaceId, {
         persisted: ctx.input.persisted,
         persistLast: ctx.input.persistLast,
         pushEnabled: ctx.input.pushEnabled,
         tlsOnly: ctx.input.tlsOnly,
-        exposeTimeserial: ctx.input.exposeTimeserial
+        exposeTimeserial: ctx.input.exposeTimeserial,
+        authenticated: ctx.input.authenticated,
+        batchingEnabled: ctx.input.batchingEnabled,
+        batchingInterval: ctx.input.batchingInterval,
+        conflationEnabled: ctx.input.conflationEnabled,
+        conflationInterval: ctx.input.conflationInterval,
+        conflationKey: ctx.input.conflationKey,
+        mutableMessages: ctx.input.mutableMessages,
+        populateChannelRegistry: ctx.input.populateChannelRegistry
       });
       return {
         output: { namespace },
@@ -106,7 +155,7 @@ A namespace applies to all channels whose name starts with the namespace ID foll
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.namespaceId)
-        throw new Error('namespaceId is required for deleting a namespace.');
+        throw createApiServiceError('namespaceId is required for deleting a namespace.');
       await client.deleteNamespace(appId, ctx.input.namespaceId);
       return {
         output: { deleted: true },
@@ -114,6 +163,6 @@ A namespace applies to all channels whose name starts with the namespace ID foll
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

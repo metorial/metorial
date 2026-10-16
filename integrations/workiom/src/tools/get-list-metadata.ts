@@ -53,7 +53,7 @@ export let getListMetadata = SlateTool.create(spec, {
         filters: metadata?.filters,
         raw: metadata
       },
-      message: `Retrieved metadata for list **${metadata?.name ?? ctx.input.listId}**. Found **${metadata?.fields?.length ?? 0}** field(s), **${metadata?.views?.length ?? 0}** view(s).`
+      message: `Retrieved metadata for list **${metadata?.name ?? ctx.input.listId}**.`
     };
   })
   .build();

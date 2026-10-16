@@ -1,95 +1,48 @@
-# Slates Specification for Pilvio
+# Pilvio Integration Specification
 
-## Overview
+Pilvio provides cloud compute, block and object storage, and networking APIs.
+The official [API reference](https://api.pilvio.com/) defines this integration's request routes and resource mappings.
 
-Pilvio is an API-first cloud infrastructure platform based in Estonia, operated by Astrec Data OÜ. It provides virtual machines (Linux and Windows), S3-compatible object storage (StorageVault), block storage, private networking, floating IPs, firewalls, and network load balancers. Resources are billed on a pay-as-you-go hourly model.
+## Authentication and scope
 
-## Authentication
+API tokens are created in the [Pilvio dashboard](https://app.pilvio.com/) and sent in the `apikey` header. Authentication reads `/user-resource/user`; profile email and names are nested under `profile_data`. The read-only `get_current_user` tool exposes the same user identity and full response.
 
-Pilvio uses API tokens for authentication. Tokens can be generated from the Pilvio web interface at `https://app.pilvio.com/`. The API token must be included in all requests as an HTTP header:
+`locationSlug` is an optional datacenter selection. Discover valid slugs with `list_platform_config` (`locations`). Location-specific compute, disks, private networks, floating IPs, firewalls, and load balancers use `/v1/{slug}/...`. Without a slug Pilvio selects the default location. Inventories must be requested separately for each location. User, billing, and S3 management APIs are global.
 
-```
-apikey: YOUR_API_TOKEN
-```
+`list_billing_accounts` calls `/payment/billing_account/list` and exposes stable account IDs, titles, status, credit, and unpaid amounts. Resource creation accepts an account ID; some endpoints allow omission with a token restricted to one account.
 
-Tokens can also be created, listed, updated, and deleted programmatically via the API. When creating a token, you can optionally:
+## Tools
 
-- Provide a `description` for identification purposes.
-- Set `restricted` to `true` to limit the token to a specific billing account (via `billing_account_id`). Restricted tokens do not require passing `billing_account_id` on resource-creation calls.
+- `get_current_user`: current user and nested profile information.
+- `list_billing_accounts`: authorized billing account discovery.
+- `list_vms`, `get_vm`, `create_vm`, `manage_vm`, `delete_vm`: VM discovery, creation, lifecycle, cloning, reinstall, backups, password changes, and one-time ISO boot.
+- `manage_snapshots`: list, create, delete, and restore VM replicas. Snapshot creation includes the complete disk response so returned replica identifiers remain available.
+- `manage_block_storage`: standalone disk lifecycle, attach/detach, create an attached disk, resize an attached disk, delete an attached data disk, and filter/set read-only bootable media.
+- `manage_object_storage`, `manage_s3_keys`: bucket management, S3 endpoint discovery, and S3 credentials. Object contents use the S3 API separately.
+- `manage_networks`: list, get, create, rename, select default, and delete private networks.
+- `manage_floating_ips`: address lifecycle and VM assignment using `assigned_to` and `assigned_to_resource_type`.
+- `manage_firewalls`: create, list, update, delete, and VM assignments. Public protocol values remain uppercase and are translated to provider lowercase values. Legacy `endpointSpec` remains a string (a single prefix or a JSON array); additive `endpointPrefixes` supports multiple IP/CIDR values. Existing rule UUIDs can be supplied when updating rules.
+- `manage_load_balancers`: list, get, create, rename, delete, manage VM targets and forwarding rules, and reassign billing. Requests use `display_name`, `rules`, and `targets`; forwarding-rule and target removal use their documented UUID paths.
+- `list_platform_config`: datacenter locations, host pools, plain OS images, app catalog images, bootable ISO media, all VM images, and VM creation constraints.
 
-The API base URL is `https://api.pilvio.com/v1/`. Pilvio supports multiple datacenter locations; to target a specific location, include its slug after the version number (e.g., `https://api.pilvio.com/v1/{location_slug}/...`). Without a slug, the default location is used.
+## Response mapping and validation
 
-No OAuth2 or other authentication methods are documented.
+VM input RAM remains MB and maps to the provider `ram` parameter; VM response RAM comes from `memory` (with a `ram` fallback for existing responses). Attached disk sizes come from `size`, standalone disk sizes from `size_gb`. CPU remains a count and ports remain numbers. Runtime validation rejects fractional CPU/RAM/disk-size inputs and invalid firewall/load-balancer ports without narrowing existing number schemas. Current resource limits are discoverable through `vm_parameters` rather than hardcoded from example documentation.
 
-## Features
+Nullable optional values such as firewall ports and unassigned floating-IP targets are omitted from their normalized fields. Additive raw resource fields preserve the original provider response, including identifiers and metadata not covered by normalized fields. Existing keys, output types, and raw image/media output fields are retained. HTTP errors and provider `errors` envelopes are translated into user-facing service failures. Unexpected list responses fail instead of reporting empty successful inventories.
 
-### Virtual Machine Management
+The API documents forms for legacy VM/storage operations, repeated `public_keys` form parameters, and JSON for networking and SSH-key mutations. The client uses those documented formats and encodes path identifiers.
 
-Create, list, start, stop, modify, clone, reinstall, and delete virtual machines. VMs can be configured with a chosen OS image (or a custom empty disk for manual OS installation), vCPU count, RAM, disk size, SSH public keys, and cloud-init user data. VMs can be placed into specific resource pools (e.g., "General" or "Performance" server classes) and assigned to specific private networks.
+## Provider constraints and limits
 
-- vCPU and RAM can only be changed while the VM is stopped.
-- A VM can be created from an existing snapshot or backup.
-- VMs can be booted from rescue or custom ISO media for one-time boot sessions.
+- CPU and RAM changes require a stopped VM; password changes require a running VM.
+- Disk resizing only grows storage; primary boot disks cannot be deleted through attached-disk deletion.
+- Non-empty buckets and default/non-empty networks cannot be deleted.
+- Firewall rules use ports 1–65535, ordered ranges, and IP/CIDR arrays for prefix filtering. Omitted ports map to provider null values for all ports.
+- The existing `sessionPersistence` and `connectionLimit` create inputs remain available and retain their legacy top-level payload fields. The API reference shows these values in returned forwarding-rule settings but does not document them in the creation request; their application is unverified.
+- No payment execution, invoice-management, token-management, or profile-update tools are exposed. The integration does not claim those capabilities.
+- The API reference does not document webhooks; no triggers are registered.
 
-### Block Storage
+## Verification scope
 
-Create, list, modify, attach, detach, and delete standalone block storage disks independently of VMs. Disks can be initialized as empty, from an OS base image, from an existing disk, or from a snapshot. Disks can be attached to and detached from VMs dynamically.
-
-- Disk size can only be increased, not decreased.
-- Deleting a disk also deletes all its snapshots.
-
-### Snapshots and Backups
-
-Create point-in-time snapshots (replicas) of VM storage, list them, restore a VM from a snapshot, or delete snapshots. Automatic weekly backups can be toggled per VM.
-
-- Automatic backups keep up to 4 weekly copies.
-
-### Object Storage (StorageVault)
-
-Manage S3-compatible object storage buckets: create, list, get info, modify billing, and delete buckets. Manage S3 access credentials (generate, list, and delete access/secret key pairs). Bucket contents are accessed via the standard S3 API at the S3 endpoint URL provided by the platform.
-
-- Bucket names must be globally unique.
-- Only empty buckets can be deleted via the management API.
-
-### Private Networking
-
-Create and manage private networks for isolating VMs. Each user has a default network; additional networks can be created. VMs can be placed into specific networks during creation.
-
-- A network can only be deleted if it contains no resources and is not the default.
-
-### Floating IPs
-
-Create, list, assign, un-assign, update, and delete floating (public) IPv4 addresses. Floating IPs can be assigned to VMs or other resources such as load balancers.
-
-### Firewalls
-
-Create and manage firewall rule sets with inbound/outbound rules specifying protocol, port ranges, and IP prefix filtering. Firewalls can be assigned to or unassigned from individual VMs.
-
-- Rules support TCP, UDP, and ICMP protocols.
-- Endpoint filtering supports "any" or specific IP prefixes (CIDR notation).
-
-### Network Load Balancers
-
-Create and manage layer-4 (TCP) network load balancers within a private network. Configure forwarding rules (source/target port mappings) and add/remove VM targets. Load balancers can optionally reserve a public IP.
-
-- Supports session persistence (source IP) and connection limit settings.
-
-### SSH Key Management
-
-Store, list, rename, and delete SSH public keys associated with the user account. Keys can be referenced when creating VMs.
-
-### Billing and Payments
-
-Manage billing accounts, view resource usage and costs, list and pay invoices, manage credit cards, buy credit, configure recurring payments, and view pricing policies. Resources can be reassigned between billing accounts.
-
-### User Profile
-
-View and update the authenticated user's profile information (name, phone number, personal ID number).
-
-### Platform Configuration
-
-List available datacenter locations, OS images (plain and app catalog), bootable ISO media, and VM creation parameter constraints (allowed OS versions, resource limits).
-
-## Events
-
-The provider does not support events. The Pilvio API documentation does not describe any webhook, event subscription, or purpose-built polling mechanism for receiving notifications about resource state changes.
+The refresh uses official documentation, static schema checks, and a package build. No authenticated provider calls, live E2E, or tool-use evals are included.

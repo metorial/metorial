@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -64,6 +64,21 @@ export let manageInvoiceTool = SlateTool.create(spec, {
     });
 
     let { action, invoiceId } = ctx.input;
+
+    if (
+      action === 'update' &&
+      !Object.values(ctx.input.updateFields ?? {}).some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide at least one updateFields value for the update action.'
+      );
+    }
+    if (action === 'add_payment' && ctx.input.paymentAmount === undefined) {
+      throw createApiServiceError('paymentAmount is required for the add_payment action.');
+    }
+    if (action === 'add_comment' && !ctx.input.comment?.trim()) {
+      throw createApiServiceError('comment is required for the add_comment action.');
+    }
 
     if (action === 'update') {
       let invoice = await client.updateInvoice(invoiceId, ctx.input.updateFields || {});

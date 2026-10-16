@@ -42,13 +42,13 @@ Event IDs match those from the odds endpoints for easy correlation.`,
 })
   .input(
     z.object({
-      sport: z.string().describe('Sport key (e.g. "americanfootball_nfl")'),
+      sport: z.string().describe('Sport key from list_sports (e.g. "americanfootball_nfl")'),
       daysFrom: z
         .number()
         .min(1)
         .max(3)
         .optional()
-        .describe('Include completed games from the last 1-3 days'),
+        .describe('Include completed games from the last 1-3 days; use a whole number'),
       eventIds: z.string().optional().describe('Comma-separated event IDs to filter')
     })
   )

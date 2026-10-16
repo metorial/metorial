@@ -33,9 +33,13 @@ export let buyImage = SlateTool.create(spec, {
 
     let image = await client.buyImage(ctx.input.imageId);
 
+    for (let url of new Set([image.fullUrl, image.upscaleUrl, image.upscaleUhdUrl])) {
+      if (url) await ctx.addAttachment({ type: 'url', url });
+    }
+
     return {
       output: image,
-      message: `Image \`${image.imageId}\` purchased successfully. Download URLs are available for preview, full, and upscale versions.`
+      message: `Image \`${image.imageId}\` purchased successfully. Full-size and available upscale versions are ready to download.`
     };
   })
   .build();

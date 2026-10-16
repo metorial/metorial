@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { getTotalCount, requireRecords, requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let galleryItems = SlateTool.create(spec, {
@@ -53,21 +54,26 @@ export let galleryItems = SlateTool.create(spec, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize
       });
-      let items = data?.items || [];
-      let totalCount = data?.total_count ?? data?.count ?? items.length;
+      let items = requireRecords(data?.folder?.items ?? data?.items, 'gallery item');
+      let totalCount = getTotalCount(
+        data?.folder?.items_data?.items_count,
+        data?.items_data?.items_count,
+        data?.total_count,
+        data?.count
+      );
       return {
         output: {
-          success: true,
+          success: requireSuccess(data),
           items,
           totalCount
         },
-        message: `Found **${totalCount}** items in gallery \`${galleryId}\`.`
+        message: `Found **${items.length}** items on this page in gallery \`${galleryId}\`.`
       };
     }
 
     if (action === 'add') {
       if (!ctx.input.assetId) {
-        throw new Error('assetId is required for add action');
+        throw createApiServiceError('assetId is required for add action');
       }
       let data = await client.addItemToGallery({
         galleryId,
@@ -75,14 +81,14 @@ export let galleryItems = SlateTool.create(spec, {
         insertPosition: ctx.input.insertPosition
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${ctx.input.assetId}\` added to gallery \`${galleryId}\`.`
       };
     }
 
     if (action === 'remove') {
       if (!ctx.input.assetId) {
-        throw new Error('assetId is required for remove action');
+        throw createApiServiceError('assetId is required for remove action');
       }
       let data = await client.removeItemFromGallery({
         galleryId,
@@ -90,11 +96,11 @@ export let galleryItems = SlateTool.create(spec, {
         deleteAsset: ctx.input.deleteAsset
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${ctx.input.assetId}\` removed from gallery \`${galleryId}\`${ctx.input.deleteAsset ? ' and permanently deleted' : ''}.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

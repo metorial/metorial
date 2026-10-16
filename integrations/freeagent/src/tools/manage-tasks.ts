@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -44,10 +44,7 @@ export let listTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let tasks = await client.listTasks(ctx.input);
     let count = tasks.length;
@@ -85,10 +82,11 @@ export let createTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
+
+    if (ctx.input.billingPeriod && !['hour', 'day'].includes(ctx.input.billingPeriod)) {
+      throw createApiServiceError('FreeAgent task billingPeriod must be hour or day.');
+    }
 
     let taskData: Record<string, any> = {
       name: ctx.input.name

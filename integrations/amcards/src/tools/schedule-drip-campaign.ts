@@ -8,7 +8,7 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
   key: 'schedule_drip_campaign',
   description: `Schedule a drip campaign to send a series of cards to a recipient over time. Campaigns are pre-configured in your AMcards account and triggered with recipient details. Supports personalization fields like birth date, phone number, and anniversary date.`,
   instructions: [
-    'The campaignId must reference a drip campaign configured in your AMcards account.',
+    'Call list_campaigns to discover a drip campaign configured in your AMcards account.',
     'Optional FROM fields override the default sender address configured in the campaign.',
     'Birth date and anniversary date should be in YYYY-MM-DD format for proper personalization.'
   ],
@@ -19,7 +19,9 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      campaignId: z.string().describe('ID of the drip campaign to schedule.'),
+      campaignId: z
+        .string()
+        .describe('Drip campaign ID. Call list_campaigns to discover campaigns.'),
       initiator: z
         .string()
         .describe(
@@ -29,7 +31,7 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Date to start the campaign in YYYY-MM-DD format. Omit to start immediately.'
+          'Date to start the campaign in YYYY-MM-DD format. Omit to schedule for the following day.'
         ),
       thirdPartyContactId: z
         .string()
@@ -57,7 +59,9 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
       recipientBirthDate: z
         .string()
         .optional()
-        .describe('Recipient birth date in YYYY-MM-DD format for birthday personalization.'),
+        .describe(
+          'Recipient birth date in YYYY-MM-DD or MM-DD format for birthday personalization.'
+        ),
       recipientPhoneNumber: z.string().optional().describe('Recipient phone number.'),
       recipientAnniversaryDate: z
         .string()
@@ -90,7 +94,11 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
       fromCountry: z
         .string()
         .optional()
-        .describe('Sender country (overrides campaign default).')
+        .describe('Sender country (overrides campaign default).'),
+      extraData: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Custom merge fields for campaign templates, keyed by field name.')
     })
   )
   .output(
@@ -98,39 +106,18 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
       campaignId: z.string().describe('ID of the campaign that was scheduled.'),
       recipientName: z.string().describe('Full name of the recipient.'),
       sendDate: z.string().optional().describe('Scheduled start date of the campaign.'),
+      mailingId: z.string().optional().describe('ID of the created mailing.'),
+      cardIds: z
+        .array(z.string())
+        .optional()
+        .describe('IDs of the cards created by the campaign.'),
       rawResponse: z.any().optional().describe('Full response from the AMcards API.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.scheduleDripCampaign({
-      campaignId: ctx.input.campaignId,
-      initiator: ctx.input.initiator,
-      sendDate: ctx.input.sendDate,
-      thirdPartyContactId: ctx.input.thirdPartyContactId,
-      recipientSalutation: ctx.input.recipientSalutation,
-      recipientFirstName: ctx.input.recipientFirstName,
-      recipientLastName: ctx.input.recipientLastName,
-      recipientOrganization: ctx.input.recipientOrganization,
-      recipientAddressLine1: ctx.input.recipientAddressLine1,
-      recipientAddressLine2: ctx.input.recipientAddressLine2,
-      recipientCity: ctx.input.recipientCity,
-      recipientState: ctx.input.recipientState,
-      recipientPostalCode: ctx.input.recipientPostalCode,
-      recipientCountry: ctx.input.recipientCountry,
-      recipientBirthDate: ctx.input.recipientBirthDate,
-      recipientPhoneNumber: ctx.input.recipientPhoneNumber,
-      recipientAnniversaryDate: ctx.input.recipientAnniversaryDate,
-      fromFirstName: ctx.input.fromFirstName,
-      fromLastName: ctx.input.fromLastName,
-      fromAddressLine1: ctx.input.fromAddressLine1,
-      fromAddressLine2: ctx.input.fromAddressLine2,
-      fromCity: ctx.input.fromCity,
-      fromState: ctx.input.fromState,
-      fromPostalCode: ctx.input.fromPostalCode,
-      fromCountry: ctx.input.fromCountry
-    });
+    let result = await client.scheduleDripCampaign(ctx.input);
 
     let recipientName = `${ctx.input.recipientFirstName} ${ctx.input.recipientLastName}`;
 
@@ -138,7 +125,9 @@ export let scheduleDripCampaign = SlateTool.create(spec, {
       output: {
         campaignId: ctx.input.campaignId,
         recipientName,
-        sendDate: ctx.input.sendDate ?? undefined,
+        sendDate: result.send_date ?? ctx.input.sendDate,
+        mailingId: result.mailing != null ? String(result.mailing) : undefined,
+        cardIds: result.cards?.map(String),
         rawResponse: result
       },
       message: `Drip campaign **${ctx.input.campaignId}** scheduled for **${recipientName}**${ctx.input.sendDate ? ` starting on ${ctx.input.sendDate}` : ''}.`

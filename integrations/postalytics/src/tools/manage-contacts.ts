@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,7 @@ export let manageContacts = SlateTool.create(spec, {
     'Use action "delete" to remove a contact.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -96,7 +96,8 @@ export let manageContacts = SlateTool.create(spec, {
     }
 
     if (action === 'get_contacts') {
-      if (!ctx.input.listId) throw new Error('listId is required for get_contacts action');
+      if (!ctx.input.listId)
+        throw createApiServiceError('listId is required for get_contacts action');
       let contacts = await client.getContactsOnList(ctx.input.listId, {
         start: ctx.input.start,
         limit: ctx.input.limit
@@ -108,17 +109,20 @@ export let manageContacts = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.contactId) throw new Error('contactId is required for get action');
+      if (!ctx.input.contactId)
+        throw createApiServiceError('contactId is required for get action');
       let contact = await client.getContact(ctx.input.contactId);
       return {
         output: { contact },
-        message: `Retrieved contact details for **${contact.first_name || ''} ${contact.last_name || ''}**.`
+        message: `Retrieved contact details for **${ctx.input.contactId}**.`
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.listId) throw new Error('listId is required for create action');
-      if (!ctx.input.fields) throw new Error('fields are required for create action');
+      if (!ctx.input.listId)
+        throw createApiServiceError('listId is required for create action');
+      if (!ctx.input.fields)
+        throw createApiServiceError('fields are required for create action');
       let fields = ctx.input.fields;
       if (
         !fields.firstName ||
@@ -128,7 +132,7 @@ export let manageContacts = SlateTool.create(spec, {
         !fields.addressState ||
         !fields.addressZip
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'firstName, lastName, addressStreet, addressCity, addressState, addressZip are required'
         );
       }
@@ -163,9 +167,12 @@ export let manageContacts = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.contactId) throw new Error('contactId is required for update action');
-      if (!ctx.input.listId) throw new Error('listId is required for update action');
-      if (!ctx.input.fields) throw new Error('fields are required for update action');
+      if (!ctx.input.contactId)
+        throw createApiServiceError('contactId is required for update action');
+      if (!ctx.input.listId)
+        throw createApiServiceError('listId is required for update action');
+      if (!ctx.input.fields)
+        throw createApiServiceError('fields are required for update action');
       let result = await client.updateContact(ctx.input.contactId, {
         contactListId: ctx.input.listId,
         contact: ctx.input.fields
@@ -177,7 +184,8 @@ export let manageContacts = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.contactId) throw new Error('contactId is required for delete action');
+      if (!ctx.input.contactId)
+        throw createApiServiceError('contactId is required for delete action');
       let result = await client.deleteContact(ctx.input.contactId);
       return {
         output: { result },
@@ -185,6 +193,6 @@ export let manageContacts = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

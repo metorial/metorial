@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getMarketIndices = SlateTool.create(spec, {
   name: 'Get Market Indices',
   key: 'get_market_indices',
-  description: `Retrieve data for 86+ global stock market indices and benchmarks. Returns current price, daily/weekly/monthly/yearly percentage changes for each index. Use the search parameter to filter by name or country.`,
+  description: `Retrieve data for 86+ global stock market indices and benchmarks. Returns current price, daily/weekly/monthly/yearly percentage changes for each index. Use the search parameter to filter by name or country within the requested list page. Fetches one list page and one detail request per listed benchmark; use get_market_index to query a known benchmark directly.`,
   constraints: ['Available on Basic plan and higher'],
   tags: {
     readOnly: true
@@ -24,6 +24,7 @@ export let getMarketIndices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -32,7 +33,7 @@ export let getMarketIndices = SlateTool.create(spec, {
       }),
       indices: z.array(
         z.object({
-          symbol: z.string(),
+          symbol: z.string().optional(),
           name: z.string(),
           country: z.string(),
           price: z.number().nullable(),
@@ -73,9 +74,10 @@ export let getMarketIndices = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         indices
       },
-      message: `Retrieved ${indices.length} market indices${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${indices.length} market indices${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

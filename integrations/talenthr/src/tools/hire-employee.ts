@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, providerId, validateDate, validateText } from '../lib/client';
 import { spec } from '../spec';
 
 export let hireEmployee = SlateTool.create(spec, {
@@ -27,7 +27,7 @@ Use this to onboard new hires into the organization with their department, divis
       hireDate: z.string().describe('Hire date in YYYY-MM-DD format'),
       employmentStatusId: z
         .string()
-        .describe('Employment status ID (e.g. Full-Time, Part-Time)'),
+        .describe('Employment status ID from list_organizational_structure'),
       reportsToEmployeeId: z
         .string()
         .optional()
@@ -87,9 +87,53 @@ Use this to onboard new hires into the organization with their department, divis
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let hirePacket: any;
+    validateText(ctx.input.firstName, 'firstName', 191);
+    validateText(ctx.input.lastName, 'lastName', 191);
+    validateText(ctx.input.email, 'email', 191);
+    if (!z.email().safeParse(ctx.input.email).success)
+      throw createApiServiceError('email must be a valid email address.');
+    validateDate(ctx.input.hireDate, 'hireDate');
     if (
-      ctx.input.hirePacketWhoId ||
+      ctx.input.payRate !== undefined &&
+      (!Number.isFinite(ctx.input.payRate) ||
+        ctx.input.payRate < 0 ||
+        Math.abs(ctx.input.payRate * 100 - Math.round(ctx.input.payRate * 100)) > 0.000001)
+    ) {
+      throw createApiServiceError(
+        'payRate must be nonnegative with at most two decimal places.'
+      );
+    }
+    const meetingFields = [
+      ctx.input.hirePacketWhoId,
+      ctx.input.hirePacketAddress,
+      ctx.input.hirePacketWhenTime
+    ];
+    if (
+      meetingFields.some(value => value !== undefined) &&
+      meetingFields.some(value => value === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide hirePacketWhoId, hirePacketAddress, and hirePacketWhenTime together.'
+      );
+    }
+    if (ctx.input.hirePacketWhoId !== undefined)
+      providerId(ctx.input.hirePacketWhoId, 'hirePacketWhoId');
+    if (ctx.input.hirePacketAddress !== undefined)
+      validateText(ctx.input.hirePacketAddress, 'hirePacketAddress', 20000);
+    if (ctx.input.hirePacketInstructions !== undefined)
+      validateText(ctx.input.hirePacketInstructions, 'hirePacketInstructions', 250);
+    if (ctx.input.hirePacketWhenTime !== undefined) {
+      if (
+        !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(ctx.input.hirePacketWhenTime) ||
+        Number(ctx.input.hirePacketWhenTime.slice(11, 13)) > 23 ||
+        Number(ctx.input.hirePacketWhenTime.slice(14)) > 59
+      )
+        throw createApiServiceError('hirePacketWhenTime must use YYYY-MM-DD HH:mm.');
+      validateDate(ctx.input.hirePacketWhenTime.slice(0, 10), 'hirePacketWhenTime');
+    }
+    let hirePacket: Record<string, unknown> | undefined;
+    if (
+      ctx.input.hirePacketWhoId !== undefined ||
       ctx.input.hirePacketAddress ||
       ctx.input.hirePacketWhenTime ||
       ctx.input.hirePacketInstructions
@@ -102,13 +146,17 @@ Use this to onboard new hires into the organization with their department, divis
       };
     }
 
-    let compensationRecord: any;
+    let compensationRecord: Record<string, unknown> | undefined;
     if (
       ctx.input.payRate !== undefined ||
       ctx.input.payRatePeriod ||
       ctx.input.payRateSchedule ||
       ctx.input.overtimeStatus
     ) {
+      if (ctx.input.payRate === undefined)
+        throw createApiServiceError(
+          'payRate is required when providing compensation details.'
+        );
       compensationRecord = {
         pay_rate: ctx.input.payRate,
         pay_rate_period: ctx.input.payRatePeriod,
@@ -117,7 +165,7 @@ Use this to onboard new hires into the organization with their department, divis
       };
     }
 
-    let jobRecord: any;
+    let jobRecord: Record<string, number | null> | undefined;
     if (
       ctx.input.jobTitleId ||
       ctx.input.locationId ||
@@ -125,10 +173,22 @@ Use this to onboard new hires into the organization with their department, divis
       ctx.input.departmentId
     ) {
       jobRecord = {
-        job_title_id: ctx.input.jobTitleId,
-        location_id: ctx.input.locationId,
-        division_id: ctx.input.divisionId,
-        department_id: ctx.input.departmentId
+        job_title_id:
+          ctx.input.jobTitleId === undefined
+            ? null
+            : providerId(ctx.input.jobTitleId, 'jobTitleId'),
+        location_id:
+          ctx.input.locationId === undefined
+            ? null
+            : providerId(ctx.input.locationId, 'locationId'),
+        division_id:
+          ctx.input.divisionId === undefined
+            ? null
+            : providerId(ctx.input.divisionId, 'divisionId'),
+        department_id:
+          ctx.input.departmentId === undefined
+            ? null
+            : providerId(ctx.input.departmentId, 'departmentId')
       };
     }
 
@@ -138,9 +198,12 @@ Use this to onboard new hires into the organization with their department, divis
       email: ctx.input.email,
       hire_date: ctx.input.hireDate,
       employment_status: {
-        employment_status_id: ctx.input.employmentStatusId
+        employment_status_id: providerId(ctx.input.employmentStatusId, 'employmentStatusId')
       },
-      reports_to_employee_id: ctx.input.reportsToEmployeeId,
+      reports_to_employee_id:
+        ctx.input.reportsToEmployeeId === undefined
+          ? null
+          : providerId(ctx.input.reportsToEmployeeId, 'reportsToEmployeeId'),
       job_record: jobRecord,
       compensation_record: compensationRecord,
       prevent_email: ctx.input.preventEmail,
@@ -148,7 +211,7 @@ Use this to onboard new hires into the organization with their department, divis
       hire_packet: hirePacket
     });
 
-    let employeeId = response?.data?.id ?? response?.id;
+    let employeeId = response.data.id;
 
     return {
       output: {

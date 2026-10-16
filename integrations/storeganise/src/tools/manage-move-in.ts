@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,7 +29,7 @@ export let manageMoveInTool = SlateTool.create(spec, {
         .describe('Move-in job ID (required for confirm, complete, cancel, get)'),
       userId: z.string().optional().describe('User/tenant ID (required for create)'),
       unitId: z.string().optional().describe('Unit ID to move into (required for create)'),
-      siteId: z.string().optional().describe('Site ID (required for create)'),
+      siteId: z.string().optional().describe('Site ID for the create action'),
       startDate: z.string().optional().describe('Move-in start date in ISO format'),
       include: z
         .string()
@@ -49,6 +49,14 @@ export let manageMoveInTool = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+
+    if (action === 'create') {
+      if (!ctx.input.userId?.trim() || !ctx.input.unitId?.trim()) {
+        throw createApiServiceError('userId and unitId are required to create a move-in.');
+      }
+    } else if (!ctx.input.jobId?.trim()) {
+      throw createApiServiceError(`jobId is required for the ${action} action.`);
+    }
 
     if (action === 'create') {
       let jobData: Record<string, any> = {

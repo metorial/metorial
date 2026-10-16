@@ -1,4 +1,4 @@
-# Slates Specification for Adrapid
+# Adrapid Integration
 
 ## Overview
 
@@ -16,7 +16,7 @@ The token is passed as a Bearer token in the `Authorization` header of HTTP requ
 Authorization: Bearer [YOUR_TOKEN]
 ```
 
-The base URL for all API requests is `https://api.adrapid.com`.
+The documented user API base URL is `https://api.adrapid.com/v1/api`.
 
 For enterprise/whitelabel integrations, there is a separate Administrative API that uses the same bearer token authentication pattern but operates under a `/v1/api/` path prefix for managing users and access.
 
@@ -33,11 +33,15 @@ The Adrapid REST API can be used to create image, video or HTML5 banners on dema
 
 ### Banner Retrieval
 
-Created banners can be retrieved by their ID to check their processing status and download the resulting files. Banners go through states: `exporting` → `ready` (or `failed`).
+Created banners can be retrieved by their ID to check their processing status and download the resulting files. Banners normally progress from `exporting` to `ready` or `failed`; the response schema also documents `uploaded`. While exporting, the provider can return `files: null`; the tool exposes an empty files collection and preserves the complete response in `raw`. Completed files become downloadable, and their original URLs and component-file metadata are retained.
+
+The user API also exposes a paginated banner list with `offset`, `limit` (at least 10), `search`, and `status` filters. List Banners enables discovery of banner IDs for subsequent retrieval. Its count comes from the provider and is omitted if not returned.
+
+Creation supports optional custom `sizes`, `clicktag`, `editable`, and `excludeBaseSize` parameters. Image modes use booleans, for example `{"png": true}`; video and GIF accept documented options. A returned `templateId` identifies an editable template, when one exists. File identifiers, file status, and direct URLs are exposed only when returned by the provider.
 
 ### Account Information
 
-The API provides an endpoint (`/me`) to retrieve information about the currently authenticated user/account.
+The API provides an endpoint (`/v1/api/me`) to retrieve information about the currently authenticated user/account. The documented response includes a nested `user` object; the integration also accepts the previously supported flat account response. Existing bearer-token authentication and empty connection configuration remain unchanged.
 
 ### Embedded Editor Widget (Enterprise)
 
@@ -53,4 +57,14 @@ The Administrative API provides endpoints for managing users, including getting 
 
 ## Events
 
-The provider does not support events. Banner creation is asynchronous and requires polling the banner endpoint to check completion status; there is no webhook or event subscription mechanism available.
+No server webhook or event subscription mechanism is documented in the user API. Banner creation is asynchronous and requires polling the banner endpoint to check completion status. Embedded editor postMessage events belong to the browser widget and are not server triggers.
+
+## API sources
+
+- [API overview and bearer-token authentication](https://docs.adrapid.com/api/overview)
+- [User API Swagger](https://user-api-docs.adrapid.com/)
+- [User API OpenAPI entrypoint](https://api.adrapid.com/spec/v1/client-api.yaml)
+- [Shared request and response schemas](https://api.adrapid.com/spec/v1/api.yaml)
+- [Embedded editor access](https://docs.adrapid.com/enterprise/whitelabel/widget)
+
+The older overview illustrates unversioned `/banners` routes, while its linked Swagger publishes the current user API under `/v1/api`. The integration uses the published versioned endpoints with the existing bearer token, input fields, and public tool keys. Enterprise resource administration is outside the ordinary user workflow.

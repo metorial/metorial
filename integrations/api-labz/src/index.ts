@@ -9,6 +9,7 @@ import {
   generateBusinessReport,
   generateSocialMediaContent,
   imageToJson,
+  listModules,
   pdfToJson,
   textToFlowDiagram,
   textToImage,
@@ -29,7 +30,8 @@ export let provider = Slate.create({
     textToImage,
     deepResearch,
     aiSearch,
-    callModule
+    callModule,
+    listModules
   ],
   triggers: []
 });

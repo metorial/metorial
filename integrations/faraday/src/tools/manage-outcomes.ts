@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let outcomeSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   outcomeId: z.string().describe('Unique identifier of the outcome'),
   name: z.string().describe('Human-readable name of the outcome'),
   status: z
@@ -43,6 +47,7 @@ export let listOutcomes = SlateTool.create(spec, {
     let outcomes = await client.listOutcomes();
 
     let mapped = outcomes.map((o: any) => ({
+      raw: o,
       outcomeId: o.id,
       name: o.name,
       status: o.status,
@@ -81,6 +86,7 @@ export let getOutcome = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: o,
         outcomeId: o.id,
         name: o.name,
         status: o.status,
@@ -168,6 +174,7 @@ export let createOutcome = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: o,
         outcomeId: o.id,
         name: o.name,
         status: o.status,

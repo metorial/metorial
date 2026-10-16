@@ -31,7 +31,7 @@ export let deleteEvent = SlateTool.create(spec, {
 
     return {
       output: { result },
-      message: `Deleted event **${ctx.input.eventId}**.`
+      message: 'Received the event deletion response.'
     };
   })
   .build();

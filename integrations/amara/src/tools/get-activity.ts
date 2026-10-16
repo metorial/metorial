@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type ActivityData, Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getActivity = SlateTool.create(spec, {
@@ -42,6 +42,10 @@ export let getActivity = SlateTool.create(spec, {
           activityType: z.string().describe('Activity type'),
           date: z.string().describe('Activity date (ISO 8601)'),
           username: z.string().nullable().describe('User who performed the action'),
+          userId: z
+            .string()
+            .optional()
+            .describe('Stable ID of the user who performed the action'),
           videoId: z.string().nullable().describe('Related video ID'),
           languageCode: z.string().nullable().describe('Related language code')
         })
@@ -54,7 +58,16 @@ export let getActivity = SlateTool.create(spec, {
       username: ctx.auth.username
     });
 
-    let result: any;
+    if (
+      [ctx.input.videoId, ctx.input.teamSlug, ctx.input.userIdentifier].filter(
+        value => value !== undefined
+      ).length !== 1
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one of videoId, teamSlug, or userIdentifier.'
+      );
+    }
+    let result: PaginatedResponse<ActivityData>;
 
     if (ctx.input.videoId) {
       result = await client.getVideoActivity(ctx.input.videoId, {
@@ -84,13 +97,16 @@ export let getActivity = SlateTool.create(spec, {
         offset: ctx.input.offset
       });
     } else {
-      throw new Error('Provide exactly one of videoId, teamSlug, or userIdentifier');
+      throw createApiServiceError(
+        'Provide exactly one of videoId, teamSlug, or userIdentifier'
+      );
     }
 
-    let activities = result.objects.map((a: any) => ({
+    let activities = result.objects.map(a => ({
       activityType: a.type,
       date: a.date,
       username: a.user?.username ?? null,
+      userId: a.user?.id,
       videoId: a.video ?? null,
       languageCode: a.language ?? null
     }));

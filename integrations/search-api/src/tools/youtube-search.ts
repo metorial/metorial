@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let youtubeVideoSchema = z.object({
@@ -44,6 +44,7 @@ export let youtubeSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       totalResults: z.number().optional().describe('Total number of results'),
       videos: z.array(youtubeVideoSchema).describe('YouTube video results'),
@@ -58,31 +59,32 @@ export let youtubeSearch = SlateTool.create(spec, {
       q: ctx.input.query,
       gl: ctx.input.country,
       hl: ctx.input.language,
-      sp: ctx.input.filterCode || ctx.input.nextPageToken
+      sp: ctx.input.nextPageToken ?? ctx.input.filterCode
     });
 
-    let videos = (data.videos || []).map((v: any) => ({
+    let videos = resultArray(data.videos, 'videos').map((v: any) => ({
       position: v.position,
       title: v.title,
       link: v.link,
-      channelName: v.channel?.name,
+      channelName: v.channel?.title ?? v.channel?.name,
       channelLink: v.channel?.link,
       views: v.views,
-      publishedDate: v.published_date,
+      publishedDate: v.published_time ?? v.published_date,
       length: v.length,
       description: v.description,
       thumbnail: v.thumbnail?.static || v.thumbnail,
-      isLive: v.is_live || undefined
+      isLive: v.live ?? v.is_live
     }));
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         totalResults: data.search_information?.total_results,
         videos,
         nextPageToken: data.pagination?.next_page_token
       },
-      message: `Found ${videos.length} YouTube video${videos.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${videos.length} YouTube video${videos.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

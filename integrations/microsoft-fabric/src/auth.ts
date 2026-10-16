@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from '@slates/provider';
+import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { DEFAULT_FABRIC_TENANT_ID } from './config';
 import { fabricOAuthError, fabricServiceError } from './lib/errors';
@@ -10,6 +10,7 @@ export type FabricAuthOutput = {
   refreshToken: string;
   fabricExpiresAt?: string;
   storageExpiresAt?: string;
+  expiresAt?: string;
   tenantId: string;
   grantedScopes: string[];
 };
@@ -60,10 +61,11 @@ type TokenResponse = {
   scope?: string;
 };
 
-let tokenExpiresAt = (expiresIn?: number) =>
-  typeof expiresIn === 'number'
-    ? new Date(Date.now() + expiresIn * 1000).toISOString()
-    : undefined;
+let tokenExpiresAt = (expiresIn?: number) => {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn)) return undefined;
+  let expiresAt = new Date(Date.now() + expiresIn * 1000);
+  return Number.isNaN(expiresAt.getTime()) ? undefined : expiresAt.toISOString();
+};
 
 let normalizeTenantId = (value: unknown) =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -167,7 +169,7 @@ let buildOutput = (input: {
   fallbackRefreshToken?: string;
 }): FabricAuthOutput => {
   let refreshToken =
-    input.fabric.refresh_token ?? input.storage.refresh_token ?? input.fallbackRefreshToken;
+    input.storage.refresh_token ?? input.fabric.refresh_token ?? input.fallbackRefreshToken;
   if (!refreshToken) {
     throw fabricServiceError(
       'Microsoft Entra did not return a refresh token. Re-authenticate with offline_access enabled.'
@@ -176,14 +178,20 @@ let buildOutput = (input: {
 
   let fabricToken = requireAccessToken(input.fabric, 'Fabric');
   let storageToken = requireAccessToken(input.storage, 'Storage');
+  let fabricExpiresAt = tokenExpiresAt(input.fabric.expires_in);
+  let storageExpiresAt = tokenExpiresAt(input.storage.expires_in);
+  let expirations = [fabricExpiresAt, storageExpiresAt].filter(
+    (value): value is string => value !== undefined
+  );
 
   return {
     token: fabricToken,
     fabricToken,
     storageToken,
     refreshToken,
-    fabricExpiresAt: tokenExpiresAt(input.fabric.expires_in),
-    storageExpiresAt: tokenExpiresAt(input.storage.expires_in),
+    fabricExpiresAt,
+    storageExpiresAt,
+    expiresAt: expirations.length > 0 ? expirations.sort()[0] : undefined,
     tenantId: input.tenantId,
     grantedScopes: [
       ...(input.fabric.scope ? input.fabric.scope.split(/\s+/).filter(Boolean) : input.scopes),
@@ -203,6 +211,10 @@ export let auth = SlateAuth.create()
       refreshToken: z.string().describe('Microsoft Entra refresh token.'),
       fabricExpiresAt: z.string().optional().describe('Fabric token expiration time.'),
       storageExpiresAt: z.string().optional().describe('Storage token expiration time.'),
+      expiresAt: z
+        .string()
+        .optional()
+        .describe('Earliest reported token expiration time, for refreshing the connection.'),
       tenantId: z.string().describe('Microsoft Entra tenant used for token exchange.'),
       grantedScopes: z
         .array(z.string())

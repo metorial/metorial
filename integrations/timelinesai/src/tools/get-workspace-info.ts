@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getWorkspaceInfo = SlateTool.create(spec, {
@@ -66,14 +66,16 @@ export let getWorkspaceInfo = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let teammatesResult = await client.getWorkspaceTeammates();
-    let teammates = (teammatesResult?.data?.teammates || []).map((t: any) => ({
-      userId: t.user_id,
-      displayName: t.display_name,
-      role: t.role,
-      email: t.email,
-      status: t.status,
-      createdAt: t.created_at
-    }));
+    let teammates = requireArray(teammatesResult?.data?.teammates, 'teammates').map(
+      (t: any) => ({
+        userId: t.user_id,
+        displayName: t.display_name,
+        role: t.role,
+        email: t.email,
+        status: t.status,
+        createdAt: t.created_at
+      })
+    );
 
     let quotas: any;
     if (ctx.input.includeQuotas) {
@@ -92,7 +94,7 @@ export let getWorkspaceInfo = SlateTool.create(spec, {
 
     return {
       output: { teammates, quotas },
-      message: `Workspace has **${teammates.length}** teammate(s).${quotas ? ` Messaging: ${quotas.messagingQuota?.used}/${quotas.messagingQuota?.total} credits used.` : ''}`
+      message: `Workspace has **${teammates.length}** teammate(s).${quotas?.messagingQuota ? ` Messaging: ${quotas.messagingQuota.used}/${quotas.messagingQuota.total} credits used.` : ''}`
     };
   })
   .build();

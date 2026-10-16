@@ -1,6 +1,25 @@
 # Corrently
 
-Retrieve renewable energy data, CO2 emissions forecasts, and electricity pricing for German locations. Query the Green Power Index (GrünstromIndex) by postal code for hourly renewable energy percentages and dynamic pricing. Get 24-hour CO2 forecasts with traffic-light advisories for optimal energy consumption timing. Track CO2 emissions for ESG Scope 2 reporting via meter readings. Generate optimized energy schedules for devices based on price, solar generation, emissions, or comfort modes. Access electricity market pricing data, photovoltaic generation forecasts, renewable energy dispatch and mix breakdowns, and merit order lists. Compare PHEV charging vs. fueling costs and emissions. Manage Corrently energy account balances, green power bonuses, and CORI token investments.
+Query German renewable-energy forecasts, electricity prices, CO2 intensity,
+solar generation, electricity mix, and energy-account data. Create optimized
+energy schedules, retrieve their recommendations, and report measured
+consumption. Compare PHEV charging with fueling and create or update CO2 meters.
+
+Connect with an API token from the [Developer Console](https://console.corrently.io/).
+Anonymous access remains available for public endpoints that accept it. Tokens
+can expire; replace an expired token in the connection. An optional default German
+postal code can be set for tools that support it.
+
+Solar capacity uses kWp and orientation uses compass degrees (north 0, east 90,
+south 180, west 270). The integration converts these to the provider parameters.
+Save the `scheduleId` returned by `create_energy_schedule` for schedule reads and
+updates. Save the `meterId` returned by `update_co2_meter` for subsequent CO2 meter
+reads and updates. CO2 meters expire if they are not updated before their returned
+expiry timestamp.
+
+Existing tools retain their public inputs and outputs; complete provider data is
+also returned. See [the API specification](docs/SPEC.md) for endpoint coverage
+and known documentation limits.
 
 ## License
 

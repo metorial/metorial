@@ -6,9 +6,11 @@ import { spec } from '../spec';
 export let getEarnings = SlateTool.create(spec, {
   name: 'Get Earnings',
   key: 'get_earnings',
-  description: `Retrieve earnings data for a company, including historical EPS, revenue, and earnings surprises.
+  description: `DEPRECATED — use \`get_earnings_history\` instead. Retrieve earnings data for a company, including historical EPS, revenue, and earnings surprises.
 Can also retrieve upcoming earnings dates via the earnings calendar.`,
+  instructions: ['Use get_earnings_history for the current documented endpoint contract.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

@@ -13,10 +13,23 @@ export let listQuestions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      status: z.enum(['active', 'archived']).optional().describe('Question status'),
+      access: z
+        .string()
+        .optional()
+        .describe('Comma-separated access values: library, owned, shared'),
+      difficulty: z.string().optional().describe('Comma-separated difficulty levels'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Comma-separated owner user IDs; call list_users to discover IDs'),
+      tags: z.string().optional().describe('Comma-separated question tags'),
+      skills: z.string().optional().describe('Comma-separated question skills'),
+      languages: z.string().optional().describe('Comma-separated programming languages'),
       type: z
         .string()
         .optional()
-        .describe('Filter by question type (e.g., "coding", "mcq", "project", "database")'),
+        .describe('Filter by question type (e.g., "code", "mcq", "database")'),
       limit: z
         .number()
         .min(1)
@@ -29,6 +42,15 @@ export let listQuestions = SlateTool.create(spec, {
   .output(
     z.object({
       questions: z.array(z.record(z.string(), z.any())).describe('Array of question objects'),
+      next: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page, empty when no next page exists'),
+      previous: z.string().optional().describe('Provider URL for the previous page'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response including pagination'),
       total: z.number().describe('Total number of questions available'),
       offset: z.number().describe('Current pagination offset')
     })
@@ -37,6 +59,7 @@ export let listQuestions = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listQuestions({
+      ...ctx.input,
       type: ctx.input.type,
       limit: ctx.input.limit,
       offset: ctx.input.offset
@@ -45,6 +68,9 @@ export let listQuestions = SlateTool.create(spec, {
     return {
       output: {
         questions: result.data,
+        next: result.next,
+        previous: result.previous,
+        raw: result.raw,
         total: result.total,
         offset: result.offset
       },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let confirmOrder = SlateTool.create(spec, {
@@ -20,7 +21,8 @@ export let confirmOrder = SlateTool.create(spec, {
   .output(
     z.object({
       orderId: z.string().describe('ID of the confirmed order.'),
-      state: z.string().describe('Updated state of the order after confirmation.')
+      state: z.string().describe('Updated state of the order after confirmation.'),
+      raw: rawSchema.optional().describe('Complete confirmed order response.')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,7 +32,8 @@ export let confirmOrder = SlateTool.create(spec, {
     return {
       output: {
         orderId: result.id,
-        state: result.state
+        state: result.state,
+        raw: result
       },
       message: `Order **${result.id}** has been confirmed and is now in state **${result.state}**.`
     };

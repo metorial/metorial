@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let checkCredits = SlateTool.create(spec, {
   name: 'Check Credit Balance',
   key: 'check_credits',
-  description: `Check the remaining query credits available on your IP2Proxy account. Useful for monitoring usage and ensuring you have sufficient credits before performing lookups.`,
+  description: `Check the remaining query credits available on your IP2Proxy account. The balance can lag usage by 10 minutes.`,
   tags: {
     readOnly: true
   }
@@ -15,7 +15,9 @@ export let checkCredits = SlateTool.create(spec, {
   .output(
     z.object({
       response: z.string().describe('Response status from the API.'),
-      credits: z.string().describe('Number of remaining query credits.')
+      credits: z
+        .string()
+        .describe('Remaining query credits; the balance can lag by 10 minutes.')
     })
   )
   .handleInvocation(async ctx => {
@@ -25,10 +27,10 @@ export let checkCredits = SlateTool.create(spec, {
 
     return {
       output: {
-        response: result.response || '',
-        credits: result.credits || '0'
+        response: result.response,
+        credits: result.credits
       },
-      message: `You have **${result.credits}** credits remaining.`
+      message: `IP2Proxy reports **${result.credits}** credits remaining. The balance can lag usage by 10 minutes.`
     };
   })
   .build();

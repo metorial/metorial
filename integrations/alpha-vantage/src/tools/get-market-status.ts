@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 let marketStatusSchema = z.object({
@@ -30,16 +31,16 @@ export let getMarketStatus = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let data = await client.marketStatus();
-    let rawMarkets: any[] = data.markets || [];
+    let rawMarkets: any[] = responseRows(data.markets, 'markets');
 
     let markets = rawMarkets.map((m: any) => ({
-      marketType: m.market_type || '',
-      region: m.region || '',
-      primaryExchanges: m.primary_exchanges || '',
-      localOpen: m.local_open || '',
-      localClose: m.local_close || '',
-      currentStatus: m.current_status || '',
-      notes: m.notes || ''
+      marketType: responseText(m.market_type, 'market_type'),
+      region: responseText(m.region, 'region'),
+      primaryExchanges: responseText(m.primary_exchanges, 'primary_exchanges'),
+      localOpen: responseText(m.local_open, 'local_open'),
+      localClose: responseText(m.local_close, 'local_close'),
+      currentStatus: responseText(m.current_status, 'current_status'),
+      notes: responseText(m.notes, 'notes', true)
     }));
 
     return {

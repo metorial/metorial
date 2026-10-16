@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyControlClient } from '../lib/control-client';
+import { appIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageRules = SlateTool.create(spec, {
@@ -24,7 +25,7 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Operation to perform'),
-      appId: z.string().optional().describe('App ID. Overrides config value if provided.'),
+      appId: appIdInput,
       ruleId: z
         .string()
         .optional()
@@ -70,9 +71,12 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyControlClient(ctx.auth.token);
+    let client = new AblyControlClient(ctx.auth.token, ctx.auth.authType);
     let appId = ctx.input.appId || ctx.config.appId;
-    if (!appId) throw new Error('appId is required. Set it in config or input.');
+    if (!appId)
+      throw createApiServiceError(
+        'appId is required. Call manage_apps with action list to discover an app ID, then supply appId.'
+      );
 
     if (ctx.input.action === 'list') {
       let rules = await client.listRules(appId);
@@ -83,7 +87,8 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required for getting a rule.');
+      if (!ctx.input.ruleId)
+        throw createApiServiceError('ruleId is required for getting a rule.');
       let rule = await client.getRule(appId, ctx.input.ruleId);
       return {
         output: { rule },
@@ -92,9 +97,12 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.ruleType) throw new Error('ruleType is required for creating a rule.');
-      if (!ctx.input.source) throw new Error('source is required for creating a rule.');
-      if (!ctx.input.target) throw new Error('target is required for creating a rule.');
+      if (!ctx.input.ruleType)
+        throw createApiServiceError('ruleType is required for creating a rule.');
+      if (!ctx.input.source)
+        throw createApiServiceError('source is required for creating a rule.');
+      if (!ctx.input.target)
+        throw createApiServiceError('target is required for creating a rule.');
       let rule = await client.createRule(appId, {
         ruleType: ctx.input.ruleType,
         requestMode: ctx.input.requestMode || 'single',
@@ -109,7 +117,8 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required for updating a rule.');
+      if (!ctx.input.ruleId)
+        throw createApiServiceError('ruleId is required for updating a rule.');
       let rule = await client.updateRule(appId, ctx.input.ruleId, {
         ruleType: ctx.input.ruleType,
         requestMode: ctx.input.requestMode,
@@ -124,7 +133,8 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required for deleting a rule.');
+      if (!ctx.input.ruleId)
+        throw createApiServiceError('ruleId is required for deleting a rule.');
       await client.deleteRule(appId, ctx.input.ruleId);
       return {
         output: { deleted: true },
@@ -132,6 +142,6 @@ Rules define how events (messages, presence, lifecycle, occupancy) are forwarded
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { locationParams } from '../lib/location';
 import { spec } from '../spec';
 
 export let geocodeLocation = SlateTool.create(spec, {
@@ -25,12 +26,19 @@ export let geocodeLocation = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       results: z
         .array(
           z.object({
             name: z.string().describe('Location name'),
-            latitude: z.number().describe('Latitude coordinate'),
-            longitude: z.number().describe('Longitude coordinate'),
+            latitude: z
+              .number()
+              .optional()
+              .describe('Latitude coordinate when returned by the provider'),
+            longitude: z
+              .number()
+              .optional()
+              .describe('Longitude coordinate when returned by the provider'),
             country: z.string().optional().describe('ISO country code')
           })
         )
@@ -39,38 +47,41 @@ export let geocodeLocation = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let raw: unknown;
     let results: Array<{
       name: string;
-      latitude: number;
-      longitude: number;
+      latitude?: number | null;
+      longitude?: number | null;
       country?: string;
     }>;
 
     if (ctx.input.lat !== undefined && ctx.input.lon !== undefined) {
+      locationParams(ctx.input);
       let data = await client.reverseGeocode({ lat: ctx.input.lat, lon: ctx.input.lon });
+      raw = data;
       results = Array.isArray(data) ? data : [data];
     } else {
-      let params: Record<string, string> = {};
-      if (ctx.input.city) params.city = ctx.input.city;
-      if (ctx.input.state) params.state = ctx.input.state;
-      if (ctx.input.country) params.country = ctx.input.country;
+      let params = locationParams(ctx.input);
       let data = await client.geocode(params);
+      raw = data;
       results = Array.isArray(data) ? data : [data];
     }
 
-    let firstResult = results[0];
+    let mapped = results.map(result => ({
+      name: result.name,
+      latitude: result.latitude ?? undefined,
+      longitude: result.longitude ?? undefined,
+      country: result.country ?? undefined
+    }));
+    let firstResult = mapped[0];
     let label = firstResult
-      ? `**${firstResult.name}** → ${firstResult.latitude}, ${firstResult.longitude}`
+      ? `**${firstResult.name}**${typeof firstResult.latitude === 'number' && typeof firstResult.longitude === 'number' ? ` → ${firstResult.latitude}, ${firstResult.longitude}` : ''}`
       : 'No results found';
 
     return {
       output: {
-        results: results.map((r: any) => ({
-          name: r.name,
-          latitude: r.latitude,
-          longitude: r.longitude,
-          country: r.country
-        }))
+        raw,
+        results: mapped
       },
       message: `Found **${results.length}** result(s). ${label}`
     };

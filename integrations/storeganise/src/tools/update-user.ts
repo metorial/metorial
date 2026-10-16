@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,11 +55,16 @@ export let updateUserTool = SlateTool.create(spec, {
     if (ctx.input.country !== undefined) updateData.country = ctx.input.country;
     if (ctx.input.customFields !== undefined) updateData.customFields = ctx.input.customFields;
 
-    let user = await client.updateUser(ctx.input.userId, updateData);
+    let hasUpdates = Object.keys(updateData).length > 0;
+    if (!hasUpdates && !ctx.input.historyComment?.trim()) {
+      throw createApiServiceError('Provide a user field to update or a historyComment.');
+    }
 
+    let user = hasUpdates ? await client.updateUser(ctx.input.userId, updateData) : undefined;
     if (ctx.input.historyComment) {
       await client.addUserComment(ctx.input.userId, ctx.input.historyComment);
     }
+    user ??= await client.getUser(ctx.input.userId);
 
     return {
       output: { user },

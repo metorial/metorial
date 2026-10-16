@@ -16,13 +16,18 @@ let userSchema = z.object({
     ),
   avatarUrl: z.string().nullable().optional().describe('URL of the user avatar'),
   timezone: z.string().optional().describe('User timezone'),
-  dateJoined: z.string().optional().describe('ISO date string when the user joined')
+  dateJoined: z.string().optional().describe('ISO date string when the user joined'),
+  profileData: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Custom profile data keyed by profile field ID'),
+  raw: z.any().optional().describe('Complete provider user profile')
 });
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List all users in the Zulip organization, including their roles, status, and profile information.`,
+  description: `List accessible users in the Zulip organization, including their roles, status, and profile information.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -61,7 +66,9 @@ export let listUsers = SlateTool.create(spec, {
       role: u.role,
       avatarUrl: u.avatar_url,
       timezone: u.timezone,
-      dateJoined: u.date_joined
+      dateJoined: u.date_joined,
+      profileData: u.profile_data,
+      raw: u
     }));
 
     return {

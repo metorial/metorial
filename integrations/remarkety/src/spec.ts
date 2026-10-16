@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'remarkety',
   name: 'Remarkety',
   description:
-    'Email and SMS marketing automation platform for eCommerce. Manage customers, orders, products, carts, newsletter subscriptions, and track email/SMS engagement events.',
+    'Email and SMS marketing automation for eCommerce. Send customer, order, product, cart, and custom events, upload contact batches, and manage newsletter subscriptions and contact unsubscriptions.',
   metadata: {},
   config,
   auth

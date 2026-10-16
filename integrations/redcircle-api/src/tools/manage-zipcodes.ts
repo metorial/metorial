@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,6 +21,14 @@ export let manageZipcodes = SlateTool.create(spec, {
       action: z
         .enum(['list', 'add', 'delete'])
         .describe('Action to perform: list, add, or delete zipcodes.'),
+      page: z
+        .number()
+        .optional()
+        .describe('Page of zipcodes to list, with up to 10 per page.'),
+      searchTerm: z
+        .string()
+        .optional()
+        .describe('Filter listed zipcodes by a partial zipcode.'),
       zipcodes: z
         .array(z.string())
         .optional()
@@ -36,10 +44,19 @@ export let manageZipcodes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.action !== 'list' &&
+      (!ctx.input.zipcodes?.length || ctx.input.zipcodes.some(zipcode => !zipcode.trim()))
+    ) {
+      throw createApiServiceError('Provide at least one non-empty zipcode for add or delete.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let data = await client.listZipcodes();
+      let data = await client.listZipcodes({
+        page: ctx.input.page,
+        search_term: ctx.input.searchTerm
+      });
       let totalZipcodes = Object.values(data.zipcodes ?? {}).reduce(
         (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0),
         0

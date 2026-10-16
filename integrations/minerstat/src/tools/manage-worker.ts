@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageWorkerTool = SlateTool.create(spec, {
   key: 'manage_worker',
   description: `Create, update, or delete mining workers. When creating, specify name, type, and system. When updating, use the "set", "add", and "remove" parameters to modify worker properties like name, IP, mining client, config, ClockTune profile, groups, profit switching, and more. Can also target workers by group or customer.`,
   instructions: [
-    'For creating: provide name, workerType, and system. Optional: ip, username, password, group, customerId, config, miningClient.',
+    'For creating: provide workerName, workerType, and system. Optional: ip, username, password, groupName, customerId, config, miningClient.',
     'For updating: provide either workerName or groupName to target workers. Use "set" for setting values, "add" for adding group membership, "remove" for removing group membership.',
     'For deleting: provide workerName and/or groupName of the worker(s) to delete.'
   ],
@@ -70,8 +70,19 @@ export let manageWorkerTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.token) {
-      throw new Error(
+      throw createApiServiceError(
         'Bearer token is required for worker management. Use the "API Credentials" authentication method.'
+      );
+    }
+
+    if (
+      ctx.input.action !== 'create' &&
+      !ctx.input.workerName &&
+      !ctx.input.groupName &&
+      ctx.input.customerId === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide workerName, groupName, or customerId to target the worker operation.'
       );
     }
 
@@ -81,7 +92,7 @@ export let manageWorkerTool = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.workerName || !ctx.input.workerType || !ctx.input.system) {
-          throw new Error(
+          throw createApiServiceError(
             'workerName, workerType, and system are required to create a worker.'
           );
         }
@@ -127,6 +138,9 @@ export let manageWorkerTool = SlateTool.create(spec, {
       }
     }
 
+    let operation = { create: 'created', update: 'updated', delete: 'deleted' }[
+      ctx.input.action
+    ];
     let targetLabel = ctx.input.workerName ?? ctx.input.groupName ?? 'workers';
 
     return {
@@ -134,7 +148,7 @@ export let manageWorkerTool = SlateTool.create(spec, {
         success: true,
         response: result
       },
-      message: `Successfully **${ctx.input.action}d** worker(s): **${targetLabel}**.`
+      message: `Successfully **${operation}** worker(s): **${targetLabel}**.`
     };
   })
   .build();

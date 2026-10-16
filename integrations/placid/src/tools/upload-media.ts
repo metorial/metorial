@@ -6,10 +6,11 @@ import { spec } from '../spec';
 export let uploadMedia = SlateTool.create(spec, {
   name: 'Upload Media',
   key: 'upload_media',
-  description: `Upload files to Placid's temporary storage and receive hosted URLs. The returned URLs can be used in picture layers when generating images, PDFs, or videos.`,
+  description: `Submit source file URLs to Placid's media endpoint and return any hosted URLs it accepts. URL submission is a legacy operation; current documentation specifies binary uploads, so URL acceptance is unverified. Hosted URLs can be used in picture layers when generating images, PDFs, or videos.`,
   constraints: [
     'Maximum of 5 files per upload request.',
-    'Files are hosted temporarily on Placid storage.'
+    'Files are hosted temporarily on Placid storage.',
+    'The media endpoint currently documents binary uploads; this legacy URL submission may be rejected.'
   ],
   tags: {
     destructive: false,
@@ -24,7 +25,7 @@ export let uploadMedia = SlateTool.create(spec, {
             name: z
               .string()
               .describe('A unique key/name for this file (e.g., "logo", "photo1")'),
-            url: z.string().describe('URL of the file to upload')
+            url: z.string().describe('Source file URL to submit directly to Placid')
           })
         )
         .min(1)

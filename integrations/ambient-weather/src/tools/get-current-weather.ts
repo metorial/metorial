@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCurrentWeather = SlateTool.create(spec, {
   name: 'Get Current Weather',
   key: 'get_current_weather',
-  description: `Get the latest real-time weather conditions from a specific device. Unlike historical data which may be delayed, this returns the most up-to-date reading available. Includes temperature, humidity, wind, pressure, rain, and all other sensors available on the station.`,
+  description: `Get the latest weather reading reported by a specific device. Includes temperature, humidity, wind, pressure, rain, and other available sensors. Check the returned timestamp for freshness; an offline station may have an older reading.`,
   instructions: [
     'Use the **List Devices** tool to discover available MAC addresses if you do not already know one.'
   ],
@@ -42,29 +42,30 @@ export let getCurrentWeather = SlateTool.create(spec, {
     );
 
     if (!device) {
-      throw new Error(
-        `Device with MAC address "${ctx.input.macAddress}" not found. Use the List Devices tool to see available devices.`
+      throw createApiServiceError(
+        `Device with MAC address "${ctx.input.macAddress}" not found. Use the List Devices tool to see available devices.`,
+        { reason: 'ambient_weather_device_not_found' }
       );
     }
 
     let lastData = device.lastData || {};
-    let tempF = lastData.tempf as number | undefined;
-    let humidity = lastData.humidity as number | undefined;
-    let windSpeed = lastData.windspeedmph as number | undefined;
+    let tempF = lastData.tempf;
+    let humidity = lastData.humidity;
+    let windSpeed = lastData.windspeedmph;
 
     let summary: string[] = [];
-    if (tempF !== undefined) summary.push(`${tempF}F`);
-    if (humidity !== undefined) summary.push(`${humidity}% humidity`);
-    if (windSpeed !== undefined) summary.push(`wind ${windSpeed} mph`);
+    if (typeof tempF === 'number') summary.push(`${tempF}F`);
+    if (typeof humidity === 'number') summary.push(`${humidity}% humidity`);
+    if (typeof windSpeed === 'number') summary.push(`wind ${windSpeed} mph`);
 
     return {
       output: {
         macAddress: device.macAddress,
         deviceName: device.info?.name,
-        timestamp: lastData.date as string | undefined,
+        timestamp: typeof lastData.date === 'string' ? lastData.date : undefined,
         currentConditions: lastData
       },
-      message: `Current weather at **${device.info?.name || device.macAddress}**: ${summary.length > 0 ? summary.join(', ') : 'data available in output'}`
+      message: `Latest reported weather at **${device.info?.name || device.macAddress}**: ${summary.length > 0 ? summary.join(', ') : Object.keys(lastData).length ? 'sensor readings available in output' : 'no sensor readings available'}`
     };
   })
   .build();

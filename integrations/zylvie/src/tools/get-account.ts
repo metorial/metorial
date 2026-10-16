@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAccount = SlateTool.create(spec, {
@@ -15,6 +16,7 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: rawResponseSchema,
       email: z.string().describe('Account email address'),
       brand: z.string().describe('Brand/business name')
     })
@@ -26,6 +28,7 @@ export let getAccount = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         email: result.email,
         brand: result.brand
       },

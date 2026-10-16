@@ -36,7 +36,7 @@ export let listOrgs = SlateTool.create(spec, {
     let organizations = orgs.map((org: any) => ({
       orgId: org.id,
       name: org.name,
-      domain: org.domain ?? null,
+      domain: org.domain,
       createdAt: org.createdAt,
       updatedAt: org.updatedAt
     }));

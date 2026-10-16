@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 export let postAnswer = SlateTool.create(spec, {
@@ -40,15 +41,17 @@ export let postAnswer = SlateTool.create(spec, {
     let a = result.items[0];
 
     if (!a) {
-      throw new Error('Failed to post answer. Ensure you have write_access scope.');
+      throw createApiServiceError(
+        'Failed to post answer. Ensure you have write_access scope.'
+      );
     }
 
     return {
       output: {
         answerId: a.answer_id,
         questionId: a.question_id,
-        score: a.score ?? 0,
-        creationDate: new Date(a.creation_date * 1000).toISOString()
+        score: a.score,
+        creationDate: providerDate(a.creation_date)
       },
       message: `Posted answer **#${a.answer_id}** to question **#${ctx.input.questionId}**.`
     };

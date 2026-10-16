@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRecord, responseSeries, responseText, validateMonth } from '../lib/response';
 import { spec } from '../spec';
 
 let ohlcvSchema = z.object({
@@ -9,15 +10,18 @@ let ohlcvSchema = z.object({
   high: z.string().describe('Highest price'),
   low: z.string().describe('Lowest price'),
   close: z.string().describe('Closing price'),
-  volume: z.string().describe('Trading volume')
+  volume: z.string().describe('Trading volume'),
+  adjustedClose: z.string().optional().describe('Split/dividend-adjusted close when returned'),
+  dividendAmount: z.string().optional().describe('Dividend amount when returned'),
+  splitCoefficient: z.string().optional().describe('Split coefficient when returned')
 });
 
 export let getStockPrice = SlateTool.create(spec, {
   name: 'Get Stock Price',
   key: 'get_stock_price',
-  description: `Retrieve historical stock price data (OHLCV) for a given ticker symbol at various time resolutions. Supports intraday (1/5/15/30/60 min), daily, weekly, and monthly intervals. Returns split/dividend-adjusted data when available. Use this to analyze price history, build charts, or feed into further analysis.`,
+  description: `Retrieve historical stock price data (OHLCV) for a given ticker symbol at various time resolutions. Supports intraday (1/5/15/30/60 min), daily, weekly, and monthly intervals. Adjusted daily, weekly, and monthly endpoints return raw OHLCV plus a separate adjusted close; intraday adjustment applies to OHLCV. Use this to analyze price history, build charts, or feed into further analysis.`,
   constraints: [
-    'Free API keys are limited to 25 requests per day and return compact data (latest 100 data points). Full historical data (20+ years) requires a premium key.'
+    'Intraday and daily adjusted data require premium access. Raw daily compact data is available with a free key; full daily history and realtime/delayed entitlements require premium access. Weekly and monthly endpoints return their available history.'
   ],
   tags: {
     readOnly: true
@@ -45,6 +49,14 @@ export let getStockPrice = SlateTool.create(spec, {
         .describe(
           '"compact" returns the latest 100 data points; "full" returns up to 20+ years of data'
         ),
+      extendedHours: z
+        .boolean()
+        .optional()
+        .describe('Include extended hours for intraday data; provider default is true'),
+      entitlement: z
+        .enum(['realtime', 'delayed'])
+        .optional()
+        .describe('US market data freshness; requires the corresponding premium entitlement'),
       month: z
         .string()
         .optional()
@@ -66,11 +78,24 @@ export let getStockPrice = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { symbol, resolution, interval, adjusted, outputSize, month } = ctx.input;
 
+    validateMonth(month);
+    if (month !== undefined && resolution !== 'intraday')
+      throw createApiServiceError('month applies only to intraday stock data.');
+    if (ctx.input.extendedHours !== undefined && resolution !== 'intraday')
+      throw createApiServiceError('extendedHours applies only to intraday stock data.');
+    if (
+      ctx.input.entitlement !== undefined &&
+      resolution !== 'intraday' &&
+      !(resolution === 'daily' && adjusted)
+    )
+      throw createApiServiceError(
+        'entitlement applies to intraday or adjusted daily stock data.'
+      );
     let data: any;
 
     if (resolution === 'intraday') {
       if (!interval) {
-        throw new Error(
+        throw createApiServiceError(
           'Interval is required for intraday resolution. Choose one of: 1min, 5min, 15min, 30min, 60min.'
         );
       }
@@ -79,11 +104,17 @@ export let getStockPrice = SlateTool.create(spec, {
         interval,
         adjusted,
         outputSize,
-        month
+        month,
+        extendedHours: ctx.input.extendedHours,
+        entitlement: ctx.input.entitlement
       });
     } else if (resolution === 'daily') {
       if (adjusted) {
-        data = await client.timeSeriesDailyAdjusted({ symbol, outputSize });
+        data = await client.timeSeriesDailyAdjusted({
+          symbol,
+          outputSize,
+          entitlement: ctx.input.entitlement
+        });
       } else {
         data = await client.timeSeriesDaily({ symbol, outputSize });
       }
@@ -99,22 +130,38 @@ export let getStockPrice = SlateTool.create(spec, {
       data = await client.timeSeriesMonthly({ symbol });
     }
 
-    let metaData = data['Meta Data'] || {};
-    let lastRefreshed = metaData['3. Last Refreshed'] || '';
-    let timeZone =
-      metaData['6. Time Zone'] || metaData['5. Time Zone'] || metaData['4. Time Zone'] || '';
+    let metaData = responseRecord(data['Meta Data'], 'metadata');
+    let lastRefreshed = responseText(metaData['3. Last Refreshed'], ' Last Refreshed');
+    let timeZone = responseText(
+      metaData['6. Time Zone'] ?? metaData['5. Time Zone'] ?? metaData['4. Time Zone'],
+      ' Time Zone'
+    );
 
     // Find the time series key (varies by endpoint)
-    let timeSeriesKey = Object.keys(data).find(k => k !== 'Meta Data') || '';
-    let timeSeries = data[timeSeriesKey] || {};
+    let timeSeries = responseSeries(data);
 
     let prices = Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'] || '',
-      high: values['2. high'] || '',
-      low: values['3. low'] || '',
-      close: values['4. close'] || values['5. adjusted close'] || '',
-      volume: values['5. volume'] || values['6. volume'] || ''
+      open: responseText(values['1. open'], ' open'),
+      high: responseText(values['2. high'], ' high'),
+      low: responseText(values['3. low'], ' low'),
+      close: responseText(values['4. close'] ?? values['5. adjusted close'], ' close'),
+      volume: responseText(values['5. volume'] ?? values['6. volume'], 'volume'),
+      adjustedClose:
+        values['5. adjusted close'] === undefined
+          ? undefined
+          : responseText(values['5. adjusted close'], 'adjusted close'),
+      dividendAmount:
+        (values['7. dividend amount'] ?? values['8. dividend amount']) === undefined
+          ? undefined
+          : responseText(
+              values['7. dividend amount'] ?? values['8. dividend amount'],
+              'dividend amount'
+            ),
+      splitCoefficient:
+        values['8. split coefficient'] === undefined
+          ? undefined
+          : responseText(values['8. split coefficient'], 'split coefficient')
     }));
 
     return {

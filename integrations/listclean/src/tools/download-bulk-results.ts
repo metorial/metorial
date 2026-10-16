@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ListcleanClient } from '../lib/client';
+import { LISTCLEAN_BASE_URL, ListcleanClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let downloadBulkResults = SlateTool.create(spec, {
@@ -39,6 +39,15 @@ export let downloadBulkResults = SlateTool.create(spec, {
 
     ctx.progress('Downloading bulk results...');
     let csvContent = await client.downloadBulkResults(ctx.input.listId, ctx.input.filter);
+    let filter =
+      ctx.input.filter === 'clean' ? 'ok' : ctx.input.filter === 'dirty' ? 'bad' : 'all';
+    await ctx.addAttachment({
+      type: 'url',
+      url: `${LISTCLEAN_BASE_URL}/bulk/list/${encodeURIComponent(ctx.input.listId)}/download/`,
+      headers: { 'X-Auth-Token': ctx.auth.token },
+      query: { filter },
+      mimeType: 'text/csv'
+    });
 
     return {
       output: {

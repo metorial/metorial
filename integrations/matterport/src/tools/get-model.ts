@@ -3,24 +3,6 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let _vector3Schema = z
-  .object({
-    x: z.number(),
-    y: z.number(),
-    z: z.number()
-  })
-  .nullable()
-  .optional();
-
-let _contactSchema = z
-  .object({
-    name: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
-    phoneNumber: z.string().nullable().optional()
-  })
-  .nullable()
-  .optional();
-
 export let getModel = SlateTool.create(spec, {
   name: 'Get Model',
   key: 'get_model',
@@ -72,10 +54,10 @@ export let getModel = SlateTool.create(spec, {
         created: model.created,
         modified: model.modified,
         description: model.description,
-        address: model.address || null,
-        publication: model.publication || null,
-        mls: model.mls || null,
-        options: model.options || null
+        address: model.address ?? null,
+        publication: model.publication ?? null,
+        mls: model.mls ?? null,
+        options: model.options ?? null
       },
       message: `Retrieved model **${model.name || model.id}** (state: ${model.state}, visibility: ${model.visibility}).`
     };

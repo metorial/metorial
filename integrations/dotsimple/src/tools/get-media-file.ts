@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getMediaId } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getMediaFile = SlateTool.create(spec, {
   name: 'Get Media File',
   key: 'get_media_file',
-  description: `Retrieve details of a specific media file by its UUID, including metadata, URL, and file information.`,
+  description: `Retrieve details of a specific media file by its UUID, including metadata, URL, file information, and an available download.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let getMediaFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       fileUuid: z.string().describe('UUID of the media file to retrieve')
     })
   )
@@ -33,14 +35,22 @@ export let getMediaFile = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.getMediaFile(ctx.input.fileUuid);
 
+    if (typeof result?.url === 'string' && result.url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.url,
+        mimeType: result.mime_type ?? undefined
+      });
+    }
+
     return {
       output: {
-        fileId: result?.id,
+        fileId: getMediaId(result?.id),
         fileUuid: result?.uuid,
         name: result?.name,
         mimeType: result?.mime_type,

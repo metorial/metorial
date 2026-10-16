@@ -35,7 +35,8 @@ export let badWordFilterTool = SlateTool.create(spec, {
       badWordsList: z.array(z.string()).describe('List of detected bad words'),
       censoredContent: z
         .string()
-        .describe('Content with bad words replaced (only if censorCharacter was provided)')
+        .describe('Content with bad words replaced (only if censorCharacter was provided)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,10 +53,11 @@ export let badWordFilterTool = SlateTool.create(spec, {
 
     return {
       output: {
-        isBad: result.isBad ?? false,
-        badWordsTotal: result.badWordsTotal ?? 0,
-        badWordsList: result.badWordsList ?? [],
-        censoredContent: result.censoredContent ?? ''
+        raw: result.raw,
+        isBad: result.isBad,
+        badWordsTotal: result.badWordsTotal,
+        badWordsList: result.badWordsList,
+        censoredContent: result.censoredContent
       },
       message: result.isBad
         ? `⚠️ Detected **${result.badWordsTotal}** bad word(s) in the content.${result.censoredContent ? ' Censored version available.' : ''}`

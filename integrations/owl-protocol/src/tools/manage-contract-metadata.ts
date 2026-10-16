@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { OwlClient } from '../lib/client';
+import {
+  OwlClient,
+  owlNumber,
+  owlObject,
+  owlString,
+  requireChainId,
+  requireInput,
+  requireMetadata
+} from '../lib/client';
+import { listInputSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getContractMetadata = SlateTool.create(spec, {
@@ -20,6 +29,7 @@ export let getContractMetadata = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       chainId: z.number().optional().describe('Chain ID'),
       contractAddress: z.string().optional().describe('Contract address'),
       name: z.string().optional().describe('Contract name'),
@@ -30,10 +40,8 @@ export let getContractMetadata = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let chainId = ctx.input.chainId ?? ctx.config.chainId;
-    if (!chainId) {
-      throw new Error('chainId is required.');
-    }
+    let chainId = requireChainId(ctx.input.chainId ?? ctx.config.chainId);
+    requireInput(ctx.input.contractAddress, 'contractAddress');
 
     let result = await client.getContractMetadata({
       chainId,
@@ -42,11 +50,13 @@ export let getContractMetadata = SlateTool.create(spec, {
 
     return {
       output: {
-        chainId: result.chainId ?? chainId,
-        contractAddress: result.address ?? ctx.input.contractAddress,
-        name: result.name,
-        symbol: result.symbol,
-        metadata: result.metadata ?? result
+        raw: result,
+        chainId: result.chainId === undefined ? chainId : owlNumber(result.chainId),
+        contractAddress:
+          result.address === undefined ? ctx.input.contractAddress : owlString(result.address),
+        name: owlString(result.name) ?? owlString(owlObject(result.metadata)?.name),
+        symbol: owlString(result.symbol),
+        metadata: result.metadata === undefined ? result : owlObject(result.metadata)
       },
       message: `Retrieved metadata for contract \`${ctx.input.contractAddress}\` on chain ${chainId}.`
     };
@@ -73,6 +83,7 @@ export let updateContractMetadata = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       chainId: z.number().optional().describe('Chain ID'),
       contractAddress: z.string().optional().describe('Contract address'),
       metadata: z
@@ -84,16 +95,15 @@ export let updateContractMetadata = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let chainId = ctx.input.chainId ?? ctx.config.chainId;
-    if (!chainId) {
-      throw new Error('chainId is required.');
-    }
+    let chainId = requireChainId(ctx.input.chainId ?? ctx.config.chainId);
+    requireInput(ctx.input.contractAddress, 'contractAddress');
 
     ctx.info({
       message: 'Updating contract metadata',
       contractAddress: ctx.input.contractAddress
     });
 
+    requireMetadata(ctx.input.metadata);
     let result = await client.patchContractMetadata({
       chainId,
       contractAddress: ctx.input.contractAddress,
@@ -102,9 +112,11 @@ export let updateContractMetadata = SlateTool.create(spec, {
 
     return {
       output: {
-        chainId: result.chainId ?? chainId,
-        contractAddress: result.address ?? ctx.input.contractAddress,
-        metadata: result.metadata ?? result
+        raw: result,
+        chainId: result.chainId === undefined ? chainId : owlNumber(result.chainId),
+        contractAddress:
+          result.address === undefined ? ctx.input.contractAddress : owlString(result.address),
+        metadata: result.metadata === undefined ? result : owlObject(result.metadata)
       },
       message: `Updated metadata for contract \`${ctx.input.contractAddress}\` on chain ${chainId}.`
     };
@@ -114,15 +126,16 @@ export let updateContractMetadata = SlateTool.create(spec, {
 export let listContracts = SlateTool.create(spec, {
   name: 'List Contracts',
   key: 'list_contracts',
-  description: `List all deployed smart contracts and their metadata within the project. Returns contract addresses, names, symbols, and chain information.`,
+  description: `List a page of contract metadata records within the project. Use list_project_contracts to discover deployed contract addresses and chain IDs.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(listInputSchema)
   .output(
     z.object({
+      raw: rawSchema,
       contracts: z
         .array(
           z.object({
@@ -142,28 +155,19 @@ export let listContracts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let result = await client.listContractsMetadata();
-    let contracts = Array.isArray(result) ? result : (result.items ?? []);
+    let contracts = await client.listContractsMetadata(ctx.input);
 
-    let mapped = contracts.map(
-      (c: {
-        chainId?: number;
-        address?: string;
-        name?: string;
-        symbol?: string;
-        metadata?: Record<string, unknown>;
-      }) => ({
-        chainId: c.chainId,
-        contractAddress: c.address,
-        name: c.name,
-        symbol: c.symbol,
-        metadata: c.metadata
-      })
-    );
+    let mapped = contracts.map(c => ({
+      chainId: owlNumber(c.chainId),
+      contractAddress: owlString(c.address),
+      name: owlString(c.name) ?? owlString(owlObject(c.metadata)?.name),
+      symbol: owlString(c.symbol),
+      metadata: owlObject(c.metadata)
+    }));
 
     return {
-      output: { contracts: mapped },
-      message: `Found **${mapped.length}** deployed contract(s).`
+      output: { contracts: mapped, raw: contracts },
+      message: `Found **${mapped.length}** contract metadata record(s).`
     };
   })
   .build();

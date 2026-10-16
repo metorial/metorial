@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,7 +20,7 @@ export let manageDomain = SlateTool.create(spec, {
 - **delete**: Remove a domain
 Custom domains require a paid plan. After creating, configure the DNS records and then verify.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -51,7 +51,8 @@ Custom domains require a paid plan. After creating, configure the DNS records an
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.domain) throw new Error('domain is required for create action');
+      if (!ctx.input.domain)
+        throw createApiServiceError('domain is required for create action');
 
       let domain = await client.createDomain(
         ctx.input.domain,
@@ -70,7 +71,8 @@ Custom domains require a paid plan. After creating, configure the DNS records an
     }
 
     if (ctx.input.action === 'verify') {
-      if (!ctx.input.domainId) throw new Error('domainId is required for verify action');
+      if (!ctx.input.domainId)
+        throw createApiServiceError('domainId is required for verify action');
 
       let domain = await client.verifyDomain(ctx.input.domainId);
 
@@ -86,7 +88,8 @@ Custom domains require a paid plan. After creating, configure the DNS records an
     }
 
     // delete
-    if (!ctx.input.domainId) throw new Error('domainId is required for delete action');
+    if (!ctx.input.domainId)
+      throw createApiServiceError('domainId is required for delete action');
     await client.deleteDomain(ctx.input.domainId);
 
     return {

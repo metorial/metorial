@@ -23,7 +23,7 @@ export let listTeamMembers = SlateTool.create(spec, {
       totalCount: z.number().describe('Total number of team members'),
       members: z.array(
         z.object({
-          username: z.string().describe('Member username'),
+          username: z.string().optional().describe('Member username, when returned'),
           userId: z.string().describe('Member user ID'),
           role: z.string().describe('Member role in the team')
         })

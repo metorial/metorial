@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { metricsEntrySchema } from '../lib/types';
+import { metricsEntrySchema, rawSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let getMetrics = SlateTool.create(spec, {
@@ -11,7 +11,8 @@ export let getMetrics = SlateTool.create(spec, {
   instructions: [
     'Metrics are aggregated hourly, then by day after 2 days, and by month after 40 days.',
     'When grouped by "time", keys are ISO 8601 timestamps. When grouped by "host", keys are location codes.',
-    'Defaults to the last month if no time range is specified.'
+    'Defaults to an aggregate for the last month when group and time range are omitted. Aggregate data is in summary; grouped entries retain provider keys in metrics.',
+    'Uptime is only returned when the provider supplies it; grouped responses do not support uptime.'
   ],
   constraints: ['Time range cannot exceed the retention period of your account.'],
   tags: {
@@ -32,15 +33,26 @@ export let getMetrics = SlateTool.create(spec, {
       group: z
         .enum(['time', 'host'])
         .optional()
-        .describe('Group metrics by time period or monitoring location. Defaults to "time".')
+        .describe(
+          'Group metrics by time period or monitoring location. Omit for aggregate metrics.'
+        )
     })
   )
   .output(
     z.object({
-      uptime: z.number().describe('Overall uptime percentage for the time range'),
+      uptime: z
+        .number()
+        .optional()
+        .describe('Overall uptime percentage, only when supplied by the provider'),
       metrics: z
         .record(z.string(), metricsEntrySchema)
-        .describe('Metrics grouped by time period or location code')
+        .describe(
+          'Metrics grouped by actual provider time keys or location codes; empty for an aggregate'
+        ),
+      summary: metricsEntrySchema
+        .optional()
+        .describe('Aggregate metrics when group is omitted'),
+      raw: rawSchema.optional().describe('Complete original metrics response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,7 +66,7 @@ export let getMetrics = SlateTool.create(spec, {
     let entryCount = Object.keys(result.metrics).length;
     return {
       output: result,
-      message: `Metrics for check \`${ctx.input.checkToken}\`: **${result.uptime}%** uptime across **${entryCount}** ${ctx.input.group === 'host' ? 'location(s)' : 'time period(s)'}.`
+      message: `Metrics for check \`${ctx.input.checkToken}\`: ${result.summary ? 'aggregate performance statistics' : `${entryCount} grouped entries`}${result.uptime !== undefined ? `; ${result.uptime}% uptime` : '; uptime is unavailable for this grouping'}.`
     };
   })
   .build();

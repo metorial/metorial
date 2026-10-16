@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import { FinmeiClient, optionalString, requireId } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCurrencies = SlateTool.create(spec, {
@@ -24,6 +24,7 @@ export let listCurrencies = SlateTool.create(spec, {
           })
         )
         .describe('List of supported currencies'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       count: z.number().describe('Total number of supported currencies')
     })
   )
@@ -32,18 +33,32 @@ export let listCurrencies = SlateTool.create(spec, {
 
     let result = await client.listCurrencies();
 
-    let rawCurrencies = result?.data ?? result?.currencies ?? result ?? [];
-    let currenciesArray = Array.isArray(rawCurrencies) ? rawCurrencies : [];
-
-    let currencies = currenciesArray.map((c: any) => ({
-      code: c.code ?? c.iso ?? c.id ?? String(c),
-      name: c.name,
-      symbol: c.symbol
-    }));
+    let values = Array.isArray(result)
+      ? result
+      : isApiErrorRecord(result)
+        ? (result.data ?? result.currencies)
+        : undefined;
+    if (!Array.isArray(values))
+      throw createApiServiceError(
+        'Finmei returned an invalid currencies list; expected an array.'
+      );
+    let currencies = values.map(value => {
+      if (typeof value === 'string') return { code: requireId(value, 'currency code') };
+      if (!isApiErrorRecord(value))
+        throw createApiServiceError('Finmei returned an invalid currency item.');
+      return {
+        code: requireId(value.code ?? value.iso ?? value.id, 'currency code'),
+        ...pickDefined({
+          name: optionalString(value.name, 'currency name'),
+          symbol: optionalString(value.symbol, 'currency symbol')
+        })
+      };
+    });
 
     return {
       output: {
         currencies,
+        rawResponse: result,
         count: currencies.length
       },
       message: `Found **${currencies.length}** supported currencies.`

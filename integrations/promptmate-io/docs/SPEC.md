@@ -1,6 +1,4 @@
-Now let me fetch the full API documentation to get more details on endpoints and webhooks.Now I have enough information to write the specification.
-
-# Slates Specification for Promptmate.io
+# Promptmate.io API Integration
 
 ## Overview
 
@@ -48,7 +46,7 @@ Retrieve the last result rows of an app, useful for fetching example outputs or 
 
 ### Reference Data
 
-List available languages and countries that can be used to configure app jobs for localized processing.
+`list_languages` returns the language strings documented by the provider for app job configuration. It replaces only the language portion of `list_reference_data`. The deprecated combined tool retains its legacy code/name object contract, without converting strings into invented codes. Country discovery remains reachable only through that combined call; its success is unverified and the language format mismatch may prevent it from returning countries. The official country response schema could not be retrieved during this audit.
 
 ### Projects
 
@@ -75,3 +73,11 @@ Promptmate.io supports webhooks that can be registered via the API. Webhooks are
 - **Restricted App IDs:** Webhooks can be restricted to specific apps. If no apps are defined, the webhook will be triggered for all apps.
 - **Endpoint URL:** The URL that will be called when the webhook fires.
 - **Webhook Reference:** A custom reference string for identifying the webhook.
+
+`list_webhooks` discovers subscriptions and `create_webhook` registers job or row callbacks. Webhook deletion remains outside the current public tool set because its endpoint details could not be retrieved from the official reference during this audit.
+
+## API Response Handling
+
+App results are returned under `resultData`; `get_app_results` exposes those rows and retains the complete provider response. The earlier bare-array response format remains accepted. Account profiles use the documented `displayName` and `email` fields, while existing `userId`, `userName`, and `name` values remain supported when present.
+
+Official API reference: https://apidoc.promptmate.io/

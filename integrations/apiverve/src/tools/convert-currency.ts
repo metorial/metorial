@@ -24,6 +24,7 @@ export let convertCurrency = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       fromCurrency: z.string().describe('Source currency code'),
       toCurrency: z.string().describe('Target currency code'),
       originalAmount: z.number().describe('Original amount'),
@@ -44,12 +45,9 @@ export let convertCurrency = SlateTool.create(spec, {
       ctx.input.toCurrency
     );
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'Currency conversion failed');
-    }
-
     let data = result.data;
     let output = {
+      rawData: data,
       fromCurrency: data.from,
       toCurrency: data.to,
       originalAmount: data.value,
@@ -60,8 +58,10 @@ export let convertCurrency = SlateTool.create(spec, {
     };
 
     return {
-      output,
-      message: `**${ctx.input.amount} ${data.from}** = **${data.convertedValue} ${data.to}** (rate: ${data.rate}).`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `**${ctx.input.amount} ${data.from}** = **${data.convertedValue} ${data.to}** (rate: ${data.rate}).`
+      )
     };
   })
   .build();

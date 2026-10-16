@@ -8,7 +8,13 @@ let timeOffRequestSchema = z.object({
   timeOffTypeName: z.string().describe('Type of time off (e.g. Vacation, Sick Leave)'),
   startDate: z.string().describe('Start date of the time off'),
   endDate: z.string().describe('End date of the time off'),
-  status: z.string().describe('Current status of the request')
+  status: z.string().optional().describe('Status string when returned by TalentHR'),
+  approved: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Approval decision returned by TalentHR; null when pending'),
+  isCanceled: z.boolean().optional().describe('Whether the request is canceled')
 });
 
 export let listTimeOffRequests = SlateTool.create(spec, {
@@ -33,13 +39,19 @@ Use this to review pending requests before approving or rejecting them.`,
         .number()
         .optional()
         .default(0)
-        .describe('Number of records to skip for pagination')
+        .describe('Number of records to skip for pagination'),
+      sort: z
+        .enum(['id', 'timeoff_type_name', 'created_at'])
+        .optional()
+        .describe('Field to sort by')
     })
   )
   .output(
     z.object({
       requests: z.array(timeOffRequestSchema).describe('List of time off requests'),
-      count: z.number().describe('Number of requests returned')
+      count: z.number().describe('Number of requests returned on this page'),
+      total: z.number().optional().describe('Total requests reported by TalentHR'),
+      rawResponse: z.any().optional().describe('Full API response')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,7 +59,8 @@ Use this to review pending requests before approving or rejecting them.`,
 
     let response = await client.listTimeOffRequests(ctx.input.employeeId, {
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      sort: ctx.input.sort
     });
 
     let requests = response.data.rows.map(req => ({
@@ -55,13 +68,17 @@ Use this to review pending requests before approving or rejecting them.`,
       timeOffTypeName: req.timeoff_type_name,
       startDate: req.start_date,
       endDate: req.end_date,
-      status: req.status
+      status: req.status,
+      approved: req.approved,
+      isCanceled: req.is_canceled
     }));
 
     return {
       output: {
         requests,
-        count: requests.length
+        count: requests.length,
+        total: response.data.total,
+        rawResponse: response
       },
       message: `Retrieved **${requests.length}** time off request(s) for employee ${ctx.input.employeeId}.`
     };

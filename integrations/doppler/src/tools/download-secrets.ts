@@ -6,13 +6,15 @@ import { spec } from '../spec';
 export let downloadSecrets = SlateTool.create(spec, {
   name: 'Download Secrets',
   key: 'download_secrets',
-  description: `Download all computed secret values from a Doppler project config as a flat key-value map. Optionally include dynamic secrets with configurable TTL. Useful for exporting secrets for local development, CI/CD pipelines, or deployment scripts.`,
+  description: `DEPRECATED — use \`export_secrets\` instead. Download all computed secret values from a Doppler project config as a flat key-value map. Optionally include dynamic secrets with configurable TTL. Useful for exporting secrets for local development, CI/CD pipelines, or deployment scripts.`,
   instructions: [
+    'Use export_secrets for a downloadable file. This legacy tool retains its key-value output for existing callers.',
     'Provide the project and config to download secrets from.',
     'Optionally filter to specific secret names.',
     'Enable includeDynamicSecrets to also issue dynamic secret leases.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

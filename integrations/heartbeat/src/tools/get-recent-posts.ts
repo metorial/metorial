@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getRecentPosts = SlateTool.create(spec, {
   name: 'Get Recent Posts',
   key: 'get_recent_posts',
-  description: `Retrieves the most recently created threads in your Heartbeat community. Can filter by channel. "Recent" refers to creation timestamp — only the most recently created posts are returned.`,
+  description: `DEPRECATED — use \`list_channel_threads\` instead. Retrieves the most recently created threads in your Heartbeat community. Can filter by channel. "Recent" refers to creation timestamp — only the most recently created posts are returned.`,
+  instructions: [
+    'Use list_channel_threads instead. The documented thread listing requires a channel ID and returns an array; community-wide listing and hasMore are not documented.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

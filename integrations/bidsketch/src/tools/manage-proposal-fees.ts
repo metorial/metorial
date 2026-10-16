@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import {
+  readBidsketchBoolean,
+  readBidsketchNumber,
+  readBidsketchString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let proposalFeeSchema = z.object({
@@ -21,7 +26,7 @@ let proposalFeeSchema = z.object({
 export let listProposalFees = SlateTool.create(spec, {
   name: 'List Proposal Fees',
   key: 'list_proposal_fees',
-  description: `Retrieve all fee items within a specific proposal. Returns both required and optional fees with amounts and totals.`,
+  description: `Retrieve fee summaries within a specific proposal, including required and optional fees with totals. Use get_proposal_fee for per-unit amounts and full details omitted from summaries.`,
   tags: {
     readOnly: true
   }
@@ -33,26 +38,35 @@ export let listProposalFees = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      fees: z.array(proposalFeeSchema).describe('List of proposal fees')
+      fees: z
+        .array(
+          proposalFeeSchema.extend({
+            amount: proposalFeeSchema.shape.amount.optional(),
+            appUrl: proposalFeeSchema.shape.appUrl.optional()
+          })
+        )
+        .describe('List of proposal fees')
     })
   )
   .handleInvocation(async ctx => {
     let client = new BidsketchClient(ctx.auth.token);
     let data = await client.listProposalFees(ctx.input.proposalId);
 
-    let fees = (Array.isArray(data) ? data : []).map((f: any) => ({
-      feeId: f.id,
-      name: f.name,
-      feeType: f.feetype,
-      amount: f.amount,
+    let fees = data.map((f: any) => ({
+      feeId: readBidsketchNumber(f.id, 'id'),
+      name: readBidsketchString(f.name, 'name'),
+      feeType: readBidsketchString(f.feetype, 'feetype'),
+      ...(f.amount === undefined && f.unit_amount === undefined
+        ? {}
+        : { amount: readBidsketchNumber(f.amount ?? f.unit_amount, 'amount') }),
       quantity: f.quantity ?? null,
       total: f.total ?? null,
       unit: f.unit ?? null,
-      optional: f.optional ?? false,
+      optional: readBidsketchBoolean(f.optional, 'optional'),
       description: f.description ?? null,
       currency: f.currency ?? null,
-      url: f.url,
-      appUrl: f.app_url
+      url: readBidsketchString(f.url, 'url'),
+      ...(f.app_url === undefined ? {} : { appUrl: readBidsketchString(f.app_url, 'app_url') })
     }));
 
     return {
@@ -102,18 +116,18 @@ export let addProposalFee = SlateTool.create(spec, {
 
     return {
       output: {
-        feeId: f.id,
-        name: f.name,
-        feeType: f.feetype,
-        amount: f.amount,
+        feeId: readBidsketchNumber(f.id, 'id'),
+        name: readBidsketchString(f.name, 'name'),
+        feeType: readBidsketchString(f.feetype, 'feetype'),
+        amount: readBidsketchNumber(f.amount ?? f.unit_amount, 'amount'),
         quantity: f.quantity ?? null,
         total: f.total ?? null,
         unit: f.unit ?? null,
-        optional: f.optional ?? false,
+        optional: readBidsketchBoolean(f.optional, 'optional'),
         description: f.description ?? null,
         currency: f.currency ?? null,
-        url: f.url,
-        appUrl: f.app_url
+        url: readBidsketchString(f.url, 'url'),
+        appUrl: readBidsketchString(f.app_url, 'app_url')
       },
       message: `Added fee **${f.name}** (${f.feetype}) to proposal ${ctx.input.proposalId}.`
     };
@@ -161,18 +175,18 @@ export let updateProposalFee = SlateTool.create(spec, {
 
     return {
       output: {
-        feeId: f.id,
-        name: f.name,
-        feeType: f.feetype,
-        amount: f.amount,
+        feeId: readBidsketchNumber(f.id, 'id'),
+        name: readBidsketchString(f.name, 'name'),
+        feeType: readBidsketchString(f.feetype, 'feetype'),
+        amount: readBidsketchNumber(f.amount ?? f.unit_amount, 'amount'),
         quantity: f.quantity ?? null,
         total: f.total ?? null,
         unit: f.unit ?? null,
-        optional: f.optional ?? false,
+        optional: readBidsketchBoolean(f.optional, 'optional'),
         description: f.description ?? null,
         currency: f.currency ?? null,
-        url: f.url,
-        appUrl: f.app_url
+        url: readBidsketchString(f.url, 'url'),
+        appUrl: readBidsketchString(f.app_url, 'app_url')
       },
       message: `Updated fee **${f.name}** in proposal ${ctx.input.proposalId}.`
     };

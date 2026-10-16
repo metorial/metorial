@@ -1,7 +1,34 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  terms: z
+    .array(
+      z.object({
+        text: z.string().describe('Suggested search term')
+      })
+    )
+    .describe('Autocomplete term suggestions'),
+  businesses: z
+    .array(
+      z.object({
+        businessId: z.string().describe('Yelp business ID'),
+        name: z.string().describe('Business name')
+      })
+    )
+    .describe('Autocomplete business suggestions'),
+  categories: z
+    .array(
+      z.object({
+        alias: z.string().describe('Category alias identifier'),
+        title: z.string().describe('Display title of the category')
+      })
+    )
+    .describe('Autocomplete category suggestions')
+});
 
 export let autocomplete = SlateTool.create(spec, {
   name: 'Autocomplete',
@@ -25,33 +52,7 @@ export let autocomplete = SlateTool.create(spec, {
       locale: z.string().optional().describe('Locale code (e.g., "en_US")')
     })
   )
-  .output(
-    z.object({
-      terms: z
-        .array(
-          z.object({
-            text: z.string().describe('Suggested search term')
-          })
-        )
-        .describe('Autocomplete term suggestions'),
-      businesses: z
-        .array(
-          z.object({
-            businessId: z.string().describe('Yelp business ID'),
-            name: z.string().describe('Business name')
-          })
-        )
-        .describe('Autocomplete business suggestions'),
-      categories: z
-        .array(
-          z.object({
-            alias: z.string().describe('Category alias identifier'),
-            title: z.string().describe('Display title of the category')
-          })
-        )
-        .describe('Autocomplete category suggestions')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -61,21 +62,23 @@ export let autocomplete = SlateTool.create(spec, {
       locale: ctx.input.locale
     });
 
-    let businesses = (result.businesses || []).map((b: any) => ({
-      businessId: b.id,
-      name: b.name
-    }));
+    return mapYelpOutput(outputSchema, () => {
+      let businesses = result.businesses.map((b: any) => ({
+        businessId: b.id,
+        name: b.name
+      }));
 
-    let terms = result.terms || [];
-    let categories = result.categories || [];
+      let terms = result.terms;
+      let categories = result.categories;
 
-    return {
-      output: {
-        terms,
-        businesses,
-        categories
-      },
-      message: `Autocomplete for "${ctx.input.text}": ${terms.length} terms, ${businesses.length} businesses, ${categories.length} categories.`
-    };
+      return {
+        output: {
+          terms,
+          businesses,
+          categories
+        },
+        message: `Autocomplete for "${ctx.input.text}": ${terms.length} terms, ${businesses.length} businesses, ${categories.length} categories.`
+      };
+    });
   })
   .build();

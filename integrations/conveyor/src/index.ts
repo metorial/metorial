@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   askQuestion,
+  createDocument,
   createFolder,
+  createKnowledgeBaseQuestion,
   createQuestionnaireRequest,
   deleteDocument,
   deleteFolder,
@@ -17,11 +19,18 @@ import {
   listFolders,
   listInteractions,
   listKnowledgeBaseQuestions,
+  listOneOffQuestions,
   listProductLines,
+  listProjects,
+  listQuestionnaireQuestions,
   listQuestionnaires,
+  listQuestionTags,
+  searchKnowledgeBase,
   submitQuestionnaire,
   updateAuthorization,
   updateDocument,
+  updateKnowledgeBaseQuestion,
+  updateQuestionnaire,
   updateQuestionnaireRequest
 } from './tools';
 export let provider = Slate.create({
@@ -41,6 +50,7 @@ export let provider = Slate.create({
     listFolders,
     createFolder,
     deleteFolder,
+    createDocument,
     listDocuments,
     updateDocument,
     deleteDocument,
@@ -48,7 +58,15 @@ export let provider = Slate.create({
     submitQuestionnaire,
     createQuestionnaireRequest,
     updateQuestionnaireRequest,
-    askQuestion
+    askQuestion,
+    searchKnowledgeBase,
+    listQuestionTags,
+    createKnowledgeBaseQuestion,
+    updateKnowledgeBaseQuestion,
+    listOneOffQuestions,
+    listQuestionnaireQuestions,
+    updateQuestionnaire,
+    listProjects
   ],
   triggers: []
 });

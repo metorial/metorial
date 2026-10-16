@@ -15,6 +15,10 @@ export let createQuestion = SlateTool.create(spec, {
         .enum([
           'manual',
           'manualnumeric',
+          'manualmultiline',
+          'barcode',
+          'barcodemultiline',
+          'barcodenumeric',
           'option',
           'checkbox',
           'dropdown',

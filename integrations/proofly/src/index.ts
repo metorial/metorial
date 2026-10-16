@@ -4,6 +4,7 @@ import {
   createConversion,
   getActivityLogs,
   getCampaignNotifications,
+  getNotification,
   getNotificationData,
   getUserInfo,
   listCampaigns,
@@ -18,6 +19,7 @@ export let provider = Slate.create({
     getCampaignNotifications,
     toggleCampaign,
     getNotificationData,
+    getNotification,
     createConversion
   ],
   triggers: []

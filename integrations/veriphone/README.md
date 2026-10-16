@@ -1,6 +1,12 @@
 # Veriphone
 
-Validate, format, and enrich phone numbers worldwide. Verify if a phone number is valid and retrieve metadata including country, region, carrier, line type (mobile, landline, toll-free, etc.), and formatted representations (international, local, E.164). Generate example phone numbers for any country and phone type combination for testing purposes.
+Validate, format, and enrich phone numbers worldwide. Retrieve country, region, original carrier, line type, and international, local, and E.164 formats. Generate example numbers for testing, check account credits, inspect current carrier lookup coverage, and look up the carrier serving a number today.
+
+For CSV lists, upload the content, inspect the column samples, start verification, poll its status, and download the CSV. Existing uploads can be listed, inspected, downloaded, or permanently deleted. Downloads return verified results when available and otherwise the original input.
+
+Static verification spends one credit per successful lookup. Current carrier lookups spend ten credits when resolved and one when current resolution is unavailable. A valid number is not proof that the number is in use or that a device is reachable.
+
+See the [integration reference](docs/SPEC.md) and [official API documentation](https://veriphone.io/docs/v3).
 
 ## License
 

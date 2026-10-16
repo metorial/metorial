@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCoinDetails = SlateTool.create(spec, {
@@ -27,6 +28,9 @@ export let getCoinDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       coinUuid: z.string().describe('Unique identifier of the coin'),
       symbol: z.string().describe('Ticker symbol'),
       name: z.string().describe('Full name'),
@@ -94,44 +98,45 @@ export let getCoinDetails = SlateTool.create(spec, {
     let coin = result.data.coin;
 
     let output = {
+      rawData: result.data,
       coinUuid: coin.uuid,
       symbol: coin.symbol,
       name: coin.name,
-      description: coin.description || null,
-      color: coin.color || null,
-      iconUrl: coin.iconUrl || null,
-      websiteUrl: coin.websiteUrl || null,
-      price: coin.price || null,
-      btcPrice: coin.btcPrice || null,
-      marketCap: coin.marketCap || null,
-      fullyDilutedMarketCap: coin.fullyDilutedMarketCap || null,
-      volume24h: coin['24hVolume'] || null,
-      change: coin.change || null,
+      description: coin.description ?? null,
+      color: coin.color ?? null,
+      iconUrl: coin.iconUrl ?? null,
+      websiteUrl: coin.websiteUrl ?? null,
+      price: coin.price ?? null,
+      btcPrice: coin.btcPrice ?? null,
+      marketCap: coin.marketCap ?? null,
+      fullyDilutedMarketCap: coin.fullyDilutedMarketCap ?? null,
+      volume24h: coin['24hVolume'] ?? null,
+      change: coin.change ?? null,
       rank: coin.rank ?? null,
       numberOfMarkets: coin.numberOfMarkets ?? null,
       numberOfExchanges: coin.numberOfExchanges ?? null,
       supply: {
         confirmed: coin.supply?.confirmed ?? null,
         supplyAt: coin.supply?.supplyAt ?? null,
-        circulating: coin.supply?.circulating || null,
-        total: coin.supply?.total || null,
-        max: coin.supply?.max || null
+        circulating: coin.supply?.circulating ?? null,
+        total: coin.supply?.total ?? null,
+        max: coin.supply?.max ?? null
       },
       allTimeHigh: {
-        price: coin.allTimeHigh?.price || null,
+        price: coin.allTimeHigh?.price ?? null,
         timestamp: coin.allTimeHigh?.timestamp ?? null
       },
-      links: (coin.links || []).map((l: any) => ({
-        name: l.name || '',
-        url: l.url || '',
-        type: l.type || ''
+      links: coin.links.map(l => ({
+        name: l.name,
+        url: l.url,
+        type: l.type
       })),
-      tags: (coin.tags || []).map((t: any) => (typeof t === 'string' ? t : t.name || ''))
+      tags: coin.tags.map(t => (typeof t === 'string' ? t : t.name))
     };
 
     return {
       output,
-      message: `**${coin.name}** (${coin.symbol}) — Price: ${coin.price || 'N/A'}, Rank: #${coin.rank || 'N/A'}, Market Cap: ${coin.marketCap || 'N/A'}, Change: ${coin.change || 'N/A'}%`
+      message: `**${coin.name}** (${coin.symbol}) — Price: ${coin.price ?? 'N/A'}, Rank: #${coin.rank ?? 'N/A'}, Market Cap: ${coin.marketCap ?? 'N/A'}, Change: ${coin.change ?? 'N/A'}%`
     };
   })
   .build();

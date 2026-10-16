@@ -1,6 +1,6 @@
 {
   "name": "@metorial/plisio",
-  "description": "Create cryptocurrency payment invoices, process withdrawals, and manage balances across 30+ cryptocurrencies. Send single or mass payouts to external wallets, estimate network fees, look up exchange rates against 167 fiat currencies, and retrieve fee plans. Create permanent deposit addresses, view transaction history, list supported cryptocurrencies, and receive webhook callbacks for invoice status updates. Supports white-label payment page customization for custom-built payment UIs.",
+  "description": "Create and retrieve cryptocurrency invoices, send single or mass payouts, and inspect balances, exchange rates, fees, and transaction history. Identify the connected shop and create or list permanent deposit addresses when white-label processing is enabled. Configure invoice callbacks to your own service.",
   "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
   "skills": [
     "create crypto invoices",
@@ -12,7 +12,9 @@
     "retrieve transaction history",
     "create deposit addresses",
     "list supported cryptocurrencies",
-    "receive invoice status callbacks"
+    "retrieve invoices",
+    "identify connected shop",
+    "list deposit addresses"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/plisio.svg"
 }

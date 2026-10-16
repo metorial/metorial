@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let deleteEvent = SlateTool.create(spec, {
@@ -27,7 +27,7 @@ export let deleteEvent = SlateTool.create(spec, {
     let result = await client.deleteEvent(ctx.input.instanceId);
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `Deleted event instance (ID: ${ctx.input.instanceId}).`
     };
   })

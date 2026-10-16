@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getWinProbability = SlateTool.create(spec, {
   name: 'Get Win Probability',
   key: 'get_win_probability',
-  description: `Retrieve win probability data for college football games. Get play-by-play win probability for a specific game, or pregame win probabilities for a set of games. Also supports PPA (Predicted Points Added) data at team and player level.`,
+  description: `Retrieve win probability data for college football games. Get play-by-play win probability for a specific game, or pregame win probabilities for a set of games. Also supports PPA (Predicted Points Added) data at team season level.`,
   tags: {
     readOnly: true
   }
@@ -44,10 +44,19 @@ export let getWinProbability = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.gameId === undefined &&
+      !ctx.input.includePregame &&
+      !ctx.input.includeTeamPPA
+    ) {
+      throw createApiServiceError('Select at least one result to retrieve.', {
+        reason: 'no_result_selected'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
     let results: any = {};
 
-    if (ctx.input.gameId) {
+    if (ctx.input.gameId !== undefined) {
       results.playWinProbability = await client.getWinProbability({
         gameId: ctx.input.gameId
       });

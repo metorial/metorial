@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PoofClient } from '../lib/client';
+import { getPoofPaymentUrl, PoofClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createCheckout = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createCheckout = SlateTool.create(spec, {
   key: 'create_checkout',
   description: `Create a hosted checkout session for collecting payments. Generates a checkout URL that customers can visit to complete a payment. Supports optional form fields (Email, Name), product attachments with quantities, custom redirect URLs, and metadata.`,
   instructions: [
-    "The username field defaults to the authenticated user's username if configured.",
+    'Provide the merchant username explicitly in username.',
     'Use the fields parameter to collect customer information like Email or Name.',
     'Use disablePayments to exclude specific payment methods from the checkout.'
   ],
@@ -74,10 +74,7 @@ export let createCheckout = SlateTool.create(spec, {
       metadata: ctx.input.metadata
     });
 
-    let checkoutUrl =
-      typeof result === 'string'
-        ? result
-        : result?.checkout_url || result?.url || JSON.stringify(result);
+    let checkoutUrl = getPoofPaymentUrl(result, ['checkout_url', 'url']);
 
     return {
       output: {

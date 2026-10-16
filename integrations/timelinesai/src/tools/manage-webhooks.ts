@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 let webhookSchema = z.object({
@@ -17,8 +17,8 @@ export let manageWebhooks = SlateTool.create(spec, {
   description: `List, create, update, or delete webhooks for real-time event notifications. Webhooks deliver events such as new messages, new chats, and chat renames to a specified HTTPS endpoint.`,
   instructions: [
     'Set the action to "list", "create", "get", "update", or "delete".',
-    'Supported event types include: message:sent:new, message:received:new, chat.created, chat.renamed, whatsapp_account.created.',
-    'Maximum of 10 webhooks per workspace.'
+    'Use provider-documented event names, for example message:sent:new or message:received:new.',
+    'Webhook limits depend on your workspace subscription.'
   ],
   tags: {
     destructive: false,
@@ -38,7 +38,7 @@ export let manageWebhooks = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Event type (for create/update). E.g., message:sent:new, message:received:new, chat.created'
+          'Event type (for create/update). E.g., message:sent:new or message:received:new'
         ),
       url: z.string().optional().describe('HTTPS endpoint URL (for create/update)'),
       enabled: z
@@ -76,7 +76,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listWebhooks();
-      let webhooks = (result?.data || []).map(mapWebhook);
+      let webhooks = requireArray(result?.data, 'webhooks').map(mapWebhook);
       return {
         output: { webhooks },
         message: `Found **${webhooks.length}** webhook(s).`
@@ -84,8 +84,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!eventType) throw new Error('eventType is required for create action');
-      if (!url) throw new Error('url is required for create action');
+      if (!eventType) throw createApiServiceError('eventType is required for create action');
+      if (!url) throw createApiServiceError('url is required for create action');
       let result = await client.createWebhook({ eventType, url, enabled });
       let webhook = mapWebhook(result?.data || result);
       return {
@@ -95,7 +95,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!webhookId) throw new Error('webhookId is required for get action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for get action');
       let result = await client.getWebhook(webhookId);
       let webhook = mapWebhook(result?.data || result);
       return {
@@ -105,7 +105,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!webhookId) throw new Error('webhookId is required for update action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for update action');
       let result = await client.updateWebhook(webhookId, { eventType, url, enabled });
       let webhook = mapWebhook(result?.data || result);
       return {
@@ -115,7 +115,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!webhookId) throw new Error('webhookId is required for delete action');
+      if (!webhookId) throw createApiServiceError('webhookId is required for delete action');
       await client.deleteWebhook(webhookId);
       return {
         output: { deleted: true },
@@ -123,6 +123,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

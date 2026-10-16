@@ -28,13 +28,13 @@ export let deleteGroup = SlateTool.create(spec, {
     if (ctx.input.action === 'delete') {
       let result = await client.deleteGroup(ctx.input.groupId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Deleted group ${ctx.input.groupId}`
       };
     } else {
       let result = await client.restoreGroup(ctx.input.groupId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Restored group ${ctx.input.groupId}`
       };
     }

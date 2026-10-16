@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { programIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let webhookEventTypes = z.enum([
@@ -17,10 +18,18 @@ let webhookEventTypes = z.enum([
   'transaction.clearing.qualified',
   'transaction.refund',
   'transaction.refund.qualified',
-  'transaction.refund.match.qualified'
+  'transaction.refund.match.qualified',
+  'credits.balance.low',
+  'mid-request.succeeded',
+  'mid-request.failed',
+  'missing-transaction-request.succeeded',
+  'missing-transaction-request.failed',
+  'offer-location.linked',
+  'offer-location.unlinked'
 ]);
 
-let webhookSchema = z.object({
+export let webhookSchema = z.object({
+  raw: z.record(z.string(), z.any()).optional().describe('Complete provider resource'),
   webhookId: z.string().describe('Unique identifier of the webhook'),
   programId: z.string().optional().describe('ID of the program the webhook belongs to'),
   accountId: z.string().optional().describe('Account ID'),
@@ -35,7 +44,7 @@ let webhookSchema = z.object({
 export let createWebhook = SlateTool.create(spec, {
   name: 'Create Webhook',
   key: 'create_webhook',
-  description: `Creates a new webhook subscription for a specific event type in a Program. When the event occurs, Fidel API sends an HTTP POST to the specified URL. You can have up to 5 webhooks per event type per program.`,
+  description: `Creates a new webhook subscription for a specific event type in a Program. When the event occurs, Fidel API sends an HTTP POST to the specified URL. Use an HTTPS destination. Brand consent and offer-location events are account-scoped; program events use the supplied Program.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -43,9 +52,11 @@ export let createWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program to create the webhook for'),
+      programId: programIdInput,
       event: webhookEventTypes.describe('Event type to subscribe to'),
-      url: z.string().describe('URL endpoint that will receive the webhook POST requests')
+      offerId: z.string().optional().describe('Filter qualified transaction events by offer'),
+      headers: z.record(z.string(), z.string()).optional().describe('Custom HTTP headers'),
+      url: z.string().describe('HTTPS endpoint that will receive the webhook POST requests')
     })
   )
   .output(webhookSchema)
@@ -53,18 +64,21 @@ export let createWebhook = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let webhook = await client.createWebhook(ctx.input.programId, {
       event: ctx.input.event,
-      url: ctx.input.url
+      url: ctx.input.url,
+      offerId: ctx.input.offerId,
+      headers: ctx.input.headers
     });
 
     return {
       output: {
+        raw: webhook,
         webhookId: webhook.id,
-        programId: webhook.programId,
-        accountId: webhook.accountId,
+        programId: webhook.programId ?? undefined,
+        accountId: webhook.accountId ?? undefined,
         event: webhook.event,
         url: webhook.url,
         live: webhook.live,
-        secretKey: webhook.secretKey,
+        secretKey: webhook.secretKey ?? undefined,
         created: webhook.created,
         updated: webhook.updated
       },
@@ -84,33 +98,40 @@ export let listWebhooks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program to list webhooks for'),
+      programId: programIdInput,
       start: z.number().optional().describe('Offset for pagination'),
+      event: z.string().optional().describe('Filter by webhook event'),
       limit: z.number().optional().describe('Maximum number of webhooks to return')
     })
   )
   .output(
     z.object({
       webhooks: z.array(webhookSchema).describe('List of webhooks'),
-      count: z.number().optional().describe('Total number of webhooks')
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response before applying a local offset'),
+      count: z.number().optional().describe('Number of webhooks reported by Fidel')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listWebhooks(ctx.input.programId, {
       start: ctx.input.start,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      event: ctx.input.event
     });
 
     let items = data?.items ?? [];
     let webhooks = items.map((w: any) => ({
+      raw: w,
       webhookId: w.id,
-      programId: w.programId,
-      accountId: w.accountId,
+      programId: w.programId ?? undefined,
+      accountId: w.accountId ?? undefined,
       event: w.event,
       url: w.url,
       live: w.live,
-      secretKey: w.secretKey,
+      secretKey: w.secretKey ?? undefined,
       created: w.created,
       updated: w.updated
     }));
@@ -118,7 +139,8 @@ export let listWebhooks = SlateTool.create(spec, {
     return {
       output: {
         webhooks,
-        count: data?.resource?.total ?? webhooks.length
+        count: data?.count,
+        raw: data.rawResponse ?? data
       },
       message: `Found **${webhooks.length}** webhook(s) in program \`${ctx.input.programId}\`.`
     };
@@ -137,7 +159,7 @@ export let deleteWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       webhookId: z.string().describe('ID of the webhook to delete'),
-      programId: z.string().describe('ID of the program the webhook belongs to')
+      programId: programIdInput
     })
   )
   .output(
@@ -172,9 +194,11 @@ export let updateWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       webhookId: z.string().describe('ID of the webhook to update'),
-      programId: z.string().describe('ID of the program the webhook belongs to'),
+      programId: programIdInput,
       event: webhookEventTypes.optional().describe('New event type'),
-      url: z.string().optional().describe('New URL endpoint')
+      offerId: z.string().optional().describe('Filter qualified transaction events by offer'),
+      headers: z.record(z.string(), z.string()).optional().describe('Custom HTTP headers'),
+      url: z.string().optional().describe('New HTTPS URL endpoint')
     })
   )
   .output(webhookSchema)
@@ -182,18 +206,21 @@ export let updateWebhook = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let webhook = await client.updateWebhook(ctx.input.webhookId, ctx.input.programId, {
       event: ctx.input.event,
-      url: ctx.input.url
+      url: ctx.input.url,
+      offerId: ctx.input.offerId,
+      headers: ctx.input.headers
     });
 
     return {
       output: {
+        raw: webhook,
         webhookId: webhook.id,
-        programId: webhook.programId,
-        accountId: webhook.accountId,
+        programId: webhook.programId ?? undefined,
+        accountId: webhook.accountId ?? undefined,
         event: webhook.event,
         url: webhook.url,
         live: webhook.live,
-        secretKey: webhook.secretKey,
+        secretKey: webhook.secretKey ?? undefined,
         created: webhook.created,
         updated: webhook.updated
       },

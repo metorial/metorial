@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateHistoryRange } from '../lib/validation';
 import { spec } from '../spec';
 
 let soilRecordSchema = z
@@ -52,7 +53,8 @@ export let getSoil = SlateTool.create(spec, {
     });
 
     let result: any;
-    let isHistorical = ctx.input.from && ctx.input.to;
+    validateHistoryRange(ctx.input.from, ctx.input.to);
+    let isHistorical = ctx.input.from !== undefined && ctx.input.to !== undefined;
 
     if (isHistorical) {
       result = await client.getSoilHistory(

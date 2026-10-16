@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { supervisedReference } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -26,13 +27,20 @@ Provide input data as field-value pairs. Returns the predicted outcome along wit
           'Input data as field name or field ID to value mapping (e.g., {"sepal length": 5.1, "sepal width": 3.5})'
         ),
       name: z.string().optional().describe('Name for the prediction'),
+      explain: z.boolean().optional().describe('Request a prediction explanation'),
+      projectId: z
+        .string()
+        .optional()
+        .describe('Project ID; discover projects with list_resources'),
       tags: z.array(z.string()).optional().describe('Tags to assign to the prediction')
     })
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the prediction'),
       prediction: z.any().describe('The predicted value'),
+      predictedValue: z.any().optional().describe('Predicted objective value when available'),
       confidence: z.number().optional().describe('Confidence of the prediction'),
       probability: z.number().optional().describe('Probability of the predicted class'),
       created: z.string().describe('Creation timestamp')
@@ -41,30 +49,16 @@ Provide input data as field-value pairs. Returns the predicted outcome along wit
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let modelId = ctx.input.modelId;
-    let modelType = modelId.split('/')[0];
-
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
+      ...supervisedReference(ctx.input.modelId),
       input_data: ctx.input.inputData
     };
 
-    // Set the appropriate model reference field based on the model type
-    if (modelType === 'ensemble') {
-      body.ensemble = modelId;
-    } else if (modelType === 'deepnet') {
-      body.deepnet = modelId;
-    } else if (modelType === 'logisticregression') {
-      body.logisticregression = modelId;
-    } else if (modelType === 'linearregression') {
-      body.linearregression = modelId;
-    } else if (modelType === 'fusion') {
-      body.fusion = modelId;
-    } else {
-      body.model = modelId;
-    }
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.explain !== undefined) body.explain = ctx.input.explain;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let result = await client.createResource('prediction', body);
 
@@ -74,8 +68,16 @@ Provide input data as field-value pairs. Returns the predicted outcome along wit
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         prediction,
+        predictedValue:
+          result.output ??
+          (result.objective_fields?.[0] &&
+          typeof result.prediction === 'object' &&
+          result.prediction !== null
+            ? (result.prediction as Record<string, unknown>)[result.objective_fields[0]]
+            : undefined),
         confidence,
         probability,
         created: result.created

@@ -29,6 +29,7 @@ export let listCustomers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       customers: z.array(
         z.object({
           customerId: z.string(),
@@ -61,24 +62,25 @@ export let listCustomers = SlateTool.create(spec, {
 
     let customers = res.data.map(c => ({
       customerId: c.id,
-      firstName: c.attributes.first_name,
-      lastName: c.attributes.last_name,
-      email: c.attributes.email,
+      firstName: c.attributes.first_name ?? undefined,
+      lastName: c.attributes.last_name ?? undefined,
+      email: c.attributes.email ?? undefined,
       active: c.attributes.active,
       newsletter: c.attributes.newsletter,
       marketing: c.attributes.marketing,
-      dateAdded: c.attributes.date_added,
-      updatedAt: c.attributes.updated_at
+      dateAdded: c.attributes.date_added ?? undefined,
+      updatedAt: c.attributes.updated_at ?? undefined
     }));
 
     return {
       output: {
+        raw: res,
         customers,
-        totalCount: res.meta.total,
-        currentPage: res.meta['current-page'],
-        lastPage: res.meta['last-page']
+        totalCount: res.meta.page.total,
+        currentPage: res.meta.page['current-page'],
+        lastPage: res.meta.page['last-page']
       },
-      message: `Found **${res.meta.total}** customers (page ${res.meta['current-page']} of ${res.meta['last-page']}).`
+      message: `Found **${res.meta.page.total}** customers (page ${res.meta.page['current-page']} of ${res.meta.page['last-page']}).`
     };
   })
   .build();

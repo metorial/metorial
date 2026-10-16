@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listInvoices = SlateTool.create(spec, {
@@ -40,6 +40,10 @@ export let listInvoices = SlateTool.create(spec, {
       contactId: z.string().optional().describe('Filter by contact ID'),
       projectId: z.string().optional().describe('Filter by project ID'),
       nestedItems: z.boolean().optional().describe('Include line items in the response'),
+      months: z
+        .number()
+        .optional()
+        .describe('Positive whole number of months; required with view last_N_months'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page')
     })
@@ -50,10 +54,7 @@ export let listInvoices = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let invoices = await client.listInvoices(ctx.input);
     let count = invoices.length;

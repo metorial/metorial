@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryData = SlateTool.create(spec, {
@@ -10,6 +11,7 @@ export let queryData = SlateTool.create(spec, {
 Flux is a functional scripting language that supports complex transformations, aggregations, joins, and custom functions.
 Results are returned as CSV-formatted data.`,
   instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.',
     'Provide a valid Flux query string. The query must include a from() clause with a bucket.',
     'Use range() to specify the time range for the query.'
   ],
@@ -19,7 +21,13 @@ Results are returned as CSV-formatted data.`,
 })
   .input(
     z.object({
-      query: z.string().describe('Flux query string to execute')
+      orgId: orgIdInput,
+      query: z.string().describe('Flux query string to execute'),
+      params: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe('Flux runtime parameters referenced through params.name'),
+      now: z.string().optional().describe('RFC3339 time used as now() during query execution')
     })
   )
   .output(
@@ -31,10 +39,12 @@ Results are returned as CSV-formatted data.`,
     let client = createClient(ctx);
 
     let result = await client.queryData({
-      query: ctx.input.query
+      query: ctx.input.query,
+      params: ctx.input.params,
+      now: ctx.input.now
     });
 
-    let csvResult = typeof result === 'string' ? result : JSON.stringify(result);
+    let csvResult = result;
 
     return {
       output: { csvResult },

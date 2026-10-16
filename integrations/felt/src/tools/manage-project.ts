@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,9 +10,9 @@ export let manageProject = SlateTool.create(spec, {
 
 To **create** a new project, provide name and visibility without a project ID.
 To **update** an existing project, provide the project ID and the fields to change.
-To **delete** a project, provide the project ID and set delete to true.`,
+To **delete** a project and all its maps and folders, provide the project ID and set delete to true.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -39,6 +39,29 @@ To **delete** a project, provide the project ID and set delete to true.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.delete && !ctx.input.projectId) {
+      throw createApiServiceError(
+        'projectId is required to delete a project. Call list_projects to find it.'
+      );
+    }
+    if (
+      ctx.input.delete &&
+      (ctx.input.name !== undefined ||
+        ctx.input.visibility !== undefined ||
+        ctx.input.maxInheritedPermission !== undefined)
+    ) {
+      throw createApiServiceError('Delete the project separately from property changes.');
+    }
+    if (
+      ctx.input.projectId &&
+      !ctx.input.delete &&
+      ctx.input.name === undefined &&
+      ctx.input.visibility === undefined &&
+      ctx.input.maxInheritedPermission === undefined
+    ) {
+      throw createApiServiceError('Provide at least one project property to update.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.delete && ctx.input.projectId) {
@@ -62,7 +85,7 @@ To **delete** a project, provide the project ID and set delete to true.`,
     }
 
     if (!ctx.input.name || !ctx.input.visibility) {
-      throw new Error('name and visibility are required to create a project');
+      throw createApiServiceError('name and visibility are required to create a project');
     }
 
     let project = await client.createProject({

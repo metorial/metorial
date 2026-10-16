@@ -16,7 +16,11 @@ export let deleteJobTool = SlateTool.create(spec, {
   .input(
     z.object({
       doNumber: z.string().describe('Delivery order number of the job to delete'),
-      date: z.string().describe('Job date in YYYY-MM-DD format')
+      date: z.string().describe('Job date in YYYY-MM-DD format'),
+      type: z
+        .enum(['Delivery', 'Collection'])
+        .optional()
+        .describe('Job type to disambiguate matching D.O. numbers')
     })
   )
   .output(
@@ -29,7 +33,7 @@ export let deleteJobTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DetrackClient(ctx.auth.token);
 
-    await client.deleteJob(ctx.input.doNumber, ctx.input.date);
+    await client.deleteJob(ctx.input.doNumber, ctx.input.date, ctx.input.type);
 
     return {
       output: {

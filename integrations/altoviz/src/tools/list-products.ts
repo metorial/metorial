@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let productSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   productId: z.number().describe('Altoviz product ID'),
   name: z.string().nullable().optional(),
   number: z.string().nullable().optional().describe('Product number'),
@@ -23,12 +24,20 @@ export let listProducts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageIndex: z.number().optional().describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
+      query: z.string().optional().describe('Full-text search query'),
+      orderBy: z
+        .string()
         .optional()
-        .describe('Number of results per page (1-100, default 10)'),
-      productNumber: z.string().optional().describe('Search by product number')
+        .describe('Provider ordering expression, for example name desc'),
+      pageIndex: z.number().optional().describe('Page index (starts at 1)'),
+      pageSize: z.number().optional().describe('Number of results per page'),
+      productNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Search by exact product number; pagination and full-text search do not apply'
+        ),
+      familyId: z.string().optional().describe('Filter by product family ID')
     })
   )
   .output(
@@ -42,23 +51,24 @@ export let listProducts = SlateTool.create(spec, {
     let products: any[];
     if (ctx.input.productNumber) {
       products = await client.findProduct(ctx.input.productNumber);
-      if (!Array.isArray(products)) {
-        products = products ? [products] : [];
-      }
     } else {
       products = await client.listProducts({
+        query: ctx.input.query,
+        orderBy: ctx.input.orderBy,
         pageIndex: ctx.input.pageIndex,
+        familyId: ctx.input.familyId,
         pageSize: ctx.input.pageSize
       });
     }
 
     let mapped = products.map((p: any) => ({
+      raw: p,
       productId: p.id,
       name: p.name,
       number: p.number,
       description: p.description,
       purchasePrice: p.purchasePrice,
-      salePrice: p.salePrice,
+      salePrice: p.taxExcludedPrice ?? p.unitPrice ?? p.salePrice,
       internalId: p.internalId
     }));
 

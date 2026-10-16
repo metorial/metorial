@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .default('eth-mainnet')
       .describe(
-        'The blockchain network to use (e.g., eth-mainnet, eth-sepolia, polygon-mainnet, arb-mainnet, opt-mainnet, base-mainnet, solana-mainnet)'
+        'Alchemy network identifier, such as eth-mainnet, eth-sepolia, polygon-mainnet, arb-mainnet, opt-mainnet, or base-mainnet. These tools use EVM APIs; availability depends on the selected network.'
       )
   })
 );

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,11 @@ export let auth = SlateAuth.create()
       token: z.string().describe('InfluxDB Cloud API token')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim() || /[\r\n]/.test(ctx.input.token)) {
+        throw createApiServiceError('Provide a nonempty InfluxDB API token.', {
+          reason: 'invalid_token'
+        });
+      }
       return {
         output: {
           token: ctx.input.token

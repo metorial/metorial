@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecords, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let estimateSchema = z.object({
@@ -37,7 +38,7 @@ export let getRealTimeDepartures = SlateTool.create(spec, {
   description: `Retrieve real-time estimated departure times for trains at a BART station. Returns upcoming departures grouped by destination, including train length, line color, delay info, bike availability, and cancellation status. Since dwell times are under one minute, ETDs effectively represent arrival times as well.`,
   instructions: [
     'Use station abbreviation codes (e.g., "RICH" for Richmond, "EMBR" for Embarcadero). Use "ALL" to get departures for all stations.',
-    'You cannot combine platform and direction filters. If platform is specified, direction is ignored.',
+    'Use either a platform filter or a direction filter, not both.',
     'Platform and direction filters cannot be used with station set to "ALL".'
   ],
   tags: {
@@ -55,6 +56,10 @@ export let getRealTimeDepartures = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Filter by platform number (1-4, station dependent)'),
+      groupByColor: z
+        .boolean()
+        .optional()
+        .describe('Group results by line color instead of destination'),
       direction: z
         .enum(['n', 's'])
         .optional()
@@ -70,61 +75,35 @@ export let getRealTimeDepartures = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
-    let result = await client.getEstimatedDepartures({
-      station: ctx.input.station,
-      platform: ctx.input.platform,
-      direction: ctx.input.direction
-    });
-
-    let stationData = result?.station;
-    let stations = Array.isArray(stationData) ? stationData : stationData ? [stationData] : [];
-
-    let mappedStations = stations.map((s: any) => {
-      let etdData = Array.isArray(s.etd) ? s.etd : s.etd ? [s.etd] : [];
-      return {
-        stationName: s.name,
-        stationAbbr: s.abbr,
-        departures: etdData.map((etd: any) => {
-          let estimates = Array.isArray(etd.estimate)
-            ? etd.estimate
-            : etd.estimate
-              ? [etd.estimate]
-              : [];
-          return {
-            destination: etd.destination,
-            abbreviation: etd.abbreviation,
-            limited: etd.limited || '0',
-            estimates: estimates.map((est: any) => ({
-              minutes: est.minutes,
-              platform: est.platform,
-              direction: est.direction,
-              length: est.length,
-              color: est.color,
-              hexcolor: est.hexcolor,
-              bikeflag: est.bikeflag,
-              delay: est.delay,
-              cancelflag: est.cancelflag || '0',
-              dynamicflag: est.dynamicflag || '0'
-            }))
-          };
-        })
-      };
-    });
-
-    let totalDepartures = mappedStations.reduce(
-      (sum: number, s: any) =>
-        sum + s.departures.reduce((dSum: number, d: any) => dSum + d.estimates.length, 0),
+    let result = await client.getEstimatedDepartures(ctx.input);
+    let stations = bartRecords(result.station).map(s => ({
+      stationName: bartText(s.name),
+      stationAbbr: bartText(s.abbr),
+      departures: bartRecords(s.etd).map(etd => ({
+        destination: bartText(etd.destination),
+        abbreviation: bartText(etd.abbreviation),
+        limited: bartText(etd.limited) || '0',
+        estimates: bartRecords(etd.estimate).map(est => ({
+          minutes: bartText(est.minutes),
+          platform: bartText(est.platform),
+          direction: bartText(est.direction),
+          length: bartText(est.length),
+          color: bartText(est.color),
+          hexcolor: bartText(est.hexcolor),
+          bikeflag: bartText(est.bikeflag),
+          delay: bartText(est.delay),
+          cancelflag: bartText(est.cancelflag) || '0',
+          dynamicflag: bartText(est.dynamicflag) || '0'
+        }))
+      }))
+    }));
+    let total = stations.reduce(
+      (sum, s) => sum + s.departures.reduce((count, d) => count + d.estimates.length, 0),
       0
     );
-
     return {
-      output: {
-        date: result?.date || '',
-        time: result?.time || '',
-        stations: mappedStations
-      },
-      message: `Retrieved **${totalDepartures}** departure estimate(s) across **${mappedStations.length}** station(s).`
+      output: { date: bartText(result.date), time: bartText(result.time), stations },
+      message: `Retrieved **${total}** departure estimate(s) across **${stations.length}** station(s).`
     };
   })
   .build();

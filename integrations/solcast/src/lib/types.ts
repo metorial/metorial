@@ -45,6 +45,10 @@ export interface AdvancedPvParams {
   outputParameters?: string[];
   period?: string;
   hours?: number;
+  availabilityPercent?: number;
+  constraintPowerMw?: number;
+  dustSoilingLoss?: number;
+  snowSoilingLoss?: number;
   applyAvailability?: boolean;
   applyConstraint?: boolean;
   applyDustSoiling?: boolean;
@@ -78,6 +82,7 @@ export interface TmyRadiationWeatherParams {
 }
 
 export interface TmyRooftopPvParams {
+  snowSoilingLoss?: number;
   latitude: number;
   longitude: number;
   capacity: number;
@@ -103,6 +108,10 @@ export interface TmyAdvancedPvParams {
   ghiWeight?: number;
   dniWeight?: number;
   probability?: string;
+  availabilityPercent?: number;
+  constraintPowerMw?: number;
+  dustSoilingLoss?: number;
+  snowSoilingLoss?: number;
   applyAvailability?: boolean;
   applyConstraint?: boolean;
   applyDustSoiling?: boolean;
@@ -148,6 +157,15 @@ export interface PvPowerSiteCreateParams {
   terrainAzimuth?: number;
   dustSoilingAverage?: number[];
   bifacialSystemEnabled?: boolean;
+  deratingOtherSystem?: number;
+  trackerAxisAzimuth?: number;
+  trackerMaxRotationAngle?: number;
+  trackerBackTracking?: boolean;
+  trackerSmartTracking?: boolean;
+  siteGroundAlbedo?: number;
+  bifacialityFactor?: number;
+  pvrowHeight?: number;
+  pvrowWidth?: number;
   siteTag?: string;
   confirmOverwrite?: string;
 }
@@ -173,48 +191,25 @@ export interface PvPowerSiteUpdateParams {
   terrainAzimuth?: number;
   dustSoilingAverage?: number[];
   bifacialSystemEnabled?: boolean;
+  deratingOtherSystem?: number;
+  trackerAxisAzimuth?: number;
+  trackerMaxRotationAngle?: number;
+  trackerBackTracking?: boolean;
+  trackerSmartTracking?: boolean;
+  siteGroundAlbedo?: number;
+  bifacialityFactor?: number;
+  pvrowHeight?: number;
+  pvrowWidth?: number;
   siteTag?: string;
 }
 
 export interface PvPowerSitesListParams {
+  skip?: number;
+  take?: number;
   entitlement?: string;
   showAll?: boolean;
-  start?: number;
-  end?: number;
+  start?: string;
+  end?: string;
+  forecastProduction?: boolean;
   query?: string;
-}
-
-export interface HistoricForecastRadiationParams {
-  latitude: number;
-  longitude: number;
-  start: string;
-  end?: string;
-  duration?: string;
-  timeZone?: string;
-  period?: string;
-  leadTime?: string;
-  tilt?: number;
-  azimuth?: number;
-  arrayType?: string;
-  outputParameters?: string[];
-  terrainShading?: boolean;
-  format?: string;
-}
-
-export interface HistoricForecastRooftopPvParams {
-  latitude: number;
-  longitude: number;
-  capacity: number;
-  start: string;
-  end?: string;
-  duration?: string;
-  timeZone?: string;
-  period?: string;
-  tilt?: number;
-  azimuth?: number;
-  installDate?: string;
-  lossFactor?: number;
-  outputParameters?: string[];
-  terrainShading?: boolean;
-  format?: string;
 }

@@ -1,22 +1,12 @@
-import crypto from 'crypto';
-import { createAxios } from 'slates';
+import crypto from 'node:crypto';
+import { createApiServiceError, createAxios } from 'slates';
+import { smugMugError } from './errors';
 
-let percentEncode = (str: string): string => {
-  return encodeURIComponent(str)
-    .replace(/!/g, '%21')
-    .replace(/\*/g, '%2A')
-    .replace(/'/g, '%27')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29');
-};
-
-let generateNonce = (): string => {
-  return crypto.randomBytes(16).toString('hex');
-};
-
-let generateTimestamp = (): string => {
-  return Math.floor(Date.now() / 1000).toString();
-};
+let percentEncode = (value: string): string =>
+  encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
 
 export interface OAuth1Credentials {
   consumerKey: string;
@@ -25,59 +15,50 @@ export interface OAuth1Credentials {
   tokenSecret: string;
 }
 
+let signHeader = (
+  method: string,
+  url: string,
+  consumerSecret: string,
+  tokenSecret: string,
+  parameters: Record<string, string>
+): string => {
+  let parsed = new URL(url);
+  let oauth = {
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_version: '1.0',
+    ...parameters
+  };
+  // RFC 5849 3.4.1.3: encode before sorting, and preserve repeated query keys.
+  let pairs = [...parsed.searchParams.entries(), ...Object.entries(oauth)]
+    .filter(([key]) => key !== 'oauth_signature')
+    .map(([key, value]) => [percentEncode(key), percentEncode(value)] as const)
+    .sort(([keyA, valueA], [keyB, valueB]) =>
+      keyA < keyB ? -1 : keyA > keyB ? 1 : valueA < valueB ? -1 : valueA > valueB ? 1 : 0
+    );
+  let normalized = pairs.map(([key, value]) => `${key}=${value}`).join('&');
+  let baseUri = `${parsed.protocol}//${parsed.host}${parsed.pathname || '/'}`;
+  let signature = crypto
+    .createHmac('sha1', `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`)
+    .update(`${method.toUpperCase()}&${percentEncode(baseUri)}&${percentEncode(normalized)}`)
+    .digest('base64');
+  return `OAuth ${Object.entries({ ...oauth, oauth_signature: signature })
+    .map(([key, value]) => `${percentEncode(key)}="${percentEncode(value)}"`)
+    .join(', ')}`;
+};
+
 export let buildOAuth1Header = (
   method: string,
   url: string,
   credentials: OAuth1Credentials,
   extraParams?: Record<string, string>
-): string => {
-  let nonce = generateNonce();
-  let timestamp = generateTimestamp();
-
-  let params: Record<string, string> = {
+): string =>
+  signHeader(method, url, credentials.consumerSecret, credentials.tokenSecret, {
     oauth_consumer_key: credentials.consumerKey,
-    oauth_nonce: nonce,
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: timestamp,
     oauth_token: credentials.token,
-    oauth_version: '1.0',
     ...extraParams
-  };
-
-  let urlObj = new URL(url);
-  let baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
-
-  let allParams: Record<string, string> = { ...params };
-  urlObj.searchParams.forEach((value, key) => {
-    allParams[key] = value;
   });
-
-  let sortedKeys = Object.keys(allParams).sort();
-  let paramString = sortedKeys
-    .map(key => `${percentEncode(key)}=${percentEncode(allParams[key]!)}`)
-    .join('&');
-
-  let signatureBaseString = `${method.toUpperCase()}&${percentEncode(baseUrl)}&${percentEncode(paramString)}`;
-
-  let signingKey = `${percentEncode(credentials.consumerSecret)}&${percentEncode(credentials.tokenSecret)}`;
-
-  let signature = crypto
-    .createHmac('sha1', signingKey)
-    .update(signatureBaseString)
-    .digest('base64');
-
-  let headerParts = [
-    `oauth_consumer_key="${percentEncode(params.oauth_consumer_key!)}"`,
-    `oauth_nonce="${percentEncode(nonce)}"`,
-    `oauth_signature="${percentEncode(signature)}"`,
-    `oauth_signature_method="HMAC-SHA1"`,
-    `oauth_timestamp="${percentEncode(timestamp)}"`,
-    `oauth_token="${percentEncode(params.oauth_token!)}"`,
-    `oauth_version="1.0"`
-  ];
-
-  return `OAuth ${headerParts.join(', ')}`;
-};
 
 export let buildOAuth1HeaderForRequestToken = (
   method: string,
@@ -85,53 +66,11 @@ export let buildOAuth1HeaderForRequestToken = (
   consumerKey: string,
   consumerSecret: string,
   callbackUrl: string
-): string => {
-  let nonce = generateNonce();
-  let timestamp = generateTimestamp();
-
-  let params: Record<string, string> = {
-    oauth_callback: callbackUrl,
+): string =>
+  signHeader(method, url, consumerSecret, '', {
     oauth_consumer_key: consumerKey,
-    oauth_nonce: nonce,
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: timestamp,
-    oauth_version: '1.0'
-  };
-
-  let urlObj = new URL(url);
-  let baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
-
-  let allParams: Record<string, string> = { ...params };
-  urlObj.searchParams.forEach((value, key) => {
-    allParams[key] = value;
+    oauth_callback: callbackUrl
   });
-
-  let sortedKeys = Object.keys(allParams).sort();
-  let paramString = sortedKeys
-    .map(key => `${percentEncode(key)}=${percentEncode(allParams[key]!)}`)
-    .join('&');
-
-  let signatureBaseString = `${method.toUpperCase()}&${percentEncode(baseUrl)}&${percentEncode(paramString)}`;
-
-  let signingKey = `${percentEncode(consumerSecret)}&`;
-
-  let signature = crypto
-    .createHmac('sha1', signingKey)
-    .update(signatureBaseString)
-    .digest('base64');
-
-  let headerParts = [
-    `oauth_callback="${percentEncode(callbackUrl)}"`,
-    `oauth_consumer_key="${percentEncode(consumerKey)}"`,
-    `oauth_nonce="${percentEncode(nonce)}"`,
-    `oauth_signature="${percentEncode(signature)}"`,
-    `oauth_signature_method="HMAC-SHA1"`,
-    `oauth_timestamp="${percentEncode(timestamp)}"`,
-    `oauth_version="1.0"`
-  ];
-
-  return `OAuth ${headerParts.join(', ')}`;
-};
 
 export let buildOAuth1HeaderForAccessToken = (
   method: string,
@@ -141,54 +80,46 @@ export let buildOAuth1HeaderForAccessToken = (
   requestToken: string,
   requestTokenSecret: string,
   verifier: string
-): string => {
-  let nonce = generateNonce();
-  let timestamp = generateTimestamp();
-
-  let params: Record<string, string> = {
+): string =>
+  signHeader(method, url, consumerSecret, requestTokenSecret, {
     oauth_consumer_key: consumerKey,
-    oauth_nonce: nonce,
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: timestamp,
     oauth_token: requestToken,
-    oauth_verifier: verifier,
-    oauth_version: '1.0'
-  };
-
-  let urlObj = new URL(url);
-  let baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
-
-  let allParams: Record<string, string> = { ...params };
-  urlObj.searchParams.forEach((value, key) => {
-    allParams[key] = value;
+    oauth_verifier: verifier
   });
 
-  let sortedKeys = Object.keys(allParams).sort();
-  let paramString = sortedKeys
-    .map(key => `${percentEncode(key)}=${percentEncode(allParams[key]!)}`)
-    .join('&');
-
-  let signatureBaseString = `${method.toUpperCase()}&${percentEncode(baseUrl)}&${percentEncode(paramString)}`;
-
-  let signingKey = `${percentEncode(consumerSecret)}&${percentEncode(requestTokenSecret)}`;
-
-  let signature = crypto
-    .createHmac('sha1', signingKey)
-    .update(signatureBaseString)
-    .digest('base64');
-
-  let headerParts = [
-    `oauth_consumer_key="${percentEncode(consumerKey)}"`,
-    `oauth_nonce="${percentEncode(nonce)}"`,
-    `oauth_signature="${percentEncode(signature)}"`,
-    `oauth_signature_method="HMAC-SHA1"`,
-    `oauth_timestamp="${percentEncode(timestamp)}"`,
-    `oauth_token="${percentEncode(requestToken)}"`,
-    `oauth_verifier="${percentEncode(verifier)}"`,
-    `oauth_version="1.0"`
-  ];
-
-  return `OAuth ${headerParts.join(', ')}`;
+let exchange = async (
+  url: string,
+  header: string,
+  secrets: string[],
+  requestToken: boolean
+) => {
+  try {
+    let response = await createAxios({ maxRedirects: 0 }).post(url, null, {
+      headers: { Authorization: header },
+      responseType: 'text'
+    });
+    if (typeof response.data !== 'string') {
+      throw createApiServiceError('SmugMug returned an invalid OAuth token response.', {
+        reason: 'invalid_oauth_response'
+      });
+    }
+    let params = new URLSearchParams(response.data);
+    let oauthToken = params.get('oauth_token');
+    let oauthTokenSecret = params.get('oauth_token_secret');
+    if (
+      !oauthToken ||
+      !oauthTokenSecret ||
+      (requestToken && params.get('oauth_callback_confirmed') !== 'true')
+    ) {
+      throw createApiServiceError(
+        'SmugMug did not return valid OAuth credentials. Reconnect and authorize again.',
+        { reason: 'invalid_oauth_response' }
+      );
+    }
+    return { oauthToken, oauthTokenSecret };
+  } catch (error) {
+    throw smugMugError(error, 'OAuth token exchange', secrets);
+  }
 };
 
 export let getRequestToken = async (
@@ -196,31 +127,13 @@ export let getRequestToken = async (
   consumerSecret: string,
   callbackUrl: string
 ): Promise<{ oauthToken: string; oauthTokenSecret: string }> => {
-  let url = 'https://secure.smugmug.com/services/oauth/1.0a/getRequestToken';
-  let authHeader = buildOAuth1HeaderForRequestToken(
-    'POST',
+  let url = 'https://api.smugmug.com/services/oauth/1.0a/getRequestToken';
+  return exchange(
     url,
-    consumerKey,
-    consumerSecret,
-    callbackUrl
+    buildOAuth1HeaderForRequestToken('POST', url, consumerKey, consumerSecret, callbackUrl),
+    [consumerKey, consumerSecret],
+    true
   );
-
-  let httpClient = createAxios();
-  let response = await httpClient.post(url, null, {
-    headers: {
-      Authorization: authHeader
-    }
-  });
-
-  let params = new URLSearchParams(response.data);
-  let oauthToken = params.get('oauth_token');
-  let oauthTokenSecret = params.get('oauth_token_secret');
-
-  if (!oauthToken || !oauthTokenSecret) {
-    throw new Error('Failed to obtain request token from SmugMug');
-  }
-
-  return { oauthToken, oauthTokenSecret };
 };
 
 export let getAccessToken = async (
@@ -230,31 +143,19 @@ export let getAccessToken = async (
   requestTokenSecret: string,
   verifier: string
 ): Promise<{ oauthToken: string; oauthTokenSecret: string }> => {
-  let url = 'https://secure.smugmug.com/services/oauth/1.0a/getAccessToken';
-  let authHeader = buildOAuth1HeaderForAccessToken(
-    'POST',
+  let url = 'https://api.smugmug.com/services/oauth/1.0a/getAccessToken';
+  return exchange(
     url,
-    consumerKey,
-    consumerSecret,
-    requestToken,
-    requestTokenSecret,
-    verifier
+    buildOAuth1HeaderForAccessToken(
+      'POST',
+      url,
+      consumerKey,
+      consumerSecret,
+      requestToken,
+      requestTokenSecret,
+      verifier
+    ),
+    [consumerKey, consumerSecret, requestToken, requestTokenSecret, verifier],
+    false
   );
-
-  let httpClient = createAxios();
-  let response = await httpClient.post(url, null, {
-    headers: {
-      Authorization: authHeader
-    }
-  });
-
-  let params = new URLSearchParams(response.data);
-  let oauthToken = params.get('oauth_token');
-  let oauthTokenSecret = params.get('oauth_token_secret');
-
-  if (!oauthToken || !oauthTokenSecret) {
-    throw new Error('Failed to obtain access token from SmugMug');
-  }
-
-  return { oauthToken, oauthTokenSecret };
 };

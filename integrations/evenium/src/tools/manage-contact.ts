@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type EveniumContact } from '../lib/client';
+import { contactSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageContact = SlateTool.create(spec, {
   key: 'manage_contact',
   description: `Create, update, or retrieve a contact in the Evenium contact database. Use **action** "create" to add a new contact, "update" to modify an existing one (requires contactId), or "get" to retrieve a contact's details.`,
   instructions: [
-    'For "create", provide at minimum a firstName, lastName, and email.',
+    'For "create", provide contact details such as firstName, lastName, and email.',
     'For "update", provide the contactId and any fields you want to change.',
     'For "get", only the contactId is required.'
   ]
@@ -37,27 +38,17 @@ export let manageContact = SlateTool.create(spec, {
         .describe('Custom fields as name-value pairs')
     })
   )
-  .output(
-    z.object({
-      contactId: z.string().describe('Contact identifier'),
-      customId: z.string().optional().describe('External/custom contact ID'),
-      firstName: z.string().optional().describe('First name'),
-      lastName: z.string().optional().describe('Last name'),
-      email: z.string().optional().describe('Email address'),
-      company: z.string().optional().describe('Company name'),
-      gender: z.string().optional().describe('Gender')
-    })
-  )
+  .output(contactSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let { action, contactId, firstName, lastName, email, company, gender, customId, fields } =
       ctx.input;
 
-    let contact: any;
+    let contact: EveniumContact;
     let actionLabel: string;
 
     if (action === 'get') {
-      if (!contactId) throw new Error('contactId is required for get action');
+      if (!contactId) throw createApiServiceError('contactId is required for get action');
       contact = await client.getContact(contactId);
       actionLabel = 'Retrieved';
     } else if (action === 'create') {
@@ -72,7 +63,7 @@ export let manageContact = SlateTool.create(spec, {
       });
       actionLabel = 'Created';
     } else {
-      if (!contactId) throw new Error('contactId is required for update action');
+      if (!contactId) throw createApiServiceError('contactId is required for update action');
       contact = await client.updateContact(contactId, {
         firstName,
         lastName,
@@ -93,7 +84,8 @@ export let manageContact = SlateTool.create(spec, {
         lastName: contact.lastName,
         email: contact.email,
         company: contact.company,
-        gender: contact.gender
+        gender: contact.gender,
+        raw: contact.raw
       },
       message: `${actionLabel} contact **${contact.firstName ?? ''} ${contact.lastName ?? ''}** (ID: \`${contact.id}\`).`
     };

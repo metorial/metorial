@@ -1,9 +1,16 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  createApiServiceError,
+  normalizeOAuthTokenResponse,
+  SlateAuth,
+  type SlateAuthWithOauth
+} from 'slates';
 import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.dub.co'
-});
+import { dubApi as api, Client } from './lib/client';
+
+type AuthOutput = { token: string; refreshToken?: string; expiresAt?: string };
+type OAuthMethod = SlateAuthWithOauth<Record<string, never>, AuthOutput>;
 
 export let auth = SlateAuth.create()
   .output(
@@ -20,19 +27,9 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
-        title: 'Read Links',
-        description: 'View links in the workspace',
-        scope: 'links.read'
-      },
-      {
         title: 'Write Links',
         description: 'Create, update, and delete links',
         scope: 'links.write'
-      },
-      {
-        title: 'Read Tags',
-        description: 'View tags in the workspace',
-        scope: 'tags.read'
       },
       {
         title: 'Write Tags',
@@ -45,19 +42,9 @@ export let auth = SlateAuth.create()
         scope: 'analytics.read'
       },
       {
-        title: 'Read Domains',
-        description: 'View domains in the workspace',
-        scope: 'domains.read'
-      },
-      {
         title: 'Write Domains',
         description: 'Add and manage custom domains',
         scope: 'domains.write'
-      },
-      {
-        title: 'Read Folders',
-        description: 'View folders in the workspace',
-        scope: 'folders.read'
       },
       {
         title: 'Write Folders',
@@ -65,9 +52,9 @@ export let auth = SlateAuth.create()
         scope: 'folders.write'
       },
       {
-        title: 'Read Conversions',
-        description: 'View conversion events (leads and sales)',
-        scope: 'conversions.write'
+        title: 'Manage Customers',
+        description: 'View, update, and delete customers',
+        scope: 'customers.write'
       },
       {
         title: 'Read User',
@@ -77,26 +64,36 @@ export let auth = SlateAuth.create()
     ],
 
     getAuthorizationUrl: async ctx => {
+      let codeVerifier = randomBytes(32).toString('base64url');
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         response_type: 'code',
         scope: ctx.scopes.join(' '),
-        state: ctx.state
+        state: ctx.state,
+        code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
+        code_challenge_method: 'S256'
       });
 
       return {
-        url: `https://app.dub.co/oauth/authorize?${params.toString()}`
+        url: `https://app.dub.co/oauth/authorize?${params.toString()}`,
+        callbackState: { codeVerifier }
       };
     },
 
     handleCallback: async ctx => {
+      let codeVerifier = ctx.callbackState?.codeVerifier;
+      if (typeof codeVerifier !== 'string' || !codeVerifier)
+        throw createApiServiceError(
+          'Dub authorization state is missing. Reconnect your account.'
+        );
       let response = await api.post(
         '/oauth/token',
         new URLSearchParams({
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
           code: ctx.code,
+          code_verifier: codeVerifier,
           redirect_uri: ctx.redirectUri,
           grant_type: 'authorization_code'
         }).toString(),
@@ -107,33 +104,26 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token: string;
-        token_type: string;
-        expires_in: number;
-        scope: string;
-      };
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Dub',
+          required: true
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (
+      ctx: Parameters<NonNullable<OAuthMethod['handleTokenRefresh']>>[0]
+    ) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError('Dub refresh token is missing. Reconnect your account.');
       let response = await api.post(
         '/oauth/token',
         new URLSearchParams({
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken ?? ''
+          refresh_token: ctx.output.refreshToken
         }).toString(),
         {
           headers: {
@@ -142,46 +132,25 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token: string;
-        token_type: string;
-        expires_in: number;
-        scope: string;
-      };
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...ctx.output,
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Dub',
+            required: true,
+            previousRefreshToken: ctx.output.refreshToken
+          })
         }
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
-    }) => {
-      let response = await api.get('/oauth/userinfo', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data as {
-        user: { id: string; name: string; image: string };
-        workspace: { id: string; slug: string; name: string; logo: string };
-      };
-
+    getProfile: async (ctx: Parameters<NonNullable<OAuthMethod['getProfile']>>[0]) => {
+      let data = await new Client(ctx.output).getCurrentUser();
       return {
         profile: {
-          id: data.user.id,
-          name: data.user.name,
-          imageUrl: data.user.image,
+          id: data.id,
+          name: data.name ?? data.id,
+          imageUrl: data.image ?? undefined,
           workspaceId: data.workspace.id,
           workspaceName: data.workspace.name,
           workspaceSlug: data.workspace.slug
@@ -199,6 +168,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) throw createApiServiceError('Enter a Dub API key.');
       return {
         output: {
           token: ctx.input.apiKey

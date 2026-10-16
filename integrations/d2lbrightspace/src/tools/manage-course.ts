@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCourse = SlateTool.create(spec, {
@@ -16,7 +17,11 @@ export let getCourse = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       name: z.string().optional().describe('Course name'),
       code: z.string().optional().describe('Course code'),
       isActive: z.boolean().optional().describe('Whether the course is active'),
@@ -37,23 +42,26 @@ export let getCourse = SlateTool.create(spec, {
     return {
       output: {
         orgUnitId: String(course.Identifier),
-        name: course.Name,
-        code: course.Code,
-        isActive: course.IsActive,
-        startDate: course.StartDate,
-        endDate: course.EndDate,
-        path: course.Path,
-        courseTemplateId: course.CourseTemplate?.Identifier
-          ? String(course.CourseTemplate.Identifier)
-          : undefined,
-        semesterId: course.Semester?.Identifier
-          ? String(course.Semester.Identifier)
-          : undefined,
-        departmentId: course.Department?.Identifier
-          ? String(course.Department.Identifier)
-          : undefined,
-        description: course.Description?.Text || course.Description?.Content,
-        canSelfRegister: course.CanSelfRegister
+        name: course.Name ?? undefined,
+        code: course.Code ?? undefined,
+        isActive: course.IsActive ?? undefined,
+        startDate: course.StartDate ?? undefined,
+        endDate: course.EndDate ?? undefined,
+        path: course.Path ?? undefined,
+        courseTemplateId:
+          (course.CourseTemplate?.Identifier ?? undefined)
+            ? String(course.CourseTemplate.Identifier)
+            : undefined,
+        semesterId:
+          (course.Semester?.Identifier ?? undefined)
+            ? String(course.Semester.Identifier)
+            : undefined,
+        departmentId:
+          (course.Department?.Identifier ?? undefined)
+            ? String(course.Department.Identifier)
+            : undefined,
+        description: richText(course.Description),
+        canSelfRegister: course.CanSelfRegister ?? undefined
       },
       message: `Retrieved course **${course.Name}** (${course.Code}, ID: ${course.Identifier}).`
     };
@@ -99,17 +107,19 @@ export let createCourse = SlateTool.create(spec, {
       EndDate: ctx.input.endDate || null,
       Description: ctx.input.description
         ? { Content: ctx.input.description, Type: 'Html' }
-        : null,
-      CanSelfRegister: ctx.input.canSelfRegister,
-      Path: ctx.input.path,
-      ForceLocale: ctx.input.forceLocale
+        : { Content: '', Type: 'Text' },
+      CanSelfRegister: ctx.input.canSelfRegister ?? false,
+      Path: ctx.input.path ?? '',
+      ForceLocale: ctx.input.forceLocale ?? false,
+      LocaleId: null,
+      ShowAddressBook: false
     });
 
     return {
       output: {
         orgUnitId: String(course.Identifier),
-        name: course.Name,
-        code: course.Code
+        name: course.Name ?? undefined,
+        code: course.Code ?? undefined
       },
       message: `Created course **${course.Name}** (${course.Code}, ID: ${course.Identifier}).`
     };
@@ -160,8 +170,8 @@ export let updateCourse = SlateTool.create(spec, {
     return {
       output: {
         orgUnitId: String(course.Identifier),
-        name: course.Name,
-        code: course.Code
+        name: course.Name ?? undefined,
+        code: course.Code ?? undefined
       },
       message: `Updated course **${course.Name}** (ID: ${course.Identifier}).`
     };

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, resourceId } from '../lib/client';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -25,15 +25,16 @@ export let getUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getUser();
+    let response = await client.getUser();
+    let result = response.user;
 
     return {
       output: {
-        userId: result?.id != null ? String(result.id) : undefined,
+        userId: resourceId(result),
         firstName: result?.first_name ?? undefined,
         lastName: result?.last_name ?? undefined,
         email: result?.email ?? undefined,
-        rawResponse: result
+        rawResponse: response.rawResponse
       },
       message: `Retrieved account info for **${[result?.first_name, result?.last_name].filter(Boolean).join(' ') || 'user'}** (${result?.email || 'no email'}).`
     };

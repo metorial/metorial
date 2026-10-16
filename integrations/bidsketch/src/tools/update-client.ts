@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 export let updateClient = SlateTool.create(spec, {
@@ -17,6 +18,8 @@ export let updateClient = SlateTool.create(spec, {
       firstName: z.string().optional().describe('Updated first name'),
       lastName: z.string().optional().describe('Updated last name'),
       email: z.string().optional().describe('Updated email address'),
+      name: z.string().optional().describe('Updated company name or full client name'),
+      altPhone: z.string().optional().describe('Updated alternate phone number'),
       phone: z.string().optional().describe('Updated phone number'),
       website: z.string().optional().describe('Updated website URL'),
       address: z.string().optional().describe('Updated street address'),
@@ -56,14 +59,16 @@ export let updateClient = SlateTool.create(spec, {
     if (ctx.input.firstName !== undefined) body.first_name = ctx.input.firstName;
     if (ctx.input.lastName !== undefined) body.last_name = ctx.input.lastName;
     if (ctx.input.email !== undefined) body.email = ctx.input.email;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.altPhone !== undefined) body.alt_phone = ctx.input.altPhone;
     if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
     if (ctx.input.website !== undefined) body.website = ctx.input.website;
-    if (ctx.input.address !== undefined) body.address = ctx.input.address;
-    if (ctx.input.address2 !== undefined) body.address2 = ctx.input.address2;
+    if (ctx.input.address !== undefined) body.address_field_one = ctx.input.address;
+    if (ctx.input.address2 !== undefined) body.address_field_two = ctx.input.address2;
     if (ctx.input.city !== undefined) body.city = ctx.input.city;
     if (ctx.input.state !== undefined) body.state = ctx.input.state;
     if (ctx.input.postalZip !== undefined) body.postal_zip = ctx.input.postalZip;
-    if (ctx.input.locale !== undefined) body.locale = ctx.input.locale;
+    if (ctx.input.locale !== undefined) body.country = ctx.input.locale;
     if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
 
     if (ctx.input.otherContact) {
@@ -79,13 +84,13 @@ export let updateClient = SlateTool.create(spec, {
 
     return {
       output: {
-        clientId: c.id,
-        firstName: c.first_name,
-        lastName: c.last_name,
-        email: c.email,
-        url: c.url,
-        appUrl: c.app_url,
-        updatedAt: c.updated_at
+        clientId: readBidsketchNumber(c.id, 'id'),
+        firstName: readBidsketchString(c.first_name, 'first_name'),
+        lastName: readBidsketchString(c.last_name, 'last_name'),
+        email: readBidsketchString(c.email, 'email'),
+        url: readBidsketchString(c.url, 'url'),
+        appUrl: readBidsketchString(c.app_url, 'app_url'),
+        updatedAt: readBidsketchString(c.updated_at, 'updated_at')
       },
       message: `Updated client **${c.first_name} ${c.last_name}** (ID: ${c.id}).`
     };

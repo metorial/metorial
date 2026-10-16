@@ -5,10 +5,13 @@ import {
   getEventTool,
   getOrderTool,
   getParticipantTool,
+  getPresentationTool,
   listAffiliatesTool,
+  listCurrentEventsTool,
   listEventsTool,
   listOrdersTool,
-  listParticipantsTool
+  listParticipantsTool,
+  listPresentationsTool
 } from './tools';
 
 export let provider = Slate.create({
@@ -21,7 +24,10 @@ export let provider = Slate.create({
     listParticipantsTool,
     getParticipantTool,
     checkinParticipantTool,
-    listAffiliatesTool
+    listAffiliatesTool,
+    listCurrentEventsTool,
+    listPresentationsTool,
+    getPresentationTool
   ],
   triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecord, bartRecords, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let fareTypeSchema = z.object({
@@ -43,32 +44,21 @@ export let getFare = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
-    let result = await client.getFare({
-      origin: ctx.input.origin,
-      destination: ctx.input.destination,
-      date: ctx.input.date
-    });
-
-    let fareData = result?.fares?.fare;
-    let fares = Array.isArray(fareData) ? fareData : fareData ? [fareData] : [];
-
-    let mappedFares = fares.map((f: any) => ({
-      amount: f['@amount'] || '',
-      fareClass: f['@class'] || '',
-      fareName: f['@name'] || ''
+    let result = await client.getFare(ctx.input);
+    let fares = bartRecords(bartRecord(result.fares).fare).map(f => ({
+      amount: bartText(f['@amount']),
+      fareClass: bartText(f['@class']),
+      fareName: bartText(f['@name'])
     }));
-
-    let clipperFare = mappedFares.find((f: any) => f.fareClass === 'clipper');
-
+    let clipperFare = fares.find(f => f.fareClass === 'clipper');
     return {
       output: {
-        origin: result?.origin || '',
-        destination: result?.destination || '',
-        scheduleNumber: result?.sched_num || '',
-        fares: mappedFares
+        origin: bartText(result.origin),
+        destination: bartText(result.destination),
+        scheduleNumber: bartText(result.sched_num),
+        fares
       },
-      message: `Fare from **${ctx.input.origin}** to **${ctx.input.destination}**: ${clipperFare ? `$${clipperFare.amount} (Clipper)` : `${mappedFares.length} fare type(s) returned`}.`
+      message: `Fare from **${ctx.input.origin}** to **${ctx.input.destination}**: ${clipperFare ? `$${clipperFare.amount} (Clipper)` : `${fares.length} fare type(s) returned`}.`
     };
   })
   .build();

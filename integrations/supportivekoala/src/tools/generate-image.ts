@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareImageDownload } from '../lib/image-download';
 import { spec } from '../spec';
 
 export let generateImage = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let generateImage = SlateTool.create(spec, {
   key: 'generate_image',
   description: `Generate an image from a Supportivekoala template by providing the template ID and dynamic parameters.
 Use this to programmatically create images with customized text, images, and other content injected into a reusable template.
-The generated image is hosted on Supportivekoala's cloud and a URL is returned.`,
+The generated image is hosted on Supportivekoala's cloud; its URL and a prepared download are returned when available.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -47,6 +48,11 @@ The generated image is hosted on Supportivekoala's cloud and a URL is returned.`
       format: ctx.input.format
     });
 
+    let downloadMessage = await prepareImageDownload(
+      attachment => ctx.addAttachment(attachment),
+      image.imageUrl
+    );
+
     return {
       output: {
         imageId: image._id,
@@ -55,7 +61,7 @@ The generated image is hosted on Supportivekoala's cloud and a URL is returned.`
         createdAt: image.createdAt,
         updatedAt: image.updatedAt
       },
-      message: `Image generated successfully. View it at: ${image.imageUrl}`
+      message: `Image generated successfully. ${downloadMessage}`
     };
   })
   .build();

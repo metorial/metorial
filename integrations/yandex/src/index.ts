@@ -1,5 +1,14 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
+import {
+  getOperation,
+  getServiceAccount,
+  listComputeImages,
+  listFolderBuckets,
+  listFunctionVersions,
+  listLogGroups
+} from './tools/discovery';
 import {
   listContainerImages,
   listRegistries,
@@ -34,6 +43,7 @@ import { listNetworks, listSubnets, manageNetwork, manageSubnet } from './tools/
 import { detectLanguage, listLanguages, translateText } from './tools/translate-text';
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
     listInstances,
     getInstance,
@@ -71,7 +81,13 @@ export let provider = Slate.create({
     manageRegistry,
     listContainerImages,
     readLogs,
-    writeLogs
+    writeLogs,
+    getOperation,
+    getServiceAccount,
+    listComputeImages,
+    listFolderBuckets,
+    listFunctionVersions,
+    listLogGroups
   ],
   triggers: []
 });

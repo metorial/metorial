@@ -19,8 +19,13 @@ let newsArticleSchema = z.object({
 export let getLatestNews = SlateTool.create(spec, {
   name: 'Get Latest News',
   key: 'get_latest_news',
-  description: `Fetch the most recent news articles from global sources. Returns a real-time stream of international news that can be filtered by language, category, country, and keywords. Useful for staying updated on current events, monitoring specific topics, or building news feeds.`,
+  description: `DEPRECATED — use \`list_latest_news\` instead. Fetch the most recent news articles using the legacy input contract.`,
+  instructions: [
+    'Use list_latest_news for supported latest-feed filters and pagination.',
+    'Currents now rejects keywords on latest-news. Use search_news for topic or keyword searches.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

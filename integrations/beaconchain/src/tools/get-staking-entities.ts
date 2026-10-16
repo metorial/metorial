@@ -19,13 +19,17 @@ This is a **Pro-tier** feature requiring a Scale or Enterprise plan.`,
 })
   .input(
     z.object({
+      evaluationWindow: z
+        .enum(['24h', '7d', '30d', '90d'])
+        .optional()
+        .describe('Entity comparison evaluation window. Defaults to 24h.'),
       entity: z
         .string()
         .optional()
         .describe(
           'Entity name to look up sub-entities for. If omitted, returns the full entity overview list.'
         ),
-      pageSize: z.number().optional().describe('Number of results per page (1-100)'),
+      pageSize: z.number().optional().describe('Number of results per page (1-10)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -49,9 +53,13 @@ This is a **Pro-tier** feature requiring a Scale or Enterprise plan.`,
     let response: any;
 
     if (ctx.input.entity) {
-      response = await client.getSubEntities(ctx.input.entity, pagination);
+      response = await client.getSubEntities(
+        ctx.input.entity,
+        pagination,
+        ctx.input.evaluationWindow
+      );
     } else {
-      response = await client.getEntities(pagination);
+      response = await client.getEntities(pagination, ctx.input.evaluationWindow);
     }
 
     return {

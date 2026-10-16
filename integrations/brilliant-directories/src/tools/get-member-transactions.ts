@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,6 +20,10 @@ export let getMemberTransactions = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       transactions: z.any().describe('The transaction records.')
     })
   )
@@ -28,6 +32,12 @@ export let getMemberTransactions = SlateTool.create(spec, {
       token: ctx.auth.token,
       websiteDomain: ctx.config.websiteDomain
     });
+
+    if (Boolean(ctx.input.userId) === Boolean(ctx.input.clientId)) {
+      throw createApiServiceError(
+        'Provide exactly one of userId or clientId to retrieve transactions.'
+      );
+    }
 
     let params: Record<string, any> = {};
     if (ctx.input.userId) params.user_id = ctx.input.userId;
@@ -38,6 +48,7 @@ export let getMemberTransactions = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         transactions: result.message
       },
       message: `Retrieved transaction history.`

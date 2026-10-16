@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ListcleanClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -32,22 +33,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.listclean.xyz/v1',
-        headers: {
-          'X-Auth-Token': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let res = await axios.get('/account/profile/');
-      let profile = res.data;
+      let client = new ListcleanClient({ token: ctx.output.token });
+      let profile = await client.getAccountProfile();
 
       return {
         profile: {
-          id: profile.id ? String(profile.id) : undefined,
-          email: profile.email,
-          name: profile.name || profile.username
+          name: profile.name
         }
       };
     }

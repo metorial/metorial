@@ -32,6 +32,7 @@ export let listProducts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       products: z.array(
         z.object({
           productId: z.string(),
@@ -68,25 +69,26 @@ export let listProducts = SlateTool.create(spec, {
 
     let products = res.data.map(p => ({
       productId: p.id,
-      name: p.attributes.name,
-      description: p.attributes.description,
+      name: p.attributes.name ?? undefined,
+      description: p.attributes.description ?? undefined,
       priceFrom: p.attributes.price_from,
       priceTo: p.attributes.price_to,
       active: p.attributes.active,
       draft: p.attributes.draft,
-      urlHandle: p.attributes.url_handle,
-      dateAdded: p.attributes.date_added,
-      dateModified: p.attributes.date_modified
+      urlHandle: p.attributes.url_handle ?? undefined,
+      dateAdded: p.attributes.date_added ?? undefined,
+      dateModified: p.attributes.date_modified ?? undefined
     }));
 
     return {
       output: {
+        raw: res,
         products,
-        totalCount: res.meta.total,
-        currentPage: res.meta['current-page'],
-        lastPage: res.meta['last-page']
+        totalCount: res.meta.page.total,
+        currentPage: res.meta.page['current-page'],
+        lastPage: res.meta.page['last-page']
       },
-      message: `Found **${res.meta.total}** products (page ${res.meta['current-page']} of ${res.meta['last-page']}).`
+      message: `Found **${res.meta.page.total}** products (page ${res.meta.page['current-page']} of ${res.meta.page['last-page']}).`
     };
   })
   .build();

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 let fileSchema = z.object({
@@ -61,9 +61,24 @@ export let manageFiles = SlateTool.create(spec, {
     let { action, downloadUrl, filename, contentType, fileUid } = ctx.input;
 
     if (action === 'upload') {
-      if (!downloadUrl) throw new Error('downloadUrl is required for upload action');
+      if (!downloadUrl)
+        throw createApiServiceError('downloadUrl is required for upload action');
       let result = await client.uploadFileFromUrl({ downloadUrl, filename, contentType });
       let f = result?.data || result;
+      if (typeof f?.uid !== 'string' || f.uid.length === 0) {
+        throw createApiServiceError('TimelinesAI did not return the uploaded file UID.');
+      }
+      if (f.temporary_download_url) {
+        let download = await client.getFileDownload(f.uid);
+        await ctx.addAttachment({
+          type: 'url',
+          url: download.url,
+          filename: f.filename,
+          mimeType: f.mimetype,
+          refreshReference: { fileUid: f.uid },
+          refreshAt: download.expiresAt
+        });
+      }
       return {
         output: {
           file: {
@@ -82,7 +97,7 @@ export let manageFiles = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listFiles(filename);
-      let files = (result?.data || []).map((f: any) => ({
+      let files = requireArray(result?.data, 'files').map((f: any) => ({
         fileUid: f.uid,
         filename: f.filename,
         size: f.size,
@@ -97,9 +112,17 @@ export let manageFiles = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!fileUid) throw new Error('fileUid is required for get action');
-      let result = await client.getFile(fileUid);
-      let f = result?.data || result;
+      if (!fileUid) throw createApiServiceError('fileUid is required for get action');
+      let download = await client.getFileDownload(fileUid);
+      let f = download.file;
+      await ctx.addAttachment({
+        type: 'url',
+        url: download.url,
+        filename: f.filename,
+        mimeType: f.mimetype,
+        refreshReference: { fileUid },
+        refreshAt: download.expiresAt
+      });
       return {
         output: {
           file: {
@@ -117,7 +140,7 @@ export let manageFiles = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!fileUid) throw new Error('fileUid is required for delete action');
+      if (!fileUid) throw createApiServiceError('fileUid is required for delete action');
       await client.deleteFile(fileUid);
       return {
         output: { deleted: true },
@@ -125,6 +148,6 @@ export let manageFiles = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

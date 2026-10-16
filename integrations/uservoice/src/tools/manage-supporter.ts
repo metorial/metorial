@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,12 +45,13 @@ export let manageSupporter = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.suggestionId) {
-        throw new Error('suggestionId is required when adding a supporter');
+      if (ctx.input.suggestionId === undefined) {
+        throw createApiServiceError('suggestionId is required when adding a supporter');
       }
 
       let supporter = await client.createSupporter({
@@ -61,13 +62,13 @@ export let manageSupporter = SlateTool.create(spec, {
       return {
         output: {
           supporterId: supporter.id,
-          suggestionId: ctx.input.suggestionId
+          suggestionId: supporter.links?.suggestion
         },
         message: `Added supporter to suggestion ${ctx.input.suggestionId}.`
       };
     } else {
-      if (!ctx.input.supporterId) {
-        throw new Error('supporterId is required when removing a supporter');
+      if (ctx.input.supporterId === undefined) {
+        throw createApiServiceError('supporterId is required when removing a supporter');
       }
 
       await client.deleteSupporter(ctx.input.supporterId);

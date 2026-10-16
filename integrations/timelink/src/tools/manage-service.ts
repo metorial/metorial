@@ -16,8 +16,12 @@ let serviceOutputSchema = z.object({
 export let listServicesTool = SlateTool.create(spec, {
   name: 'List Services',
   key: 'list_services',
-  description: `Retrieve all services (activity types) in Timelink. Services categorize the type of work being done in time entries. Use this to find service IDs for creating or filtering time entries.`,
+  description: `DEPRECATED — use \`list_records\` instead. Retrieve all services (activity types) in Timelink. Services categorize the type of work being done in time entries. Use this to find service IDs for creating or filtering time entries.`,
+  instructions: [
+    'Use list_records for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -51,8 +55,12 @@ export let listServicesTool = SlateTool.create(spec, {
 export let createServiceTool = SlateTool.create(spec, {
   name: 'Create Service',
   key: 'create_service',
-  description: `Create a new service (activity type) in Timelink. Services define the type of work performed and can be assigned to time entries.`,
+  description: `DEPRECATED — use \`manage_service_record\` instead. Create a new service (activity type) in Timelink. Services define the type of work performed and can be assigned to time entries.`,
+  instructions: [
+    'Use manage_service_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -95,8 +103,12 @@ export let createServiceTool = SlateTool.create(spec, {
 export let updateServiceTool = SlateTool.create(spec, {
   name: 'Update Service',
   key: 'update_service',
-  description: `Update an existing service (activity type) in Timelink. Only the provided fields will be updated; omitted fields remain unchanged.`,
+  description: `DEPRECATED — use \`manage_service_record\` instead. Update an existing service (activity type) in Timelink. Only the provided fields will be updated; omitted fields remain unchanged.`,
+  instructions: [
+    'Use manage_service_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

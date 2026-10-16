@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
@@ -42,7 +43,11 @@ export let getContact = SlateTool.create(spec, {
       })
       .describe('Provide one of contactId, email, or userId')
   )
-  .output(contactSchema)
+  .output(
+    contactSchema.extend({
+      rawResponse: z.any().optional().describe('Complete provider response data')
+    })
+  )
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
     let data: any;
@@ -54,26 +59,30 @@ export let getContact = SlateTool.create(spec, {
     } else if (ctx.input.userId) {
       data = await client.getContactByUserId(ctx.input.userId);
     } else {
-      throw new Error('Provide at least one of contactId, email, or userId');
+      throw createApiServiceError('Provide at least one of contactId, email, or userId');
     }
 
     let contact = data.contact || data;
 
     return {
       output: {
-        contactId: String(contact.id),
+        rawResponse: client.responses,
+        contactId: requiredId(contact.id),
         type: contact.type,
         name: contact.name,
         email: contact.email,
-        userId: contact.user_id ? String(contact.user_id) : undefined,
+        userId: contact.user_id !== undefined ? String(contact.user_id) : undefined,
         phone: contact.phone,
-        createdAt: contact.created_at ? String(contact.created_at) : undefined,
-        signedUpAt: contact.signed_up_at ? String(contact.signed_up_at) : undefined,
-        lastSeenAt: contact.last_seen_at ? String(contact.last_seen_at) : undefined,
-        lastContactedAt: contact.last_contacted_at
-          ? String(contact.last_contacted_at)
-          : undefined,
-        updatedAt: contact.updated_at ? String(contact.updated_at) : undefined,
+        createdAt: contact.created_at !== undefined ? String(contact.created_at) : undefined,
+        signedUpAt:
+          contact.signed_up_at !== undefined ? String(contact.signed_up_at) : undefined,
+        lastSeenAt:
+          contact.last_seen_at !== undefined ? String(contact.last_seen_at) : undefined,
+        lastContactedAt:
+          contact.last_contacted_at !== undefined
+            ? String(contact.last_contacted_at)
+            : undefined,
+        updatedAt: contact.updated_at !== undefined ? String(contact.updated_at) : undefined,
         sessionCount: contact.session_count,
         avatar: contact.avatar,
         landingUrl: contact.landing_url,

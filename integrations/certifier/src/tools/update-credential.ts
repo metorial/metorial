@@ -1,15 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type UpdateCredentialParams } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateCredential = SlateTool.create(spec, {
   name: 'Update Credential',
   key: 'update_credential',
-  description: `Update an existing credential's recipient name, dates, or custom attributes. Only provided fields are updated; omitted fields remain unchanged.`,
+  description: `Update an existing credential's recipient name, email, dates, or custom attributes. Only provided fields are updated; omitted fields remain unchanged.`,
   instructions: [
     'Set expiryDate to null to clear the expiration date.',
-    'Custom attribute keys must use the "custom." prefix.'
+    'Custom attribute keys must use the "custom." prefix.',
+    'When changing recipientId, provide the target recipientName and optionally recipientEmail. Omitted name/email values are inherited only when updating the current recipient.'
   ],
   tags: {
     destructive: false,
@@ -19,7 +20,24 @@ export let updateCredential = SlateTool.create(spec, {
   .input(
     z.object({
       credentialId: z.string().describe('ID of the credential to update'),
-      recipientName: z.string().optional().describe('Updated recipient name'),
+      recipientName: z
+        .string()
+        .optional()
+        .describe(
+          'Updated recipient name. Required when recipientId selects a different recipient.'
+        ),
+      recipientId: z
+        .string()
+        .optional()
+        .describe(
+          'Existing recipient ID to link. Normally resolved automatically from the credential; get_credential also returns it. Selecting a different ID requires recipientName.'
+        ),
+      recipientEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Updated recipient email address. When selecting a different recipientId, omitted email is not copied from the previous recipient.'
+        ),
       issueDate: z.string().optional().describe('Updated issuance date in YYYY-MM-DD format'),
       expiryDate: z
         .string()
@@ -49,9 +67,17 @@ export let updateCredential = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updateParams: Record<string, any> = {};
-    if (ctx.input.recipientName !== undefined) {
-      updateParams.recipient = { name: ctx.input.recipientName };
+    let updateParams: UpdateCredentialParams = {};
+    if (
+      ctx.input.recipientName !== undefined ||
+      ctx.input.recipientEmail !== undefined ||
+      ctx.input.recipientId !== undefined
+    ) {
+      updateParams.recipient = {
+        id: ctx.input.recipientId,
+        name: ctx.input.recipientName,
+        email: ctx.input.recipientEmail
+      };
     }
     if (ctx.input.issueDate !== undefined) {
       updateParams.issueDate = ctx.input.issueDate;

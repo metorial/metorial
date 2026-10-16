@@ -22,7 +22,12 @@ export let listProposals = SlateTool.create(spec, {
       page: z
         .number()
         .optional()
-        .describe('Page number for pagination. Increment until an empty list is returned.')
+        .describe('Page number for pagination. Increment until an empty list is returned.'),
+      perPage: z.number().optional().describe('Number of results per page'),
+      documentTypeId: z
+        .string()
+        .optional()
+        .describe('Document type ID. Call list_document_types to discover IDs.')
     })
   )
   .output(
@@ -36,9 +41,18 @@ export let listProposals = SlateTool.create(spec, {
 
     let result: any;
     if (ctx.input.status && ctx.input.status !== 'all') {
-      result = await client.listProposalsByStatus(ctx.input.status, ctx.input.page);
+      result = await client.listProposalsByStatus(
+        ctx.input.status,
+        ctx.input.page,
+        ctx.input.perPage,
+        ctx.input.documentTypeId
+      );
     } else {
-      result = await client.listProposals(ctx.input.page);
+      result = await client.listProposals(
+        ctx.input.page,
+        ctx.input.perPage,
+        ctx.input.documentTypeId
+      );
     }
 
     let proposals = Array.isArray(result.data)
@@ -49,7 +63,7 @@ export let listProposals = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         proposals
       },
       message: `Retrieved ${proposals.length} proposal(s)${ctx.input.status !== 'all' ? ` with status "${ctx.input.status}"` : ''}.`

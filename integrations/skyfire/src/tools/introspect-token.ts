@@ -24,7 +24,16 @@ export let introspectToken = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Remaining balance on the token (for PAY or KYA+PAY tokens)'),
-      validationError: z.string().optional().describe('Error message if the token is invalid')
+      validationError: z.string().optional().describe('Error message if the token is invalid'),
+      expiresAt: z
+        .number()
+        .optional()
+        .describe('Provider expiration timestamp in Unix seconds'),
+      chargeableUntil: z
+        .number()
+        .optional()
+        .describe('Latest charge timestamp in Unix seconds for a payment token'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -37,7 +46,7 @@ export let introspectToken = SlateTool.create(spec, {
       : `Token is **invalid**: ${result.validationError || 'unknown error'}.`;
 
     return {
-      output: result,
+      output: { ...result, raw: result },
       message
     };
   })

@@ -7,12 +7,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lowerdeck/error": "^1.1.0",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
+    "slates": "1.0.0-rc.28",
     "zod": "^4.2"
   },
   "devDependencies": {
     "typescript": "^5"
   },
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

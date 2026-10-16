@@ -1,13 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let filterConditionSchema = z
   .object({
     fieldId: z.string().describe('The field ID to filter on (e.g., "1000001")'),
     operator: z
-      .enum(['eq', 'regex', 'like', 'gte', 'lte', 'gt', 'lt'])
+      .enum(['eq', 'regex', 'like', 'gte', 'lte', 'gt', 'lt', 'eqeq'])
       .describe(
         'Filter operator: eq (equals), regex (regular expression), like (contains), gte/lte/gt/lt (comparison)'
       ),
@@ -28,7 +28,9 @@ export let listRecords = SlateTool.create(spec, {
     'Multiple filter conditions on different fields use AND logic. Multiple eq/like/regex on the same field use OR logic.',
     'Default limit is 1000 records. Use **limit** and **offset** for pagination.'
   ],
-  constraints: ['Maximum 1000 records returned per request by default'],
+  constraints: [
+    'The default limit is 1000 records; set limit and offset to page through results'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -104,11 +106,7 @@ export let listRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverDomain: ctx.config.serverDomain,
-      accountName: ctx.config.accountName
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let sheet = {
       tabFolder: ctx.input.tabFolder,
@@ -134,10 +132,13 @@ export let listRecords = SlateTool.create(spec, {
       reverse: ctx.input.reverseOrder
     });
 
-    let records = Object.entries(data).map(([recordId, recordData]: [string, any]) => ({
-      recordId,
-      fields: recordData
-    }));
+    let records = Object.entries(data).map(([recordId, recordData]) => {
+      if (!/^\d+$/.test(recordId) || !isApiErrorRecord(recordData))
+        throw createApiServiceError('Ragic returned an invalid record listing.', {
+          reason: 'invalid_response'
+        });
+      return { recordId, fields: recordData };
+    });
 
     return {
       output: {

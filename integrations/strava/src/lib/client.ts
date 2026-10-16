@@ -1,7 +1,17 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 let api = createAxios({
   baseURL: 'https://www.strava.com/api/v3'
+});
+
+api.interceptors.response.use(undefined, error => {
+  throw buildApiServiceError(error, {
+    providerLabel: 'Strava',
+    reason: 'strava_api_error',
+    extractResponse: (upstream, helpers) => helpers.getResponseWithBody(upstream),
+    detailKeys: ['message', 'resource', 'field', 'code'],
+    nestedKeys: ['errors']
+  });
 });
 
 export class Client {
@@ -31,7 +41,9 @@ export class Client {
   }
 
   async updateAthlete(params: { weight?: number }): Promise<any> {
-    let response = await api.put('/athlete', params, { headers: this.headers });
+    let response = await api.put('/athlete', params, {
+      headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   }
 
@@ -87,7 +99,7 @@ export class Client {
         commute: params.commute ? 1 : 0,
         hide_from_home: params.hideFromHome
       },
-      { headers: this.headers }
+      { headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     return response.data;
   }
@@ -113,12 +125,14 @@ export class Client {
     if (params.hideFromHome !== undefined) body.hide_from_home = params.hideFromHome;
     if (params.gearId !== undefined) body.gear_id = params.gearId;
 
-    let response = await api.put(`/activities/${activityId}`, body, { headers: this.headers });
+    let response = await api.put(`/activities/${activityId}`, body, {
+      headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   }
 
   async getActivityComments(
-    activityId: number,
+    activityId: number | string,
     params?: {
       page?: number;
       perPage?: number;
@@ -172,7 +186,7 @@ export class Client {
       headers: this.headers,
       params: {
         keys: streamTypes.join(','),
-        key_type: 'time'
+        key_by_type: true
       }
     });
     return response.data;
@@ -252,14 +266,14 @@ export class Client {
       {
         starred
       },
-      { headers: this.headers }
+      { headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     return response.data;
   }
 
   // ── Segment Efforts ──
 
-  async getSegmentEffort(effortId: number): Promise<any> {
+  async getSegmentEffort(effortId: number | string): Promise<any> {
     let response = await api.get(`/segment_efforts/${effortId}`, { headers: this.headers });
     return response.data;
   }
@@ -272,9 +286,10 @@ export class Client {
       perPage?: number;
     }
   ): Promise<any[]> {
-    let response = await api.get(`/segments/${segmentId}/all_efforts`, {
+    let response = await api.get('/segment_efforts', {
       headers: this.headers,
       params: {
+        segment_id: segmentId,
         start_date_local: params?.startDateLocal,
         end_date_local: params?.endDateLocal,
         per_page: params?.perPage
@@ -283,18 +298,39 @@ export class Client {
     return response.data;
   }
 
-  async getSegmentEffortStreams(effortId: number, streamTypes: string[]): Promise<any> {
+  async getSegmentEffortStreams(
+    effortId: number | string,
+    streamTypes: string[]
+  ): Promise<any> {
     let response = await api.get(`/segment_efforts/${effortId}/streams`, {
       headers: this.headers,
       params: {
         keys: streamTypes.join(','),
-        key_type: 'time'
+        key_by_type: true
       }
     });
     return response.data;
   }
 
+  async getSegmentStreams(segmentId: number | string, streamTypes: string[]): Promise<any> {
+    let response = await api.get(`/segments/${segmentId}/streams`, {
+      headers: this.headers,
+      params: { keys: streamTypes.join(','), key_by_type: true }
+    });
+    return response.data;
+  }
+
   // ── Routes ──
+
+  async getRouteDetails(routeId: string): Promise<any> {
+    let response = await api.get(`/routes/${routeId}`, { headers: this.headers });
+    return response.data;
+  }
+
+  async getRouteDetailsStreams(routeId: string): Promise<any> {
+    let response = await api.get(`/routes/${routeId}/streams`, { headers: this.headers });
+    return response.data;
+  }
 
   async getRoute(routeId: number): Promise<any> {
     let response = await api.get(`/routes/${routeId}`, { headers: this.headers });

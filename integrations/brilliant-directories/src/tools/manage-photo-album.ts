@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,6 +28,10 @@ Covers photo albums, products, digital products, properties, and classifieds.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       album: z.any().describe('The photo album record(s) returned.')
     })
   )
@@ -40,18 +44,21 @@ Covers photo albums, products, digital products, properties, and classifieds.`,
     let result: any;
     if (ctx.input.groupId) {
       result = await client.getPortfolioGroup(ctx.input.groupId);
-    } else if (ctx.input.property && ctx.input.propertyValue) {
+    } else if (ctx.input.property && ctx.input.propertyValue !== undefined) {
       result = await client.getPortfolioGroupByProperty(
         ctx.input.property,
         ctx.input.propertyValue
       );
     } else {
-      throw new Error('Either groupId or both property and propertyValue must be provided.');
+      throw createApiServiceError(
+        'Either groupId or both property and propertyValue must be provided.'
+      );
     }
 
     return {
       output: {
         status: result.status,
+        raw: result,
         album: result.message
       },
       message: `Retrieved photo album data successfully.`
@@ -77,7 +84,12 @@ Supports photo albums, products, digital products, properties, and classifieds w
       groupDescription: z.string().optional().describe('Description of the album.'),
       groupLocation: z.string().optional().describe('Location associated with the album.'),
       groupCategory: z.string().optional().describe('Category of the album.'),
-      groupStatus: z.string().optional().describe('Status (e.g., "active", "pending").'),
+      groupStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Provider status code: "0" for hidden, "1" for published, or "3" for pending approval.'
+        ),
       postImage: z.string().optional().describe('Comma-separated image URLs for the album.'),
       postTags: z.string().optional().describe('Comma-separated tags.'),
       autoImageImport: z.boolean().optional().describe('Whether to auto-import images.'),
@@ -99,6 +111,10 @@ Supports photo albums, products, digital products, properties, and classifieds w
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       album: z.any().describe('The newly created album record.')
     })
   )
@@ -140,6 +156,7 @@ Supports photo albums, products, digital products, properties, and classifieds w
     return {
       output: {
         status: result.status,
+        raw: result,
         album: result.message
       },
       message: `Created photo album${ctx.input.groupName ? ` **"${ctx.input.groupName}"**` : ''}.`
@@ -172,6 +189,10 @@ export let updatePhotoAlbum = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       album: z.any().describe('The updated album record.')
     })
   )
@@ -203,6 +224,7 @@ export let updatePhotoAlbum = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         album: result.message
       },
       message: `Updated photo album **${ctx.input.groupId}**.`
@@ -226,6 +248,10 @@ export let deletePhotoAlbum = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       confirmation: z.string().describe('Confirmation message from the API.')
     })
   )
@@ -240,6 +266,7 @@ export let deletePhotoAlbum = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         confirmation:
           typeof result.message === 'string' ? result.message : JSON.stringify(result.message)
       },
@@ -265,8 +292,13 @@ export let searchPhotoAlbums = SlateTool.create(spec, {
       bedrooms: z.string().optional().describe('Number of bedrooms filter.'),
       bathrooms: z.string().optional().describe('Number of bathrooms filter.'),
       price: z.string().optional().describe('Price filter.'),
-      limit: z.number().optional().describe('Number of results per page (20-100).'),
-      page: z.string().optional().describe('Pagination token.'),
+      limit: z.number().optional().describe('Number of results per page (1-100).'),
+      page: z
+        .string()
+        .optional()
+        .describe(
+          'Page number as a string for the search endpoint. For cursor pagination, use list_records.'
+        ),
       outputType: z.enum(['array', 'html']).optional().describe('Output format.'),
       additionalFilters: z
         .record(z.string(), z.string())
@@ -277,6 +309,10 @@ export let searchPhotoAlbums = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       albums: z.any().describe('The search results.')
     })
   )
@@ -294,7 +330,7 @@ export let searchPhotoAlbums = SlateTool.create(spec, {
     if (ctx.input.bedrooms) params.bedrooms = ctx.input.bedrooms;
     if (ctx.input.bathrooms) params.bathrooms = ctx.input.bathrooms;
     if (ctx.input.price) params.price = ctx.input.price;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
     if (ctx.input.page) params.page = ctx.input.page;
     if (ctx.input.outputType) params.output_type = ctx.input.outputType;
     if (ctx.input.additionalFilters) {
@@ -308,6 +344,7 @@ export let searchPhotoAlbums = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         albums: result.message
       },
       message: `Found photo albums matching the search criteria.`

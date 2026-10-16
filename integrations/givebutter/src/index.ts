@@ -7,8 +7,10 @@ import {
   createTransaction,
   deleteCampaign,
   deleteFund,
+  getAccount,
   getCampaign,
   getContact,
+  getFund,
   getPayout,
   getPlan,
   getTicket,
@@ -22,6 +24,7 @@ import {
   listPlans,
   listTickets,
   listTransactions,
+  manageContactTags,
   updateCampaign,
   updateContact,
   updateFund
@@ -29,6 +32,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getAccount,
+    getFund,
+    manageContactTags,
     listCampaigns,
     getCampaign,
     createCampaign,

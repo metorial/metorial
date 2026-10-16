@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,12 +53,9 @@ Each workspace includes a dedicated Steampipe database instance, Powerpipe serve
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listUserWorkspaces']>>;
 
     if (ctx.input.scope === 'user') {
       let userHandle = ctx.input.userHandle;
@@ -72,7 +69,10 @@ Each workspace includes a dedicated Steampipe database instance, Powerpipe serve
       });
     } else if (ctx.input.scope === 'org') {
       if (!ctx.input.orgHandle) {
-        throw new Error('orgHandle is required when scope is "org"');
+        throw createApiServiceError(
+          'orgHandle is required when scope is "org". Call list_organizations to discover organization handles.',
+          { reason: 'invalid_input' }
+        );
       }
       result = await client.listOrgWorkspaces(ctx.input.orgHandle, {
         limit: ctx.input.limit,

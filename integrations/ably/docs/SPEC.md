@@ -1,4 +1,4 @@
-# Slates Specification for Ably
+# Ably Integration Specification
 
 ## Overview
 
@@ -26,7 +26,7 @@ Ably supports two main authentication schemes: basic authentication and token au
 - Tokens are short-lived and may be issued with a particular scope, such as a limited set of access rights or capabilities, or being limited to use by a specific clientId identity.
 - Token request endpoint: `POST https://rest.ably.io/keys/{keyName}/requestToken`
 
-**Capability operations** available for API keys and tokens: channel-metadata, history, presence, publish, push-admin, push-subscribe, statistics, subscribe.
+**Capability operations** available for API keys and tokens: channel-metadata, history, presence, presence-subscribe, publish, push-admin, push-subscribe, stats, subscribe. The `stats` operation must be assigned to the wildcard resource `*` (or a resource that includes it), for example `{"*":["stats"]}`. Current presence retrieval requires `presence-subscribe` or the broader `subscribe` capability on the channel; `presence` grants presence registration (enter, update, leave). Retrieving presence history requires `history`.
 
 ### Control API
 
@@ -120,3 +120,18 @@ The following event sources can trigger webhook notifications:
 - Payloads can be enveloped (wrapped with metadata) or sent as raw message data.
 - Encoding can be JSON or MsgPack.
 - Pre-built integrations are available for AWS Lambda, Azure Functions, Google Cloud Functions, Zapier, Cloudflare Workers, IFTTT, and generic HTTP endpoints.
+
+
+## Tool coverage and API boundaries
+
+The Pub/Sub REST API category contains publishing, message/presence history, current presence, channel metadata/enumeration, application statistics, token issuance/revocation, and service time. The Control API category contains infrastructure management and account/app statistics. `who_am_i` is an uncategorized read-only Control API identity operation: use its account ID with `manage_apps` (list), then pass the chosen app ID to other Control tools. Both existing credential methods and optional saved config defaults remain supported; tool IDs override those defaults.
+
+Paginated Pub/Sub read operations return `nextPageUrl`. Pass it unchanged as `page` to the same operation and channel; the provider's opaque query is retained, and new filters are ignored for continuation requests. Channels may be duplicated across pages or a page may be empty while another page remains. Enumeration permits only one in-flight request per app. Messages and presence records retain their complete original metadata in `raw`; numeric presence actions map to their documented string names.
+
+Unsigned token requests include the key name, a current request timestamp, a cryptographically random nonce, and JSON-encoded capabilities. These are generated request parameters; returned token data and expiry remain actual provider values. No identity or discovery request is added before existing writes.
+
+Queue TTL is documented in **minutes** by the Control API. Prefer `ttlMinutes`; it takes precedence over `ttl`. The legacy `ttl` input and its historical unchanged numeric request value are preserved for existing callers, including its old seconds label. No conversion or new defaults are applied to that legacy field. The provider requires TTL, max length, and region when creating queues; supply them explicitly for new requests. The integration does not newly require fields omitted by old callers.
+
+Control statistics use the official OpenAPI's `GET /accounts/{id}/stats` and `GET /apps/{id}/stats` query parameters. The prose app-statistics example currently shows POST; the machine-readable API contract specifies GET.
+
+Official references: [REST API](https://ably.com/docs/api/rest-api), [Token request specification](https://ably.com/docs/api/token-request-spec), [Control API guide](https://ably.com/docs/platform/account/control-api), and [Control OpenAPI](https://ably.com/docs/open-specs/control-v1.yaml).

@@ -48,8 +48,9 @@ export let searchJobsTool = SlateTool.create(spec, {
           })
         )
         .describe('List of matching jobs'),
-      total: z.number().describe('Total number of matching jobs'),
-      page: z.number().describe('Current page number')
+      total: z.number().optional().describe('Total number of matching jobs'),
+      page: z.number().describe('Current page number'),
+      links: z.record(z.string(), z.unknown()).optional().describe('Provider pagination links')
     })
   )
   .handleInvocation(async ctx => {
@@ -71,8 +72,8 @@ export let searchJobsTool = SlateTool.create(spec, {
 
     let jobs = result.jobs.map(j => ({
       jobId: j.id ? String(j.id) : undefined,
-      doNumber: String(j.do_number ?? ''),
-      date: String(j.date ?? ''),
+      doNumber: j.do_number,
+      date: j.date,
       type: j.type ? String(j.type) : undefined,
       status: j.status ? String(j.status) : undefined,
       assignTo: j.assign_to ? String(j.assign_to) : undefined,
@@ -87,9 +88,10 @@ export let searchJobsTool = SlateTool.create(spec, {
       output: {
         jobs,
         total: result.total,
-        page: result.page
+        page: result.page,
+        links: result.links
       },
-      message: `Search found **${result.total}** job(s) (page ${result.page}). Showing ${jobs.length} result(s).`
+      message: `Showing **${jobs.length}** job(s) on page ${result.page}.${result.total !== undefined ? ` Total matching jobs: ${result.total}.` : ''}`
     };
   })
   .build();

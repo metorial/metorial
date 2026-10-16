@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -74,6 +74,9 @@ Provide the calibration ID and any fields to update. Only the specified fields w
     if (ctx.input.calibrationEnvironment !== undefined)
       data.CalibrationEnvironment = ctx.input.calibrationEnvironment;
 
+    if (Object.keys(data).length === 1) {
+      throw createApiServiceError('Provide at least one calibration field to update.');
+    }
     let result = await client.updateCalibration(data);
 
     return {

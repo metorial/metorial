@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutId, requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
 
 let categorySchema = z
@@ -15,6 +16,7 @@ let categorySchema = z
 let subcategorySchema = z
   .object({
     subCategoryId: z.string().describe('Subcategory identifier'),
+    categoryId: z.string().optional().describe('Parent category ID'),
     name: z.string().describe('Subcategory name'),
     cityCode: z.string().optional().describe('City code'),
     canonicalUrl: z.string().optional().describe('Subcategory page URL')
@@ -43,7 +45,7 @@ Categories (e.g., "Tickets", "Tours") and subcategories (e.g., "Landmarks", "Mus
       languageCode: z
         .string()
         .optional()
-        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL)')
+        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL, PL)')
     })
   )
   .output(
@@ -68,9 +70,10 @@ Categories (e.g., "Tickets", "Tours") and subcategories (e.g., "Landmarks", "Mus
     let categoriesResult = await client.listCategories(ctx.input.cityCode, langParams);
     let categories = (categoriesResult.items ?? categoriesResult.categories ?? []).map(
       (c: any) => ({
-        categoryId: String(c.id ?? c.categoryId ?? ''),
-        name: c.name ?? '',
-        cityCode: c.cityCode,
+        ...c,
+        categoryId: requireHeadoutId(c?.id ?? c?.categoryId, 'category ID'),
+        name: requireHeadoutText(c.name, 'category name'),
+        cityCode: c.cityCode ?? ctx.input.cityCode,
         canonicalUrl: c.canonicalUrl
       })
     );
@@ -82,12 +85,18 @@ Categories (e.g., "Tickets", "Tours") and subcategories (e.g., "Landmarks", "Mus
       let subcategoriesResult = await client.listSubcategories(ctx.input.cityCode, langParams);
       subcategories = (
         subcategoriesResult.items ??
+        subcategoriesResult.subCategories ??
         subcategoriesResult.subcategories ??
         []
       ).map((s: any) => ({
-        subCategoryId: String(s.id ?? s.subCategoryId ?? ''),
-        name: s.name ?? '',
-        cityCode: s.cityCode,
+        ...s,
+        categoryId:
+          s?.categoryId != null
+            ? requireHeadoutId(s.categoryId, 'parent category ID')
+            : undefined,
+        subCategoryId: requireHeadoutId(s?.id ?? s?.subCategoryId, 'subcategory ID'),
+        name: requireHeadoutText(s.name, 'subcategory name'),
+        cityCode: s.cityCode ?? ctx.input.cityCode,
         canonicalUrl: s.canonicalUrl
       }));
     }

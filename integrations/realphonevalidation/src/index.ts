@@ -7,6 +7,7 @@ import {
   identifyPhoneType,
   scoreFraudRisk,
   scrubPhone,
+  validateEmailLightning,
   validatePhone,
   verifyEmail
 } from './tools';
@@ -21,7 +22,8 @@ export let provider = Slate.create({
     dncLookup,
     scoreFraudRisk,
     checkReassignedNumber,
-    verifyEmail
+    verifyEmail,
+    validateEmailLightning
   ],
   triggers: []
 });

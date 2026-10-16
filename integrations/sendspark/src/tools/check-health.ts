@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let checkHealth = SlateTool.create(spec, {
@@ -15,24 +15,25 @@ export let checkHealth = SlateTool.create(spec, {
   .output(
     z.object({
       healthy: z.boolean(),
-      message: z.string()
+      message: z.string(),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
     let result = await client.healthCheck();
+    if (typeof result?.message !== 'string') {
+      throw createApiServiceError('Sendspark did not return an API health message.');
+    }
 
     return {
       output: {
         healthy: true,
-        message: result.message || 'API is operational'
+        message: result.message,
+        raw: result
       },
-      message: `Sendspark API is **healthy**: ${result.message || 'everything is ok!'}`
+      message: `Sendspark API health response: ${result.message}`
     };
   })
   .build();

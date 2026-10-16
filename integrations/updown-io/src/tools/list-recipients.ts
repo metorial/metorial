@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { recipientSchema } from '../lib/types';
+import { listedRecipientSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let listRecipients = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ export let listRecipients = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      recipients: z.array(recipientSchema).describe('List of all alert recipients')
+      recipients: z.array(listedRecipientSchema).describe('List of all alert recipients')
     })
   )
   .handleInvocation(async ctx => {

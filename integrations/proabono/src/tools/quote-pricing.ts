@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -45,9 +45,21 @@ Use this to show customers the correct charge before confirming an action.`,
       referenceCustomer: z.string().optional().describe('Customer reference'),
       referenceOffer: z.string().optional().describe('Offer reference'),
       referenceSegment: z.string().optional().describe('Segment reference'),
-      referenceSubscription: z.string().optional().describe('Subscription reference'),
-      subscriptionId: z.number().optional().describe('Subscription ID'),
+      referenceSubscription: z
+        .string()
+        .optional()
+        .describe('Legacy field; use subscriptionId or referenceCustomer for the Live API'),
+      subscriptionId: z
+        .number()
+        .optional()
+        .describe(
+          'Subscription ID for start/upgrade/usage quotes. Discover IDs with manage_subscriptions list'
+        ),
       referenceFeature: z.string().optional().describe('Feature reference for usage quotes'),
+      dateStamp: z
+        .string()
+        .optional()
+        .describe('For usage_update: required UTC timestamp of the usage event (ISO 8601).'),
       increment: z.number().optional().describe('Usage increment for quote'),
       quantityCurrent: z.number().optional().describe('Usage quantity for quote'),
       isEnabled: z.boolean().optional().describe('Feature toggle for quote'),
@@ -73,8 +85,9 @@ Use this to show customers the correct charge before confirming an action.`,
     let { quoteType } = ctx.input;
 
     if (quoteType === 'subscription_creation') {
-      if (!ctx.input.referenceOffer) throw new Error('referenceOffer is required');
-      if (!ctx.input.referenceCustomer) throw new Error('referenceCustomer is required');
+      if (!ctx.input.referenceOffer) throw createApiServiceError('referenceOffer is required');
+      if (!ctx.input.referenceCustomer)
+        throw createApiServiceError('referenceCustomer is required');
       let result = await client.quoteSubscriptionCreation({
         ReferenceOffer: ctx.input.referenceOffer,
         ReferenceCustomer: ctx.input.referenceCustomer,
@@ -84,43 +97,69 @@ Use this to show customers the correct charge before confirming an action.`,
       let quote = mapQuote(result);
       return {
         output: { quote },
-        message: `Subscription creation quote: **${quote.amountTotal ?? 0} cents** total (subtotal: ${quote.amountSubtotal ?? 0}, recurring: ${quote.amountRecurrence ?? 0})`
+        message:
+          quote.amountTotal === undefined
+            ? 'Computed subscription creation pricing.'
+            : `Subscription creation quote: **${quote.amountTotal} cents** total`
       };
     }
 
     if (quoteType === 'subscription_upgrade') {
-      if (!ctx.input.referenceCustomer) throw new Error('referenceCustomer is required');
-      if (!ctx.input.referenceOffer) throw new Error('referenceOffer is required');
+      if (!ctx.input.referenceOffer) throw createApiServiceError('referenceOffer is required');
       let result = await client.quoteSubscriptionUpgrade({
         ReferenceCustomer: ctx.input.referenceCustomer,
+        ReferenceSubscription: ctx.input.referenceSubscription,
+        IdSubscription: ctx.input.subscriptionId,
         ReferenceOffer: ctx.input.referenceOffer,
         ...(ctx.input.overrides || {})
       });
       let quote = mapQuote(result);
       return {
         output: { quote },
-        message: `Subscription upgrade quote: **${quote.amountTotal ?? 0} cents** total`
+        message:
+          quote.amountTotal === undefined
+            ? 'Computed subscription upgrade pricing.'
+            : `Subscription upgrade quote: **${quote.amountTotal} cents** total`
       };
     }
 
     if (quoteType === 'subscription_start') {
       let result = await client.quoteSubscriptionStart({
         ReferenceSubscription: ctx.input.referenceSubscription,
-        IdSubscription: ctx.input.subscriptionId
+        IdSubscription: ctx.input.subscriptionId,
+        ReferenceCustomer: ctx.input.referenceCustomer
       });
       let quote = mapQuote(result);
       return {
         output: { quote },
-        message: `Subscription start quote: **${quote.amountTotal ?? 0} cents** total`
+        message:
+          quote.amountTotal === undefined
+            ? 'Computed subscription start pricing.'
+            : `Subscription start quote: **${quote.amountTotal} cents** total`
       };
     }
 
     if (quoteType === 'usage_update') {
-      if (!ctx.input.referenceFeature) throw new Error('referenceFeature is required');
-      if (!ctx.input.referenceCustomer) throw new Error('referenceCustomer is required');
+      if (!ctx.input.referenceFeature)
+        throw createApiServiceError('referenceFeature is required');
+      if (!ctx.input.referenceCustomer)
+        throw createApiServiceError('referenceCustomer is required');
+      if (!ctx.input.dateStamp)
+        throw createApiServiceError('dateStamp is required for usage_update.');
+      let operations = [
+        ctx.input.increment,
+        ctx.input.quantityCurrent,
+        ctx.input.isEnabled
+      ].filter(value => value !== undefined);
+      if (operations.length !== 1)
+        throw createApiServiceError(
+          'Provide exactly one of increment, quantityCurrent, or isEnabled.'
+        );
       let result = await client.quoteUsageUpdate({
+        DateStamp: ctx.input.dateStamp,
         ReferenceFeature: ctx.input.referenceFeature,
         ReferenceCustomer: ctx.input.referenceCustomer,
+        IdSubscription: ctx.input.subscriptionId,
         Increment: ctx.input.increment,
         QuantityCurrent: ctx.input.quantityCurrent,
         IsEnabled: ctx.input.isEnabled
@@ -128,13 +167,17 @@ Use this to show customers the correct charge before confirming an action.`,
       let quote = mapQuote(result);
       return {
         output: { quote },
-        message: `Usage update quote: **${quote.amountTotal ?? 0} cents** total`
+        message:
+          quote.amountTotal === undefined
+            ? 'Computed usage update pricing.'
+            : `Usage update quote: **${quote.amountTotal} cents** total`
       };
     }
 
     if (quoteType === 'balance_line') {
-      if (!ctx.input.referenceCustomer) throw new Error('referenceCustomer is required');
-      if (ctx.input.amount == null) throw new Error('amount is required');
+      if (!ctx.input.referenceCustomer)
+        throw createApiServiceError('referenceCustomer is required');
+      if (ctx.input.amount == null) throw createApiServiceError('amount is required');
       let result = await client.quoteBalanceLine({
         ReferenceCustomer: ctx.input.referenceCustomer,
         Amount: ctx.input.amount,
@@ -143,11 +186,14 @@ Use this to show customers the correct charge before confirming an action.`,
       let quote = mapQuote(result);
       return {
         output: { quote },
-        message: `Balance line quote: **${quote.amountTotal ?? 0} cents** total`
+        message:
+          quote.amountTotal === undefined
+            ? 'Computed balance line pricing.'
+            : `Balance line quote: **${quote.amountTotal} cents** total`
       };
     }
 
-    throw new Error(`Unknown quote type: ${quoteType}`);
+    throw createApiServiceError(`Unknown quote type: ${quoteType}`);
   })
   .build();
 

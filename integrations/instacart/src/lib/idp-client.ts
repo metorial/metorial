@@ -1,3 +1,4 @@
+import { createApiServiceError } from 'slates';
 import { createAuthenticatedAxios } from './client';
 
 export interface RecipeLineItem {
@@ -11,6 +12,8 @@ export interface RecipeLineItem {
   }>;
   filters?: {
     brandName?: string;
+    brandFilters?: string[];
+    healthFilters?: string[];
     healthAttributes?: string[];
   };
 }
@@ -36,11 +39,14 @@ export interface ShoppingListLineItem {
   name: string;
   quantity?: number;
   unit?: string;
+  lineItemMeasurements?: Array<{ quantity?: number; unit?: string }>;
   displayText?: string;
   productIds?: number[];
   upcs?: string[];
   filters?: {
     brandName?: string;
+    brandFilters?: string[];
+    healthFilters?: string[];
     healthAttributes?: string[];
   };
 }
@@ -69,7 +75,7 @@ export class IdpClient {
 
   async createRecipePage(
     params: CreateRecipePageParams
-  ): Promise<{ productsLinkUrl: string }> {
+  ): Promise<{ productsLinkUrl: string; raw: unknown }> {
     let axios = createAuthenticatedAxios(this.token, this.environment);
 
     let body: Record<string, unknown> = {
@@ -87,8 +93,10 @@ export class IdpClient {
         }
         if (item.filters) {
           lineItem.filters = {
-            brand_name: item.filters.brandName,
-            health_attributes: item.filters.healthAttributes
+            brand_filters:
+              item.filters.brandFilters ??
+              (item.filters.brandName !== undefined ? [item.filters.brandName] : undefined),
+            health_filters: item.filters.healthFilters ?? item.filters.healthAttributes
           };
         }
         return lineItem;
@@ -112,12 +120,14 @@ export class IdpClient {
     }
 
     let response = await axios.post('/idp/v1/products/recipe', body);
-    return { productsLinkUrl: response.data.products_link_url };
+    if (typeof response.data.products_link_url !== 'string')
+      throw createApiServiceError('Instacart did not return a page URL.');
+    return { productsLinkUrl: response.data.products_link_url, raw: response.data };
   }
 
   async createShoppingListPage(
     params: CreateShoppingListPageParams
-  ): Promise<{ productsLinkUrl: string }> {
+  ): Promise<{ productsLinkUrl: string; raw: unknown }> {
     let axios = createAuthenticatedAxios(this.token, this.environment);
 
     let body: Record<string, unknown> = {
@@ -126,13 +136,17 @@ export class IdpClient {
         let lineItem: Record<string, unknown> = { name: item.name };
         if (item.quantity !== undefined) lineItem.quantity = item.quantity;
         if (item.unit) lineItem.unit = item.unit;
+        if (item.lineItemMeasurements !== undefined)
+          lineItem.line_item_measurements = item.lineItemMeasurements;
         if (item.displayText) lineItem.display_text = item.displayText;
         if (item.productIds) lineItem.product_ids = item.productIds;
         if (item.upcs) lineItem.upcs = item.upcs;
         if (item.filters) {
           lineItem.filters = {
-            brand_name: item.filters.brandName,
-            health_attributes: item.filters.healthAttributes
+            brand_filters:
+              item.filters.brandFilters ??
+              (item.filters.brandName !== undefined ? [item.filters.brandName] : undefined),
+            health_filters: item.filters.healthFilters ?? item.filters.healthAttributes
           };
         }
         return lineItem;
@@ -151,7 +165,9 @@ export class IdpClient {
     }
 
     let response = await axios.post('/idp/v1/products/products_link', body);
-    return { productsLinkUrl: response.data.products_link_url };
+    if (typeof response.data.products_link_url !== 'string')
+      throw createApiServiceError('Instacart did not return a page URL.');
+    return { productsLinkUrl: response.data.products_link_url, raw: response.data };
   }
 
   async getNearbyRetailers(
@@ -159,9 +175,10 @@ export class IdpClient {
     countryCode: string
   ): Promise<
     Array<{
-      retailerKey: string;
-      name: string;
-      retailerLogoUrl: string;
+      retailerKey?: string;
+      name?: string;
+      retailerLogoUrl?: string;
+      raw?: unknown;
     }>
   > {
     let axios = createAuthenticatedAxios(this.token, this.environment);
@@ -175,9 +192,10 @@ export class IdpClient {
 
     let retailers = response.data.retailers || [];
     return retailers.map((r: Record<string, unknown>) => ({
-      retailerKey: r.retailer_key as string,
-      name: r.name as string,
-      retailerLogoUrl: r.retailer_logo_url as string
+      raw: r,
+      retailerKey: r.retailer_key as string | undefined,
+      name: r.name as string | undefined,
+      retailerLogoUrl: r.retailer_logo_url as string | undefined
     }));
   }
 }

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RealtimeClient } from '../lib/realtime-client';
+import { createRealtimeClient, realtimeRecords } from '../lib/realtime-client';
 import { spec } from '../spec';
 
 export let getBars = SlateTool.create(spec, {
@@ -11,7 +11,7 @@ Use this to create charts or analyze price history. Requires OAuth2 authenticati
   instructions: [
     'Requires OAuth2 Client Credentials authentication (not API Key).',
     'Use barPrecision to set the interval (e.g., "1day" for daily bars, "5minute" for 5-minute bars).',
-    'Use dateRange to specify the lookback period (e.g., "1m" for 1 month, "1y" for 1 year).'
+    'Use dateRange to specify the lookback period. Supported pairs: 1d with 1minute/5minute; 5d with 5minute/10minute/15minute/30minute; 1m/3m/6m/ytd with 1day; 1y with 1day/1week; 5y/max with 1week/1month.'
   ],
   tags: {
     readOnly: true
@@ -34,11 +34,13 @@ Use this to create charts or analyze price history. Requires OAuth2 authenticati
           '1month'
         ])
         .optional()
-        .describe('Time interval for each bar.'),
+        .describe(
+          'Time interval for each bar. Defaults to 1day; choose an interval supported for the requested date range.'
+        ),
       dateRange: z
         .enum(['1d', '5d', '1m', '3m', '6m', '1y', '5y', 'max', 'ytd'])
         .optional()
-        .describe('Date range for the bar data.'),
+        .describe('Date range for the bar data. Defaults to 1m.'),
       source: z.enum(['Nasdaq', 'CQT']).optional().describe('Data source.'),
       offset: z
         .enum(['realtime', 'delayed'])
@@ -54,27 +56,7 @@ Use this to create charts or analyze price history. Requires OAuth2 authenticati
     })
   )
   .handleInvocation(async ctx => {
-    if (
-      ctx.auth.authMethod !== 'oauth' ||
-      !ctx.auth.baseUrl ||
-      !ctx.auth.oauthToken ||
-      !ctx.auth.tokenEndpoint ||
-      !ctx.auth.clientId ||
-      !ctx.auth.clientSecret
-    ) {
-      throw new Error(
-        'This tool requires OAuth2 Client Credentials authentication. Please use the OAuth2 authentication method.'
-      );
-    }
-
-    let client = new RealtimeClient({
-      baseUrl: ctx.auth.baseUrl,
-      oauthToken: ctx.auth.oauthToken,
-      tokenEndpoint: ctx.auth.tokenEndpoint,
-      clientId: ctx.auth.clientId,
-      clientSecret: ctx.auth.clientSecret,
-      oauthTokenExpiresAt: ctx.auth.oauthTokenExpiresAt || ''
-    });
+    let client = createRealtimeClient(ctx.auth);
 
     let result = await client.getBars({
       symbols: ctx.input.symbols,
@@ -84,13 +66,13 @@ Use this to create charts or analyze price history. Requires OAuth2 authenticati
       offset: ctx.input.offset
     });
 
-    let bars = Array.isArray(result) ? result : [result];
+    let bars = realtimeRecords(result, 'bars');
 
     return {
       output: {
         bars
       },
-      message: `Retrieved ${ctx.input.barPrecision || 'default'} bar data for **${ctx.input.symbols.join(', ')}** over ${ctx.input.dateRange || 'default'} range.`
+      message: `Retrieved ${ctx.input.barPrecision || '1day'} bar data for **${ctx.input.symbols.join(', ')}** over ${ctx.input.dateRange || '1m'} range.`
     };
   })
   .build();

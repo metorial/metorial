@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity } from '../lib/response';
 import { spec } from '../spec';
 
 export let triggerAutomation = SlateTool.create(spec, {
   name: 'Trigger Automation',
   key: 'trigger_automation',
-  description: `Trigger an automation run for a specific contact. Automations are workflows configured in the Piggy dashboard that can send emails, award credits, or perform other actions. Optionally list available automations.`
+  description: `Trigger a contact_updated automation run for a specific contact. Automations are workflows configured in the Piggy dashboard that can send emails, award credits, or perform other actions. Optionally list available automations.`
 })
   .input(
     z.object({
@@ -55,19 +56,22 @@ export let triggerAutomation = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let result = await client.listAutomations();
-      let automations = (result.data || []).map((a: any) => ({
-        automationUuid: a.uuid,
-        name: a.name,
-        ...a
-      }));
+      let automations = result.data.map((a: any) =>
+        mapEntity(a, {
+          automationUuid: a.uuid,
+          name: a.name
+        })
+      );
       return {
         output: { automations },
         message: `Retrieved **${automations.length}** automation(s).`
       };
     }
 
-    if (!ctx.input.automationUuid) throw new Error('automationUuid is required for trigger');
-    if (!ctx.input.contactUuid) throw new Error('contactUuid is required for trigger');
+    if (!ctx.input.automationUuid)
+      throw createApiServiceError('automationUuid is required for trigger');
+    if (!ctx.input.contactUuid)
+      throw createApiServiceError('contactUuid is required for trigger');
 
     await client.triggerAutomationRun({
       automationUuid: ctx.input.automationUuid,

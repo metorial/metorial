@@ -1,86 +1,31 @@
-Let me fetch the Swagger spec to get more details on the API endpoints.Now let me check the Pipedream source code for more details about the webhook subscription endpoints:Now I have enough information to write the specification.
+# WaiverFile API integration
 
-# Slates Specification for Waiverfile
-
-## Overview
-
-WaiverFile is an online waiver form system that allows individuals to sign their release waivers from a computer, tablet, or mobile device. The API provides access to manage and retrieve waivers, customer data, and events, allowing integration with other services.
+WaiverFile manages signed waivers, waiver form definitions, and events. Signer and participant data remains in the complete provider response, including provider IDs, reference IDs, custom fields, and null values.
 
 ## Authentication
 
-WaiverFile uses API keys for authentication. Every API call requires two credentials:
+Use the API Key and Site ID shown under **Settings → API → API Keys** in the WaiverFile dashboard. Both are authentication credentials. The Site ID is stored with the API key; there is no duplicate tool configuration or separate organization identifier. Existing credential field names remain supported.
 
-- **API Key** (also called Site Key): A secret key generated in the WaiverFile dashboard.
-- **Site ID**: A unique identifier for your WaiverFile account.
+## Workflows
 
-To obtain these, log into your WaiverFile dashboard, select Settings >> API, then select the API keys tab. If you do not already have a key created, click on Create a Key to generate a new one. The key is masked, so click the Show button to reveal the key. Below the key is your Site ID.
+- `get_site_details` identifies the connected site and retrieves its configuration.
+- `get_waiver` retrieves a complete signed waiver. `search_waivers` searches by terms or reference IDs linked to external bookings.
+- `list_waivers_by_date` retrieves tabular waiver data with custom-column and participant consolidation options. Page indexes start at zero; page size is capped at 500.
+- `list_complete_waivers` retrieves complete waiver records by signing date. `get_waiver_data_count` provides the count response for planning tabular retrieval.
+- `get_waiver_forms` discovers active forms or all forms, including deleted forms.
+- `list_events` discovers events by UTC date range, category, or upcoming status. `create_event`, `update_event`, and `delete_event` manage events.
+- `manage_event_categories` lists, creates, updates, and deletes categories.
+- `manage_event_managers` invites managers or revokes event access.
 
-Both values are passed as query parameters (`apiKey` and `siteID`) on each API request. The base URL for the API is `https://api.waiverfile.com/api/v1/`.
+The API reference leaves most response objects unspecified. Tools preserve provider responses without guessing list envelopes, missing counts, identifiers, or operation status. Successful requests return the response; a response alone may not establish an asynchronous workflow's completion.
 
-Example request:
+## Limits
 
-```
-GET https://api.waiverfile.com/api/v1/GetSiteDetails?apiKey=YOUR_API_KEY&siteID=YOUR_SITE_ID
-```
+No PDF download tool or webhook trigger is registered. The documented PDF operation does not specify a binary or download-URL response. Webhook signature and registration identity guarantees require additional evidence before adding triggers.
 
-## Features
+## Official references
 
-### Waiver Retrieval and Search
-
-Retrieve signed waivers individually by waiver ID or search for waivers using keywords. The key methods include GetWaiversByReferenceID (which accepts refID1, refID2, refID3 and refIDAny parameters to search across up to 3 reference ID fields) and GetWaiver (which accepts a waiverID to retrieve a complete waiver record with participant data).
-
-- Waiver data includes signer details (name, email, address, phone, DOB), participant information, custom field values, signature status, opt-in preference, and associated event/form data.
-- Supports searching by reference IDs to link waivers with external booking or reservation systems.
-
-### Reference ID Integration
-
-WaiverFile allows you to add a waiver into a customer reservation or booking workflow and includes a reference ID feature to link signatures to your existing booking ID so you can monitor signature status automatically.
-
-- The reference ID can be a booking ID, reservation ID, or customer ID. You can use one or several (up to 3) ID numbers.
-- Reference IDs are passed via URL parameters (`refid`, `refid2`, `refid3`) when linking to the waiver signing page.
-
-### Event Management
-
-Create, update, and manage events (e.g., parties, classes, tournaments) within WaiverFile. You can create event categories and update the details of existing events.
-
-- Events have properties such as name, date range, location, description, max participants, signing cutoff, associated waiver forms, and manager email lists.
-- Event categories help organize events into logical groupings.
-
-### Site Details
-
-Retrieve account-level site information and configuration details via the API.
-
-### Waiver Form Data
-
-Access waiver form definitions, including the agreement text, field configuration, participant fields, signing options, and form settings.
-
-- Forms can include custom questions with various field types (text, number, etc.).
-- Forms support configurable options for adult signing, child signing, email verification, opt-in settings, and more.
-
-## Events
-
-WaiverFile supports webhooks that can be configured in the dashboard under **Settings >> API >> Web Hooks**. You can select which triggers are enabled, and the webhook will fire when any of your selected triggers occur. The API also supports programmatic webhook subscription via a Subscription API.
-
-The "skinny payloads" option sends only the ID of the related item, requiring a subsequent API call to fetch the full data. This is generally considered more secure.
-
-### New Waiver
-
-Fires when a new waiver is signed, submitting the waiver data to the configured URL. The payload includes full waiver details: signer info, participants, custom field values, associated event, waiver form definition, reference IDs, and more.
-
-- Subscription API type: `newwaiver`
-
-### New Event
-
-Fires when a new event is created in WaiverFile.
-
-- Subscription API type: `newevent`
-
-### Edit Event
-
-Fires when an existing event in WaiverFile is edited.
-
-- Subscription API type: `editevent`
-
-### Waiver Edited
-
-Fires when changes are made to an existing waiver. Original waivers are always retained within WaiverFile.
+- [API reference](https://api.waiverfile.com/swagger/ui/index)
+- [Swagger specification](https://api.waiverfile.com/swagger/docs/v1)
+- [Registration and booking integration guide](https://www.waiverfile.com/Resources/Help/Advanced-Options/Workflow/Registration-Integration-How-To.aspx)
+- [API credential setup](https://www.waiverfile.com/Resources/Help/Export-and-Integrations/Integrations/Zapier.aspx)

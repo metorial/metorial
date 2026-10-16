@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { publicationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteDraftIssue = SlateTool.create(spec, {
   name: 'Delete Draft Issue',
   key: 'delete_draft_issue',
-  description: `Delete a draft newsletter issue. Only draft issues can be deleted; published issues cannot be removed via the API.`,
+  description: `Delete a draft newsletter issue. Only draft issues can be deleted; published issues cannot be removed via the API. Call list_publications to discover the publication ID.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      publicationId: z.string().describe('ID of the publication'),
+      publicationId: publicationIdSchema,
       issueId: z.string().describe('Database ID of the draft issue to delete')
     })
   )

@@ -1,7 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput, responseArray } from '../lib/response';
 import { spec } from '../spec';
+
+let instagramProfileOutputSchema = z.object({
+  userId: z.string().optional(),
+  username: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  avatar: z.string().optional(),
+  followers: z.number().optional(),
+  following: z.number().optional(),
+  isPrivate: z.boolean().optional(),
+  isVerified: z.boolean().optional(),
+  isBusinessAccount: z.boolean().optional(),
+  categoryName: z.string().optional(),
+  website: z.string().optional(),
+  posts: z
+    .array(
+      z.object({
+        postId: z.string().optional(),
+        shortcode: z.string().optional(),
+        caption: z.string().optional(),
+        likes: z.number().optional(),
+        comments: z.number().optional(),
+        isVideo: z.boolean().optional(),
+        displayUrl: z.string().optional(),
+        timestamp: z.number().optional()
+      })
+    )
+    .optional()
+    .describe('Recent posts'),
+  raw: z.any().describe('Full raw response')
+});
 
 export let instagramProfile = SlateTool.create(spec, {
   name: 'Instagram Profile',
@@ -16,55 +48,27 @@ export let instagramProfile = SlateTool.create(spec, {
       usernameOrUrl: z.string().describe('Instagram username or profile URL')
     })
   )
-  .output(
-    z.object({
-      userId: z.string().optional(),
-      username: z.string().optional(),
-      name: z.string().optional(),
-      description: z.string().optional(),
-      avatar: z.string().optional(),
-      followers: z.number().optional(),
-      following: z.number().optional(),
-      isPrivate: z.boolean().optional(),
-      isVerified: z.boolean().optional(),
-      isBusinessAccount: z.boolean().optional(),
-      categoryName: z.string().optional(),
-      website: z.string().optional(),
-      posts: z
-        .array(
-          z.object({
-            postId: z.string().optional(),
-            shortcode: z.string().optional(),
-            caption: z.string().optional(),
-            likes: z.number().optional(),
-            comments: z.number().optional(),
-            isVideo: z.boolean().optional(),
-            displayUrl: z.string().optional(),
-            timestamp: z.number().optional()
-          })
-        )
-        .optional()
-        .describe('Recent posts'),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(instagramProfileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.getInstagramUser({ query: ctx.input.usernameOrUrl });
 
-    let posts = (result.posts ?? []).map((p: any) => ({
-      postId: p.id,
-      shortcode: p.shortcode,
-      caption: p.caption,
-      likes: p.likes,
-      comments: p.comments,
-      isVideo: p.is_video,
-      displayUrl: p.display_url,
-      timestamp: p.timestamp
-    }));
+    let posts =
+      result.posts == null
+        ? undefined
+        : responseArray(result.posts, 'Instagram posts').map((p: any) => ({
+            postId: p.id,
+            shortcode: p.shortcode,
+            caption: p.caption,
+            likes: p.likes,
+            comments: p.comments,
+            isVideo: p.is_video,
+            displayUrl: p.display_url,
+            timestamp: p.timestamp
+          }));
 
     return {
-      output: {
+      output: normalizeOutput(instagramProfileOutputSchema, {
         userId: result.id,
         username: result.username,
         name: result.name,
@@ -79,11 +83,27 @@ export let instagramProfile = SlateTool.create(spec, {
         website: result.website,
         posts,
         raw: result
-      },
-      message: `Retrieved Instagram profile **@${result.username ?? ctx.input.usernameOrUrl}**: **${result.followers ?? 0} followers**, **${posts.length} recent posts**.`
+      }),
+      message: 'Retrieved Instagram profile data.'
     };
   })
   .build();
+
+let instagramPostOutputSchema = z.object({
+  postId: z.string().optional(),
+  shortcode: z.string().optional(),
+  text: z.string().optional(),
+  createdTime: z.string().optional(),
+  likeCount: z.number().optional(),
+  commentsCount: z.number().optional(),
+  videoViewsCount: z.number().optional(),
+  isVideo: z.boolean().optional(),
+  mediaUrl: z.string().optional(),
+  carouselMediaUrls: z.array(z.string()).optional(),
+  ownerId: z.string().optional(),
+  locationName: z.string().optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let instagramPost = SlateTool.create(spec, {
   name: 'Instagram Post',
@@ -98,29 +118,13 @@ export let instagramPost = SlateTool.create(spec, {
       postUrlOrShortcode: z.string().describe('Instagram post URL or shortcode')
     })
   )
-  .output(
-    z.object({
-      postId: z.string().optional(),
-      shortcode: z.string().optional(),
-      text: z.string().optional(),
-      createdTime: z.string().optional(),
-      likeCount: z.number().optional(),
-      commentsCount: z.number().optional(),
-      videoViewsCount: z.number().optional(),
-      isVideo: z.boolean().optional(),
-      mediaUrl: z.string().optional(),
-      carouselMediaUrls: z.array(z.string()).optional(),
-      ownerId: z.string().optional(),
-      locationName: z.string().optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(instagramPostOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.getInstagramPost({ query: ctx.input.postUrlOrShortcode });
 
     return {
-      output: {
+      output: normalizeOutput(instagramPostOutputSchema, {
         postId: result.id,
         shortcode: result.shortcode,
         text: result.text,
@@ -134,8 +138,8 @@ export let instagramPost = SlateTool.create(spec, {
         ownerId: result.owner_id,
         locationName: result.location_name,
         raw: result
-      },
-      message: `Retrieved Instagram post **${result.shortcode ?? ctx.input.postUrlOrShortcode}**: **${result.like_count ?? 0} likes**, **${result.comments_count ?? 0} comments**.`
+      }),
+      message: 'Retrieved Instagram post data.'
     };
   })
   .build();

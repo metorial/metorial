@@ -27,7 +27,7 @@ export let listRequestTypesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of request types'),
+      total: z.number().describe('Number of request types on this page'),
       requestTypes: z
         .array(
           z.object({
@@ -57,10 +57,7 @@ export let listRequestTypesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let result = await client.getRequestTypes(
       ctx.input.serviceDeskId,
@@ -80,20 +77,16 @@ export let listRequestTypesTool = SlateTool.create(spec, {
         };
 
         if (ctx.input.includeFields) {
-          try {
-            let fieldsResult = await client.getRequestTypeFields(
-              ctx.input.serviceDeskId,
-              String(rt.id)
-            );
-            requestType.fields = (fieldsResult.requestTypeFields || []).map((f: any) => ({
-              fieldId: f.fieldId,
-              name: f.name,
-              required: f.required || false,
-              description: f.description
-            }));
-          } catch {
-            requestType.fields = [];
-          }
+          let fieldsResult = await client.getRequestTypeFields(
+            ctx.input.serviceDeskId,
+            String(rt.id)
+          );
+          requestType.fields = (fieldsResult.requestTypeFields || []).map((f: any) => ({
+            fieldId: f.fieldId,
+            name: f.name,
+            required: f.required,
+            description: f.description
+          }));
         }
 
         return requestType;

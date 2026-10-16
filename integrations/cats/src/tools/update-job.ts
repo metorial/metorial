@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,6 +16,7 @@ export let updateJob = SlateTool.create(spec, {
     z.object({
       jobId: z.string().describe('ID of the job to update'),
       title: z.string().optional().describe('Job title'),
+      companyId: z.number().optional().describe('Company ID from search_companies'),
       orderId: z.string().optional().describe('Order/requisition ID'),
       description: z.string().optional().describe('Job description'),
       notes: z.string().optional().describe('Internal notes'),
@@ -43,22 +44,34 @@ export let updateJob = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {};
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.orderId) body.order_id = ctx.input.orderId;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
-    if (ctx.input.isActive !== undefined) body.is_active = ctx.input.isActive;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.postalCode) body.postal_code = ctx.input.postalCode;
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.salary) body.salary = ctx.input.salary;
-    if (ctx.input.duration) body.duration = ctx.input.duration;
-    if (ctx.input.startDate) body.start_date = ctx.input.startDate;
+    if (ctx.input.companyId !== undefined) body.company_id = ctx.input.companyId;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.orderId !== undefined) body.external_id = ctx.input.orderId;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.isActive !== undefined)
+      throw createApiServiceError(
+        'CATS job activity is controlled by workflow statuses; isActive cannot be written directly. Use change_job_status with a status from list_job_statuses.'
+      );
+    if (
+      ctx.input.city !== undefined ||
+      ctx.input.state !== undefined ||
+      ctx.input.postalCode !== undefined
+    ) {
+      body.location = {
+        city: ctx.input.city,
+        state: ctx.input.state,
+        postal_code: ctx.input.postalCode
+      };
+    }
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.salary !== undefined) body.salary = ctx.input.salary;
+    if (ctx.input.duration !== undefined) body.duration = ctx.input.duration;
+    if (ctx.input.startDate !== undefined) body.start_date = ctx.input.startDate;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
-    if (ctx.input.openings) body.openings = ctx.input.openings;
-    if (ctx.input.type) body.type = ctx.input.type;
+    if (ctx.input.openings !== undefined) body.openings = ctx.input.openings;
+    if (ctx.input.type !== undefined) body.type = ctx.input.type;
 
     await client.updateJob(ctx.input.jobId, body);
 

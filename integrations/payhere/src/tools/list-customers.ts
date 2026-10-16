@@ -23,18 +23,36 @@ export let listCustomers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       customers: z.array(
         z.object({
+          raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
           customerId: z.number().describe('Customer identifier'),
           name: z.string().describe('Customer name'),
           email: z.string().describe('Customer email'),
           ipAddress: z.string().nullable().describe('IP address at time of payment'),
-          location: z.string().nullable().describe('Geographic location'),
+          location: z
+            .string()
+            .nullable()
+            .describe('Geographic location; structured provider values are JSON-encoded'),
+          locationDetails: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('Structured geographic location supplied by Payhere'),
+          payments: z
+            .array(z.record(z.string(), z.unknown()))
+            .optional()
+            .describe('Payment history returned for this customer'),
+          subscriptions: z
+            .array(z.record(z.string(), z.unknown()))
+            .optional()
+            .describe('Subscriptions returned for this customer'),
           createdAt: z.string(),
           updatedAt: z.string()
         })
       ),
       meta: z.object({
+        raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
         currentPage: z.number(),
         nextPage: z.number().nullable(),
         prevPage: z.number().nullable(),

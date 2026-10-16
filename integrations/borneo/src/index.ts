@@ -5,9 +5,13 @@ import {
   downloadReport,
   exportInventory,
   getCloudAccount,
+  getCurrentUser,
   getResourceStatistics,
   getScanIteration,
+  listAccounts,
+  listConnectors,
   listInspectionResults,
+  listScanIterations,
   manageAsset,
   manageDashboardUser,
   manageDataBreach,
@@ -44,7 +48,11 @@ export let provider = Slate.create({
     exportInventory,
     getResourceStatistics,
     downloadReport,
-    getCloudAccount
+    getCloudAccount,
+    getCurrentUser,
+    listAccounts,
+    listConnectors,
+    listScanIterations
   ],
   triggers: []
 });

@@ -41,7 +41,8 @@ export let validatePhoneTool = SlateTool.create(spec, {
       countryCode3: z.string().describe('ISO 3-letter country code'),
       currencyCode: z.string().describe('ISO 4217 currency code'),
       isMobile: z.boolean().describe('Whether this is a mobile number'),
-      prefixNetwork: z.string().describe('Network/carrier owning the prefix')
+      prefixNetwork: z.string().describe('Network/carrier owning the prefix'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,18 +59,19 @@ export let validatePhoneTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         valid: result.valid,
-        type: result.type ?? 'unknown',
-        internationalCallingCode: result.internationalCallingCode ?? '',
-        internationalNumber: result.internationalNumber ?? '',
-        localNumber: result.localNumber ?? '',
-        location: result.location ?? '',
-        country: result.country ?? '',
-        countryCode: result.countryCode ?? '',
-        countryCode3: result.countryCode3 ?? '',
-        currencyCode: result.currencyCode ?? '',
-        isMobile: result.isMobile ?? false,
-        prefixNetwork: result.prefixNetwork ?? ''
+        type: result.type,
+        internationalCallingCode: result.internationalCallingCode,
+        internationalNumber: result.internationalNumber,
+        localNumber: result.localNumber,
+        location: result.location,
+        country: result.country,
+        countryCode: result.countryCode,
+        countryCode3: result.countryCode3,
+        currencyCode: result.currencyCode,
+        isMobile: result.isMobile,
+        prefixNetwork: result.prefixNetwork
       },
       message: result.valid
         ? `**${result.internationalNumber}** is a valid ${result.type} number in ${result.country}.${result.prefixNetwork ? ` Carrier: ${result.prefixNetwork}.` : ''}`

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createRows = SlateTool.create(spec, {
@@ -18,7 +18,11 @@ export let createRows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table to create rows in'),
+      tableId: z
+        .number()
+        .describe(
+          'The ID of the table to create rows in. Discover with list_token_tables, or list_databases then list_tables for JWT connections.'
+        ),
       rows: z
         .array(z.record(z.string(), z.any()))
         .min(1)
@@ -38,11 +42,7 @@ export let createRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     let createdRows = await client.createRows({
       tableId: ctx.input.tableId,

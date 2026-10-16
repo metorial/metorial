@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageContactIdentifiers = SlateTool.create(spec, {
@@ -59,15 +60,20 @@ export let manageContactIdentifiers = SlateTool.create(spec, {
     let { action, contactIdentifierValue, contactUuid, contactIdentifierName } = ctx.input;
 
     if (action === 'list') {
-      if (!contactUuid) throw new Error('contactUuid is required for listing identifiers');
+      if (!contactUuid)
+        throw createApiServiceError('contactUuid is required for listing identifiers');
       let result = await client.getContactIdentifiers(contactUuid);
-      let identifiers = (result.data || []).map((id: any) => ({
-        identifierValue: id.value || id.contact_identifier_value,
-        contactUuid: id.contact?.uuid,
-        name: id.name || id.contact_identifier_name,
-        active: id.active ?? id.contact_identifier_active,
-        ...id
-      }));
+      let identifiers = result.data.map((id: any) =>
+        mapEntity(id, {
+          identifierValue: requiredString(
+            id.value ?? id.contact_identifier_value,
+            'identifier value'
+          ),
+          contactUuid: id.contact?.uuid,
+          name: id.name ?? id.contact_identifier_name,
+          active: id.active ?? id.contact_identifier_active
+        })
+      );
       return {
         output: { identifiers },
         message: `Found **${identifiers.length}** identifier(s) for contact ${contactUuid}.`
@@ -75,20 +81,22 @@ export let manageContactIdentifiers = SlateTool.create(spec, {
     }
 
     if (!contactIdentifierValue)
-      throw new Error('contactIdentifierValue is required for this action');
+      throw createApiServiceError('contactIdentifierValue is required for this action');
 
     if (action === 'find') {
       let result = await client.findContactIdentifier(contactIdentifierValue);
-      let id = result.data || result;
+      let id = result.data;
       return {
         output: {
-          identifier: {
-            identifierValue: id.value || id.contact_identifier_value || contactIdentifierValue,
+          identifier: mapEntity(id, {
+            identifierValue: requiredString(
+              id.value ?? id.contact_identifier_value,
+              'identifier value'
+            ),
             contactUuid: id.contact?.uuid,
-            name: id.name || id.contact_identifier_name,
-            active: id.active ?? id.contact_identifier_active,
-            ...id
-          }
+            name: id.name ?? id.contact_identifier_name,
+            active: id.active ?? id.contact_identifier_active
+          })
         },
         message: `Found identifier **${contactIdentifierValue}**.`
       };
@@ -100,32 +108,36 @@ export let manageContactIdentifiers = SlateTool.create(spec, {
         contactUuid,
         contactIdentifierName
       });
-      let id = result.data || result;
+      let id = result.data;
       return {
         output: {
-          identifier: {
-            identifierValue: id.value || id.contact_identifier_value || contactIdentifierValue,
-            contactUuid: id.contact?.uuid || contactUuid,
-            name: id.name || id.contact_identifier_name,
-            active: id.active ?? id.contact_identifier_active,
-            ...id
-          }
+          identifier: mapEntity(id, {
+            identifierValue: requiredString(
+              id.value ?? id.contact_identifier_value,
+              'identifier value'
+            ),
+            contactUuid: id.contact?.uuid,
+            name: id.name ?? id.contact_identifier_name,
+            active: id.active ?? id.contact_identifier_active
+          })
         },
         message: `Created identifier **${contactIdentifierValue}**${contactUuid ? ` linked to ${contactUuid}` : ''}.`
       };
     }
 
     if (action === 'link') {
-      if (!contactUuid) throw new Error('contactUuid is required for link action');
+      if (!contactUuid) throw createApiServiceError('contactUuid is required for link action');
       let result = await client.linkContactIdentifier(contactIdentifierValue, contactUuid);
-      let id = result.data || result;
+      let id = result.data;
       return {
         output: {
-          identifier: {
-            identifierValue: contactIdentifierValue,
-            contactUuid,
-            ...id
-          }
+          identifier: mapEntity(id, {
+            identifierValue: requiredString(
+              id.value ?? id.contact_identifier_value,
+              'identifier value'
+            ),
+            contactUuid
+          })
         },
         message: `Linked identifier **${contactIdentifierValue}** to contact ${contactUuid}.`
       };
@@ -133,13 +145,15 @@ export let manageContactIdentifiers = SlateTool.create(spec, {
 
     // unlink
     let result = await client.unlinkContactIdentifier(contactIdentifierValue);
-    let id = result.data || result;
+    let id = result.data;
     return {
       output: {
-        identifier: {
-          identifierValue: contactIdentifierValue,
-          ...id
-        }
+        identifier: mapEntity(id, {
+          identifierValue: requiredString(
+            id.value ?? id.contact_identifier_value,
+            'identifier value'
+          )
+        })
       },
       message: `Unlinked identifier **${contactIdentifierValue}** from its contact.`
     };

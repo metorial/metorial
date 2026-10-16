@@ -1,93 +1,33 @@
-Now let me check the details on media uploads and the transfer/export feature:Now I have enough information. Let me compile the specification.
+# Placid Integration Specification
 
-# Slates Specification for Placid
+The integration uses the project-specific Bearer token and REST API at `https://api.placid.app/api/rest`. Obtain the token from **Projects → Select Project → API Tokens**. No OAuth refresh is required.
 
-## Overview
+| Tool | Operations |
+| --- | --- |
+| `generate_image` | Create an image with dynamic layers, optional synchronous rendering, output modifications, callbacks, and storage transfer. |
+| `generate_pdf` | Render ordered template pages into a PDF. |
+| `generate_video` | Render ordered clips with optional audio, frame rate, size, and background settings. |
+| `merge_pdfs` | Merge 2–10 existing PDF URLs. |
+| `get_generation_status` | Retrieve an image, PDF, or video job and download its completed file. |
+| `delete_generation` | Permanently delete an image, PDF, or video by ID. |
+| `upload_media` | Legacy submission of 1–5 source URLs to temporary media storage; URL acceptance is unverified against current binary-upload documentation. |
+| `manage_templates` | List, retrieve, create, duplicate, update, and delete templates; filter by collection, title, or tag and follow the returned next-page URL. |
+| `manage_collections` | List, retrieve, create, update, and delete collections; paginate using the returned cursor URL and replace, add, or remove template membership. |
 
-Placid is a creative automation platform that generates images, videos, and PDFs from reusable design templates populated with dynamic data. It provides a REST API, a URL-based image API, and an embeddable Editor SDK for managing templates and generating visuals at scale.
+Completed generation and merge responses include a downloadable file when the provider returns its URL. Queued jobs must be retrieved again with `get_generation_status`. Existing URL fields remain available for downstream requests. Templates and uploaded-media records expose preview or source URLs as metadata.
 
-## Authentication
+The legacy `upload_media` operation preserves provider-side URL submission and does not fetch the source files in the integration runtime. Current media documentation requires binary file uploads, so the provider may reject this operation. Source image URLs can instead be used directly in picture layers.
 
-### REST API — Bearer Token (API Key)
+Use template discovery to obtain UUIDs and layer names. Unspecified layer properties retain the template defaults. Image format maps to `modifications.image_format`; PDF and video modifications follow their respective REST contracts. For duplication, `fromTemplate` selects the source template and the provider overrides the supplied title and dimensions.
 
-The Placid REST API uses authentication via an API token. It is passed along with every API call to identify your account and access the templates from your project. Placid API tokens are project-specific.
+Placid temporarily stores generated and uploaded files. Save important files to your own storage or request an S3-compatible transfer. The API does not document a file-URL renewal operation or an exact expiration timestamp. Completion callbacks are supplied per generation request; this integration does not expose global event subscriptions.
 
-To obtain your API token:
+## Official API documentation
 
-1. Log in at `placid.app/login`
-2. Go to the **Projects** overview
-3. Select the project you want to work with
-4. Click **API Tokens** in the left menu
-
-All requests must contain an `Authorization` header with your API token:
-
-```
-Authorization: Bearer {TOKEN}
-```
-
-### URL API — HMAC Signature
-
-The URL API uses HMAC-SHA256 signed URLs for authentication. The URL format is `https://api.placid.app/u/{template_uuid}?{layer-name}[{property}]={value}&s={signature}`, where the signature is generated using your private API token and the query string via HMAC-SHA256.
-
-### Editor SDK — JWT
-
-The Editor SDK uses JSON Web Tokens (JWT) to handle authentication for its components. These tokens transfer a compact JSON object with a signed payload of your Placid API key and secret. The JWT payload includes fields like `exp` (expiration), `iat` (issued at), `sdk_token` (public token), `scopes`, and `editor_options`. The token is signed with your API secret using HMAC-SHA256. Alternatively, Placid provides a REST endpoint to generate a JWT token on your behalf.
-
-## Features
-
-### Image Generation
-
-The Placid Image Automation API enables template-based, deterministic image generation from structured data. You provide a template UUID and fill its dynamic layers with content (text, images, colors, etc.). Generation is asynchronous — images are queued and can be retrieved via polling or webhook callback. You can also configure output filename, size modifications, and export options. A `create_now` option is available for synchronous generation. Generated images can be transferred directly to external storage (e.g., Amazon S3).
-
-### PDF Generation
-
-PDFs are generated from one or more templates used as pages, filling their layers with your data. The API allows you to create a PDF from one or more pages/templates, merged in the order you define. PDFs also support merging with existing static PDFs. Output can be transferred to external storage like S3 using a `transfer` object. Modifications to template defaults (like size) can be applied at generation time.
-
-### Video Generation
-
-Videos are generated from one or more templates used as clips, filling their layers with your data. The content of your video will be defined by an array of templates in your clips object. The API allows you to create a video from one or more clips/templates, merged in the order you define. You can fill picture layers with video files, fill text layers with values, and use animation and transition settings from the template editor. Audio tracks can be attached to clips with trim options. If multiple videos are used in a single clip, shorter ones loop automatically.
-
-### Template Management
-
-Templates can be listed, created, retrieved, updated, and deleted via the API. Templates can be filtered by collection ID or title, and sorted by creation date, update date, or title. New templates can be created from scratch (specifying width, height, title) or duplicated from an existing template. Templates support tags (up to 10) and custom data for referencing. Each template exposes its dynamic layers (text, picture, shape, browserframe, barcode, rating, subtitle) with configurable properties.
-
-### Template Collections
-
-Collections allow organizing templates into groups. Collections can be created, listed, retrieved, updated, and deleted via the API.
-
-### Dynamic Layers
-
-Templates contain dynamic layers that are populated at generation time. Supported layer types include:
-
-- **Text**: Set text content, color, and font.
-- **Picture**: Set image URL or video URL; supports webpage screenshot via viewport setting.
-- **Shape**: Configure background color, border, border radius, and custom SVG.
-- **Browserframe**: Render a URL as a webpage screenshot within a browser frame.
-- **Barcode/QR Code**: Set a value to encode.
-- **Rating**: Set a numeric rating value with color.
-- **Subtitle**: Subtitle overlay for videos.
-
-All layers share common properties like visibility (hide), opacity, rotation, position, and dimensions.
-
-### Media Upload
-
-The API provides a media upload endpoint for temporarily hosting files (images, etc.) on Placid's storage. Up to 5 files can be uploaded at once. The returned URLs can then be used in picture layers during generation.
-
-### URL-based Image Generation
-
-The URL API allows embedding dynamic image URLs directly (e.g., in HTML) that render images on the fly based on query parameters. Layer values are passed as URL query parameters, and the URL is authenticated via an HMAC signature.
-
-### Export and Transfer
-
-Generated creatives (images, PDFs, videos) can be automatically transferred to Amazon S3-compatible storage by providing credentials, bucket, region, and path in a `transfer` object on the generation request.
-
-## Events
-
-Placid supports per-request webhook callbacks rather than a global event subscription system. When creating an image, PDF, or video, you can provide a `webhook_success` URL in the request body. You can poll the GET endpoint for status updates or use a webhook to get the generated image.
-
-### Generation Completed
-
-- **Description**: When a queued image, PDF, or video has finished rendering, Placid sends a POST request to the `webhook_success` URL provided in the original creation request.
-- **Parameters**: The `webhook_success` URL is specified per generation request. A `passthrough` field can be included to attach custom reference data that will be returned in the webhook payload.
-
-Placid does not offer a global webhook subscription or event registration system. Webhooks are configured inline on each generation request.
+- [Authentication](https://placid.app/docs/2.0/rest/authentication)
+- [Images](https://placid.app/docs/2.0/rest/images)
+- [PDFs and PDF merge](https://placid.app/docs/2.0/rest/pdfs)
+- [Videos](https://placid.app/docs/2.0/rest/videos)
+- [Templates](https://placid.app/docs/2.0/rest/templates)
+- [Template collections](https://placid.app/docs/2.0/rest/collections)
+- [Media uploads](https://placid.app/docs/2.0/rest/media)

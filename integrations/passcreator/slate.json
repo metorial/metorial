@@ -12,7 +12,9 @@
     "bundle multiple passes",
     "set location-based notifications",
     "retrieve pass statistics",
-    "manage webhook subscriptions"
+    "track bulk operation status",
+    "discover personalization fields",
+    "cancel scheduled notifications"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/passcreator.png"
 }

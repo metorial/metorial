@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTasksTool = SlateTool.create(spec, {
@@ -8,12 +9,12 @@ export let manageTasksTool = SlateTool.create(spec, {
   key: 'manage_tasks',
   description: `List, create, update, or delete translation/proofreading tasks. Tasks assign specific translation work to team members with deadlines and progress tracking.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
@@ -42,6 +43,7 @@ export let manageTasksTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       tasks: z
         .array(
           z.object({
@@ -86,38 +88,39 @@ export let manageTasksTool = SlateTool.create(spec, {
       let tasks = result.data.map((item: any) => ({
         taskId: item.data.id,
         title: item.data.title,
-        languageId: item.data.languageId,
+        languageId: item.data.languageId ?? item.data.targetLanguageId,
         type: item.data.type,
         status: item.data.status,
-        fileIds: item.data.fileIds || undefined,
-        deadline: item.data.deadline || undefined,
+        fileIds: item.data.fileIds ?? undefined,
+        deadline: item.data.deadline ?? undefined,
         createdAt: item.data.createdAt,
-        progress: item.data.progress || undefined
+        progress: item.data.progress ?? undefined
       }));
 
       return {
-        output: { tasks, pagination: result.pagination },
+        output: { raw: client.lastResponse, tasks, pagination: result.pagination },
         message: `Found **${tasks.length}** tasks.`
       };
     }
 
     if (action === 'get') {
-      if (!ctx.input.taskId) throw new Error('taskId is required');
+      if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
       let task = await client.getTask(projectId, ctx.input.taskId);
 
       return {
         output: {
+          raw: client.lastResponse,
           tasks: [
             {
               taskId: task.id,
               title: task.title,
-              languageId: task.languageId,
+              languageId: task.languageId ?? task.targetLanguageId,
               type: task.type,
               status: task.status,
-              fileIds: task.fileIds || undefined,
-              deadline: task.deadline || undefined,
+              fileIds: task.fileIds ?? undefined,
+              deadline: task.deadline ?? undefined,
               createdAt: task.createdAt,
-              progress: task.progress || undefined
+              progress: task.progress ?? undefined
             }
           ]
         },
@@ -132,9 +135,16 @@ export let manageTasksTool = SlateTool.create(spec, {
         !ctx.input.fileIds ||
         ctx.input.type === undefined
       ) {
-        throw new Error('title, languageId, fileIds, and type are required');
+        throw createApiServiceError('title, languageId, fileIds, and type are required');
       }
 
+      if (ctx.input.type !== 0 && ctx.input.type !== 1)
+        throw createApiServiceError('Task type must be 0 (translate) or 1 (proofread).');
+      if (ctx.input.status === 'done' || ctx.input.status === 'closed')
+        throw createApiServiceError(
+          'New tasks must start as todo or in_progress. Update the status after creation.'
+        );
+      if (!ctx.input.fileIds.length) throw createApiServiceError('fileIds must not be empty.');
       let assignees = ctx.input.assigneeIds?.map(id => ({ id }));
 
       let task = await client.createTask(projectId, {
@@ -151,15 +161,16 @@ export let manageTasksTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           tasks: [
             {
               taskId: task.id,
               title: task.title,
-              languageId: task.languageId,
+              languageId: task.languageId ?? task.targetLanguageId,
               type: task.type,
               status: task.status,
-              fileIds: task.fileIds || undefined,
-              deadline: task.deadline || undefined,
+              fileIds: task.fileIds ?? undefined,
+              deadline: task.deadline ?? undefined,
               createdAt: task.createdAt
             }
           ]
@@ -169,7 +180,7 @@ export let manageTasksTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.taskId) throw new Error('taskId is required');
+      if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
 
       let patches: Array<{ op: string; path: string; value: any }> = [];
       if (ctx.input.title !== undefined)
@@ -185,19 +196,32 @@ export let manageTasksTool = SlateTool.create(spec, {
       if (ctx.input.deadline !== undefined)
         patches.push({ op: 'replace', path: '/deadline', value: ctx.input.deadline });
 
+      if (ctx.input.assigneeIds !== undefined)
+        patches.push({
+          op: 'replace',
+          path: '/assignees',
+          value: ctx.input.assigneeIds.map(id => ({ id }))
+        });
+      if (ctx.input.fileIds !== undefined)
+        patches.push({ op: 'replace', path: '/fileIds', value: ctx.input.fileIds });
+      if (ctx.input.labelIds !== undefined)
+        patches.push({ op: 'replace', path: '/labelIds', value: ctx.input.labelIds });
+      if (!patches.length)
+        throw createApiServiceError('Provide at least one task field to update.');
       let task = await client.updateTask(projectId, ctx.input.taskId, patches);
 
       return {
         output: {
+          raw: client.lastResponse,
           tasks: [
             {
               taskId: task.id,
               title: task.title,
-              languageId: task.languageId,
+              languageId: task.languageId ?? task.targetLanguageId,
               type: task.type,
               status: task.status,
-              fileIds: task.fileIds || undefined,
-              deadline: task.deadline || undefined,
+              fileIds: task.fileIds ?? undefined,
+              deadline: task.deadline ?? undefined,
               createdAt: task.createdAt
             }
           ]
@@ -207,15 +231,15 @@ export let manageTasksTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.taskId) throw new Error('taskId is required');
+      if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
       await client.deleteTask(projectId, ctx.input.taskId);
 
       return {
-        output: { deleted: true },
+        output: { raw: client.lastResponse, deleted: true },
         message: `Deleted task with ID **${ctx.input.taskId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

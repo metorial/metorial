@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireValue, validateNumber } from '../lib/client';
 import { buildClientConfig, flattenResourceList, flattenSingleResource } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -52,6 +52,15 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      requireValue(ctx.input.identifier, 'Coupon identifier for create');
+      requireValue(ctx.input.couponType, 'Coupon type for create');
+      if (ctx.input.value === undefined)
+        throw createApiServiceError('Coupon value is required for create.');
+      validateNumber(ctx.input.value, 'Coupon value', {
+        integer: true,
+        min: 0,
+        ...(ctx.input.couponType === 'percentage' ? { max: 100 } : {})
+      });
       let attributes: Record<string, any> = {};
       if (ctx.input.identifier) attributes.identifier = ctx.input.identifier;
       if (ctx.input.couponType) attributes.coupon_type = ctx.input.couponType;
@@ -66,14 +75,28 @@ export let manageCoupons = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.action === 'update' && ctx.input.couponId) {
+    if (ctx.input.action === 'update') {
+      let couponId = requireValue(ctx.input.couponId, 'Coupon ID for update');
+      let existing = (await client.getResource('coupons', couponId)).data?.attributes;
+      if (
+        (ctx.input.identifier !== undefined &&
+          ctx.input.identifier !== existing?.identifier) ||
+        (ctx.input.couponType !== undefined && ctx.input.couponType !== existing?.coupon_type)
+      ) {
+        throw createApiServiceError(
+          'Coupon identifier and type are immutable. Create a new coupon to change them.'
+        );
+      }
+      validateNumber(ctx.input.value, 'Coupon value', {
+        integer: true,
+        min: 0,
+        ...(existing?.coupon_type === 'percentage' ? { max: 100 } : {})
+      });
       let attributes: Record<string, any> = {};
-      if (ctx.input.identifier) attributes.identifier = ctx.input.identifier;
-      if (ctx.input.couponType) attributes.coupon_type = ctx.input.couponType;
       if (ctx.input.value !== undefined) attributes.value = ctx.input.value;
       if (ctx.input.active !== undefined) attributes.active = ctx.input.active;
 
-      let response = await client.updateCoupon(ctx.input.couponId, attributes);
+      let response = await client.updateCoupon(couponId, attributes);
       let coupon = flattenSingleResource(response);
       return {
         output: { coupon },
@@ -81,17 +104,13 @@ export let manageCoupons = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.action === 'archive' && ctx.input.couponId) {
-      await client.archiveCoupon(ctx.input.couponId);
+    {
+      let couponId = requireValue(ctx.input.couponId, 'Coupon ID for archive');
+      await client.archiveCoupon(couponId);
       return {
         output: { archived: true },
         message: `Archived coupon ${ctx.input.couponId}.`
       };
     }
-
-    return {
-      output: {},
-      message: 'No action performed. Provide a valid action and required parameters.'
-    };
   })
   .build();

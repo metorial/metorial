@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as vpc from '../lib/vpc';
 import { spec } from '../spec';
@@ -35,7 +35,8 @@ export let listNetworks = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await vpc.listNetworks(
       ctx.auth,
@@ -97,7 +98,8 @@ export let listSubnets = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await vpc.listSubnets(
       ctx.auth,
@@ -153,8 +155,9 @@ export let manageNetwork = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for network creation');
-      if (!ctx.input.name) throw new Error('name is required for network creation');
+      if (!folderId) throw createApiServiceError('folderId is required for network creation');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for network creation');
 
       let result = await vpc.createNetwork(ctx.auth, {
         folderId,
@@ -167,19 +170,20 @@ export let manageNetwork = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           networkId: result.metadata?.networkId,
-          done: result.done || false
+          done: result.done
         },
         message: `Network **${ctx.input.name}** creation initiated.`
       };
     } else {
-      if (!ctx.input.networkId) throw new Error('networkId is required for deletion');
+      if (!ctx.input.networkId)
+        throw createApiServiceError('networkId is required for deletion');
 
       let result = await vpc.deleteNetwork(ctx.auth, ctx.input.networkId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Network **${ctx.input.networkId}** deletion initiated.`
       };
@@ -223,12 +227,14 @@ export let manageSubnet = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for subnet creation');
-      if (!ctx.input.name) throw new Error('name is required for subnet creation');
-      if (!ctx.input.networkId) throw new Error('networkId is required for subnet creation');
-      if (!ctx.input.zoneId) throw new Error('zoneId is required for subnet creation');
+      if (!folderId) throw createApiServiceError('folderId is required for subnet creation');
+      if (!ctx.input.name) throw createApiServiceError('name is required for subnet creation');
+      if (!ctx.input.networkId)
+        throw createApiServiceError('networkId is required for subnet creation');
+      if (!ctx.input.zoneId)
+        throw createApiServiceError('zoneId is required for subnet creation');
       if (!ctx.input.v4CidrBlocks)
-        throw new Error('v4CidrBlocks is required for subnet creation');
+        throw createApiServiceError('v4CidrBlocks is required for subnet creation');
 
       let result = await vpc.createSubnet(ctx.auth, {
         folderId,
@@ -245,19 +251,20 @@ export let manageSubnet = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           subnetId: result.metadata?.subnetId,
-          done: result.done || false
+          done: result.done
         },
         message: `Subnet **${ctx.input.name}** creation initiated in zone ${ctx.input.zoneId}.`
       };
     } else {
-      if (!ctx.input.subnetId) throw new Error('subnetId is required for deletion');
+      if (!ctx.input.subnetId)
+        throw createApiServiceError('subnetId is required for deletion');
 
       let result = await vpc.deleteSubnet(ctx.auth, ctx.input.subnetId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Subnet **${ctx.input.subnetId}** deletion initiated.`
       };

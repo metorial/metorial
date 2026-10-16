@@ -37,7 +37,7 @@ export let listLabelTypes = SlateTool.create(spec, {
 
     let res = await client.getLabelTypes(ctx.input.first, ctx.input.after);
 
-    let labelTypes = (res.edges || []).map((edge: any) => ({
+    let labelTypes = res.edges.map((edge: any) => ({
       labelTypeId: edge.node.id,
       name: edge.node.name,
       icon: edge.node.icon,
@@ -47,8 +47,8 @@ export let listLabelTypes = SlateTool.create(spec, {
     return {
       output: {
         labelTypes,
-        hasNextPage: res.pageInfo?.hasNextPage ?? false,
-        endCursor: res.pageInfo?.endCursor ?? null
+        hasNextPage: res.pageInfo.hasNextPage,
+        endCursor: res.pageInfo.endCursor
       },
       message: `Found **${labelTypes.length}** label types`
     };

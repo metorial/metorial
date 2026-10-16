@@ -41,7 +41,9 @@ export let getProduct = SlateTool.create(spec, {
       output: {
         product
       },
-      message: `Retrieved product details for **${productName}** (SKU: ${ctx.input.sku}).`
+      message: client.redactMessage(
+        `Retrieved product details for **${productName}** (SKU: ${ctx.input.sku}).`
+      )
     };
   })
   .build();

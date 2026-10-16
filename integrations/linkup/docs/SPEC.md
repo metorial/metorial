@@ -1,64 +1,29 @@
-Now let me get more details on the fetch endpoint and source filtering:Now let me check if there's a fetch endpoint and credit balance endpoint:I now have enough information to write the specification. Note: There are two different products called "Linkup" — one is linkup.so (AI search API) and the other is linkupapi.com (LinkedIn/WhatsApp automation). Based on the context of the query asking about "Linkup" as a provider, and given that linkup.so is the more prominent and well-known API product, I'll focus on Linkup (linkup.so).
+# Linkup integration
 
-# Slates Specification for Linkup
+Linkup provides web search, page retrieval, asynchronous research, and credit balance APIs at `https://api.linkup.so/v1`. All requests use an API key in the `Authorization: Bearer <key>` header. No OAuth scopes or refresh flow apply.
 
-## Overview
+| Tool | API | Behavior |
+| --- | --- | --- |
+| `web_search` | `POST /search` | Standard/deep search with sourced answers, text results, or structured JSON. Native image entries appear in additive `imageResults`; `results` retains text entries with content. `raw` preserves the entire provider response and native result ordering. Structured responses also remain intact in `structuredData`, with compatible legacy fields populated. |
+| `fetch_webpage` | `POST /fetch` | Page/PDF markdown, optional images, raw content, structured extraction, JavaScript rendering, and standard/pro retrieval. Keeps `content` as an alias of provider `markdown`, and the requested `url`. Image `alt` also populates the existing `description` field. |
+| `check_credit_balance` | `GET /credits/balance` | Exposes provider `balance` and the existing `remainingCredits` alias. |
+| `create_research` | `POST /research` | Starts research with sourced or structured output and returns a task ID. |
+| `get_research` | `GET /research/{id}` | Retrieves task state, output, and failure details. |
+| `list_research` | `GET /research` | Lists organization tasks with page, page size, sorting, and pagination metadata. |
 
-Linkup (linkup.so) is a web search API designed for AI applications. It allows developers to retrieve real-time web content based on natural language queries, providing factual grounding data for LLMs and AI agents. It offers both fast standard search and comprehensive deep search with agentic workflows.
+Structured schemas must be valid JSON with root type `object`. Fetch extraction instructions require a schema. Date filters use valid YYYY-MM-DD dates after 1970-01-01; a supplied start date precedes the end date. Research callers poll pending/processing tasks, back off between requests, and stop at completed/failed.
 
-## Authentication
+The documented API has no current-user/profile endpoint, so there is no identity tool. Batch tasks and closed-beta extraction are outside this integration's current surface. No webhook or event registration API is documented.
 
-Linkup uses API key authentication.
+## Official references
 
-1. Create a Linkup account for free to get your API key.
-2. Your API key needs to be sent along all your requests as a Bearer token in the Authorization header.
-
-**Base URL:** The Linkup API can be accessed using the base URL: `https://api.linkup.so/v1`.
-
-**Header format:**
-
-```
-Authorization: Bearer <YOUR_LINKUP_API_KEY>
-```
-
-There are no OAuth flows, scopes, or additional credentials required. A single API key is all that is needed.
-
-## Features
-
-### Web Search
-
-The `/search` endpoint allows you to discover and access relevant web content based on a natural language query. Once the content is retrieved, it can serve as factual grounding for Large Language Models (LLMs), helping them produce more accurate and informed responses.
-
-- **Depth modes:**
-  - `standard`: Returns results more quickly, suitable for low-latency scenarios.
-  - `deep`: Continues to search iteratively if it doesn't find sufficient information on the first attempt. This may take longer, but often yields more comprehensive results.
-
-- **Output types:**
-  - `sourcedAnswer`: Returns a natural language answer with source attributions.
-  - `searchResults`: Provides chunks of contextual data suitable for grounding in LLM prompts.
-  - `structured`: Produces a response following a specified JSON schema, ideal for structured data extraction. Requires providing a `structuredOutputSchema` parameter defining the desired JSON schema.
-
-- **Filtering options:**
-  - `fromDate` / `toDate`: Filter results by date range (format: YYYY-MM-DD). `includeDomains` / `excludeDomains`: Filter results to include or exclude specific domains.
-  - `maxResults`: The maximum number of results to return.
-  - `includeImages`: Defines whether the API should include images in its results.
-  - `includeInlineCitations`: Relevant only when outputType is `sourcedAnswer`. Defines whether the answer should include inline citations.
-  - `includeSources`: Specifically designed for use with the structured output type. When enabled, it modifies the schema of the structured response to include source information alongside your custom data structure.
-
-### Web Page Fetching
-
-The `/fetch` endpoint allows you to fetch a single webpage from a given URL. The response includes the clean markdown version of the webpage.
-
-- **Parameters:**
-  - `url` (required): The URL of the webpage to fetch.
-  - `includeRawHtml`: Defines whether the API should include the raw HTML of the webpage in its response.
-  - `renderJs`: Defines whether the API should render the JavaScript of the webpage. Useful for dynamic pages but makes requests slower.
-  - `extractImages`: Defines whether the API should extract the images from the webpage in its response.
-
-### Credit Balance
-
-The API provides an endpoint to check your remaining account credit balance (`GET /credits/balance`).
-
-## Events
-
-The provider does not support events. Linkup is a stateless search and content retrieval API with no webhook or event subscription capabilities.
+- [Authentication](https://docs.linkup.so/pages/documentation/platform/authentication)
+- [Search](https://docs.linkup.so/pages/documentation/endpoints/search/reference)
+- [Structured output](https://docs.linkup.so/pages/documentation/tutorials/structured-output-guide)
+- [Fetch](https://docs.linkup.so/pages/documentation/endpoints/fetch/reference)
+- [Balance](https://docs.linkup.so/pages/documentation/endpoints/account/balance)
+- [Create research](https://docs.linkup.so/pages/documentation/endpoints/research/post)
+- [Get research](https://docs.linkup.so/pages/documentation/endpoints/research/get)
+- [List research](https://docs.linkup.so/pages/documentation/endpoints/research/list)
+- [Research polling](https://docs.linkup.so/pages/documentation/endpoints/research/best-practices)
+- [Errors](https://docs.linkup.so/pages/documentation/platform/errors)

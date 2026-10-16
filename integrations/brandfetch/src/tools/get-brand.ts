@@ -29,11 +29,18 @@ let colorSchema = z.object({
 });
 
 let fontSchema = z.object({
-  name: z.string().describe('Font family name'),
+  name: z.string().optional().describe('Font family name when provided'),
   type: z.string().describe('Font type'),
   origin: z.string().nullable().describe('Font origin, e.g. "google"'),
   originId: z.string().nullable().describe('Font origin identifier'),
-  weights: z.array(z.number()).describe('Available font weights')
+  weights: z
+    .array(z.number())
+    .optional()
+    .describe('Available numeric font weights when returned as numbers'),
+  structuredWeights: z
+    .array(z.unknown())
+    .optional()
+    .describe('Complete provider font weights when returned in a structured format')
 });
 
 let imageSchema = z.object({
@@ -95,8 +102,24 @@ Use explicit identifier types to prevent collisions when the identifier could ma
       identifier: z
         .string()
         .describe(
-          'Brand identifier: domain (e.g. "nike.com"), stock ticker (e.g. "NKE"), ISIN (e.g. "US6541061031"), or crypto symbol (e.g. "BTC")'
+          'Brand identifier: domain, website URL, email address, Brand ID, stock ticker (e.g. "NKE"), ISIN (e.g. "US6541061031"), or crypto symbol (e.g. "BTC")'
         ),
+      allowNsfw: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include NSFW brands when true, exclude them when false; omitted uses the provider default.'
+        ),
+      cachedOnly: z
+        .boolean()
+        .optional()
+        .describe(
+          'Read indexed brands only. If no indexed brand exists, retry without this option to allow live indexing.'
+        ),
+      palette: z
+        .boolean()
+        .optional()
+        .describe('Include the detailed color palette in the complete response.'),
       identifierType: z
         .enum(['domain', 'ticker', 'isin', 'crypto'])
         .optional()
@@ -107,7 +130,7 @@ Use explicit identifier types to prevent collisions when the identifier could ma
   )
   .output(
     z.object({
-      brandName: z.string().describe('Brand name'),
+      brandName: z.string().optional().describe('Brand name when provided'),
       domain: z.string().describe('Brand domain'),
       claimed: z.boolean().describe('Whether the brand has been claimed by its owner'),
       description: z.string().nullable().describe('Short brand description'),
@@ -130,15 +153,27 @@ Use explicit identifier types to prevent collisions when the identifier could ma
       fonts: z.array(fontSchema).describe('Brand fonts'),
       images: z.array(imageSchema).describe('Brand images (banners, etc.)'),
       links: z.array(linkSchema).describe('Brand social/web links'),
-      company: companySchema.describe('Company firmographic data')
+      company: companySchema.describe('Company firmographic data'),
+      brandId: z.string().optional().describe('Stable Brandfetch brand identifier'),
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete original brand response, including additional metadata and original null values'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new BrandApiClient(ctx.auth.token);
 
+    let options = {
+      allowNsfw: ctx.input.allowNsfw,
+      cachedOnly: ctx.input.cachedOnly,
+      palette: ctx.input.palette
+    };
     let brand = ctx.input.identifierType
-      ? await client.getBrandByType(ctx.input.identifierType, ctx.input.identifier)
-      : await client.getBrand(ctx.input.identifier);
+      ? await client.getBrandByType(ctx.input.identifierType, ctx.input.identifier, options)
+      : await client.getBrand(ctx.input.identifier, options);
 
     let company = brand.company
       ? {
@@ -151,20 +186,20 @@ Use explicit identifier types to prevent collisions when the identifier could ma
           region: brand.company.location?.region ?? null,
           state: brand.company.location?.state ?? null,
           subregion: brand.company.location?.subregion ?? null,
-          industries: (brand.company.industries || []).map(ind => ({
+          industries: brand.company.industries.map(ind => ({
             score: ind.score,
             name: ind.name,
             emoji: ind.emoji,
             slug: ind.slug,
-            parentName: ind.parent?.name ?? null,
-            parentSlug: ind.parent?.slug ?? null
+            parentName: (Array.isArray(ind.parent) ? ind.parent[0] : ind.parent)?.name ?? null,
+            parentSlug: (Array.isArray(ind.parent) ? ind.parent[0] : ind.parent)?.slug ?? null
           }))
         }
       : null;
 
     return {
       output: {
-        brandName: brand.name,
+        brandName: brand.name ?? undefined,
         domain: brand.domain,
         claimed: brand.claimed,
         description: brand.description,
@@ -172,14 +207,39 @@ Use explicit identifier types to prevent collisions when the identifier could ma
         qualityScore: brand.qualityScore,
         isNsfw: brand.isNsfw,
         urn: brand.urn,
-        logos: brand.logos,
+        logos: brand.logos.map(logo => ({
+          ...logo,
+          formats: logo.formats.map(format => ({
+            ...format,
+            height: format.height ?? undefined,
+            width: format.width ?? undefined
+          }))
+        })),
         colors: brand.colors,
-        fonts: brand.fonts,
-        images: brand.images,
+        fonts: brand.fonts.map(font => ({
+          ...font,
+          name: font.name ?? undefined,
+          weights: font.weights.every((weight): weight is number => typeof weight === 'number')
+            ? font.weights
+            : undefined,
+          structuredWeights: font.weights.every(weight => typeof weight === 'number')
+            ? undefined
+            : font.weights
+        })),
+        images: brand.images.map(image => ({
+          ...image,
+          formats: image.formats.map(format => ({
+            ...format,
+            height: format.height ?? undefined,
+            width: format.width ?? undefined
+          }))
+        })),
         links: brand.links,
-        company
+        company,
+        brandId: brand.id,
+        raw: brand
       },
-      message: `Retrieved brand data for **${brand.name}** (${brand.domain}). Quality score: ${brand.qualityScore}. Found ${brand.logos.length} logos, ${brand.colors.length} colors, ${brand.fonts.length} fonts, and ${brand.images.length} images.`
+      message: `Retrieved brand data for **${brand.name ?? brand.domain}** (${brand.domain}). Quality score: ${brand.qualityScore}. Found ${brand.logos.length} logos, ${brand.colors.length} colors, ${brand.fonts.length} fonts, and ${brand.images.length} images.`
     };
   })
   .build();

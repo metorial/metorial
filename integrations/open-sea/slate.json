@@ -1,6 +1,6 @@
 {
   "name": "@metorial/opensea",
-  "description": "Interact with the OpenSea NFT marketplace across 20+ blockchains. Retrieve NFT metadata, collection details, floor prices, and ownership data. Create and manage listings and offers (item-level, collection-level, and trait-level). Fetch and fulfill buy/sell orders with on-chain transaction data. Query historical marketplace events including sales, transfers, listings, and cancellations. Look up account profiles and wallet holdings. Search across collections, NFTs, and accounts. Retrieve trending fungible token data, balances, and swap quotes.",
+  "description": "Retrieve OpenSea NFT metadata, collection details and statistics, wallet holdings, account profiles, marketplace events, listings, and offers. Browse paginated results and request NFT metadata refreshes.",
   "categories": [
     "apis-and-http-requests",
     "e-commerce-and-retail",
@@ -8,13 +8,12 @@
   ],
   "skills": [
     "retrieve NFT metadata",
-    "manage marketplace listings",
-    "create and fulfill offers",
     "query collection statistics",
     "track marketplace events",
-    "search collections and NFTs",
+    "browse collections and NFTs",
     "lookup wallet holdings",
-    "retrieve token data",
+    "lookup public account profiles",
+    "retrieve active listings and offers",
     "refresh NFT metadata"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/open-sea.png"

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listModulesTool = SlateTool.create(spec, {
@@ -20,6 +20,7 @@ export let listModulesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       modules: z.array(
         z.object({
           moduleId: z.string().describe('Module ID'),
@@ -54,10 +55,7 @@ export let listModulesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
     if (ctx.input.includeItems) include.push('items');
@@ -67,7 +65,19 @@ export let listModulesTool = SlateTool.create(spec, {
       include: include.length > 0 ? include : undefined
     });
 
-    let modules = raw.map((m: any) => ({
+    let expanded = raw;
+    if (ctx.input.includeItems) {
+      expanded = [];
+      for (let module of raw) {
+        expanded.push({
+          ...module,
+          items: Array.isArray(module.items)
+            ? module.items
+            : await client.listModuleItems(ctx.input.courseId, String(module.id))
+        });
+      }
+    }
+    let modules = expanded.map((m: any) => ({
       moduleId: String(m.id),
       name: m.name,
       position: m.position,
@@ -86,7 +96,7 @@ export let listModulesTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { modules },
+      output: { raw: raw, modules },
       message: `Found **${modules.length}** module(s) in course ${ctx.input.courseId}.`
     };
   })

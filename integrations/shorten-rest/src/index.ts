@@ -6,11 +6,12 @@ import {
   getAlias,
   getClicks,
   listAliases,
+  listClicks,
   updateAlias
 } from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [createAlias, getAlias, updateAlias, deleteAlias, listAliases, getClicks],
+  tools: [createAlias, getAlias, updateAlias, deleteAlias, listAliases, getClicks, listClicks],
   triggers: []
 });

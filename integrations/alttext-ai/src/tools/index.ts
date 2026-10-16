@@ -1,5 +1,9 @@
+export { bulkGenerateAltText } from './bulk-generate-alt-text';
+export { deleteImage } from './delete-image';
 export { generateAltText } from './generate-alt-text';
 export { getAccount } from './get-account';
 export { getImage } from './get-image';
 export { listImages } from './list-images';
+export { scrapePage } from './scrape-page';
 export { searchImages } from './search-images';
+export { updateImage } from './update-image';

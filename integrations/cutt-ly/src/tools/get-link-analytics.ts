@@ -65,7 +65,8 @@ export let getLinkAnalytics = SlateTool.create(spec, {
       browsers: z.array(deviceEntrySchema).describe('Click counts by browser'),
       brands: z.array(deviceEntrySchema).describe('Click counts by device brand'),
       languages: z.array(deviceEntrySchema).describe('Click counts by language'),
-      botDetails: z.array(botEntrySchema).describe('Detailed breakdown of bot clicks')
+      botDetails: z.array(botEntrySchema).describe('Detailed breakdown of bot clicks'),
+      raw: z.unknown().describe('Complete analytics response returned by Cutt.ly')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,12 +80,6 @@ export let getLinkAnalytics = SlateTool.create(spec, {
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo
     });
-
-    if (stats.status !== 1) {
-      throw new Error(
-        `Failed to retrieve analytics. The link may not exist or you may not own it.`
-      );
-    }
 
     return {
       output: {
@@ -105,7 +100,8 @@ export let getLinkAnalytics = SlateTool.create(spec, {
         browsers: stats.browsers,
         brands: stats.brands,
         languages: stats.languages,
-        botDetails: stats.botDetails
+        botDetails: stats.botDetails,
+        raw: stats.raw
       },
       message: `Analytics for **${stats.shortLink}**: **${stats.clicks}** total clicks`
     };

@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let graphEdgeSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider dependency metadata'),
   downstreamId: z.string().describe('UUID of the dependent resource'),
   downstreamType: z.string().describe('Resource type of the dependent resource'),
   downstreamName: z
@@ -34,6 +38,7 @@ export let getDependencyGraph = SlateTool.create(spec, {
     let graph = await client.getGraph();
 
     let edges = graph.map((edge: any) => ({
+      raw: edge,
       downstreamId: edge.downstream_id,
       downstreamType: edge.downstream_type,
       downstreamName: edge.downstream_literate,

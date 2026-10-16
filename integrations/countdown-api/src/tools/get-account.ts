@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccount = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account',
-  description: `Retrieve account usage information and platform status. Returns plan details, credit usage and remaining balance, collection and destination limits, platform component status, and 3-month usage history broken down by day.`,
+  description: `Identify the connected account and retrieve usage information and platform status. Returns plan details, credit usage and remaining balance, collection and destination limits, platform component status, and 3-month usage history broken down by day.`,
   tags: {
     readOnly: true
   }
@@ -14,6 +14,12 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      name: z.string().optional().describe('Account owner name.'),
+      email: z.string().optional().describe('Account email address.'),
+      timezone: z
+        .string()
+        .optional()
+        .describe('Account timezone used for collection schedules.'),
       plan: z.string().optional().describe('Current plan name.'),
       creditsUsed: z.number().optional().describe('Credits used this billing period.'),
       creditsLimit: z
@@ -43,10 +49,13 @@ export let getAccount = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
 
     let result = await client.getAccount();
-    let account = result.account_info || {};
+    let account = requireRecord(result.account_info, 'account_info');
 
     return {
       output: {
+        name: account.name,
+        email: account.email,
+        timezone: account.timezone,
         plan: account.plan,
         creditsUsed: account.credits_used,
         creditsLimit: account.credits_limit,

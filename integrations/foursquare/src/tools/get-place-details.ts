@@ -23,12 +23,14 @@ let hoursSchema = z
 export let getPlaceDetails = SlateTool.create(spec, {
   name: 'Get Place Details',
   key: 'get_place_details',
-  description: `Retrieve comprehensive details about a specific place by its Foursquare ID. Returns rich data including name, address, coordinates, categories, hours, contact info, ratings, popularity, and more. Use the fields parameter to request only specific attributes.`,
+  description: `DEPRECATED — use \`get_place_details_current\` instead. Retrieve comprehensive details about a specific place by its Foursquare ID. Returns rich data including name, address, coordinates, categories, hours, contact info, ratings, popularity, and more. Use the fields parameter to request only specific attributes.`,
   instructions: [
+    'Use get_place_details_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Use a Foursquare place ID (fsq_id) obtained from search, autocomplete, or match results.',
     'Use the fields parameter to limit response data and improve performance.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

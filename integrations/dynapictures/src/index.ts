@@ -7,17 +7,23 @@ import {
   deleteWorkspace,
   generateBatchPdf,
   generateImage,
+  getAiGeneration,
   getMediaAsset,
   getTemplate,
   listMediaAssets,
   listTemplates,
   listWorkspaces,
-  updateWorkspace
+  startAiGeneration,
+  updateWorkspace,
+  uploadMediaAsset
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     generateImage,
+    startAiGeneration,
+    getAiGeneration,
+    uploadMediaAsset,
     generateBatchPdf,
     listTemplates,
     getTemplate,

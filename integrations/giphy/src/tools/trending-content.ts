@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, paginationSchema, ratingEnum } from '../lib/types';
+import {
+  gifSchema,
+  paginationSchema,
+  ratingEnum,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let trendingContent = SlateTool.create(spec, {
@@ -14,6 +20,15 @@ export let trendingContent = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...requestContextFields,
+      bundle: z
+        .string()
+        .optional()
+        .describe('Optional documented rendition bundle, such as messaging_non_clips'),
+      removeLowContrast: z
+        .boolean()
+        .optional()
+        .describe('Exclude low-contrast items when true'),
       contentType: z
         .enum(['gifs', 'stickers'])
         .default('gifs')
@@ -30,25 +45,25 @@ export let trendingContent = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       results: z.array(gifSchema).describe('Array of trending GIFs or stickers'),
       pagination: paginationSchema.describe('Pagination information')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
     let rating = ctx.input.rating || ctx.config.rating;
 
     if (ctx.input.contentType === 'stickers') {
       let result = await client.trendingStickers({
         limit: ctx.input.limit,
         offset: ctx.input.offset,
-        rating
+        rating,
+        bundle: ctx.input.bundle,
+        removeLowContrast: ctx.input.removeLowContrast
       });
       return {
-        output: {
-          results: result.stickers,
-          pagination: result.pagination
-        },
+        output: { raw: result.raw, results: result.stickers, pagination: result.pagination },
         message: `Fetched ${result.stickers.length} trending stickers.`
       };
     }
@@ -56,13 +71,12 @@ export let trendingContent = SlateTool.create(spec, {
     let result = await client.trendingGifs({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
-      rating
+      rating,
+      bundle: ctx.input.bundle,
+      removeLowContrast: ctx.input.removeLowContrast
     });
     return {
-      output: {
-        results: result.gifs,
-        pagination: result.pagination
-      },
+      output: { raw: result.raw, results: result.gifs, pagination: result.pagination },
       message: `Fetched ${result.gifs.length} trending GIFs.`
     };
   })

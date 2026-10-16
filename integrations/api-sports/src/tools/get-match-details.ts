@@ -76,6 +76,10 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete responses from the requested match detail endpoints'),
       fixtureId: z.number().describe('Fixture ID'),
       events: z
         .array(eventSchema)
@@ -95,11 +99,13 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
       statistics: null
     };
 
+    let raw: Record<string, unknown> = {};
     let promises: Promise<void>[] = [];
 
     if (ctx.input.includeEvents) {
       promises.push(
         client.getFixtureEvents(fixtureId).then(data => {
+          raw.events = data;
           result.events = (data.response ?? []).map((e: any) => ({
             timeElapsed: e.time?.elapsed ?? null,
             timeExtra: e.time?.extra ?? null,
@@ -118,6 +124,7 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
     if (ctx.input.includeLineups) {
       promises.push(
         client.getFixtureLineups(fixtureId).then(data => {
+          raw.lineups = data;
           result.lineups = (data.response ?? []).map((l: any) => ({
             teamId: l.team?.id ?? null,
             teamName: l.team?.name ?? null,
@@ -132,7 +139,7 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
               playerName: p.player?.name ?? null,
               playerNumber: p.player?.number ?? null,
               position: p.player?.pos ?? null,
-              grid: null
+              grid: p.player?.grid ?? null
             }))
           }));
         })
@@ -142,6 +149,7 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
     if (ctx.input.includeStatistics) {
       promises.push(
         client.getFixtureStatistics(fixtureId).then(data => {
+          raw.statistics = data;
           result.statistics = (data.response ?? []).map((s: any) => ({
             teamId: s.team?.id ?? null,
             teamName: s.team?.name ?? null,
@@ -161,6 +169,7 @@ export let getMatchDetailsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw,
         fixtureId,
         events: result.events,
         lineups: result.lineups,

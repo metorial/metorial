@@ -1,32 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attendeeInputSchema, providerRecordSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let attendeeInputSchema = z.object({
-  email: z.string().describe('Email address of the attendee (required)'),
-  firstName: z.string().optional().describe('First name of the attendee'),
-  lastName: z.string().optional().describe('Last name of the attendee'),
-  photoUrl: z.string().optional().describe('URL for the attendee profile photo'),
-  phone: z.string().optional().describe('Phone number of the attendee'),
-  bio: z.string().optional().describe('Biography of the attendee'),
-  webPage: z.string().optional().describe('Personal web page URL'),
-  facebookUrl: z.string().optional().describe('Facebook profile URL'),
-  twitterUrl: z.string().optional().describe('Twitter profile URL'),
-  linkedinUrl: z.string().optional().describe('LinkedIn profile URL'),
-  jobPosition: z.string().optional().describe('Job position/title'),
-  company: z.string().optional().describe('Company name'),
-  sendEmail: z
-    .boolean()
-    .optional()
-    .describe('Whether to send an invitation email to the attendee')
-});
 
 export let inviteAttendees = SlateTool.create(spec, {
   name: 'Invite Attendees',
   key: 'invite_attendees',
   description: `Invites one or more attendees to the event. Each attendee must have an email address; additional profile fields (name, photo, phone, bio, social links, job, company) are optional.
-Optionally triggers an invitation email to each attendee.`,
+Optionally triggers an invitation email to each attendee. Eventee processes the first 25 entries immediately and the rest in the background; invalid entries and event admins or moderators may be skipped. Use list_participants to verify the outcome.`,
   instructions: [
     'At minimum, provide an email address for each attendee.',
     'Set sendEmail to true if you want Eventee to send an invitation email to the attendee.'
@@ -42,20 +24,38 @@ Optionally triggers an invitation email to each attendee.`,
   )
   .output(
     z.object({
-      invitedCount: z.number().describe('Number of attendees successfully invited')
+      invitedCount: z
+        .number()
+        .describe(
+          'Confirmed invitation count; 0 when Eventee does not return a count. This is not the submitted count'
+        ),
+      invitedCountConfirmed: z
+        .boolean()
+        .describe(
+          'Whether invitedCount was supplied by Eventee; false means the successful count is unknown'
+        ),
+      submittedCount: z
+        .number()
+        .describe('Number submitted for processing; not a confirmation of invitations'),
+      raw: providerRecordSchema.describe(
+        'Complete response, including the event URL and QR code URL'
+      )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.inviteAttendees(ctx.input.attendees);
 
-    let invitedCount = result.invited ?? ctx.input.attendees.length;
+    let invitedCount = typeof result.invited === 'number' ? result.invited : 0;
 
     return {
       output: {
-        invitedCount
+        invitedCount,
+        invitedCountConfirmed: typeof result.invited === 'number',
+        submittedCount: ctx.input.attendees.length,
+        raw: result
       },
-      message: `Successfully invited **${invitedCount}** attendee(s) to the event.`
+      message: `Submitted **${ctx.input.attendees.length}** attendee(s) for processing. Eventee does not confirm a successful count; call list_participants to verify.`
     };
   })
   .build();

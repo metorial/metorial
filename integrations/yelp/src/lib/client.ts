@@ -1,12 +1,70 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let placesAxios = createAxios({
-  baseURL: 'https://api.yelp.com/v3'
-});
+let validateInteger = (value: number | undefined, field: string, min: number, max: number) => {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < min || value > max)) {
+    throw createApiServiceError(`${field} must be a whole number between ${min} and ${max}.`, {
+      reason: 'invalid_input'
+    });
+  }
+};
 
-let aiAxios = createAxios({
-  baseURL: 'https://api.yelp.com/ai'
-});
+let validateCoordinates = (
+  params: { latitude?: number; longitude?: number },
+  requirePair = true
+) => {
+  for (let [field, value, min, max] of [
+    ['latitude', params.latitude, -90, 90],
+    ['longitude', params.longitude, -180, 180]
+  ] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value < min || value > max)) {
+      throw createApiServiceError(`${field} must be between ${min} and ${max}.`, {
+        reason: 'invalid_input'
+      });
+    }
+  }
+  if (requirePair && (params.latitude === undefined) !== (params.longitude === undefined)) {
+    throw createApiServiceError('Provide latitude and longitude together.', {
+      reason: 'invalid_input'
+    });
+  }
+};
+
+let validateLocation = (params: {
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+}) => {
+  validateCoordinates(params);
+  if (
+    params.location !== undefined &&
+    (!params.location.trim() || params.location.length > 250)
+  ) {
+    throw createApiServiceError('location must contain between 1 and 250 characters.', {
+      reason: 'invalid_input'
+    });
+  }
+  if (!params.location && params.latitude === undefined) {
+    throw createApiServiceError('Provide a location or both latitude and longitude.', {
+      reason: 'invalid_input'
+    });
+  }
+};
+
+let validateText = (
+  value: string,
+  field: string,
+  max = Number.MAX_SAFE_INTEGER,
+  allowEmpty = false
+) => {
+  if ((!allowEmpty && !value.trim()) || value.length > max) {
+    throw createApiServiceError(
+      `${field} must ${allowEmpty ? '' : 'not be empty and must '}contain at most ${max} characters.`,
+      {
+        reason: 'invalid_input'
+      }
+    );
+  }
+};
 
 export interface BusinessSearchParams {
   term?: string;
@@ -23,6 +81,7 @@ export interface BusinessSearchParams {
   openNow?: boolean;
   openAt?: number;
   attributes?: string;
+  devicePlatform?: string;
 }
 
 export interface BusinessMatchParams {
@@ -39,6 +98,7 @@ export interface BusinessMatchParams {
   longitude?: number;
   limit?: number;
   matchThreshold?: string;
+  yelpBusinessId?: string;
 }
 
 export interface AiChatParams {
@@ -50,21 +110,55 @@ export interface AiChatParams {
 }
 
 export class Client {
-  private token: string;
+  private placesAxios: ReturnType<typeof createAuthenticatedAxios>;
+  private aiAxios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private get headers() {
-    return {
-      Authorization: `Bearer ${this.token}`
+    if (!config.token?.trim()) {
+      throw createApiServiceError('A Yelp API key is required.', { reason: 'invalid_auth' });
+    }
+    let options = {
+      authHeader: { value: `Bearer ${config.token}` },
+      maxRedirects: 0,
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Yelp',
+          reason: 'yelp_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          detailKeys: ['description', 'message', 'code'],
+          nestedKeys: ['error'],
+          extractUpstreamCode: (_error, response, helpers) => {
+            if (!helpers.isRecord(response?.data)) return undefined;
+            let body = response.data;
+            return helpers.isRecord(body.error) && typeof body.error.code === 'string'
+              ? body.error.code
+              : undefined;
+          }
+        })
     };
+    this.placesAxios = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.yelp.com/v3'
+    });
+    this.aiAxios = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.yelp.com/ai'
+    });
   }
 
   async searchBusinesses(params: BusinessSearchParams) {
-    let response = await placesAxios.get('/businesses/search', {
-      headers: this.headers,
+    validateLocation(params);
+    validateInteger(params.radius, 'radius', 0, 40000);
+    validateInteger(params.limit, 'limit', 0, 50);
+    validateInteger(params.offset, 'offset', 0, 1000);
+    validateInteger(params.openAt, 'openAt', Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+    if (params.term !== undefined) validateText(params.term, 'term', 300, true);
+    if (params.openNow !== undefined && params.openAt !== undefined) {
+      throw createApiServiceError('openNow and openAt cannot be used together.', {
+        reason: 'invalid_input'
+      });
+    }
+    let response = await this.placesAxios.get('/businesses/search', {
       params: {
         term: params.term,
         location: params.location,
@@ -79,15 +173,21 @@ export class Client {
         price: params.price,
         open_now: params.openNow,
         open_at: params.openAt,
-        attributes: params.attributes
+        attributes: params.attributes,
+        device_platform: params.devicePlatform
       }
     });
     return response.data;
   }
 
   async searchByPhone(phone: string, locale?: string) {
-    let response = await placesAxios.get('/businesses/search/phone', {
-      headers: this.headers,
+    if (!/^\+[0-9 +()\-.x/]+$/.test(phone) || phone.length > 32) {
+      throw createApiServiceError(
+        'phone must start with + and include a country code, with at most 32 characters.',
+        { reason: 'invalid_input' }
+      );
+    }
+    let response = await this.placesAxios.get('/businesses/search/phone', {
       params: {
         phone,
         locale
@@ -102,26 +202,38 @@ export class Client {
       location?: string;
       latitude?: number;
       longitude?: number;
+      term?: string;
+      categories?: string;
+      price?: string;
     }
   ) {
-    let response = await placesAxios.get(`/transactions/${transactionType}/search`, {
-      headers: this.headers,
+    validateLocation(params);
+    if (params.term !== undefined) validateText(params.term, 'term', 300, true);
+    let response = await this.placesAxios.get(`/transactions/${transactionType}/search`, {
       params: {
         location: params.location,
         latitude: params.latitude,
-        longitude: params.longitude
+        longitude: params.longitude,
+        term: params.term,
+        categories: params.categories,
+        price: params.price
       }
     });
     return response.data;
   }
 
-  async getBusinessDetails(businessIdOrAlias: string, locale?: string) {
-    let response = await placesAxios.get(
+  async getBusinessDetails(
+    businessIdOrAlias: string,
+    locale?: string,
+    devicePlatform?: string
+  ) {
+    validateText(businessIdOrAlias, 'businessIdOrAlias');
+    let response = await this.placesAxios.get(
       `/businesses/${encodeURIComponent(businessIdOrAlias)}`,
       {
-        headers: this.headers,
         params: {
-          locale
+          locale,
+          device_platform: devicePlatform
         }
       }
     );
@@ -137,10 +249,12 @@ export class Client {
       offset?: number;
     }
   ) {
-    let response = await placesAxios.get(
+    validateText(businessIdOrAlias, 'businessIdOrAlias');
+    validateInteger(params?.limit, 'limit', 0, 50);
+    validateInteger(params?.offset, 'offset', 0, 1000);
+    let response = await this.placesAxios.get(
       `/businesses/${encodeURIComponent(businessIdOrAlias)}/reviews`,
       {
-        headers: this.headers,
         params: {
           locale: params?.locale,
           sort_by: params?.sortBy,
@@ -160,8 +274,9 @@ export class Client {
       locale?: string;
     }
   ) {
-    let response = await placesAxios.get('/autocomplete', {
-      headers: this.headers,
+    validateText(text, 'text');
+    validateCoordinates(params ?? {});
+    let response = await this.placesAxios.get('/autocomplete', {
       params: {
         text,
         latitude: params?.latitude,
@@ -173,8 +288,26 @@ export class Client {
   }
 
   async matchBusiness(params: BusinessMatchParams) {
-    let response = await placesAxios.get('/businesses/matches', {
-      headers: this.headers,
+    validateCoordinates(params);
+    validateText(params.name, 'name', 64);
+    validateText(params.address1, 'address1', 64, true);
+    validateText(params.city, 'city', 64);
+    validateText(params.state, 'state', 3);
+    if (!/^[A-Z]{2}$/.test(params.country)) {
+      throw createApiServiceError('country must be an uppercase two-letter country code.', {
+        reason: 'invalid_input'
+      });
+    }
+    validateInteger(params.limit, 'limit', 1, 10);
+    if (params.zipCode !== undefined) validateText(params.zipCode, 'zipCode', 12, true);
+    if (params.address2 !== undefined) validateText(params.address2, 'address2', 64, true);
+    if (params.address3 !== undefined) validateText(params.address3, 'address3', 64, true);
+    if (params.yelpBusinessId !== undefined && params.yelpBusinessId.length !== 22) {
+      throw createApiServiceError('yelpBusinessId must be a 22-character Yelp business ID.', {
+        reason: 'invalid_input'
+      });
+    }
+    let response = await this.placesAxios.get('/businesses/matches', {
       params: {
         name: params.name,
         address1: params.address1,
@@ -183,19 +316,22 @@ export class Client {
         country: params.country,
         address2: params.address2,
         address3: params.address3,
-        zip_code: params.zipCode,
+        postal_code: params.zipCode,
         phone: params.phone,
         latitude: params.latitude,
         longitude: params.longitude,
         limit: params.limit,
-        match_threshold: params.matchThreshold
+        match_threshold: params.matchThreshold,
+        yelp_business_id: params.yelpBusinessId
       }
     });
     return response.data;
   }
 
   async aiChat(params: AiChatParams) {
-    let body: Record<string, any> = {
+    validateText(params.query, 'query', 1000);
+    validateCoordinates(params, false);
+    let body: Record<string, unknown> = {
       query: params.query
     };
 
@@ -203,7 +339,7 @@ export class Client {
       body.chat_id = params.chatId;
     }
 
-    let userContext: Record<string, any> = {};
+    let userContext: Record<string, unknown> = {};
     if (params.latitude !== undefined) userContext.latitude = params.latitude;
     if (params.longitude !== undefined) userContext.longitude = params.longitude;
     if (params.locale) userContext.locale = params.locale;
@@ -212,8 +348,19 @@ export class Client {
       body.user_context = userContext;
     }
 
-    let response = await aiAxios.post('/chat/v2', body, {
-      headers: this.headers
+    let response = await this.aiAxios.post('/chat/v2', body);
+    return response.data;
+  }
+
+  async listCategories(locale?: string) {
+    let response = await this.placesAxios.get('/categories', { params: { locale } });
+    return response.data;
+  }
+
+  async getCategory(alias: string, locale?: string) {
+    validateText(alias, 'alias');
+    let response = await this.placesAxios.get(`/categories/${encodeURIComponent(alias)}`, {
+      params: { locale }
     });
     return response.data;
   }

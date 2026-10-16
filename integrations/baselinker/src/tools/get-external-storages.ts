@@ -46,7 +46,7 @@ export let getExternalStorages = SlateTool.create(spec, {
 
     if (!ctx.input.storageId) {
       let result = await client.getExternalStoragesList();
-      storages = result.storages || [];
+      storages = result.storages;
       let count = Array.isArray(storages) ? storages.length : Object.keys(storages).length;
       return {
         output: { storages },

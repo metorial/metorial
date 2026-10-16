@@ -7,6 +7,14 @@ let insightSchema = z.object({
   guid: z.string().optional().describe('MX-assigned unique identifier'),
   userGuid: z.string().optional().describe('GUID of the owning user'),
   title: z.string().optional().nullable().describe('Insight title'),
+  template: z.string().optional().nullable().describe('MX insight template'),
+  activeAt: z.string().optional().nullable().describe('Time when the insight becomes active'),
+  isDismissed: z.boolean().optional().nullable().describe('Whether the insight is dismissed'),
+  hasBeenDisplayed: z
+    .boolean()
+    .optional()
+    .nullable()
+    .describe('Whether the insight has been displayed'),
   description: z.string().optional().nullable().describe('Insight description'),
   insightType: z.string().optional().nullable().describe('Type of insight'),
   isRead: z.boolean().optional().nullable().describe('Whether the insight has been read'),
@@ -55,9 +63,13 @@ export let listInsights = SlateTool.create(spec, {
     });
 
     let insights = (result.insights || []).map((i: any) => ({
-      guid: i.guid,
-      userGuid: i.user_guid,
+      guid: i.guid ?? undefined,
+      userGuid: i.user_guid ?? undefined,
       title: i.title,
+      template: i.template,
+      activeAt: i.active_at,
+      isDismissed: i.is_dismissed,
+      hasBeenDisplayed: i.has_been_displayed,
       description: i.description,
       insightType: i.insight_type,
       isRead: i.is_read,

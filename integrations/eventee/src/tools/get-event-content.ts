@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { providerRecordSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let stageSchema = z.object({
@@ -19,10 +20,21 @@ let sessionSchema = z.object({
   sessionId: z.number().describe('Unique identifier for the session'),
   title: z.string().describe('Title of the session'),
   description: z.string().describe('Description of the session'),
-  start: z.string().describe('Start time of the session (ISO 8601)'),
-  end: z.string().describe('End time of the session (ISO 8601)'),
-  stageId: z.number().describe('ID of the stage where the session takes place'),
-  trackId: z.number().nullable().describe('ID of the track the session belongs to, or null'),
+  start: z
+    .string()
+    .describe('Start time of the session in the event time zone (YYYY-MM-DD HH:mm:ss)'),
+  end: z
+    .string()
+    .describe('End time of the session in the event time zone (YYYY-MM-DD HH:mm:ss)'),
+  stageId: z
+    .number()
+    .describe('ID of the stage where the session takes place; 0 when no hall is assigned'),
+  trackId: z
+    .number()
+    .nullable()
+    .describe(
+      'First label ID assigned to the session, or null; all label IDs are preserved in raw'
+    ),
   speakers: z.array(z.number()).describe('List of speaker IDs assigned to this session')
 });
 
@@ -40,41 +52,54 @@ let speakerSchema = z.object({
 export let getEventContent = SlateTool.create(spec, {
   name: 'Get Event Content',
   key: 'get_event_content',
-  description: `Retrieves the full event content including event details, agenda with sessions, stages/rooms, tracks, and speakers.
+  description: `Retrieves the full event content including the agenda with sessions, stages/rooms, tracks, and speakers. Event name and event date metadata are not supplied by this endpoint; compatibility metadata fields are empty strings.
 Use this to get a complete snapshot of an event's schedule and lineup.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      date: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .describe('Filter the agenda to YYYY-MM-DD'),
+      withOverlapping: z.boolean().optional().describe('Include event days without content')
+    })
+  )
   .output(
     z.object({
-      eventName: z.string().describe('Name of the event'),
-      eventDescription: z.string().describe('Description of the event'),
-      eventStart: z.string().describe('Start date/time of the event (ISO 8601)'),
-      eventEnd: z.string().describe('End date/time of the event (ISO 8601)'),
+      eventName: z.string().describe('Event name when returned; otherwise an empty string'),
+      eventDescription: z
+        .string()
+        .describe('Event description when returned; otherwise an empty string'),
+      eventStart: z.string().describe('Event start when returned; otherwise an empty string'),
+      eventEnd: z.string().describe('Event end when returned; otherwise an empty string'),
       stages: z.array(stageSchema).describe('List of stages/rooms at the event'),
       tracks: z.array(trackSchema).describe('List of session tracks'),
       sessions: z.array(sessionSchema).describe('List of sessions in the agenda'),
-      speakers: z.array(speakerSchema).describe('List of speakers')
+      speakers: z
+        .array(speakerSchema)
+        .describe(
+          'List of speakers; unsupplied first and last names are empty strings. Full names are in raw.speakers'
+        ),
+      raw: providerRecordSchema.describe(
+        'Complete provider response, including days, workshops, breaks, files, and all speaker and session fields'
+      )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let content = await client.getContent();
+    let content = await client.getContent({
+      date: ctx.input.date,
+      with_overlapping:
+        ctx.input.withOverlapping === undefined ? undefined : Number(ctx.input.withOverlapping)
+    });
 
     return {
-      output: {
-        eventName: content.eventName,
-        eventDescription: content.eventDescription,
-        eventStart: content.eventStart,
-        eventEnd: content.eventEnd,
-        stages: content.stages,
-        tracks: content.tracks,
-        sessions: content.sessions,
-        speakers: content.speakers
-      },
-      message: `Retrieved event content for **${content.eventName}** with ${content.sessions.length} session(s), ${content.speakers.length} speaker(s), ${content.stages.length} stage(s), and ${content.tracks.length} track(s).`
+      output: content,
+      message: `Retrieved the event agenda with ${content.sessions.length} session(s), ${content.speakers.length} speaker(s), ${content.stages.length} stage(s), and ${content.tracks.length} track(s).`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let intradayPriceSchema = z.object({
@@ -17,11 +17,12 @@ let intradayPriceSchema = z.object({
 export let getIntradayPrices = SlateTool.create(spec, {
   name: 'Get Intraday Prices',
   key: 'get_intraday_prices',
-  description: `Retrieve intraday OHLCV price data at 1-minute, 5-minute, or 1-hour intervals. Data is available for approximately the past year.
+  description: `Retrieve intraday OHLCV price data at 1-minute, 5-minute, or 1-hour intervals. Availability and request windows depend on the interval.
 All timestamps are in UTC. Use Unix timestamps for the \`from\` and \`to\` date range filters.`,
   instructions: [
     'Ticker format is SYMBOL.EXCHANGE, e.g., AAPL.US',
-    'The from/to parameters accept Unix timestamps (seconds since epoch), not date strings'
+    'The from/to parameters accept Unix timestamps (seconds since epoch), not date strings',
+    'Maximum request windows: 120 days for 1m, 600 days for 5m, and 7200 days for 1h; omitted dates return the latest 120 days'
   ],
   tags: {
     readOnly: true
@@ -54,7 +55,7 @@ All timestamps are in UTC. Use Unix timestamps for the \`from\` and \`to\` date 
       to: ctx.input.to
     });
 
-    let priceArray = Array.isArray(prices) ? prices : [];
+    let priceArray = eodhdArray(prices, 'get-intraday-prices');
 
     return {
       output: {

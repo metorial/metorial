@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTableSettings = SlateTool.create(spec, {
@@ -13,8 +13,16 @@ export let manageTableSettings = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      masterPassword: z
+        .string()
+        .optional()
+        .describe('Master password for an encrypted connection'),
       action: z.enum(['get', 'create', 'update', 'delete']).describe('Action to perform'),
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table'),
       settings: z
         .record(z.string(), z.unknown())
@@ -32,10 +40,7 @@ export let manageTableSettings = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let { action, connectionId, tableName, settings } = ctx.input;
 
@@ -48,7 +53,8 @@ export let manageTableSettings = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!settings) throw new Error('settings is required for creating table settings');
+      if (!settings)
+        throw createApiServiceError('settings is required for creating table settings');
       let result = await client.createTableSettings(connectionId, tableName, settings);
       return {
         output: { settings: result, success: true },
@@ -57,7 +63,8 @@ export let manageTableSettings = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!settings) throw new Error('settings is required for updating table settings');
+      if (!settings)
+        throw createApiServiceError('settings is required for updating table settings');
       let result = await client.updateTableSettings(connectionId, tableName, settings);
       return {
         output: { settings: result, success: true },
@@ -73,6 +80,6 @@ export let manageTableSettings = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

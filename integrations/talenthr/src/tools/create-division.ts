@@ -32,7 +32,7 @@ export let createDivision = SlateTool.create(spec, {
     return {
       output: {
         divisionId: response.data.id,
-        name: ctx.input.name,
+        name: response.data.name,
         rawResponse: response
       },
       message: `Successfully created division **${ctx.input.name}**.`

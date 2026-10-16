@@ -14,7 +14,10 @@ export let viewPortSchema = z
   .object({
     width: z.number().optional().describe('Viewport width in pixels'),
     height: z.number().optional().describe('Viewport height in pixels'),
-    deviceScaleFactor: z.number().optional().describe('Device scale factor (DPR)')
+    deviceScaleFactor: z.number().optional().describe('Device scale factor (DPR)'),
+    isMobile: z.boolean().optional().describe('Emulate a mobile device'),
+    hasTouch: z.boolean().optional().describe('Emulate touch support'),
+    isLandscape: z.boolean().optional().describe('Emulate landscape orientation')
   })
   .optional()
   .describe('Browser viewport configuration');
@@ -22,7 +25,18 @@ export let viewPortSchema = z
 export let waitForSelectorSchema = z
   .object({
     selector: z.string().describe('CSS selector to wait for'),
-    timeout: z.number().optional().describe('Maximum wait time in milliseconds')
+    timeout: z
+      .number()
+      .optional()
+      .describe('Maximum wait time in milliseconds; used when options.timeout is omitted'),
+    options: z
+      .object({
+        visible: z.boolean().optional().describe('Wait until the element is visible'),
+        hidden: z.boolean().optional().describe('Wait until the element is hidden or removed'),
+        timeout: z.number().optional().describe('Maximum selector wait time in milliseconds')
+      })
+      .optional()
+      .describe('Selector wait behavior')
   })
   .optional()
   .describe('Wait for a CSS selector to appear before generating');
@@ -30,6 +44,7 @@ export let waitForSelectorSchema = z
 export let headerFooterTemplateSchema = z
   .object({
     selector: z.string().optional().describe('CSS selector for the template element'),
+    margin: marginSchema.describe('Header or footer margin overrides'),
     method: z.string().optional().describe('Template method type'),
     style: z.string().optional().describe('CSS styles for the template'),
     imageStyle: z.string().optional().describe('CSS styles for images in the template')
@@ -38,6 +53,14 @@ export let headerFooterTemplateSchema = z
 
 export let generatePreviewSchema = z
   .object({
+    type: z
+      .enum(['png', 'jpg', 'webp'])
+      .optional()
+      .describe('Preview image format; takes precedence over imageType'),
+    maintainAspectRatio: z
+      .boolean()
+      .optional()
+      .describe('Preserve the PDF page aspect ratio in the preview'),
     width: z.number().optional().describe('Preview width in pixels'),
     height: z.number().optional().describe('Preview height in pixels'),
     imageType: z.string().optional().describe('Preview image type (e.g. "webp", "png")'),
@@ -76,11 +99,17 @@ export let paperFormatSchema = z
   .describe('Paper format');
 
 export let imageTypeSchema = z
-  .enum(['png', 'jpg', 'webp'])
+  .enum(['png', 'jpg', 'webp', 'jpeg', 'svg'])
   .optional()
   .describe('Output image format');
 
 export let baseOptionsSchema = z.object({
+  async: z
+    .boolean()
+    .optional()
+    .describe(
+      'Process asynchronously by default. Set false to wait for the completed job; the response remains JSON.'
+    ),
   delay: z
     .number()
     .optional()
@@ -124,7 +153,7 @@ export let pdfOptionsSchema = baseOptionsSchema.extend({
   printBackground: z
     .boolean()
     .optional()
-    .describe('Include background graphics (default true)'),
+    .describe('Include background graphics (provider default false)'),
   preferCSSPageSize: z
     .boolean()
     .optional()
@@ -135,6 +164,16 @@ export let pdfOptionsSchema = baseOptionsSchema.extend({
 });
 
 export let imageOptionsSchema = baseOptionsSchema.extend({
+  quality: z
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Image quality from 1 to 100 for JPG, JPEG, or WebP'),
+  preferCSSPageSize: z
+    .boolean()
+    .optional()
+    .describe('Use CSS @page size for image dimensions'),
   imageType: imageTypeSchema,
   transparent: z
     .boolean()
@@ -145,13 +184,17 @@ export let imageOptionsSchema = baseOptionsSchema.extend({
 
 export let jobResponseSchema = z.object({
   jobId: z.string().describe('Unique job identifier'),
-  status: z.string().describe('Job status (pending, processing, completed, failed)'),
+  status: z.string().describe('Provider job status, such as pending, success, or error'),
   assetUrl: z.string().optional().describe('URL to the generated asset (when completed)'),
   previewUrl: z
     .string()
     .optional()
     .describe('URL to the preview image (if preview was requested)'),
-  timestamp: z.string().optional().describe('ISO 8601 timestamp')
+  timestamp: z.string().optional().describe('ISO 8601 timestamp'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Provider response details with credentials removed')
 });
 
 export let assetSchema = z.object({
@@ -161,5 +204,9 @@ export let assetSchema = z.object({
   type: z.string().optional().describe('MIME type'),
   size: z.number().optional().describe('File size in bytes'),
   url: z.string().optional().describe('Direct download URL'),
-  timestamp: z.string().optional().describe('ISO 8601 creation timestamp')
+  timestamp: z.string().optional().describe('ISO 8601 creation timestamp'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Provider response details with credentials removed')
 });

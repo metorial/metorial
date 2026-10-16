@@ -6,10 +6,12 @@ import { spec } from '../spec';
 export let takeScreenshot = SlateTool.create(spec, {
   name: 'Take Screenshot',
   key: 'take_screenshot',
-  description: `Capture a screenshot of a web page (by URL), or render HTML/Markdown content as an image. Returns a URL to the rendered screenshot.
+  description: ` DEPRECATED — use \`render_file\` instead. Capture a screenshot of a web page (by URL), or render HTML/Markdown content as an image. Returns a URL to the rendered screenshot.
 
 Supports multiple output formats (PNG, JPEG, WebP, GIF, AVIF, etc.), full-page capture, element-level selection via CSS selectors, device emulation, content blocking (ads, cookie banners, chat widgets), dark mode, custom JavaScript/CSS injection, geolocation emulation, and caching.`,
   instructions: [
+    'Use render_file to receive a downloadable image from one capture. This compatibility tool returns the original temporary provider links.',
+    'Do not call both tools for the same file: each capture can consume provider quota.',
     'Exactly one of **url**, **html**, or **markdown** must be provided.',
     'For full-page screenshots, set **fullPage** to true. This automatically scrolls and triggers lazy-loaded content.',
     'Use **selector** to capture a specific element on the page by CSS selector.',
@@ -17,7 +19,8 @@ Supports multiple output formats (PNG, JPEG, WebP, GIF, AVIF, etc.), full-page c
     'Set **cache** to true and specify **cacheTtl** to avoid redundant renders. Cached screenshots are not counted against your quota.'
   ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

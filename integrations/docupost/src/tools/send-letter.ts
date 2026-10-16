@@ -13,15 +13,17 @@ export let sendLetter = SlateTool.create(spec, {
   key: 'send_letter',
   description: `Send a physical letter via U.S. mail through DocuPost. Provide recipient and sender addresses along with letter content as either a **PDF URL** or **raw HTML**. Supports options for color printing, double-sided printing, mail class, certified mail, and return envelopes.`,
   instructions: [
+    'This submits physical mail and can incur charges. Check the dashboard before retrying an uncertain request.',
     'Provide letter content as either a PDF URL or HTML content, but not both.',
     'HTML content is limited to 9,000 characters and may render differently in print than on screen.',
     'PDF files should be 8.5x11 inches and max 10MB.',
     'States must be 2-letter U.S. abbreviations (e.g., "CA", "NY").',
-    'Names must be under 40 characters.',
-    'Letters can be canceled within one hour of sending.'
+    'Names support at most 40 characters.',
+    'Check the mail detail page immediately if cancellation is needed; availability is limited and is not guaranteed.',
+    'Priority Mail and Priority Mail Express letters cannot be canceled after submission.'
   ],
   constraints: [
-    'Names (recipient and sender) must be less than 40 characters.',
+    'Names (recipient and sender) support at most 40 characters.',
     'HTML content limited to 9,000 characters.',
     'PDF files must be max 10MB and 8.5x11 inches recommended.',
     'Certified service level requires usps_first_class mail class.'
@@ -99,7 +101,12 @@ export let sendLetter = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Status of the send letter request'),
+      status: z
+        .string()
+        .describe(
+          'Provider request status when supplied; otherwise the HTTP status code as text. This is not mail delivery status.'
+        ),
+      httpStatus: z.number().optional().describe('HTTP status code returned by DocuPost'),
       response: z.any().optional().describe('Raw response from the DocuPost API')
     })
   )
@@ -131,19 +138,14 @@ export let sendLetter = SlateTool.create(spec, {
       description: ctx.input.description
     });
 
-    ctx.info({
-      message: 'Letter sent successfully',
-      recipientName: ctx.input.recipientName,
-      recipientCity: ctx.input.recipientCity,
-      recipientState: ctx.input.recipientState
-    });
-
     return {
       output: {
-        status: 'success',
-        response: result
+        status: result.status,
+        httpStatus: result.httpStatus,
+        response: result.response
       },
-      message: `Letter sent to **${ctx.input.recipientName}** at ${ctx.input.recipientCity}, ${ctx.input.recipientState} ${ctx.input.recipientZip}. You can cancel this letter within one hour from the DocuPost dashboard.`
+      message:
+        'Letter request completed. Check the DocuPost dashboard for processing status and any available cancellation option.'
     };
   })
   .build();

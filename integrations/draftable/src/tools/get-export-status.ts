@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachExport } from '../lib/files';
 import { spec } from '../spec';
 
 export let getExportStatus = SlateTool.create(spec, {
   name: 'Get Export Status',
   key: 'get_export_status',
-  description: `Retrieves the status of a PDF export. Use this to poll for export completion after initiating an export with the **Export Comparison** tool. When ready, provides the download URL for the exported PDF.`,
+  description: `Retrieves the status of a PDF export. Use this to poll for export completion after initiating an export with the **Export Comparison** tool. When ready, provides a downloadable PDF and its current download URL.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -26,9 +27,14 @@ export let getExportStatus = SlateTool.create(spec, {
       downloadUrl: z
         .string()
         .nullable()
+        .optional()
         .describe('URL to download the exported PDF. Available when ready is true.'),
       failed: z.boolean().describe('Whether the export processing failed'),
-      errorMessage: z.string().nullable().describe('Error message if the export failed')
+      errorMessage: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Error message if the export failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -38,6 +44,8 @@ export let getExportStatus = SlateTool.create(spec, {
     });
 
     let result = await client.getExport(ctx.input.exportIdentifier);
+
+    await attachExport(ctx, result);
 
     let status = result.failed ? 'failed' : result.ready ? 'ready' : 'processing';
 
@@ -51,7 +59,7 @@ export let getExportStatus = SlateTool.create(spec, {
         failed: result.failed,
         errorMessage: result.errorMessage
       },
-      message: `Export **${result.identifier}** is **${status}**.${result.ready && result.url ? ` [Download PDF](${result.url})` : ''}`
+      message: `Export **${result.identifier}** is **${status}**.`
     };
   })
   .build();

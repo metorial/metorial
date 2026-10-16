@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getOrder = SlateTool.create(spec, {
   name: 'Get Order',
   key: 'get_order',
-  description: `Retrieve detailed information about a specific ticket order by its ID. Returns buyer details, costs, attendee information, and order status.`,
+  description: `Retrieve detailed information about a specific ticket order by its ID. Returns buyer details, costs and order status.`,
   tags: {
     readOnly: true
   }
@@ -45,22 +45,23 @@ export let getOrder = SlateTool.create(spec, {
     return {
       output: {
         orderId: order.id,
-        eventId: order.event_id,
-        name: order.name,
-        firstName: order.first_name,
-        lastName: order.last_name,
-        email: order.email,
-        status: order.status,
-        created: order.created,
-        changed: order.changed,
-        costs: order.costs
-          ? {
-              gross: order.costs.gross?.display,
-              tax: order.costs.tax?.display,
-              fees: order.costs.eventbrite_fee?.display,
-              payment: order.costs.payment_fee?.display
-            }
-          : undefined
+        eventId: order.event_id ?? undefined,
+        name: order.name ?? undefined,
+        firstName: order.first_name ?? undefined,
+        lastName: order.last_name ?? undefined,
+        email: order.email ?? undefined,
+        status: order.status ?? undefined,
+        created: order.created ?? undefined,
+        changed: order.changed ?? undefined,
+        costs:
+          (order.costs ?? undefined)
+            ? {
+                gross: order.costs.gross?.display ?? undefined,
+                tax: order.costs.tax?.display ?? undefined,
+                fees: order.costs.eventbrite_fee?.display ?? undefined,
+                payment: order.costs.payment_fee?.display ?? undefined
+              }
+            : undefined
       },
       message: `Retrieved order \`${order.id}\` for **${order.name || 'unknown'}** (status: ${order.status}).`
     };

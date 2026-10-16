@@ -1,8 +1,10 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   amazonProduct,
   amazonSearch,
+  captureScreenshot,
   checkDomainReputation,
   checkUsage,
   crunchbaseCompany,
@@ -19,8 +21,11 @@ import {
   instagramProfile,
   linkedinCompany,
   linkedinJob,
+  linkedinJobCount,
   linkedinJobSearch,
+  linkedinJobSuggestions,
   linkedinPost,
+  linkedinProfile,
   scrapeWebsite,
   screenshotWebpage,
   shopifyProduct,
@@ -32,7 +37,12 @@ import {
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
+    captureScreenshot,
+    linkedinProfile,
+    linkedinJobSuggestions,
+    linkedinJobCount,
     scrapeWebsite,
     detectTechnology,
     enrichCompany,

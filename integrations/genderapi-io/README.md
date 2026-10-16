@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Gender Api.io
+# <img src="logo.webp" height="20"> GenderAPI.io
 
-Predict a person's gender from their first name, full name, email address, or social media username. Supports multilingual names across many scripts including Chinese, Hindi, and Arabic, with optional country-based tuning for region-specific names. Uses AI fallback for uncommon or fantasy names. Validate and format international phone numbers from 242 countries, returning E.164 format, number type, geographic location, and country metadata. Monitor API usage and remaining credits.
+Estimate gender from names, email addresses or usernames with country context and optional AI inference. Use the current API for mixed batches, nullable prediction evidence, request IDs and billing details. Existing V1 single and bulk tools remain available. Validate and format international phone numbers and monitor remaining account credits.
+
+Predictions describe naming patterns and do not verify personal identity. See the [tool specification](docs/SPEC.md) for inputs, limits and response details.
 
 ## License
 

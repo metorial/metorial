@@ -1,25 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let _permissionSchema = z.object({
-  action: z.enum(['read', 'write']).describe('Permission action'),
-  resource: z
-    .object({
-      type: z
-        .string()
-        .describe('Resource type (e.g. buckets, tasks, dashboards, orgs, users)'),
-      resourceId: z
-        .string()
-        .optional()
-        .describe('Specific resource ID (omit for all resources of this type)'),
-      orgId: z.string().optional().describe('Organization ID for the resource')
-    })
-    .describe('Resource the permission applies to')
-});
+const mapPermissions = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(item => {
+        const permission = resource(item, ['action']);
+        const target = resource(permission.resource, ['type']);
+        return {
+          ...permission,
+          action: permission.action,
+          resource: {
+            ...target,
+            type: target.type,
+            resourceId: optionalString(target.id),
+            orgId: optionalString(target.orgID)
+          }
+        };
+      })
+    : undefined;
 
-let authorizationSchema = z.object({
+export let authorizationSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   authorizationId: z.string().describe('Authorization ID'),
   token: z
     .string()
@@ -54,17 +58,22 @@ export let listAuthorizations = SlateTool.create(spec, {
   name: 'List Authorizations',
   key: 'list_authorizations',
   description: `List all API token authorizations in the organization. Each authorization contains permissions that define what the token can access.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       userId: z.string().optional().describe('Filter authorizations by user ID')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       authorizations: z.array(authorizationSchema).describe('List of authorizations')
     })
   )
@@ -74,27 +83,21 @@ export let listAuthorizations = SlateTool.create(spec, {
       userID: ctx.input.userId
     });
 
-    let authorizations = (result.authorizations || []).map((a: any) => ({
-      authorizationId: a.id,
-      token: a.token,
-      description: a.description,
-      status: a.status,
-      orgId: a.orgID,
-      userId: a.userID,
-      permissions: a.permissions?.map((p: any) => ({
-        action: p.action,
-        resource: {
-          type: p.resource?.type,
-          resourceId: p.resource?.id,
-          orgId: p.resource?.orgID
-        }
-      })),
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt
+    let authorizations = requireArray(result, 'authorizations').map((a: any) => ({
+      raw: a,
+      authorizationId: resource(a, ['id']).id,
+      token: optionalString(a.token),
+      description: optionalString(a.description),
+      status: optionalString(a.status),
+      orgId: optionalString(a.orgID),
+      userId: optionalString(a.userID),
+      permissions: mapPermissions(a.permissions),
+      createdAt: optionalString(a.createdAt),
+      updatedAt: optionalString(a.updatedAt)
     }));
 
     return {
-      output: { authorizations },
+      output: { authorizations, raw: result },
       message: `Found **${authorizations.length}** authorization(s).`
     };
   })
@@ -109,12 +112,16 @@ Permissions cannot be modified after creation.`,
     'Token value is only returned once at creation time and cannot be retrieved later.',
     'Permissions cannot be changed after creation - delete and recreate if needed.'
   ],
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       description: z.string().optional().describe('Description for the authorization'),
       permissions: z
         .array(
@@ -155,22 +162,16 @@ Permissions cannot be modified after creation.`,
 
     return {
       output: {
-        authorizationId: a.id,
-        token: a.token,
-        description: a.description,
-        status: a.status,
-        orgId: a.orgID,
-        userId: a.userID,
-        permissions: a.permissions?.map((p: any) => ({
-          action: p.action,
-          resource: {
-            type: p.resource?.type,
-            resourceId: p.resource?.id,
-            orgId: p.resource?.orgID
-          }
-        })),
-        createdAt: a.createdAt,
-        updatedAt: a.updatedAt
+        raw: a,
+        authorizationId: resource(a, ['id']).id,
+        token: optionalString(a.token),
+        description: optionalString(a.description),
+        status: optionalString(a.status),
+        orgId: optionalString(a.orgID),
+        userId: optionalString(a.userID),
+        permissions: mapPermissions(a.permissions),
+        createdAt: optionalString(a.createdAt),
+        updatedAt: optionalString(a.updatedAt)
       },
       message: `Created authorization **${a.id}**. Save the token value - it won't be available again.`
     };
@@ -204,22 +205,16 @@ Permissions cannot be changed after creation.`,
 
     return {
       output: {
-        authorizationId: a.id,
-        token: a.token,
-        description: a.description,
-        status: a.status,
-        orgId: a.orgID,
-        userId: a.userID,
-        permissions: a.permissions?.map((p: any) => ({
-          action: p.action,
-          resource: {
-            type: p.resource?.type,
-            resourceId: p.resource?.id,
-            orgId: p.resource?.orgID
-          }
-        })),
-        createdAt: a.createdAt,
-        updatedAt: a.updatedAt
+        raw: a,
+        authorizationId: resource(a, ['id']).id,
+        token: optionalString(a.token),
+        description: optionalString(a.description),
+        status: optionalString(a.status),
+        orgId: optionalString(a.orgID),
+        userId: optionalString(a.userID),
+        permissions: mapPermissions(a.permissions),
+        createdAt: optionalString(a.createdAt),
+        updatedAt: optionalString(a.updatedAt)
       },
       message: `Updated authorization **${a.id}** (status: ${a.status}).`
     };

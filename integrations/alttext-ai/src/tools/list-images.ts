@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { imageSummarySchema, mapImage } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listImages = SlateTool.create(spec, {
@@ -15,26 +16,18 @@ export let listImages = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      perPage: z.number().optional().describe('Number of images per page')
+      perPage: z.number().optional().describe('Number of images per page (1–100)'),
+      imageUrl: z.string().optional().describe('Filter by an exact source image URL')
     })
   )
   .output(
     z.object({
-      images: z
-        .array(
-          z.object({
-            imageAssetId: z.string().describe('Unique identifier for the image'),
-            imageUrl: z.string().describe('URL of the image'),
-            altText: z.string().describe('Generated alt text'),
-            lang: z.string().describe('Language of the alt text'),
-            status: z.string().describe('Processing status'),
-            createdAt: z.string().describe('When the image was processed')
-          })
-        )
-        .describe('List of images'),
+      images: z.array(imageSummarySchema).describe('Image results'),
       page: z.number().describe('Current page number'),
       perPage: z.number().describe('Number of images per page'),
-      total: z.number().describe('Total number of images in the library')
+      total: z.number().describe('Total number of images in the library'),
+      totalPages: z.number().optional().describe('Total result pages'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,24 +35,20 @@ export let listImages = SlateTool.create(spec, {
 
     let result = await client.getImages({
       page: ctx.input.page,
-      perPage: ctx.input.perPage
+      perPage: ctx.input.perPage,
+      imageUrl: ctx.input.imageUrl
     });
 
-    let images = result.images.map(img => ({
-      imageAssetId: img.asset_id,
-      imageUrl: img.url,
-      altText: img.alt_text,
-      lang: img.lang,
-      status: img.status,
-      createdAt: img.created_at
-    }));
+    let images = result.images.map(mapImage);
 
     return {
       output: {
         images,
         page: result.page,
         perPage: result.per_page,
-        total: result.total
+        total: result.total,
+        totalPages: result.total_pages,
+        raw: result.raw
       },
       message: `Retrieved **${images.length}** images (page ${result.page}, ${result.total} total).`
     };

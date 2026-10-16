@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
@@ -65,6 +65,10 @@ export let listSuppliers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      supplierIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return suppliers with these IDs'),
       limit: z.number().min(1).max(250).optional().describe('Number of suppliers to return'),
       cursor: z.string().optional().describe('Pagination cursor'),
       showDeleted: z.boolean().optional().describe('Include deleted suppliers')
@@ -79,6 +83,7 @@ export let listSuppliers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listSuppliers({
+      supplierIds: joinIds(ctx.input.supplierIds),
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted
@@ -155,7 +160,7 @@ export let createOrUpdateSupplier = SlateTool.create(spec, {
 
     return {
       output: mapSupplier(result),
-      message: `${isUpdate ? 'Updated' : 'Created'} supplier **${result.name}**.`
+      message: `${isUpdate ? 'Updated' : 'Created'} supplier **${result.name ?? result.id}**.`
     };
   })
   .build();

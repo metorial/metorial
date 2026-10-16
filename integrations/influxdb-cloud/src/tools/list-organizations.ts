@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, requiredOrg, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let organizationSchema = z.object({
+export let organizationSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   orgId: z.string().describe('Unique organization ID'),
   name: z.string().describe('Organization name'),
   description: z.string().optional().describe('Organization description'),
@@ -11,7 +13,8 @@ let organizationSchema = z.object({
   updatedAt: z.string().optional().describe('Last update timestamp')
 });
 
-let memberSchema = z.object({
+export let memberSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   userId: z.string().describe('User ID'),
   name: z.string().optional().describe('User name'),
   status: z.string().optional().describe('Member status'),
@@ -21,7 +24,7 @@ let memberSchema = z.object({
 export let listOrganizations = SlateTool.create(spec, {
   name: 'List Organizations',
   key: 'list_organizations',
-  description: `List all organizations accessible to the current API token. An organization is a workspace for a group of users, and all resources belong to an organization.`,
+  description: `List organizations visible to the current API token. Cloud returns only the organization that owns the token. An organization is a workspace for a group of users, and all resources belong to an organization.`,
   tags: {
     readOnly: true
   }
@@ -34,6 +37,7 @@ export let listOrganizations = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       organizations: z.array(organizationSchema).describe('List of organizations')
     })
   )
@@ -44,16 +48,17 @@ export let listOrganizations = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let organizations = (result.orgs || []).map((o: any) => ({
-      orgId: o.id,
+    let organizations = requireArray(result, 'orgs').map((o: any) => ({
+      raw: o,
+      orgId: resource(o, ['id', 'name']).id,
       name: o.name,
-      description: o.description,
-      createdAt: o.createdAt,
-      updatedAt: o.updatedAt
+      description: optionalString(o.description),
+      createdAt: optionalString(o.createdAt),
+      updatedAt: optionalString(o.updatedAt)
     }));
 
     return {
-      output: { organizations },
+      output: { organizations, raw: result },
       message: `Found **${organizations.length}** organization(s).`
     };
   })
@@ -69,31 +74,30 @@ export let getOrganizationMembers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgId: z
-        .string()
-        .optional()
-        .describe('Organization ID (defaults to the configured organization)')
+      orgId: orgIdInput
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       members: z.array(memberSchema).describe('List of organization members')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let targetOrgId = ctx.input.orgId || ctx.config.orgId;
+    let targetOrgId = requiredOrg(ctx.input.orgId || ctx.config.orgId);
     let result = await client.getOrganizationMembers(targetOrgId);
 
-    let members = (result.users || []).map((m: any) => ({
-      userId: m.id,
-      name: m.name,
-      status: m.status,
-      role: m.role
+    let members = requireArray(result, 'users').map((m: any) => ({
+      raw: m,
+      userId: resource(m, ['id']).id,
+      name: optionalString(m.name),
+      status: optionalString(m.status),
+      role: optionalString(m.role)
     }));
 
     return {
-      output: { members },
+      output: { members, raw: result },
       message: `Found **${members.length}** member(s) in organization.`
     };
   })

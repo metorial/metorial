@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDate, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTechPortProject = SlateTool.create(spec, {
@@ -24,6 +24,7 @@ export let getTechPortProject = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       project: z
         .record(z.string(), z.any())
         .optional()
@@ -35,24 +36,30 @@ export let getTechPortProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInteger(ctx.input.projectId, 'Project ID', 1);
+    validateDate(ctx.input.updatedSince, 'Updated since');
     let client = new NasaClient({ token: ctx.auth.token });
 
-    if (ctx.input.projectId) {
+    if (ctx.input.projectId !== undefined) {
       let result = await client.getTechPortProject(ctx.input.projectId);
       let project = result.project || result;
       return {
-        output: { project },
+        output: { raw: result, project },
         message: `Retrieved TechPort project **${project.title || project.projectId || ctx.input.projectId}**.`
       };
     }
 
     let result = await client.searchTechPortProjects({ updatedSince: ctx.input.updatedSince });
-    let projectIds = (result.projects || result || []).map((p: any) =>
-      typeof p === 'number' ? p : p.projectId
+    let projects = result.projects?.projects ?? result.projects ?? result;
+    if (!Array.isArray(projects)) {
+      throw createApiServiceError('NASA TechPort returned an unexpected project list.');
+    }
+    let projectIds = projects.map((p: any) =>
+      typeof p === 'number' ? p : (p.projectId ?? p.id)
     );
 
     return {
-      output: { projectIds },
+      output: { raw: result, projectIds },
       message: `Found **${projectIds.length}** TechPort projects${ctx.input.updatedSince ? ` updated since ${ctx.input.updatedSince}` : ''}.`
     };
   })

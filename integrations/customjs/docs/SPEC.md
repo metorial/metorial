@@ -1,82 +1,36 @@
-Now let me get more details on the Make.com modules to understand the full feature set:Now I have enough information to write the specification.
+# CustomJS integration
 
-# Slates Specification for Customjs
+CustomJS runs code and document/browser workflows through HTTP APIs. This integration offers 13 tools and uses an API key from [the CustomJS dashboard](https://app.customjs.space).
 
-## Overview
+## Authentication and account
 
-CustomJS is an automation platform by TechnologyCircle GmbH that allows users to execute custom JavaScript and Python code via API, generate PDFs and images from HTML, capture website screenshots, scrape web content, and host static HTML pages. It integrates with automation platforms like Make.com, n8n, Zapier, and Power Automate, and also offers a standalone HTTP API.
+Requests use `x-api-key`. Inline execution retains the documented `__js1-{api_key}` route. Connection validation and `get_account` use the [account verification endpoint](https://www.customjs.space/api/docs/). Account output includes only workspace, owner, allowance, and creation details; API keys, API-key records, and JWT credentials are excluded. Connection configuration is empty.
 
-## Authentication
+## Code execution
 
-CustomJS uses **API key** authentication.
+- `execute_javascript` sends code and an optional string input to the inline execution API. JSON and text results retain their original result field. Binary results also produce a download.
+- `execute_stored_function` calls a saved Script ID with a JSON object. Obtain the ID from the Code Editor after saving a function. Its configured response type determines the result format; request a download when the function returns binary content.
+- `execute_python` remains available as a legacy action. The current [native execution reference](https://www.customjs.space/integration/native-api/inline-vs-stored/) documents JavaScript only, so it does not establish Python availability or a Python route.
 
-1. Sign up at [https://app.customjs.io](https://app.customjs.io).
-2. After logging in, your API key is displayed on the right-hand side of the dashboard.
-3. The API key is used to authenticate requests by verifying the provided key and gaining access to workspace-level details.
+## Documents and images
 
-For API requests, the key is used in two ways depending on the endpoint:
+- `generate_pdf` supports HTML, template data, and page dimensions through [HTML to PDF](https://www.customjs.space/integration/pdf-api/html-to-pdf/).
+- `generate_image` supports HTML-to-PNG and [website screenshots](https://www.customjs.space/screenshot-api/), including browser commands and cropping.
+- `convert_document` supports [Markdown-to-PDF](https://www.customjs.space/blog/markdown-to-pdf/), Markdown-to-HTML, and HTML-to-DOCX.
+- `manipulate_pdf` merges, extracts pages, compresses, converts to text or PNG, reads form fields, and fills forms. The current [PDF API references](https://www.customjs.space/integration/pdf-api/) document the merge/extract/compress/text/PNG utility contracts, including public URL sources.
 
-- **Execution endpoint:** The API key is embedded in the URL path: `POST https://e.customjs.io/__js1-{api_key}`. A `customjs-origin` header should also be included to identify the calling platform.
-- **Management/auth endpoint:** Pass the API key both in the URL and as a header: `GET https://api.app.customjs.io/core/api-key/{api_key}` with header `x-api-key: {api_key}`.
+File results are downloadable. Existing base64, HTML, text, and raw result fields remain available for compatibility. Legacy form-field, HTML-to-DOCX, and Markdown-to-HTML helper contracts are not described in the current public reference and remain unverified.
 
-The standard CustomJS API key works for all new modules. Only for some older Make.com modules that are still in operation is a RapidAPI key required; this does not apply to n8n or Zapier modules.
+## Browsing and hosted pages
 
-## Features
+- `scrape_website` retains the legacy scraper route and raw HTML result. Its older command variants remain accepted; the current API index lists this route without documenting its request shape.
+- `extract_web_data` uses the current [browser agent API](https://www.customjs.space/web-scraping-api/). Describe a data collection goal and choose extracted data, text, HTML, or Markdown. The complete response retains browser events and usage. This tool can interact with pages as part of the requested task.
+- `manage_pages` lists, retrieves, creates or updates by name, explicitly updates by page ID, and deletes pages. The [Pages reference](https://www.customjs.space/integration/native-api/html-pages/) documents list, create, and update. Upsert matches the name in the page list, updates an existing page, or creates a new one. Custom slugs are documented for creation; existing get/delete routes and slug forwarding during updates are retained for compatibility without fresh provider verification.
 
-### Custom JavaScript Execution
+## Data utilities and SSL
 
-Allows users to create and integrate custom JavaScript logic as an HTTP API. Supports Node.js with full NPM module support. Code is sent inline in the request body along with an optional `input` parameter for data to process. Useful for data transformations, calculations, API integrations, and custom business logic.
+`process_data` supports JSONPath and regular expression extract/replace/test/split operations. Empty regex text and patterns are valid. Global extraction advances safely after zero-width matches. `check_ssl` retrieves certificate details through the retained certificate utility. These older helper-level request contracts are not specified in the current native API reference.
 
-### Custom Python Execution
+## Verification boundary
 
-Runs custom Python code written inline in a module. Available for data analysis, API interactions, or other logic that is better suited to Python.
-
-### PDF Generation and Manipulation
-
-- **HTML to PDF:** Converts HTML into pixel-perfect PDFs via API. Supports styled HTML with CSS for generating invoices, reports, certificates, etc.
-- **Merge PDFs:** Combines multiple PDF files (provided as URLs) into a single document.
-- **Extract Pages:** Splits a PDF or extracts specific page ranges into a new PDF.
-- **Compress PDF:** Reduces the file size of PDFs without losing quality.
-- **PDF to Text:** Extracts all text content from a PDF file.
-- **PDF to PNG:** Converts PDF documents or specific pages into PNG images.
-- **Read PDF Form Fields:** Extracts all form field names and types from a fillable PDF.
-
-### Image Generation
-
-- **HTML to PNG:** Converts HTML content into high-quality PNG images. Useful for generating charts, infographics, and dynamic OG images.
-- **Website Screenshots:** Captures high-resolution web views in seconds from any public URL.
-
-### Web Scraping and Browser Automation
-
-- **Scraper:** Crawls websites and extracts data, including handling interactive elements like clicks and typing for dynamic content.
-- **Puppeteer:** Provides full headless browser control for advanced web automation tasks.
-
-### HTML Page Hosting
-
-Deploys HTML landing pages with a single API call, with no Git or build steps required. Suited for AI-generated pages, campaigns, and prototypes. Supports custom domains.
-
-### Form Builder
-
-Collects data directly into Make or n8n workflows. Forms can submit data to webhook endpoints. Supports custom domains and integration with automation platforms.
-
-### Mail Hook
-
-Creates custom email addresses that forward incoming emails to webhooks. Connects to Make, n8n, or any webhook endpoint to build email-triggered automations.
-
-- Emails are forwarded to webhooks in real-time with no delays or polling.
-- Provides sender, subject, body, HTML content, and metadata in JSON format, and includes attachments with direct download links.
-- Emails are stored for 60 days.
-
-### Data Processing Utilities
-
-- Selects, extracts, and flattens specific values from complex, nested JSON structures using JSON Path or simple selectors.
-- Performs Regex pattern extraction, search-and-replace, and validation on unstructured text data.
-- **SSL Checker:** Monitors SSL certificates and retrieves expiration dates.
-
-### Stored Functions
-
-Runs functions written and stored within the CustomJS platform. Enables centrally managed, reusable code that can be invoked from any integration or API call.
-
-## Events
-
-The provider does not support events. CustomJS is a request-response execution platform and does not offer webhooks or event subscription mechanisms for listening to changes. Note that while CustomJS _sends data to_ external webhooks (e.g., form submissions, Mail Hook forwarding), it does not provide an event system that external consumers can subscribe to for platform-level events.
+No platform triggers are registered. Form submission and mail forwarding products are not exposed by this integration. Local builds and schema inspection do not establish live provider acceptance, downloadable-file integrity, or availability of retained legacy helpers.

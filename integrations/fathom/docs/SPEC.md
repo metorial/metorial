@@ -1,88 +1,57 @@
-I see there are multiple products called "Fathom" — Fathom Analytics (website analytics), Fathom Global (flood risk data), and Fathom AI (meeting recorder). Given that "Fathom" most commonly refers to the AI meeting recorder (fathom.video / developers.fathom.ai), and it has a developer API with webhooks, let me research that one more specifically.Now let me get the webhook payload details and the full API reference:I now have enough information to write the specification. Let me compile everything.
+# Fathom integration specification
 
-# Slates Specification for Fathom
-
-## Overview
-
-Fathom is an AI meeting assistant that joins Zoom, Google Meet, and Microsoft Teams calls to automatically record, transcribe, and summarize meetings. It generates AI-powered meeting notes, action items, and summaries, and can sync meeting data to CRMs like HubSpot and Salesforce.
+Fathom records and processes meetings from Zoom, Google Meet, and Microsoft Teams. This integration reads accessible meeting metadata, speaker-labeled transcripts, AI summaries, action items, highlights, and CRM matches.
 
 ## Authentication
 
-Fathom supports two authentication methods:
+- Personal API keys come from User Settings → API Access and are sent with `X-Api-Key`.
+- OAuth uses the `public_api` scope. Authorization retains the Fathom website endpoint; token exchange and refresh use `https://api.fathom.ai/external/v1/oauth2/token` with form-encoded parameters. API requests use `Authorization: Bearer` for OAuth connections.
+- OAuth access tokens expire. Refresh tokens rotate and can be consumed once. Returned replacements are persisted; an omitted replacement retains the saved token. Missing refresh credentials produce an actionable error.
+- New connections record their authentication method. Older connections with a saved refresh token are recognized as OAuth; older API-key connections continue to use the key header.
+- No separate instance, team, or account configuration is required.
 
-### API Key Authentication
+## Tools
 
-Users generate a personal API key from their Fathom dashboard under **Settings → API Access**. The key is passed via the `X-Api-Key` header on every request:
+| Tool | Provider endpoint | Behavior |
+| --- | --- | --- |
+| `list_meetings` | `GET /meetings` | Returns one page and `nextCursor`. Filters by creation time, recorder emails, team names, company domains, domain type, and meeting type. Optional action items, CRM matches, and highlights are returned when provided by Fathom. |
+| `get_transcript` | `GET /recordings/{recording_id}/transcript` | Returns the synchronous speaker-labeled transcript. Does not supply a callback URL. |
+| `get_summary` | `GET /recordings/{recording_id}/summary` | Returns the default summary's template name and Markdown text. Does not supply a callback URL. |
+| `get_meeting_details` | Dedicated transcript/summary endpoints plus `GET /meetings` | Fetches selected content. Searches up to five meeting-list pages for action items; returns search progress and the next unsearched cursor when the recording was not found. Requested endpoint failures are errors. |
+| `list_teams` | `GET /teams`, optionally `GET /team_members?team=...` | Retrieves all pages of teams and, when requested, all pages of each team's members. Rejects repeated cursors. |
+| `list_meeting_types` | `GET /meeting_types` | Returns a page of active and inactive meeting types. Names are usable as the `meetingType` meeting filter. |
+| `list_team_members` | `GET /team_members` | Returns a page of members with optional team filtering, allowing recorder email discovery without loading every team's members. |
 
-```
-curl https://api.fathom.ai/external/v1/meetings \
-  -H "X-Api-Key: YOUR_API_KEY"
-```
+The `recordingId` input remains a number. It must be a positive safe integer from the meeting-list response; the number in a Fathom call URL is a different identifier.
 
-API keys are user-scoped: they can only access meetings recorded by the user or shared to their team. Admin keys do not grant access to other users' unshared meetings.
+Fathom's default meeting page size is ten and there is no page-size parameter. Attendee-email filtering is not supported by the provider API. The existing `calendarInvitees` input is retained as an exact email filter applied locally within each provider page. An empty filtered page may still have a next cursor and does not prove there are no later matches. Domain filters are sent upstream using repeated `calendar_invitees_domains[]` parameters; recorder and team arrays use their documented repeated parameter names.
 
-### OAuth 2.0 (Authorization Code Flow)
+OAuth applications cannot inline summaries or transcripts in a meeting listing. Dedicated transcript and summary tools work with both authentication methods. There is a global limit of 60 API calls per minute; heavy summary/transcript requests have a separate limit, normally 30 per minute and sometimes reduced to five. Rate-limit responses are errors; callers should follow the provider's retry guidance.
 
-For public integrations intended for multiple Fathom users, OAuth 2.0 is required. Developers must first register an OAuth app at `https://fathom.video/marketplace_applications/new` to obtain a Client ID and Client Secret.
+## Response fidelity
 
-- **Authorization URL:** Generated via SDK or manually constructed to redirect users.
-- **Token endpoint:** `https://api.fathom.ai/external/v1/oauth2/token`
-- **Redirect URI:** Must be HTTPS; configured during app registration.
-- **Grant types:** `authorization_code` and `refresh_token`.
-- **Scopes:** The only available scope is `public_api`.
-- Access tokens are short-lived. Refresh tokens are single-use and remain valid until the user revokes access or the token is consumed.
+- Recorder and invitee names map from documented `name` fields; historical `display_name` responses remain accepted.
+- Invitee names and emails can be null. Their existing string fields are omitted when the source is null, and the exact source values remain in the original invitee and meeting data. No empty display names or email addresses are invented.
+- Transcript speaker emails are optional and nullable in the provider schema. Omission stays omitted and explicit null stays null; original entries are retained.
+- All previously nullable meeting metadata, summaries, action-item assignees, and moment links keep their nullable output contracts. Original nulls are preserved.
+- Action-item moment links map from `recording_playback_url`, with the historical `url` field retained as a fallback. Description, completion state, assignee fields, optional user-generated flag, and timestamp are exposed alongside original action data.
+- Optional CRM matches and highlights retain provider structures and nulls, including a CRM error when no CRM is connected.
+- Missing or malformed required response objects, arrays, IDs, names, state, and content fields produce a service error. Missing transcript or invitee arrays are not converted to empty lists.
 
-OAuth apps have some limitations compared to API key access: they cannot use `include_transcript` or `include_summary` inline when listing meetings and must fetch transcripts and summaries separately via dedicated endpoints.
+## Capability boundaries
 
-## Features
+The official API has no current-user, self, or profile endpoint. Its `/users` endpoint lists organization permissions and is admin-only; it is not an identity endpoint and is not exposed by this read-oriented integration.
 
-### Meeting Retrieval
+Webhook registration and recording downloads are documented provider capabilities. They are not exposed as tools or triggers here. Webhook delivery requires its own verified registration and callback lifecycle. Recording downloads are asynchronous and return expiring signed URLs; generation, polling, and URL renewal require a complete file workflow. Existing internal webhook client methods retain documented request behavior, including validation that at least one content flag is enabled.
 
-List and retrieve meetings recorded by the user or shared to their team. Meetings include metadata such as title, scheduled and actual recording times, meeting type (internal/external), calendar invitees, and who recorded the meeting. Filtering is available by:
+## Official references
 
-- Recorder email addresses
-- Team names
-- Calendar invitee email addresses
-- Calendar invitee domains (with options: all, only internal, one or more external)
-- Date range (`created_after`, `created_before`)
-- Meeting type
+Verified against public documentation on 2026-10-15:
 
-### Transcripts
-
-Retrieve speaker-labeled, timestamped transcripts for individual meeting recordings. Each transcript entry includes the speaker's display name, matched calendar invitee email, spoken text, and timestamp. Transcripts can be included inline when listing meetings (API key auth only) or fetched separately per recording. Supports asynchronous delivery via callback URL.
-
-### Meeting Summaries
-
-Retrieve AI-generated summaries for specific recordings in Markdown format. Summaries are associated with a template name (e.g., "general"). Like transcripts, summaries can be included inline (API key auth only) or fetched per recording. Supports asynchronous delivery via callback URL.
-
-### Action Items
-
-Access AI-extracted action items from meetings, including description, assignee (name, email, team), completion status, and a link to the relevant moment in the recording. Action items can be included when listing meetings.
-
-### CRM Matches
-
-Retrieve CRM-matched data for meetings, including matched contacts, companies, and deals (with name, amount, and CRM record URL). Requires the user to have a CRM connected in Fathom. CRM match data can be included when listing meetings or in webhook payloads.
-
-### Team Management
-
-List teams accessible to the authenticated user and retrieve team members with optional filtering by team name.
-
-### Webhook Management
-
-Create and delete webhooks programmatically. When creating a webhook, you specify a destination URL, which recording types should trigger it (`my_recordings`, `shared_team_recordings`), and what data to include in the payload (transcript, summary, action items, CRM matches). A webhook secret is returned for signature verification.
-
-## Events
-
-Fathom supports webhooks that deliver meeting data to a specified URL after meetings are processed.
-
-### New Meeting Content Ready
-
-Fires when a recorded meeting has been fully processed and its content (transcript, summary, action items) is available. This is the primary (and currently only) webhook event type.
-
-- **Trigger configuration:** Can be set to fire for the user's own recordings, recordings shared to their team, or both.
-- **Payload configuration:** You choose which data to include in the webhook payload:
-  - Transcript
-  - Summary
-  - Action items
-  - CRM matches
-- **Verification:** Each webhook request includes `webhook-id`, `webhook-timestamp`, and `webhook-signature` headers. The signature is an HMAC-SHA256 hash using the webhook secret provided at creation time, allowing receivers to verify authenticity and prevent replay attacks.
+- [OpenAPI specification](https://developers.fathom.ai/api-reference/openapi.yaml)
+- [Meeting listing](https://developers.fathom.ai/api-reference/meetings/list-meetings)
+- [Meeting types](https://developers.fathom.ai/api-reference/meetings/list-meeting-types)
+- [Transcript retrieval](https://developers.fathom.ai/api-reference/recordings/get-transcript)
+- [Summary retrieval](https://developers.fathom.ai/api-reference/recordings/get-summary)
+- [Teams](https://developers.fathom.ai/api-reference/teams/list-teams) and [team members](https://developers.fathom.ai/api-reference/team-members/list-team-members)
+- [OAuth](https://developers.fathom.ai/sdks/oauth), [FAQ](https://developers.fathom.ai/faq), and [rate limits](https://developers.fathom.ai/api-overview#global-rate-limits)

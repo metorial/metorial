@@ -8,12 +8,15 @@ export let getLogoUrl = SlateTool.create(spec, {
   key: 'get_logo_url',
   description: `Generate a Logo.dev CDN URL for a company logo. Supports lookup by **domain**, **stock ticker**, **cryptocurrency symbol**, **ISIN**, or **company name**. Returns a direct image URL that can be embedded in HTML, markdown, or any image container. Optionally configure format, size, theme, greyscale, and retina settings.`,
   instructions: [
-    'For stock tickers on non-US exchanges, append the exchange shortcode (e.g., "7203.T" for Tokyo, "AAPL.LSE" for London).',
-    'If a publishable key was configured during authentication, it will be embedded in the URL automatically.'
+    'For stock tickers on non-US exchanges, append the exchange shortcode (e.g., "7203.T" for Tokyo, "AZN.L" for London).',
+    'A publishable key must be configured during authentication. It is safe to embed in a CDN URL.',
+    'For a downloadable logo file, use download_brand_image. CDN URLs are for displaying images in websites and applications.',
+    'Use PNG or WebP with the dark theme.'
   ],
   constraints: [
     'Maximum image size is 800px.',
-    'SVG format is only available on Enterprise plans.'
+    'Only JPG, PNG, and WebP output formats are supported.',
+    'Domain-restricted publishable keys need an allowed Referer header from the embedding application.'
   ],
   tags: {
     readOnly: true
@@ -54,6 +57,30 @@ export let getLogoUrl = SlateTool.create(spec, {
         .optional()
         .describe(
           'Behavior when no logo is found. "monogram" returns a letter placeholder (default), "404" returns an HTTP 404.'
+        ),
+      width: z
+        .number()
+        .int()
+        .min(1)
+        .max(800)
+        .optional()
+        .describe(
+          'Image width in pixels; overrides the width from size while preserving aspect ratio.'
+        ),
+      height: z
+        .number()
+        .int()
+        .min(1)
+        .max(800)
+        .optional()
+        .describe(
+          'Image height in pixels; overrides the height from size while preserving aspect ratio.'
+        ),
+      redirect: z
+        .enum(['follow', '404'])
+        .optional()
+        .describe(
+          'Use 404 to reject a domain that resolves only by redirecting to another brand.'
         )
     })
   )
@@ -72,10 +99,13 @@ export let getLogoUrl = SlateTool.create(spec, {
       {
         format: ctx.input.format,
         size: ctx.input.size,
+        width: ctx.input.width,
+        height: ctx.input.height,
         theme: ctx.input.theme,
         greyscale: ctx.input.greyscale,
         retina: ctx.input.retina,
-        fallback: ctx.input.fallback
+        fallback: ctx.input.fallback,
+        redirect: ctx.input.redirect
       }
     );
 

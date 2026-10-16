@@ -1,10 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 let contentModuleSchema = z.object({
-  moduleId: z.string().describe('Module ID'),
+  moduleId: z.string().describe('Content object ID (module or topic)'),
+  contentType: z
+    .number()
+    .optional()
+    .describe('Content object type: 0 for module, 1 for topic'),
+  topicId: z
+    .string()
+    .optional()
+    .describe('Topic ID for contentType 1 entries, for get_content_topic'),
   title: z.string().optional().describe('Module title'),
   shortTitle: z.string().optional().describe('Short title'),
   isHidden: z.boolean().optional().describe('Whether the module is hidden'),
@@ -24,7 +33,11 @@ export let listContentModules = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       moduleId: z
         .string()
         .optional()
@@ -51,15 +64,17 @@ export let listContentModules = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : [];
     let modules = items.map((m: any) => ({
       moduleId: String(m.Id),
-      title: m.Title,
-      shortTitle: m.ShortTitle,
-      isHidden: m.IsHidden,
-      isLocked: m.IsLocked,
-      startDate: m.ModuleStartDate,
-      endDate: m.ModuleEndDate,
-      dueDate: m.ModuleDueDate,
-      lastModifiedDate: m.LastModifiedDate,
-      description: m.Description?.Text || m.Description?.Content
+      contentType: m.Type ?? undefined,
+      topicId: m.Type === 1 ? String(m.Id) : undefined,
+      title: m.Title ?? undefined,
+      shortTitle: m.ShortTitle ?? undefined,
+      isHidden: m.IsHidden ?? undefined,
+      isLocked: m.IsLocked ?? undefined,
+      startDate: m.ModuleStartDate ?? undefined,
+      endDate: m.ModuleEndDate ?? undefined,
+      dueDate: m.ModuleDueDate ?? undefined,
+      lastModifiedDate: m.LastModifiedDate ?? undefined,
+      description: richText(m.Description)
     }));
 
     return {
@@ -77,7 +92,11 @@ export let createContentModule = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       title: z.string().describe('Module title'),
       parentModuleId: z
         .string()
@@ -103,7 +122,13 @@ export let createContentModule = SlateTool.create(spec, {
     let moduleData: any = {
       Title: ctx.input.title,
       ShortTitle: ctx.input.shortTitle || ctx.input.title,
-      Type: 0 // Module type
+      Type: 0,
+      Description: { Content: ctx.input.description ?? '', Type: 'Html' },
+      IsHidden: ctx.input.isHidden ?? false,
+      IsLocked: false,
+      ModuleStartDate: ctx.input.startDate ?? null,
+      ModuleEndDate: ctx.input.endDate ?? null,
+      ModuleDueDate: ctx.input.dueDate ?? null
     };
 
     if (ctx.input.description) {
@@ -128,7 +153,7 @@ export let createContentModule = SlateTool.create(spec, {
     return {
       output: {
         moduleId: String(result.Id),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Created content module **${result.Title}** (ID: ${result.Id})${ctx.input.parentModuleId ? ` under module ${ctx.input.parentModuleId}` : ''}.`
     };
@@ -143,7 +168,11 @@ export let updateContentModule = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       moduleId: z.string().describe('Module ID to update'),
       title: z.string().optional().describe('Updated title'),
       shortTitle: z.string().optional().describe('Updated short title'),
@@ -184,7 +213,7 @@ export let updateContentModule = SlateTool.create(spec, {
     return {
       output: {
         moduleId: String(result.Id),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Updated content module **${result.Title}** (ID: ${result.Id}).`
     };
@@ -199,7 +228,11 @@ export let deleteContentModule = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       moduleId: z.string().describe('Module ID to delete')
     })
   )

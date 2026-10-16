@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Placid
 
-Generate images, PDFs, and videos from reusable design templates populated with dynamic data. Create and manage templates and collections, configure dynamic layers (text, images, shapes, barcodes, QR codes, ratings, browser screenshots), and produce visuals at scale. Upload media files for use in generations, generate images on the fly via URL-based rendering, and transfer outputs to Amazon S3-compatible storage. Supports webhook callbacks for asynchronous generation completion notifications.
+Generate images, PDFs, and videos from reusable templates with dynamic text, pictures, shapes, barcodes, and other layers. Browse and manage templates and collections, merge PDFs, poll asynchronous rendering jobs, and delete generated files. Completed renders include downloadable files. Generation requests can send completion callbacks or transfer their output to S3-compatible storage.
+
+The legacy `upload_media` operation submits source URLs to Placid. Current documentation specifies binary uploads, so acceptance of URL submission is unverified. Source image URLs can also be supplied directly to picture layers.
+
+Authenticate with the project-specific API token from **Projects → Select Project → API Tokens**.
 
 ## License
 

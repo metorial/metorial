@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -60,6 +60,10 @@ export let listFiles = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
+
+    if (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) {
+      throw createApiServiceError('limit must be a whole number.');
+    }
 
     let result = await client.listFiles({
       stored: ctx.input.stored,

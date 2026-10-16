@@ -15,25 +15,34 @@ export let getAppResults = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      appId: z.string().describe('Unique identifier of the app to get results for'),
+      appId: z.string().describe('App ID. Call list_apps to discover available apps.'),
       onlyDefaultResultFields: z
         .boolean()
         .optional()
-        .describe('If true, returns only the default result fields. Defaults to true.')
+        .describe('Request only default result fields; omit to use provider behavior.')
     })
   )
   .output(
     z.object({
-      rows: z.array(z.record(z.string(), z.unknown())).describe('Array of recent result rows')
+      rows: z.array(z.record(z.string(), z.unknown())).describe('Array of recent result rows'),
+      appId: z.string().optional().describe('App ID returned by the provider'),
+      responseFields: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Result field definitions'),
+      raw: z.unknown().optional().describe('Complete app results response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let rows = await client.getAppResults(ctx.input.appId, ctx.input.onlyDefaultResultFields);
+    let result = await client.getAppResults(
+      ctx.input.appId,
+      ctx.input.onlyDefaultResultFields
+    );
 
     return {
-      output: { rows },
-      message: `Retrieved **${rows.length}** result row(s) for the app.`
+      output: result,
+      message: `Retrieved **${result.rows.length}** result row(s) for the app.`
     };
   })
   .build();

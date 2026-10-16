@@ -1,7 +1,22 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type SymplaParticipant, validateSymplaOutput } from '../lib/client';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  participantId: z.number().describe('Unique participant/ticket identifier'),
+  orderId: z.string().describe('Associated order ID'),
+  firstName: z.string().describe('Participant first name'),
+  lastName: z.string().describe('Participant last name'),
+  email: z.string().describe('Participant email'),
+  ticketNumber: z.string().describe('Ticket number printed on the ticket'),
+  ticketNumStart: z.string().describe('Ticket number start'),
+  ticketName: z.string().describe('Ticket type name'),
+  ticketSalePrice: z.number().describe('Ticket sale price'),
+  checkedIn: z.boolean().describe('Whether the participant has checked in'),
+  checkedInDate: z.string().describe('Check-in date, if checked in'),
+  customForm: z.record(z.string(), z.string()).describe('Custom form field responses')
+});
 
 export let getParticipantTool = SlateTool.create(spec, {
   name: 'Get Participant',
@@ -24,31 +39,18 @@ export let getParticipantTool = SlateTool.create(spec, {
         .describe('Ticket number printed on the ticket (use this or ticketId)')
     })
   )
-  .output(
-    z.object({
-      participantId: z.number().describe('Unique participant/ticket identifier'),
-      orderId: z.string().describe('Associated order ID'),
-      firstName: z.string().describe('Participant first name'),
-      lastName: z.string().describe('Participant last name'),
-      email: z.string().describe('Participant email'),
-      ticketNumber: z.string().describe('Ticket number printed on the ticket'),
-      ticketNumStart: z.string().describe('Ticket number start'),
-      ticketName: z.string().describe('Ticket type name'),
-      ticketSalePrice: z.number().describe('Ticket sale price'),
-      checkedIn: z.boolean().describe('Whether the participant has checked in'),
-      checkedInDate: z.string().describe('Check-in date, if checked in'),
-      customForm: z.record(z.string(), z.string()).describe('Custom form field responses')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    if (!ctx.input.ticketId && !ctx.input.ticketNumber) {
-      throw new Error('Either ticketId or ticketNumber must be provided.');
+    if (ctx.input.ticketId === undefined && !ctx.input.ticketNumber?.trim()) {
+      throw createApiServiceError('Either ticketId or ticketNumber must be provided.', {
+        reason: 'sympla_missing_ticket'
+      });
     }
 
-    let p: any;
-    if (ctx.input.ticketId) {
+    let p: SymplaParticipant;
+    if (ctx.input.ticketId !== undefined) {
       p = await client.getParticipantByTicketId(ctx.input.eventId, ctx.input.ticketId);
     } else {
       p = await client.getParticipantByTicketNumber(
@@ -58,22 +60,22 @@ export let getParticipantTool = SlateTool.create(spec, {
     }
 
     let output = {
-      participantId: p.id ?? 0,
-      orderId: p.order_id ?? '',
-      firstName: p.first_name ?? '',
-      lastName: p.last_name ?? '',
-      email: p.email ?? '',
-      ticketNumber: p.ticket_number ?? '',
-      ticketNumStart: p.ticket_num_start ?? '',
-      ticketName: p.ticket_name ?? '',
-      ticketSalePrice: p.ticket_sale_price ?? 0,
-      checkedIn: p.checkin?.checked_in ?? false,
-      checkedInDate: p.checkin?.checked_in_date ?? '',
-      customForm: p.custom_form ?? {}
+      participantId: p.id,
+      orderId: p.order_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      email: p.email,
+      ticketNumber: p.ticket_number,
+      ticketNumStart: p.ticket_num_start,
+      ticketName: p.ticket_name,
+      ticketSalePrice: p.ticket_sale_price,
+      checkedIn: p.checkin?.checked_in,
+      checkedInDate: p.checkin?.checked_in_date,
+      customForm: p.custom_form
     };
 
     return {
-      output,
+      output: validateSymplaOutput(outputSchema, output),
       message: `Retrieved participant **${output.firstName} ${output.lastName}** (${output.email}). Check-in: ${output.checkedIn ? 'Yes' : 'No'}.`
     };
   })

@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Spotlightr
 
-Manage hosted videos for marketing and e-learning. Create, list, update, and delete videos by uploading files or linking external URLs (YouTube, Vimeo, Google Drive). Update video sources without changing embed codes or watch page URLs. Copy player settings between videos. Retrieve video analytics including loads, plays, play rate, watch percentage, completion rate, and shares. Access individual view session data and ranked lists of top-performing videos.
+Manage hosted videos for marketing and e-learning. Create, list, update, and delete videos linked from external URLs (YouTube, Vimeo, Google Drive). Update video sources without changing embed codes or watch page URLs. Copy player settings between videos. Retrieve video analytics including loads, plays, play rate, watch percentage, completion rate, and shares. Access individual view session data, ranked lists of top-performing videos, and global account search. Organize project groups, manage allowed embedding domains, and expire course access or gallery access codes.
 
 ## License
 

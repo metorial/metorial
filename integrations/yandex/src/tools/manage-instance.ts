@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as compute from '../lib/compute';
 import { spec } from '../spec';
@@ -40,7 +40,8 @@ export let listInstances = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await compute.listInstances(
       ctx.auth,
@@ -51,7 +52,10 @@ export let listInstances = SlateTool.create(spec, {
 
     return {
       output: {
-        instances: result.instances || [],
+        instances: (result.instances || []).map((instance: Record<string, unknown>) => ({
+          ...instance,
+          instanceId: instance.id
+        })),
         nextPageToken: result.nextPageToken
       },
       message: `Found ${(result.instances || []).length} instance(s) in folder ${folderId}.`
@@ -155,7 +159,14 @@ export let createInstance = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
+
+    if (ctx.input.bootDiskImageId && ctx.input.bootDiskSnapshotId) {
+      throw createApiServiceError(
+        'Specify either bootDiskImageId or bootDiskSnapshotId, not both.'
+      );
+    }
 
     let primaryV4AddressSpec = ctx.input.assignPublicIp
       ? {
@@ -197,7 +208,7 @@ export let createInstance = SlateTool.create(spec, {
       output: {
         operationId: result.id,
         instanceId: result.metadata?.instanceId,
-        done: result.done || false
+        done: result.done
       },
       message: `Instance creation initiated. Operation ID: **${result.id}**.`
     };
@@ -244,7 +255,7 @@ export let controlInstance = SlateTool.create(spec, {
     return {
       output: {
         operationId: result.id,
-        done: result.done || false
+        done: result.done
       },
       message: `Instance **${ctx.input.instanceId}** ${ctx.input.action} operation initiated. Operation ID: **${result.id}**.`
     };
@@ -285,6 +296,12 @@ export let updateInstance = SlateTool.create(spec, {
     if (ctx.input.labels !== undefined) updateFields.push('labels');
     if (ctx.input.metadata !== undefined) updateFields.push('metadata');
 
+    if (updateFields.length === 0) {
+      throw createApiServiceError(
+        'Provide at least one field to update: name, description, labels, or metadata.'
+      );
+    }
+
     let result = await compute.updateInstance(ctx.auth, ctx.input.instanceId, {
       name: ctx.input.name,
       description: ctx.input.description,
@@ -296,7 +313,7 @@ export let updateInstance = SlateTool.create(spec, {
     return {
       output: {
         operationId: result.id,
-        done: result.done || false
+        done: result.done
       },
       message: `Instance **${ctx.input.instanceId}** update initiated. Updated fields: ${updateFields.join(', ')}.`
     };

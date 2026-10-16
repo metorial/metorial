@@ -1,7 +1,99 @@
-import { createAxios } from 'slates';
-import type { Check, Downtime, MetricsEntry, Node, Recipient, StatusPage } from './types';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import type {
+  Check,
+  Downtime,
+  ListedRecipient,
+  MetricsEntry,
+  Node,
+  Recipient,
+  StatusPage
+} from './types';
 
-let mapCheck = (raw: any): Check => ({
+type RawCheck = {
+  token: string;
+  url: string;
+  type?: string;
+  alias?: string | null;
+  last_status?: number | null;
+  uptime: number;
+  down: boolean;
+  down_since?: string | null;
+  up_since?: string | null;
+  error?: string | null;
+  period: number;
+  apdex_t: number;
+  string_match?: string | null;
+  enabled: boolean;
+  published: boolean;
+  disabled_locations?: string[] | null;
+  recipients?: string[] | null;
+  last_check_at?: string | null;
+  next_check_at?: string | null;
+  created_at?: string | null;
+  mute_until?: string | null;
+  favicon_url?: string | null;
+  custom_headers?: Record<string, string> | null;
+  http_verb?: string | null;
+  http_body?: string | null;
+  ssl?: {
+    tested_at?: string;
+    expires_at?: string;
+    valid?: boolean;
+    error?: string | null;
+    cert?: Record<string, unknown>;
+  } | null;
+  domain?: Record<string, unknown> | null;
+  metrics?: unknown;
+  results?: unknown;
+  [key: string]: unknown;
+};
+type RawDowntime = {
+  id: string;
+  error: string;
+  started_at: string;
+  ended_at?: string | null;
+  duration?: number | null;
+  partial?: boolean | null;
+  details_url?: string;
+  results?: unknown;
+  [key: string]: unknown;
+};
+type RawRecipient = {
+  id: string;
+  type: string;
+  name?: string | null;
+  value?: string;
+  selected?: boolean;
+  immutable?: boolean;
+  [key: string]: unknown;
+};
+type RawStatusPage = {
+  token: string;
+  url?: string | null;
+  name?: string | null;
+  description?: string | null;
+  visibility?: string | null;
+  checks?: string[] | null;
+  access_key?: string | null;
+  [key: string]: unknown;
+};
+type RawNode = {
+  ip: string;
+  ip6: string;
+  city: string;
+  country: string;
+  country_code: string;
+  lat: number;
+  lng: number;
+  [key: string]: unknown;
+};
+
+let mapCheck = (raw: RawCheck): Check => ({
   token: raw.token,
   url: raw.url,
   alias: raw.alias ?? null,
@@ -31,38 +123,51 @@ let mapCheck = (raw: any): Check => ({
         testedAt: raw.ssl.tested_at ?? undefined,
         expiresAt: raw.ssl.expires_at ?? undefined,
         valid: raw.ssl.valid ?? undefined,
-        error: raw.ssl.error ?? null
+        error: raw.ssl.error ?? null,
+        cert: raw.ssl.cert
       }
-    : null
+    : null,
+  type: raw.type,
+  domain: raw.domain,
+  metrics: raw.metrics,
+  results: raw.results,
+  raw
 });
 
-let mapDowntime = (raw: any): Downtime => ({
-  downtimeId: String(raw.id),
+let mapDowntime = (raw: RawDowntime): Downtime => ({
+  downtimeId: raw.id,
   error: raw.error,
   startedAt: raw.started_at,
   endedAt: raw.ended_at ?? null,
   duration: raw.duration ?? null,
-  partial: raw.partial ?? null
+  partial: raw.partial ?? null,
+  detailsUrl: raw.details_url,
+  results: raw.results,
+  raw
 });
 
-let mapRecipient = (raw: any): Recipient => ({
+let mapRecipient = (raw: RawRecipient): ListedRecipient => ({
   recipientId: raw.id,
   type: raw.type,
   name: raw.name ?? null,
   value: raw.value,
-  selected: raw.selected
+  selected: raw.selected,
+  immutable: raw.immutable,
+  raw
 });
 
-let mapStatusPage = (raw: any): StatusPage => ({
+let mapStatusPage = (raw: RawStatusPage): StatusPage => ({
   statusPageToken: raw.token,
   url: raw.url ?? null,
   name: raw.name ?? null,
   description: raw.description ?? null,
   visibility: raw.visibility ?? null,
-  checks: raw.checks ?? null
+  checks: raw.checks ?? null,
+  accessKey: raw.access_key,
+  raw
 });
 
-let mapNode = (code: string, raw: any): Node => ({
+let mapNode = (code: string, raw: RawNode): Node => ({
   nodeCode: code,
   ip: raw.ip,
   ip6: raw.ip6,
@@ -70,33 +175,63 @@ let mapNode = (code: string, raw: any): Node => ({
   country: raw.country,
   countryCode: raw.country_code,
   lat: raw.lat,
-  lng: raw.lng
+  lng: raw.lng,
+  raw
 });
 
-let mapMetricsEntry = (raw: any): MetricsEntry => ({
-  apdex: raw.apdex,
-  requests: {
-    samples: raw.requests?.samples ?? 0,
-    failures: raw.requests?.failures ?? 0,
-    satisfied: raw.requests?.satisfied ?? 0,
-    tolerated: raw.requests?.tolerated ?? 0,
-    byResponseTime: raw.requests?.by_response_time ?? null
-  },
-  timings: {
-    redirect: raw.timings?.redirect ?? null,
-    namelookup: raw.timings?.namelookup ?? null,
-    connection: raw.timings?.connection ?? null,
-    handshake: raw.timings?.handshake ?? null,
-    response: raw.timings?.response ?? null,
-    total: raw.timings?.total ?? null
+let mapMetricsEntry = (raw: Record<string, unknown>): MetricsEntry => {
+  let requests = raw.requests;
+  let timings = raw.timings;
+  if (
+    typeof raw.apdex !== 'number' ||
+    !isApiErrorRecord(requests) ||
+    !isApiErrorRecord(timings) ||
+    ['samples', 'failures', 'satisfied', 'tolerated'].some(
+      key => typeof requests[key] !== 'number'
+    )
+  ) {
+    throw createApiServiceError(
+      'Updown.io returned an incomplete performance metrics entry.',
+      {
+        reason: 'invalid_metrics_response'
+      }
+    );
   }
-});
+  return {
+    apdex: raw.apdex,
+    requests: {
+      samples: requests.samples as number,
+      failures: requests.failures as number,
+      satisfied: requests.satisfied as number,
+      tolerated: requests.tolerated as number,
+      byResponseTime:
+        (requests.by_response_time as Record<string, number> | null | undefined) ?? null
+    },
+    timings: {
+      redirect: (timings.redirect as number | null | undefined) ?? null,
+      namelookup: (timings.namelookup as number | null | undefined) ?? null,
+      connection: (timings.connection as number | null | undefined) ?? null,
+      handshake: (timings.handshake as number | null | undefined) ?? null,
+      response: (timings.response as number | null | undefined) ?? null,
+      total: (timings.total as number | null | undefined) ?? null
+    },
+    group: typeof raw.group === 'string' ? raw.group : undefined,
+    raw
+  };
+};
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Updown.io',
+          reason: 'updown_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          nestedKeys: ['errors', 'error']
+        }),
       baseURL: 'https://updown.io/api',
       headers: {
         'X-API-KEY': config.token
@@ -108,20 +243,25 @@ export class Client {
 
   async listChecks(): Promise<Check[]> {
     let response = await this.axios.get('/checks');
-    return (response.data as any[]).map(mapCheck);
+    return (response.data as RawCheck[]).map(mapCheck);
   }
 
-  async getCheck(token: string, includeMetrics?: boolean): Promise<Check> {
-    let params: Record<string, any> = {};
+  async getCheck(
+    token: string,
+    includeMetrics?: boolean,
+    includeResults?: boolean
+  ): Promise<Check> {
+    let params: Record<string, unknown> = {};
     if (includeMetrics) {
       params.metrics = true;
     }
-    let response = await this.axios.get(`/checks/${token}`, { params });
+    if (includeResults !== undefined) params.results = includeResults;
+    let response = await this.axios.get<RawCheck>(`/checks/${token}`, { params });
     return mapCheck(response.data);
   }
 
   async createCheck(data: {
-    url: string;
+    url?: string;
     type?: string;
     period?: number;
     apdexT?: number;
@@ -136,7 +276,7 @@ export class Client {
     customHeaders?: Record<string, string>;
     muteUntil?: string;
   }): Promise<Check> {
-    let body: Record<string, any> = { url: data.url };
+    let body: Record<string, unknown> = { url: data.url };
     if (data.type !== undefined) body.type = data.type;
     if (data.period !== undefined) body.period = data.period;
     if (data.apdexT !== undefined) body.apdex_t = data.apdexT;
@@ -150,7 +290,7 @@ export class Client {
     if (data.recipients !== undefined) body.recipients = data.recipients;
     if (data.customHeaders !== undefined) body.custom_headers = data.customHeaders;
     if (data.muteUntil !== undefined) body.mute_until = data.muteUntil;
-    let response = await this.axios.post('/checks', body);
+    let response = await this.axios.post<RawCheck>('/checks', body);
     return mapCheck(response.data);
   }
 
@@ -173,7 +313,7 @@ export class Client {
       muteUntil?: string;
     }
   ): Promise<Check> {
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (data.url !== undefined) body.url = data.url;
     if (data.type !== undefined) body.type = data.type;
     if (data.period !== undefined) body.period = data.period;
@@ -188,13 +328,15 @@ export class Client {
     if (data.recipients !== undefined) body.recipients = data.recipients;
     if (data.customHeaders !== undefined) body.custom_headers = data.customHeaders;
     if (data.muteUntil !== undefined) body.mute_until = data.muteUntil;
-    let response = await this.axios.put(`/checks/${token}`, body);
+    let response = await this.axios.put<RawCheck>(`/checks/${token}`, body);
     return mapCheck(response.data);
   }
 
-  async deleteCheck(token: string): Promise<{ deleted: boolean }> {
+  async deleteCheck(
+    token: string
+  ): Promise<{ deleted: boolean; raw: Record<string, unknown> }> {
     let response = await this.axios.delete(`/checks/${token}`);
-    return response.data;
+    return { ...response.data, raw: response.data };
   }
 
   // ---- Downtimes ----
@@ -206,11 +348,11 @@ export class Client {
       results?: boolean;
     }
   ): Promise<Downtime[]> {
-    let params: Record<string, any> = {};
+    let params: Record<string, unknown> = {};
     if (options?.page !== undefined) params.page = options.page;
     if (options?.results !== undefined) params.results = options.results;
     let response = await this.axios.get(`/checks/${token}/downtimes`, { params });
-    return (response.data as any[]).map(mapDowntime);
+    return (response.data as RawDowntime[]).map(mapDowntime);
   }
 
   // ---- Metrics ----
@@ -222,32 +364,43 @@ export class Client {
       to?: string;
       group?: string;
     }
-  ): Promise<{ uptime: number; metrics: Record<string, MetricsEntry> }> {
-    let params: Record<string, any> = {};
+  ): Promise<{
+    uptime?: number;
+    metrics: Record<string, MetricsEntry>;
+    summary?: MetricsEntry;
+    raw: Record<string, unknown>;
+  }> {
+    let params: Record<string, unknown> = {};
     if (options?.from !== undefined) params.from = options.from;
     if (options?.to !== undefined) params.to = options.to;
     if (options?.group !== undefined) params.group = options.group;
-    let response = await this.axios.get(`/checks/${token}/metrics`, { params });
-    let raw = response.data as any;
-
-    // The metrics API returns { uptime: number, ...metricEntries } when grouped by time
-    // or { uptime: number, ...hostEntries } when grouped by host
-    let uptime = raw.uptime ?? 0;
-
+    let response = await this.axios.get<Record<string, unknown>>(`/checks/${token}/metrics`, {
+      params
+    });
+    let raw = response.data;
     let metrics: Record<string, MetricsEntry> = {};
-    for (let key of Object.keys(raw)) {
-      if (key === 'uptime') continue;
-      metrics[key] = mapMetricsEntry(raw[key]);
+    let summary: MetricsEntry | undefined;
+    if (raw.apdex !== undefined || raw.requests !== undefined || raw.timings !== undefined) {
+      summary = mapMetricsEntry(raw);
+    } else {
+      for (let [key, value] of Object.entries(raw)) {
+        if (key === 'uptime' || key === 'group') continue;
+        if (isApiErrorRecord(value)) metrics[key] = mapMetricsEntry(value);
+      }
     }
-
-    return { uptime, metrics };
+    if (raw.uptime !== undefined && typeof raw.uptime !== 'number') {
+      throw createApiServiceError('Updown.io returned a non-numeric uptime value.', {
+        reason: 'invalid_metrics_response'
+      });
+    }
+    return { uptime: raw.uptime, metrics, summary, raw };
   }
 
   // ---- Recipients ----
 
-  async listRecipients(): Promise<Recipient[]> {
+  async listRecipients(): Promise<ListedRecipient[]> {
     let response = await this.axios.get('/recipients');
-    return (response.data as any[]).map(mapRecipient);
+    return (response.data as RawRecipient[]).map(mapRecipient);
   }
 
   async createRecipient(data: {
@@ -256,20 +409,25 @@ export class Client {
     name?: string;
     selected?: boolean;
   }): Promise<Recipient> {
-    let response = await this.axios.post('/recipients', data);
-    return mapRecipient(response.data);
+    let response = await this.axios.post<RawRecipient & { value: string }>(
+      '/recipients',
+      data
+    );
+    return { ...mapRecipient(response.data), value: response.data.value };
   }
 
-  async deleteRecipient(recipientId: string): Promise<{ deleted: boolean }> {
+  async deleteRecipient(
+    recipientId: string
+  ): Promise<{ deleted: boolean; raw: Record<string, unknown> }> {
     let response = await this.axios.delete(`/recipients/${recipientId}`);
-    return response.data;
+    return { ...response.data, raw: response.data };
   }
 
   // ---- Status Pages ----
 
   async listStatusPages(): Promise<StatusPage[]> {
     let response = await this.axios.get('/status_pages');
-    return (response.data as any[]).map(mapStatusPage);
+    return (response.data as RawStatusPage[]).map(mapStatusPage);
   }
 
   async createStatusPage(data: {
@@ -279,12 +437,12 @@ export class Client {
     checks: string[];
     accessKey?: string;
   }): Promise<StatusPage> {
-    let body: Record<string, any> = { checks: data.checks };
+    let body: Record<string, unknown> = { checks: data.checks };
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
     if (data.visibility !== undefined) body.visibility = data.visibility;
     if (data.accessKey !== undefined) body.access_key = data.accessKey;
-    let response = await this.axios.post('/status_pages', body);
+    let response = await this.axios.post<RawStatusPage>('/status_pages', body);
     return mapStatusPage(response.data);
   }
 
@@ -298,18 +456,28 @@ export class Client {
       accessKey?: string;
     }
   ): Promise<StatusPage> {
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
     if (data.visibility !== undefined) body.visibility = data.visibility;
     if (data.checks !== undefined) body.checks = data.checks;
     if (data.accessKey !== undefined) body.access_key = data.accessKey;
-    let response = await this.axios.put(`/status_pages/${token}`, body);
+    let response = await this.axios.put<RawStatusPage>(`/status_pages/${token}`, body);
     return mapStatusPage(response.data);
   }
 
-  async deleteStatusPage(token: string): Promise<{ deleted: boolean }> {
+  async deleteStatusPage(
+    token: string
+  ): Promise<{ deleted: boolean; raw: Record<string, unknown> }> {
     let response = await this.axios.delete(`/status_pages/${token}`);
+    return { ...response.data, raw: response.data };
+  }
+
+  async listNodeIps(family?: 'all' | 'ipv4' | 'ipv6'): Promise<string[]> {
+    let endpoint = family === 'ipv4' || family === 'ipv6' ? family : 'ips';
+    let response = await this.axios.get<string[]>(`/nodes/${endpoint}`, {
+      params: { format: 'json' }
+    });
     return response.data;
   }
 
@@ -317,7 +485,7 @@ export class Client {
 
   async listNodes(): Promise<Node[]> {
     let response = await this.axios.get('/nodes');
-    let raw = response.data as Record<string, any>;
+    let raw = response.data as Record<string, RawNode>;
     return Object.entries(raw).map(([code, data]) => mapNode(code, data));
   }
 }

@@ -7,7 +7,7 @@ export let removeUserFromProduct = SlateTool.create(spec, {
   name: 'Remove User from Product',
   key: 'remove_user_from_product',
   description: `Revoke a user's access to a specific product in MemberVault. The user's account remains intact — only their access to the specified product is removed.`,
-  instructions: ['Use the "List Products" tool first to find the correct product ID.'],
+  instructions: ['Use get_courses first to find the correct product ID.'],
   tags: {
     destructive: true
   }
@@ -20,7 +20,8 @@ export let removeUserFromProduct = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation completed successfully')
+      success: z.boolean().describe('Whether the operation completed successfully'),
+      raw: z.unknown().optional().describe('Original response from MemberVault')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,13 +30,13 @@ export let removeUserFromProduct = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
-    await client.removeUserFromProduct({
+    let raw = await client.removeUserFromProduct({
       email: ctx.input.email,
       productId: ctx.input.productId
     });
 
     return {
-      output: { success: true },
+      output: { success: true, raw },
       message: `Removed user **${ctx.input.email}** from product **${ctx.input.productId}**.`
     };
   })

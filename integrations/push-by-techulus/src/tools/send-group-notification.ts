@@ -28,6 +28,10 @@ export let sendGroupNotification = SlateTool.create(spec, {
 
 Supports the same customization options as regular notifications: sound, channel, link, image, and time-sensitive delivery.`,
   constraints: ['Only works with an account API key, not a team API key.'],
+  instructions: [
+    'Copy the device group ID from your Push account; the API does not document a group-list endpoint.',
+    'Inspect responses for individual device failures even when success is true.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -54,7 +58,18 @@ Supports the same customization options as regular notifications: sound, channel
   .output(
     z.object({
       success: z.boolean().describe('Whether the notification was sent successfully'),
-      message: z.string().optional().describe('Response message from the API')
+      message: z.string().optional().describe('Response message from the API'),
+      responses: z
+        .array(
+          z
+            .object({
+              success: z.boolean(),
+              message: z.string().optional()
+            })
+            .passthrough()
+        )
+        .optional()
+        .describe('Per-device delivery results returned by the API')
     })
   )
   .handleInvocation(async ctx => {
@@ -70,14 +85,15 @@ Supports the same customization options as regular notifications: sound, channel
       timeSensitive: ctx.input.timeSensitive
     });
 
+    let failedDevices = result.responses?.filter(response => !response.success).length ?? 0;
+
     return {
       output: {
         success: result.success,
-        message: result.message
+        message: result.message,
+        responses: result.responses
       },
-      message: result.success
-        ? `Notification **"${ctx.input.title}"** sent to device group \`${ctx.input.groupId}\`.`
-        : `Failed to send group notification: ${result.message ?? result.error ?? 'Unknown error'}`
+      message: `Notification **"${ctx.input.title}"** processed for device group \`${ctx.input.groupId}\`.${failedDevices ? ` ${failedDevices} device result(s) reported a failure; inspect responses.` : ''}`
     };
   })
   .build();

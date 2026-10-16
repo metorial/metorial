@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'echtpost',
   name: 'Echtpost',
   description:
-    'Send real physical postcards programmatically through the German EchtPost platform. Manage contacts, templates, and schedule postcard deliveries.',
+    'Send physical postcards from saved EchtPost templates. Manage contacts and groups, check balance and prices, and inspect or cancel scheduled postcards.',
   metadata: {},
   config,
   auth
