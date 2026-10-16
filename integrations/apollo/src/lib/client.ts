@@ -176,6 +176,7 @@ export class Client {
         '/mixed_people/api_search',
         compact({
           person_titles: filters.personTitles,
+          contact_email_status: filters.contactEmailStatus,
           person_locations: filters.personLocations,
           person_seniorities: filters.personSeniorities,
           q_organization_domains_list: filters.organizationDomains,

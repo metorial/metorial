@@ -179,6 +179,7 @@ export interface PaginatedResponse<_T> {
 }
 
 export interface PeopleSearchFilters {
+  contactEmailStatus?: ('verified' | 'unverified' | 'likely to engage' | 'unavailable')[];
   personTitles?: string[];
   personLocations?: string[];
   personSeniorities?: string[];

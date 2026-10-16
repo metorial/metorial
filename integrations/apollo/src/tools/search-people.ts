@@ -23,6 +23,12 @@ export let searchPeople = SlateTool.create(spec, {
   .input(
     z.object({
       keywords: z.string().optional().describe('Keywords to search for across person records'),
+      contactEmailStatus: z
+        .array(z.enum(['verified', 'unverified', 'likely to engage', 'unavailable']))
+        .optional()
+        .describe(
+          'Filter by email status. Use ["verified"] to find people with verified email addresses. Multiple statuses expand the search; email addresses still require Enrich Person.'
+        ),
       jobTitles: z
         .array(z.string())
         .optional()
@@ -86,6 +92,7 @@ export let searchPeople = SlateTool.create(spec, {
 
     let result = await client.searchPeople({
       qKeywords: ctx.input.keywords,
+      contactEmailStatus: ctx.input.contactEmailStatus,
       personTitles: ctx.input.jobTitles,
       personLocations: ctx.input.locations,
       personSeniorities: ctx.input.seniorities,
